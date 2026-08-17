@@ -1,0 +1,68 @@
+/nologo
+/target:library
+/out:bin\Release\SR_UCH.dll
+/nostdlib+
+# 注意：以下游戏 / BepInEx 引用路径需按本机实际安装位置修改。
+# 参考默认路径：
+#   D:\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\
+#   D:\Steam\steamapps\common\Ultimate Chicken Horse\BepInEx\core\
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\mscorlib.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\netstandard.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\System.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\System.Core.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\System.Xml.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\UnityEngine.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\UnityEngine.CoreModule.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\UnityEngine.UNETModule.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\UnityEngine.IMGUIModule.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\UnityEngine.InputLegacyModule.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\UnityEngine.Physics2DModule.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\UnityEngine.TextRenderingModule.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\UnityEngine.UI.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\UnityEngine.UIModule.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\UnityEngine.AudioModule.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\InControl.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\com.unity.multiplayer-hlapi.Runtime.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\Assembly-CSharp.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed\AK.Wwise.Unity.API.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\BepInEx\core\BepInEx.dll"
+/r:"D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\BepInEx\core\0Harmony.dll"
+MainPlugin.cs
+SR_UCH\Loc.cs
+SR_UCH\AttemptCounter.cs
+SR_UCH\BuilderEnhancements.cs
+SR_UCH\BuildUnlimiter.cs
+SR_UCH\CharacterMute.cs
+SR_UCH\ChatLog.cs
+SR_UCH\DestroyBlocks.cs
+SR_UCH\Experiments.cs
+SR_UCH\ExRef.cs
+SR_UCH\FovAdjust.cs
+SR_UCH\ModManager.Core.cs
+SR_UCH\ModManager.Input.cs
+SR_UCH\ModManager.KeyBinds.cs
+SR_UCH\ModManager.Localization.cs
+SR_UCH\ModManager.Map.cs
+SR_UCH\ModManager.MonoBehaviour.cs
+SR_UCH\ModManager.Pages.cs
+SR_UCH\ModManager.Plugins.cs
+SR_UCH\ModManager.Progression.cs
+SR_UCH\ModManager.Reload.cs
+SR_UCH\ModManager.Settings.cs
+SR_UCH\ModManager.Styles.cs
+SR_UCH\ModManager.Window.cs
+SR_UCH\ModMC.Core.cs
+SR_UCH\ModMC.Lobby.cs
+SR_UCH\ModMC.Menu.cs
+SR_UCH\MorePlayers.CharSelect.cs
+SR_UCH\MorePlayers.Core.cs
+SR_UCH\MorePlayers.Handicap.cs
+SR_UCH\MorePlayers.LobbyCode.cs
+SR_UCH\MorePlayers.Menu.cs
+SR_UCH\MorePlayers.RoomSize.cs
+SR_UCH\NoSpawnImmunity.cs
+SR_UCH\PlayerTracker.cs
+SR_UCH\RespawnDelay.cs
+SR_UCH\SpawnPoints.cs
+SR_UCH\Suicide.cs
+SR_UCH\SyncedCycles.cs
