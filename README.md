@@ -1,6 +1,6 @@
 # SR_UCH
 
-> Ultimate Chicken Horse 模组整合增强包（免费开源）
+> Ultimate Chicken Horse 模组整合增强包
 > A quality-of-life mod suite for **Ultimate Chicken Horse** (BepInEx / Harmony)
 
 [![BepInEx](https://img.shields.io/badge/BepInEx-5.4-blue)](https://github.com/BepInEx/BepInEx)
