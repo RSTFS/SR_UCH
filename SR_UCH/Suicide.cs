@@ -1,4 +1,4 @@
-using BepInEx.Configuration;
+﻿using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
 
@@ -24,10 +24,10 @@ namespace SR_UCH.Tweaks {
                 _keybind.Value = KeyCode.Alpha0;
             }
             //默认 Shift+0：注册时若用户从未设置过组合修饰，则默认 Shift
-            ModManager.RegisterShiftKey("快捷自杀", _keybind, "hold");
-            if (ModManager.KeyComboMod(_keybind) == ModManager.ComboMod.None)
+            SR.RegisterShiftKey("快捷自杀", _keybind, "hold");
+            if (SR.KeyComboMod(_keybind) == SR.ComboMod.None)
             {
-                ModManager.SetDefaultCombo(_keybind, ModManager.ComboMod.Shift);
+                SR.SetDefaultCombo(_keybind, SR.ComboMod.Shift);
             }
             Harmony.CreateAndPatchAll(typeof(TreehouseSuicide));
         }
@@ -35,13 +35,13 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(Character), "FixedUpdate")]
         [HarmonyPostfix]
         private static void CharacterPatch(Character __instance) {
-            if (!ModManager.AllEnabled) return;
+            if (!SR.AllEnabled) return;
             if (!Enabled) return;
-            if (ModManager.UiOpen && ModManager.BlockInput) return; //UI open + block on: don't steal input
+            if (SR.UiOpen && SR.BlockInput) return; //UI open + block on: don't steal input
             //only ever kill the local player, never teammates
             if (!__instance.hasAuthority) return;
             //组合键判定：修饰键 + 主键（修饰键在键位捕捉时设置，默认 Shift）
-            if (ModManager.ComboKeyDown(_keybind) && !__instance.Frozen) {
+            if (SR.ComboKeyDown(_keybind) && !__instance.Frozen) {
                 //works both in the treehouse lobby and in-game (instantly skips the suicide hold bar)
                 __instance.KillCharacter("Suicide", false, __instance.networkNumber);
             }

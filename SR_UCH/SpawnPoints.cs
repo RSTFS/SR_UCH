@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using BepInEx.Configuration;
@@ -29,9 +29,9 @@ namespace SR_UCH.Tweaks {
             _setKey = plugin.Config.Bind("Respawn", "Set Spawn Key", KeyCode.O, "在当前位置设置重生点（组合键：点按钮后在按住 Shift/Ctrl/Alt 的同时按主键设置）");
             _respawnKey = plugin.Config.Bind("Respawn", "Respawn Key", KeyCode.P, "重生（传送到最近的自定义重生点，无则游戏默认；支持组合键）");
             _resetKey = plugin.Config.Bind("Respawn", "Reset Spawn Keys", KeyCode.K, "恢复重生点（删除所有自定义重生点，保留游戏默认；支持组合键）");
-            ModManager.RegisterKey("重生点-设置", _setKey, "press");
-            ModManager.RegisterKey("重生点-重生", _respawnKey, "press");
-            ModManager.RegisterKey("重生点-恢复", _resetKey, "press");
+            SR.RegisterKey("重生点-设置", _setKey, "press");
+            SR.RegisterKey("重生点-重生", _respawnKey, "press");
+            SR.RegisterKey("重生点-恢复", _resetKey, "press");
             SceneManager.activeSceneChanged += (a, b) => { DefaultPoint = null; };
             Harmony.CreateAndPatchAll(typeof(SpawnPoints));
         }
@@ -39,19 +39,55 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(GameState), "Update")]
         [HarmonyPrefix]
         static void SpawnKeys() {
-            if (!ModManager.AllEnabled) return;
+            if (!SR.AllEnabled) return;
             if (!Enabled) return;
-            if (ModManager.UiOpen && ModManager.BlockInput) return;
-            if (ModManager.MapOpen) return; //地图打开时 O/P/K 由地图页面处理，避免重复设置
+            if (SR.UiOpen && SR.BlockInput) return;
+            if (SR.MapOpen) return; //地图打开时 O/P/K 由地图页面处理，避免重复设置
             //重生点功能只在自由模式可用（EX"无视模式限制"开启后任何模式都可用）
-            if (!ModManager.IgnoreModeLimit && GameSettings.GetInstance().GameMode != GameState.GameMode.FREEPLAY) return;
-            if (ModManager.ComboKeyDown(_setKey)) SetPoint(GetLocalPosition());
-            if (ModManager.ComboKeyDown(_respawnKey)) Respawn();
-            if (ModManager.ComboKeyDown(_resetKey)) ResetPoints();
+            if (!SR.IgnoreModeLimit && GameSettings.GetInstance().GameMode != GameState.GameMode.FREEPLAY) return;
+            if (SR.ComboKeyDown(_setKey)) SetPoint(GetLocalPosition());
+            if (SR.ComboKeyDown(_respawnKey)) Respawn();
+            if (SR.ComboKeyDown(_resetKey)) ResetPoints();
         }
 
         public static Vector2 GetLocalPosition() {
-            //树屋：优先“选中的角色”（选中后光标会隐藏，位置以角色为准）；对局：Character
+            //地图界面：优先光标位置（本地玩家的光标；地图上设点/传送以光标为准）
+            if (SR.MapOpen) {
+                try {
+                    foreach (Player p in PlayerManager.GetInstance()) {
+                        if (p == null || p.AssociatedLobbyPlayer == null) continue;
+                        if (!p.AssociatedLobbyPlayer.IsLocalPlayer) continue;
+                        if (p.AssociatedLobbyPlayer.CursorInstance != null)
+                            return (Vector2)p.AssociatedLobbyPlayer.CursorInstance.transform.position;
+                    }
+                } catch { }
+                try {
+                    LobbyManager lm = LobbyManager.instance;
+                    if (lm != null && lm.PlayerTracker != null) {
+                        for (int i = 0; i < lm.PlayerTracker.NumPlayers; i++) {
+                            LobbyPlayer lp = lm.PlayerTracker.GetLobbyPlayer(lm.PlayerTracker.GetPlayerInfoByIndex(i).NetworkNumber);
+                            if (lp == null || !lp.IsLocalPlayer) continue;
+                            if (lp.CursorInstance != null) return (Vector2)lp.CursorInstance.transform.position;
+                        }
+                    }
+                } catch { }
+            }
+            //不在地图界面：优先本地玩家的实际角色（Player.PlayerCharacter / GamePlayer.CharacterInstance）；
+            //LobbyPlayer.CharacterInstance 对局中可能为 null，直接用它会落到光标位置 → 点不对
+            try {
+                foreach (Player p in PlayerManager.GetInstance()) {
+                    if (p == null || p.AssociatedLobbyPlayer == null) continue;
+                    if (!p.AssociatedLobbyPlayer.IsLocalPlayer) continue;
+                    Character ch = p.PlayerCharacter;
+                    if (ch != null) return (Vector2)ch.transform.position;
+                    if (p.AssociatedGamePlayer != null && p.AssociatedGamePlayer.CharacterInstance != null)
+                        return (Vector2)p.AssociatedGamePlayer.CharacterInstance.transform.position;
+                    if (p.AssociatedLobbyPlayer.CursorInstance != null)
+                        return (Vector2)p.AssociatedLobbyPlayer.CursorInstance.transform.position;
+                    return Vector2.zero;
+                }
+            } catch { }
+            //树屋/大厅：优先"选中的角色"（选中后光标会隐藏，位置以角色为准）
             try {
                 LobbyManager lm = LobbyManager.instance;
                 if (lm != null && lm.PlayerTracker != null) {
@@ -134,6 +170,21 @@ namespace SR_UCH.Tweaks {
 
         public static void ResetPoints() {
             CustomPoints.Clear();
+        }
+
+        //删除鼠标位置附近的自定义重生点（最接近的）；游戏默认起点不在列表里，天然不可删。
+        public static bool RemoveNearest(Vector2 world, float maxDist) {
+            int best = -1;
+            float bestD = maxDist * maxDist;
+            for (int i = 0; i < CustomPoints.Count; i++) {
+                float d = ((Vector2)CustomPoints[i] - world).sqrMagnitude;
+                if (d <= bestD) { bestD = d; best = i; }
+            }
+            if (best >= 0) {
+                CustomPoints.RemoveAt(best);
+                return true;
+            }
+            return false;
         }
 
         //read (and cache) the game's default spawn position for the current level

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using BepInEx.Configuration;
@@ -101,19 +101,29 @@ namespace SR_UCH.Tweaks {
         public static bool InvincibleOn { get { return Get<bool>("InvincibleOn"); } }
         public static bool FlyOn { get { return Get<bool>("FlyOn"); } }
         public static bool CrouchMoveOn { get { return Get<bool>("CrouchMoveOn"); } }
-        public static bool AntiKickOn { get { return Get<bool>("AntiKickOn"); } }
 
         public static ConfigEntry<PointBlock.pointBlockType> ScoreTypeEntry { get { return Get<ConfigEntry<PointBlock.pointBlockType>>("ScoreTypeEntry"); } }
         public static ConfigEntry<int> CoinAmountEntry { get { return Get<ConfigEntry<int>>("CoinAmountEntry"); } }
         public static ConfigEntry<int> LivesAmountEntry { get { return Get<ConfigEntry<int>>("LivesAmountEntry"); } }
         public static ConfigEntry<GameState.LevelName> TargetLevelEntry { get { return Get<ConfigEntry<GameState.LevelName>>("TargetLevelEntry"); } }
+        public static ConfigEntry<KeyCode> InvincibleKeyEntry { get { return Get<ConfigEntry<KeyCode>>("InvincibleKeyEntry"); } }
+        public static ConfigEntry<KeyCode> FlyKeyEntry { get { return Get<ConfigEntry<KeyCode>>("FlyKeyEntry"); } }
+        public static ConfigEntry<KeyCode> CrouchMoveKeyEntry { get { return Get<ConfigEntry<KeyCode>>("CrouchMoveKeyEntry"); } }
+        public static ConfigEntry<KeyCode> KickKeyEntry { get { return Get<ConfigEntry<KeyCode>>("KickKeyEntry"); } }
+        public static ConfigEntry<KeyCode> ScoreKeyEntry { get { return Get<ConfigEntry<KeyCode>>("ScoreKeyEntry"); } }
+        public static ConfigEntry<KeyCode> CoinKeyEntry { get { return Get<ConfigEntry<KeyCode>>("CoinKeyEntry"); } }
+        public static ConfigEntry<KeyCode> RespawnKeyEntry { get { return Get<ConfigEntry<KeyCode>>("RespawnKeyEntry"); } }
+        public static ConfigEntry<KeyCode> WinKeyEntry { get { return Get<ConfigEntry<KeyCode>>("WinKeyEntry"); } }
+        public static ConfigEntry<KeyCode> EndRoundKeyEntry { get { return Get<ConfigEntry<KeyCode>>("EndRoundKeyEntry"); } }
+        public static ConfigEntry<KeyCode> LivesKeyEntry { get { return Get<ConfigEntry<KeyCode>>("LivesKeyEntry"); } }
+        public static ConfigEntry<KeyCode> ForceLevelKeyEntry { get { return Get<ConfigEntry<KeyCode>>("ForceLevelKeyEntry"); } }
 
         //--- methods ---
         public static void ToggleInvincible() { Call("ToggleInvincible"); }
         public static void ToggleFly() { Call("ToggleFly"); }
         public static void ToggleCrouchMove() { Call("ToggleCrouchMove"); }
-        public static void ToggleAntiKick() { Call("ToggleAntiKick"); }
         public static void SelectTargetByIndex(int index) { Call("SelectTargetByIndex", index); }
+        public static void EnsureDefaultTarget() { Call("EnsureDefaultTarget"); }
         public static bool IsSelf(int number) { object r = Call("IsSelf", number); return r is bool b && b; }
 
         public static string TargetName() { return (string)Call("TargetName") ?? "（未安装附加功能）"; }
@@ -148,13 +158,11 @@ namespace SR_UCH.Tweaks {
         public static int RowScore(object row) { object v = RowField(row, "score"); return v is int i ? i : 0; }
 
         public static void KickTarget() { Call("KickTarget"); }
-        public static void DisbandMatch() { Call("DisbandMatch"); }
-        public static void NotifyCultivation(string text) { Call("NotifyCultivation", text); }
+        public static void ClearPartyBox() { Call("ClearPartyBox"); }
         public static void AddScore() { Call("AddScore"); }
         public static void AddCoin() { Call("AddCoin"); }
         public static void WinTarget() { Call("WinTarget"); }
         public static void RespawnTarget() { Call("RespawnTarget"); }
-        public static void KillTarget() { Call("KillTarget"); }
         public static void AddLives() { Call("AddLives"); }
         public static void ForceLevel() { Call("ForceLevel"); }
         public static void EndRound() { Call("EndRound"); }

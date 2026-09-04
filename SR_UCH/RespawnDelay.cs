@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
@@ -33,7 +33,15 @@ namespace SR_UCH.Tweaks {
                     yield return null;
                 }
                 _pending.Remove(c);
-                if (c == null || _reset == null) yield break;
+                if (c == null) yield break;
+                GameState.GameMode gm = GameSettings.GetInstance().GameMode;
+                //挑战模式：不触发自动重试（自动重试归「快速重试」分区管理）。
+                //重生延迟在挑战模式只用于延迟等待（不影响其他行为）。
+                if (gm == GameState.GameMode.CHALLENGE) {
+                    yield break;
+                }
+                //自由模式：延迟结束后原地复活
+                if (_reset == null) yield break;
                 FreePlayControl control = LobbyManager.instance != null
                     ? LobbyManager.instance.CurrentGameController as FreePlayControl
                     : null;
@@ -59,16 +67,20 @@ namespace SR_UCH.Tweaks {
             Harmony.CreateAndPatchAll(typeof(RespawnDelay));
         }
 
-        //death hook: schedule the respawn for the local player
+        //death hook: schedule the respawn for the local player (仅自由模式；挑战模式重试逻辑移到「快速重试」分区)
         [HarmonyPatch(typeof(Character), "setupDeath")]
         [HarmonyPostfix]
         static void OnDeath(Character __instance) {
-            if (!ModManager.AllEnabled) return;
+            if (!SR.AllEnabled) return;
             if (!Enabled) return;
-            if (!ModManager.IgnoreModeLimit && GameSettings.GetInstance().GameMode != GameState.GameMode.FREEPLAY) return;
+            GameState.GameMode gm = GameSettings.GetInstance().GameMode;
+            if (!SR.IgnoreModeLimit && gm != GameState.GameMode.FREEPLAY && gm != GameState.GameMode.CHALLENGE) return;
             if (__instance == null || !__instance.hasAuthority) return;
             if (__instance.Success) return;
             if (_pending.Contains(__instance)) return;
+
+            //挑战模式：重生延迟只用于等待，不触发动作（自动重试归「快速重试」分区）
+            if (gm == GameState.GameMode.CHALLENGE) return;
 
             if (!_resetResolved) {
                 _resetResolved = true;
@@ -79,8 +91,8 @@ namespace SR_UCH.Tweaks {
             if (_reset == null) return;
 
             _pending.Add(__instance);
-            DelayComponent comp = UnityEngine.Object.FindObjectOfType<DelayComponent>();
-            if (comp != null) comp.Schedule(__instance);
+            DelayComponent comp2 = UnityEngine.Object.FindObjectOfType<DelayComponent>();
+            if (comp2 != null) comp2.Schedule(__instance);
         }
 
         //suppress the game's default auto-respawn in FreePlayControl.Update so the
@@ -89,7 +101,7 @@ namespace SR_UCH.Tweaks {
         //its master switch) is off the game's normal auto-respawn is restored.
         private static int _suppress = -1;
         internal static int SuppressValue {
-            get { return (ModManager.AllEnabled && Enabled) ? -1 : int.MaxValue; }
+            get { return (SR.AllEnabled && Enabled) ? -1 : int.MaxValue; }
         }
 
         [HarmonyPatch(typeof(FreePlayControl), "Update")]

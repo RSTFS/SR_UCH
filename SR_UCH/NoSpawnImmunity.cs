@@ -1,4 +1,4 @@
-using BepInEx.Configuration;
+﻿using BepInEx.Configuration;
 using HarmonyLib;
 
 namespace SR_UCH.Tweaks {
@@ -29,9 +29,11 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(Character), "StartInvincibleTimer")]
         [HarmonyPrefix]
         static void ImmunityPatch(ref float time) {
-            if (!ModManager.AllEnabled) return;
+            if (!SR.AllEnabled) return;
             if (!Enabled) return;
-            if (ModManager.IgnoreModeLimit || GameSettings.GetInstance().GameMode == GameState.GameMode.FREEPLAY) {
+            //仅自由模式生效
+            GameState.GameMode gm = GameSettings.GetInstance().GameMode;
+            if (SR.IgnoreModeLimit || gm == GameState.GameMode.FREEPLAY) {
                 time = _immunityTime.Value;
             }
         }

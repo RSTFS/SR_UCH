@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using BepInEx.Configuration;
@@ -13,6 +13,7 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<int> _skipFrames;
         private static ConfigEntry<float> _lineWidthStart;
         private static ConfigEntry<float> _lineWidthEnd;
+        private static ConfigEntry<float> _teleportThreshold;
         //runtime toggle (also controlled by the in-game manager)
         public static bool Enabled = true;
 
@@ -40,7 +41,7 @@ namespace SR_UCH.Tweaks {
             private bool _lastEff;
             private void FixedUpdate() {
                 if (!_linesReady()) return;
-                bool eff = Enabled && ModManager.AllEnabled;
+                bool eff = Enabled && SR.AllEnabled;
                 //只在显示状态变化时 SetActive（避免每帧对 8 条线重复调用）
                 if (eff != _lastEff) {
                     _lastEff = eff;
@@ -53,7 +54,21 @@ namespace SR_UCH.Tweaks {
                 framesLeft = _skipFrames.Value;
                 try {
                     foreach (PlayerLine pl in GetPlayers()) {
-                        pl.line.queue.Enqueue(pl.character.transform.position);
+                        Vector3 pos = pl.character.transform.position;
+                        //异常坐标过滤：与上一个记录点距离超过阈值（角色消失/被瞬移，如派对盒
+                        //选道具时坐标跳到远处）→ 清空重来，避免拖出贯穿全图的长线。
+                        //阈值可自定义（Teleport Threshold：超过该距离就删除已绘制线段重新开始）
+                        float threshold = (_teleportThreshold != null) ? Mathf.Max(1f, _teleportThreshold.Value) : 40f;
+                        if (pl.line.queue.Count > 0) {
+                            float d = Vector3.Distance(pl.line.queue.Last(), pos);
+                            if (d > threshold) {
+                                pl.line.queue.Clear();
+                                pl.line.renderer.positionCount = 0;
+                                pl.line.renderer.SetPositions(new Vector3[0]);
+                                continue;
+                            }
+                        }
+                        pl.line.queue.Enqueue(pos);
                         while (pl.line.queue.Count > _trackingLength.Value) pl.line.queue.Dequeue();
                         pl.line.renderer.positionCount = pl.line.queue.Count;
                         pl.line.renderer.SetPositions(pl.line.queue.ToArray());
@@ -91,6 +106,11 @@ namespace SR_UCH.Tweaks {
                 "Line End Width",
                 0.1f,
                 "Width of the tracking line at the end");
+            _teleportThreshold = _mp.Config.Bind(
+                "Player Tracker",
+                "Teleport Threshold",
+                10f,
+                "Distance that clears the drawn trail (if a character teleports farther than this, delete the existing line and start over). Min 1.");
 
             //persistent object that owns the tracker update and the line renderers
             GameObject go = new GameObject("SR_UCHPlayerTracker");

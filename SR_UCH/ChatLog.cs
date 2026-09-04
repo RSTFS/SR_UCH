@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
@@ -57,7 +57,7 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(ChatDisplay), "Update")]
         [HarmonyPrefix]
         static bool HideChatUpdate(ChatDisplay __instance) {
-            if (!ModManager.AllEnabled || !ModManager.HideChatWindow) return true;
+            if (!SR.AllEnabled || !SR.HideChatWindow) return true;
             try {
                 if (__instance.ChatCanvasGroup != null) __instance.ChatCanvasGroup.alpha = 0f;
                 __instance.ChatMode = false;
@@ -72,14 +72,14 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(ChatDisplay), "ReceiveEvent")]
         [HarmonyPrefix]
         static bool HideChatInput(InputEvent e) {
-            if (!ModManager.AllEnabled || !ModManager.HideChatWindow) return true;
+            if (!SR.AllEnabled || !SR.HideChatWindow) return true;
             return false;
         }
 
         [HarmonyPatch(typeof(ChatDisplay), "DisplayNewMessage")]
         [HarmonyPostfix]
         static void OnMessage(object[] __args) {
-            if (!ModManager.AllEnabled) return;
+            if (!SR.AllEnabled) return;
             if (__args == null || __args.Length == 0) return;
             if (!(__args[0] is ChatMessageDetails)) return;
             ChatMessageDetails details = (ChatMessageDetails)__args[0];
@@ -88,17 +88,17 @@ namespace SR_UCH.Tweaks {
             string text = details.Message;
             if (string.IsNullOrEmpty(text)) {
                 if (details.EmoteType == EmoteMeanings.CHAT_Text) return; //空文字消息不记录
-                text = "[" + ModManager.T(EmoteNameZh(details.EmoteType), details.EmoteType.ToString()) + "]";
+                text = "[" + SR.T(EmoteNameZh(details.EmoteType), details.EmoteType.ToString()) + "]";
                 isQuick = true;
             }
             _log.Add(new ChatEntry {
                 time = DateTime.Now.ToString("HH:mm:ss"),
-                sender = string.IsNullOrEmpty(details.UserName) ? ModManager.T("未知", "Unknown") : details.UserName,
+                sender = string.IsNullOrEmpty(details.UserName) ? SR.T("未知", "Unknown") : details.UserName,
                 color = details.UserNameColor,
                 text = text,
                 isQuick = isQuick
             });
-            if (_log.Count > 100) _log.RemoveAt(0);
+            if (_log.Count > 500) _log.RemoveAt(0); //保留最近 500 条（滚动淘汰）
         }
 
         private static string EmoteNameZh(EmoteMeanings emote) {

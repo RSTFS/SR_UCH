@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
 using GameEvent;
@@ -90,6 +90,43 @@ namespace SR_UCH.Tweaks {
             }
         }
 
+        //网络放置监听：PiecePlacedEvent 只在"放置者本地"触发（游戏在收到网络放置消息时
+        //用 PlayerNumber == 本地 networkNumber 过滤，其他端不重放事件），所以房主端
+        //的 _placements 缺房客放的方块 → 追踪模式对房客无效。网络消息（NetMsgTypes.PiecePlaced）
+        //是所有端都收到的，这里直接从消息里取放置者 + 用 PieceID 找方块补记录。
+        public class NetworkPlacementListener : GameEvent.IGameEventListener {
+            public void handleEvent(GameEvent.GameEvent e) {
+                try {
+                    GameEvent.NetworkMessageReceivedEvent nm = e as GameEvent.NetworkMessageReceivedEvent;
+                    if (nm == null || nm.Message == null) return;
+                    if (nm.Message.msgType != NetMsgTypes.PiecePlaced) return;
+                    MsgPiecePlaced msg = nm.ReadMessage as MsgPiecePlaced;
+                    if (msg == null || msg.PieceID == 0) return;
+                    Placeable p = FindPlaceableByID(msg.PieceID);
+                    if (p == null) return;
+                    PlacementInfo info = new PlacementInfo();
+                    info.playerNumber = msg.PlayerNumber;
+                    LobbyManager lm = LobbyManager.instance;
+                    if (lm != null) {
+                        LobbyPlayer lp = lm.GetLobbyPlayer(msg.PlayerNumber);
+                        if (lp != null) {
+                            info.playerName = lp.playerName;
+                            info.color = lp.NetworkPlayerColor;
+                        }
+                    }
+                    if (string.IsNullOrEmpty(info.playerName)) info.playerName = "Player " + info.playerNumber;
+                    _placements[p] = info;
+                } catch { }
+            }
+
+            private static Placeable FindPlaceableByID(int id) {
+                foreach (Placeable p in Placeable.AllPlaceables) {
+                    if (p != null && p.ID == id) return p;
+                }
+                return null;
+            }
+        }
+
         public void Initialize(MainPlugin plugin) {
             _mp = plugin;
             ConfigEntry<bool> enabled = _mp.Config.Bind("Destroy Blocks", "Enabled", false, "方块破坏功能总开关（仅房主可用）");
@@ -105,8 +142,8 @@ namespace SR_UCH.Tweaks {
                 "Delete Key",
                 KeyCode.Backspace,
                 "Keybind for deleting the currently selected block");
-            ModManager.RegisterKey("方块破坏-切换", _toggleKey, "hold");
-            ModManager.RegisterKey("方块破坏-删除", _deleteKey, "press");
+            SR.RegisterKey("方块破坏-切换", _toggleKey, "hold");
+            SR.RegisterKey("方块破坏-删除", _deleteKey, "press");
             _allowClients = _mp.Config.Bind(
                 "EX",
                 "Allow Clients",
@@ -132,6 +169,9 @@ namespace SR_UCH.Tweaks {
             PlacementListener listener = new PlacementListener();
             GameEventManager.ChangeListener<GameEvent.PiecePlacedEvent>(listener, true);
             GameEventManager.ChangeListener<GameEvent.DestroyPieceEvent>(listener, true);
+            //网络放置消息监听：补记"非本端放置"的方块归属（追踪模式按玩家号筛选的基础）
+            NetworkPlacementListener netListener = new NetworkPlacementListener();
+            GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(netListener, true);
             SceneManager.activeSceneChanged += OnSceneChanged;
         }
 
@@ -143,16 +183,18 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(GameControl), "Update")]
         [HarmonyPrefix]
         static void Controls(GameControl __instance) {
-            if (!ModManager.AllEnabled) return;
+            if (!SR.AllEnabled) return;
             if (!Enabled) return;
             if (!Experiments.IsProgressionUnlockedB()) return; //B 组未解锁：自动拦截
-            if (ModManager.UiOpen && ModManager.BlockInput) return; 
-            if (GameSettings.GetInstance().GameMode == GameState.GameMode.CHALLENGE) return;
+            if (SR.UiOpen && SR.BlockInput) return; 
+            //只允许排队（派对）模式和创意模式使用方块破坏
+            GameState.GameMode gm = GameSettings.GetInstance().GameMode;
+            if (gm != GameState.GameMode.PARTY && gm != GameState.GameMode.CREATIVE) return;
             if (!_allowClients.Value) {
                 if (Matchmaker.CurrentMatchmakingLobby is GamesparksMatchmakingLobby gml && !gml.IsOwner) return;
             }
             //扫描一次 + 按模式排序，缓存
-            if (ModManager.ComboKeyDown(_toggleKey)) {
+            if (SR.ComboKeyDown(_toggleKey)) {
                 _altDown = true;
                 RebuildList();
                 if (Blocks.Count <= 0) return;
@@ -164,7 +206,7 @@ namespace SR_UCH.Tweaks {
                 }
                 _selected = Blocks[_index];
             }
-            if (ModManager.ComboKeyHeld(_toggleKey)) 
+            if (SR.ComboKeyHeld(_toggleKey)) 
             {
  
                 if (Blocks.Count <= 0) return;
@@ -175,7 +217,7 @@ namespace SR_UCH.Tweaks {
                     }
                 }
                 if (_index < 0 || _index >= Blocks.Count) _index = Blocks.Count - 1;
-                if (ModManager.ComboKeyDown(_deleteKey)) {
+                if (SR.ComboKeyDown(_deleteKey)) {
                     Placeable target = Blocks[_index];
                     if (target == null || target.MarkedForDestruction) {
                         Blocks.RemoveAt(_index);

@@ -1,18 +1,18 @@
-using System;
+﻿using System;
 using BepInEx.Configuration;
 using UnityEngine;
 
 namespace SR_UCH.Tweaks {
     //自由相机 (BuildingPlus-style custom camera):
-    //  - F4 (自由相机) on: the wheel zooms the camera FOV (1 - 20); turning it off
+    //  - F4 (自由相机) on: the wheel zooms the camera FOV (1 - 60); turning it off
     //    restores the game's own camera completely
     //  - 任何模式/场景都可用（透视相机改 FOV，正交相机改 orthoSize）；挑战模式对局内自动禁用
     //  - FOV slider mirrors the current FOV
     //  - 自由相机 Key (default F3): toggle; every game start it is off
-    //Applied from ModManager's per-frame camera hook.
+    //Applied from SR's per-frame camera hook.
     public class FovAdjust : ITweak {
         private const float MinFov = 1f;
-        private const float MaxFov = 20f;
+        private const float MaxFov = 32f;
         private const float ZoomSensitivity = 7f;
 
         private static MainPlugin _mp;
@@ -39,9 +39,9 @@ namespace SR_UCH.Tweaks {
             _mp = plugin;
             _lockEntry = plugin.Config.Bind("视野", "自由相机", false, "自由相机：开启后滚轮缩放视野；关闭后完全恢复游戏默认相机（任何模式/场景都可用，挑战模式对局内自动禁用）");
             _fovEntry = plugin.Config.Bind("视野", "FOV", 10f, new ConfigDescription(
-                "视野（1 - 20）", new AcceptableValueRange<float>(1f, 20f)));
+                "视野（1 - 32）", new AcceptableValueRange<float>(1f, 32f)));
             _keyEntry = plugin.Config.Bind("视野", "FOV Key", KeyCode.F3, "按键切换自由相机（组合键：点按钮后在按住 Shift/Ctrl/Alt 的同时按主键设置；任何模式/场景都可用，挑战模式对局内禁用；每次启动恢复游戏默认）");
-            ModManager.RegisterKey("视野-自由相机", _keyEntry, "press");
+            SR.RegisterKey("视野-自由相机", _keyEntry, "press");
             _lockEntry.SettingChanged += OnLockChanged;
             //every game start has the normal view
             _lockEntry.Value = false;
@@ -73,19 +73,16 @@ namespace SR_UCH.Tweaks {
             if (_mp != null) _mp.Config.Save();
         }
 
-        //自由相机不再限制模式：任何模式/场景都可用
-
-        //挑战模式对局内禁用自由相机（多人挑战/单人挑战都算；附加"无视模式限制"开启后放宽）
-        private static bool InChallenge() {
-            if (ModManager.IgnoreModeLimit) return false;
-            try { return GameSettings.GetInstance().GameMode == GameState.GameMode.CHALLENGE; } catch { return false; }
-        }
+        //自由相机不限制模式：任何模式/场景都可用（含挑战模式；对局开始统一重置为关闭）
 
         public static void CheckKey() {
-            if (!ModManager.AllEnabled) return;
+            if (!SR.AllEnabled) return;
             if (_keyEntry == null) return;
-            if (InChallenge()) return; //挑战模式禁用
-            if (ModManager.ComboKeyDown(_keyEntry)) ToggleLock();
+            //视野（自由相机）仅在自由模式可用（"无视模式限制"开启后放开）
+            try {
+                if (!SR.IgnoreModeLimit && GameSettings.GetInstance().GameMode != GameState.GameMode.FREEPLAY) return;
+            } catch { }
+            if (SR.ComboKeyDown(_keyEntry)) ToggleLock();
         }
 
         public static void ToggleLock() {
@@ -125,12 +122,11 @@ namespace SR_UCH.Tweaks {
         }
 
         //input handling runs ONCE per frame (from ManagerUI.Update) - never per camera/per hook.
-        //only the mouse wheel zooms; the camera never follows the mouse
+        //mouse wheel zooms; the camera never follows the mouse
         public static void TickInput() {
-            if (!ModManager.AllEnabled) return;
+            if (!SR.AllEnabled) return;
             if (!LockView) return;
-            if (ModManager.MapOpen) return;
-            if (InChallenge()) return; //挑战模式禁用
+            if (SR.MapOpen) return;
             Camera cam = GameCamera();
             if (cam == null) return;
 
@@ -149,13 +145,16 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        //called from ModManager per camera (multiple times per frame, so it must be
+        //called from SR per camera (multiple times per frame, so it must be
         //idempotent): when locked, the camera's FOV mirrors the slider value
         public static void ApplyToCamera(Camera cam) {
-            if (!ModManager.AllEnabled) return;
-            if (ModManager.MapOpen) return; //map editor takes priority
+            if (!SR.AllEnabled) return;
+            if (SR.MapOpen) return; //map editor takes priority
+            //自由相机仅在自由模式应用（即使勾选了，非自由也不改视野；“无视模式限制”开启后放开）
+            try {
+                if (!SR.IgnoreModeLimit && GameSettings.GetInstance().GameMode != GameState.GameMode.FREEPLAY) return;
+            } catch { }
             if (!LockView) return;
-            if (InChallenge()) return; //挑战模式禁用
             if (cam == null) return;
             if (cam.orthographic) {
                 cam.orthographicSize = Mathf.Clamp(_fovEntry.Value, MinFov, MaxFov);

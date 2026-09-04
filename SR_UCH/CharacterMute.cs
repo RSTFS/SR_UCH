@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
@@ -42,7 +42,7 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(AkSoundEngine), "PostEvent", new Type[] { typeof(string), typeof(GameObject) })]
         [HarmonyPrefix]
         static bool MuteCharacterSound(string in_pszEventName, GameObject in_gameObjectID) {
-            if (!ModManager.AllEnabled) return true;
+            if (!SR.AllEnabled) return true;
             if (!MuteOwn && !MuteOthers) return true;
             if (in_gameObjectID == null) return true;
             try {
