@@ -10,13 +10,11 @@
 装好 **BepInEx 5.4** 后，把 `SR_UCH.dll` 放进 `Ultimate Chicken Horse\BepInEx\plugins\`。
 Put `SR_UCH.dll` into `Ultimate Chicken Horse\BepInEx\plugins\`. 首次启动生成 `BepInEx\config\com.gamingbeast.SR_UCH.cfg`（可改）。
 
-> 可选附加功能：再放一个 `SR_UCH_EX.dll` 会多出 **EX** 栏（房主工具等，见下）。
-
 ---
 
 ## 快速开始 Quick Start
 - 打开管理器：**`Insert`**（可改）· open the manager: `Insert`
-- 总开关 **All Enabled** 默认**关**，打开后各功能才生效（在设置/首页右上角）· master switch default **OFF**
+- 总开关 **All Enabled** 默认**关**，打开后各功能才生效 · master switch default **OFF**
 - 默认英文界面，可在设置页切中文 · English by default, switch to 中文 in Settings
 
 ---
@@ -40,7 +38,7 @@ Put `SR_UCH.dll` into `Ultimate Chicken Horse\BepInEx\plugins\`. 首次启动生
 **关卡 Level**（仅派对/创意局内、房主）
 - **重载关卡**：真重载当前场景，保留已放方块；按模式保留或重置分数 · reload level, keep blocks (keep/reset score)
 - **广播方块快照**：把房主视角方块重发，全员重建（修不同步，不重载）· broadcast snapshot to resync blocks
-- （装 EX 后）派对盒炸弹等 · party-box bomb etc. (with EX)
+- **派对盒炸弹**：全员发「炸弹！」快捷消息即在派对盒生成炸弹（不需要 EX）· party-box bomb when all send "Bomb!" (no EX needed)
 
 **自由模式 / 地图 Freeplay & Map**
 - **地图** `M`（俯视，T 传送）；**树屋地图**；**地图总开关**；**地图网格**（行动阶段也显示网格）· map (M), treehouse map, map grid
@@ -54,9 +52,6 @@ Put `SR_UCH.dll` into `Ultimate Chicken Horse\BepInEx\plugins\`. 首次启动生
 - **加载后清理**（进关卡 GC 减卡顿）· GC after level load
 - **树屋问号**：给指定关卡的门加问号（解锁盒）· question marks on treehouse portals
 - **声音静音**（自己/他人）/ **读取统计** / **作弊标识** / **功能解锁进度** · mute sounds, stats, cheat flag, unlock progress
-
-**EX（另装 SR_UCH_EX.dll）**
-- 房主工具（发分/金币/获胜/复活/加命/指定关卡/回合/清派对盒道具 等）+ **无视模式限制**（让"仅自由模式"的功能在任何模式可用）· host tools + ignore mode limit
 
 ---
 
@@ -85,13 +80,6 @@ Put `SR_UCH.dll` into `Ultimate Chicken Horse\BepInEx\plugins\`. 首次启动生
 - Group A (>17h / >52000m): ignore collision, free placement, question marks · Group B (>52h / >100000m): destroy blocks. 进度在实验页查看 / live progress on the Experiments page.
 
 ---
-
-## 兼容性 Compatibility
-整合包。**建议只装 SR_UCH**，勿与同名原版 mod（Even More Players / BetterFreeplay / BuildUnlimiter 等）同装以免补丁冲突；管理器会默认禁用其他外部插件。
-Install SR_UCH only; overlapping Harmony patches from duplicate mods will conflict.
-
-## 构建 Build
-源码经 Roslyn `csc` 用 `sr_uch.rsp`（源码清单 + 引用）在仓库根编译：`dotnet <csc.dll> @sr_uch.rsp`，输出 `bin\Release\SR_UCH.dll`。
 
 ## 致谢 Credits
 BetterFreeplay · BetterNight · BuildingPlus · BuildUnlimiter · Even More Players · UCH Freeplay Spawn Setter · UCH Tweaks · UCH-PlayerTracker-Mod · UltimateBuilder
