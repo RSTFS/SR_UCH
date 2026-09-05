@@ -2,90 +2,99 @@
 
 > Ultimate Chicken Horse 模组整合增强包（免费开源）· A quality-of-life mod suite for **Ultimate Chicken Horse**（BepInEx / Harmony）
 
-**中文 / English**：游戏内设置页可切换语言，即时生效 / switch language in-game from the Settings page, applies immediately.
+**中文 / English**：游戏内可切换界面语言，即时生效 / switch in-game language anytime.
 
 ---
 
 ## 安装 Install
+装好 **BepInEx 5.4** 后，把 `SR_UCH.dll` 放进 `Ultimate Chicken Horse\BepInEx\plugins\`。
+Put `SR_UCH.dll` into `Ultimate Chicken Horse\BepInEx\plugins\`. 首次启动生成 `BepInEx\config\com.gamingbeast.SR_UCH.cfg`（可改）。
 
-1. 已装 **BepInEx 5.4**；把 `SR_UCH.dll` 放进 `Ultimate Chicken Horse\BepInEx\plugins\`
-2. Install **BepInEx 5.4**; put `SR_UCH.dll` into `Ultimate Chicken Horse\BepInEx\plugins\`
-
-首次启动生成 `BepInEx\config\com.gamingbeast.SR_UCH.cfg`（可改）。
-A config file is created on first launch at `BepInEx\config\com.gamingbeast.SR_UCH.cfg`.
+> 可选附加功能：再放一个 `SR_UCH_EX.dll` 会多出 **EX** 栏（房主工具等，见下）。
 
 ---
 
 ## 快速开始 Quick Start
-
-- 默认打开管理器：**`Insert`**（可改）· open manager: **`Insert`** (rebindable)
-- 右上角**总开关**默认**关**，打开后各功能才生效 · master switch top-right, default **OFF**
-- 打开管理器时默认**冻结游戏输入**（防误操作，可关）· game input frozen while open (toggleable)
+- 打开管理器：**`Insert`**（可改）· open the manager: `Insert`
+- 总开关 **All Enabled** 默认**关**，打开后各功能才生效（在设置/首页右上角）· master switch default **OFF**
+- 默认英文界面，可在设置页切中文 · English by default, switch to 中文 in Settings
 
 ---
 
 ## 功能 Features
 
-| 栏目 Tab | 功能 Features |
-|---|---|
-| 首页 Home | 简介 / 使用提示 / 致谢 Intro, tips, credits |
-| 移动轨迹 Player Tracker | 每玩家**移动轨迹线**，可调长度/跳帧/宽细 trailing line per player |
-| 建造增强 Builder | **无视碰撞**（`F1`）/ **建造上限**（解除树屋保存满度）ignore collision (F1) / build cap |
-| 方块破坏 Destroy | **`Alt`** 进入删除、滚轮切换、**`Backspace`** 删除；显示放置者；可允许客户端删 delete blocks (Alt/Backspace), show owner, allow clients |
-| 视野 Camera | **自由相机**：滚轮缩放 FOV（**`F3`** 切换）free camera (F3) |
-| 快速调整 Quick | **评分折扣** / **快速切换** 行动↔建造（`LeftCtrl`）/ **快速自杀**（`Shift+0`）score discount / quick switch / suicide |
-| 地图 Map | **地图总开关** / 俯视图**`M`** / **树屋地图** / **地图网格** map on/off, M map, treehouse map, map grid |
-| 重生 Respawn | 重生无敌 / 重生延迟 / 自定义重生点 **`O`/`P`/`K`** spawn invincibility, delay, points |
-| 会话内容 Chat | 本会话聊天记录面板（过滤/清空/时间/隐藏窗口）chat log panel |
-| 更多联机 More Online | 房间扩展到 **8-100 人**；`M` 码 invites 8-100 players, M codes |
-| 模组联机 Mod Lobby | 原生 4 人、只显示装 mod 的房间；`R` 码 vanilla 4p mod-only rooms, R codes |
-| 实验 Experiments | 位置同步 / 地图网格 / 树屋问号 / **重载关卡**（保留方块·保留或重置分）/ **广播方块快照** / 快速切换·重试 / 声音静音 / 作弊标识等 position sync, reload level (keep blocks & score), snapshot broadcast, etc. |
+**移动轨迹 Player Tracker**
+- 给每位玩家画**移动轨迹线**，可调长度/跳帧/粗细 · trailing line per player (length / skip frames / width)
+
+**快速调整 Quick Adjust**
+- **评分折扣**（平衡板 handicap）/ **快速切换** 行动↔建造（长按 B）/ **快速重试**（挑战模式）/ **快速自杀** · score discount / quick switch / quick retry (challenge) / quick suicide
+
+**建造 Builder**
+- **无视碰撞**：方块可放任意位置（重叠/空中/交叉）(`F1`) · ignore collision rules (F1)
+- **自由放置**：方块不再吸附 1 单位网格，可微调摆放 (`F2`) · free placement / fine snap (F2)
+- **解除建造上限**：树屋保存/发布的满度上限 500 → 自定义（默认 1000000）· lift build-fullness cap
+
+**方块破坏 Destroy Blocks**
+- `Alt` 进入删除模式、滚轮切换、`Backspace` 删除；显示放置者；可允许客户端删 · delete blocks, show owner, allow clients
+
+**关卡 Level**（仅派对/创意局内、房主）
+- **重载关卡**：真重载当前场景，保留已放方块；按模式保留或重置分数 · reload level, keep blocks (keep/reset score)
+- **广播方块快照**：把房主视角方块重发，全员重建（修不同步，不重载）· broadcast snapshot to resync blocks
+- （装 EX 后）派对盒炸弹等 · party-box bomb etc. (with EX)
+
+**自由模式 / 地图 Freeplay & Map**
+- **地图** `M`（俯视，T 传送）；**树屋地图**；**地图总开关**；**地图网格**（行动阶段也显示网格）· map (M), treehouse map, map grid
+- **视野**：自由相机滚轮缩放 (`F3`) · free camera FOV (F3)
+- **重生**：重生无敌 / 重生延迟 / 自定义重生点 `O`/`P`/`K` · spawn invincibility / delay / custom points
+
+**会话内容 Chat**
+- 会话聊天记录面板（记录/发送；过滤快捷消息 / 隐藏游戏内聊天窗口）· in-session chat log panel
+
+**实验 Experiments**
+- **加载后清理**（进关卡 GC 减卡顿）· GC after level load
+- **树屋问号**：给指定关卡的门加问号（解锁盒）· question marks on treehouse portals
+- **声音静音**（自己/他人）/ **读取统计** / **作弊标识** / **功能解锁进度** · mute sounds, stats, cheat flag, unlock progress
+
+**EX（另装 SR_UCH_EX.dll）**
+- 房主工具（发分/金币/获胜/复活/加命/指定关卡/回合/清派对盒道具 等）+ **无视模式限制**（让"仅自由模式"的功能在任何模式可用）· host tools + ignore mode limit
 
 ---
 
 ## 全部按键 Keybinds
 
-| 功能 Function | 键 Default |
+| 功能 Function | 默认键 Default |
 |---|---|
 | 管理器 Manager | `Insert` |
-| 地图 Map | `M` |
+| 地图 Map / 传送 Teleport | `M` / `T` |
 | 自由相机 Free camera | `F3` |
 | 无视碰撞 Ignore collision | `F1` |
+| 自由放置 Free placement | `F2` |
 | 方块破坏（切换/删除）Destroy | `Alt` / `Backspace` |
-| 快速切换 Quick switch | `LeftCtrl` |
 | 快速自杀 Quick suicide | `Shift+0` |
 | 重生点 设置/传送/恢复 Spawn | `O` / `P` / `K` |
 
-> 在管理器点击按键框即可改绑：`Esc` 清空，`Shift+Esc` 取消。
+> 在管理器内点击按键框即可改绑：`Esc` 清空，`Shift+Esc` 取消。
 
 ---
 
-## 进度解锁 Progression Unlock
+## 进度解锁 Progression
+部分功能需先达标，否则灰显/禁用：
 
-部分功能需先达标，锁定期间灰显/禁用：
-
-- **A 组**：游戏时长 > 17h 或奔跑 > 52000m → 解锁 无视碰撞、树屋问号
-- **B 组**：游戏时长 > 52h 或奔跑 > 100000m → 解锁 方块破坏总开关
-- Group A (>17h / >52000m): ignore collision, question marks · Group B (>52h / >100000m): destroy blocks. Live progress on the Experiments page.
+- **A 组**：游戏时长 > 17h16m18s 或 奔跑 > 52000m → 解锁 **无视碰撞 / 自由放置 / 树屋问号**
+- **B 组**：游戏时长 > 52h 或 奔跑 > 100000m → 解锁 **方块破坏**
+- Group A (>17h / >52000m): ignore collision, free placement, question marks · Group B (>52h / >100000m): destroy blocks. 进度在实验页查看 / live progress on the Experiments page.
 
 ---
 
 ## 兼容性 Compatibility
+整合包。**建议只装 SR_UCH**，勿与同名原版 mod（Even More Players / BetterFreeplay / BuildUnlimiter 等）同装以免补丁冲突；管理器会默认禁用其他外部插件。
+Install SR_UCH only; overlapping Harmony patches from duplicate mods will conflict.
 
-整合包，已内置所列功能。**建议只装 SR_UCH**，勿与同名原版 mod（Even More Players / BetterFreeplay / BuildUnlimiter 等）同装以免补丁冲突。管理器会默认禁用其他外部插件（可在「外部」栏开启，并关闭 SR_UCH 对应功能）。
-Install SR_UCH only; the manager disables other external plugins by default (enable them in the External tab and turn off the matching SR_UCH feature).
-
----
-
-## 从源码构建 Build
-
-无 `.csproj`，源码经 Roslyn `csc` 用 `sr_uch.rsp`（源码清单 + 引用，仓库根相对路径）直接编译。改 `/r:` 指向本机 UCH 后，在仓库根执行 `dotnet <roslyn-csc.dll> @sr_uch.rsp`，输出 `bin\Release\SR_UCH.dll`。新增源文件后把路径追加到 `sr_uch.rsp` 再构建。
-No project file — compile with Roslyn `csc` via `sr_uch.rsp` (source list + references, repo-root relative); add new files to the rsp and rebuild.
-
----
+## 构建 Build
+源码经 Roslyn `csc` 用 `sr_uch.rsp`（源码清单 + 引用）在仓库根编译：`dotnet <csc.dll> @sr_uch.rsp`，输出 `bin\Release\SR_UCH.dll`。
 
 ## 致谢 Credits
 BetterFreeplay · BetterNight · BuildingPlus · BuildUnlimiter · Even More Players · UCH Freeplay Spawn Setter · UCH Tweaks · UCH-PlayerTracker-Mod · UltimateBuilder
 
 ## License
-MIT — 自由使用/修改/分发，请保留原作者署名。 Free to use, modify, distribute (keep attribution).
+MIT — 自由使用/修改/分发，保留署名。 Free to use, modify, distribute (keep attribution).
