@@ -85,4 +85,4 @@ Put `SR_UCH.dll` into `Ultimate Chicken Horse\BepInEx\plugins\`. 首次启动生
 BetterFreeplay · BetterNight · BuildingPlus · BuildUnlimiter · Even More Players · UCH Freeplay Spawn Setter · UCH Tweaks · UCH-PlayerTracker-Mod · UltimateBuilder
 
 ## License
-MIT — 自由使用/修改/分发，保留署名。 Free to use, modify, distribute (keep attribution).
+MIT — 自由使用/修改/分发。 Free to use, modify, distribute.
