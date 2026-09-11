@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using BepInEx.Configuration;
 using UnityEngine;
 
@@ -39,7 +39,7 @@ namespace SR_UCH.Tweaks {
             try {
                 GameSettings gs = GameSettings.GetInstance();
                 if (gs == null) return;
-                gs.LevelFullnessScoreLimit = (SR.AllEnabled && Enabled) ? LimitValue : VanillaLimit;
+                gs.LevelFullnessScoreLimit = (SR.GateMaster && Enabled) ? LimitValue : VanillaLimit;
                 if (_mp != null) _mp.Config.Save();
             } catch {
             }

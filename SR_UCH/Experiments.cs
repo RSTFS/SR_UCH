@@ -81,7 +81,7 @@ public class Experiments : ITweak
 					if (kv.Key == null || kv.Value == null) continue;
 					if (!next.ContainsKey(kv.Key)) next[kv.Key] = kv.Value;
 				}
-			} catch { }
+			} catch (Exception __ex) { SR.Guard.Log("Experiments.GetInstance", __ex); }
 		}
 
 		[HarmonyPatch(typeof(GameControl), "ProcessNextUnlocks")]
@@ -117,6 +117,28 @@ public class Experiments : ITweak
 		public static bool QuickRetryFastOn => _quickRetryFast != null && _quickRetryFast.Value;
 
 		public static float QuickRetryHold => (_quickRetryHoldTime != null) ? Mathf.Clamp(_quickRetryHoldTime.Value, 0f, 2f) : 0.5f;
+
+		//「等待秒数」滑块的**游戏默认值**标注（快速调整页显示用）：
+		//  · 长按 B 的等待阈值是 Character.SuicideTime —— 游戏里自由模式（切建造）与挑战模式（重试）
+		//    都固定 0.5s（其它模式另有两档：有命可复活 0.5s / "放弃" 2.2s）。
+		//  · 建造态长按 B 切回行动用的是 PiecePlacementCursor.SwitchTime —— 游戏代码从不给它赋值
+		//    （prefab 序列化值），所以运行时从本地玩家光标上读实际值；读不到就只报已知的 0.5s。
+		public static string VanillaHoldBText(bool forSwitch) {
+			string s = "0.5s";
+			if (!forSwitch) return s;
+			try {
+				foreach (Player p in PlayerManager.GetInstance()) {
+					if (p == null || p.AssociatedGamePlayer == null) continue;
+					PiecePlacementCursor pc = p.AssociatedGamePlayer.CursorInstance as PiecePlacementCursor;
+					if (pc == null || pc.SwitchTime <= 0f) continue;
+					if (Mathf.Abs(pc.SwitchTime - 0.5f) > 0.05f) {
+						s += SR.T("（建造→行动 " + pc.SwitchTime.ToString("0.0") + "s）", " (build→action " + pc.SwitchTime.ToString("0.0") + "s)");
+					}
+					break;
+				}
+			} catch (Exception __ex) { SR.Guard.Log("读取 SwitchTime 默认值", __ex); }
+			return s;
+		}
 
 		public static int ScoreDiscount => (_scoreDiscount != null) ? _scoreDiscount.Value : 0;
 
@@ -164,7 +186,7 @@ public class Experiments : ITweak
 				//场景切换后 GamePlayer 会重建，旧引用残留；超限就整体清空，避免无限累积
 				if (_lastHandicapShown.Count > 64) _lastHandicapShown.Clear();
 				RefreshScoreboardHandicapCore(__instance);
-			} catch { }
+			} catch (Exception __ex) { SR.Guard.Log("Experiments.RefreshScoreboardHandicapCore", __ex); }
 		}
 
 		private static void RefreshScoreboardHandicapCore(GamePlayer __instance) {
@@ -182,7 +204,7 @@ public class Experiments : ITweak
 						if (_gsbField == null) _gsbField = AccessTools.Field(typeof(VersusControl), "graphScoreBoardInstance");
 						if (_gsbField != null) board = _gsbField.GetValue(vc) as GraphScoreBoard;
 					}
-				} catch { }
+				} catch (Exception __ex) { SR.Guard.Log("Experiments.RefreshScoreboardHandicapCore", __ex); }
 				if (board == null) {
 					board = UnityEngine.Object.FindObjectOfType<GraphScoreBoard>();
 				}
@@ -200,11 +222,11 @@ public class Experiments : ITweak
 					//SyncVar 未就绪时按 GamePlayer 在计分板中的槽位兜底（localNumber 与槽位一致）
 					try {
 						line = relDict[__instance.localNumber];
-					} catch { }
+					} catch (Exception __ex) { SR.Guard.Log("Experiments.GetValue", __ex); }
 				}
 				if (line == null) return;
 				line.SetHandicap(__instance.Handicap);
-			} catch { }
+			} catch (Exception __ex) { SR.Guard.Log("Experiments.SetHandicap", __ex); }
 		}
 
 		public static bool GridAlwaysOn => _gridAlwaysOn != null && _gridAlwaysOn.Value;
@@ -236,12 +258,11 @@ public class Experiments : ITweak
 		[HarmonyPostfix]
 		private static void OverrideHoldTime(Character __instance)
 		{
-			if (!SR.AllEnabled || (SR.UiOpen && SR.BlockInput) || !__instance.hasAuthority) return;
-			GameState.GameMode gm;
-			try { gm = GameSettings.GetInstance().GameMode; } catch { return; }
+			if (!SR.GateMaster || (SR.UiOpen && SR.BlockInput) || !__instance.hasAuthority) return;
 			try
 			{
-				if (gm == GameState.GameMode.FREEPLAY && QuickSwitchOn)
+				//模式门控统一走 GateModeAllows（已接入 IgnoreModeLimit 豁免；原为硬判模式，缺陷 3）
+				if (QuickSwitchOn && SR.GateModeAllows(SR.ModeMask.Freeplay))
 				{
 					__instance.SuicideTime = QuickSwitchHold; //自由模式长按 B 切换等待（行动→建造）
 					//建造状态长按 B 切换回行动用的是 PiecePlacementCursor.SwitchTime，每帧同步
@@ -251,19 +272,19 @@ public class Experiments : ITweak
 						if (pc != null) pc.SwitchTime = QuickSwitchHold;
 					}
 				}
-				else if (gm == GameState.GameMode.CHALLENGE && QuickRetryFastOn)
+				else if (QuickRetryFastOn && SR.GateModeAllows(SR.ModeMask.Challenge))
 				{
 					__instance.SuicideTime = QuickRetryHold; //挑战模式长按 B 重试等待
 				}
 			}
-			catch { }
+			catch (Exception __ex) { SR.Guard.Log("Experiments.OverrideHoldTime", __ex); }
 		}
 
 		[HarmonyPatch(typeof(Character), "UpdateSuicidalState")]
 		[HarmonyPostfix]
 		private static void ForceSuicideState(Character __instance)
 		{
-			if (!SR.AllEnabled || (SR.UiOpen && SR.BlockInput) || !__instance.hasAuthority)
+			if (!SR.GateMaster || (SR.UiOpen && SR.BlockInput) || !__instance.hasAuthority)
 			{
 				return;
 			}
@@ -276,8 +297,8 @@ public class Experiments : ITweak
 			{
 				return;
 			}
-			//挑战模式：死后自动重试（无需长按）
-			if (gm == GameState.GameMode.CHALLENGE)
+			//挑战模式：死后自动重试（无需长按）。已接入 IgnoreModeLimit 豁免（原硬判模式，缺陷 3）
+			if (gm == GameState.GameMode.CHALLENGE || SR.IgnoreModeLimit)
 			{
 				bool dead = !__instance.Success && (__instance.Dead || __instance.Dying || __instance.LocallyDead);
 				if (dead && QuickRetryOn && !__instance.WantsToRetry)
@@ -287,9 +308,7 @@ public class Experiments : ITweak
 						MsgPlayerWantsToRetry msg = new MsgPlayerWantsToRetry { networkNumber = __instance.networkNumber };
 						UnityEngine.Networking.NetworkManager.singleton.client.Send(NetMsgTypes.PlayerWantsToRetry, msg);
 					}
-					catch
-					{
-					}
+					catch (Exception __ex) { SR.Guard.Log("Experiments.Send", __ex); }
 				}
 				return;
 			}
@@ -308,7 +327,7 @@ public class Experiments : ITweak
 			{
 				return;
 			}
-			try { __instance.SuicideTime = QuickSwitchHold; } catch { }
+			try { __instance.SuicideTime = QuickSwitchHold; } catch (Exception __ex) { SR.Guard.Log("Experiments.Send", __ex); }
 			//建造状态长按 B 切换回行动用的是 PiecePlacementCursor.SwitchTime，也设为用户等待秒数
 			try {
 				foreach (Player p in PlayerManager.GetInstance()) {
@@ -316,7 +335,7 @@ public class Experiments : ITweak
 					PiecePlacementCursor pc = p.AssociatedGamePlayer.CursorInstance as PiecePlacementCursor;
 					if (pc != null) pc.SwitchTime = QuickSwitchHold;
 				}
-			} catch { }
+			} catch (Exception __ex) { SR.Guard.Log("Experiments.Send", __ex); }
 		}
 
 		//建造网格（Graphpaper = 建造阶段的网格背景）。
@@ -352,7 +371,7 @@ public class Experiments : ITweak
 		{
 			try
 			{
-				if (!SR.AllEnabled) return true;
+				if (!SR.GateMaster) return true;
 				StartPhaseEvent spe = e as StartPhaseEvent;
 				if (spe == null) return true; // 非阶段事件 → 交给原方法（本就不处理）
 				bool place = spe.Phase == GameControl.GamePhase.PLACE;
@@ -383,14 +402,14 @@ public class Experiments : ITweak
 					if (on) gp.enableGrid(); else gp.disableGrid();
 				}
 			}
-			catch { }
+			catch (Exception __ex) { SR.Guard.Log("Experiments.GridKeepAllowed", __ex); }
 		}
 
 		public static void ApplyScoreDiscount()
 		{
 			try
 			{
-				if (!SR.AllEnabled)
+				if (!SR.GateMaster)
 				{
 					NotifyExp(Msgs.MasterOff());
 					return;
@@ -433,16 +452,12 @@ public class Experiments : ITweak
 						{
 							p.AssociatedGamePlayer.CallCmdSetPlayerHandicap(value);
 						}
-						catch
-						{
-						}
+						catch (Exception __ex) { SR.Guard.Log("Experiments.CallCmdSetPlayerHandicap", __ex); }
 					}
 					return true;
 				}
 			}
-			catch
-			{
-			}
+			catch (Exception __ex) { SR.Guard.Log("Experiments.CallCmdSetPlayerHandicap", __ex); }
 			return false;
 		}
 
@@ -451,7 +466,7 @@ public class Experiments : ITweak
 		{
 			try
 			{
-				if (!SR.AllEnabled)
+				if (!SR.GateMaster)
 				{
 					NotifyExp(Msgs.MasterOff());
 					return;
@@ -477,9 +492,7 @@ public class Experiments : ITweak
 			{
 				UserMessageManager.Instance.UserMessage(text, false);
 			}
-			catch
-			{
-			}
+			catch (Exception __ex) { SR.Guard.Log("Experiments.UserMessage", __ex); }
 			MainPlugin.ModLogger.LogInfo((object)("[实验] " + text));
 		}
 
@@ -650,7 +663,7 @@ public class Experiments : ITweak
 			//IL_00dc: Unknown result type (might be due to invalid IL or missing references)
 			try
 			{
-				if (!SR.AllEnabled)
+				if (!SR.GateMaster)
 				{
 					NotifyExp(Msgs.MasterOff());
 					return;
@@ -679,9 +692,7 @@ public class Experiments : ITweak
 					{
 						val2 = LobbyManager.instance.CurrentLevelSelectController;
 					}
-					catch
-					{
-					}
+					catch (Exception __ex) { SR.Guard.Log("Experiments.NotifyExp", __ex); }
 				}
 				if ((UnityEngine.Object)(object)val2 == (UnityEngine.Object)null)
 				{
@@ -712,9 +723,7 @@ public class Experiments : ITweak
 				{
 					flag = val3.Locked;
 				}
-				catch
-				{
-				}
+				catch (Exception __ex) { SR.Guard.Log("Experiments.NotifyExp", __ex); }
 				if (flag)
 				{
 					NotifyExp(SR.T("该关卡尚未解锁，不能添加问号", "This level is not unlocked yet; cannot add a question mark"));
@@ -736,9 +745,7 @@ public class Experiments : ITweak
 				{
 					flag2 = NetworkServer.active && (UnityEngine.Object)(object)LobbyManager.instance != (UnityEngine.Object)null && LobbyManager.instance.IsHost;
 				}
-				catch
-				{
-				}
+				catch (Exception __ex) { SR.Guard.Log("Experiments.NotifyExp", __ex); }
 				if (flag2)
 				{
 					MethodInfo methodInfo = AccessTools.Method(typeof(LevelSelectController), "SetUnlockForPlayer", (Type[])null, (Type[])null);
@@ -797,9 +804,7 @@ public class Experiments : ITweak
 						val = instance.GetSaveFileDataForMainUser();
 					}
 				}
-				catch
-				{
-				}
+				catch (Exception __ex) { SR.Guard.Log("Experiments.GetSaveFileDataForMainUser", __ex); }
 				if (val == null)
 				{
 					return false;
@@ -824,9 +829,7 @@ public class Experiments : ITweak
 						}
 					}
 				}
-				catch
-				{
-				}
+				catch (Exception __ex) { SR.Guard.Log("Experiments.GetValue", __ex); }
 				try
 				{
 					FieldInfo fieldInfo2 = AccessTools.Field(typeof(LevelSelectController), "LevelUnlocks");
@@ -847,9 +850,7 @@ public class Experiments : ITweak
 						}
 					}
 				}
-				catch
-				{
-				}
+				catch (Exception __ex) { SR.Guard.Log("Experiments.GetValue", __ex); }
 				try
 				{
 					FieldInfo fieldInfo3 = AccessTools.Field(typeof(LevelSelectController), "OutfitUnlocks");
@@ -873,9 +874,7 @@ public class Experiments : ITweak
 									{
 										num2 = array3[k].OutfitMaskNumber;
 									}
-									catch
-									{
-									}
+									catch (Exception __ex) { SR.Guard.Log("Experiments.GetValue", __ex); }
 									if ((values3[num] & num2) == 0)
 									{
 										result = array3[k];
@@ -886,9 +885,7 @@ public class Experiments : ITweak
 						}
 					}
 				}
-				catch
-				{
-				}
+				catch (Exception __ex) { SR.Guard.Log("Experiments.GetValue", __ex); }
 				return false;
 			}
 			catch
@@ -909,7 +906,7 @@ public class Experiments : ITweak
 			//IL_0208: Unknown result type (might be due to invalid IL or missing references)
 			try
 			{
-				if (!SR.AllEnabled)
+				if (!SR.GateMaster)
 				{
 					NotifyExp(Msgs.MasterOff());
 					return;
@@ -938,9 +935,7 @@ public class Experiments : ITweak
 					{
 						val2 = LobbyManager.instance.CurrentLevelSelectController;
 					}
-					catch
-					{
-					}
+					catch (Exception __ex) { SR.Guard.Log("Experiments.NotifyExp", __ex); }
 				}
 				if ((UnityEngine.Object)(object)val2 == (UnityEngine.Object)null)
 				{
@@ -1032,7 +1027,7 @@ public class Experiments : ITweak
 		{
 			try
 			{
-				if (!SR.AllEnabled)
+				if (!SR.GateMaster)
 				{
 					NotifyExp(Msgs.MasterOff());
 					return;
@@ -1060,9 +1055,7 @@ public class Experiments : ITweak
 					{
 						val = LobbyManager.instance.CurrentLevelSelectController;
 					}
-					catch
-					{
-					}
+					catch (Exception __ex) { SR.Guard.Log("Experiments.NotifyExp", __ex); }
 				}
 				if ((UnityEngine.Object)(object)val == (UnityEngine.Object)null)
 				{
@@ -1114,7 +1107,7 @@ public class Experiments : ITweak
 			//IL_019a: Unknown result type (might be due to invalid IL or missing references)
 			try
 			{
-				if (!SR.AllEnabled)
+				if (!SR.GateMaster)
 				{
 					NotifyExp(Msgs.MasterOff());
 					return;
@@ -1142,9 +1135,7 @@ public class Experiments : ITweak
 					{
 						val = LobbyManager.instance.CurrentLevelSelectController;
 					}
-					catch
-					{
-					}
+					catch (Exception __ex) { SR.Guard.Log("Experiments.NotifyExp", __ex); }
 				}
 				if ((UnityEngine.Object)(object)val == (UnityEngine.Object)null)
 				{
@@ -1166,9 +1157,7 @@ public class Experiments : ITweak
 				{
 					flag = NetworkServer.active && (UnityEngine.Object)(object)LobbyManager.instance != (UnityEngine.Object)null && LobbyManager.instance.IsHost;
 				}
-				catch
-				{
-				}
+				catch (Exception __ex) { SR.Guard.Log("Experiments.NotifyExp", __ex); }
 				if (!FillNextUnlock(val, val2))
 				{
 					NotifyExp(SR.T("所有物品已解锁，没有可获取的新物品，不添加问号", "Everything is already unlocked; no new items available, no question mark added"));
@@ -1200,9 +1189,7 @@ public class Experiments : ITweak
 					{
 						flag2 = val3.Locked;
 					}
-					catch
-					{
-					}
+					catch (Exception __ex) { SR.Guard.Log("Experiments.NotifyExp", __ex); }
 					if (flag2)
 					{
 						num2++;
@@ -1237,14 +1224,9 @@ public class Experiments : ITweak
 
 		private static bool IsHostExp()
 		{
-			try
-			{
-				return NetworkServer.active && (UnityEngine.Object)(object)LobbyManager.instance != (UnityEngine.Object)null && LobbyManager.instance.IsHost;
-			}
-			catch
-			{
-				return false;
-			}
+			//统一房主判定（原为 NetworkServer.active && LobbyManager.IsHost）。见 SR.Gate.Service.cs。
+			//行为变更：离线/无连接现在也算房主（与 DestroyBlocks 原语义一致）。
+			return SR.IsHost;
 		}
 
 		//（旧 BroadcastSnapshot 方法体已并入 RebuildBlocksFromHost 共享核心）
@@ -1266,7 +1248,7 @@ public class Experiments : ITweak
 		{
 			try
 			{
-				if (!SR.AllEnabled)
+				if (!SR.GateMaster)
 				{
 					NotifyExp(Msgs.MasterOff());
 					return;
@@ -1347,9 +1329,7 @@ public class Experiments : ITweak
 					};
 					NetworkServer.SendToAll(NetMsgTypes.PrepareToReloadScene, msg);
 				}
-				catch
-				{
-				}
+				catch (Exception __ex) { SR.Guard.Log("Experiments.SendToAll", __ex); }
 				if (LoadingInterstitialSplash.Instance != null)
 				{
 					LoadingInterstitialSplash.Instance.showLevelInfoNextLoad = true;
@@ -1369,15 +1349,8 @@ public class Experiments : ITweak
 		//仅派对(PARTY)/创意(CREATIVE)局内生效
 		private static bool IsPartyOrCreative()
 		{
-			try
-			{
-				GameState.GameMode m = GameSettings.GetInstance().GameMode;
-				return m == GameState.GameMode.PARTY || m == GameState.GameMode.CREATIVE;
-			}
-			catch
-			{
-				return false;
-			}
+			//统一模式门控（IgnoreModeLimit 豁免已内置；原重载/广播硬判模式，缺陷 3）
+			return SR.GateModeAllows(SR.ModeMask.Party | SR.ModeMask.Creative);
 		}
 
 		private static IEnumerator ReloadSceneRoutine()
@@ -1432,9 +1405,7 @@ public class Experiments : ITweak
 				System.Reflection.FieldInfo lpx = HarmonyLib.AccessTools.Field(typeof(QuickSaver), "levelPortalXml");
 				if (lpx != null) lpx.SetValue(null, null);
 			}
-			catch
-			{
-			}
+			catch (Exception __ex) { SR.Guard.Log("Experiments.Field", __ex); }
 		}
 
 		//广播方块快照：房主重发当前关卡快照 → 全员按房主视角重建方块（修复方块消失/不同步）。
@@ -1450,7 +1421,7 @@ public class Experiments : ITweak
 		{
 			try
 			{
-				if (!SR.AllEnabled)
+				if (!SR.GateMaster)
 				{
 					NotifyExp(Msgs.MasterOff());
 					return;
@@ -1540,9 +1511,7 @@ public class Experiments : ITweak
 					}
 				}
 			}
-			catch
-			{
-			}
+			catch (Exception __ex) { SR.Guard.Log("Experiments.GetLobbyPlayer", __ex); }
 			return null;
 		}
 
@@ -1565,9 +1534,7 @@ public class Experiments : ITweak
 				{
 					flag = saveFileDataForMainUser.IsCheater;
 				}
-				catch
-				{
-				}
+				catch (Exception __ex) { SR.Guard.Log("Experiments.T", __ex); }
 				if (flag)
 				{
 					return SR.T("⚠ 已被标识为作弊\n使用过作弊码，无法解锁全部成就", "⚠ Flagged as a cheater\nCheat codes were used, achievements stay locked");

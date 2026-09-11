@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
 using GameEvent;
@@ -116,7 +116,7 @@ namespace SR_UCH.Tweaks {
                     }
                     if (string.IsNullOrEmpty(info.playerName)) info.playerName = "Player " + info.playerNumber;
                     _placements[p] = info;
-                } catch { }
+                } catch (Exception __ex) { SR.Guard.Log("记录方块放置者", __ex); }
             }
 
             private static Placeable FindPlaceableByID(int id) {
@@ -183,13 +183,12 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(GameControl), "Update")]
         [HarmonyPrefix]
         static void Controls(GameControl __instance) {
-            if (!SR.AllEnabled) return;
+            if (!SR.GateMaster) return;
             if (!Enabled) return;
-            if (!Experiments.IsProgressionUnlockedB()) return; //B 组未解锁：自动拦截
+            if (!SR.ProgressionAllows(SR_UCH.Gating.ProgressGroup.B)) return; //B 组未解锁：自动拦截（统一门控，读快照缓存）
             if (SR.UiOpen && SR.BlockInput) return; 
-            //只允许排队（派对）模式和创意模式使用方块破坏
-            GameState.GameMode gm = GameSettings.GetInstance().GameMode;
-            if (gm != GameState.GameMode.PARTY && gm != GameState.GameMode.CREATIVE) return;
+            //只允许派对/创意模式；现已统一接入 IgnoreModeLimit 豁免（原缺陷 3：此处漏接入）
+            if (!SR.GateModeAllows(SR.ModeMask.Party | SR.ModeMask.Creative)) return;
             if (!_allowClients.Value) {
                 if (Matchmaker.CurrentMatchmakingLobby is GamesparksMatchmakingLobby gml && !gml.IsOwner) return;
             }
@@ -247,19 +246,19 @@ namespace SR_UCH.Tweaks {
                 _selected = Blocks[_index];
                 if (_selected != _tintedBlock) {
                     if (_tintedBlock != null) {
-                        try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch { } //恢复旧方块
+                        try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.GetAxis", __ex); } //恢复旧方块
                     }
-                    try { _selected.AddBombTint(new Color(255, 255, 255, 10)); } catch { }
+                    try { _selected.AddBombTint(new Color(255, 255, 255, 10)); } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.RemoveBombTint", __ex); }
                     _tintedBlock = _selected;
                 }
-                try { _selected.Tint(); } catch { } //每帧应用高亮色（bombTints>0 → 白色）
+                try { _selected.Tint(); } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.AddBombTint", __ex); } //每帧应用高亮色（bombTints>0 → 白色）
                 UpdateInfoTag(_selected);
             } 
             else if(_altDown)
             {
                 _altDown = false;
                 if (_tintedBlock != null) {
-                    try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch { } //恢复颜色
+                    try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.UpdateInfoTag", __ex); } //恢复颜色
                 }
                 _tintedBlock = null;
                 _selected = null;
@@ -279,7 +278,7 @@ namespace SR_UCH.Tweaks {
                     float db = (b.transform.position - me).sqrMagnitude;
                     return da.CompareTo(db);
                 });
-            } catch { }
+            } catch (Exception __ex) { SR.Guard.Log("按距离排序方块", __ex); }
         }
 
         private static Vector3 LocalPlayerPos() {
@@ -287,7 +286,7 @@ namespace SR_UCH.Tweaks {
                 foreach (Character c in UnityEngine.Object.FindObjectsOfType<Character>()) {
                     if (c != null && c.hasAuthority) return c.transform.position;
                 }
-            } catch { }
+            } catch (Exception __ex) { SR.Guard.Log("获取本地角色位置", __ex); }
             return Vector3.zero;
         }
 
@@ -381,19 +380,34 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        private static bool IsHostNow() {
+        //供 EX 的「清除地图对象」调用：清空**玩家放置过**的全部道具。
+        //识别依据与方块破坏列表一致（Normal 列表 = _placements 的记录集，来自 PiecePlaced/
+        //NetMsgPiecePlaced 事件），因此不会误删关卡自带布局。
+        //每个方块都广播 PieceDestroyed 后本地销毁：房客发送的这条消息由服务器转发全员，
+        //所以房客也能用、且全员可见（与 DestroyBlocks 的客户端删除同一条网络通道）。
+        public static int ClearAllPlayerPlacements() {
+            int n = 0;
             try {
-                if (NetworkServer.active) {
-                    LobbyManager lm = LobbyManager.instance;
-                    if (lm != null && lm.IsHost) return true;
+                List<Placeable> list = new List<Placeable>(_placements.Keys);
+                for (int i = 0; i < list.Count; i++) {
+                    Placeable p = list[i];
+                    if (p == null || p.MarkedForDestruction) continue;
+                    try {
+                        BroadcastPieceDestroyed(p);
+                        p.DestroySelf();
+                        p.OnDestroy();
+                        n++;
+                    } catch (Exception __ex) { SR.Guard.Log("清除地图对象(单个销毁)", __ex); }
                 }
-            } catch { }
-            try {
-                LobbyManager lm = LobbyManager.instance;
-                if (lm == null || lm.client == null) return true;
-                if (!lm.client.isConnected) return true;
-            } catch { return true; }
-            return false;
+                _placements.Clear();
+                try { Blocks.Clear(); } catch { } //方块破坏候选表同步清空，避免残留已销毁引用
+            } catch (Exception __ex) { SR.Guard.Log("清除地图对象", __ex); }
+            return n;
+        }
+
+        private static bool IsHostNow() {
+            //统一房主判定（并入 SR.IsHost；原离线/无连接也算权威的语义已内置）。见 SR.Gate.Service.cs。
+            return SR.IsHost;
         }
 
         private static int MyNetworkNumber() {
@@ -403,7 +417,7 @@ namespace SR_UCH.Tweaks {
                     Character c = p.PlayerCharacter;
                     if (c != null && c.hasAuthority) return c.networkNumber;
                 }
-            } catch { }
+            } catch (Exception __ex) { SR.Guard.Log("获取本地 networkNumber", __ex); }
             return -1;
         }
 

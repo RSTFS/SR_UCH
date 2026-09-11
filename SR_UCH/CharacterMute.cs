@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
@@ -42,7 +42,7 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(AkSoundEngine), "PostEvent", new Type[] { typeof(string), typeof(GameObject) })]
         [HarmonyPrefix]
         static bool MuteCharacterSound(string in_pszEventName, GameObject in_gameObjectID) {
-            if (!SR.AllEnabled) return true;
+            if (!SR.GateMaster) return true;
             if (!MuteOwn && !MuteOthers) return true;
             if (in_gameObjectID == null) return true;
             try {
@@ -50,7 +50,7 @@ namespace SR_UCH.Tweaks {
                 if (c == null) return true; //非角色声音，不拦截
                 if (MuteOwn && c.hasAuthority) return false; //A：自己的角色声音
                 if (MuteOthers && !c.hasAuthority) return false; //B：其它玩家的角色声音
-            } catch { }
+            } catch (Exception __ex) { SR.Guard.Log("判定角色声音归属", __ex); }
             return true;
         }
     }

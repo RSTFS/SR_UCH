@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
@@ -71,10 +71,10 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(Character), "setupDeath")]
         [HarmonyPostfix]
         static void OnDeath(Character __instance) {
-            if (!SR.AllEnabled) return;
+            if (!SR.GateMaster) return;
             if (!Enabled) return;
             GameState.GameMode gm = GameSettings.GetInstance().GameMode;
-            if (!SR.IgnoreModeLimit && gm != GameState.GameMode.FREEPLAY && gm != GameState.GameMode.CHALLENGE) return;
+            if (!SR.GateModeAllows(SR.ModeMask.Freeplay | SR.ModeMask.Challenge)) return;
             if (__instance == null || !__instance.hasAuthority) return;
             if (__instance.Success) return;
             if (_pending.Contains(__instance)) return;
@@ -101,7 +101,7 @@ namespace SR_UCH.Tweaks {
         //its master switch) is off the game's normal auto-respawn is restored.
         private static int _suppress = -1;
         internal static int SuppressValue {
-            get { return (SR.AllEnabled && Enabled) ? -1 : int.MaxValue; }
+            get { return (SR.GateMaster && Enabled) ? -1 : int.MaxValue; }
         }
 
         [HarmonyPatch(typeof(FreePlayControl), "Update")]
@@ -113,11 +113,20 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(FreePlayControl), "Update")]
         [HarmonyTranspiler]
         static IEnumerable<CodeInstruction> ForceNoReset(IEnumerable<CodeInstruction> instructions) {
+            //原来用 list[i-1].ToString().Contains("get_Count") 匹配 IL——字符串包含判断在游戏
+            //更新后会**静默失效**（提示词第 7 节“Transpiler 脆弱”）。改为按操作数 MethodInfo
+            //精确匹配 get_Count，并在匹配失败时打日志告警 + 原样返回（降级），不再悄悄失效。
             List<CodeInstruction> list = new List<CodeInstruction>(instructions);
+            bool matched = false;
             for (int i = 1; i < list.Count; i++) {
-                if (list[i].opcode == OpCodes.Ldc_I4_1 && list[i - 1].ToString().Contains("get_Count")) {
-                    list[i] = new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(RespawnDelay), "_suppress"));
-                }
+                if (list[i].opcode != OpCodes.Ldc_I4_1) continue;
+                MethodInfo prev = list[i - 1].operand as MethodInfo;
+                if (prev == null || prev.Name != "get_Count") continue;
+                list[i] = new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(RespawnDelay), "_suppress"));
+                matched = true;
+            }
+            if (!matched) {
+                MainPlugin.ModLogger.LogWarning("RespawnDelay: 未匹配到 FreePlayControl.Update 的 get_Count 模式，重生延迟抑制降级为不生效（游戏可能已更新，需重新适配）");
             }
             return list;
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using BepInEx.Configuration;
 using UnityEngine;
 
@@ -68,7 +68,7 @@ namespace SR_UCH.Tweaks {
                         ZoomCamera zc = lm.GetCurrentZoomCamera();
                         if (zc != null) zc.ForceFrameUpdate();
                     }
-                } catch { }
+                } catch (Exception __ex) { SR.Guard.Log("地图相机强制刷新取景", __ex); }
             }
             if (_mp != null) _mp.Config.Save();
         }
@@ -76,12 +76,10 @@ namespace SR_UCH.Tweaks {
         //自由相机不限制模式：任何模式/场景都可用（含挑战模式；对局开始统一重置为关闭）
 
         public static void CheckKey() {
-            if (!SR.AllEnabled) return;
+            if (!SR.GateMaster) return;
             if (_keyEntry == null) return;
-            //视野（自由相机）仅在自由模式可用（"无视模式限制"开启后放开）
-            try {
-                if (!SR.IgnoreModeLimit && GameSettings.GetInstance().GameMode != GameState.GameMode.FREEPLAY) return;
-            } catch { }
+            //视野（自由相机）仅自由模式可用（统一门控；IgnoreModeLimit 已由 GateModeAllows 豁免）
+            if (!SR.GateModeAllows(SR.ModeMask.Freeplay)) return;
             if (SR.ComboKeyDown(_keyEntry)) ToggleLock();
         }
 
@@ -111,7 +109,7 @@ namespace SR_UCH.Tweaks {
                     }
                 }
                 if (ZoomCamera.CurrentZoomCamera != null) return ZoomCamera.CurrentZoomCamera;
-            } catch { }
+            } catch (Exception __ex) { SR.Guard.Log("获取当前 ZoomCamera", __ex); }
             return Camera.main;
         }
 
@@ -124,7 +122,7 @@ namespace SR_UCH.Tweaks {
         //input handling runs ONCE per frame (from ManagerUI.Update) - never per camera/per hook.
         //mouse wheel zooms; the camera never follows the mouse
         public static void TickInput() {
-            if (!SR.AllEnabled) return;
+            if (!SR.GateMaster) return;
             if (!LockView) return;
             if (SR.MapOpen) return;
             Camera cam = GameCamera();
@@ -138,7 +136,9 @@ namespace SR_UCH.Tweaks {
                 } else {
                     float mid = (MinFov + MaxFov) / 2f;
                     float ratio = cam.fieldOfView / mid;
-                    float nv = cam.fieldOfView - wheel * ZoomSensitivity * ratio * 100f * Time.deltaTime;
+                    //滚轮是**离散事件量**，不能乘 Time.deltaTime：原来这里乘了、正交分支没乘，
+                    //导致两种帧率依赖并存（提示词第 7 节“帧率相关 bug”）。统一为不乘。
+                    float nv = cam.fieldOfView - wheel * ZoomSensitivity * ratio * 100f;
                     _fovEntry.Value = Mathf.Clamp(nv, MinFov, MaxFov);
                 }
                 if (_mp != null) _mp.Config.Save();
@@ -148,12 +148,10 @@ namespace SR_UCH.Tweaks {
         //called from SR per camera (multiple times per frame, so it must be
         //idempotent): when locked, the camera's FOV mirrors the slider value
         public static void ApplyToCamera(Camera cam) {
-            if (!SR.AllEnabled) return;
+            if (!SR.GateMaster) return;
             if (SR.MapOpen) return; //map editor takes priority
-            //自由相机仅在自由模式应用（即使勾选了，非自由也不改视野；“无视模式限制”开启后放开）
-            try {
-                if (!SR.IgnoreModeLimit && GameSettings.GetInstance().GameMode != GameState.GameMode.FREEPLAY) return;
-            } catch { }
+            //自由相机仅在自由模式应用（统一门控；IgnoreModeLimit 已豁免）
+            if (!SR.GateModeAllows(SR.ModeMask.Freeplay)) return;
             if (!LockView) return;
             if (cam == null) return;
             if (cam.orthographic) {

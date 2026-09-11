@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -64,7 +64,7 @@ public partial class SR {
                     Font nf = Font.CreateDynamicFontFromOSFont("Microsoft YaHei", fs);
                     UnityEngine.Object.DontDestroyOnLoad(nf);
                     _font = nf;
-                } catch { }
+                } catch (Exception __ex) { Guard.Log("创建中文字体", __ex); }
             }
         }
 

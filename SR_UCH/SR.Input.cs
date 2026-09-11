@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -17,10 +17,29 @@ public partial class SR {
 
 // ==== 分区：Input（打开/关闭键 / 输入冻结 / EventSystem 门控 / 角色冻结）====
 
+        //EX 页开关行的快捷键：允许客户端删除 / 无视模式限制 / 冻结角色。
+        //（无敌/飞天/蹲移/无视房主限制的快捷键由 EX 模块自己轮询；这三个开关是 SR 侧的，在这里轮询。）
+        //统一用 ComboKeyDown（= 修饰键按住 + 主键按下），所以支持组合键。
+        public static void CheckToggleKeys() {
+            if (_capturing != null) return;
+            if (SR.ComboKeyDown(_allowClientsKeyEntry)) DestroyBlocks.ToggleAllowClients();
+            if (SR.ComboKeyDown(_ignoreModeLimitKeyEntry)) {
+                IgnoreModeLimit = !IgnoreModeLimit;
+                if (_ignoreModeLimitEntry != null) _ignoreModeLimitEntry.Value = IgnoreModeLimit;
+            }
+            if (SR.ComboKeyDown(_freezeCharKeyEntry)) {
+                PauseGame = !PauseGame;
+                if (_freezeCharEntry != null) _freezeCharEntry.Value = PauseGame;
+            }
+        }
+
         //--- open/close ---
         private static void CheckOpenKey() {
             if (_capturing != null) return;
-            if (Input.GetKeyDown(_openKey.Value) || SR.ComboKeyDown(_openKey)) {
+            //只用 ComboKeyDown：它 = 修饰键按住 + 主键按下（无修饰键时等价于裸按键）。
+            //原来写成 `Input.GetKeyDown(键) || ComboKeyDown(键)`，等于组合键形同虚设——
+            //绑了 Shift+Insert 之后单按 Insert 也会开面板（组合键"无效"的另一个来源）。
+            if (SR.ComboKeyDown(_openKey)) {
                 _visible = !_visible;
                 if (!_visible) CloseMenu();
                 else {

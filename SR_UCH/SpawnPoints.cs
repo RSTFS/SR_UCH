@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using BepInEx.Configuration;
@@ -39,12 +39,12 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(GameState), "Update")]
         [HarmonyPrefix]
         static void SpawnKeys() {
-            if (!SR.AllEnabled) return;
+            if (!SR.GateMaster) return;
             if (!Enabled) return;
             if (SR.UiOpen && SR.BlockInput) return;
             if (SR.MapOpen) return; //地图打开时 O/P/K 由地图页面处理，避免重复设置
-            //重生点功能只在自由模式可用（EX"无视模式限制"开启后任何模式都可用）
-            if (!SR.IgnoreModeLimit && GameSettings.GetInstance().GameMode != GameState.GameMode.FREEPLAY) return;
+            //重生点功能只在自由模式可用（统一门控；IgnoreModeLimit 已豁免）
+            if (!SR.GateModeAllows(SR.ModeMask.Freeplay)) return;
             if (SR.ComboKeyDown(_setKey)) SetPoint(GetLocalPosition());
             if (SR.ComboKeyDown(_respawnKey)) Respawn();
             if (SR.ComboKeyDown(_resetKey)) ResetPoints();
@@ -60,7 +60,7 @@ namespace SR_UCH.Tweaks {
                         if (p.AssociatedLobbyPlayer.CursorInstance != null)
                             return (Vector2)p.AssociatedLobbyPlayer.CursorInstance.transform.position;
                     }
-                } catch { }
+                } catch (Exception __ex) { SR.Guard.Log("取本地光标位置(Player)", __ex); }
                 try {
                     LobbyManager lm = LobbyManager.instance;
                     if (lm != null && lm.PlayerTracker != null) {
@@ -70,7 +70,7 @@ namespace SR_UCH.Tweaks {
                             if (lp.CursorInstance != null) return (Vector2)lp.CursorInstance.transform.position;
                         }
                     }
-                } catch { }
+                } catch (Exception __ex) { SR.Guard.Log("取本地光标位置(LobbyPlayer)", __ex); }
             }
             //不在地图界面：优先本地玩家的实际角色（Player.PlayerCharacter / GamePlayer.CharacterInstance）；
             //LobbyPlayer.CharacterInstance 对局中可能为 null，直接用它会落到光标位置 → 点不对
@@ -86,7 +86,7 @@ namespace SR_UCH.Tweaks {
                         return (Vector2)p.AssociatedLobbyPlayer.CursorInstance.transform.position;
                     return Vector2.zero;
                 }
-            } catch { }
+            } catch (Exception __ex) { SR.Guard.Log("取本地角色位置(Player)", __ex); }
             //树屋/大厅：优先"选中的角色"（选中后光标会隐藏，位置以角色为准）
             try {
                 LobbyManager lm = LobbyManager.instance;
@@ -98,7 +98,7 @@ namespace SR_UCH.Tweaks {
                         if (lp.CursorInstance != null) return (Vector2)lp.CursorInstance.transform.position;
                     }
                 }
-            } catch { }
+            } catch (Exception __ex) { SR.Guard.Log("取本地角色位置(树屋)", __ex); }
             foreach (Character c in UnityEngine.Object.FindObjectsOfType<Character>()) {
                 if (c != null && c.hasAuthority) return c.transform.position;
             }
@@ -120,7 +120,7 @@ namespace SR_UCH.Tweaks {
                         return;
                     }
                 }
-            } catch { }
+            } catch (Exception __ex) { SR.Guard.Log("传送本地角色(对局)", __ex); }
             //树屋/大厅：优先传送“选中的角色”（选中角色后光标会被隐藏，玩家的存在感 = 角色本体）
             try {
                 LobbyManager lm = LobbyManager.instance;
@@ -151,7 +151,7 @@ namespace SR_UCH.Tweaks {
                         return;
                     }
                 }
-            } catch { }
+            } catch (Exception __ex) { SR.Guard.Log("传送本地角色(树屋)", __ex); }
             //最后兜底：Character
             foreach (Character c in UnityEngine.Object.FindObjectsOfType<Character>()) {
                 if (c == null || !c.hasAuthority) continue;

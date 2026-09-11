@@ -50,18 +50,18 @@ public partial class SR {
                     _startup = true;
                     EnsureScanned();
                     ApplyDisabledPlugins();
+                    GateAudit.Run(); //T5：启动自检（列出补丁目标 + 标出每帧方法）
                 }
                 FovAdjust.CheckKey(); //view hotkey works in every scene (no ZoomCamera needed)
                 FovAdjust.TickInput(); //wheel zoom, once per frame
                 SR.Tick();
                 SR.CheckOpenKey();
                 SR.CheckMapKey();
-                SR.ApplyView();
-            }
-
-            private void LateUpdate() {
-                //applied after every other LateUpdate so the game camera control loses
-                SR.ApplyView();
+                SR.CheckToggleKeys(); //EX 页开关行的快捷键
+                //相机应用已收敛（提示词第 7 节性能项：原来每帧最多 4 次）。现保留两处最可靠时机：
+                //  ① Camera.onPreCull（渲染前，保证“锁定/地图取景”最后生效）
+                //  ② ZoomCamera.Update 后缀（游戏刚移动相机后立刻纠正）
+                //这里不再调用 SR.ApplyView()：Update/LateUpdate 的两次都被上面两处覆盖，纯属重复。
             }
 
             private void OnGUI() {

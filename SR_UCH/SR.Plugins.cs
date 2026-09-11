@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -34,18 +34,18 @@ public partial class SR {
 
         //unpatch every Harmony patch owned by this plugin (by id AND by scanning all patches)
         private static void UnpatchPlugin(string guid) {
-            try { HarmonyLib.Harmony.UnpatchID(guid); } catch { }
+            Guard.Try("撤销外部插件补丁(UnpatchID): " + guid, () => HarmonyLib.Harmony.UnpatchID(guid));
             try {
                 HarmonyLib.Harmony h = new HarmonyLib.Harmony("SR_UCH.Unpatch");
                 foreach (MethodBase mb in HarmonyLib.Harmony.GetAllPatchedMethods()) {
                     var pi = HarmonyLib.Harmony.GetPatchInfo(mb);
                     if (pi == null) continue;
-                    foreach (var p in pi.Prefixes) if (p.owner == guid) { try { h.Unpatch(mb, p.PatchMethod); } catch { } }
-                    foreach (var p in pi.Postfixes) if (p.owner == guid) { try { h.Unpatch(mb, p.PatchMethod); } catch { } }
-                    foreach (var p in pi.Transpilers) if (p.owner == guid) { try { h.Unpatch(mb, p.PatchMethod); } catch { } }
-                    foreach (var p in pi.Finalizers) if (p.owner == guid) { try { h.Unpatch(mb, p.PatchMethod); } catch { } }
+                    foreach (var p in pi.Prefixes) if (p.owner == guid) { Guard.Try("解绑 Prefix", () => h.Unpatch(mb, p.PatchMethod)); }
+                    foreach (var p in pi.Postfixes) if (p.owner == guid) { Guard.Try("解绑 Postfix", () => h.Unpatch(mb, p.PatchMethod)); }
+                    foreach (var p in pi.Transpilers) if (p.owner == guid) { Guard.Try("解绑 Transpiler", () => h.Unpatch(mb, p.PatchMethod)); }
+                    foreach (var p in pi.Finalizers) if (p.owner == guid) { Guard.Try("解绑 Finalizer", () => h.Unpatch(mb, p.PatchMethod)); }
                 }
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("扫描补丁表并解绑", __ex); }
         }
 
         private static void DisablePlugin(PluginEntry p) {
@@ -64,7 +64,7 @@ public partial class SR {
                 }
                 try {
                     new HarmonyLib.Harmony(p.guid).PatchAll(p.instance.GetType().Assembly);
-                } catch { }
+                } catch (Exception __ex) { Guard.Log("重新应用外部插件补丁: " + p.guid, __ex); }
             }
         }
 
@@ -109,7 +109,7 @@ public partial class SR {
             }
             if (changed) {
                 _disabledPluginsEntry.Value = string.Join(";", disabledSet);
-                try { _disabledPluginsEntry.ConfigFile.Save(); } catch { }
+                Guard.Try("外部插件禁用列表保存", () => _disabledPluginsEntry.ConfigFile.Save());
             }
         }
 

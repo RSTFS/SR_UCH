@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -21,18 +21,15 @@ public partial class SR {
         //the map only works in freeplay mode (附加"无视模式限制"或实验"树屋地图"开启后可放宽)
         private static void CheckMapKey() {
             if (_capturing != null) return;
-            if (!AllEnabled) return; //总开关关闭：地图不可用
+            if (!GateMaster) return; //总开关关闭：地图不可用（统一门控）
             if (!MapEnabled) return; //地图总开关关闭：M 键无效
-            //地图仅在自由模式可用；树屋需开启「树屋地图」；挑战禁用（"无视模式限制"开启后放宽）
-            try {
-                if (!SR.IgnoreModeLimit) {
-                    GameState.GameMode gm = GameSettings.GetInstance().GameMode;
-                    bool freeplay = gm == GameState.GameMode.FREEPLAY;
-                    bool treehouseOk = InTreehouseLobby() && TreehouseMap;
-                    if (!freeplay && !treehouseOk) return;
-                }
-            } catch { }
-            if (Input.GetKeyDown(_mapKey.Value) || SR.ComboKeyDown(_mapKey)) {
+            //自由模式可用；树屋需开「树屋地图」；IgnoreModeLimit 由 GateModeAllows 统一豁免
+            bool freeplay = GateModeAllows(ModeMask.Freeplay);
+            bool treehouseOk = InTreehouseLobby() && TreehouseMap;
+            if (!freeplay && !treehouseOk) return;
+            //只用 ComboKeyDown（= 修饰键按住 + 主键按下；无修饰等价裸按键）。
+            //原来 `Input.GetKeyDown(键) || ComboKeyDown(键)` 会让组合键失效：绑了 Shift+M 后单按 M 也开地图。
+            if (SR.ComboKeyDown(_mapKey)) {
                 //地图任何模式/场景都能打开（树屋由「地图总开关」控制；T 传送仅树屋/自由模式；O 仅自由模式）
                 _mapVisible = !_mapVisible;
                 if (_mapVisible) EnterMapView();
@@ -54,7 +51,7 @@ public partial class SR {
                     }
                 }
                 if (ZoomCamera.CurrentZoomCamera != null) return ZoomCamera.CurrentZoomCamera;
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("SR.Map.GetCurrentZoomCamera", __ex); }
             return Camera.main;
         }
 
@@ -93,7 +90,7 @@ public partial class SR {
                         player.x - (_mapMin.x + _mapMax.x) / 2f,
                         player.y - (_mapMin.y + _mapMax.y) / 2f, 0f);
                 }
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("SR.Map.Vector3", __ex); }
         }
 
         //本地玩家的当前位置（对局 = 角色；树屋 = 选中的角色或光标）
@@ -103,7 +100,7 @@ public partial class SR {
                 foreach (Character c in UnityEngine.Object.FindObjectsOfType<Character>()) {
                     if (c != null && c.hasAuthority) return c.transform.position;
                 }
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("SR.Map.LocalPlayerPos", __ex); }
             //树屋/大厅：本地 LobbyPlayer 的角色实例优先，光标其次
             //（GetLobbyPlayers 遍历，不依赖 PlayerTracker；树屋角色/光标均为网络对象）
             try {
@@ -118,13 +115,13 @@ public partial class SR {
                         if (lp.CursorInstance != null) return lp.CursorInstance.transform.position;
                     }
                 }
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("SR.Map.LocalPlayerPos", __ex); }
             //树屋兜底：本地 LobbyCursor（hasAuthority 的光标即本地玩家控制的树屋光标）
             try {
                 foreach (LobbyCursor c in UnityEngine.Object.FindObjectsOfType<LobbyCursor>()) {
                     if (c != null && c.hasAuthority) return c.transform.position;
                 }
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("SR.Map.LocalPlayerPos", __ex); }
             return Vector3.zero;
         }
 
@@ -171,7 +168,7 @@ public partial class SR {
                 if (lm != null && lm.CurrentLevelSelectController != null) return true;
                 string sc = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
                 if (sc == "TreeHouseLobby" || sc == "Treehouse" || sc == "Lobby" || (sc != null && sc.StartsWith("Lobby_"))) return true;
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("SR.Map.GetActiveScene", __ex); }
             try {
                 return GameSettings.GetInstance().GameMode != GameState.GameMode.FREEPLAY;
             } catch {
@@ -281,7 +278,7 @@ public partial class SR {
             //applied again right after the game moved the camera (belt and braces)
             if (!_mapVisible && !FovAdjust.LockView) return; //未激活：跳过
             Camera cam = null;
-            try { cam = __instance.useCamera; } catch { }
+            try { cam = __instance.useCamera; } catch (Exception __ex) { Guard.Log("SR.Map.ForceGameCamera", __ex); }
             if (cam == null) cam = __instance.GetComponent<Camera>();
             if (cam == null) return;
             if (_mapVisible) {
@@ -309,7 +306,7 @@ public partial class SR {
                         return;
                     }
                 }
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("SR.Map.Vector2", __ex); }
             //the game's exact camera bounds for the level (like BetterFreeplay)
             Level lv = UnityEngine.Object.FindObjectOfType<Level>();
             if (lv != null) {
@@ -320,7 +317,7 @@ public partial class SR {
                         _mapMax = new Vector2(b.max.x, b.max.y);
                         return;
                     }
-                } catch { }
+                } catch (Exception __ex) { Guard.Log("SR.Map.Vector2", __ex); }
             }
             //fallback: aggregate placeables + players
             _mapMin = new Vector2(float.MaxValue, float.MaxValue);
@@ -366,17 +363,17 @@ public partial class SR {
             try {
                 LevelSelectController lsc = LobbyManager.instance != null ? LobbyManager.instance.CurrentLevelSelectController : null;
                 treehouseMap = lsc != null;
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("SR.Map.GameCamera", __ex); }
             if (!treehouseMap) {
                 try {
                     string sc = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
                     treehouseMap = sc == "TreeHouseLobby" || sc == "Treehouse" || sc == "Lobby" || sc.StartsWith("Lobby_");
-                } catch { }
+                } catch (Exception __ex) { Guard.Log("SR.Map.StartsWith", __ex); }
             }
             if (!treehouseMap) {
                 try {
                     treehouseMap = GameSettings.GetInstance().GameMode != GameState.GameMode.FREEPLAY;
-                } catch { }
+                } catch (Exception __ex) { Guard.Log("SR.Map.GetInstance", __ex); }
             }
 
             //top bar

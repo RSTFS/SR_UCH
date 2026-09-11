@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -59,10 +59,11 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(GameState), "Update")]
         [HarmonyPrefix]
         static void ToggleKeys() {
-            if (!SR.AllEnabled) return;
+            if (!SR.GateMaster) return;
             if (!Enabled) return;
             if (SR.UiOpen && SR.BlockInput) return; 
-            bool collLocked = !Experiments.IsProgressionUnlocked();
+            //进度锁走统一门控（能力门，读每帧快照缓存；不再每帧直读存档）
+            bool collLocked = !SR.ProgressionAllows(SR_UCH.Gating.ProgressGroup.A);
             if (collLocked) {
                 //A 组未解锁时按键静默忽略（不再弹“未解锁”提示）
                 SR.ComboKeyDown(_toggleCollisionKey);
@@ -85,11 +86,11 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(PiecePlacementCursor), "ReceiveEvent")]
         [HarmonyPostfix]
         static void OnPieceInput(PiecePlacementCursor __instance) {
-            if (!SR.AllEnabled) return;
+            if (!SR.GateMaster) return;
             if (!Enabled) return;
             if (SR.UiOpen && SR.BlockInput) return; 
             if (__instance.Piece == null) return;
-            __instance.Piece.IgnorePlacementRules = _collisionOverride && Experiments.IsProgressionUnlocked();
+            __instance.Piece.IgnorePlacementRules = _collisionOverride && SR.ProgressionAllows(SR_UCH.Gating.ProgressGroup.A);
         }
 
         //自由放置（网格覆盖）：在游戏计算网格位置后，把 Piece 位置改为自由位置（不吸附 1 单位网格）。
@@ -113,11 +114,11 @@ namespace SR_UCH.Tweaks {
                         _heldOffsetField = AccessTools.Field(typeof(PiecePlacementCursor), "heldPositionOffset");
                     Vector3 held = Vector3.zero;
                     if (_heldOffsetField != null) {
-                        try { held = (Vector3)_heldOffsetField.GetValue(__instance); } catch { }
+                        try { held = (Vector3)_heldOffsetField.GetValue(__instance); } catch (Exception __ex) { SR.Guard.Log("BuilderEnhancements.Field", __ex); }
                     }
                     Vector2 freePos = new Vector2(cp.x + held.x + offset.x, cp.y + held.y + offset.y);
                     __instance.Piece.transform.position = new Vector3(freePos.x, freePos.y, __instance.Piece.transform.position.z);
-                } catch { }
+                } catch (Exception __ex) { SR.Guard.Log("BuilderEnhancements.Vector3", __ex); }
             }
         }
     }

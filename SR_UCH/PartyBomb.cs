@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -35,11 +35,12 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(ChatDisplay), "DisplayNewMessage", new Type[] { typeof(ChatMessageDetails) })]
         [HarmonyPrefix]
         static void OnBombEmote(ChatMessageDetails chatMessageDetails) {
-            if (!SR.AllEnabled || !Enabled) return;
+            if (!SR.GateMaster || !Enabled) return;
             try {
                 if (chatMessageDetails.EmoteType != EmoteMeanings.EMOTE_Bomb) return;
                 //仅服务器（房主）端统计/生成（炸弹需 NetworkServer.Spawn 广播全员）
-                if (!UnityEngine.Networking.NetworkServer.active) return;
+                //统一走 SR.HasServer（= NetworkServer.active），见 SR.Gate.Service.cs。
+                if (!SR.HasServer) return;
                 List<int> online = OnlinePlayerNumbers();
                 if (online.Count == 0) return;
                 _bombSent.Add(chatMessageDetails.NetworkNumber);
@@ -71,7 +72,7 @@ namespace SR_UCH.Tweaks {
                         list.Add(info.NetworkNumber);
                     }
                 }
-            } catch { }
+            } catch (Exception __ex) { SR.Guard.Log("统计在线玩家(PlayerTracker)", __ex); }
             if (list.Count == 0) {
                 try {
                     foreach (Player p in PlayerManager.GetInstance()) {
@@ -79,7 +80,7 @@ namespace SR_UCH.Tweaks {
                         int n = p.PlayerCharacter.networkNumber;
                         if (!list.Contains(n)) list.Add(n);
                     }
-                } catch { }
+                } catch (Exception __ex) { SR.Guard.Log("统计在线玩家(PlayerManager)", __ex); }
             }
             return list;
         }
@@ -106,14 +107,14 @@ namespace SR_UCH.Tweaks {
 
                 //定位：设 parent、美术层、Layer、圆周半径内随机位置（尽量不重叠到已有道具角度）
                 piece.transform.SetParent(pb.transform, false);
-                try { piece.ChangeArtLayer("Background 2"); } catch { }
+                try { piece.ChangeArtLayer("Background 2"); } catch (Exception __ex) { SR.Guard.Log("设置炸弹美术层", __ex); }
                 foreach (Transform t in piece.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = 5;
                 float ang = UnityEngine.Random.Range(0f, 360f) * Mathf.Deg2Rad;
                 float rad = Mathf.Max(0.1f, pb.PlacementRadius * 0.8f);
                 piece.transform.localPosition = new Vector3(Mathf.Cos(ang) * rad, Mathf.Sin(ang) * rad, 0f);
                 piece.NetworkUseStartPosition = true;
                 piece.FindPartyBox = true; //让 piece 找到并跟随派对盒子（同游戏自身 spawn）
-                try { piece.setInitialScale(GameSettings.GetInstance().partyBoxItemScale); } catch { }
+                try { piece.setInitialScale(GameSettings.GetInstance().partyBoxItemScale); } catch (Exception __ex) { SR.Guard.Log("设置炸弹初始缩放", __ex); }
                 piece.InPartybox = true;
                 piece.Enable(); //激活可交互（参考 PartyBox.ChoosePieces）
                 NetworkServer.Spawn(piece.gameObject);
@@ -149,16 +150,6 @@ namespace SR_UCH.Tweaks {
             }
             int idx = Mathf.Clamp(size, 0, arr.Length - 1);
             return arr[idx];
-        }
-
-        static string ListBombTypes(PartyBox pb) {
-            string s = "";
-            for (int i = 0; i < pb.BombPrefab.Length; i++) {
-                string nm = pb.BombPrefab[i] != null ? pb.BombPrefab[i].name : "null";
-                if (s.Length > 0) s += ", ";
-                s += "#" + i + "=" + nm;
-            }
-            return s;
         }
     }
 }

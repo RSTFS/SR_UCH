@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using BepInEx.Configuration;
@@ -38,6 +38,27 @@ namespace SR_UCH.Tweaks {
         }
 
         public static bool Loaded { get { return T != null; } }
+
+        //--- EX 反射接口版本握手 ---
+        //SR_UCH 不引用 EX 模块，双方靠 ApiVersion 协商接口版本。EX 未安装 → VersionOk=false 但
+        //EX 页本身就隐藏；EX 装了但版本过旧/无该属性 → 记一次告警，并在 EX 页明确提示
+        //（提示词第 7 节“闭源 EX 通道：加 ApiVersion 握手 + EX 页明确提示”）。
+        public const int RequiredApiVersion = 1;
+        private static bool _versionChecked;
+        private static int _apiVersion;
+        public static int ExApiVersion { get { EnsureVersionChecked(); return _apiVersion; } }
+        public static bool VersionOk { get { return Loaded && ExApiVersion >= RequiredApiVersion; } }
+        private static void EnsureVersionChecked() {
+            if (_versionChecked) return;
+            _versionChecked = true;
+            try {
+                _apiVersion = Loaded ? Get<int>("ApiVersion") : 0;
+                if (Loaded && _apiVersion < RequiredApiVersion) {
+                    MainPlugin.ModLogger.LogWarning("[EX] 附加模块接口版本不匹配：EX=" + _apiVersion
+                        + "，需要 >= " + RequiredApiVersion + "。部分 EX 功能可能不可用，请更新 SR_UCH_EX.dll。");
+                }
+            } catch { _apiVersion = 0; }
+        }
 
         private static MethodInfo M(string name, params Type[] argTypes) {
             string key = name;
@@ -159,6 +180,13 @@ namespace SR_UCH.Tweaks {
 
         public static void KickTarget() { Call("KickTarget"); }
         public static void ClearPartyBox() { Call("ClearPartyBox"); }
+        public static void ClearMapObjects() { Call("ClearMapObjects"); }
+        public static void KillTarget() { Call("KillTarget"); }
+        public static ConfigEntry<KeyCode> ClearMapObjectsKeyEntry { get { return Get<ConfigEntry<KeyCode>>("ClearMapObjectsKeyEntry"); } }
+        public static ConfigEntry<KeyCode> KillKeyEntry { get { return Get<ConfigEntry<KeyCode>>("KillKeyEntry"); } }
+        public static ConfigEntry<KeyCode> ClearPartyBoxKeyEntry { get { return Get<ConfigEntry<KeyCode>>("ClearPartyBoxKeyEntry"); } }
+        //「无视房主限制」开关的快捷键（EX 侧轮询；旧版 EX 没有这个属性时返回 null → 该行不可绑键，不会报错）
+        public static ConfigEntry<KeyCode> IgnoreHostLimitKeyEntry { get { return Get<ConfigEntry<KeyCode>>("IgnoreHostLimitKeyEntry"); } }
         public static void AddScore() { Call("AddScore"); }
         public static void AddCoin() { Call("AddCoin"); }
         public static void WinTarget() { Call("WinTarget"); }

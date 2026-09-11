@@ -18,6 +18,8 @@ public partial class SR {
 // ==== 分区：Window（主窗口框架：Tick 主循环 / 标题栏 / DrawGUI / 窗口拖动缩放）====
 
         private static void Tick() {
+            //门控快照：每帧刷新一次（所有限制读同一份 → 同帧一致；进度解锁走缓存不读存档）
+            RefreshGate();
             //延迟加载后清理：FadeOut 后 1 秒执行 GC.Collect + UnloadUnusedAssets（不阻塞过渡）
             if (_pendingCleanupAt >= 0f && Time.unscaledTime >= _pendingCleanupAt) {
                 _pendingCleanupAt = -1f;
@@ -25,19 +27,13 @@ public partial class SR {
                     _lastCleanedScene = _pendingCleanupScene;
                     System.GC.Collect();
                     Resources.UnloadUnusedAssets();
-                } catch { }
+                } catch (Exception __ex) { Guard.Log("加载后清理(GC)", __ex); }
             }
-            //进度解锁：未达标时锁定项强制复位为 false（每分钟检查一次，避免频繁读存档；
-            //内部按 A/B 组分别判断是否已解锁，已解锁的组不再复位）
-            _progCheckTimer += Time.unscaledDeltaTime;
-            if (_progCheckTimer >= 60f) {
-                _progCheckTimer = 0f;
-                ForceLockedConfigs();
-            }
+            //（已移除）进度解锁的“每分钟强制复位”：改为纯运行时门控，见 SR.Progression.cs 顶部说明。
             //fade in/out for open/close
             _uiAlpha = Mathf.Clamp01(_uiAlpha + (_visible ? 8f : -8f) * Time.unscaledDeltaTime);
             //总开关 / 地图总开关关闭时强制退出已打开的地图（运行时关闭开关的场景）
-            if ((!AllEnabled || !MapEnabled) && _mapVisible) {
+            if ((!GateMaster || !MapEnabled) && _mapVisible) {
                 ExitMapView();
                 _mapVisible = false;
             }
@@ -62,9 +58,103 @@ public partial class SR {
             if (_dirty && !Input.GetMouseButton(0) && !Input.GetMouseButton(1)) {
                 _dirty = false;
                 if (_dirtyConfig != null) {
-                    _dirtyConfig.Save();
+                    var dc = _dirtyConfig;
                     _dirtyConfig = null;
+                    //配置写盘失败以前是静默的（表现为“改了设置重启就没了”）；统一记日志
+                    Guard.Try("配置保存", () => dc.Save());
                 }
+            }
+        }
+
+        //录制：每按下一个键记一个。规则：
+        //  · **最多三个键**（再多按不再记）；
+        //  · 每个键最多出现一次（Q→Q→W 不允许，只能 Q→W）；
+        //  · **必须按住上一个再按下一个**：因为"松开任意键即完成录制"（见结束条件），
+        //    序列只可能由"按住链"构成（和弦式），松手就定型。
+        private static void RecPushKey(KeyCode k) {
+            if (k == KeyCode.None) return;
+            if (_recSeq.Count >= 3) return;   //最多三个键
+            if (_recSeq.Contains(k)) return;  //同键只记一次
+            _recSeq.Add(k);
+            if (!_recHeld.Contains(k)) _recHeld.Add(k);
+            _recLastAt = Time.unscaledTime;
+        }
+
+        //松手检测：把已经松开的键从"仍按住"集合里去掉（全部松开 → 立刻完成录制并保存）
+        private static void RecCheckRelease() {
+            for (int i = _recHeld.Count - 1; i >= 0; i--) {
+                bool held;
+                try { held = Input.GetKey(_recHeld[i]); } catch { held = false; }
+                if (!held) _recHeld.RemoveAt(i);
+            }
+        }
+
+        //结束录制并保存：最后一个键 = 主键；开头连续的修饰键 = 组合修饰；中间其余键 = 序列前键。
+        //这样"单键 / Shift+1 / Shift+Q+W / Q+W"都是同一条存储格式。
+        private static void CommitRecording() {
+            ConfigEntryBase cap = _capturing;
+            if (cap == null) { _recSeq.Clear(); return; }
+            if (_recSeq.Count == 0) { _capturing = null; _dirty = true; return; }
+            KeyCode main = _recSeq[_recSeq.Count - 1];
+            ComboMod mods = ComboMod.None;
+            List<KeyCode> extras = new List<KeyCode>();
+            for (int i = 0; i < _recSeq.Count - 1; i++) {
+                KeyCode k = _recSeq[i];
+                if (extras.Count == 0 && IsModifierKey(k)) {
+                    if (k == KeyCode.LeftShift || k == KeyCode.RightShift) mods |= ComboMod.Shift;
+                    else if (k == KeyCode.LeftControl || k == KeyCode.RightControl) mods |= ComboMod.Ctrl;
+                    else mods |= ComboMod.Alt;
+                } else {
+                    extras.Add(k);
+                }
+            }
+            try {
+                if (cap.SettingType == typeof(BepInEx.Configuration.KeyboardShortcut)) {
+                    //外部模组的 KeyboardShortcut：只支持 主键+修饰键，序列前键不适用（保留主键与修饰）
+                    List<KeyCode> mk = new List<KeyCode>();
+                    if ((mods & ComboMod.Shift) != 0) mk.Add(KeyCode.LeftShift);
+                    if ((mods & ComboMod.Ctrl) != 0) mk.Add(KeyCode.LeftControl);
+                    if ((mods & ComboMod.Alt) != 0) mk.Add(KeyCode.LeftAlt);
+                    try { cap.BoxedValue = new BepInEx.Configuration.KeyboardShortcut(main, mk.ToArray()); } catch (Exception __ex) { Guard.Log("写入组合键(KeyboardShortcut)", __ex); }
+                } else {
+                    SetValue(cap, main);
+                    SetKeyComboMod(cap, mods);            //先写修饰键
+                    SetKeySeqExtra(cap, extras);          //再写序列前键（合并进同一个隐藏条目）
+                }
+                try {
+                    string s = "";
+                    foreach (KeyCode k in _recSeq) s += (s.Length > 0 ? " → " : "") + k;
+                    MainPlugin.ModLogger.LogInfo("[HotkeyDiag] 保存快捷键 " + cap.Definition.Key + " = " + s);
+                } catch { }
+            } finally {
+                _capturing = null;
+                _pendingModKey = KeyCode.None;
+                _recSeq.Clear();
+                _dirty = true;
+            }
+        }
+
+        //统一绑定入口（保留给个别直接绑定鼠标键的旧路径用）
+        private static void BindCapturedKey(KeyCode kc, ComboMod mod) {
+            ConfigEntryBase cap = _capturing;
+            if (cap == null) return;
+            try {
+                if (cap.SettingType == typeof(BepInEx.Configuration.KeyboardShortcut)) {
+                    //BepInEx 的 KeyboardShortcut 自带"修饰键列表"，这里把按住的修饰键一并写进去（支持 Ctrl+Alt+X）
+                    List<KeyCode> mods = new List<KeyCode>();
+                    if ((mod & ComboMod.Shift) != 0) mods.Add(KeyCode.LeftShift);
+                    if ((mod & ComboMod.Ctrl) != 0) mods.Add(KeyCode.LeftControl);
+                    if ((mod & ComboMod.Alt) != 0) mods.Add(KeyCode.LeftAlt);
+                    try { cap.BoxedValue = new BepInEx.Configuration.KeyboardShortcut(kc, mods.ToArray()); } catch (Exception __ex) { Guard.Log("写入组合键(KeyboardShortcut)", __ex); }
+                } else {
+                    SetValue(cap, kc);
+                    SetKeyComboMod(cap, mod);
+                }
+                try { MainPlugin.ModLogger.LogInfo("[HotkeyDiag] 绑定 " + cap.Definition.Key + " = " + kc + " 修饰=" + mod); } catch { }
+            } finally {
+                _capturing = null;
+                _pendingModKey = KeyCode.None;
+                _dirty = true;
             }
         }
 
@@ -99,6 +189,12 @@ public partial class SR {
             Event e = Event.current;
             Vector2 mouse = e.mousePosition; //no matrix scale, so no conversion needed
 
+            //诊断（临时）：确认 SR 的 OnGUI 是否收到右键按下（没有这条日志 = 右键根本没到插件）
+            if (e.type == EventType.MouseDown && e.button == 1 && Time.realtimeSinceStartup - _hotkeyDiagAt0 > 0.5f) {
+                _hotkeyDiagAt0 = Time.realtimeSinceStartup;
+                try { MainPlugin.ModLogger.LogInfo("[HotkeyDiag] OnGUI 收到右键 pos=" + e.mousePosition + " 窗口=(" + _winX + "," + _winY + "," + _winWidth + "," + _winHeight + ") 模式=" + _mode + " 栏目=" + _selectedInternalSection); } catch { }
+            }
+
             Rect winRect = new Rect(_winX, _winY, _winWidth, _winHeight);
             bool over = winRect.Contains(mouse);
             Rect gripRect = new Rect(winRect.xMax - Sc(20), winRect.yMax - Sc(20), Sc(20), Sc(20));
@@ -107,12 +203,19 @@ public partial class SR {
                 gripRect = new Rect(0, 0, 0, 0);
             }
 
-            //key capture: next keypress binds, Esc clears to (未设置), Shift+Esc cancels
-            //(restores the previous value), click cancels.
-            //组合键：按主键时若同时按住 Shift/Ctrl/Alt，则绑定为组合键（如 Shift+P），
-            //修饰键持久化到隐藏配置；显示为 "Shift + P"。所有自定义键位都支持。
-            //注意：纯修饰键（Shift/Ctrl/Alt 自身）不作为主键——先按住 Ctrl 再按 P 时，
-            //Ctrl 的 KeyDown 事件被跳过，等 P 到达时才绑定 Ctrl+P（避免绑成 Ctrl+Ctrl）。
+            //EX 按钮右键绑键：改为"HOTKEY 按钮画完当帧自判"（见 SR.Pages.TryBindByRightClick），
+            //不再跨帧登记矩形（跨帧矩形会被上方状态栏的增减行挤位移 → 右键绑错键）。
+            //下拉框展开中的点击处理：必须在页面内容之前拦截，否则点击会被浮层下面的控件先吃掉。
+            //（_combo* 是上一帧渲染时记录的，本帧此刻仍有效；本帧稍后 BeginScrollView 前才清空重记。）
+            //下拉框展开列表改为"布局流内下一行"绘制（见 SR.Settings.DrawComboListInline），
+            //不再需要帧首帧首命中检测/吞事件，也就没有穿透问题。
+            //=== 快捷键录制态 ===
+            //进入这个状态后**收集所有按键及其顺序**，保存为一整条快捷键：
+            //  · 单个键       → 单键
+            //  · 修饰键+主键  → 组合键（如 Shift → 1，等价于旧的 Shift+1）
+            //  · 多个普通键   → 序列键（如 9 → 0）
+            //结束方式：Enter 立即保存 / 静默 0.8 秒自动保存（松手即生效）/ Backspace 删掉最后一个 /
+            //          Esc 清空绑定、Shift+Esc 放弃改动 / 左键点击别处取消。
             if (_capturing != null) {
                 //鼠标侧键检测（IMGUI 的 MouseDown 事件对侧键 button 3/4 不一定触发，
                 //用 Input.GetMouseButtonDown 独立检测侧键1(button3=Mouse4)、侧键2(button4=Mouse5)）
@@ -122,89 +225,59 @@ public partial class SR {
                     else if (Input.GetMouseButtonDown(4)) sideBtn = 4; //侧键2 (Mouse5)
                 } catch { sideBtn = -1; }
                 if (sideBtn >= 0) {
-                    KeyCode mouseKey = KeyCode.Mouse0 + sideBtn; //Mouse3 / Mouse4
-                    ComboMod mmod = ComboMod.None;
-                    if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) mmod = ComboMod.Shift;
-                    else if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) mmod = ComboMod.Ctrl;
-                    else if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) mmod = ComboMod.Alt;
-                    if (_capturing.SettingType == typeof(BepInEx.Configuration.KeyboardShortcut)) {
-                        try { _capturing.BoxedValue = new BepInEx.Configuration.KeyboardShortcut(mouseKey); } catch { }
-                    } else {
-                        SetValue(_capturing, mouseKey);
-                        SetKeyComboMod(_capturing, mmod);
-                    }
-                    _capturing = null;
-                    _dirty = true;
-                    Event.current.Use();
+                    RecPushKey(KeyCode.Mouse0 + sideBtn); //鼠标键也进序列（Mouse3 / Mouse4）
+                    if (Event.current != null) Event.current.Use();
                     return;
                 }
                 if (e.type == EventType.KeyDown) {
                     if (e.keyCode == KeyCode.Escape) {
                         if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) {
-                            //Shift+Esc = cancel, keep the old binding
+                            //Shift+Esc = 放弃这次改动，恢复原值
                             if (_prevBoxed != null) {
-                                try { _capturing.BoxedValue = _prevBoxed; } catch { }
+                                try { _capturing.BoxedValue = _prevBoxed; } catch (Exception __ex) { Guard.Log("恢复组合键原值", __ex); }
                             }
                         } else {
-                            //Esc = clear the binding
+                            //Esc = 清空绑定
                             if (_capturing.SettingType == typeof(BepInEx.Configuration.KeyboardShortcut)) {
-                                try { _capturing.BoxedValue = new BepInEx.Configuration.KeyboardShortcut(KeyCode.None); } catch { }
+                                try { _capturing.BoxedValue = new BepInEx.Configuration.KeyboardShortcut(KeyCode.None); } catch (Exception __ex) { Guard.Log("清空组合键", __ex); }
                             } else {
                                 SetValue(_capturing, KeyCode.None);
+                                SetKeyComboMod(_capturing, ComboMod.None);
+                                SetKeySeqExtra(_capturing, null);
                             }
-                            //清空组合修饰
-                            SetKeyComboMod(_capturing, ComboMod.None);
                         }
                         _capturing = null;
+                        _pendingModKey = KeyCode.None;
+                        _recSeq.Clear();
+                        _recHeld.Clear();
                         _dirty = true;
                         e.Use();
                     } else if (e.keyCode != KeyCode.None) {
-                        //允许纯修饰键作为主键（Shift/Ctrl/Alt 本身可设为快捷键）。
-                        bool isPureMod = e.keyCode == KeyCode.LeftShift || e.keyCode == KeyCode.RightShift ||
-                            e.keyCode == KeyCode.LeftControl || e.keyCode == KeyCode.RightControl ||
-                            e.keyCode == KeyCode.LeftAlt || e.keyCode == KeyCode.RightAlt;
-                        //检测按住的主修饰键（Shift > Ctrl > Alt 优先级）
-                        ComboMod mod = ComboMod.None;
-                        if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) mod = ComboMod.Shift;
-                        else if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) mod = ComboMod.Ctrl;
-                        else if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) mod = ComboMod.Alt;
-                        //主键是纯修饰键且与检测到的组合修饰是同一个键（如单独按 Ctrl）→ 无组合，主键=Ctrl
-                        bool ctrlAsMain = isPureMod && (e.keyCode == KeyCode.LeftControl || e.keyCode == KeyCode.RightControl) && mod == ComboMod.Ctrl;
-                        bool shiftAsMain = isPureMod && (e.keyCode == KeyCode.LeftShift || e.keyCode == KeyCode.RightShift) && mod == ComboMod.Shift;
-                        bool altAsMain = isPureMod && (e.keyCode == KeyCode.LeftAlt || e.keyCode == KeyCode.RightAlt) && mod == ComboMod.Alt;
-                        if (ctrlAsMain || shiftAsMain || altAsMain) mod = ComboMod.None;
-                        if (_capturing.SettingType == typeof(BepInEx.Configuration.KeyboardShortcut)) {
-                            try { _capturing.BoxedValue = new BepInEx.Configuration.KeyboardShortcut(e.keyCode); } catch { }
-                            //KeyboardShortcut 自含修饰，无需额外记录
-                        } else {
-                            SetValue(_capturing, e.keyCode);
-                            SetKeyComboMod(_capturing, mod);
-                        }
-                        _capturing = null;
-                        _dirty = true;
+                        //所有其它键都作为录制内容（不再有"Enter 保存"这类保留键；Esc 仍用于清空/放弃）
+                        RecPushKey(e.keyCode);
                         e.Use();
                     }
                 } else if (e.type == EventType.MouseDown) {
-                    //捕捉中：鼠标中键(2)及侧键(3+)可绑定为快捷键；左键(0)/右键(1)不绑定
-                    //（左键用于点击按钮进入捕捉，右键用于取消）
-                    if (_capturing != null && e.button >= 2 && e.button <= 6) {
-                        KeyCode mouseKey = KeyCode.Mouse0 + e.button; //Mouse2..Mouse6
-                        ComboMod mmod = ComboMod.None;
-                        if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) mmod = ComboMod.Shift;
-                        else if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) mmod = ComboMod.Ctrl;
-                        else if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) mmod = ComboMod.Alt;
-                        if (_capturing.SettingType == typeof(BepInEx.Configuration.KeyboardShortcut)) {
-                            try { _capturing.BoxedValue = new BepInEx.Configuration.KeyboardShortcut(mouseKey); } catch { }
-                        } else {
-                            SetValue(_capturing, mouseKey);
-                            SetKeyComboMod(_capturing, mmod);
-                        }
-                        _capturing = null;
-                        _dirty = true;
+                    //鼠标中键(2)及侧键(3+)作为序列中的一个键；左键(0)/右键(1)不录（用于取消）
+                    if (e.button >= 2 && e.button <= 6) {
+                        RecPushKey(KeyCode.Mouse0 + e.button);
                         e.Use();
                         return;
                     }
-                    _capturing = null;
+                    if (Time.frameCount != _captureStartFrame) {
+                        try { MainPlugin.ModLogger.LogInfo("[HotkeyDiag] 录制被鼠标取消 button=" + e.button); } catch { }
+                        _capturing = null;
+                        _pendingModKey = KeyCode.None;
+                        _recSeq.Clear();
+                        _recHeld.Clear();
+                    }
+                }
+                //录制结束条件（用户要求：**松开按键即完成保存**，不等待、不需要 Enter）：
+                //  · 录到的键全部松开 → 立刻保存；
+                //  · 因此按键必须是"按住链"：先按住第一个，再按第二个（最多三个），最后松手完成。
+                if (_capturing != null && _recSeq.Count > 0) {
+                    RecCheckRelease();
+                    if (_recHeld.Count == 0) CommitRecording();
                 }
             }
             //resize grip (hidden while collapsed)
@@ -242,6 +315,8 @@ public partial class SR {
                         _sidebarResizing = false;
                         _dragActive = false;
                         _dirty = true;
+                        //拖动结束把结果写回「栏目宽度」设置，保证重启后保持（0=自动时不动）
+                        try { if (_sidebarWEntry != null && _sidebarW > 0f) _sidebarWEntry.Value = Mathf.RoundToInt(_sidebarW); } catch (Exception __ex) { Guard.Log("保存栏目宽度", __ex); }
                     }
                 }
             }
@@ -318,22 +393,18 @@ public partial class SR {
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
             GUILayout.Space(Sc(2));
-            //right: search + entries + footer
+            //right: entries + footer（搜索已移除：条目过滤对中文界面无意义，直接删掉省一行）
             GUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
             GUILayout.BeginHorizontal();
-            //搜索标签：宽度按文本测量（英文 "Search" 比中文长）
-            float searchLabelW = _label.CalcSize(new GUIContent(T("搜索", "Search"))).x + Sc(10);
-            GUILayout.Label(T("搜索", "Search"), _label, GUILayout.Width(searchLabelW), GUILayout.Height(Sc(26)));
-            _search = GUILayout.TextField(_search, _searchBox, GUILayout.Width(Sc(220)), GUILayout.Height(Sc(26)));
             GUILayout.FlexibleSpace();
-            //本 Mod 总开关（搜索栏右侧）
+            //本 Mod 总开关（右上角）
             if (GUILayout.Button(new GUIContent(AllEnabled ? T("总开关：开", "Master ON") : T("总开关：关", "Master OFF"),
                 T("本 Mod 总开关：关闭时所有内部功能运行时失效，各功能开关值保持不变", "Mod master switch: off disables all internal features at runtime")),
                 AllEnabled ? _selItem : _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(26)))) {
                 AllEnabled = !AllEnabled;
                 if (_allEnabledEntry != null) {
                     _allEnabledEntry.Value = AllEnabled; //写入配置
-                    try { _allEnabledEntry.ConfigFile.Save(); } catch { } //自动保存
+                    Guard.Try("总开关自动保存", () => _allEnabledEntry.ConfigFile.Save()); //自动保存（失败记日志）
                 }
             }
             GUILayout.EndHorizontal();
@@ -344,7 +415,7 @@ public partial class SR {
                 if (GUILayout.Button(T("恢复默认", "Defaults"), _btn, GUILayout.Width(Sc(84)))) {
                     if (_internalConfig != null) {
                         foreach (ConfigEntryBase ce in AllEntries(_internalConfig)) {
-                            try { ce.BoxedValue = ce.DefaultValue; } catch { }
+                            Guard.Try("恢复默认值 " + ce.Definition.Key, () => ce.BoxedValue = ce.DefaultValue);
                         }
                         _internalConfig.Save();
                         _editText.Clear();
@@ -381,39 +452,13 @@ public partial class SR {
                 } else if (_selectedInternalSection == "关卡") {
                     RenderLevelPage();
                 } else {
-                    //视野 page: read-only 当前 FOV box on top (order: 当前FOV, 自由相机, FOV滑块, 按键)
-                    if (_selectedInternalSection == "视野") {
-                        GUILayout.BeginHorizontal();
-                        GUILayout.Label(T("当前 FOV", "Current FOV"), _label, GUILayout.Width(colWidth), GUILayout.Height(Sc(26)));
-                        GUILayout.FlexibleSpace();
-                        bool oldEn = GUI.enabled;
-                        GUI.enabled = false;
-                        GUILayout.TextField(FovAdjust.CurrentFov().ToString("0.0"), _searchBox, GUILayout.Width(Sc(90)), GUILayout.Height(Sc(26)));
-                        GUI.enabled = oldEn;
-                        GUILayout.EndHorizontal();
-                        GUILayout.Space(Sc(2));
-                    }
+                    //（已删除）原“视野”分区分支与“Respawn”分区分支：永远不可达——
+                    //  SR.Core 已把「视野」「Respawn」两个 config section 从侧栏栏目 continue 掉，
+                    //  它们的条目由地图页（RenderMapPage，界面显示为“自由模式”）渲染
+                    //  （提示词第 7 节“死代码”）。同时删掉只服务于它们的 respDiv/spawnDiv。
                     bool any = false;
                     bool blDiv = false; //建造增强页内“建造上限”小分区的分隔标题只画一次
-                    bool respDiv = false; //重生页内“重生”分区标题
-                    bool spawnDiv = false; //重生页内“重生点”分区标题
                     foreach (ConfigEntryBase entry in InternalSectionEntries()) {
-                        //重生页：按功能分两个分区（重生 / 重生点）
-                        if (entry.Definition.Section == "Respawn") {
-                            string rk = entry.Definition.Key;
-                            if (!respDiv && (rk == "Enabled" || rk == "Spawn Immunity" || rk == "Delay")) {
-                                respDiv = true;
-                                GUILayout.Space(Sc(6));
-                                GUILayout.Label("— " + T("重生", "Respawn") + " —", _secHeader);
-                                GUILayout.Space(Sc(2));
-                            }
-                            if (!spawnDiv && (rk == "Spawn Points Enabled" || rk == "Set Spawn Key" || rk == "Respawn Key" || rk == "Reset Spawn Keys")) {
-                                spawnDiv = true;
-                                GUILayout.Space(Sc(6));
-                                GUILayout.Label("— " + T("重生点", "Spawn Points") + " —", _secHeader);
-                                GUILayout.Space(Sc(2));
-                            }
-                        }
                         //建造增强: the toggle keys are merged into the override rows below
                         if (entry.Definition.Section == "Builder Enhancements" && IsBuilderToggleKey(entry.Definition.Key)) continue;
                         //建造增强页内的“建造上限”分区：先画分隔标题 + 当前生效值，再画这两行
@@ -505,30 +550,20 @@ public partial class SR {
                 GUILayout.EndHorizontal();
                 GUILayout.Space(Sc(4));
             }
-            //footer: settings shortcut (bottom-left) + save/reload
+            //footer: settings shortcut (bottom-left) + current page label
             GUILayout.BeginHorizontal(_footer);
-            //按钮宽度按文本测量（英文 "Settings"/"Reload" 比中文长，固定宽度会截断）
+            //按钮宽度按文本测量（英文比中文长，固定宽度会截断）
             float settingsW = _btn.CalcSize(new GUIContent(T("设置", "Settings"))).x + Sc(18);
-            float saveW = _btn.CalcSize(new GUIContent(T("保存", "Save"))).x + Sc(18);
-            float reloadW = _btn.CalcSize(new GUIContent(T("重新加载", "Reload"))).x + Sc(18);
             if (GUILayout.Button(T("设置", "Settings"), _mode == Mode.Settings ? _selItem : _btn, GUILayout.Width(settingsW))) {
                 _mode = Mode.Settings;
                 _editText.Clear();
                 _editOpen.Clear();
                 _capturing = null;
             }
-            GUILayout.Space(Sc(8));
-            if (GUILayout.Button(T("保存", "Save"), _btn, GUILayout.Width(saveW))) {
-                _dirty = false;
-                if (_dirtyConfig != null) _dirtyConfig.Save();
-                if (curConfig != null) curConfig.Save();
-                _dirtyConfig = null;
-            }
-            if (GUILayout.Button(T("重新加载", "Reload"), _btn, GUILayout.Width(reloadW))) {
-                if (curConfig != null) curConfig.Reload();
-                _editText.Clear();
-                _editOpen.Clear();
-            }
+            //「保存」与「重读配置」都已删除：
+            //  · 保存没有作用——BepInEx 的 ConfigFile 默认 SaveOnConfigSet=true，改任何一项都会立即写盘，
+            //    本 mod 另有"松开鼠标即保存"的自动写盘（见 Tick）；
+            //  · 重读配置（config.Reload）只有"在游戏外手改 .cfg 后同步"这一种用途，属边缘场景，按用户要求一并删除。
             GUILayout.FlexibleSpace();
             GUILayout.Space(Sc(60));
             GUILayout.Label(ModeLabel(), _label, GUILayout.Width(Sc(160)), GUILayout.Height(Sc(26)));

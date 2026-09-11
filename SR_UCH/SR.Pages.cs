@@ -15,13 +15,13 @@ using UnityEngine.UI;
 namespace SR_UCH.Tweaks {
 public partial class SR {
 
-// ==== 分区：Pages（各栏目页面渲染：首页/地图/EX/实验/快速调整/会话内容）====
+// ==== 分区：Pages（各栏目页面渲染：首页/地图/EX/实验/快速调整/会话内容）===
 
         //快速调整 page: 分数折扣 + 快速切换 + 快速自杀 (三个分区)
         private static void RenderQuickAdjustConsole() {
             GUILayout.Label(T("— 分数折扣 —", "— Score discount —"), _secHeader);
             //折扣数值：默认滑块（0/10/20...90 整十倍数，与其它滑块条一致的 DrawSlider 样式）；
-            //「更多折扣数值」开 → 编辑框自由 0-90。更多折扣选择框放在"恢复原值"右侧。
+            //「更多折扣数值」开 → 编辑框自由 0-90。更多折扣选择框放到"恢复原值"右侧。
             GUILayout.BeginHorizontal();
             ConfigEntryBase disc = FindInternalEntry("快速调整", "Score Discount");
             int discVal = Experiments.ScoreDiscount;
@@ -37,12 +37,12 @@ public partial class SR {
                     if (disc != null) SetValue(disc, parsed);
                 }
             } else {
-                //滑块：0-90 整十倍数（DrawSlider 样式，滚轮也支持）
+                //滑块：0-90 整十倍数（DrawSlider 样式，滚轮也支持）。
                 int slideVal = Mathf.Clamp((discVal + 5) / 10 * 10, 0, 90);
                 Rect sr = GUILayoutUtility.GetRect(Sc(220), Sc(28));
                 float nv = DrawSlider(sr, slideVal, 0f, 90f, true);
                 int nslide = Mathf.RoundToInt(nv / 10f) * 10; //吸附整十
-                if (nslide != slideVal && disc != null) SetValue(disc, nslide);
+                if (_sliderCommitted && nslide != slideVal && disc != null) SetValue(disc, nslide);
                 GUILayout.Label(T(nslide + "%", nslide + "%"), _label, GUILayout.Width(Sc(52)), GUILayout.Height(Sc(26)));
             }
             GUILayout.FlexibleSpace();
@@ -88,20 +88,24 @@ public partial class SR {
             //等待秒数滑块（0-2，步长 0.1；与折扣滑块同宽）
             GUILayout.BeginHorizontal();
             ConfigEntryBase qrh = FindInternalEntry("快速调整", "Quick Retry Hold");
-            GUILayout.Label(T("等待秒数", "Hold s"), _label, GUILayout.Width(Sc(84)), GUILayout.Height(Sc(26)));
+            //游戏默认值放在"等待秒数"的悬浮提示里（不再单独占一个标签）
+            GUILayout.Label(new GUIContent(T("等待秒数", "Hold s"),
+                T("长按 B 的等待阈值（Character.SuicideTime）：挑战模式「重试」游戏默认 " + Experiments.VanillaHoldBText(false) + "。",
+                  "Hold-B threshold (Character.SuicideTime): vanilla " + Experiments.VanillaHoldBText(false) + " for challenge retry.")),
+                _label, GUILayout.Width(Sc(84)), GUILayout.Height(Sc(26)));
             if (qrh != null) {
                 float hv = (float)qrh.BoxedValue;
                 Rect hr = GUILayoutUtility.GetRect(Sc(150), Sc(28));
                 float hn = DrawSlider(hr, hv, 0f, 2f, false);
                 hn = Mathf.Round(hn * 10f) / 10f; //吸附 0.1
-                if (Mathf.Abs(hn - hv) > 0.0001f) SetValue(qrh, hn);
+                if (_sliderCommitted && Mathf.Abs(hn - hv) > 0.0001f) SetValue(qrh, hn);
                 GUILayout.Label(T(hn.ToString("0.0") + "s", hn.ToString("0.0") + "s"), _label, GUILayout.Width(Sc(44)), GUILayout.Height(Sc(26)));
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.Space(Sc(6));
 
-            //快速切换（仅自由模式）：快速切换 + 等待秒数滑块
+            //快速切换 + 等待秒数滑块
             GUILayout.Label(T("— 快速切换 —", "— Quick switch —"), _secHeader);
             GUILayout.BeginHorizontal();
             ConfigEntryBase qs = FindInternalEntry("快速调整", "Quick Switch");
@@ -113,13 +117,17 @@ public partial class SR {
             //等待秒数滑块（0-2，步长 0.1；与折扣滑块同宽）
             GUILayout.BeginHorizontal();
             ConfigEntryBase qsh = FindInternalEntry("快速调整", "Quick Switch Hold");
-            GUILayout.Label(T("等待秒数", "Hold s"), _label, GUILayout.Width(Sc(84)), GUILayout.Height(Sc(26)));
+            //游戏默认值放在"等待秒数"的悬浮提示里（不再单独占一个标签）
+            GUILayout.Label(new GUIContent(T("等待秒数", "Hold s"),
+                T("自由模式长按 B 的阈值：行动→建造 = Character.SuicideTime，游戏默认 " + Experiments.VanillaHoldBText(true) + "；建造→行动 = PiecePlacementCursor.SwitchTime。",
+                  "Freeplay hold-B thresholds: action→build = Character.SuicideTime, vanilla " + Experiments.VanillaHoldBText(true) + "; build→action = PiecePlacementCursor.SwitchTime.")),
+                _label, GUILayout.Width(Sc(84)), GUILayout.Height(Sc(26)));
             if (qsh != null) {
                 float shv = (float)qsh.BoxedValue;
                 Rect shr = GUILayoutUtility.GetRect(Sc(150), Sc(28));
                 float shn = DrawSlider(shr, shv, 0f, 2f, false);
                 shn = Mathf.Round(shn * 10f) / 10f; //吸附 0.1
-                if (Mathf.Abs(shn - shv) > 0.0001f) SetValue(qsh, shn);
+                if (_sliderCommitted && Mathf.Abs(shn - shv) > 0.0001f) SetValue(qsh, shn);
                 GUILayout.Label(T(shn.ToString("0.0") + "s", shn.ToString("0.0") + "s"), _label, GUILayout.Width(Sc(44)), GUILayout.Height(Sc(26)));
             }
             GUILayout.FlexibleSpace();
@@ -183,11 +191,11 @@ public partial class SR {
             GUILayout.EndHorizontal();
             GUILayout.Space(Sc(4));
 
-            //视野（原“视野”栏目并入“自由模式”）
+            //视野（原“视野”栏目并入本页：地图栏目，界面显示名为“自由模式”）
             GUILayout.Label(T("— 视野 —", "— Camera —"), _secHeader);
             RenderSectionGroup("视野");
             GUILayout.Space(Sc(4));
-            //重生（原“重生”栏目并入“自由模式”）
+            //重生（原“重生”栏目并入本页）
             GUILayout.Label(T("— 重生 —", "— Respawn —"), _secHeader);
             RenderSectionGroup("Respawn");
             GUILayout.Space(Sc(4));
@@ -278,11 +286,15 @@ public partial class SR {
             GUILayout.BeginHorizontal();
             if (GUILayout.Button(
                 ExRef.Enabled ? T("EX总开关：开", "EX master: ON") : T("EX总开关：关", "EX master: OFF"),
-                ExRef.Enabled ? _selItem : _btn, GUILayout.Width(Sc(160)), GUILayout.Height(Sc(30)))) {
+                ExRef.Enabled ? _selItem : _btn, GUILayout.Width(Sc(150)), GUILayout.Height(Sc(30)))) {
                 ExRef.Enabled = !ExRef.Enabled;
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
+            //EX 接口版本不匹配：明确提示（避免“装了 EX 却没反应”的静默失败）
+            if (ExRef.Loaded && !ExRef.VersionOk) {
+                GUILayout.Label("⚠ 附加模块接口版本不匹配（EX=" + ExRef.ExApiVersion + "，需要 >= " + ExRef.RequiredApiVersion + "）：请更新 SR_UCH_EX.dll", _label);
+            }
             GUILayout.Space(Sc(6));
 
             //status box: player table (number | animal | score) with header + hint lines
@@ -328,16 +340,17 @@ public partial class SR {
             //action buttons (grayed out while the master switch is off)
             bool oldEn = GUI.enabled;
             GUI.enabled = ExRef.Enabled;
-            float bw = Sc(118), bh = Sc(30);
+            float exBtnW = Sc(150); //EX 操作按钮统一宽度（用户指定 Sc(150)：所有 EX 按钮等宽）
             GUILayout.Label(T("— 操作 —", "— Actions —"), _secHeader);
             //踢出目标（伪造游戏原生消息，房主原生转发）
             GUILayout.BeginHorizontal();
-            if (HotkeyActionButton(T("踢出目标", "Kick"), T("把目标踢出房间", "Kick the target"), ExRef.KickKeyEntry)) ExRef.KickTarget();
+            if (HotkeyActionButton(T("踢出目标", "Kick"), T("把目标踢出房间", "Kick the target"), ExRef.KickKeyEntry, exBtnW, true)) ExRef.KickTarget();
             GUILayout.EndHorizontal();
             GUILayout.Space(Sc(4));
-            //清空派对盒道具
+            //清空派对盒道具 / 清除地图对象：同一行、宽度统一（都走 HotkeyActionButton → 可右键绑键）
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(new GUIContent(T("清空派对盒道具", "Clear party-box items"), T("清空当前派对盒里可选的道具（派对模式）", "Clear the items in the current party box (Party mode)")), _btn, GUILayout.Width(bw), GUILayout.Height(bh))) ExRef.ClearPartyBox();
+            if (HotkeyActionButton(T("清空派对盒道具", "Clear party-box items"), T("清空当前派对盒里可选的道具（派对模式；房主端执行全员可见）", "Clear the items in the current party box (Party mode; host-side clears are visible to everyone)"), ExRef.ClearPartyBoxKeyEntry, exBtnW, true)) ExRef.ClearPartyBox();
+            if (HotkeyActionButton(T("清除地图对象", "Clear map objects"), T("清除地图上玩家放置的全部道具（关卡自带布局不受影响）", "Remove every player-placed prop on the map (the level's own layout is untouched)"), ExRef.ClearMapObjectsKeyEntry, exBtnW, true)) ExRef.ClearMapObjects();
             GUILayout.EndHorizontal();
             GUILayout.Space(Sc(4));
             //score: type dropdown + apply（游戏原生 PointAwarded 全员；分值按类型标准值：获胜 50、陷阱 10 等）
@@ -347,7 +360,7 @@ public partial class SR {
                 RenderControl(ExRef.ScoreTypeEntry);
             }
             GUI.enabled = enCtl;
-            if (HotkeyActionButton(T("加分", "Score"), T("给目标按类型标准分值加分", "Award points by type value"), ExRef.ScoreKeyEntry)) ExRef.AddScore();
+            if (HotkeyActionButton(T("加分", "Score"), T("给目标按类型标准分值加分", "Award points by type value"), ExRef.ScoreKeyEntry, exBtnW, true)) ExRef.AddScore();
             GUILayout.EndHorizontal();
             GUILayout.Space(Sc(4));
             //coin amount + button（游戏原生 PointAwarded(coin) 全员）
@@ -356,19 +369,20 @@ public partial class SR {
                 RenderControl(ExRef.CoinAmountEntry);
             }
             GUI.enabled = enCtl;
-            if (HotkeyActionButton(T("加金币", "Coin"), T("给目标加金币", "Add coins"), ExRef.CoinKeyEntry)) ExRef.AddCoin();
+            if (HotkeyActionButton(T("加金币", "Coin"), T("给目标加金币", "Add coins"), ExRef.CoinKeyEntry, exBtnW, true)) ExRef.AddCoin();
             GUILayout.EndHorizontal();
             GUILayout.Space(Sc(4));
             //受限功能：获胜 / 复活 / 加生命 / 指定关卡
             GUILayout.Space(Sc(2));
             GUILayout.Label(T("— 受限功能 —", "— Restricted —"), _secHeader);
             GUILayout.BeginHorizontal();
-            if (HotkeyActionButton(T("复活", "Respawn"), T("让自己重生回起点", "Respawn yourself"), ExRef.RespawnKeyEntry)) ExRef.RespawnTarget();
+            if (HotkeyActionButton(T("复活", "Respawn"), T("让自己重生回起点", "Respawn yourself"), ExRef.RespawnKeyEntry, exBtnW, true)) ExRef.RespawnTarget();
+            if (HotkeyActionButton(T("杀死目标", "Kill target"), T("让目标立即死亡（需房主/单机权限）", "Kill the target instantly (host/single-player only)"), ExRef.KillKeyEntry, exBtnW, true)) ExRef.KillTarget();
             GUILayout.EndHorizontal();
             GUILayout.Space(Sc(4));
             GUILayout.BeginHorizontal();
-            if (HotkeyActionButton(T("获胜", "Win"), T("让自己到达终点获胜", "Win as yourself"), ExRef.WinKeyEntry)) ExRef.WinTarget();
-            if (HotkeyActionButton(T("结束对局", "End match"), T("当前对局立即进入结算", "End the match into scoring"), ExRef.EndRoundKeyEntry)) ExRef.EndRound();
+            if (HotkeyActionButton(T("获胜", "Win"), T("让自己到达终点获胜", "Win as yourself"), ExRef.WinKeyEntry, exBtnW, true)) ExRef.WinTarget();
+            if (HotkeyActionButton(T("结束对局", "End match"), T("当前对局立即进入结算", "End the match into scoring"), ExRef.EndRoundKeyEntry, exBtnW, true)) ExRef.EndRound();
             GUILayout.EndHorizontal();
             GUILayout.Space(Sc(4));
             GUILayout.BeginHorizontal();
@@ -376,7 +390,7 @@ public partial class SR {
                 RenderControl(ExRef.LivesAmountEntry);
             }
             GUI.enabled = enCtl;
-            if (HotkeyActionButton(T("加生命", "Lives"), T("改自己剩余生命", "Change your lives"), ExRef.LivesKeyEntry)) ExRef.AddLives();
+            if (HotkeyActionButton(T("加生命", "Lives"), T("改自己剩余生命", "Change your lives"), ExRef.LivesKeyEntry, exBtnW, true)) ExRef.AddLives();
             GUILayout.EndHorizontal();
             GUILayout.Space(Sc(4));
             //指定关卡放加生命下面（需服务器权限：仅单机/本地派对/房主有效）
@@ -385,27 +399,26 @@ public partial class SR {
                 RenderControl(ExRef.TargetLevelEntry);
             }
             GUI.enabled = enCtl;
-            if (HotkeyActionButton(T("指定关卡", "Force level"), T("树屋大厅直接开始所选关卡", "Start the chosen level"), ExRef.ForceLevelKeyEntry)) ExRef.ForceLevel();
+            if (HotkeyActionButton(T("指定关卡", "Force level"), T("树屋大厅直接开始所选关卡", "Start the chosen level"), ExRef.ForceLevelKeyEntry, exBtnW, true)) ExRef.ForceLevel();
             GUILayout.EndHorizontal();
             GUILayout.Space(Sc(4));
-            //自身状态（本地生效）
+            //自身状态（本地生效）：三个开关等宽 Sc(150)，一行排开
             GUILayout.Space(Sc(2));
             GUILayout.Label(T("— 自身状态 —", "— Self states —"), _secHeader);
             GUILayout.BeginHorizontal();
-            if (SelfToggleButton(T("无敌：", "Invincible: "), T("自己免疫非强制死亡", "Immune to non-forced deaths"), ExRef.InvincibleOn, ExRef.InvincibleKeyEntry)) ExRef.ToggleInvincible();
-            if (SelfToggleButton(T("飞天：", "Fly: "), T("方向键自由飞行", "Fly with arrow keys"), ExRef.FlyOn, ExRef.FlyKeyEntry)) ExRef.ToggleFly();
-            GUILayout.EndHorizontal();
-            GUILayout.Space(Sc(4));
-            GUILayout.BeginHorizontal();
-            if (SelfToggleButton(T("蹲移：", "Duck: "), T("保持蹲下自由移动", "Stay ducked and move freely"), ExRef.CrouchMoveOn, ExRef.CrouchMoveKeyEntry)) ExRef.ToggleCrouchMove();
+            if (SelfToggleButton(T("无敌：", "Invincible: "), T("自己免疫非强制死亡", "Immune to non-forced deaths"), ExRef.InvincibleOn, ExRef.InvincibleKeyEntry, Sc(150), true)) ExRef.ToggleInvincible();
+            if (SelfToggleButton(T("飞天：", "Fly: "), T("方向键自由飞行", "Fly with arrow keys"), ExRef.FlyOn, ExRef.FlyKeyEntry, Sc(150), true)) ExRef.ToggleFly();
+            if (SelfToggleButton(T("蹲移：", "Duck: "), T("保持蹲下自由移动", "Stay ducked and move freely"), ExRef.CrouchMoveOn, ExRef.CrouchMoveKeyEntry, Sc(150), true)) ExRef.ToggleCrouchMove();
+            GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.Space(Sc(4));
             GUI.enabled = oldEn;
             GUILayout.Space(Sc(6));
-            //三个复选框开关放一起：允许客户端删除 / 无视模式限制 / 无视房主限制
+            //开关项统一用复选框（选择框就是选择框）；**右键可绑键**（整行都是命中区）
             GUILayout.BeginHorizontal();
             ConfigEntryBase ac = FindInternalEntry("EX", "Allow Clients");
-            RestoreLabel(new GUIContent(T("允许客户端删除", "Allow clients delete"), T("非房主玩家也能删除方块（由房主同步）", "Non-host players can destroy blocks")), ac, Sc(140), Sc(26));
+            RestoreLabel(new GUIContent(T("允许客户端删除", "Allow clients delete") + KeySuffix(_allowClientsKeyEntry), T("非房主玩家也能删除方块（由房主同步）", "Non-host players can destroy blocks")), ac, Sc(140), Sc(26));
+            RegisterRowHotkey(_allowClientsKeyEntry);
             if (GUILayout.Button(DestroyBlocks.AllowClientsOn ? "✓" : "", DestroyBlocks.AllowClientsOn ? _checkOn : _checkOff, GUILayout.Width(Sc(30)), GUILayout.Height(Sc(26)))) DestroyBlocks.ToggleAllowClients();
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
@@ -413,7 +426,8 @@ public partial class SR {
             //ignore-mode-limit switch (independent of the master switch): unlock every
             //FREEPLAY-only feature (视野/地图/重生/附加功能) in any game mode
             GUILayout.BeginHorizontal();
-            RestoreLabel(new GUIContent(T("无视模式限制", "Ignore mode limit"), T("视野/地图/重生/附加功能等在任何游戏模式下都可用", "Unlock every mode-limited feature in any game mode")), _ignoreModeLimitEntry, Sc(140), Sc(26));
+            RestoreLabel(new GUIContent(T("无视模式限制", "Ignore mode limit") + KeySuffix(_ignoreModeLimitKeyEntry), T("视野/地图/重生/附加功能等在任何游戏模式下都可用", "Unlock every mode-limited feature in any game mode")), _ignoreModeLimitEntry, Sc(140), Sc(26));
+            RegisterRowHotkey(_ignoreModeLimitKeyEntry);
             if (GUILayout.Button(IgnoreModeLimit ? "✓" : "", IgnoreModeLimit ? _checkOn : _checkOff, GUILayout.Width(Sc(30)), GUILayout.Height(Sc(26)))) {
                 IgnoreModeLimit = !IgnoreModeLimit;
                 if (_ignoreModeLimitEntry != null) _ignoreModeLimitEntry.Value = IgnoreModeLimit;
@@ -424,7 +438,8 @@ public partial class SR {
             //无视房主限制：开启后房客也能执行房主限制的操作（如树屋问号添加/删除等）
             GUILayout.BeginHorizontal();
             ConfigEntryBase ih = FindInternalEntry("EX", "Ignore Host Limit");
-            RestoreLabel(new GUIContent(T("无视房主限制", "Ignore host limit"), T("开启后房客也能执行房主限制的操作（如树屋问号添加/删除等）", "When on, guests can use host-only operations (e.g. treehouse question marks)")), ih, Sc(140), Sc(26));
+            RestoreLabel(new GUIContent(T("无视房主限制", "Ignore host limit") + KeySuffix(ExRef.IgnoreHostLimitKeyEntry), T("开启后房客也能执行房主限制的操作（如树屋问号添加/删除等）", "When on, guests can use host-only operations (e.g. treehouse question marks)")), ih, Sc(140), Sc(26));
+            RegisterRowHotkey(ExRef.IgnoreHostLimitKeyEntry);
             if (GUILayout.Button(ExRef.IgnoreHostLimit ? "✓" : "", ExRef.IgnoreHostLimit ? _checkOn : _checkOff, GUILayout.Width(Sc(30)), GUILayout.Height(Sc(26)))) {
                 ExRef.IgnoreHostLimit = !ExRef.IgnoreHostLimit;
             }
@@ -434,7 +449,8 @@ public partial class SR {
             //冻结角色：打开面板/地图时只冻结自己（默认关 = 游戏照常运行、自己也能动）
             GUILayout.BeginHorizontal();
             ConfigEntryBase pg = FindInternalEntry("EX", "Freeze Character");
-            RestoreLabel(new GUIContent(T("冻结角色", "Freeze self"), T("打开面板/地图时冻结自己的角色，其他角色照常移动（默认关闭：打开面板/地图时游戏照常运行、自己也能动）", "Freeze your own character while the panel/map is open; other characters keep moving (OFF by default: game keeps running and you can move)")), pg, Sc(140), Sc(26));
+            RestoreLabel(new GUIContent(T("冻结角色", "Freeze self") + KeySuffix(_freezeCharKeyEntry), T("打开面板/地图时冻结自己的角色，其他角色照常移动（默认关闭：打开面板/地图时游戏照常运行、自己也能动）", "Freeze your own character while the panel/map is open; other characters keep moving (OFF by default: game keeps running and you can move)")), pg, Sc(140), Sc(26));
+            RegisterRowHotkey(_freezeCharKeyEntry);
             if (GUILayout.Button(PauseGame ? "✓" : "", PauseGame ? _checkOn : _checkOff, GUILayout.Width(Sc(30)), GUILayout.Height(Sc(26)))) {
                 PauseGame = !PauseGame;
                 if (_freezeCharEntry != null) _freezeCharEntry.Value = PauseGame;
@@ -447,45 +463,98 @@ public partial class SR {
             }
         }
 
-        //自身状态开关按钮：左键切换 on/off（快捷键按下即切换功能）。
-        //keyEntry 为对应功能的快捷键配置（EX 模块暴露），按钮上显示当前绑定键。
-        private static bool SelfToggleButton(string label, string tooltip, bool on, ConfigEntry<KeyCode> keyEntry) {
-            bool capturing = keyEntry != null && _capturing == keyEntry;
-            string keyTxt = "";
-            if (keyEntry != null && keyEntry.Value != KeyCode.None) keyTxt = " [" + KeyDisplayName(keyEntry.Value) + "]";
-            string text = label + (on ? T("开", "ON") : T("关", "OFF")) + keyTxt
-                + (capturing ? " " + T("按键..", "key..") : "");
-            //GetRect 指定固定宽度（限宽），GUI.Button 只负责绘制；点击由下面手动事件检测，
-            //这样右键明确进入设置/删除，不会误触按钮操作，也不会被 GUILayout.Button 抢走右键。
-            Rect r = GUILayoutUtility.GetRect(new GUIContent(text, tooltip), _btn,
-                GUILayout.Width(Sc(150)), GUILayout.Height(Sc(30)));
-            bool clicked = false;
-            Event e = Event.current;
-            if (e.type == EventType.MouseDown && r.Contains(e.mousePosition)) {
-                if (e.button == 0 && !capturing) { clicked = true; e.Use(); }
-                else if (e.button == 1 && keyEntry != null) { HandleHotkeyRightClick(keyEntry, capturing); e.Use(); }
-            }
-            GUI.Button(r, new GUIContent(text, tooltip), capturing ? _capture : _btn);
-            return clicked; //左键（非捕捉）触发切换
+        //EX 按钮右键绑键：**画完当帧自判**（见 TryBindByRightClick）。
+        //不再跨帧登记矩形 —— 跨帧方案会因为按钮上方（玩家表格/坐标/加载状态）每帧增减行、
+        //布局整体上下浮动而把矩形对到别的按钮上（"右键指定关卡却绑到飞天"就是这么来的）。
+
+        //按钮矩形登记（右键绑键用）：记录的是"当前 GUI 组（滚动视图内容）内坐标"。
+        //命中检测因此也必须放在同一个组里（见 SR.Window：EndScrollView 之前），两边坐标系一致、无需转换。
+
+        //录制中显示已录到的按键顺序（按钮/键位行共用）：如 "Shift → 9 → 0"
+        private static string RecText() {
+            if (_recSeq.Count == 0) return T("请按键…", "press keys…");
+            string s = "";
+            foreach (KeyCode k in _recSeq) s += (s.Length > 0 ? " → " : "") + KeyDisplayName(k);
+            return s;
         }
 
-        //操作按钮：左键触发操作（快捷键按下即触发操作）。
-        //keyEntry 为对应操作的快捷键配置（EX 模块暴露），按钮上显示当前绑定键。
-        private static bool HotkeyActionButton(string label, string tooltip, ConfigEntry<KeyCode> keyEntry) {
+        //快捷键后缀：未绑定时返回空串，绑定时返回 " [Shift + K]"（组合键也能显示）
+        private static string KeySuffix(ConfigEntry<KeyCode> e) {
+            if (e == null || e.Value == KeyCode.None) return "";
+            return " [" + ComboKeyDisplay(e, e.Value) + "]";
+        }
+
+        //把"开关行"登记为右键绑键命中区：用刚画完的标签按钮矩形向右扩展，覆盖右侧的选择框。
+        private static void RegisterRowHotkey(ConfigEntry<KeyCode> entry) {
+            if (entry == null) return;
+            if (Event.current == null) return;
+            Rect r = GUILayoutUtility.GetLastRect();
+            r.width += Sc(44);
+            TryBindByRightClick(entry, r);
+        }
+
+        //右键绑键：**当场判定**（刚画出来的按钮矩形 + 本帧鼠标位置；同一帧、同一 GUI 组坐标系）。
+        //历史教训：早前是"上一帧 Repaint 记矩形 → 本帧 MouseDown 命中检测"，但按钮上方有玩家表格/
+        //坐标/加载状态这些**每帧可能增减行**的内容，布局会整体上下浮动 → 上一帧的矩形落到下一帧
+        //就是别的按钮，于是出现"右键指定关卡却绑到了飞天"。改成画完即判，帧内一致、绝不串位。
+        private static void TryBindByRightClick(ConfigEntry<KeyCode> entry, Rect rect) {
+            if (entry == null) return;
+            if (_capturing != null) return;
+            if (_rmbConsumedFrame == Time.frameCount) return; //一次右键只认一个按钮
+            Event ev = Event.current;
+            if (ev == null) return;
+            bool down = (ev.type == EventType.MouseDown && ev.button == 1) || Input.GetMouseButtonDown(1);
+            if (!down) return;
+            if (!rect.Contains(ev.mousePosition)) return;
+            _rmbConsumedFrame = Time.frameCount;
+            HandleHotkeyRightClick(entry, false);
+            try { MainPlugin.ModLogger.LogInfo("[HotkeyDiag] 右键命中(当帧) " + entry.Definition.Key + " 鼠标=" + ev.mousePosition + " 矩形=" + rect); } catch { }
+            ev.Use();
+        }
+
+        //自身状态开关按钮：左键切换 on/off（快捷键按下即切换功能）。
+        //keyEntry 为对应功能的快捷键配置（EX 模块暴露），按钮上显示当前绑定键。
+        //右键绑键检测用「GUILayout.Button + GetLastRect」：原来在 MouseDown 事件里用
+        //GUILayoutUtility.GetRect 取矩形——IMGUI 只在 Layout/Repaint 保证布局，鼠标事件期间
+        //拿到的矩形不可靠，表现为"只有个别按钮能右键绑键"。改成按钮绘制后用 GetLastRect
+        //取真实矩形，所有按钮一致可靠。width=0 用默认宽（供并排按钮统一宽度）。
+        private static bool SelfToggleButton(string label, string tooltip, bool on, ConfigEntry<KeyCode> keyEntry, float width = 0f, bool bindable = false) {
             bool capturing = keyEntry != null && _capturing == keyEntry;
             string keyTxt = "";
-            if (keyEntry != null && keyEntry.Value != KeyCode.None) keyTxt = " [" + KeyDisplayName(keyEntry.Value) + "]";
-            string text = label + keyTxt + (capturing ? " " + T("按键..", "key..") : "");
-            Rect r = GUILayoutUtility.GetRect(new GUIContent(text, tooltip), _btn,
-                GUILayout.Width(Sc(150)), GUILayout.Height(Sc(30)));
-            bool clicked = false;
+            if (keyEntry != null && keyEntry.Value != KeyCode.None) keyTxt = " [" + ComboKeyDisplay(keyEntry, keyEntry.Value) + "]"; //含修饰键：Shift/Ctrl/Alt + 主键
+            string text = label + (on ? T("开", "ON") : T("关", "OFF")) + keyTxt
+                + (capturing ? " " + RecText() : "");
+            float w = width > 0f ? width : Sc(150);
             Event e = Event.current;
-            if (e.type == EventType.MouseDown && r.Contains(e.mousePosition)) {
-                if (e.button == 0 && !capturing) { clicked = true; e.Use(); }
-                else if (e.button == 1 && keyEntry != null) { HandleHotkeyRightClick(keyEntry, capturing); e.Use(); }
+            int evBtn = e != null ? e.button : 0;
+            bool clicked = GUILayout.Button(new GUIContent(text, tooltip), capturing ? _capture : _btn,
+                GUILayout.Width(w), GUILayout.Height(Sc(30)));
+            //GUI.Button 对右键也会返回 true → 必须按"触发按键"过滤：右键绝不触发左键动作
+            if (clicked && evBtn != 0) clicked = false;
+            //只有 bindable 的按钮才支持右键绑键；其余按钮右键什么也不会发生
+            if (bindable && keyEntry != null && e != null) {
+                TryBindByRightClick(keyEntry, GUILayoutUtility.GetLastRect()); //当帧判定（不跨帧存矩形）
             }
-            GUI.Button(r, new GUIContent(text, tooltip), capturing ? _capture : _btn);
-            return clicked; //左键（非捕捉）触发操作
+            return clicked && !capturing; //左键（非捕捉）触发切换
+        }
+
+        //操作按钮：左键触发操作。bindable=true 时该按钮支持右键绑定快捷键（其余按钮右键无反应）。
+        private static bool HotkeyActionButton(string label, string tooltip, ConfigEntry<KeyCode> keyEntry, float width = 0f, bool bindable = false) {
+            bool capturing = keyEntry != null && _capturing == keyEntry;
+            string keyTxt = "";
+            if (keyEntry != null && keyEntry.Value != KeyCode.None) keyTxt = " [" + ComboKeyDisplay(keyEntry, keyEntry.Value) + "]"; //含修饰键：Shift/Ctrl/Alt + 主键
+            string text = label + keyTxt + (capturing ? " " + RecText() : "");
+            float w = width > 0f ? width : Sc(150);
+            Event e = Event.current;
+            int evBtn = e != null ? e.button : 0;
+            bool clicked = GUILayout.Button(new GUIContent(text, tooltip), capturing ? _capture : _btn,
+                GUILayout.Width(w), GUILayout.Height(Sc(30)));
+            //GUI.Button 对右键也会返回 true → 按触发按键过滤，右键不触发操作
+            if (clicked && evBtn != 0) clicked = false;
+            if (bindable && keyEntry != null && e != null) {
+                TryBindByRightClick(keyEntry, GUILayoutUtility.GetLastRect()); //当帧判定（不跨帧存矩形）
+            }
+            return clicked && !capturing; //左键（非捕捉）触发操作
         }
 
         //右键处理：未捕捉 → 进入捕捉（等待按键设为快捷键）；捕捉中再右键 → 删除快捷键。
@@ -493,27 +562,34 @@ public partial class SR {
         private static void HandleHotkeyRightClick(ConfigEntry<KeyCode> keyEntry, bool capturing) {
             if (keyEntry == null) return;
             if (capturing) {
-                try { keyEntry.BoxedValue = KeyCode.None; } catch { }
+                try { keyEntry.BoxedValue = KeyCode.None; } catch (Exception __ex) { Guard.Log("清空按键绑定", __ex); }
                 _capturing = null;
                 _dirty = true;
             } else {
                 _prevBoxed = keyEntry.BoxedValue;
                 _capturing = keyEntry;
+                _captureStartFrame = Time.frameCount; //右键进入捕捉：本次 MouseDown 不能被"按下即取消"清掉
+                _pendingModKey = KeyCode.None;
+                _recSeq.Clear();
+                _recHeld.Clear();
+                _recLastAt = Time.unscaledTime;
+                //诊断（定位"右键绑键/组合键无效"用，修好后可删）
+                try { MainPlugin.ModLogger.LogInfo("[HotkeyDiag] 右键命中按钮 → 进入捕捉: " + keyEntry.Definition.Key); } catch { }
             }
         }
 
         //首页: overview + links to the separate mod parts
         private static void RenderHomePage() {
             GUILayout.Label(T("— 欢迎使用 SR＿UCH —", "— Welcome to SR＿UCH —"), _secHeader);
-            WrapLabel(T("Ultimate Chicken Horse 模组整合增强包（免费开源）。", "A free open-source enhancement pack for Ultimate Chicken Horse."));
-            WrapLabel(T("本 mod 参考了 BetterFreeplay，BetterNight，BuildingPlus，BuildUnlimiter，Even More Players，UCH Freeplay Spawn Setter，UCH Tweaks，UCH-PlayerTracker-Mod，UltimateBuilder，向这些 mod 的制作者表示感谢。", "This mod references BetterFreeplay, BetterNight, BuildingPlus, BuildUnlimiter, Even More Players, UCH Freeplay Spawn Setter, UCH Tweaks, UCH-PlayerTracker-Mod and UltimateBuilder. Thanks to their authors."));
+            WrapLabel(T("Ultimate Chicken Horse 模组整合增强包。", "An enhancement pack for Ultimate Chicken Horse."));
+            WrapLabel(T("本 mod 参考了 BetterFreeplay，BetterNight，BuildingPlus，BuildUnlimiter，UCH Freeplay Spawn Setter，UCH Tweaks，UCH-PlayerTracker-Mod，UltimateBuilder，向这些 mod 的制作者表示感谢。", "This mod references BetterFreeplay, BetterNight, BuildingPlus, BuildUnlimiter, UCH Freeplay Spawn Setter, UCH Tweaks, UCH-PlayerTracker-Mod and UltimateBuilder. Thanks to their authors."));
             GUILayout.Space(Sc(4));
 
             //开源地址：点击用浏览器打开 GitHub 仓库
             GUILayout.Label(T("— 开源地址 —", "— Source —"), _secHeader);
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("https://github.com/RSTFS/SR_UCH", _btn, GUILayout.Height(Sc(30)))) {
-                try { Application.OpenURL("https://github.com/RSTFS/SR_UCH"); } catch { }
+                try { Application.OpenURL("https://github.com/RSTFS/SR_UCH"); } catch (Exception __ex) { Guard.Log("打开开源地址", __ex); }
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
@@ -521,7 +597,7 @@ public partial class SR {
 
             GUILayout.Space(Sc(8));
             GUILayout.Label(T("— 使用提示 —", "— Tips —"), _secHeader);
-            WrapLabel(T("· 修改配置后点底部“保存”写盘；“重新加载”放弃本次修改。", "· Use Save to write config, Reload to discard."));
+            WrapLabel(T("· 修改配置即时写盘（无需手动保存，也没有保存/重读按钮）。", "· Config changes are written to disk immediately (no manual save button)."));
             WrapLabel(T("· 自定义按键：点按键按钮后，直接按一个键设为单键；按住 Shift/Ctrl/Alt 再按主键设为组合键（如 Shift+P）。Esc 清空，Shift+Esc 取消。", "· Custom keys: click the key button, then press a key for single-key; hold Shift/Ctrl/Alt while pressing a key for a combo (e.g. Shift+P). Esc clears, Shift+Esc cancels."));
             WrapLabel(T("· 通用条目页：点击条目前的名称即可恢复默认值。", "· Generic entries: click the name to restore its default."));
             GUILayout.Space(Sc(4));
@@ -686,6 +762,7 @@ public partial class SR {
             GUILayout.Space(Sc(16));
             if (GUILayout.Button(_chatShowTime ? "✓" : "", _chatShowTime ? _checkOn : _checkOff, GUILayout.Width(Sc(26)), GUILayout.Height(Sc(26)))) {
                 _chatShowTime = !_chatShowTime;
+                if (_chatShowTimeEntry != null) _chatShowTimeEntry.Value = _chatShowTime; //配置持久化（原来没有绑定，重启即丢）
             }
             GUILayout.Label(T("显示具体时间", "Show time"), _label, GUILayout.Height(Sc(26)));
             GUILayout.Space(Sc(16));

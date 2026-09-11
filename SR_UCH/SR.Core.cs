@@ -26,6 +26,10 @@ public partial class SR : ITweak {
         private static ConfigEntry<string> _disabledPluginsEntry;
         private static ConfigEntry<bool> _ignoreModeLimitEntry;
         private static ConfigEntry<bool> _freezeCharEntry;
+        //EX 页开关行的快捷键（可右键绑键 / 也可在设置页外的键位按钮里绑；默认未设置 = 无快捷键）
+        private static ConfigEntry<KeyCode> _allowClientsKeyEntry;
+        private static ConfigEntry<KeyCode> _ignoreModeLimitKeyEntry;
+        private static ConfigEntry<KeyCode> _freezeCharKeyEntry;
         private static ConfigEntry<bool> _treehouseMapEntry;
         private static ConfigEntry<bool> _gcAfterLoadEntry;
         private static ConfigEntry<bool> _allEnabledEntry;
@@ -41,10 +45,11 @@ public partial class SR : ITweak {
         //初始默认关闭；改动写入配置自动保存（_allEnabledEntry）
         public static bool AllEnabled = false;
         private static bool _appliedDisabled;
-        //组合键修饰：ConfigEntry<KeyCode> → 所需修饰键（Shift/Ctrl/Alt/无）。
+        //组合键修饰：ConfigEntry<KeyCode> → 所需修饰键集合（可多选，如 Ctrl+Alt）。
         //所有自定义键位统一走这里：捕捉时按住修饰键一起按 → 存为该键位的修饰键；
-        //不再需要单独的"修饰键"下拉框。持久化见 _keyModEntry。
-        public enum ComboMod { None, Shift, Ctrl, Alt }
+        //持久化格式为 "Shift+Ctrl+Alt"（见 SR.KeyBinds 的 ParseComboMod/FormatComboMod）。
+        [Flags]
+        public enum ComboMod { None = 0, Shift = 1, Ctrl = 2, Alt = 4 }
         private static readonly Dictionary<ConfigEntryBase, ComboMod> _keyMods = new Dictionary<ConfigEntryBase, ComboMod>();
         private static readonly Dictionary<ConfigEntryBase, ConfigEntry<string>> _keyModEntries = new Dictionary<ConfigEntryBase, ConfigEntry<string>>();
         private static bool _visible;
@@ -59,14 +64,14 @@ public partial class SR : ITweak {
         private static Mode _mode = Mode.Internal;
         private static readonly List<PluginEntry> _externalPlugins = new List<PluginEntry>();
         private static string _pluginKey = "";
-        private static string _search = "";
         private static Vector2 _scroll;
         private static ConfigEntry<bool> _chatFilterQuickEntry;
         private static bool _chatFilterQuick; //会话内容页：过滤快捷消息（表情/预设消息不显示；配置持久化）
         private static ConfigEntry<bool> _hideChatEntry;
         private static bool _hideChat; //会话内容页：隐藏游戏内聊天窗口（消息气泡/输入框不显示；配置持久化）
         public static bool HideChatWindow { get { return _hideChat; } }
-        private static bool _chatShowTime = true; //会话内容页：每条消息前显示具体时间（默认开）
+        private static ConfigEntry<bool> _chatShowTimeEntry;
+        private static bool _chatShowTime = true; //会话内容页：每条消息前显示具体时间（默认开；配置持久化）
         private static string _chatTextCache; //编辑框内容缓存（每秒重建一次，避免每帧拼接字符串）
         private static float _chatTextTimer;
 
@@ -108,7 +113,6 @@ public partial class SR : ITweak {
         private static Vector3 _mapDragOffset = Vector3.zero;
         private static int _activePoint = -1; //selected custom spawn point in the editor
         private static bool _camSaved;
-        private static float _progCheckTimer; //进度解锁强制复位检查计时（每分钟一次）
         private static Vector3 _savedCamPos;
         private static Quaternion _savedCamRot;
         private static float _savedOrtho;
@@ -116,7 +120,20 @@ public partial class SR : ITweak {
         private static float _savedFar;
         private static float _savedFov; //perspective: the map view fixes FOV for a stable fit
         private static ConfigEntryBase _capturing; //key capture target
+        //捕捉起始帧：右键进入捕捉时，**同一次 MouseDown** 不能被"鼠标按下即取消捕捉"那条规则清掉
+        //（否则右键绑键永远绑不上：捕捉在同一事件里开始又立刻结束）。只忽略起始帧那一次。
+        private static int _captureStartFrame = -1;
+        private static float _hotkeyDiagAt = -99f;  //诊断日志限速（右键绑键问题定位用）
+        private static float _hotkeyDiagAt0 = -99f; //同上（OnGUI 入口打点限速）
+        private static int _lastRmbFrame = -1;   //（旧方案保留字段，未再使用）
+        private static int _rmbConsumedFrame = -1; //当帧右键绑键：一帧只认一个按钮
         private static object _prevBoxed;
+        //捕捉中的"待定修饰键"（Shift/Ctrl/Alt 自身）：按下先记，松开时若没按过别的键就当主键绑定
+        private static KeyCode _pendingModKey = KeyCode.None;
+        //快捷键录制态：收集所有按键及其顺序（见 SR.Window 的录制分支 / CommitRecording）
+        private static readonly List<KeyCode> _recSeq = new List<KeyCode>();
+        private static readonly List<KeyCode> _recHeld = new List<KeyCode>(); //录制中仍按住的键（全部松开即完成录制）
+        private static float _recLastAt;
         private static ConfigFile _dirtyConfig;
         private static readonly Dictionary<ConfigEntryBase, string> _editText = new Dictionary<ConfigEntryBase, string>();
         private static readonly Dictionary<ConfigEntryBase, bool> _editOpen = new Dictionary<ConfigEntryBase, bool>();
@@ -174,9 +191,9 @@ public partial class SR : ITweak {
                 _editOpen.Clear();
                 _winCollapsed = false;
                 //对局开始：关闭自由相机（避免残留；每次进对局恢复默认视角）
-                try { FovAdjust.ForceDisableLock(); } catch { }
+                try { FovAdjust.ForceDisableLock(); } catch (Exception __ex) { Guard.Log("对局开始时关闭自由相机", __ex); }
                 ApplyEventSystemGate(); //re-enable the game's EventSystem
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("对局开始处理", __ex); }
         }
 
 
@@ -198,6 +215,13 @@ public partial class SR : ITweak {
             _ignoreModeLimitEntry = plugin.Config.Bind("EX", "Ignore Mode Limit", false, "无视模式限制：附加功能/视野/地图/重生在任何模式下都可用");
             IgnoreModeLimit = _ignoreModeLimitEntry.Value;
             _ignoreModeLimitEntry.SettingChanged += (s, e) => IgnoreModeLimit = _ignoreModeLimitEntry.Value;
+            //EX 页开关行的快捷键（可右键绑键；默认未设置 = 无快捷键）
+            _allowClientsKeyEntry = plugin.Config.Bind("EX", "Allow Clients Key", KeyCode.None, "「允许客户端删除」开关的快捷键（组合键：点按钮后按住 Shift/Ctrl/Alt 再按主键）");
+            RegisterKey("EX-允许客户端删除", _allowClientsKeyEntry, "press");
+            _ignoreModeLimitKeyEntry = plugin.Config.Bind("EX", "Ignore Mode Limit Key", KeyCode.None, "「无视模式限制」开关的快捷键");
+            RegisterKey("EX-无视模式限制", _ignoreModeLimitKeyEntry, "press");
+            _freezeCharKeyEntry = plugin.Config.Bind("EX", "Freeze Character Key", KeyCode.None, "「冻结角色」开关的快捷键");
+            RegisterKey("EX-冻结角色", _freezeCharKeyEntry, "press");
             _freezeCharEntry = plugin.Config.Bind("EX", "Freeze Character", false, "冻结角色：打开面板/地图时冻结自己的角色（其他角色照常移动；默认关 = 打开面板/地图时自己也能动）");
             PauseGame = _freezeCharEntry.Value;
             _freezeCharEntry.SettingChanged += (s, e) => PauseGame = _freezeCharEntry.Value;
@@ -210,6 +234,15 @@ public partial class SR : ITweak {
             _hideChatEntry = plugin.Config.Bind("设置", "隐藏聊天窗口", false, "隐藏游戏内聊天窗口（消息气泡/输入框不显示），会话内容页仍照常记录聊天。默认关闭。");
             _hideChat = _hideChatEntry.Value;
             _hideChatEntry.SettingChanged += (s, e) => _hideChat = _hideChatEntry.Value;
+            //会话内容页：显示具体时间——原来是**无绑定**的内存字段（重启即丢），现补上配置持久化
+            _chatShowTimeEntry = plugin.Config.Bind("设置", "显示时间", true, "会话内容页：每条消息前显示具体时间。默认开启。");
+            _chatShowTime = _chatShowTimeEntry.Value;
+            _chatShowTimeEntry.SettingChanged += (s, e) => _chatShowTime = _chatShowTimeEntry.Value;
+            //设置页「栏目宽度」：调节左侧栏目栏宽度（0 = 自动按文字宽度）。
+            //也可直接在窗口里拖动侧栏右缘调整（拖动结果会写回本项，见 SR.Window）。
+            _sidebarWEntry = plugin.Config.Bind("设置", "Sidebar Width", 0, "左侧栏目栏宽度（像素，0 = 自动）。也可在窗口里直接拖动侧栏右缘调整。");
+            _sidebarW = _sidebarWEntry.Value;
+            _sidebarWEntry.SettingChanged += (s, e) => _sidebarW = _sidebarWEntry.Value;
             //性能优化：进关卡/换关卡时回收垃圾（同关卡回合切换不清理，不影响结算速度）
             _gcAfterLoadEntry = plugin.Config.Bind("地图", "加载后清理", false, "进关卡/换关卡时执行一次 GC 回收 + 资源卸载，减少对局内卡顿。同关卡回合切换不清理（场景名不变自动跳过），不影响结算速度。");
             _allEnabledEntry = plugin.Config.Bind("设置", "All Enabled", false, "本 Mod 总开关：关闭时所有内部功能运行时失效，各功能开关值保持不变。\n初始默认关闭；改动自动保存，下次启动保持上次状态。");
@@ -275,7 +308,7 @@ public partial class SR : ITweak {
                         foreach (var kme in new Dictionary<ConfigEntryBase, ComboMod>(_keyMods)) {
                             SetKeyComboMod(kme.Key, kme.Value);
                         }
-                    } catch { }
+                    } catch (Exception __ex) { Guard.Log("重新应用按键修饰键", __ex); }
                     continue;
                 }
                 _externalPlugins.Add(pe);
@@ -288,7 +321,7 @@ public partial class SR : ITweak {
                     if (sec == "设置") continue; //the 设置 page is independent
                     if (sec == "Saved Lobby Details") continue; //feature removed
                     if (sec == "Treehouse Suicide") continue; //已并入“快速调整”栏目
-                    if (sec == "视野" || sec == "Respawn") continue; //已并入“自由模式”栏目（不再单独成侧栏栏目）
+                    if (sec == "视野" || sec == "Respawn") continue; //已并入「地图」栏目（界面显示名是“自由模式”，见 SR.Pages.RenderMapPage；不再单独成侧栏栏目）
                     if (!_internalSections.Contains(sec)) _internalSections.Add(sec);
                 }
             }
@@ -323,9 +356,11 @@ public partial class SR : ITweak {
         private static void CloseMenu() {
             _visible = false;
             _capturing = null;
-            if (_dirtyConfig != null) _dirtyConfig.Save();
+            var dc = _dirtyConfig;
             _dirtyConfig = null;
             _dirty = false;
+            //关闭菜单时保存配置：失败记日志，不再静默/抛异常
+            Guard.Try("关闭菜单时保存配置", () => { if (dc != null) dc.Save(); });
             ApplyEventSystemGate();
         }
 

@@ -34,7 +34,7 @@ public partial class SR {
             RestoreHandicapsIfAny();
             //重载场景加载完成：通知 Experiments 记录时刻，用于决定何时清 levelPortalXml（替代固定延时）
             Experiments.OnReloadSceneLoaded();
-            if (!SR.AllEnabled) return;
+            if (!SR.GateMaster) return;
             if (_gcAfterLoadEntry == null || !_gcAfterLoadEntry.Value) return;
             try {
                 string sc = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
@@ -42,7 +42,7 @@ public partial class SR {
                 //延迟 1 秒执行（进入对局后），不阻塞 FadeOut 过渡
                 _pendingCleanupScene = sc;
                 _pendingCleanupAt = Time.unscaledTime + 1f;
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("记录加载后清理场景", __ex); }
         }
 
         //--- 场景重载期间暂停"坏客户端踢出"检测 ---
@@ -108,7 +108,7 @@ public partial class SR {
                     //房主端备份（服务器权威值）；房客端也备份无妨（恢复仅房主执行）。
                     BackupHandicaps();
                 }
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("处理 PrepareToReloadScene", __ex); }
         }
 
         //备份所有在线玩家的 handicap（从 LobbyPlayer 读服务器权威值）。
@@ -123,12 +123,12 @@ public partial class SR {
                         LobbyPlayer lp = lm.PlayerTracker.GetLobbyPlayer(info.NetworkNumber);
                         if (lp == null) continue;
                         _handicapBackup[info.NetworkNumber] = lp.Networkhandicap;
-                    } catch { }
+                    } catch (Exception __ex) { Guard.Log("读取玩家 handicap", __ex); }
                 }
                 if (_handicapBackup.Count > 0) {
                     MainPlugin.ModLogger.LogInfo("[折扣] 重载前备份 " + _handicapBackup.Count + " 名玩家 handicap");
                 }
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("备份 handicap", __ex); }
         }
 
         //重载完成后：房主把备份的 handicap 写回（LobbyPlayer + GamePlayer 的 SyncVar，
@@ -138,21 +138,21 @@ public partial class SR {
             Dictionary<int, int> backup = _handicapBackup;
             _handicapBackup = null;
             try {
-                if (!NetworkServer.active) return; //仅房主写 SyncVar
+                if (!HasServer) return; //仅房主写 SyncVar（统一走 SR.HasServer）
                 LobbyManager lm = LobbyManager.instance;
                 if (lm == null || lm.PlayerTracker == null) return;
                 foreach (KeyValuePair<int, int> kv in backup) {
                     try {
                         LobbyPlayer lp = lm.PlayerTracker.GetLobbyPlayer(kv.Key);
                         if (lp != null) lp.Networkhandicap = kv.Value;
-                    } catch { }
+                    } catch (Exception __ex) { Guard.Log("恢复 LobbyPlayer handicap", __ex); }
                     try {
                         GamePlayer gp = lm.PlayerTracker.GetGamePlayer(kv.Key);
                         if (gp != null) gp.NetworkHandicap = kv.Value;
-                    } catch { }
+                    } catch (Exception __ex) { Guard.Log("恢复 GamePlayer handicap", __ex); }
                 }
                 MainPlugin.ModLogger.LogInfo("[折扣] 重载后恢复 " + backup.Count + " 名玩家 handicap");
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("恢复 handicap", __ex); }
         }
 
         //结算时 ClearNewPointBlocks 会删掉非 AlwaysAward 分块（second/third/fourth 名次分等）。
@@ -180,7 +180,7 @@ public partial class SR {
                 if (_clearedExternBlocks.Count > 500) {
                     _clearedExternBlocks.RemoveRange(0, _clearedExternBlocks.Count - 500);
                 }
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("缓存被清除的外部加分分块", __ex); }
             return true;
         }
 
@@ -203,7 +203,7 @@ public partial class SR {
                 if (msg != null && msg.AlwaysAward) {
                     _externAwardedKeys.Add(Key(msg.PlayerNumber, msg.PointType));
                 }
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("标记外部加分分块", __ex); }
         }
 
         //补分重放的分块在结算 tally 后即完成使命；此时清除 _refillPending 与外部加分标记，
@@ -284,11 +284,11 @@ public partial class SR {
         private const int FillTotalCap = 300;
         private static void FillScoresIfPending() {
             if (_scoreBackupBlocks == null || _scoreBackupBlocks.Count == 0) return;
-            if (!AllEnabled) return;
+            if (!GateMaster) return;
             Dictionary<int, List<PointBlock>> backup = _scoreBackupBlocks;
             _scoreBackupBlocks = null;
             try {
-                if (!NetworkServer.active) return; //仅房主广播
+                if (!HasServer) return; //仅房主广播（统一走 SR.HasServer）
                 LobbyManager lm = LobbyManager.instance;
                 if (lm == null || lm.client == null || !lm.client.isConnected) return;
                 //扁平化：networkNumber → 分块类型序列

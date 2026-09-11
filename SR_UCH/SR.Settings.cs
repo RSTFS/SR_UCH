@@ -42,11 +42,9 @@ public partial class SR {
         private static List<ConfigEntryBase> InternalSectionEntries() {
             List<ConfigEntryBase> result = new List<ConfigEntryBase>();
             if (_internalConfig == null) return result;
-            string q = _search.Trim().ToLower();
             foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
                 if (e.Definition.Section != _selectedInternalSection) continue;
-                if (q.Length > 0 && !e.Definition.Key.ToLower().Contains(q)) continue;
-                //追踪玩家仅在列表模式=普通时显示（进阶时隐藏）
+                //追踪玩家仅在列表模式=普通时显示（进阶时隐藏
                 if (e.Definition.Section == "Destroy Blocks" && e.Definition.Key == "Track Player"
                     && !DestroyBlocks.TrackPlayerVisible) continue;
                 result.Add(e);
@@ -76,6 +74,9 @@ public partial class SR {
             bool any = false;
             foreach (ConfigEntryBase entry in SettingsEntries()) {
                 any = true;
+                //「栏目宽度」专用行：滑块 + [−]/[+] 步进按钮 + 当前值
+                //按钮是绝对可靠的点击路径；即使滑块在本机某些情况下失效，+/− 也能调
+                if (entry.Definition.Key == "Sidebar Width") { RenderSidebarWidthRow(); continue; }
                 string g = SettingsGroup(entry.Definition.Key);
                 if (g != null && g != lastGroup) {
                     lastGroup = g;
@@ -86,24 +87,48 @@ public partial class SR {
             if (!any) GUILayout.Label(T("（无匹配条目）", "(no matching entries)"), _label);
         }
 
+        //「栏目宽度」专用行：滑块 + [−]/[+] 步进按钮 + 当前值（0 = 自动
+        private static void RenderSidebarWidthRow() {
+            int cur = _sidebarWEntry != null ? Mathf.Clamp(_sidebarWEntry.Value, 0, 320) : 0;
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(new GUIContent(T("栏目宽度", "Sidebar Width"), T("左侧栏目栏宽度（0 = 自动，100-320）", "Left sidebar width (0 = auto, 100-320)")), _label, GUILayout.Width(Sc(140)), GUILayout.Height(Sc(26)));
+            if (GUILayout.Button("−", _btn, GUILayout.Width(Sc(30)), GUILayout.Height(Sc(26)))) SetSidebarWidth(cur - 16);
+            Rect sr = GUILayoutUtility.GetRect(Sc(150), Sc(28));
+            float nv = DrawSlider(sr, cur, 0f, 320f, true);
+            if (_sliderCommitted && Mathf.Abs(nv - cur) > 0.001f) SetSidebarWidth(Mathf.RoundToInt(nv));
+            if (GUILayout.Button("+", _btn, GUILayout.Width(Sc(30)), GUILayout.Height(Sc(26)))) SetSidebarWidth(cur + 16);
+            GUILayout.Label(cur + " px", _label, GUILayout.Width(Sc(70)), GUILayout.Height(Sc(26)));
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+        }
+
+        //设置栏目宽度：同时更新即时值（立刻改变布局）与配置项（持久化）
+        private static void SetSidebarWidth(int px) {
+            px = Mathf.Clamp(px, 0, 320);
+            _sidebarW = px;
+            if (_sidebarWEntry != null) _sidebarWEntry.Value = px;
+        }
+
         private static List<ConfigEntryBase> SettingsEntries() {
             List<ConfigEntryBase> result = new List<ConfigEntryBase>();
             if (_internalConfig == null) return result;
-            string q = _search.Trim().ToLower();
             foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
                 if (e.Definition.Section != "设置") continue;
-                //「过滤快捷消息」「隐藏聊天窗口」在会话内容页有专用开关、「All Enabled」在搜索栏右侧有专用总开关按钮，
-                //设置页不再重复渲染成通用复选框（避免冗余不美观）。
-                if (e.Definition.Key == "过滤快捷消息" || e.Definition.Key == "隐藏聊天窗口" || e.Definition.Key == "All Enabled") continue;
-                if (q.Length > 0 && !e.Definition.Key.ToLower().Contains(q)) continue;
+                //「过滤快捷消息」「隐藏聊天窗口」「显示时间」在会话内容页有专用开关、「All Enabled」在搜索栏右侧有专用总开关按钮，
+                //设置页不再重复渲染成通用控件（避免重复，用户反馈"显示时间"与绘画/会话界面重复）
+                if (e.Definition.Key == "过滤快捷消息" || e.Definition.Key == "隐藏聊天窗口"
+                    || e.Definition.Key == "显示时间" || e.Definition.Key == "All Enabled") continue;
+                //「组合键 XXX」是键位修饰键的内部持久化条目（RegisterComboEntry 自动建立），
+                //不该作为普通设置显示在设置页里
+                if (e.Definition.Key.StartsWith("组合键 ")) continue;
                 result.Add(e);
             }
             return result;
         }
 
         //the 地图 page: only the map key rebind (the map itself opens with the M key)
-        //可点击的条目标签：点击恢复该条目的默认值（自定义按键/数值/滑块都适用）。
-        //非开关条目（按键/数值/枚举/文本）的默认值显示在悬浮提示里（不占标签文字），如“默认: 20”。
+        //可点击的条目标签：点击恢复该条目的默认值（自定义按键/数值/滑块都适用）
+        //非开关条目（按键/数值/枚举/文本）的默认值显示在悬浮提示里（不占标签文字），如“默认: 20”
         private static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h) {
             GUIContent c2 = content;
             try {
@@ -117,9 +142,9 @@ public partial class SR {
                         c2 = new GUIContent(content.text, tip);
                     }
                 }
-            } catch { }
+            } catch (Exception __ex) { Guard.Log("条目默认值处理", __ex); }
             if (GUILayout.Button(c2, _label, GUILayout.Width(w), GUILayout.Height(h))) {
-                try { entry.BoxedValue = entry.DefaultValue; } catch { }
+                try { entry.BoxedValue = entry.DefaultValue; } catch (Exception __ex) { Guard.Log("恢复条目默认值", __ex); }
                 _editText.Remove(entry);
                 _editOpen.Remove(entry);
                 if (_capturing == entry) _capturing = null;
@@ -142,9 +167,7 @@ public partial class SR {
         private static List<ConfigEntryBase> VisibleEntries(ConfigFile config) {
             List<ConfigEntryBase> result = new List<ConfigEntryBase>();
             if (config == null) return result;
-            string q = _search.Trim().ToLower();
             foreach (ConfigEntryBase e in AllEntries(config)) {
-                if (q.Length > 0 && !e.Definition.Key.ToLower().Contains(q)) continue;
                 result.Add(e);
             }
             return result;
@@ -156,13 +179,20 @@ public partial class SR {
             return config != null ? config.GetConfigEntries() : new ConfigEntryBase[0];
         }
 
-        //手动拖宽侧栏：0 = 自动；>0 = 用户拖出的宽度
+        //手动拖宽侧栏：0 = 自动；>0 = 用户拖出的宽度。
         private static float _sidebarW = 0f;
         private static bool _sidebarResizing;
+        private static ConfigEntry<int> _sidebarWEntry; //设置页「栏目宽度」滑块（0=自动
 
         private static float SidebarWidth() {
+            //两个来源都要生效：拖动侧栏右缘时用即时值 _sidebarW；否则用设置页「栏目宽度」配置项
+            //（上一版只读配置项，导致拖动被忽略；只读 _sidebarW 又会被"设置改了但同步失效" 卡住。）
+            float w = 0f;
+            if (_sidebarResizing) w = _sidebarW;
+            if (w <= 0f && _sidebarWEntry != null) w = _sidebarWEntry.Value;
+            if (w <= 0f) w = _sidebarW;
             float auto = CalcAutoSidebarWidth();
-            return _sidebarW > 0f ? Mathf.Clamp(_sidebarW, 100f, 320f) : auto;
+            return w > 0f ? Mathf.Clamp(w, 100f, 320f) : auto;
         }
 
         private static float CalcAutoSidebarWidth() {
@@ -178,9 +208,8 @@ public partial class SR {
         }
 
         private static float EntryNameWidth() {
-            //缓存：模式/分区/语言/缩放/搜索/外部插件不变时列宽不变，避免每帧对所有条目名 CalcSize
-            string key = _mode + "|" + _selectedInternalSection + "|" + _langEn + "|" + _scaled + "|" + _search
-                + "|" + (CurrentExternalPlugin() != null ? CurrentExternalPlugin().guid : "");
+            //缓存：模式/分区/语言/缩放/外部插件不变时列宽不变，避免每帧对所有条目名 CalcSize
+            string key = _mode + "|" + _selectedInternalSection + "|" + _langEn + "|" + _scaled + "|" + (CurrentExternalPlugin() != null ? CurrentExternalPlugin().guid : "");
             if (key == _nameWKey) return _nameWCached;
             _nameWKey = key;
             float maxW = 60f;
@@ -225,7 +254,7 @@ public partial class SR {
 
         private static void RenderEntryRow(ConfigEntryBase entry, bool isInternal, float colWidth) {
             string name = isInternal ? ZhKey(entry) : entry.Definition.Key;
-            //描述：中文模式用 ZhDesc/配置描述；英文模式只用 ZhDesc 的英文表（查不到留空，不显示中文）
+            //描述：中文模式用 ZhDesc/配置描述；英文模式只用 ZhDesc 的英文表（查不到留空，不显示中文
             string desc;
             if (_langEn && !_forceZh) {
                 desc = isInternal ? ZhDesc(entry) : null;
@@ -249,19 +278,16 @@ public partial class SR {
             //name column: clickable to restore the default value; tooltip shows the default
             string defText = FormatDefaultValue(entry);
             string tip = desc;
-            if (ProgressionLocked(entry)) {
-                bool groupA = entry.Definition.Section == "Builder Enhancements";
-                tip += groupA
-                    ? "\n🔒 " + T("A组未解锁（建造的无视碰撞 / 自由放置）：需游戏时长 > 17时16分18秒 或 奔跑长度 > 52000米（实验页查看进度）", "Group A locked (Collision Override / Free Placement): need >17h16m18s playtime or >52000m run distance (see Experiments page)")
-                    : "\n🔒 " + T("B组未解锁：需游戏时长 > 52时 或 奔跑长度 > 100000米（实验页查看进度）", "Group B locked: need >52h playtime or >100000m run distance (see Experiments page)");
-            }
+            //进度锁定提示：文案走单一来源（ProgressionReasonText），不再就地手拼阈值文案
+            string lockTip = ProgressionReasonText(entry);
+            if (lockTip != null) tip += "\n🔒 " + lockTip;
             if (defText.Length > 0) {
                 tip += "\n" + T("默认: " + defText, "Default: " + defText);
             }
             tip += "\n" + T("点击恢复默认值", "Click to reset to default");
             if (GUILayout.Button(new GUIContent(name, tip),
                 _nameLabel, GUILayout.Width(nameW), GUILayout.Height(TextHeight(name, nameW)))) {
-                try { entry.BoxedValue = entry.DefaultValue; } catch { }
+                try { entry.BoxedValue = entry.DefaultValue; } catch (Exception __ex) { Guard.Log("恢复条目默认值(点击名称)", __ex); }
                 _editText.Remove(entry);
                 _editOpen.Remove(entry);
             }
@@ -284,7 +310,7 @@ public partial class SR {
         }
 
         //measured text height + extra room for the CJK glyph sink, so labels never clip
-        //（按 文本+宽度+缩放 缓存，条目名固定时不再每帧 CalcHeight）
+        //（按 文本+宽度+缩放 缓存，条目名固定时不再每帧 CalcHeight
         private static float TextHeight(string text, float width) {
             try {
                 string key = text + "|" + width + "|" + _scaled;
@@ -300,42 +326,72 @@ public partial class SR {
         }
 
         //Dear ImGui 风格水平滑块（SliderFloat 范式）：
-        //  - 细轨道 + 已填充段（蓝）+ 圆形把手（normal/hover/active 三态反馈）
+        //  - 细轨道 + 已填充段（蓝）；圆形把手（normal/hover/active 三态反馈）
         //  - 左键拖拽把手或点击轨道直接跳转；悬停/拖拽时滚轮微调
-        //  - 返回新值（调用方比较变化后 SetValue）
+        //  - 返回新值；**数值在松开左键时才提交**（_sliderCommitted）——拖动过程只预览不写配置，
+        //    避免拖动中每帧写盘/触发联动（用户要求：松开左键时滑块数值生效）。
+        private static bool _sliderCommitted;
+        //拖动状态：用"控件几何"而非 hotControl/控件 id 认领拖动。原因：hotControl 与
+        //GUIUtility.GetControlID 的 id 在 Layout / 输入事件 / Repaint 三种 pass 之间不保证一致，
+        //一旦对不上，MouseDrag 就不会被认领 → 把手完全不动（用户反馈"所有滑块条都无法滑动）。
+        //同时拖动中的 t 必须跨帧保存：调用方按"松开左键才提交"设计，不保存的话每帧都会从旧值反推 t 而弹回起点。
+        private static bool _sliderDragActive;
+        private static Rect _sliderDragRect;
+        private static float _sliderDragT;
+
+        //同一滑块条的几何匹配（浮点容差；拖动期间布局不变，容差只防亚像素抖动）
+        private static bool SameSliderRect(Rect a, Rect b) {
+            return Mathf.Abs(a.x - b.x) < 0.75f && Mathf.Abs(a.y - b.y) < 0.75f
+                && Mathf.Abs(a.width - b.width) < 0.75f && Mathf.Abs(a.height - b.height) < 0.75f;
+        }
+
+        private static float SliderT(Rect rect, float trackW, float handleD, float mouseX) {
+            return Mathf.Clamp01(Mathf.InverseLerp(rect.x + handleD / 2f, rect.x + handleD / 2f + trackW, mouseX));
+        }
+
         private static float DrawSlider(Rect rect, float value, float min, float max, bool intStep = false) {
-            float t = Mathf.InverseLerp(min, max, value);
+            _sliderCommitted = false;
             float trackH = Sc(4), handleD = Sc(16);
-            Rect trackRect = new Rect(rect.x, rect.y + (rect.height - trackH) / 2f, rect.width, trackH);
-            Rect fillRect = new Rect(rect.x, trackRect.y, rect.width * t, trackH);
-            Rect handleRect = new Rect(rect.x + (rect.width - handleD) * t, rect.y + (rect.height - handleD) / 2f, handleD, handleD);
+            float trackW = Mathf.Max(1f, rect.width - handleD);
             Event ev = Event.current;
-            int id = GUIUtility.GetControlID(14001, FocusType.Passive, rect);
+            bool mine = _sliderDragActive && SameSliderRect(_sliderDragRect, rect);
             bool hover = rect.Contains(ev.mousePosition);
-            bool dragging = GUIUtility.hotControl == id;
-            if (ev.type == EventType.MouseDown && ev.button == 0 && rect.Contains(ev.mousePosition)) {
-                GUIUtility.hotControl = id;
-                dragging = true;
-                t = Mathf.Clamp01(Mathf.InverseLerp(rect.x, rect.xMax, ev.mousePosition.x));
+            float t = mine ? _sliderDragT : Mathf.InverseLerp(min, max, value);
+            bool passive = ev.type == EventType.Repaint || ev.type == EventType.Layout;
+            if (ev.type == EventType.MouseDown && ev.button == 0 && hover) {
+                _sliderDragActive = true;
+                _sliderDragRect = rect;
+                t = SliderT(rect, trackW, handleD, ev.mousePosition.x);
+                _sliderDragT = t;
+                GUIUtility.hotControl = GUIUtility.GetControlID(14001, FocusType.Passive, rect);
                 ev.Use();
-            } else if (ev.type == EventType.MouseDrag && dragging) {
-                //拖动中：不管鼠标是否移出滑块范围都跟随，并钳制到 [0,1]
-                t = Mathf.Clamp01(Mathf.InverseLerp(rect.x, rect.xMax, ev.mousePosition.x));
-                ev.Use();
-            } else if (ev.type == EventType.MouseUp && dragging) {
+            } else if (mine && (ev.type == EventType.MouseDrag || (passive && Input.GetMouseButton(0)))) {
+                //拖动中：不管鼠标是否移出滑块范围都跟随，并钳制到 [0,1]。
+                //MouseDrag 优先；万一某帧没收到 MouseDrag（事件被别的逻辑吞掉/顺序异常），
+                //用"左键仍按住"兜底跟随，保证拖动一定跟手。
+                t = SliderT(rect, trackW, handleD, ev.mousePosition.x);
+                _sliderDragT = t;
+                if (ev.type == EventType.MouseDrag) ev.Use();
+            } else if (mine && ((ev.type == EventType.MouseUp && ev.button == 0) || (passive && !Input.GetMouseButton(0)))) {
+                //松开左键：这一帧提交数值（漏收 MouseUp 时用"左键已松开"兜底）。
+                _sliderDragActive = false;
+                _sliderCommitted = true;
                 GUIUtility.hotControl = 0;
-                dragging = false;
-                ev.Use();
-            } else if (ev.type == EventType.ScrollWheel && hover && !dragging) {
+                if (ev.type == EventType.MouseUp) ev.Use();
+            } else if (ev.type == EventType.ScrollWheel && hover && !mine) {
                 float step = intStep ? 1f : Mathf.Max((max - min) / 100f, 0.01f);
                 value = Mathf.Clamp(value + (ev.delta.y > 0f ? -step : step) * (intStep ? 1f : 5f), min, max);
                 ev.Use();
                 return value;
             }
+            //几何按最终 t 计算：轨道两端各留半个把手，使 t=0/1 时把手完整落在 rect 内，且与上面的鼠标映射一一对应
+            Rect trackRect = new Rect(rect.x + handleD / 2f, rect.y + (rect.height - trackH) / 2f, trackW, trackH);
+            Rect fillRect = new Rect(trackRect.x, trackRect.y, trackW * Mathf.Clamp01(t), trackH);
+            Rect handleRect = new Rect(rect.x + trackW * Mathf.Clamp01(t), rect.y + (rect.height - handleD) / 2f, handleD, handleD);
             //绘制（Repaint 或任意帧都画，事件帧提前画把手以命中 hover）
             GUI.Box(trackRect, GUIContent.none, _sliderTrack);
             if (fillRect.width > 0.5f) GUI.Box(fillRect, GUIContent.none, _sliderFill);
-            GUIStyle hs = dragging ? _sliderHandleActive : (hover ? _sliderHandleHover : _sliderHandle);
+            GUIStyle hs = mine ? _sliderHandleActive : (hover ? _sliderHandleHover : _sliderHandle);
             GUI.Box(handleRect, GUIContent.none, hs);
             //把手中心点画个小圆点（Dear ImGui 把手细节）
             GUI.DrawTexture(new Rect(handleRect.x + handleD / 2f - Sc(2), handleRect.y + handleD / 2f - Sc(2), Sc(4), Sc(4)), Texture2D.whiteTexture);
@@ -352,6 +408,7 @@ public partial class SR {
                 case "Window Height": min = 300f; max = 1000f; return true;
                 case "Window X": min = 0f; max = 2000f; return true;
                 case "Window Y": min = 0f; max = 2000f; return true;
+                case "Sidebar Width": min = 0f; max = 320f; return true; //0 = 自动
             }
             min = 0f; max = 0f; return false;
         }
@@ -372,26 +429,26 @@ public partial class SR {
                 bool capturing = _capturing == entry;
                 string text;
                 if (capturing) {
-                    text = T("请按键... (Esc 清空)", "Press a key... (Esc=clear)");
+                    text = RecText();
                 } else {
                     KeyCode kc = (KeyCode)val;
                     //组合键显示：Shift/Ctrl/Alt + 主键（捕捉时按住修饰键即可设置组合）
                     text = ComboKeyDisplay(entry, kc);
                 }
                 if (GUILayout.Button(text, capturing ? _capture : _frame, GUILayout.Width(Sc(170)), GUILayout.Height(Sc(26)))) {
-                    if (!capturing) { _prevBoxed = val; _capturing = entry; }
+                    if (!capturing) { _prevBoxed = val; _capturing = entry; _captureStartFrame = Time.frameCount; _pendingModKey = KeyCode.None; _recSeq.Clear(); _recHeld.Clear(); _recLastAt = Time.unscaledTime; }
                 }
             } else if (val is BepInEx.Configuration.KeyboardShortcut) {
                 //combo keys (external mods like BetterFreeplay use KeyboardShortcut)
                 bool capturing = _capturing == entry;
-                string text = capturing ? T("请按键... (Esc 清空)", "Press a key... (Esc=clear)") : val.ToString();
+                string text = capturing ? RecText() : val.ToString();
                 if (GUILayout.Button(text, capturing ? _capture : _frame, GUILayout.Width(Sc(170)), GUILayout.Height(Sc(26)))) {
-                    if (!capturing) { _prevBoxed = val; _capturing = entry; }
+                    if (!capturing) { _prevBoxed = val; _capturing = entry; _captureStartFrame = Time.frameCount; _pendingModKey = KeyCode.None; _recSeq.Clear(); _recHeld.Clear(); _recLastAt = Time.unscaledTime; }
                 }
             } else if (val is Enum) {
                 Type et = val.GetType();
                 string cur = EnumDisplayName(val.ToString());
-                //问号关卡 / EX 指定关卡下拉框：过滤掉不合适的关卡（空白/随机/原型 PROTOTYPE1-8），避免误选
+                //问号关卡 / EX 指定关卡下拉框：过滤掉不合适的关卡（空白/随机/原型 PROTOTYPE1-8），避免误选。
                 bool qLevel = (entry.Definition.Section == "实验" && entry.Definition.Key == "Question Level")
                     || (entry.Definition.Section == "EX" && entry.Definition.Key == "Target Level");
                 //缓存枚举选项（名称/值不变，语言切换时显示名每帧现算）：EX 页下拉框多，
@@ -433,7 +490,7 @@ public partial class SR {
                     float nv = DrawSlider(sr, fv, 1f, 32f);
                     GUILayout.Label(nv.ToString("0"), _label, GUILayout.Width(Sc(44)), GUILayout.Height(Sc(26)));
                     GUILayout.EndHorizontal();
-                    if (Mathf.Abs(nv - fv) > 0.001f) SetValue(entry, nv);
+                    if (_sliderCommitted && Mathf.Abs(nv - fv) > 0.001f) SetValue(entry, nv);
                     return;
                 }
                 //附加 Time Scale slider (0 = pause, 2 = fast)
@@ -444,7 +501,7 @@ public partial class SR {
                     float nv = DrawSlider(sr, fv, 0f, 2f);
                     GUILayout.Label(nv.ToString("0.0"), _label, GUILayout.Width(Sc(44)), GUILayout.Height(Sc(26)));
                     GUILayout.EndHorizontal();
-                    if (Mathf.Abs(nv - fv) > 0.001f) SetValue(entry, nv);
+                    if (_sliderCommitted && Mathf.Abs(nv - fv) > 0.001f) SetValue(entry, nv);
                     return;
                 }
                 //实验 Score Discount：编辑框直接输入整数（0-100，任意值如 85；走下方通用数字编辑框）
@@ -458,7 +515,7 @@ public partial class SR {
                     float nv = DrawSlider(sr, fv, smin, smax, isInt);
                     GUILayout.Label(nv.ToString(isInt ? "0" : "0.0"), _label, GUILayout.Width(Sc(44)), GUILayout.Height(Sc(26)));
                     GUILayout.EndHorizontal();
-                    if (Mathf.Abs(nv - fv) > 0.001f) SetValue(entry, isInt ? Mathf.RoundToInt(nv) : nv);
+                    if (_sliderCommitted && Mathf.Abs(nv - fv) > 0.001f) SetValue(entry, isInt ? Mathf.RoundToInt(nv) : nv);
                     return;
                 }
                 //界面语言：下拉框（中文 / English），运行时立即生效
@@ -479,11 +536,10 @@ public partial class SR {
                     txt = Convert.ToString(val, CultureInfo.InvariantCulture);
                     _editText[entry] = txt;
                 }
-                //附加页的金额/编号框窄一点（加生命/加金币/方块编号/分数数量）
+                //EX 页：编辑框宽度与同页下拉框一致（下拉框在 EX 段落用 Sc(80)，见上面 ComboBox 分支）。
+                //原来只对 3 个硬编码键名生效，其余 EX 数值项仍是 170 → 与下拉框不齐。
                 float editW = Sc(170);
-                if (entry.Definition.Section == "EX" &&
-                    (entry.Definition.Key == "Lives Amount" ||
-                     entry.Definition.Key == "Coin Amount" || entry.Definition.Key == "Piece Index")) {
+                if (entry.Definition.Section == "EX") {
                     editW = Sc(80);
                 }
                 string ntxt = GUILayout.TextField(txt, _searchBox, GUILayout.Width(editW), GUILayout.Height(Sc(26)));
@@ -504,28 +560,42 @@ public partial class SR {
             }
         }
 
-        //下拉框（照 SR_OLD 内联展开式）：按钮点击后在布局内直接展开选项列表。
-        //不弹层、不覆盖：列表项是普通按钮（点击天然命中，不会穿透），滚轮由外层
-        //ScrollView 处理，无坐标换算问题——比自绘弹层方案稳定得多。
+        //下拉框（全 mod 唯一实现，所有下拉框都走这里 → 行为完全统一）：
+        //按钮与展开列表放在**同一个纵向组**里 → 列表天然落在按钮正下方、左边缘与按钮对齐；
+        //按钮在整行最右边时，列表也跟着右对齐。不再需要任何"坐标缩进估算"
+        //（历史三版错位的根因：旧实现把列表画在行外的下一行，只能用 rect 相减估缩进，
+        //  估大了被推到可视区外、估小了跑到最左边，和下拉框完全脱节）。
+        //列表项是普通 GUILayout.Button（点击天然命中，不穿透、无浮层）。
+        //展开/收起当帧不画列表：IMGUI 的控件矩形来自上一趟 Layout，点击同一帧才新建出来的列表控件
+        //没有 Layout 记录（矩形是垃圾值/零值）→ 会出现列表一闪就没、或被误判为点击。
+        //延后一帧（下一帧 Layout 已包含列表）即可彻底避免。
+        //注意 width：调用方传入的已是 Sc() 过的大小，这里不再二次缩放。
+        private static int _comboSkipFrame = -1;
+
         private static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width = -1f) {
             if (width <= 0f) width = Sc(170);
-            int sel = -1;
-            if (GUILayout.Button(current + "   ▾", _frame, GUILayout.Width(Sc(width)), GUILayout.Height(Sc(26)))) {
+            int clicked = -1;
+            //"本帧是否展开"用**进入时**的状态决定：保证本帧 Layout 与 Repaint 的控件结构完全一致
+            //（中途点选只改下一帧的状态，绝不在同一帧里改变结构）
+            bool drew = open && Time.frameCount != _comboSkipFrame;
+            GUILayout.BeginVertical(GUILayout.Width(width));
+            if (GUILayout.Button(current + "   ▾", _frame, GUILayout.Width(width), GUILayout.Height(Sc(26)))) {
                 open = !open;
+                _editOpen[entry] = open;
+                _comboSkipFrame = Time.frameCount; //展开当帧不画列表，下一帧起
             }
-            if (open) {
-                //展开列表（内联，占布局位置）
-                GUILayout.BeginVertical(_popup, GUILayout.Width(Sc(width)));
+            if (drew) {
                 for (int i = 0; i < options.Length; i++) {
                     bool isSel = options[i] == current;
-                    if (GUILayout.Button(options[i], isSel ? _selItem : _item, GUILayout.Height(Sc(26)), GUILayout.ExpandWidth(true))) {
-                        sel = i;
-                        open = false;
-                    }
+                    if (GUILayout.Button(options[i], isSel ? _selItem : _item, GUILayout.Width(width), GUILayout.Height(Sc(26)))) clicked = i;
                 }
-                GUILayout.EndVertical();
             }
-            return sel;
+            GUILayout.EndVertical();
+            if (clicked >= 0) {
+                open = false;
+                _editOpen[entry] = false;
+            }
+            return clicked; //调用方按索引取 value 并落配置
         }
 
 	}

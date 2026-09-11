@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
@@ -45,7 +45,7 @@ namespace SR_UCH.Tweaks {
                     LobbyPlayer lp = slots[i] as LobbyPlayer;
                     if (lp != null && lp.LocalPlayer != null) return lp.networkNumber;
                 }
-            } catch { }
+            } catch (Exception __ex) { SR.Guard.Log("查找本地玩家 networkNumber", __ex); }
             return -1;
         }
 
@@ -57,7 +57,7 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(ChatDisplay), "Update")]
         [HarmonyPrefix]
         static bool HideChatUpdate(ChatDisplay __instance) {
-            if (!SR.AllEnabled || !SR.HideChatWindow) return true;
+            if (!SR.GateMaster || !SR.HideChatWindow) return true;
             try {
                 if (__instance.ChatCanvasGroup != null) __instance.ChatCanvasGroup.alpha = 0f;
                 __instance.ChatMode = false;
@@ -72,14 +72,14 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(ChatDisplay), "ReceiveEvent")]
         [HarmonyPrefix]
         static bool HideChatInput(InputEvent e) {
-            if (!SR.AllEnabled || !SR.HideChatWindow) return true;
+            if (!SR.GateMaster || !SR.HideChatWindow) return true;
             return false;
         }
 
         [HarmonyPatch(typeof(ChatDisplay), "DisplayNewMessage")]
         [HarmonyPostfix]
         static void OnMessage(object[] __args) {
-            if (!SR.AllEnabled) return;
+            if (!SR.GateMaster) return;
             if (__args == null || __args.Length == 0) return;
             if (!(__args[0] is ChatMessageDetails)) return;
             ChatMessageDetails details = (ChatMessageDetails)__args[0];

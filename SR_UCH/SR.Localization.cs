@@ -73,6 +73,7 @@ public partial class SR {
             { "设置\tWindow Height", "窗口高度" },
             { "设置\tWindow X", "窗口X" },
             { "设置\tWindow Y", "窗口Y" },
+            { "设置\tSidebar Width", "栏目宽度" },
             { "地图\t加载后清理", "加载后清理" },
             { "实验\tQuick Switch", "快速切换" },
             { "实验\tQuick Switch Hold", "等待秒数" },
@@ -196,6 +197,7 @@ public partial class SR {
             { "设置\tWindow Height", "管理器窗口高度（300 - 1000）" },
             { "设置\tWindow X", "管理器窗口 X 坐标（屏幕左上角为原点）" },
             { "设置\tWindow Y", "管理器窗口 Y 坐标（屏幕左上角为原点）" },
+            { "设置\tSidebar Width", "左侧栏目栏宽度（像素，0 = 自动；100-320）。也可在窗口里直接拖动侧栏右缘调整。" },
             { "地图\t地图总开关", "地图总开关：关闭后无法打开地图窗口（M 键无效），已打开的地图立即关闭。\n「地图网格」「树屋地图」等独立功能不受影响。" },
         };
 
@@ -258,6 +260,7 @@ public partial class SR {
             { "设置\tWindow Height", "Manager window height (300 - 1000)" },
             { "设置\tWindow X", "Manager window X (origin at top-left of screen)" },
             { "设置\tWindow Y", "Manager window Y (origin at top-left of screen)" },
+            { "设置\tSidebar Width", "Left sidebar width in pixels (0 = auto; 100-320). You can also drag the sidebar's right edge." },
             { "地图\t地图总开关", "Map master switch: OFF disables opening the map (M key does nothing); an open map closes immediately.\nIndependent features like Map grid / Treehouse map are not affected." },
         };
 

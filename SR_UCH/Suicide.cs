@@ -1,4 +1,4 @@
-﻿using BepInEx.Configuration;
+using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
 
@@ -35,7 +35,7 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(Character), "FixedUpdate")]
         [HarmonyPostfix]
         private static void CharacterPatch(Character __instance) {
-            if (!SR.AllEnabled) return;
+            if (!SR.GateMaster) return;
             if (!Enabled) return;
             if (SR.UiOpen && SR.BlockInput) return; //UI open + block on: don't steal input
             //only ever kill the local player, never teammates
