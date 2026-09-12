@@ -27,7 +27,11 @@ public partial class SR : ITweak {
 
         //对外（附加模块 DLL）暴露的注册接口版本：外部模块初始化时与自己的需求版本比对，不匹配就自行提示/降级。
         //SR 不认识任何具体外部模块，只提供版本号。
-        public const int ApiVersion = 1;
+        //用 static readonly（而非 const）：const 会在**编译外部模块 DLL 时**被内联成字面量，
+        //导致外部模块比对的是"它编译时 SR 的版本"，而不是"用户机器上当前 SR 的版本"——
+        //将来 SR 升级后要么误报"请更新 SR_UCH.dll"，要么漏报（装了却没反应）。
+        //改成 static readonly 后，外部模块在运行时才读取 SR 的真实版本，握手才真正生效。
+        public static readonly int ApiVersion = 1;
 
         //本 Mod 总开关：关闭时所有内部功能运行时失效，各功能开关值不变；初始默认关闭，改动自动保存
         public static bool AllEnabled = false;
