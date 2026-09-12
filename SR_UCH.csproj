@@ -1,17 +1,33 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- SR_UCH 主模块：入口 MainPlugin.cs + SR_UCH/ 下全部源码 -->
+  <!-- SR_UCH 主模块：入口 MainPlugin.cs + SR_UCH/ 下全部源码。
+       本工程只服务于 IDE / MSBuild（VS、Rider、dotnet build）里看代码、查游戏 API 与编译；
+       ⚠ 要部署进游戏的那一份必须由 _tools\build_sr_uch.ps1 产出（csc + 游戏自带 mscorlib/
+       UnityEngine），本工程用的是 .NET Framework 参考程序集，二者不可混用 → 输出刻意分家。 -->
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
     <AssemblyName>SR_UCH</AssemblyName>
     <RootNamespace>SR_UCH</RootNamespace>
-    <!-- 显式列出源码，避免把 bin/、参考源码等误纳入 -->
+
+    <!-- 硬约束：BepInEx 5.4 / Harmony 2 / Unity 老 Mono → C# 7.3（禁 switch 表达式/可空引用等） -->
+    <LangVersion>7.3</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- 旧 Mono / net472：不生成 ref assembly 与多余程序集属性 -->
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DebugType>none</DebugType>
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
+
+    <!-- 显式列源码，避免 bin/、obj/ 等被误纳入（新增 SR_UCH\*.cs 会自动跟上） -->
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <!-- ⚠ 输出到 bin\MSBuild：这是给 VS/二次开发用的 net472 编译产物（引用 .NET 参考程序集）。
-         要部署进游戏的那一份必须由 _tools\build_sr_uch.ps1 产出（引用游戏自带 mscorlib/UnityEngine，
-         二者不可混用），所以这里刻意分开，避免误把 MSBuild 产物拷进 BepInEx\plugins。 -->
     <OutputPath>bin\MSBuild\</OutputPath>
+
+    <!-- 本机游戏路径：可在命令行覆盖，如
+         dotnet build -p:UchManagedDir="D:\Steam\...\UltimateChickenHorse_Data\Managed" -->
+    <UchManagedDir Condition="'$(UchManagedDir)' == ''">D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed</UchManagedDir>
+    <BepInExCoreDir Condition="'$(BepInExCoreDir)' == ''">D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\BepInEx\core</BepInExCoreDir>
   </PropertyGroup>
 
   <ItemGroup>
