@@ -1,4 +1,4 @@
-# SR_UCH
+﻿# SR_UCH
 
 > Ultimate Chicken Horse 模组整合增强包（免费开源）· A quality-of-life mod suite for **Ultimate Chicken Horse**（BepInEx / Harmony）
 
@@ -70,19 +70,11 @@ Put `SR_UCH.dll` into `Ultimate Chicken Horse\BepInEx\plugins\`. 首次启动生
 
 > 在管理器内点击按键框即可改绑：`Esc` 清空，`Shift+Esc` 取消。
 
----
-
-## 进度解锁 Progression
-部分功能需先达标，否则灰显/禁用：
-
-- **A 组**：游戏时长 > 17h16m18s 或 奔跑 > 52000m → 解锁 **无视碰撞 / 自由放置 / 树屋问号**
-- **B 组**：游戏时长 > 52h 或 奔跑 > 100000m → 解锁 **方块破坏**
-- Group A (>17h / >52000m): ignore collision, free placement, question marks · Group B (>52h / >100000m): destroy blocks. 进度在实验页查看 / live progress on the Experiments page.
 
 ---
 
 ## 致谢 Credits
-BetterFreeplay · BetterNight · BuildingPlus · BuildUnlimiter · Even More Players · UCH Freeplay Spawn Setter · UCH Tweaks · UCH-PlayerTracker-Mod · UltimateBuilder
+BetterFreeplay · BetterNight · BuildingPlus · BuildUnlimiter · UCH Freeplay Spawn Setter · UCH Tweaks · UCH-PlayerTracker-Mod · UltimateBuilder
 
 ## License
 MIT — 自由使用/修改/分发。 Free to use, modify, distribute.

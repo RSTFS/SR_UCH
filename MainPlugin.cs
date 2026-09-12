@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -17,7 +17,7 @@ namespace SR_UCH {
 
         public void Awake() {
             ModLogger = Logger;
-            //loop thru every tweak and initialize it
+            //反射发现全部 ITweak 并初始化（新功能只要实现 ITweak 就会被自动加载；Harmony 补丁需类自己注册）
             foreach (Type type in Assembly.GetExecutingAssembly().GetTypes()
                          .Where(t => typeof(ITweak).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)) {
                 var tweak = (ITweak)Activator.CreateInstance(type);
@@ -27,16 +27,12 @@ namespace SR_UCH {
                     ModLogger.LogError("Failed to initialize " + type.Name + ": " + e);
                 }
             }
-            //附加模块：由 SR_UCH 主动加载（BepInEx/plugins 下的独立模块，不被任何加载器识别）
             LoadExModule();
         }
 
-        //加载 SR_UCH_EX.dll：该 DLL 没有 [BepInPlugin] 入口、不是
-        //BaseUnityPlugin 子类，BepInEx 扫描 plugins 目录时会直接跳过它（不会
-        //加载成外部插件、不显示在外部列表），其他 mod 加载器也无法把它当作
-        //插件加载。只有这里显式 Assembly.LoadFile + 反射调用 ExLoader.Init
-        //把附加功能挂进 SR_UCH 的"EX"栏目。
-        //查找顺序：先找 plugins 目录（与 SR_UCH.dll 放一起），再找 BepInEx/modules。
+        //加载 SR_UCH_EX.dll（闭源附加模块）：它没有 [BepInPlugin] 入口也不是 BaseUnityPlugin，
+        //BepInEx 扫描 plugins 时会跳过 → 只能这里 Assembly.LoadFile + 反射调 ExLoader.Init，
+        //把附加功能挂进"EX"栏目。查找顺序：plugins 目录 → BepInEx/modules。
         private void LoadExModule() {
             try {
                 string dll = Path.Combine(Paths.PluginPath, "SR_UCH_EX.dll");
