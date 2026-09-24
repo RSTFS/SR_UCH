@@ -5,15 +5,7 @@ using HarmonyLib;
 using UnityEngine;
 
 namespace ChatHider {
-    //============================================================
-    // ChatHider — standalone "Hide Chat" plugin (English only)
-    //  - Built-in toggle: Hide Chat Window (default OFF), a standard
-    //    BepInEx config entry;
-    //  - Controlled in-game by Config Manager (BepInEx Configuration
-    //    Manager): F1 → Chat Hider → Hide Chat Window, applies instantly.
-    //  - Hides the in-game chat UI (bubbles / input field); messages
-    //    are still sent & received, only the UI is hidden.
-    //============================================================
+
     [BepInPlugin("com.gamingbeast.ChatHider", "Chat Hider", "1.0.0")]
     public class ChatHiderPlugin : BaseUnityPlugin {
         public static ManualLogSource ModLogger;
