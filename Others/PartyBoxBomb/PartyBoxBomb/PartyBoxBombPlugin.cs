@@ -9,17 +9,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 
 namespace PartyBoxBomb {
-    //============================================================
-    // Party Box Bomb -- standalone plugin (English only, no SR_UCH
-    // dependency). Host-only.
-    //  When EVERY member of the lobby has sent the "Bomb!" quick-phrase
-    //  (recognized by the EmoteMeanings.EMOTE_Bomb code, so it is
-    //  language-independent), the host spawns one pickable bomb into the
-    //  current party box.
-    //  Bomb type: 0 = Small (99abombmini) / 1 = Big (99bomb) / 2 = Mega.
-    //  Configure in the BepInEx config file / Config Manager (F1).
-    //  Do NOT run together with SR_UCH's built-in party-box bomb.
-    //============================================================
+
     [BepInPlugin("com.gamingbeast.partybox_bomb", "Party Box Bomb", "1.0.0")]
     public class PartyBoxBombPlugin : BaseUnityPlugin {
         public static ManualLogSource ModLogger;
