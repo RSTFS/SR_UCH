@@ -84,7 +84,8 @@ public class QuickAdjust : ITweak {
         if (more != null) {
             string moreTip = SR.T("更多折扣数值（默认关闭）：开启后折扣滑块变为自由输入框（0-90 任意整数，0 = 关闭）。\n",
                 "More discount values (OFF by default): turns the slider into a free input box (0-90 any integer, 0 = off).\n");
-            bool nm = GUILayout.Toggle(moreOn, new GUIContent(SR.T("更多折扣数值", "More values"), moreTip), GUILayout.Width(SR.Ctl.Sc(160)), GUILayout.Height(SR.Ctl.Sc(30)));
+            //宽度交给 IMGUI 按文字自适应（原来固定 160 是为"标签+快捷键"预留，快捷键已挪到别处，不留空白）
+            bool nm = GUILayout.Toggle(moreOn, new GUIContent(SR.T("更多折扣数值", "More values"), moreTip), GUILayout.Height(SR.Ctl.Sc(30)));
             if (nm != moreOn) SR.Ctl.SetValue(more, nm);
         }
         GUILayout.FlexibleSpace();

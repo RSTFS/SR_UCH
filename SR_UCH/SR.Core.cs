@@ -127,6 +127,20 @@ public partial class SR : ITweak {
         }
 
         //启动总览（首次 Update 跑一次，此时所有功能的 SelfReg 都已执行完）：
+        //存在性判定（自检专用，纯反射）：只看类型+基类里有没有这个名字，不关心重载歧义，
+        //也不会像 AccessTools.Field 那样对方法名打 "Could not find field" 的警告（那 6 条日志就是这么来的）。
+        private static bool RefExists(Type owner, string member) {
+            const BindingFlags F = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+            try {
+                for (Type t = owner; t != null; t = t.BaseType) {
+                    if (t.GetField(member, F) != null) return true;
+                    MethodInfo[] ms = t.GetMethods(F);
+                    for (int i = 0; i < ms.Length; i++) if (ms[i].Name == member) return true;
+                }
+            } catch { }
+            return false;
+        }
+
         //把各功能自己声明的反射成员逐个解析一遍，日志给出「可用 N / 失效 M」总览。
         //没有这一步时，失效成员只在对应功能被真正用到时才告警（可能一直没提示）；
         //顺带把 [Reflection] 段的覆盖项全部建出来（用户打开 cfg 就能看到可填的成员名）。
@@ -146,9 +160,7 @@ public partial class SR : ITweak {
                     bool found = false;
                     if (owner != null) {
                         string real = RefName(owner, member); //同时建出 cfg 覆盖项
-                        try {
-                            found = AccessTools.Field(owner, real) != null || AccessTools.Method(owner, real) != null;
-                        } catch { }
+                        found = RefExists(owner, real);
                     }
                     if (found) ok++;
                     else failed.Add(kv.Key + "（" + kv.Value + "）");
@@ -239,7 +251,7 @@ public partial class SR : ITweak {
         private static float Sc(float v) { return v * _scaled; }
         private static UnityEngine.EventSystems.EventSystem _gatedEventSystem;
         private static bool _stylesReady;
-        private static GUIStyle _win, _title, _titleLabel, _titleMid, _label, _nameLabel, _labelWrap, _chatLabel, _secHeader, _item, _selItem, _btn, _frame,
+        private static GUIStyle _win, _title, _titleLabel, _titleMid, _label, _nameLabel, _labelWrap, _chatLabel, _chatArea, _secHeader, _item, _selItem, _btn, _frame,
             _capture, _checkOn, _checkOff, _popup, _searchBox, _footer, _tooltip,
             _sliderTrack, _sliderFill, _sliderHandle, _sliderHandleHover, _sliderHandleActive;
         private static Font _font;
@@ -371,6 +383,8 @@ public partial class SR : ITweak {
             //NOTE: EnsureScanned/ApplyDisabledPlugins are NOT called here - other tweaks
             //may initialize after us, so the scan runs on the manager's first Update frame
             Harmony.CreateAndPatchAll(typeof(SR));
+            //录键期间屏蔽游戏表情系统（嵌套类不会被上面的 CreateAndPatchAll 递归发现，需单独注册；失败不影响其它补丁）
+            try { Harmony.CreateAndPatchAll(typeof(EmoteBlockPatch)); } catch (Exception ex) { MainPlugin.ModLogger.LogWarning("录键屏蔽表情系统 补丁注册失败: " + ex.Message); }
         }
 
         //--- scan: split SR_UCH (internal) from every other plugin (external) ---

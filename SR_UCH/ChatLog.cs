@@ -95,7 +95,8 @@ namespace SR_UCH.Tweaks {
                 if (_chatShowTime) {
                     sb.Append(ce.time).Append(' ');
                 }
-                sb.Append('<').Append(ce.sender).Append("> ").Append(ce.text).Append('\n');
+                //"<名字>" 与正文之间用不换行空格：宽度不够时不会正好从 ">" 后面折到下一行（看着像正文跑到了下一行）
+                sb.Append('<').Append(ce.sender).Append(">\u00A0").Append(ce.text).Append('\n');
             }
             return any ? sb.ToString() : null;
         }
@@ -128,7 +129,9 @@ namespace SR_UCH.Tweaks {
                     _chatHeightCache = SR.Ctl.ChatLabel.CalcHeight(new GUIContent(_chatTextCache), innerW) + SR.Ctl.Sc(8);
                 }
                 float th = Mathf.Max(SR.Ctl.Sc(200), _chatHeightCache);
-                GUILayout.Label(_chatTextCache, SR.Ctl.ChatLabel, GUILayout.Width(innerW), GUILayout.Height(th));
+                //只读编辑框：文本可像编辑框那样选中、Ctrl+A / Ctrl+C 复制（游戏本身没有文本选择功能）。
+                //IMGUI 的 TextArea 会返回编辑后的文本，这里直接忽略（不回写）→ 只读，但不影响选择/复制。
+                GUILayout.TextArea(_chatTextCache, SR.Ctl.ChatArea, GUILayout.Width(innerW), GUILayout.Height(th));
                 if (entries.Count > _lastChatCount) { SR.Ctl.ScrollToBottom(); } //新消息滚到底
                 _lastChatCount = entries.Count;
             }
@@ -143,6 +146,14 @@ namespace SR_UCH.Tweaks {
                 ChatLog.Clear();
                 _chatTextCache = null;
                 _chatBuilt = false; //清空后强制重建（否则要等下一个 1 秒计时点）
+            }
+            GUILayout.Space(SR.Ctl.Sc(4));
+            //复制：把当前显示（应用了"过滤快捷消息"）的聊天记录整段复制到剪贴板——原来这里是纯标签，没法选中复制
+            if (SR.Ctl.HotkeyButton("chat.copy", SR.T("复制", "Copy"),
+                SR.T("把当前显示的聊天记录复制到剪贴板（游戏里没有文本选择功能，用这个代替）", "Copy the currently shown chat log to the clipboard"),
+                () => { try { GUIUtility.systemCopyBuffer = BuildChatText(ChatLog.Entries) ?? ""; } catch (Exception __ex) { SR.Guard.Log("复制聊天记录", __ex); } },
+                SR.Ctl.Sc(56), SR.Ctl.Sc(26))) {
+                try { GUIUtility.systemCopyBuffer = BuildChatText(ChatLog.Entries) ?? ""; } catch (Exception __ex) { SR.Guard.Log("复制聊天记录", __ex); }
             }
             GUILayout.Space(SR.Ctl.Sc(8));
             //三个开关：标签（左键恢复默认 / 右键绑快捷键）+ 复选框，与通用条目行同一套写法

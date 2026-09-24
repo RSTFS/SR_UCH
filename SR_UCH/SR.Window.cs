@@ -135,6 +135,16 @@ public partial class SR {
             }
         }
 
+        //录键期间屏蔽游戏自己的表情系统：鼠标中键/侧键在 UCH 里同时被表情系统接收（游戏 InputEvent），
+        //绑键时会顺带触发游戏 UI → 看起来像"界面被抢了一下"。做法与 RemovePlayerPlacements 一致
+        //（它给 EmoteSystem.ReceiveEvent 挂前缀，按住自己的键时 return false）。
+        //独立嵌套类 + 单独注册：万一将来游戏改名，失败也不会带走 SR 的其它补丁。
+        [HarmonyPatch(typeof(EmoteSystem), "ReceiveEvent")]
+        private static class EmoteBlockPatch {
+            [HarmonyPrefix]
+            private static bool Prefix() { return _capturing == null; }
+        }
+
             //标题栏用绝对布局；▼/▶ 折叠整个窗口；右端 = 总开关 + 关闭
         private static float DrawTitleBar(float width) {
             float barH = Sc(26);
@@ -192,8 +202,12 @@ public partial class SR {
             //外部模块页按钮右键绑键由按钮绘制当帧自判（跨帧登记矩形会被状态栏增减行挤位移 → 绑错键）；
             //下拉框列表在布局流内下一行绘制，无需帧首吞事件。
             //快捷键录制：单键 / 修饰键+主键 / 多普通键序列；Esc 清空、Shift+Esc 放弃、点别处取消（松开按键即保存）。
-            if (_capturing != null) {
+            //注意：整个录制块只在「非 Layout」事件里跑。Input.GetMouseButtonDown 在 Layout / Repaint 阶段同样返回 true
+            //（它按帧判定，和 IMGUI 当前在处理哪种事件无关），旧代码在 Layout 阶段对着布局事件 Use() →
+            //IMGUI 布局状态被打断 → 整个窗口闪一下（这就是鼠标侧键/中键绑键闪屏的根因）。
+            if (_capturing != null && e.type != EventType.Layout) {
                 //IMGUI 的 MouseDown 对侧键(3/4)不一定触发，故用 Input.GetMouseButtonDown 独立检测
+                bool sideHandled = false;
                 int sideBtn = -1;
                 try {
                     if (Input.GetMouseButtonDown(3)) sideBtn = 3;      //侧键1 (Mouse4)
@@ -201,10 +215,10 @@ public partial class SR {
                 } catch { sideBtn = -1; }
                 if (sideBtn >= 0) {
                     RecPushKey(KeyCode.Mouse0 + sideBtn); //鼠标键也进序列（Mouse3 / Mouse4）
-                    if (Event.current != null) Event.current.Use();
-                    return;
+                    if (e.type == EventType.MouseDown) e.Use(); //Repaint 阶段不需要（也不能）吞事件
+                    sideHandled = true; //同帧跳过下面的取消/结束判定（这里同样不能 return，return 会中断本帧绘制 → 闪一下）
                 }
-                if (e.type == EventType.KeyDown) {
+                if (!sideHandled && e.type == EventType.KeyDown) {
                     if (e.keyCode == KeyCode.Escape) {
                         if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) {
                             if (_prevBoxed != null) {
@@ -228,14 +242,13 @@ public partial class SR {
                         RecPushKey(e.keyCode);
                         e.Use();
                     }
-                } else if (e.type == EventType.MouseDown) {
-                    //中键/侧键进序列；左键/右键不录（用于取消）
+                } else if (!sideHandled && e.type == EventType.MouseDown) {
+                    //中键/侧键进序列；左键/右键不录（用于取消）。同样不能 return（会中断本帧绘制 → 闪一下）
                     if (e.button >= 2 && e.button <= 6) {
                         RecPushKey(KeyCode.Mouse0 + e.button);
                         e.Use();
-                        return;
-                    }
-                    if (Time.frameCount != _captureStartFrame) {
+                        sideHandled = true;
+                    } else if (Time.frameCount != _captureStartFrame) {
                         _capturing = null;
                         _recSeq.Clear();
                         _recHeld.Clear();

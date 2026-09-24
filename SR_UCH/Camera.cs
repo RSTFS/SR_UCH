@@ -154,6 +154,7 @@ namespace SR_UCH.Tweaks {
             if (cam == null) return;
 
             float wheel = Input.GetAxis("Mouse ScrollWheel");
+            if (ChatWindow.WheelFrame == Time.frameCount) return; //本帧滚轮已给聊天窗口用（滚动/缩放聊天框），不再缩放视野
             if (Mathf.Abs(wheel) >= 0.0001f) {
                 if (cam.orthographic) {
                     _fovEntry.Value = Mathf.Clamp(cam.orthographicSize - wheel * 5f, MinFov, MaxFov);

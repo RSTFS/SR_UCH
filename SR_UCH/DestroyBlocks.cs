@@ -63,11 +63,43 @@ namespace SR_UCH.Tweaks {
             public Color color;
         }
 
+        //与 RemovePlayerPlacements 同源的过滤：炸弹是临时道具（放置后自爆），记成"玩家放置"会在普通列表里
+        //留下永远删不到的幽灵；PlayerNumber<=0 = 非玩家（系统/关卡自带件）。
+        private static readonly string[] _tmpPieces = new string[] { "Bomb Mini", "3x3 Bomb", "Bomb Mega" };
+
+        private static bool IsPlayerPlacement(Placeable p, int playerNumber) {
+            if (p == null || playerNumber <= 0) return false;
+            string n = p.Name;
+            if (string.IsNullOrEmpty(n)) return true;
+            for (int i = 0; i < _tmpPieces.Length; i++) {
+                if (n == _tmpPieces[i]) return false;
+            }
+            return true;
+        }
+
+        //多对象道具（主体 + 子元件/附属件）：游戏只为"主体"发 PiecePlacedEvent，子元件自己不在记录里。
+        //普通列表要能列出并删除整件道具的所有部件，故沿 Placeable.ParentPiece 向上找归属。
+        private static PlacementInfo ResolveInfo(Placeable p) {
+            if (p == null) return null;
+            PlacementInfo info;
+            if (_placements.TryGetValue(p, out info)) return info;
+            try {
+                Placeable cur = p;
+                for (int i = 0; i < 8; i++) {
+                    Placeable up = cur.ParentPiece;
+                    if (up == null || up == cur) break;
+                    if (_placements.TryGetValue(up, out info)) return info;
+                    cur = up;
+                }
+            } catch (Exception __ex) { SR.Guard.Log("解析子元件归属", __ex); }
+            return null;
+        }
+
         public class PlacementListener : GameEvent.IGameEventListener {
             public void handleEvent(GameEvent.GameEvent e) {
                 GameEvent.PiecePlacedEvent ppe = e as GameEvent.PiecePlacedEvent;
                 if (ppe != null) {
-                    if (ppe.PlacedBlock == null) return;
+                    if (!IsPlayerPlacement(ppe.PlacedBlock, ppe.PlayerNumber)) return;
                     PlacementInfo info = new PlacementInfo();
                     info.playerNumber = ppe.PlayerNumber;
                     LobbyManager lm = LobbyManager.instance;
@@ -101,6 +133,7 @@ namespace SR_UCH.Tweaks {
                     if (msg == null || msg.PieceID == 0) return;
                     Placeable p = FindPlaceableByID(msg.PieceID);
                     if (p == null) return;
+                    if (!IsPlayerPlacement(p, msg.PlayerNumber)) return;
                     PlacementInfo info = new PlacementInfo();
                     info.playerNumber = msg.PlayerNumber;
                     LobbyManager lm = LobbyManager.instance;
@@ -137,7 +170,7 @@ namespace SR_UCH.Tweaks {
             SR.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
             SR.LocDesc("Destroy Blocks", "Select Mode", "选择模式：距离 = 按离自己距离排序（初始最近）；放置顺序 = 最后放的先选", "Select mode: Distance = sorted by distance to you (nearest first); Placement = most recently placed first");
             SR.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
-            SR.LocDesc("Destroy Blocks", "List Mode", "列表模式：普通 = 只列出玩家确切放置过的方块；进阶 = 所有方块单独列出", "List mode: Normal = only blocks actually placed by players; Advanced = every block listed individually");
+            SR.LocDesc("Destroy Blocks", "List Mode", "列表模式：普通 = 只列出玩家确切放置过的方块（多对象道具的子部件也算，沿 ParentPiece 归属主体；炸弹等临时道具不计）；进阶 = 所有方块单独列出", "List mode: Normal = only blocks actually placed by players (sub-parts of multi-object props count too, resolved through ParentPiece; temporary items such as bombs are excluded); Advanced = every block listed individually");
             SR.LocKey("Destroy Blocks", "Track Player", "追踪玩家", null);
             SR.LocDesc("Destroy Blocks", "Track Player", "追踪玩家：不追踪 = 找所有玩家的方块；#1 = 只找玩家1的方块，#2/#3/#4 以此类推（只影响列表，配合列表模式使用）", "Track player: NoTrack = find every player's blocks; #1 = only blocks placed by player 1, #2/#3/#4 likewise (affects the list, used with list mode)");
         }
@@ -319,10 +352,9 @@ namespace SR_UCH.Tweaks {
                 if (p.Name.Contains("Goal Block")) continue;
                 if (p.Name.Contains("Start Plank")) continue;
                 if (p.isSetPiece) continue;
-                if (normalOnly && !_placements.ContainsKey(p)) continue;
+                PlacementInfo pi = ResolveInfo(p); //自身记录，或沿 ParentPiece 找到主体记录（多对象道具）
+                if (normalOnly && pi == null) continue;
                 if (_trackMode != null && _trackMode.Value != TrackMode.NoTrack) {
-                    PlacementInfo pi = null;
-                    _placements.TryGetValue(p, out pi);
                     if (pi == null || pi.playerNumber != (int)_trackMode.Value) continue;
                 }
                 Blocks.Add(p);
@@ -337,8 +369,7 @@ namespace SR_UCH.Tweaks {
             }
             _infoTarget = p;
             if (!EnsureInfoTag()) return;
-            PlacementInfo info = null;
-            _placements.TryGetValue(p, out info);
+            PlacementInfo info = ResolveInfo(p); //子元件显示所属主体的放置者
             string label = info != null ? "#" + info.playerNumber + " " + info.playerName : "Unknown";
             if (_infoText != null) {
                 _infoText.text = label;
@@ -394,7 +425,13 @@ namespace SR_UCH.Tweaks {
         public static int ClearAllPlayerPlacements() {
             int n = 0;
             try {
-                List<Placeable> list = new List<Placeable>(_placements.Keys);
+                //按"归属"收集：主体 + 其子元件（多对象道具）都算玩家放置，关卡自带布局没有归属 → 不误删。
+                List<Placeable> list = new List<Placeable>();
+                foreach (Placeable p in Placeable.AllPlaceables) {
+                    if (p == null || p.MarkedForDestruction) continue;
+                    if (ResolveInfo(p) == null) continue;
+                    list.Add(p);
+                }
                 for (int i = 0; i < list.Count; i++) {
                     Placeable p = list[i];
                     if (p == null || p.MarkedForDestruction) continue;

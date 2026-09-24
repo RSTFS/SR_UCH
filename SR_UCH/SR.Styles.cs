@@ -80,6 +80,8 @@ public partial class SR {
             Color item = new Color(0.18f, 0.19f, 0.22f, 1f);
             Color itemHover = new Color(0.24f, 0.26f, 0.32f, 1f);
             Color selItem = new Color(0.26f, 0.37f, 0.56f, 1f);
+        //文本选中高亮：统一改成左栏选中项的那种蓝色（IMGUI 默认是橙色）
+        GUI.skin.settings.selectionColor = selItem;
             Color btnBg = new Color(0.2f, 0.21f, 0.24f, 1f);
             Color btnHover = new Color(0.3f, 0.32f, 0.38f, 1f);
             Color btnActive = new Color(0.16f, 0.17f, 0.2f, 1f);
@@ -141,6 +143,12 @@ public partial class SR {
             _chatLabel.wordWrap = true; //chat entries wrap; extra vertical room so wrapped CJK lines never clip
             _chatLabel.padding = new RectOffset(6, 6, 6, 16);
             _styleList.Add(_chatLabel);
+
+            //会话内容页用只读编辑框显示聊天记录（可选中/Ctrl+C 复制；样式沿用聊天标签，不要输入框底色）
+            _chatArea = new GUIStyle(_chatLabel);
+            _chatArea.wordWrap = true;
+            _chatArea.richText = false;
+            _styleList.Add(_chatArea);
 
             _item = StyleBtn(item, itemHover, itemHover, text);
             _item.alignment = TextAnchor.MiddleLeft;

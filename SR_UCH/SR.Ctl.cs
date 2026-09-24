@@ -73,6 +73,7 @@ public partial class SR {
         public static GUIStyle LabelWrap { get { return _labelWrap; } }
         public static GUIStyle NameLabel { get { return _nameLabel; } }
         public static GUIStyle ChatLabel { get { return _chatLabel; } }
+        public static GUIStyle ChatArea { get { return _chatArea; } }
         public static GUIStyle SecHeader { get { return _secHeader; } }
         public static GUIStyle Item { get { return _item; } }
         public static GUIStyle SelItem { get { return _selItem; } }
@@ -310,6 +311,7 @@ public partial class SR {
 
     public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
     public static readonly List<RowCompanionFn> RowCompanions = new List<RowCompanionFn>();
+    public static readonly List<RowCompanionFn> RowExtras = new List<RowCompanionFn>(); //本行右侧"再渲染一个控件"的条目（如 缩放+键位、文字大小+开关）
     public static readonly List<RowSliderFn> RowSliders = new List<RowSliderFn>();
     public static readonly List<RowComboWidthFn> RowComboWidths = new List<RowComboWidthFn>();
     public static readonly List<RowEnumFilterFn> RowEnumFilters = new List<RowEnumFilterFn>();
@@ -326,6 +328,14 @@ public partial class SR {
     public static string RowCompanion(ConfigEntryBase entry) {
         for (int i = 0; i < RowCompanions.Count; i++) {
             try { string k = RowCompanions[i](entry); if (k != null) return k; } catch (Exception __ex) { Guard.Log("同伴条目", __ex); }
+        }
+        return null;
+    }
+
+    // 同伴条目 key（同一行右侧"再渲染一个控件"），null = 无
+    public static string RowExtra(ConfigEntryBase entry) {
+        for (int i = 0; i < RowExtras.Count; i++) {
+            try { string k = RowExtras[i](entry); if (k != null) return k; } catch (Exception __ex) { Guard.Log("行附加控件", __ex); }
         }
         return null;
     }

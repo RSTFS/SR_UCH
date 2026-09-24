@@ -372,11 +372,7 @@ public partial class SR {
             if (it != null) { it.Run = action; it.Get = null; it.Set = null; }
         }
 
-        //登记"按下即切换"的开关（get/set 由功能提供，兼容非配置项的运行时开关）
-        public static void HotkeyToggle(string id, string label, Func<bool> get, Action<bool> set) {
-            HkItem it = HkEnsure(id, label);
-            if (it != null) { it.Get = get; it.Set = set; it.Run = null; }
-        }
+
 
         //取该动作的快捷键条目（界面用它做右键绑定与显示）；_internalConfig 就绪后惰性建立
         public static ConfigEntry<KeyCode> Hotkey(string id) {
@@ -413,41 +409,11 @@ public partial class SR {
             return " [" + ComboKeyDisplay(k, v) + "]";
         }
 
-        //开关条目 → 自动快捷键（id = "row:段.键"）。所有"选择框"（通用条目行 + 各功能手绘行）都走这一个入口：
-        //登记"按下即切换"，返回键条目给界面显示/右键录制；非 bool 条目返回 null（不参与）。
-        //重复调用无副作用；条目本身在 Hotkey() 里惰性建立，绑定值持久化在隐藏段 [Hotkeys]。
-        public static ConfigEntry<KeyCode> AutoHotkeyFor(ConfigEntryBase entry) {
-            if (entry == null) return null;
-            if (!(entry.BoxedValue is bool)) return null;
-            string id = AutoHotkeyId(entry);
-            ConfigEntryBase be = entry;
-            HotkeyToggle(id, ZhKey(entry), () => be.BoxedValue is bool && (bool)be.BoxedValue, v => { be.BoxedValue = v; });
-            return Hotkey(id);
-        }
-
-        public static string AutoHotkeyId(ConfigEntryBase entry) {
-            return entry == null ? null : "row:" + entry.Definition.Section + "." + entry.Definition.Key;
-        }
-
         //把已登记的条目都建出来（首次按键检查时；此时 _internalConfig 已就绪，旧绑定从 cfg 读回）
         private static void HkInitAll() {
             if (_hkInitDone || _internalConfig == null) return;
             _hkInitDone = true;
             try { NavHide(HkSec); } catch (Exception __ex) { Guard.Log("隐藏 Hotkeys 段", __ex); }
-            //持久性：上次会话绑过的开关快捷键（id = "row:段.键"）在这里按名字反查条目并重新登记，
-            //这样"绑过一次的键"开机就生效，不必先打开对应页面（页面渲染也会登记，二者等价）。
-            try {
-                foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
-                    if (e.Definition.Section != HkSec) continue;
-                    string id = e.Definition.Key;
-                    if (string.IsNullOrEmpty(id) || !id.StartsWith("row:", StringComparison.Ordinal)) continue;
-                    string rest = id.Substring(4);
-                    int dot = rest.LastIndexOf('.');
-                    if (dot <= 0) continue;
-                    ConfigEntryBase target = FindInternalEntry(rest.Substring(0, dot), rest.Substring(dot + 1));
-                    if (target != null) AutoHotkeyFor(target);
-                }
-            } catch (Exception __ex) { Guard.Log("恢复自动快捷键", __ex); }
             for (int i = 0; i < _hkItems.Count; i++) Hotkey(_hkItems[i].Id);
         }
 

@@ -49,6 +49,13 @@ public partial class SR {
             if (en != null) _descEn[k] = en;
         }
 
+        //枚举成员的显示名（各功能自己声明，如 SR.LocEnum("Hold", "按住显示")）：
+        //中文模式用它，英文模式仍显示枚举原名（Hold/Toggle 本身就是英文）。
+        public static void LocEnum(string name, string zh) {
+            if (string.IsNullOrEmpty(name) || zh == null) return;
+            _enumZh[name] = zh;
+        }
+
         //  中文模式：中文 → 英文覆盖 → key 原名；英文模式：英文覆盖 → key 原名。
         //  悬浮说明：中文模式 中文 → 英文；英文模式 英文 → 中文；都没有 = null（不显示）。
         private static string ZhSection(string sec) {

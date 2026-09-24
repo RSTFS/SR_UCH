@@ -22,6 +22,12 @@ public partial class SR {
 
         private static void SetValue(ConfigEntryBase entry, object value) {
             try {
+                //类型归一化：滑块/输入框给的是 float，而 int 条目只接受 int（否则 BepInEx 抛异常 → 表现为"怎么滑都调不动"）
+                if (value != null) {
+                    Type st = entry.SettingType;
+                    if (st == typeof(int) && !(value is int)) value = Mathf.RoundToInt(Convert.ToSingle(value));
+                    else if (st == typeof(float) && !(value is float)) value = Convert.ToSingle(value);
+                }
                 entry.BoxedValue = value;
                 if (entry == _blockInputEntry) {
                     BlockInput = value is bool bv && bv;
@@ -119,7 +125,7 @@ public partial class SR {
         //hotkey 传 null 时：bool 条目自动取"row:段.键"的自动快捷键，其余类型不参与。
         private static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey = null) {
             GUIContent c2 = content;
-            ConfigEntry<KeyCode> hk = hotkey != null ? hotkey : AutoHotkeyFor(entry);
+            ConfigEntry<KeyCode> hk = hotkey; //只认功能显式传入的键（复选框标签不再自动接快捷键）
             try {
                 string tip = content.tooltip != null ? content.tooltip : "";
                 if (entry != null && !(entry.BoxedValue is bool)) {
@@ -133,11 +139,15 @@ public partial class SR {
                     string txt = content.text + KeySuffix(hk);
                     tip += (tip.Length > 0 ? "\n" : "") + T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey");
                     c2 = new GUIContent(txt, tip);
-                    float need = _label.CalcSize(c2).x + Sc(6);
-                    if (need > w) w = Mathf.Min(need, Mathf.Max(w, _winWidth - SidebarWidth() - Sc(24)));
                 } else if (tip != content.tooltip) {
                     c2 = new GUIContent(content.text, tip);
                 }
+                //宽度：只按文字实际宽度占位（+内边距）。以前这里固定预留一大段宽度给"复选框标签上的快捷键"，
+                //快捷键已改到右侧同伴控件/独立键位框，标签再留着那段空白就只是把复选框推远 → 现在收缩掉。
+                //只收缩、不放大（除非本行带键位后缀，后缀可能比预留宽度还长，那时按需放宽到窗口可用宽度）。
+                float need = _label.CalcSize(c2).x + Sc(8);
+                if (need < w) w = Mathf.Max(Sc(24), need);
+                else if (hk != null) w = Mathf.Min(need, Mathf.Max(w, _winWidth - SidebarWidth() - Sc(24)));
             } catch (Exception __ex) { Guard.Log("条目默认值处理", __ex); }
             if (GUILayout.Button(c2, _label, GUILayout.Width(w), GUILayout.Height(h))) {
                 //只认左键：右键是"绑定快捷键"的手势，不能顺手把值重置为默认（会造成数值/勾选闪变）
@@ -259,18 +269,9 @@ public partial class SR {
 
         private static void RenderEntryRow(ConfigEntryBase entry, bool isInternal, float colWidth) {
             string name = isInternal ? ZhKey(entry) : entry.Definition.Key;
-            //开关行的快捷键归属（都显示在名称后的独立小标签里，右键名称即录制）：
-            //   · 功能自己带键的行（RowCompanion，如 建造增强的「无视碰撞 + F1」）→ 用它自带的键，
-            //     不再把那个键单独渲染成控件（键已经搬到标签上了）；
-            //   · 其它开关 → 自动快捷键（id = row:段.键）。
+            //功能自带的同伴键（如 建造增强的「无视碰撞 + F1」、视野的「自由相机 + F3」）：
+            //键位控件在本行右侧并排渲染（原生做法），开关行的标签不再承担绑键入口。
             string companionKey = isInternal ? SR.RowCompanion(entry) : null;
-            ConfigEntry<KeyCode> rowHk = null;
-            if (isInternal) {
-                if (companionKey != null) rowHk = FindInternalEntry(entry.Definition.Section, companionKey) as ConfigEntry<KeyCode>;
-                if (rowHk == null) rowHk = SR.AutoHotkeyFor(entry);
-            }
-            //名称与快捷键后缀放在同一个标签里：天然紧挨着（中间只有样式自带的内边距），不会出现空白间隔
-            if (rowHk != null) name += SR.KeySuffix(rowHk);
             //描述：中文模式用 ZhDesc/配置描述；英文模式只用 ZhDesc 的英文表（查不到留空）
             string desc;
             if (_langEn && !_forceZh) {
@@ -296,6 +297,7 @@ public partial class SR {
             }
             float avail = Mathf.Max(Sc(140), _winWidth - SidebarWidth() - Sc(24));
             float textW = _nameLabel.CalcSize(new GUIContent(name)).x;
+
             float nameW = Mathf.Clamp(Mathf.Max(colWidth, textW), Sc(50), Mathf.Max(Sc(50), avail - reserve));
             float nameTw = Mathf.Min(textW, nameW); //自适应到文字宽度；只有超出可用上限时才截断（此时才换行）
             //名称列包在垂直组里，标签才能拿到完整高度：直接放在 BeginHorizontal 只给单行高，
@@ -308,7 +310,6 @@ public partial class SR {
                 tip += "\n" + T("默认: " + defText, "Default: " + defText);
             }
             tip += "\n" + T("点击恢复默认值", "Click to reset to default");
-            if (rowHk != null) tip += "\n" + T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey");
             if (GUILayout.Button(new GUIContent(name, tip),
                 _nameLabel, GUILayout.Width(nameTw), GUILayout.Height(TextHeight(name, nameTw)))) {
                 //只认左键：右键是"绑定快捷键"的手势，绝不能顺手把值重置为默认（会造成数值/勾选闪变）
@@ -319,11 +320,23 @@ public partial class SR {
                     _editOpen.Remove(entry);
                 }
             }
-            //开关行的名称标签 = 该开关的快捷键入口：右键名称/紧邻区域即录制（复选框本身不绑，避免两个入口）
-            if (rowHk != null) RegisterRowHotkey(rowHk);
             GUILayout.EndVertical();
             GUILayout.FlexibleSpace();
             RenderControl(entry);
+            //同伴控件（功能自己注册：如 建造增强的「无视碰撞 + 对应快捷键」同行显示）
+            if (companionKey != null) {
+                GUILayout.Space(Sc(8));
+                ConfigEntryBase ck = FindInternalEntry(entry.Definition.Section, companionKey);
+                if (ck != null) RenderControl(ck);
+            }
+            //本行附加控件（功能注册：如「聊天框缩放 + 滑块 + 键位」「文字大小 + 滑块 + 开关」）
+            if (isInternal) {
+                string extraKey = SR.RowExtra(entry);
+                if (extraKey != null) {
+                    ConfigEntryBase ex = FindInternalEntry(entry.Definition.Section, extraKey);
+                    if (ex != null) { GUILayout.Space(Sc(6)); RenderControl(ex); }
+                }
+            }
             GUILayout.EndHorizontal();
             GUILayout.Space(Sc(2));
         }
@@ -497,7 +510,7 @@ public partial class SR {
                     float fv = val is int ? (int)val : (float)val;
                     GUILayout.BeginHorizontal();
                     Rect sr = GUILayoutUtility.GetRect(Sc(150), Sc(28));
-                    float nv = DrawSlider(sr, fv, hmin, hmax);
+                    float nv = DrawSlider(sr, fv, hmin, hmax, val is int); //int 条目：整数步进（提交时的类型由 SetValue 归一化）
                     GUILayout.Label(nv.ToString(hfmt), _label, GUILayout.Width(Sc(44)), GUILayout.Height(Sc(26)));
                     GUILayout.EndHorizontal();
                     if (_sliderCommitted && Mathf.Abs(nv - fv) > 0.001f) SetValue(entry, nv);
