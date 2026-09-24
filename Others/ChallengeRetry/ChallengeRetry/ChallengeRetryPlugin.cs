@@ -6,20 +6,7 @@ using HarmonyLib;
 using UnityEngine;
 
 namespace ChallengeRetry {
-    //============================================================
-    // Challenge Retry -- standalone plugin (English only, does not
-    // depend on SR_UCH).
-    //  In Challenge mode:
-    //   - Auto Retry: automatically retry (restart the run) as soon
-    //     as you die, without holding B.
-    //   - Fast Retry: after death, hold B for the set Hold Seconds to
-    //     retry fast (overrides the vanilla 0.5s hold).
-    //  Toggle in the BepInEx config file (or Config Manager, F1):
-    //    [Challenge Retry]  Auto Retry / Fast Retry / Hold Seconds
-    //  Hold Seconds is a plain number box (not a slider), clamped 0.1-2.
-    //  Do NOT run together with SR_UCH (which already includes this
-    //  feature under its Experiments page).
-    //============================================================
+
     [BepInPlugin("com.gamingbeast.challenge_retry", "Challenge Retry", "1.0.0")]
     public class ChallengeRetryPlugin : BaseUnityPlugin {
         public static ManualLogSource ModLogger;
