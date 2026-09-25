@@ -421,6 +421,12 @@ namespace SR_UCH.Tweaks {
         }
 
         //供 EX「清除地图对象」调用：依据 _placements 记录，只清玩家放置的道具、不误删关卡布局。
+        //供外部模块（EX「无视对象」）用：这个方块是不是玩家放置的道具（关卡自带布局/系统件不算）。
+        //走与列表模式同一个归属解析（含多对象道具的子部件），不暴露内部字典。
+        public static bool IsPlayerPlaced(Placeable p) {
+            try { return ResolveInfo(p) != null; } catch { return false; }
+        }
+
         //逐个广播 PieceDestroyed 后本地销毁：服务器转发全员，房客也能用（与客户端删除同一通道）。
         public static int ClearAllPlayerPlacements() {
             int n = 0;

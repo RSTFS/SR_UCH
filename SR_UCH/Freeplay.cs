@@ -451,7 +451,7 @@ public class Freeplay : ITweak {
             }
             //T = 传送到鼠标位置（仅树屋/自由模式）；O = 添加重生点（仅自由模式）。
             //用 Input.GetKeyDown 不依赖 IMGUI 事件（timeScale=0 时可靠）；mousePosition 左下原点需翻转 y。
-            if (Input.GetKeyDown(KeyCode.T)) {
+            if (Input.GetKeyDown(KeyCode.T) && !ChatWindow.ChatTyping) { //聊天输入中不触发（打字时 t 不应传送）
                 Vector2 mp = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
                 Vector2 w = CamScreenToWorld(cam, mp);
                 if (treehouseMap || GameSettings.GetInstance().GameMode == GameState.GameMode.FREEPLAY) {

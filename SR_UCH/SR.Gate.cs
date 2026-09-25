@@ -25,9 +25,10 @@ public partial class SR {
             public readonly bool OverrideModes; // 无视模式限制 IgnoreModeLimit
             public readonly bool OverrideHost;  // 无视房主限制 HostOverride（由外部模块提供）
             public readonly GameState.GameMode Mode;
+            public readonly bool ModeKnown;     //Mode 是否真的取到了（取不到时 GateModeAllows 一律不放行）
     
             public GateContext(bool master, bool isHost, bool inTreehouse, bool inMatch, bool uiCapturing,
-                               bool overrideModes, bool overrideHost, GameState.GameMode mode)
+                               bool overrideModes, bool overrideHost, GameState.GameMode mode, bool modeKnown)
             {
                 Master = master;
                 IsHost = isHost;
@@ -37,6 +38,7 @@ public partial class SR {
                 OverrideModes = overrideModes;
                 OverrideHost = overrideHost;
                 Mode = mode;
+                ModeKnown = modeKnown;
             }
         }
 
@@ -75,6 +77,9 @@ public partial class SR {
         public static bool GateModeAllows(ModeMask allowed) {
             GateContext ctx = _gateCtx;
             if (ctx.OverrideModes) return true;
+            //模式未知（GameSettings 取不到）时一律不放行：否则会按默认值 FREEPLAY 意外放开
+            //"仅自由模式"的功能，等于"取不到就当作放行了"，与保守原则相反。
+            if (!ctx.ModeKnown) return false;
             return (MaskOf(ctx.Mode) & allowed) != 0;
         }
 
@@ -124,11 +129,17 @@ public partial class SR {
                 bool overrideModes = IgnoreModeLimit;
                 bool overrideHost = HostOverride; //由外部模块通过 SetHostOverrideProvider 提供；未安装外部模块 = false
                 GameState.GameMode mode = GameState.GameMode.FREEPLAY;
-                try { mode = GameSettings.GetInstance().GameMode; } catch { }
+                bool modeKnown = false;
+                try { mode = GameSettings.GetInstance().GameMode; modeKnown = true; } catch { }
 
                 _gateCtx = new GateContext(master, isHost, treehouse, inMatch, uiCapturing,
-                    overrideModes, overrideHost, mode);
-            } catch { }
+                    overrideModes, overrideHost, mode, modeKnown);
+            } catch (Exception __ex) {
+                //不改成"保守全关"：运行中因某个 getter 抛异常而突然全关，会让正在飞行的玩家
+                //瞬间掉下来，也是一种不安全；且这些 getter 几乎不抛异常，下一帧即恢复。
+                //这里只让它可观测（Guard 有 5 秒去重，不会刷屏）。
+                Guard.Log("刷新门控上下文", __ex);
+            }
         }
 
         // ---- 求值入口 ----

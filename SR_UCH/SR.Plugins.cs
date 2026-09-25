@@ -49,19 +49,17 @@ public partial class SR {
         }
 
         private static void DisablePlugin(PluginEntry p) {
-            if (p.instance != null) {
-                foreach (Behaviour b in p.instance.GetComponents<Behaviour>()) {
-                    if (b != null) b.enabled = false;
-                }
-            }
+            //⚠ BepInEx 把**所有**插件都 AddComponent 到同一个 "BepInEx_Manager" GameObject 上
+            //（Chainloader.Start：new GameObject → AddComponent(每个插件类型)）。
+            //所以这里绝不能遍历 GetComponents<Behaviour>() 全关：那会把同物体上的其它插件（包括
+            //ConfigurationManager，按 HOME 打不开 GUI）一起关掉。只关这个插件自己这一个组件。
+            if (p.instance != null) p.instance.enabled = false;
             UnpatchPlugin(p.guid);
         }
 
         private static void EnablePlugin(PluginEntry p) {
             if (p.instance != null) {
-                foreach (Behaviour b in p.instance.GetComponents<Behaviour>()) {
-                    if (b != null) b.enabled = true;
-                }
+                p.instance.enabled = true; //同理：只开它自己（全开会顺带把用户禁用的其它插件也打开）
                 try {
                     new HarmonyLib.Harmony(p.guid).PatchAll(p.instance.GetType().Assembly);
                 } catch (Exception __ex) { Guard.Log("重新应用外部插件补丁: " + p.guid, __ex); }

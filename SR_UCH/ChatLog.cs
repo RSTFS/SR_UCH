@@ -22,8 +22,6 @@ namespace SR_UCH.Tweaks {
 
         private static ConfigEntry<bool> _chatFilterQuickEntry;
         private static bool _chatFilterQuick;   //过滤快捷消息（表情/预设消息不显示）
-        private static ConfigEntry<bool> _hideChatEntry;
-        private static bool _hideChat;          //隐藏游戏内聊天窗口（会话内容页仍照常记录）
         private static ConfigEntry<bool> _chatShowTimeEntry;
         private static bool _chatShowTime = true; //每条消息前显示具体时间
         private static string _chatTextCache;   //消息文本缓存（每秒重建一次，避免每帧拼接）
@@ -39,8 +37,6 @@ namespace SR_UCH.Tweaks {
         private static int _lastChatCount;      //上次渲染的条目数（判断是否有新消息 → 滚到底）
         private static bool _chatCacheFilter, _chatCacheShowTime;
         private static string _chatInputText = ""; //底部发送框内容
-
-        public static bool HideWindow { get { return _hideChat; } }
 
         public static void Clear() {
             _log.Clear();
@@ -76,11 +72,9 @@ namespace SR_UCH.Tweaks {
         private static void SelfReg() {
             SR.LocSec("Chat", "会话内容", null);
             SR.Nav("Chat", 80); //侧栏栏目顺序 80
-            //三个开关的文案（配置已在本文件 Bind 到 Chat 段；即使被通用条目行渲染也是中文）
+            //两个开关的文案（配置已在本文件 Bind 到 Chat 段；即使被通用条目行渲染也是中文）
             SR.LocKey("Chat", "Filter Quick Msgs", "过滤快捷消息", null);
             SR.LocDesc("Chat", "Filter Quick Msgs", "过滤快捷消息（表情/预设消息不显示）", "Hide quick messages (emotes/presets) from the log");
-            SR.LocKey("Chat", "Hide Chat Window", "隐藏聊天窗口", null);
-            SR.LocDesc("Chat", "Hide Chat Window", "隐藏游戏内聊天窗口（消息气泡/输入框），本页仍照常记录", "Hide the in-game chat window; the log page still records everything");
             SR.LocKey("Chat", "Show Time", "显示时间", null);
             SR.LocDesc("Chat", "Show Time", "每条消息前显示具体时间", "Show the timestamp before each message");
         }
@@ -156,7 +150,7 @@ namespace SR_UCH.Tweaks {
                 try { GUIUtility.systemCopyBuffer = BuildChatText(ChatLog.Entries) ?? ""; } catch (Exception __ex) { SR.Guard.Log("复制聊天记录", __ex); }
             }
             GUILayout.Space(SR.Ctl.Sc(8));
-            //三个开关：标签（左键恢复默认 / 右键绑快捷键）+ 复选框，与通用条目行同一套写法
+            //两个开关：标签（左键恢复默认 / 右键绑快捷键）+ 复选框，与通用条目行同一套写法
             SR.Ctl.RestoreLabel(new GUIContent(SR.T("过滤快捷消息", "Hide quick msgs"), SR.T("过滤快捷消息（表情/预设消息不显示）", "Hide quick msgs (emotes/presets)")),
                 _chatFilterQuickEntry, SR.Ctl.Sc(120), SR.Ctl.Sc(26));
             if (_chatFilterQuickEntry != null) SR.Ctl.RenderControl(_chatFilterQuickEntry);
@@ -164,10 +158,6 @@ namespace SR_UCH.Tweaks {
             SR.Ctl.RestoreLabel(new GUIContent(SR.T("显示具体时间", "Show time"), SR.T("每条消息前显示具体时间", "Show a timestamp before each message")),
                 _chatShowTimeEntry, SR.Ctl.Sc(110), SR.Ctl.Sc(26));
             if (_chatShowTimeEntry != null) SR.Ctl.RenderControl(_chatShowTimeEntry);
-            GUILayout.Space(SR.Ctl.Sc(16));
-            SR.Ctl.RestoreLabel(new GUIContent(SR.T("隐藏聊天窗口", "Hide chat window"), SR.T("隐藏游戏内聊天窗口（本页仍照常记录）", "Hide the in-game chat window (still recorded here)")),
-                _hideChatEntry, SR.Ctl.Sc(120), SR.Ctl.Sc(26));
-            if (_hideChatEntry != null) SR.Ctl.RenderControl(_hideChatEntry);
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.Space(SR.Ctl.Sc(4));
@@ -204,35 +194,10 @@ namespace SR_UCH.Tweaks {
             _chatFilterQuickEntry = plugin.Config.Bind("Chat", "Filter Quick Msgs", false, "会话内容页：过滤快捷消息（表情/预设消息不显示）");
             _chatFilterQuick = _chatFilterQuickEntry.Value;
             _chatFilterQuickEntry.SettingChanged += (s, e) => _chatFilterQuick = _chatFilterQuickEntry.Value;
-            _hideChatEntry = plugin.Config.Bind("Chat", "Hide Chat Window", false, "隐藏游戏内聊天窗口（消息气泡/输入框不显示），会话内容页仍照常记录聊天。默认关闭。");
-            _hideChat = _hideChatEntry.Value;
-            _hideChatEntry.SettingChanged += (s, e) => _hideChat = _hideChatEntry.Value;
             _chatShowTimeEntry = plugin.Config.Bind("Chat", "Show Time", true, "会话内容页：每条消息前显示具体时间。默认开启。");
             _chatShowTime = _chatShowTimeEntry.Value;
             _chatShowTimeEntry.SettingChanged += (s, e) => _chatShowTime = _chatShowTimeEntry.Value;
             try { Harmony.CreateAndPatchAll(typeof(ChatLog)); } catch (Exception e) { MainPlugin.ModLogger.LogWarning("会话内容 补丁注册失败: " + e.Message); }
-        }
-
-        [HarmonyPatch(typeof(ChatDisplay), "Update")]
-        [HarmonyPrefix]
-        static bool HideChatUpdate(ChatDisplay __instance) {
-            if (!SR.GateMaster || !SR.HideChatWindow) return true;
-            try {
-                if (__instance.ChatCanvasGroup != null) __instance.ChatCanvasGroup.alpha = 0f;
-                __instance.ChatMode = false;
-                if (__instance.currentChatInputField != null && __instance.currentChatInputField.gameObject.activeSelf)
-                    __instance.currentChatInputField.gameObject.SetActive(false);
-                return false;
-            } catch {
-                return true;
-            }
-        }
-
-        [HarmonyPatch(typeof(ChatDisplay), "ReceiveEvent")]
-        [HarmonyPrefix]
-        static bool HideChatInput(InputEvent e) {
-            if (!SR.GateMaster || !SR.HideChatWindow) return true;
-            return false;
         }
 
         [HarmonyPatch(typeof(ChatDisplay), "DisplayNewMessage")]

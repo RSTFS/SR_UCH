@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -17,8 +17,57 @@ public partial class SR {
 
 // ==== 分区：Settings（设置页 / 通用条目行渲染 / 控件渲染 / 滑块 / 下拉框）====
 
+        // ---- 让 Configuration Manager 的条目顺序与 SR 界面一致 ----
+        //Configuration Manager 按条目 Tag 里的 ConfigurationManagerAttributes.Order 排序；
+        //BepInEx 的 ConfigDescription / ConfigEntryBase.Description 都没有公开 setter，所以这里用反射替换
+        //Description（只改显示顺序的标签，Value/AcceptableValues 原样保留）。
+        //顺序规则 = 侧栏栏目顺序（_internalSections）→ 栏目内条目的注册（绑定）顺序，与 SR 页面渲染顺序一致。
+        private static bool _cmOrderApplied;
+        private static readonly FieldInfo _fEntryDesc =
+            typeof(ConfigEntryBase).GetField("<Description>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? typeof(ConfigEntryBase).GetField("Description", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        internal static void ApplyCmOrder() {
+            if (_cmOrderApplied || _internalConfig == null) return;
+            _cmOrderApplied = true;
+            try {
+                //Configuration Manager 是 OrderByDescending(Order)：**Order 大的显示在前面**（反查它 IL 确认的）
+                //→ 每个栏目内把顺序倒过来编：先绑定的条目拿最大的 Order。
+                Dictionary<string, int> secRank = new Dictionary<string, int>();
+                for (int i = 0; i < _internalSections.Count; i++) secRank[_internalSections[i]] = i;
+                //先按栏目分组收集，拿到每栏条目数才能倒着编号
+                Dictionary<string, List<ConfigEntryBase>> bySec = new Dictionary<string, List<ConfigEntryBase>>();
+                foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
+                    if (e == null) continue;
+                    string sec = e.Definition.Section;
+                    if (string.IsNullOrEmpty(sec)) sec = "(General)";
+                    List<ConfigEntryBase> list;
+                    if (!bySec.TryGetValue(sec, out list)) { list = new List<ConfigEntryBase>(); bySec[sec] = list; }
+                    list.Add(e);
+                }
+                foreach (KeyValuePair<string, List<ConfigEntryBase>> kv in bySec) {
+                    int r; if (!secRank.TryGetValue(kv.Key, out r)) r = 500; //没注册成栏目的段（Hotkeys/Reflection 等）排最后
+                    List<ConfigEntryBase> list = kv.Value;
+                    for (int k = 0; k < list.Count; k++) {
+                        ConfigEntryBase e = list[k];
+                        int order = r * 1000 + (list.Count - 1 - k); //倒序编号：第 1 个绑定的排最前
+                        try {
+                            ConfigDescription d = e.Description;
+                            if (_fEntryDesc != null) {
+                                object[] tags = new object[] { new ConfigurationManagerAttributes { Order = order } };
+                                _fEntryDesc.SetValue(e, new ConfigDescription(d != null ? d.Description : "", d != null ? d.AcceptableValues : null, tags));
+                            }
+                        } catch (Exception __ex) { Guard.Log("设置条目显示顺序(单条)", __ex); }
+                    }
+                }
+            } catch (Exception __ex) { Guard.Log("Configuration Manager 排序", __ex); }
+        }
+
         //枚举下拉选项缓存（值不变；显示名按语言每帧现算）——避免每帧 GetNames/GetValues/遍历
-        private static readonly Dictionary<Type, object[]> _enumOptions = new Dictionary<Type, object[]>();
+        //枚举选项缓存：键是 **entry 而非 Type** —— 过滤器 RowEnumAllowed 的签名带 entry
+        //（同一枚举类型被不同配置项使用时过滤结果可能不同），按 Type 缓存会让先渲染的 entry
+        //的过滤结果被后续同类型 entry 复用（表现为下拉框选项串台，且取决于渲染顺序）。
+        private static readonly Dictionary<ConfigEntryBase, object[]> _enumOptions = new Dictionary<ConfigEntryBase, object[]>();
 
         private static void SetValue(ConfigEntryBase entry, object value) {
             try {
@@ -474,7 +523,7 @@ public partial class SR {
                 string cur = EnumDisplayName(val.ToString());
                 //枚举选项缓存（值不变；显示名每帧现算）——外部模块页下拉框多，避免每帧 Enum.GetNames/GetValues
                 object[] cachedVals;
-                if (!_enumOptions.TryGetValue(et, out cachedVals)) {
+                if (!_enumOptions.TryGetValue(entry, out cachedVals)) {
                     string[] names = Enum.GetNames(et);
                     Array vals = Enum.GetValues(et);
                     List<object> vlist = new List<object>();
@@ -485,7 +534,7 @@ public partial class SR {
                         vlist.Add(v);
                     }
                     cachedVals = vlist.ToArray();
-                    _enumOptions[et] = cachedVals;
+                    _enumOptions[entry] = cachedVals;
                 }
                 string[] dispNames = new string[cachedVals.Length];
                 for (int i = 0; i < cachedVals.Length; i++) dispNames[i] = EnumDisplayName(cachedVals[i].ToString());
@@ -511,7 +560,7 @@ public partial class SR {
                     GUILayout.BeginHorizontal();
                     Rect sr = GUILayoutUtility.GetRect(Sc(150), Sc(28));
                     float nv = DrawSlider(sr, fv, hmin, hmax, val is int); //int 条目：整数步进（提交时的类型由 SetValue 归一化）
-                    GUILayout.Label(nv.ToString(hfmt), _label, GUILayout.Width(Sc(44)), GUILayout.Height(Sc(26)));
+                    GUILayout.Label(nv.ToString(hfmt), _label, GUILayout.Width(SliderValueWidth(nv.ToString(hfmt))), GUILayout.Height(Sc(26)));
                     GUILayout.EndHorizontal();
                     if (_sliderCommitted && Mathf.Abs(nv - fv) > 0.001f) SetValue(entry, nv);
                     return;
@@ -524,7 +573,7 @@ public partial class SR {
                     GUILayout.BeginHorizontal();
                     Rect sr = GUILayoutUtility.GetRect(Sc(150), Sc(28));
                     float nv = DrawSlider(sr, fv, smin, smax, isInt);
-                    GUILayout.Label(nv.ToString(isInt ? "0" : "0.0"), _label, GUILayout.Width(Sc(44)), GUILayout.Height(Sc(26)));
+                    GUILayout.Label(nv.ToString(isInt ? "0" : "0.0"), _label, GUILayout.Width(SliderValueWidth(nv.ToString(isInt ? "0" : "0.0"))), GUILayout.Height(Sc(26)));
                     GUILayout.EndHorizontal();
                     if (_sliderCommitted && Mathf.Abs(nv - fv) > 0.001f) SetValue(entry, isInt ? Mathf.RoundToInt(nv) : nv);
                     return;
@@ -574,6 +623,28 @@ public partial class SR {
         //延后一帧绘制。注意 width：调用方传入的已是 Sc() 过的大小，这里不再二次缩放。
         private static int _comboSkipFrame = -1;
 
+        //滑块右边的数值标签宽度：按文字实测（-1000 这种 5 位负值以前用固定 44 会被截断）
+        private static float SliderValueWidth(string text) {
+            try {
+                return Mathf.Max(Sc(44), _label.CalcSize(new GUIContent(text)).x + Sc(8));
+            } catch { return Sc(44); }
+        }
+
+        //---- 悬停在下拉框上滚轮 = 换选项（不滚页面）----
+        //上一帧画过的"已收起的下拉框"矩形：滚动区在它之前绘制，所以要在那里先把 ScrollWheel 事件吞掉，
+        //否则页面会跟着滚（下拉框自己在 Repaint 阶段用 Input.GetAxis 落值）。
+        private static Rect _comboWheelRect;
+        private static bool _comboWheelValid;
+
+        internal static void ComboWheelShield() {
+            try {
+                Event e = Event.current;
+                if (e == null || e.type != EventType.ScrollWheel) return;
+                if (!_comboWheelValid || !_comboWheelRect.Contains(e.mousePosition)) return;
+                e.Use();
+            } catch { }
+        }
+
         private static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width = -1f) {
             if (width <= 0f) width = Sc(170);
             int clicked = -1;
@@ -584,6 +655,25 @@ public partial class SR {
                 open = !open;
                 _editOpen[entry] = open;
                 _comboSkipFrame = Time.frameCount; //展开当帧不画列表，下一帧起
+            }
+            //悬停滚轮换选项：记录收起状态的矩形（供滚动区之前吞事件），并在 Repaint 阶段落值
+            //（Repaint 是每帧最后一次绘制，此时改配置不会打断本帧 Layout；下拉框宽度固定，也不会引起布局变化）
+            Rect boxRect = GUILayoutUtility.GetLastRect();
+            _comboWheelRect = boxRect;
+            _comboWheelValid = !open;
+            Event ce = Event.current;
+            if (!open && ce != null && ce.type == EventType.Repaint && options != null && options.Length > 1
+                && boxRect.Contains(ce.mousePosition)) {
+                float cw = 0f;
+                try { cw = Input.GetAxis("Mouse ScrollWheel"); } catch { cw = 0f; }
+                if (Mathf.Abs(cw) > 0.0001f) {
+                    int cur = 0;
+                    for (int i = 0; i < options.Length; i++) { if (options[i] == current) { cur = i; break; } }
+                    int ni = cw > 0f ? cur - 1 : cur + 1; //上滚 = 上一项
+                    if (ni < 0) ni = options.Length - 1;
+                    if (ni >= options.Length) ni = 0;
+                    clicked = ni;
+                }
             }
             if (drew) {
                 for (int i = 0; i < options.Length; i++) {

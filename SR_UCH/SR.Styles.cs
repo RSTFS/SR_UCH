@@ -50,16 +50,28 @@ public partial class SR {
             return s;
         }
 
+        //中文字体候选名（依次尝试，取第一个真正创建成功的）：
+        //Windows 用微软雅黑；Linux/Proton（含 Steam Deck）通常只带开源 CJK 字体，硬编码单个名字时
+        //CreateDynamicFontFromOSFont **返回 null 而不抛异常** → 紧接着 DontDestroyOnLoad(null) 抛异常 →
+        //_font 保持 null → 中文退回 Unity 默认字体，显示为豆腐块。故必须显式判空 + 候选回退。
+        //注：微软雅黑的 CJK 字形下沉到字体度量下方，故所有文本样式加额外垂直内边距防裁切（见 padding）。
+        private static readonly string[] FontCandidates = {
+            "Microsoft YaHei", "微软雅黑", "Noto Sans CJK SC", "Source Han Sans SC",
+            "WenQuanYi Micro Hei", "PingFang SC", "Heiti SC"
+        };
+
         //font size follows the UI scale so layout height matches rendered text height
         private static void EnsureFont() {
             int fs = Mathf.RoundToInt(14f * Mathf.Clamp(_uiScaleEntry.Value, 1f, 1.8f));
             if (_font == null || _font.fontSize != fs) {
-                try {
-                    //Microsoft YaHei：CJK 字形下沉到字体度量下方，故所有文本样式加额外垂直内边距防裁切。
-                    Font nf = Font.CreateDynamicFontFromOSFont("Microsoft YaHei", fs);
-                    UnityEngine.Object.DontDestroyOnLoad(nf);
-                    _font = nf;
-                } catch (Exception __ex) { Guard.Log("创建中文字体", __ex); }
+                for (int i = 0; i < FontCandidates.Length && _font == null; i++) {
+                    try {
+                        Font nf = Font.CreateDynamicFontFromOSFont(FontCandidates[i], fs);
+                        if (nf == null) continue; //字体不存在：返回 null 而非抛异常，必须显式判空
+                        UnityEngine.Object.DontDestroyOnLoad(nf);
+                        _font = nf;
+                    } catch (Exception __ex) { Guard.Log("创建中文字体(" + FontCandidates[i] + ")", __ex); }
+                }
             }
         }
 

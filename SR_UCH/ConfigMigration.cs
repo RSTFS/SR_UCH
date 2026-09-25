@@ -26,7 +26,6 @@ namespace SR_UCH.Tweaks {
             { "自由相机", "Free Camera" },
             { "地图总开关", "Map Enabled" },
             { "过滤快捷消息", "Filter Quick Msgs" },
-            { "隐藏聊天窗口", "Hide Chat Window" },
             { "显示时间", "Show Time" },
             { "加载后清理", "GC After Load" },
         };
@@ -126,10 +125,9 @@ namespace SR_UCH.Tweaks {
                 // 现在统一搬回 [EX]（幂等：已在 EX 段就不动）
                 text = MoveKeyBetweenSections(text, "Destroy Blocks", "EX", "Allow Clients");
                 text = MoveKeyBetweenSections(text, "Destroy Blocks", "EX", "Allow Clients Key");
-                // 会话内容页的 3 个开关已从 [Settings] 归位到 [Chat]（功能自包含：配置跟功能走）。
-                // 必须搬值，否则老用户这三个开关的当前状态会丢（回到默认）。
+                // 会话内容页的两个开关已从 [Settings] 归位到 [Chat]（功能自包含：配置跟功能走）。
+                // 必须搬值，否则老用户这两个开关的当前状态会丢（回到默认）。
                 text = MoveKeyBetweenSections(text, "Settings", "Chat", "Filter Quick Msgs");
-                text = MoveKeyBetweenSections(text, "Settings", "Chat", "Hide Chat Window");
                 text = MoveKeyBetweenSections(text, "Settings", "Chat", "Show Time");
                 if (text == orig) return false;
                 //不生成 .bak 备份：迁移幂等、只改 section/key 名（值原样保留），多出的旧配置容易被误读

@@ -352,7 +352,7 @@ public partial class SR {
                 }
             }
             GUILayout.Space(Sc(6));
-            //外部插件与内部栏目之间只画一条分隔线（不再用「外部」标签）
+            //外部插件与内部栏目之间画一条分隔线
             GUILayout.Box(GUIContent.none, _footer, GUILayout.Height(Sc(1)), GUILayout.ExpandWidth(true));
             GUILayout.Space(Sc(4));
             foreach (PluginEntry p in _externalPlugins) {
@@ -390,6 +390,8 @@ public partial class SR {
             if (_mode == Mode.Internal && _selectedInternalSection == "Chat") {
                 ChatLog.RenderToolbar(); //本功能页在 ChatLog.cs
             }
+            //鼠标悬停在下拉框上滚轮 = 换选项：先于滚动区把滚轮事件吞掉，免得页面跟着滚
+            SR.ComboWheelShield();
             _scroll = GUILayout.BeginScrollView(_scroll);
             ConfigFile curConfig = _mode == Mode.Internal
                 ? _internalConfig

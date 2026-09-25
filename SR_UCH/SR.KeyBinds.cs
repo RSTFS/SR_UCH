@@ -313,8 +313,11 @@ public partial class SR {
         }
 
         //按下检测：单键 / 修饰键组合（修饰键全部按住 + 主键按下）/ 多键序列（按顺序，如 9 → 0）
+        //注：游戏自己的聊天输入框打开时（ChatTyping）一律返回 false —— 打字期间不能触发任何功能快捷键
+        //（所有 SR 功能与外部模块的键轮询都走这两个函数，这里是唯一的统一入口）。
         public static bool ComboKeyDown(ConfigEntry<KeyCode> entry) {
             if (entry == null) return false;
+            if (ChatWindow.ChatTyping) return false;
             KeyCode main = KeyCode.None;
             try { main = entry.Value; } catch { }
             if (main == KeyCode.None) return false;
@@ -324,6 +327,7 @@ public partial class SR {
 
         public static bool ComboKeyHeld(ConfigEntry<KeyCode> entry) {
             if (entry == null) return false;
+            if (ChatWindow.ChatTyping) return false;
             return ComboModDown(entry) && Input.GetKey(entry.Value);
         }
 

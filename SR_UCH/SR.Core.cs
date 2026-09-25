@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -200,8 +200,11 @@ public partial class SR : ITweak {
             if (!_cfgDirty || _internalConfig == null) return;
             if (Time.unscaledTime < _cfgNextSaveAt) return;
             _cfgNextSaveAt = Time.unscaledTime + 1f;
-            _cfgDirty = false;
-            Guard.Try("配置定期落盘", () => _internalConfig.Save());
+            //保存成功才清脏标记：Guard.Try 会吞掉异常，若 Save 失败却已清脏，这一批改动会被
+            //当成"已落盘"而永久丢失（日志里只有一条可能被 5 秒去重吞掉的 Warning）。
+            //保持脏则下一秒自动重试，直到成功。
+            bool saved = Guard.Try("配置定期落盘", () => { _internalConfig.Save(); return true; }, false);
+            if (saved) _cfgDirty = false;
         }
         private static readonly List<string> _internalSections = new List<string>();
         //侧栏栏目自注册表（各功能文件在自己的 SelfReg 里声明；见 SR.Nav / SR.NavHide）
@@ -213,7 +216,6 @@ public partial class SR : ITweak {
         private static readonly List<PluginEntry> _externalPlugins = new List<PluginEntry>();
         private static string _pluginKey = "";
         private static Vector2 _scroll;
-        public static bool HideChatWindow { get { return ChatLog.HideWindow; } }
         //文本测量缓存（控制台打开时避免每帧对所有条目 CalcSize/CalcHeight，减少掉帧）
         private static string _nameWKey = "";
         private static float _nameWCached;
@@ -464,6 +466,7 @@ public partial class SR : ITweak {
             if (_internalSections.Count > 0) _selectedInternalSection = _internalSections[0];
             if (_externalPlugins.Count > 0) _pluginKey = _externalPlugins[0].guid;
             ApplyDisabledPlugins(); //re-disable plugins from the last session
+            ApplyCmOrder();         //让 Configuration Manager 的条目顺序与 SR 界面一致（侧栏顺序 + 栏目内绑定顺序）
         }
 
         private static void CloseMenu() {
