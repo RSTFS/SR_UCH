@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -120,16 +120,27 @@ public partial class SR {
         private static void RenderSettingsEntries(float colWidth) {
             string lastGroup = null;
             bool any = false;
+            bool pluginListDrawn = false;
             foreach (ConfigEntryBase entry in SettingsEntries()) {
                 any = true;
                 //「栏目宽度」专用行：滑块 + [−]/[+] 步进（滑块失效时步进按钮仍可靠）
                 if (entry.Definition.Key == "Sidebar Width") { RenderSidebarWidthRow(); continue; }
                 string g = SettingsGroup(entry.Definition.Key);
+                //外部插件清单挪到「界面」分组之后（原来在最上面，把界面设置挤下去了）
+                if (!pluginListDrawn && lastGroup == "界面" && (g == null || g != "界面")) {
+                    pluginListDrawn = true;
+                    GUILayout.Space(Sc(4));
+                    RenderPluginList();
+                }
                 if (g != null && g != lastGroup) {
                     lastGroup = g;
                     GUILayout.Label("— " + T(g, g == "按键" ? "Keys" : g == "界面" ? "UI" : "Plugins") + " —", _secHeader);
                 }
                 RenderEntryRow(entry, true, colWidth);
+            }
+            if (!pluginListDrawn) {
+                GUILayout.Space(Sc(4));
+                RenderPluginList();
             }
             if (!any) GUILayout.Label(T("（无匹配条目）", "(no matching entries)"), _label);
         }
@@ -433,6 +444,9 @@ public partial class SR {
             Event ev = Event.current;
             bool mine = _sliderDragActive && SameSliderRect(_sliderDragRect, rect);
             bool hover = rect.Contains(ev.mousePosition);
+            //记录矩形供下一帧"滚动区之前"吞滚轮（否则滚轮会同时滚页面）
+            _sliderWheelRect = rect;
+            _sliderWheelValid = true;
             float t = mine ? _sliderDragT : Mathf.InverseLerp(min, max, value);
             bool passive = ev.type == EventType.Repaint || ev.type == EventType.Layout;
             if (ev.type == EventType.MouseDown && ev.button == 0 && hover) {
@@ -478,7 +492,7 @@ public partial class SR {
         private static bool SliderRange(string key, out float min, out float max) {
             switch (key) {
                 case "UI Scale": min = 1f; max = 1.8f; return true;
-                case "Window Width": min = 400f; max = 1200f; return true;
+                case "Window Width": min = 400f; max = 1600f; return true;
                 case "Window Height": min = 300f; max = 1000f; return true;
                 case "Window X": min = 0f; max = 2000f; return true;
                 case "Window Y": min = 0f; max = 2000f; return true;
@@ -635,13 +649,21 @@ public partial class SR {
         //否则页面会跟着滚（下拉框自己在 Repaint 阶段用 Input.GetAxis 落值）。
         private static Rect _comboWheelRect;
         private static bool _comboWheelValid;
+        //展开的下拉列表矩形（上一帧记录）：展开时滚轮也要被吞掉，否则会带着页面滚动
+        private static Rect _comboListRect;
+        private static bool _comboListValid;
+        //滑块矩形（上一帧记录）：滚轮调滑块时不要带着页面滚动
+        private static Rect _sliderWheelRect;
+        private static bool _sliderWheelValid;
 
+        //在滚动区之前吞掉滚轮：下拉框（收起/展开都算）+ 滑块
         internal static void ComboWheelShield() {
             try {
                 Event e = Event.current;
                 if (e == null || e.type != EventType.ScrollWheel) return;
-                if (!_comboWheelValid || !_comboWheelRect.Contains(e.mousePosition)) return;
-                e.Use();
+                if (_comboWheelValid && _comboWheelRect.Contains(e.mousePosition)) { e.Use(); return; }
+                if (_comboListValid && _comboListRect.Contains(e.mousePosition)) { e.Use(); return; }
+                if (_sliderWheelValid && _sliderWheelRect.Contains(e.mousePosition)) { e.Use(); return; }
             } catch { }
         }
 
@@ -680,6 +702,14 @@ public partial class SR {
                     bool isSel = options[i] == current;
                     if (GUILayout.Button(options[i], isSel ? _selItem : _item, GUILayout.Width(width), GUILayout.Height(Sc(26)))) clicked = i;
                 }
+                _comboListRect = GUILayoutUtility.GetLastRect();
+                //列表可能是多行：把整块区域都算进去（首个格子顶部 ~ 最后一个格子底部）
+                if (_comboListRect.height < Sc(26) * options.Length) {
+                    _comboListRect = new Rect(boxRect.x, boxRect.yMax, width, Sc(26) * options.Length);
+                }
+                _comboListValid = true;
+            } else {
+                _comboListValid = false;
             }
             GUILayout.EndVertical();
             if (clicked >= 0) {

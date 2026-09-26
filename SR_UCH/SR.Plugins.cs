@@ -32,6 +32,19 @@ public partial class SR {
             return _extDisabled.TryGetValue(guid, out v) && v;
         }
 
+        //「设置」页里不渲染原始的禁用 GUID 字符串条目（改为顶部按钮清单）
+        private static bool SettingsHiddenDisabledPlugins(ConfigEntryBase e) {
+            return !(e.Definition.Section == "Settings" && e.Definition.Key == "Disabled Plugins");
+        }
+
+        //窗口宽高/XY 不再做成可自定义条目（窗口直接拖右下角缩放、拖标题栏移动即可）：
+        //配置项本身保留（用于持久化），只是不在设置页显示
+        private static bool SettingsHiddenWindowGeometry(ConfigEntryBase e) {
+            if (e.Definition.Section != "Settings") return true;
+            string k = e.Definition.Key;
+            return !(k == "Window Width" || k == "Window Height" || k == "Window X" || k == "Window Y");
+        }
+
         //撤销该插件的全部 Harmony 补丁（先按 ID，再扫描补丁表兜底）
         private static void UnpatchPlugin(string guid) {
             Guard.Try("撤销外部插件补丁(UnpatchID): " + guid, () => HarmonyLib.Harmony.UnpatchID(guid));
@@ -118,6 +131,37 @@ public partial class SR {
         private static PluginEntry CurrentExternalPlugin() {
             foreach (PluginEntry p in _externalPlugins) if (p.guid == _pluginKey) return p;
             return _externalPlugins.Count > 0 ? _externalPlugins[0] : null;
+        }
+
+        //「设置」页顶部的插件清单：一行一个插件 = 启用/禁用按钮 + 名字（悬停显示 GUID）。
+        //原来这里只有一个 "Disabled Plugins" 原始字符串条目（分号分隔的 GUID），既不好看也不好点。
+        private static void RenderPluginList() {
+            try {
+                if (_externalPlugins.Count == 0) return;
+                GUILayout.Label(T("— 外部插件（运行时启用/禁用）—", "— External plugins (enable/disable at runtime) —"), _secHeader);
+                GUILayout.Label(T("禁用会立刻卸载该插件的 Harmony 补丁并停掉它，重启后保持；启用会重新应用补丁。",
+                                  "Disabling unpatches and stops the plugin immediately and persists after a restart; enabling re-applies its patches."),
+                                _label);
+                GUILayout.Space(Sc(2));
+                float w = Mathf.Max(Sc(160), _winWidth - SidebarWidth() - Sc(40));
+                foreach (PluginEntry p in _externalPlugins) {
+                    bool dis = IsExternalDisabled(p.guid);
+                    GUILayout.BeginHorizontal(GUILayout.Width(w));
+                    if (GUILayout.Button(dis ? T("启用", "Enable") : T("禁用", "Disable"),
+                            dis ? _checkOn : _btn, GUILayout.Width(Sc(58)), GUILayout.Height(Sc(24)))) {
+                        ToggleExternalPlugin(p);
+                    }
+                    GUILayout.Space(Sc(6));
+                    Color prev = GUI.color;
+                    if (dis) GUI.color = new Color(1f, 1f, 1f, 0.55f);
+                    GUILayout.Label(new GUIContent((dis ? "⛔ " : "") + p.name, p.guid + "\n" + (dis ? T("已禁用", "disabled") : T("已启用", "enabled"))),
+                        _labelClip, GUILayout.Width(w - Sc(70)), GUILayout.Height(Sc(24)));
+                    GUI.color = prev;
+                    GUILayout.FlexibleSpace();
+                    GUILayout.EndHorizontal();
+                }
+                GUILayout.Space(Sc(6));
+            } catch (Exception __ex) { Guard.Log("外部插件清单渲染", __ex); }
         }
 
 	}

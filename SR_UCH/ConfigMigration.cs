@@ -77,6 +77,37 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SR.Guard.Log("cfg 行搬移", __ex); return text; }
         }
 
+        // 删掉已删除功能的废弃键（幂等：不在就原样返回）。带 "组合键 <段> <键>" 的绑定行一起删。
+        private static string RemoveKeys(string text, string section, string[] keys) {
+            try {
+                string[] lines = text.Replace("\r\n", "\n").Split('\n');
+                List<string> outp = new List<string>();
+                string cur = "";
+                bool changed = false;
+                for (int i = 0; i < lines.Length; i++) {
+                    string t = lines[i].Trim();
+                    if (t.StartsWith("[", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal)) {
+                        cur = t.Substring(1, t.Length - 2);
+                        outp.Add(lines[i]);
+                        continue;
+                    }
+                    if (cur == section) {
+                        int eq = t.IndexOf('=');
+                        if (eq > 0) {
+                            string k = t.Substring(0, eq).TrimEnd();
+                            bool drop = false;
+                            for (int j = 0; j < keys.Length; j++) {
+                                if (k == keys[j] || k.StartsWith("组合键 " + section + " " + keys[j], StringComparison.Ordinal)) { drop = true; break; }
+                            }
+                            if (drop) { changed = true; continue; }
+                        }
+                    }
+                    outp.Add(lines[i]);
+                }
+                return changed ? string.Join("\n", outp.ToArray()) : text;
+            } catch (Exception __ex) { SR.Guard.Log("cfg 废弃键清理", __ex); return text; }
+        }
+
         // 返回 true 表示文件被改写过（调用方应随后 ConfigFile.Reload()）
         public static bool Migrate(string cfgPath) {
             try {
@@ -129,6 +160,16 @@ namespace SR_UCH.Tweaks {
                 // 必须搬值，否则老用户这两个开关的当前状态会丢（回到默认）。
                 text = MoveKeyBetweenSections(text, "Settings", "Chat", "Filter Quick Msgs");
                 text = MoveKeyBetweenSections(text, "Settings", "Chat", "Show Time");
+                // 已删除的功能：可动方块力度（整块删掉）、放置形态（整块删掉 → [CC] 段相关键全清）、
+                // Online 段里删掉的两个筛选
+                text = RemoveKeys(text, "CC", new[] {
+                    "BlockMod Enabled", "BlockMod Log", "BlockMod All", "BlockMod BaseMotion", "BlockMod Treadmill",
+                    "BlockMod Wind", "BlockMod Gravity", "BlockMod GroundFriction", "BlockMod WallFriction",
+                    "BlockMod JumpForce", "BlockMod AirInertia", "BlockMod Blackhole", "BlockMod Rotation",
+                    "PlaceForm Enabled", "PlaceForm Key", "PlaceForm Key Prev", "PlaceForm Key Next",
+                    "PlaceForm Steps", "PlaceForm Preview", "PlaceForm Log", "PlaceForm Modifier"
+                });
+                text = RemoveKeys(text, "Online", new[] { "Filter Limit", "Filter Mods", "Column Widths", "Sort" });
                 if (text == orig) return false;
                 //不生成 .bak 备份：迁移幂等、只改 section/key 名（值原样保留），多出的旧配置容易被误读
                 File.WriteAllText(cfgPath, text, new UTF8Encoding(false));

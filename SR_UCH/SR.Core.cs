@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -253,7 +253,7 @@ public partial class SR : ITweak {
         private static float Sc(float v) { return v * _scaled; }
         private static UnityEngine.EventSystems.EventSystem _gatedEventSystem;
         private static bool _stylesReady;
-        private static GUIStyle _win, _title, _titleLabel, _titleMid, _label, _nameLabel, _labelWrap, _chatLabel, _chatArea, _secHeader, _item, _selItem, _btn, _frame,
+        private static GUIStyle _win, _title, _titleLabel, _titleMid, _label, _nameLabel, _labelClip, _labelClipCenter, _secHeaderCenter, _labelWrap, _chatLabel, _chatArea, _secHeader, _item, _selItem, _btn, _btnClip, _frame,
             _capture, _checkOn, _checkOff, _popup, _searchBox, _footer, _tooltip,
             _sliderTrack, _sliderFill, _sliderHandle, _sliderHandleHover, _sliderHandleActive;
         private static Font _font;
@@ -352,12 +352,16 @@ public partial class SR : ITweak {
             //外部插件默认启用（不再默认禁用）；用户在「外部」栏手动禁用的 GUID 记入
             //本禁用列表（deny-list），重启后保持禁用；不在列表内的插件默认启用。
             _disabledPluginsEntry = plugin.Config.Bind("Settings", "Disabled Plugins", "", "被禁用的外部插件 GUID（分号分隔；不在列表内的外部插件默认启用）");
+            //设置页顶部有专门的插件清单（启用/禁用按钮），这个原始 GUID 字符串条目不再重复显示
+            SR.RowFilters.Add(SettingsHiddenDisabledPlugins);
+            //窗口宽高/XY 不再暴露为设置条目（右下角拖拽即可，见 SR.Window.ApplyScaleToWindow）
+            SR.RowFilters.Add(SettingsHiddenWindowGeometry);
             BlockInput = _blockInputEntry.Value;
             _blockInputEntry.SettingChanged += (s, e) => {
                 BlockInput = _blockInputEntry.Value;
                 ApplyEventSystemGate();
             };
-            _winWidth = Mathf.Clamp(plugin.Config.Bind("Settings", "Window Width", 720, "").Value, 400, 1200);
+            _winWidth = Mathf.Clamp(plugin.Config.Bind("Settings", "Window Width", 720, "").Value, 400, 1600);
             _winHeight = Mathf.Clamp(plugin.Config.Bind("Settings", "Window Height", 520, "").Value, 300, 1000);
             _winX = plugin.Config.Bind("Settings", "Window X", 30f, "").Value;
             _winY = plugin.Config.Bind("Settings", "Window Y", 30f, "").Value;
@@ -505,7 +509,7 @@ public partial class SR : ITweak {
             SR.LocKey("Settings", "Block Input", "冻结输入", null);
             SR.LocDesc("Settings", "Block Input", "打开管理器时冻结游戏输入（防止误操作角色）", "Freeze game input while the manager is open (prevents accidental character control)");
             SR.LocKey("Settings", "Window Width", "窗口宽度", null);
-            SR.LocDesc("Settings", "Window Width", "管理器窗口宽度（400 - 1200）", "Manager window width (400 - 1200)");
+            SR.LocDesc("Settings", "Window Width", "管理器窗口宽度（400 - 1600）", "Manager window width (400 - 1600)");
             SR.LocKey("Settings", "Window Height", "窗口高度", null);
             SR.LocDesc("Settings", "Window Height", "管理器窗口高度（300 - 1000）", "Manager window height (300 - 1000)");
             SR.LocKey("Settings", "Window X", "窗口X", null);

@@ -70,6 +70,9 @@ public partial class SR {
 
         // ---- 样式（深色主题，见 SR.Styles.cs）----
         public static GUIStyle Label { get { return _label; } }
+        public static GUIStyle LabelClip { get { return _labelClip; } }
+        public static GUIStyle LabelClipCenter { get { return _labelClipCenter; } }
+        public static GUIStyle SecHeaderCenter { get { return _secHeaderCenter; } }
         public static GUIStyle LabelWrap { get { return _labelWrap; } }
         public static GUIStyle NameLabel { get { return _nameLabel; } }
         public static GUIStyle ChatLabel { get { return _chatLabel; } }
@@ -78,6 +81,7 @@ public partial class SR {
         public static GUIStyle Item { get { return _item; } }
         public static GUIStyle SelItem { get { return _selItem; } }
         public static GUIStyle Btn { get { return _btn; } }
+        public static GUIStyle BtnClip { get { return _btnClip; } }
         public static GUIStyle Frame { get { return _frame; } }
         public static GUIStyle Capture { get { return _capture; } }
         public static GUIStyle CheckOn { get { return _checkOn; } }
@@ -105,6 +109,7 @@ public partial class SR {
         public static bool IsCapturing { get { return _capturing != null; } }
 
         public static float WinWidth { get { return _winWidth; } }
+        public static float WinHeight { get { return _winHeight; } }
         public static Vector2 Scroll { get { return _scroll; } set { _scroll = value; } }
         //滚到底（新消息到达时用；不能写成 Ctl.Scroll.y = ... —— 属性返回的是副本）
         public static void ScrollToBottom() { _scroll.y = float.MaxValue; }
@@ -277,15 +282,31 @@ public partial class SR {
         }
 
         //悬浮提示框：最后绘制以保证在最上层。
+        //不再按固定 380px 强行折行（中文/英文混排会被切得很难看）：
+        //先按最宽的一行决定宽度（只在 '\n' 处换行），只有整行真的超过屏幕 80% 时才回退到自动折行。
         private static void DrawTooltip(Vector2 mp) {
             string tip = GUI.tooltip;
             if (tip == null || tip.Length == 0) return;
             GUIContent content = new GUIContent(tip);
-            float maxW = Mathf.Min(380f, Screen.width * 0.5f);
-            float h = _tooltip.CalcHeight(content, maxW);
-            float w = Mathf.Min(_tooltip.CalcSize(content).x + 16f, maxW + 16f);
-            float x = Mathf.Clamp(mp.x + 16, 2f, Screen.width - w - 6);
-            float y = Mathf.Clamp(mp.y + 16, 2f, Screen.height - h - 10);
+            float limit = Mathf.Min(560f, Screen.width * 0.8f);
+            float maxLine = 0f;
+            string[] lines = tip.Split('\n');
+            for (int i = 0; i < lines.Length; i++) {
+                float lw = _tooltip.CalcSize(new GUIContent(lines[i])).x;
+                if (lw > maxLine) maxLine = lw;
+            }
+            bool wrap = maxLine + 20f > limit;
+            _tooltip.wordWrap = wrap;
+            float w, h;
+            if (wrap) {
+                w = limit;
+                h = _tooltip.CalcHeight(content, w);
+            } else {
+                w = maxLine + 18f;
+                h = _tooltip.CalcSize(content).y;
+            }
+            float x = Mathf.Clamp(mp.x + 16, 2f, Mathf.Max(2f, Screen.width - w - 6));
+            float y = Mathf.Clamp(mp.y + 16, 2f, Mathf.Max(2f, Screen.height - h - 10));
             GUI.Box(new Rect(x, y, w, h + 8), content, _tooltip);
         }
 

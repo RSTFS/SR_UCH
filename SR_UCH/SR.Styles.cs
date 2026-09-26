@@ -64,6 +64,10 @@ public partial class SR {
         private static void EnsureFont() {
             int fs = Mathf.RoundToInt(14f * Mathf.Clamp(_uiScaleEntry.Value, 1f, 1.8f));
             if (_font == null || _font.fontSize != fs) {
+                //缩放变化时 _font 已存在：原代码的循环条件 `_font == null` 直接让循环体不执行 → 字号永远不变。
+                //这里先把旧字体摘下来再重建，失败则回退旧字体（避免中文变豆腐块）。
+                Font old = _font;
+                _font = null;
                 for (int i = 0; i < FontCandidates.Length && _font == null; i++) {
                     try {
                         Font nf = Font.CreateDynamicFontFromOSFont(FontCandidates[i], fs);
@@ -72,6 +76,8 @@ public partial class SR {
                         _font = nf;
                     } catch (Exception __ex) { Guard.Log("创建中文字体(" + FontCandidates[i] + ")", __ex); }
                 }
+                if (_font == null) _font = old;
+                try { if (_font != null) GUI.skin.font = _font; } catch { }
             }
         }
 
@@ -126,7 +132,9 @@ public partial class SR {
             _titleMid.fontStyle = FontStyle.Normal;
             _titleMid.fontSize = 0; //follows the scaled font
             _titleMid.normal.textColor = new Color(0.75f, 0.78f, 0.85f, 1f);
-            _titleMid.alignment = TextAnchor.MiddleCenter;
+            //左对齐（原来是居中）：宽度已经收窄到总开关左边，居中时窗口一窄两端一起裁，
+            //左对齐只会从右边裁掉，文字开头始终可读。
+            _titleMid.alignment = TextAnchor.MiddleLeft;
             _styleList.Add(_titleMid);
 
             _label = new GUIStyle(GUI.skin.label);
@@ -139,6 +147,23 @@ public partial class SR {
             _nameLabel = new GUIStyle(_label);
             _nameLabel.wordWrap = true; //entry name column: wrap instead of clipping
             _styleList.Add(_nameLabel);
+
+            //固定宽度单元格用：不折行、超出就裁掉（表格里长房主名/长区域名不再挤进下一列）
+            _labelClip = new GUIStyle(_label);
+            _labelClip.wordWrap = false;
+            _labelClip.clipping = TextClipping.Clip;
+            _styleList.Add(_labelClip);
+
+            //联机列表：表头与单元格一律居中
+            _labelClipCenter = new GUIStyle(_labelClip);
+            _labelClipCenter.alignment = TextAnchor.MiddleCenter;
+            _styleList.Add(_labelClipCenter);
+
+            _secHeaderCenter = new GUIStyle(_labelClip);
+            _secHeaderCenter.fontStyle = FontStyle.Bold;
+            _secHeaderCenter.alignment = TextAnchor.MiddleCenter;
+            _secHeaderCenter.normal.textColor = new Color(0.65f, 0.78f, 1f, 1f);
+            _styleList.Add(_secHeaderCenter);
 
             _secHeader = new GUIStyle(_label);
             _secHeader.fontStyle = FontStyle.Bold;
@@ -169,6 +194,11 @@ public partial class SR {
 
             _btn = StyleBtn(btnBg, btnHover, btnActive, text);
             _btn.alignment = TextAnchor.MiddleCenter;
+            //窄格子里的按钮（联机列表「操作」列）：内边距收到 2px，宽度够就不该被裁掉
+            _btnClip = new GUIStyle(_btn);
+            _btnClip.padding = new RectOffset(2, 2, 2, 2);
+            _btnClip.clipping = TextClipping.Clip;
+            _styleList.Add(_btnClip);
             _frame = StyleBtn(frame, frameHover, frame, text);
             _frame.alignment = TextAnchor.MiddleCenter;
             _capture = StyleBtn(capture, capture, capture, Color.white);
@@ -284,6 +314,7 @@ public partial class SR {
                 }
             }
             _gripTex.Apply();
+            _gripTex.filterMode = FilterMode.Point; //16px 贴图按 24px 画：点采样才不会糊
             UnityEngine.Object.DontDestroyOnLoad(_gripTex);
 
             _cursorTex = new Texture2D(16, 16, TextureFormat.RGBA32, false);

@@ -23,6 +23,7 @@ public partial class SR {
             FlushConfig(); //配置节流落盘（改过的值最多延迟 1 秒写盘）
             //加载后清理（配置在 Experiments、实现在 LevelTools）：FadeOut 后 1 秒执行一次
             LevelTools.TickCleanup();
+            ExpOnline.CheckHotkeys(); //联机列表：退出联机 / 返回主界面 / 刷新列表 的快捷键
             _uiAlpha = Mathf.Clamp01(_uiAlpha + (_visible ? 8f : -8f) * Time.unscaledDeltaTime);
             //总开关/地图总开关关闭时强制退出已打开的地图
             if ((!GateMaster || !MapEnabled) && Freeplay.Visible) {
@@ -145,20 +146,64 @@ public partial class SR {
             private static bool Prefix() { return _capturing == null; }
         }
 
+        //页面里正在拖自己的控件（如联机列表的列宽分隔线）时置 true：本帧起不要拖动整个窗口。
+        //为什么需要：窗口拖动判定在页面绘制之前执行，页面这帧的 Event.Use() 拦不住它。
+        public static bool BlockWindowDrag;
+
+        //右栏内容区（屏幕坐标），每帧刷新；自绘页用它铺满窗口
+        public static Rect ContentArea;
+
+        //右栏底部那行（设置/模式）的高度：自绘页（联机列表）要用它给表格留出底部空间，
+        //否则表格最后几行会被这行盖住（"最下面的数据被设置按钮挡住"）。
+        public static float FooterHeight;
+
+        //页面滚动位置：自绘页（联机列表下拉框）用它抵消"控件变化导致滚动区跳动"
+        public static Vector2 PageScroll { get { return _scroll; } set { _scroll = value; } }
+
+        //自绘页要求：本页内容自己适配窗口，不要页面级滚动条。
+        //为什么需要：页面滚动条是被页面每帧写回的 PageScroll 拖住的（拖不动），而且它不随界面缩放，
+        //在联机列表页会和表格的横向条凑成"两个用不到的滚动条"。页面自己在每帧末置 true，切换栏目时清掉。
+        public static bool NoPageScrollBars;
+
+        //界面缩放：字号/控件都乘 Sc()，但窗口本身原来不变 → 放大后内容被裁（文字显示不全）。
+        //这里让窗口跟着缩放比例同步变大/变小（一次性），并把位置夹回屏幕内。
+        private static float _lastScale;
+        private static void ApplyScaleToWindow(float scale) {
+            try {
+                if (_lastScale <= 0f) { _lastScale = scale; return; }
+                if (Mathf.Abs(scale - _lastScale) < 0.001f) return;
+                float r = scale / _lastScale;
+                _lastScale = scale;
+                _winWidth = Mathf.Clamp(Mathf.RoundToInt(_winWidth * r), 400, 1600);
+                _winHeight = Mathf.Clamp(Mathf.RoundToInt(_winHeight * r), 300, 1000);
+                _winX = Mathf.Clamp(_winX, 0f, Mathf.Max(0f, Screen.width - _winWidth));
+                _winY = Mathf.Clamp(_winY, 0f, Mathf.Max(0f, Screen.height - _winHeight));
+                try {
+                    _mp.Config.Bind("Settings", "Window Width", 720, "").Value = _winWidth;
+                    _mp.Config.Bind("Settings", "Window Height", 520, "").Value = _winHeight;
+                    _mp.Config.Bind("Settings", "Window X", 30f, "").Value = Mathf.RoundToInt(_winX);
+                    _mp.Config.Bind("Settings", "Window Y", 30f, "").Value = Mathf.RoundToInt(_winY);
+                } catch { }
+                _dirty = true;
+                _stylesReady = false;   //字号变了：样式/字体重建
+            } catch (Exception __ex) { Guard.Log("界面缩放调整窗口", __ex); }
+        }
+
             //标题栏用绝对布局；▼/▶ 折叠整个窗口；右端 = 总开关 + 关闭
         private static float DrawTitleBar(float width) {
             float barH = Sc(26);
             Rect barRect = new Rect(0, 0, width, barH);
             GUI.Box(barRect, GUIContent.none, _title);
             float tY = (barH - Sc(26)) / 2f;
-            if (GUI.Button(new Rect(Sc(4), tY, Sc(26), Sc(26)), _winCollapsed ? "▶" : "▼", _btn)) {
-                _winCollapsed = !_winCollapsed;
-            }
-            GUI.Label(new Rect(Sc(34), tY, Sc(90), Sc(26)), "SR＿UCH", _titleLabel);
-            GUI.Label(new Rect(Sc(124), tY, barRect.width - Sc(160), Sc(26)), T("INS开关界面&悬停条目查看说明", "INS: manager · hover entries for tooltips"), _titleMid);
+            //左上角的折叠三角已按需求删除（不再提供折叠）；标题直接顶到左边
+            GUI.Label(new Rect(Sc(8), tY, Sc(110), Sc(26)), "SR＿UCH", _titleLabel);
             //关闭按钮左边：本 Mod 总开关（关闭时所有内部功能运行时失效，各功能开关值保持不变）
             float mw = Sc(96);
             float mx = barRect.width - Sc(32) - Sc(4) - mw;
+            //提示标签的宽度必须**止于总开关左边**：原来写的是"窗口宽 - 160"，右端伸进总开关底下，
+            //窗口不够宽时提示文字被总开关盖住（左对齐 + 收窄 = 只会从右边裁掉，不再被压住）。
+            GUI.Label(new Rect(Sc(124), tY, Mathf.Max(Sc(40), mx - Sc(124) - Sc(6)), Sc(26)),
+                T("INS开关界面&悬停条目查看说明", "INS: manager · hover entries for tooltips"), _titleMid);
             if (GUI.Button(new Rect(mx, tY, mw, Sc(26)),
                 new GUIContent(AllEnabled ? T("总开关：开", "Master ON") : T("总开关：关", "Master OFF"),
                     T("本 Mod 总开关：关闭时所有内部功能运行时失效，各功能开关值保持不变", "Mod master switch: off disables all internal features at runtime")),
@@ -174,7 +219,11 @@ public partial class SR {
         }
 
         private static void DrawGUI() {
-            if (!_visible && _uiAlpha <= 0.01f && !Freeplay.Visible) return;
+            if (!_visible && _uiAlpha <= 0.01f && !Freeplay.Visible) {
+                //面板已经关掉：把自绘页当帧声明的系统光标形状收掉（否则 ↔/✥ 光标会留在屏幕上）
+                ExpOnline.EndFrameCursor();
+                return;
+            }
             _scaled = Mathf.Clamp(_uiScaleEntry.Value, 1f, 1.8f);
             if (_visible || _uiAlpha > 0.01f) {
             EnsureScanned();
@@ -182,6 +231,7 @@ public partial class SR {
             EnsureFont();
             //布局缩放：所有固定尺寸乘 Sc()，字号随之
             float scale = Mathf.Clamp(_uiScaleEntry.Value, 1f, 1.8f);
+            ApplyScaleToWindow(scale);
             _scaled = scale;
             _prevFont = GUI.skin.font;
             if (_font != null) GUI.skin.font = _font;
@@ -193,7 +243,8 @@ public partial class SR {
 
             Rect winRect = new Rect(_winX, _winY, _winWidth, _winHeight);
             bool over = winRect.Contains(mouse);
-            Rect gripRect = new Rect(winRect.xMax - Sc(20), winRect.yMax - Sc(20), Sc(20), Sc(20));
+            //右下角自定义大小：热区略大于三角，手感更稳（三角本身已按需求改成 24）
+            Rect gripRect = new Rect(winRect.xMax - Sc(32), winRect.yMax - Sc(32), Sc(32), Sc(32));
             if (_winCollapsed) {
                 winRect.height = Sc(32); //collapsed: title bar only
                 gripRect = new Rect(0, 0, 0, 0);
@@ -271,10 +322,10 @@ public partial class SR {
                 _dragMoved = false;
             }
             if (_resizing && e.type == EventType.MouseDrag) {
-                _winWidth = Mathf.Clamp(Mathf.RoundToInt(_resizeStartSize.x + (mouse.x - _resizeStart.x)), 400, 1200);
+                _winWidth = Mathf.Clamp(Mathf.RoundToInt(_resizeStartSize.x + (mouse.x - _resizeStart.x)), 400, 1600);
                 _winHeight = Mathf.Clamp(Mathf.RoundToInt(_resizeStartSize.y + (mouse.y - _resizeStart.y)), 300, 1000);
                 winRect = new Rect(_winX, _winY, _winWidth, _winHeight);
-                gripRect = new Rect(winRect.xMax - Sc(20), winRect.yMax - Sc(20), Sc(20), Sc(20));
+                gripRect = new Rect(winRect.xMax - Sc(32), winRect.yMax - Sc(32), Sc(32), Sc(32));
                 _mp.Config.Bind("Settings", "Window Width", 720, "").Value = _winWidth;
                 _mp.Config.Bind("Settings", "Window Height", 520, "").Value = _winHeight;
                 _dirty = true;
@@ -298,6 +349,8 @@ public partial class SR {
                     }
                 }
             }
+            //松手就解除「别拖窗口」：即使页面没机会清（比如拖到一半切了栏目）也不会卡住窗口拖动
+            if (e.type == EventType.MouseUp) BlockWindowDrag = false;
             if (!_resizing) {
                 if (e.type == EventType.MouseDown && over && e.button == 0) _downPos = mouse;
                 if (_dragActive && e.type == EventType.MouseDrag) {
@@ -311,7 +364,9 @@ public partial class SR {
                         _dirty = true;
                     }
                 }
-                if (e.type == EventType.MouseDrag && over && GUIUtility.hotControl == 0 && !_dragActive) {
+                //页面里正在拖自己的东西（如联机列表的列宽）时不要拖窗口：
+                //本函数在页面绘制之前跑，页面这帧才 e.Use()，来不及阻止 → 用 BlockWindowDrag 显式告知
+                if (e.type == EventType.MouseDrag && over && GUIUtility.hotControl == 0 && !_dragActive && !BlockWindowDrag) {
                     _dragActive = true;
                     _dragMoved = false;
                     _dragOffset = mouse - new Vector2(_winX, _winY);
@@ -334,18 +389,23 @@ public partial class SR {
                 GUI.matrix = prevMatrix;
                 GUI.color = prevColor;
                 if (_prevFont != null) GUI.skin.font = _prevFont;
+                ExpOnline.EndFrameCursor();
                 return;
             }
             float barH = DrawTitleBar(winRect.width - Sc(8));
             GUILayout.Space(barH + Sc(2));
             GUILayout.BeginHorizontal();
             float sbw = SidebarWidth();
+            //右栏内容区（屏幕坐标）：自绘页用它把控件铺满窗口（联机列表的表格框要随窗口变化）
+            ContentArea = new Rect(winRect.x + Sc(4) + sbw + Sc(2), winRect.y + Sc(4),
+                                   winRect.width - Sc(8) - sbw - Sc(2), winRect.height - Sc(8));
             GUILayout.BeginVertical(GUILayout.Width(sbw));
             _leftScroll = GUILayout.BeginScrollView(_leftScroll);
             foreach (string s in _internalSections) {
                 if (GUILayout.Button(ZhSection(s), _mode == Mode.Internal && s == _selectedInternalSection ? _selItem : _item, GUILayout.Height(Sc(26)), GUILayout.ExpandWidth(true))) {
                     _mode = Mode.Internal;
                     _selectedInternalSection = s;
+                    NoPageScrollBars = false;   //换栏目：页面级滚动条要求复位（由自绘页每帧重新声明）
                     _editText.Clear();
                     _editOpen.Clear();
                     _capturing = null;
@@ -356,9 +416,13 @@ public partial class SR {
             GUILayout.Box(GUIContent.none, _footer, GUILayout.Height(Sc(1)), GUILayout.ExpandWidth(true));
             GUILayout.Space(Sc(4));
             foreach (PluginEntry p in _externalPlugins) {
-                if (GUILayout.Button(new GUIContent(p.name, p.guid), _mode == Mode.External && p.guid == _pluginKey ? _selItem : _item, GUILayout.Height(Sc(26)), GUILayout.ExpandWidth(true))) {
+                //被禁用的插件在侧栏标出来（⛔），避免"点了没反应"的错觉
+                string label = (IsExternalDisabled(p.guid) ? "⛔ " : "") + p.name;
+                if (GUILayout.Button(new GUIContent(label, p.guid + (IsExternalDisabled(p.guid) ? "\n" + T("已禁用（设置页可重新启用）", "disabled (re-enable in Settings)") : "")),
+                        _mode == Mode.External && p.guid == _pluginKey ? _selItem : _item, GUILayout.Height(Sc(26)), GUILayout.ExpandWidth(true))) {
                     _mode = Mode.External;
                     _pluginKey = p.guid;
+                    NoPageScrollBars = false;
                     _editText.Clear();
                     _editOpen.Clear();
                     _capturing = null;
@@ -392,7 +456,10 @@ public partial class SR {
             }
             //鼠标悬停在下拉框上滚轮 = 换选项：先于滚动区把滚轮事件吞掉，免得页面跟着滚
             SR.ComboWheelShield();
-            _scroll = GUILayout.BeginScrollView(_scroll);
+            //自绘页（联机列表）要求不要页面级滚动条：把两条都换成 none（内容由页面自己铺满窗口）
+            _scroll = NoPageScrollBars
+                ? GUILayout.BeginScrollView(_scroll, false, false, GUIStyle.none, GUIStyle.none, GUIStyle.none)
+                : GUILayout.BeginScrollView(_scroll);
             ConfigFile curConfig = _mode == Mode.Internal
                 ? _internalConfig
                 : (_mode == Mode.External && CurrentExternalPlugin() != null ? CurrentExternalPlugin().config : null);
@@ -422,7 +489,7 @@ public partial class SR {
                     if (!any) GUILayout.Label(T("（无匹配条目）", "(no matching entries)"), _label);
                 }
             } else if (_mode == Mode.Settings) {
-                RenderSettingsEntries(colWidth);
+                RenderSettingsEntries(colWidth);   //外部插件清单由 RenderSettingsEntries 在「界面」分组之后渲染
             } else {
                 PluginEntry curExt = CurrentExternalPlugin();
                 if (curExt != null) {
@@ -459,6 +526,7 @@ public partial class SR {
             float settingsW = _btn.CalcSize(new GUIContent(T("设置", "Settings"))).x + Sc(18);
             if (GUILayout.Button(T("设置", "Settings"), _mode == Mode.Settings ? _selItem : _btn, GUILayout.Width(settingsW))) {
                 _mode = Mode.Settings;
+                NoPageScrollBars = false;
                 _editText.Clear();
                 _editOpen.Clear();
                 _capturing = null;
@@ -467,17 +535,21 @@ public partial class SR {
             GUILayout.Space(Sc(60));
             GUILayout.Label(ModeLabel(), _label, GUILayout.Width(Sc(160)), GUILayout.Height(Sc(26)));
             GUILayout.EndHorizontal();
+            FooterHeight = GUILayoutUtility.GetLastRect().height;   //自绘页据此避让（见 ContentArea 注释）
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
             GUILayout.EndArea();
 
-            GUI.DrawTexture(new Rect(winRect.xMax - Sc(16), winRect.yMax - Sc(16), Sc(16), Sc(16)), _gripTex);
+            GUI.DrawTexture(new Rect(winRect.xMax - Sc(24), winRect.yMax - Sc(24), Sc(24), Sc(24)), _gripTex);
             //自绘光标（游戏隐藏了系统光标）
             GUI.DrawTexture(new Rect(mouse.x - Sc(7), mouse.y - Sc(7), Sc(15), Sc(15)), _cursorTex);
             DrawTooltip(mouse);
             GUI.matrix = prevMatrix;
             GUI.color = prevColor;
             if (_prevFont != null) GUI.skin.font = _prevFont;
+            //自绘页本帧声明的鼠标形状在这里统一应用（并复位）：
+            //页面没画（切走栏目）或本帧没声明 → 自动回到"不强制"，特殊光标不会残留
+            ExpOnline.EndFrameCursor();
             }
             //地图窗口最后绘制，保证在最上层
             if (Freeplay.Visible) Freeplay.DrawMapWindow();
