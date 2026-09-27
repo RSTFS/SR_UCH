@@ -194,6 +194,16 @@ public partial class SR : ITweak {
 
         private static void OnAnySettingChanged(object s, SettingChangedEventArgs e) { _cfgDirty = true; }
 
+        //把"这个配置该落盘了"统一交给节流器，而不是当场写磁盘：
+        //  · SR 自己的配置：记 _cfgDirty，由 FlushConfig 每秒最多写一次；
+        //  · 其它插件的配置（外部插件页那条路径）：走 _dirtyConfig（Tick 里松手即写，仍不是每帧写盘）。
+        internal static void MarkConfigDirty(ConfigFile cfg) {
+            if (cfg == null) return;
+            if (ReferenceEquals(cfg, _internalConfig)) { _cfgDirty = true; return; }
+            _dirtyConfig = cfg;
+            _dirty = true;
+        }
+
         //改过的配置最多每秒落盘一次（滚轮/滑块连续改值只写一次盘）；
         //关面板、退出前的显式 Save 仍是即时落盘，所以不会丢值。
         public static void FlushConfig() {
@@ -291,6 +301,15 @@ public partial class SR : ITweak {
         //树屋地图：允许在树屋大厅使用地图（地图功能主要自由模式；开启后树屋也能用）
         public static bool TreehouseMap { get { return Freeplay.TreehouseAllowed; } }
 
+        //统一提示：游戏原生 UserMessage（屏幕上那行字）+ BepInEx 日志。
+        //以前这个入口叫 Experiments.NotifyExp（挂在「实验」模块上），但它是**全模块共用的**提示通道，
+        //成熟功能（联机等）不该绕道实验模块 → 现在统一走这里；NotifyExp 只是转发，老调用点不受影响。
+        public static void Notify(string text) {
+            try { UserMessageManager.Instance.UserMessage(text, false); }
+            catch (Exception __ex) { Guard.Log("提示(UserMessage)", __ex); }
+            try { MainPlugin.ModLogger.LogInfo("[SR] " + text); } catch { }
+        }
+
         //force-reset every UI state (used when a match starts so a stuck manager/map can
         //never hold up the snapshot-loading handshake for the whole lobby)
         public static void ForceResetUiState() {
@@ -318,6 +337,7 @@ public partial class SR : ITweak {
             try {
                 if (ConfigMigration.Migrate(plugin.Config.ConfigFilePath)) {
                     plugin.Config.Reload();
+                    ClearEntryCache();   //键被改名/删掉了：条目缓存必须失效（FindInternalEntry / SectionEntries）
                     MainPlugin.ModLogger.LogInfo("[T1] 已迁移旧版 cfg（section/key → 英文）并重新读盘");
                 }
             } catch (Exception __ex) { Guard.Log("T1 cfg 迁移/重读", __ex); }

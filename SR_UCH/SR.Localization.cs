@@ -38,15 +38,21 @@ public partial class SR {
         public static void LocKey(string sec, string key, string zh, string en) {
             if (sec == null || key == null) return;
             string k = sec + "\t" + key;
-            if (zh != null) _keyZh[k] = zh;
-            if (en != null) _keyEn[k] = en;
+            bool changed = false;
+            string old;
+            if (zh != null && (!_keyZh.TryGetValue(k, out old) || old != zh)) { _keyZh[k] = zh; changed = true; }
+            if (en != null && (!_keyEn.TryGetValue(k, out old) || old != en)) { _keyEn[k] = en; changed = true; }
+            if (changed) _nameCacheVer = -1; //显示名表变了 → 让 ZhKey 的名字缓存整体失效（注册集中在启动期）
         }
 
         public static void LocDesc(string sec, string key, string zh, string en) {
             if (sec == null || key == null) return;
             string k = sec + "\t" + key;
-            if (zh != null) _descZh[k] = zh;
-            if (en != null) _descEn[k] = en;
+            bool changed = false;
+            string old;
+            if (zh != null && (!_descZh.TryGetValue(k, out old) || old != zh)) { _descZh[k] = zh; changed = true; }
+            if (en != null && (!_descEn.TryGetValue(k, out old) || old != en)) { _descEn[k] = en; changed = true; }
+            if (changed) _nameCacheVer = -1; //说明表变了 → 让 ZhDesc 的说明缓存整体失效
         }
 
         //枚举成员的显示名（各功能自己声明，如 SR.LocEnum("Hold", "按住显示")）：
@@ -68,12 +74,39 @@ public partial class SR {
         //英文显示覆盖（英文模式侧边栏/分区标题用；T6 起由各功能文件 LocSec 注册）
         private static readonly Dictionary<string, string> _sectionEn = new Dictionary<string, string>(); //T6：内容已下放到各功能文件（LocSec/LocKey/LocDesc 注册）
 
+        //显示名/说明文本缓存：ZhKey/ZhDesc 原来每次调用都要 Section+"\t"+Key 拼字符串 + 两次字典查表，
+        //而它们每帧被调很多次（条目行名、列宽测量、联机列表…），IMGUI 一帧还有 Layout+Repaint 两趟。
+        //失效条件照项目已有写法（见 SectionEntries/Experiments 统计缓存）：
+        //  · 语言变化（中文/英文、外部模块页 ForceZh）；
+        //  · 条目表版本 _entryVersion 变化（新增/改名的惰性绑定条目）；
+        //  · LocKey/LocDesc 注册了新名（启动期注册，之后不可能再变）。
+        private static readonly Dictionary<ConfigEntryBase, string> _keyNameCache = new Dictionary<ConfigEntryBase, string>();
+        private static readonly Dictionary<ConfigEntryBase, string> _descTextCache = new Dictionary<ConfigEntryBase, string>();
+        private static bool _nameCacheEn = true;   //与 _langEn 默认值一致
+        private static int _nameCacheVer = -1;
+
+        private static bool NameCacheSync() {
+            bool en = _langEn && !_forceZh;
+            if (en != _nameCacheEn || _nameCacheVer != _entryVersion) {
+                _nameCacheEn = en;
+                _nameCacheVer = _entryVersion;
+                _keyNameCache.Clear();
+                _descTextCache.Clear();
+            }
+            return en;
+        }
+
         private static string ZhKey(ConfigEntryBase e) {
+            bool en = NameCacheSync();
+            string cached;
+            if (_keyNameCache.TryGetValue(e, out cached)) return cached;
             string key = e.Definition.Section + "\t" + e.Definition.Key;
-            string zh, en;
+            string zh, enName;
             _keyZh.TryGetValue(key, out zh);
-            _keyEn.TryGetValue(key, out en);
-            return (_langEn && !_forceZh) ? (en ?? e.Definition.Key) : (zh ?? en ?? e.Definition.Key);
+            _keyEn.TryGetValue(key, out enName);
+            string v = en ? (enName ?? e.Definition.Key) : (zh ?? enName ?? e.Definition.Key);
+            _keyNameCache[e] = v;
+            return v;
         }
 
         //英文 key 显示覆盖（英文模式用；T6 起由各功能文件 LocKey 注册）
@@ -86,12 +119,17 @@ public partial class SR {
         private static readonly Dictionary<string, string> _descEn = new Dictionary<string, string>(); //T6：内容已下放到各功能文件（LocSec/LocKey/LocDesc 注册）
 
         private static string ZhDesc(ConfigEntryBase e) {
+            bool en = NameCacheSync();
+            string cached;
+            if (_descTextCache.TryGetValue(e, out cached)) return cached;
             string key = e.Definition.Section + "\t" + e.Definition.Key;
-            string zh, en;
+            string zh, enDesc;
             _descZh.TryGetValue(key, out zh);
-            _descEn.TryGetValue(key, out en);
-            //"" = 显式「无说明」（Destroys Blocks\Enabled 就是这种），不算缺失
-            return (_langEn && !_forceZh) ? (en ?? zh ?? null) : (zh ?? en ?? null);
+            _descEn.TryGetValue(key, out enDesc);
+            //"" = 显式「无说明」（Destroys Blocks\Enabled 就是这种），不算缺失；null 也照缓存（值可为 null）
+            string v = en ? (enDesc ?? zh ?? null) : (zh ?? enDesc ?? null);
+            _descTextCache[e] = v;
+            return v;
         }
 
         //common key names in Chinese (falls back to the English enum name)

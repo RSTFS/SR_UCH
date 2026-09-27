@@ -45,18 +45,56 @@ public partial class SR {
             return !(k == "Window Width" || k == "Window Height" || k == "Window X" || k == "Window Y");
         }
 
-        //撤销该插件的全部 Harmony 补丁（先按 ID，再扫描补丁表兜底）
+        private static PluginEntry EntryByGuid(string guid) {
+            for (int i = 0; i < _externalPlugins.Count; i++) {
+                if (_externalPlugins[i].guid == guid) return _externalPlugins[i];
+            }
+            return null;
+        }
+
+        //该 GUID 对应插件的程序集（用于"按程序集认领补丁"的兜底解绑；取不到 = null，只按 owner 比对）
+        private static Assembly AssemblyOf(string guid) {
+            try {
+                PluginEntry p = EntryByGuid(guid);
+                if (p != null && p.instance != null) return p.instance.GetType().Assembly;
+            } catch (Exception __ex) { Guard.Log("定位插件程序集", __ex); }
+            return null;
+        }
+
+        //这个补丁是不是属于该插件？两条判据：
+        //  ① owner == GUID（BepInEx 惯例：插件用 new Harmony(GUID) 打补丁）；
+        //  ② PatchMethod 所在程序集 == 该插件程序集 —— 覆盖"插件用了别的 Harmony id"和
+        //     "插件在 Awake 里自己 PatchAll"这两种按 owner 认不出来的情况（否则禁用时清不干净，
+        //     再次启用就会把同一 patch 再打一份 → 双重执行）。
+        //绝不认领 SR_UCH 自己的程序集，避免误删本 mod 的补丁。
+        private static bool PatchOwnedBy(HarmonyLib.Patch patch, string guid, Assembly target, Assembly mine) {
+            try {
+                if (patch == null) return false;
+                if (patch.owner == guid) return true;
+                if (target == null) return false;
+                MethodBase pm = patch.PatchMethod;
+                Type dt = pm != null ? pm.DeclaringType : null;
+                if (dt == null) return false;
+                Assembly a = dt.Assembly;
+                if (a == null || a == mine) return false;
+                return a == target;
+            } catch { return false; }
+        }
+
+        //撤销该插件的全部 Harmony 补丁（先按 ID，再扫描补丁表兜底：按 owner 或按程序集认领）
         private static void UnpatchPlugin(string guid) {
             Guard.Try("撤销外部插件补丁(UnpatchID): " + guid, () => HarmonyLib.Harmony.UnpatchID(guid));
+            Assembly target = AssemblyOf(guid);
+            Assembly mine = typeof(SR).Assembly;
             try {
                 HarmonyLib.Harmony h = new HarmonyLib.Harmony("SR_UCH.Unpatch");
                 foreach (MethodBase mb in HarmonyLib.Harmony.GetAllPatchedMethods()) {
                     var pi = HarmonyLib.Harmony.GetPatchInfo(mb);
                     if (pi == null) continue;
-                    foreach (var p in pi.Prefixes) if (p.owner == guid) { Guard.Try("解绑 Prefix", () => h.Unpatch(mb, p.PatchMethod)); }
-                    foreach (var p in pi.Postfixes) if (p.owner == guid) { Guard.Try("解绑 Postfix", () => h.Unpatch(mb, p.PatchMethod)); }
-                    foreach (var p in pi.Transpilers) if (p.owner == guid) { Guard.Try("解绑 Transpiler", () => h.Unpatch(mb, p.PatchMethod)); }
-                    foreach (var p in pi.Finalizers) if (p.owner == guid) { Guard.Try("解绑 Finalizer", () => h.Unpatch(mb, p.PatchMethod)); }
+                    foreach (var p in pi.Prefixes) if (PatchOwnedBy(p, guid, target, mine)) { Guard.Try("解绑 Prefix", () => h.Unpatch(mb, p.PatchMethod)); }
+                    foreach (var p in pi.Postfixes) if (PatchOwnedBy(p, guid, target, mine)) { Guard.Try("解绑 Postfix", () => h.Unpatch(mb, p.PatchMethod)); }
+                    foreach (var p in pi.Transpilers) if (PatchOwnedBy(p, guid, target, mine)) { Guard.Try("解绑 Transpiler", () => h.Unpatch(mb, p.PatchMethod)); }
+                    foreach (var p in pi.Finalizers) if (PatchOwnedBy(p, guid, target, mine)) { Guard.Try("解绑 Finalizer", () => h.Unpatch(mb, p.PatchMethod)); }
                 }
             } catch (Exception __ex) { Guard.Log("扫描补丁表并解绑", __ex); }
         }
@@ -73,6 +111,9 @@ public partial class SR {
         private static void EnablePlugin(PluginEntry p) {
             if (p.instance != null) {
                 p.instance.enabled = true; //同理：只开它自己（全开会顺带把用户禁用的其它插件也打开）
+                //启用前先解绑干净（解绑是幂等的）：以前只依赖"禁用时解绑成功"，插件若用了别的 Harmony id
+                //或在 Awake 里自打补丁，禁用时清不掉 → 这里不经解绑直接 PatchAll 就会把同一 patch 打第二份（双重执行）。
+                UnpatchPlugin(p.guid);
                 try {
                     new HarmonyLib.Harmony(p.guid).PatchAll(p.instance.GetType().Assembly);
                 } catch (Exception __ex) { Guard.Log("重新应用外部插件补丁: " + p.guid, __ex); }
@@ -86,7 +127,7 @@ public partial class SR {
                 if (kv.Value) list.Add(kv.Key);
             }
             _disabledPluginsEntry.Value = string.Join(";", list.ToArray());
-            _disabledPluginsEntry.ConfigFile.Save();
+            MarkConfigDirty(_disabledPluginsEntry.ConfigFile); //交给 SR.FlushConfig 节流落盘，不在点击当帧写磁盘
         }
 
         //插件扫描后执行一次：默认启用所有外部 mod（各自由 BepInEx 独立加载、独立初始化）；
@@ -116,7 +157,7 @@ public partial class SR {
             }
             if (changed) {
                 _disabledPluginsEntry.Value = string.Join(";", disabledSet);
-                Guard.Try("外部插件禁用列表保存", () => _disabledPluginsEntry.ConfigFile.Save());
+                MarkConfigDirty(_disabledPluginsEntry.ConfigFile); //清理失效 GUID 的结果同样交给节流落盘
             }
         }
 

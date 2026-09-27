@@ -1,6 +1,7 @@
 ﻿using System;
 using BepInEx.Configuration;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
     //建造上限：放宽 GameSettings.LevelFullnessScoreLimit（移植自 Osqat/UCH-BuildUnlimiter）
@@ -10,7 +11,6 @@ namespace SR_UCH.Tweaks {
         private const int MinLimit = 500;
         private const int MaxLimit = 10000000;
 
-        private static MainPlugin _mp;
         private static ConfigEntry<bool> _enabled;
         private static ConfigEntry<int> _limitEntry;
 
@@ -29,7 +29,6 @@ namespace SR_UCH.Tweaks {
 
         public void Initialize(MainPlugin plugin) {
             SelfReg();
-            _mp = plugin;
             _enabled = plugin.Config.Bind("Builder Enhancements", "Lift Build Cap", false,
                 "解除关卡满度限制：开启后树屋保存/发布界面的满度上限从原版 500 提高到“上限数值”（默认 1000000），超满的关卡也能正常发布/上传；关闭立即恢复原版。");
             _limitEntry = plugin.Config.Bind("Builder Enhancements", "Build Cap Value", DefaultLimit, new ConfigDescription(
@@ -40,15 +39,22 @@ namespace SR_UCH.Tweaks {
             _enabled.SettingChanged += (s, e) => Apply();
             _limitEntry.SettingChanged += (s, e) => Apply();
             Apply(); //启动时归位：关闭则保持原版 500
+            //启动时 GameSettings 可能还没加载完（BepInEx 插件的 Awake 早于游戏首个场景），
+            //GetInstance() 返回 null → Apply 静默失败，而之后没有任何重试时机 →
+            //已勾选的「解除建造上限」要等用户手动切换一次开关才生效（建造页只读框显示 500，与勾选状态矛盾）。
+            //挂场景切换重试：与 DestroyBlocks / Respawn / ExModule 等其它 tweak 的做法一致。
+            SceneManager.activeSceneChanged += (a, b) => Apply();
         }
 
         private static void Apply() {
             try {
                 GameSettings gs = GameSettings.GetInstance();
-                if (gs == null) return;
+                if (gs == null) return; //场景还没加载完：交给下次场景切换重试（见 Initialize 里的订阅）
                 gs.LevelFullnessScoreLimit = (SR.GateMaster && Enabled) ? LimitValue : VanillaLimit;
-                if (_mp != null) _mp.Config.Save();
-            } catch {
+                //注：这里只写游戏的字段、不改任何配置项，原来还调了一次 Config.Save() —— 纯属无谓的磁盘写
+                //（挂了场景切换重试后会变成每次换场景都写一次），故去掉；配置落盘统一由 SR.FlushConfig 节流。
+            } catch (Exception __ex) {
+                SR.Guard.Log("应用建造上限", __ex);
             }
         }
 

@@ -52,9 +52,23 @@ public class Experiments : ITweak
 			SR.LocKey("Experiments", "GC After Load", "加载后清理", "GC after load");
 		}
 
+		//警告样式：以前每帧 new 一个 GUIStyle（IMGUI 一帧 Layout+Repaint 两趟 → 每帧两个对象，纯垃圾）。
+		//缓存一份，但基准样式 SR.Ctl.LabelWrap 会在"贴图被卸载/缩放变化"时被 EnsureStyles 整个重建
+		//（对象引用换新的、fontSize 也跟着缩放变），所以这里比对**基准对象引用**，换了才重建派生样式。
+		private static GUIStyle _warnStyle;
+		private static GUIStyle _warnStyleBase;
+		private static GUIStyle WarnStyle() {
+			GUIStyle b = SR.Ctl.LabelWrap;
+			if (_warnStyle == null || !ReferenceEquals(_warnStyleBase, b)) {
+				_warnStyleBase = b;
+				_warnStyle = new GUIStyle(b);
+				_warnStyle.normal.textColor = new Color(1f, 0.85f, 0.3f, 1f);
+			}
+			return _warnStyle;
+		}
+
 		public static void Render() {
-			GUIStyle warn = new GUIStyle(SR.Ctl.LabelWrap);
-			warn.normal.textColor = new Color(1f, 0.85f, 0.3f, 1f);
+			GUIStyle warn = WarnStyle();
 			GUILayout.Label(SR.T("⚠ 实验区的功能处于测试阶段，可能会导致游戏稳定性下降以及更多的 bug。",
 				"⚠ Experimental features are in testing; they may reduce stability and cause more bugs."), warn);
 			GUILayout.Space(SR.Ctl.Sc(4));
@@ -142,14 +156,10 @@ public class Experiments : ITweak
 			GcAfterLoadEntry = ((BaseUnityPlugin)plugin).Config.Bind<bool>("Experiments", "GC After Load", false, "进关卡/换关卡时执行一次 GC 回收 + 资源卸载，减少对局内卡顿。同关卡回合切换不清理（场景名不变自动跳过），不影响结算速度。");
 		}
 
+		//提示通道统一在 SR（SR.Notify）：这里只是保留老调用点的转发（Level/QuickAdjust 等还在用）
 		internal static void NotifyExp(string text)
 		{
-			try
-			{
-				UserMessageManager.Instance.UserMessage(text, false);
-			}
-			catch (Exception __ex) { SR.Guard.Log("Experiments.UserMessage", __ex); }
-			MainPlugin.ModLogger.LogInfo((object)("[实验] " + text));
+			SR.Notify(text);
 		}
 
 		public static string ReadStatsText()

@@ -5,6 +5,7 @@ using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
     //派对盒子炸弹：房主端统计对局内所有在线成员的「炸弹！」快捷短语
@@ -31,6 +32,9 @@ namespace SR_UCH.Tweaks {
             //带 try/catch：单个补丁目标失效（游戏更新改方法名/签名）只丢本类功能，不影响其它功能。
             try { Harmony.CreateAndPatchAll(typeof(PartyBomb)); }
             catch (Exception e) { MainPlugin.ModLogger.LogError("派对盒炸弹 补丁注册失败: " + e.Message); }
+            //换场景/换对局清空「已发过炸弹」记录：networkNumber 会跨对局复用，
+            //残留会让新局里同号玩家被当成"已发"→ 不必全员发过就提前塞炸弹。
+            SceneManager.activeSceneChanged += (a, b) => _bombSent.Clear();
         }
 
         //快捷短语都走 ChatDisplay.DisplayNewMessage，EmoteType 保留原枚举码；房主端收集每位成员的 EMOTE_Bomb。

@@ -97,27 +97,29 @@ namespace SR_UCH.Tweaks {
 
         public class PlacementListener : GameEvent.IGameEventListener {
             public void handleEvent(GameEvent.GameEvent e) {
-                GameEvent.PiecePlacedEvent ppe = e as GameEvent.PiecePlacedEvent;
-                if (ppe != null) {
-                    if (!IsPlayerPlacement(ppe.PlacedBlock, ppe.PlayerNumber)) return;
-                    PlacementInfo info = new PlacementInfo();
-                    info.playerNumber = ppe.PlayerNumber;
-                    LobbyManager lm = LobbyManager.instance;
-                    if (lm != null) {
-                        LobbyPlayer lp = lm.GetLobbyPlayer(ppe.PlayerNumber);
-                        if (lp != null) {
-                            info.playerName = lp.playerName;
-                            info.color = lp.NetworkPlayerColor;
+                try {
+                    GameEvent.PiecePlacedEvent ppe = e as GameEvent.PiecePlacedEvent;
+                    if (ppe != null) {
+                        if (!IsPlayerPlacement(ppe.PlacedBlock, ppe.PlayerNumber)) return;
+                        PlacementInfo info = new PlacementInfo();
+                        info.playerNumber = ppe.PlayerNumber;
+                        LobbyManager lm = LobbyManager.instance;
+                        if (lm != null) {
+                            LobbyPlayer lp = lm.GetLobbyPlayer(ppe.PlayerNumber);
+                            if (lp != null) {
+                                info.playerName = lp.playerName;
+                                info.color = lp.NetworkPlayerColor;
+                            }
                         }
+                        if (string.IsNullOrEmpty(info.playerName)) info.playerName = "Player " + info.playerNumber;
+                        _placements[ppe.PlacedBlock] = info;
+                        return;
                     }
-                    if (string.IsNullOrEmpty(info.playerName)) info.playerName = "Player " + info.playerNumber;
-                    _placements[ppe.PlacedBlock] = info;
-                    return;
-                }
-                GameEvent.DestroyPieceEvent dpe = e as GameEvent.DestroyPieceEvent;
-                if (dpe != null && dpe.Piece != null) {
-                    _placements.Remove(dpe.Piece);
-                }
+                    GameEvent.DestroyPieceEvent dpe = e as GameEvent.DestroyPieceEvent;
+                    if (dpe != null && dpe.Piece != null) {
+                        _placements.Remove(dpe.Piece);
+                    }
+                } catch (Exception __ex) { SR.Guard.Log("记录方块放置者(本地)", __ex); }
             }
         }
 
@@ -209,6 +211,9 @@ namespace SR_UCH.Tweaks {
                 "List Mode",
                 ListMode.Normal,
                 "列表模式：普通 = 只列出玩家确切放置过的方块（关卡初始布局/系统方块不出现）；进阶 = 所有方块单独列出，不在乎有没有玩家号。");
+            //「追踪玩家」这一行是否显示取决于列表模式（见 TrackPlayerRowVisible），而条目缓存只按"绑定版本"失效
+            //→ 切换列表模式时主动让缓存失效，否则该行会按旧模式残留/消失。
+            _listMode.SettingChanged += (s, e) => SR.NoteEntryBound();
             _trackMode = _mp.Config.Bind(
                 "Destroy Blocks",
                 "Track Player",
@@ -228,6 +233,13 @@ namespace SR_UCH.Tweaks {
 
         private static void OnSceneChanged(Scene a, Scene b) {
             _placements.Clear();
+            //候选表与选中态同样跨场景作废：旧场景的 Placeable 已被销毁，留着会在下次进入删除模式前
+            //被当作有效选中项（对已销毁对象 AddBombTint/RemoveBombTint 会抛异常，只靠 try/catch 兜着）。
+            //Blocks 只在按住切换键时重建（RebuildList），清空不会影响正常流程。
+            try { Blocks.Clear(); } catch { }
+            _selected = null;
+            _tintedBlock = null;
+            _index = 0;
             DestroyInfoTag();
         }
 
@@ -289,6 +301,7 @@ namespace SR_UCH.Tweaks {
                 float wheel = Input.GetAxis("Mouse ScrollWheel");
                 if (wheel != 0f) {
                     _index += wheel > 0f ? 1 : -1;
+                    SR.MarkWheelUsed(); //滚轮已被选块器吃掉，地图/自由相机让路
                 }
                 if (_index >= Blocks.Count) _index = 0;
                 if (_index < 0) _index = Blocks.Count - 1;

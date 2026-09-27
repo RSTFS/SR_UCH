@@ -64,8 +64,9 @@ namespace SR_UCH.Tweaks {
         private static FieldInfo _fChatMode;
         private static FieldInfo _fVisTimer;   //ChatDisplay.VisibilityTimer（可见计时器，游戏自己的淡入淡出用它）
 
-        //滚轮被本功能吃掉的帧号：自由相机的滚轮缩放据此让路
-        public static int WheelFrame = -1;
+        //滚轮被本功能吃掉的帧号：转发 SR 的通用滚轮仲裁（见 SR.Input.cs 的 WheelFrame/MarkWheelUsed）。
+        //保留这个名字是因为它原来就在这里，外部引用点（曾用于自由相机让路）不用改。
+        public static int WheelFrame { get { return SR.WheelFrame; } set { SR.WheelFrame = value; } }
 
         // ==== 分区：Chat Window ====
 
@@ -253,12 +254,18 @@ namespace SR_UCH.Tweaks {
 
         //游戏自己的聊天输入框正在输入中吗（ChatDisplay.ChatMode）→ 打字期间屏蔽所有快捷键。
         //给 SR 自己的键轮询（SR.ComboKeyDown/ComboKeyHeld）与外部模块用；缓存 ChatDisplay 实例，避免每帧 FindObjectOfType。
+        //ChatMode 是私有字段、只能反射读 → 结果按帧缓存（每帧十几次调用会重复读同一个字段）。
         private static ChatDisplay _typingProbe;
+        private static bool _chatTypingCache;
+        private static int _chatTypingFrame = -1;
         public static bool ChatTyping {
             get {
                 try {
+                    if (_chatTypingFrame == Time.frameCount) return _chatTypingCache;
+                    _chatTypingFrame = Time.frameCount;
                     if (_typingProbe == null) _typingProbe = UnityEngine.Object.FindObjectOfType<ChatDisplay>();
-                    return _typingProbe != null && ChatInputActive(_typingProbe);
+                    _chatTypingCache = _typingProbe != null && ChatInputActive(_typingProbe);
+                    return _chatTypingCache;
                 } catch { return false; }
             }
         }
@@ -419,7 +426,9 @@ namespace SR_UCH.Tweaks {
                 if (_crisp != null && canvas.pixelPerfect != _crisp.Value) canvas.pixelPerfect = _crisp.Value;
                 //注：本游戏这块画布挂的是自定义 SafeAreaScaler（没有 CanvasScaler），
                 //所以只做能生效的两件事：pixelPerfect（像素对齐）+ 字号取整（见 ApplyFont）。
-                float v = 1f; //保留一个"变化检测"用的常量：开关切换时会重建一次字库
+                //变化检测：v 必须跟着开关走。原来写成常量 1f，首次执行后 _lastClarity 就恒等于 1，
+                //此后条件永远为假 → 切换「启用清晰度」不会再重建字库（与这行原本的注释描述不符）。
+                float v = (_crisp != null && _crisp.Value) ? 1f : 0f;
                 if (Mathf.Abs(_lastClarity - v) > 0.001f) {
                     _lastClarity = v;
                     Text[] texts = holder.GetComponentsInChildren<Text>(true);

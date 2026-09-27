@@ -28,6 +28,12 @@ namespace SR_UCH.Tweaks {
             { "过滤快捷消息", "Filter Quick Msgs" },
             { "显示时间", "Show Time" },
             { "加载后清理", "GC After Load" },
+            // 联机栏目的自动快捷键：老 id 带着 CC 栏目的痕迹（cc.*）→ 改成 online.*
+            // （[Hotkeys] 段的键名就是这个 id，连同 "组合键 Hotkeys <id>" 一起迁移，用户绑过的键不丢）
+            { "cc.lobbies", "online.lobbies" },
+            { "cc.disband", "online.disband" },
+            // 老的 cc.mainmenu 没有对应的 id 了（联机页两个按钮已合并成「返回主界面」）→ 并到同动作的 online.disband
+            { "cc.mainmenu", "online.disband" },
         };
 
         // 组合键条目内层 "<section> <key>" 改名（key 本身可能含空格，故先匹配 section）
@@ -35,6 +41,13 @@ namespace SR_UCH.Tweaks {
             foreach (KeyValuePair<string, string> kv in SectionMap) {
                 if (rest.StartsWith(kv.Key + " ", StringComparison.Ordinal))
                     return kv.Value + " " + RenameKeyIn(rest.Substring(kv.Key.Length + 1));
+            }
+            // 段名没变、只有 key 改名的情况（如 [Hotkeys] 的 cc.lobbies → online.lobbies）：
+            // 按第一个空格切成 "<section> <key>"，对后半段查 KeyMap
+            int sp = rest.IndexOf(' ');
+            if (sp > 0) {
+                string tail = RenameKeyIn(rest.Substring(sp + 1));
+                if (tail != rest.Substring(sp + 1)) return rest.Substring(0, sp + 1) + tail;
             }
             return RenameKeyIn(rest);
         }
@@ -108,6 +121,45 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SR.Guard.Log("cfg 废弃键清理", __ex); return text; }
         }
 
+        // 把 from 段的 keyFrom 的**值**写到 to 段的 keyTo（只在"源有值、目标还没这个键"时写）。
+        // 用于已删除条目的绑定值抢救：调用方随后用 RemoveKeys 删掉源键，用户绑过的键不会丢。
+        private static string MergeKeyValue(string text, string from, string keyFrom, string to, string keyTo) {
+            try {
+                string[] lines = text.Replace("\r\n", "\n").Split('\n');
+                string cur = "";
+                int fromLine = -1, toLine = -1, toHdr = -1;
+                for (int i = 0; i < lines.Length; i++) {
+                    string t = lines[i].Trim();
+                    if (t.StartsWith("[", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal)) {
+                        cur = t.Substring(1, t.Length - 2);
+                        if (cur == to) toHdr = i;
+                        continue;
+                    }
+                    int eq = t.IndexOf('=');
+                    if (eq <= 0) continue;
+                    string k = t.Substring(0, eq).TrimEnd();
+                    if (cur == from && k == keyFrom) fromLine = i;
+                    if (cur == to && k == keyTo) toLine = i;
+                }
+                if (fromLine < 0 || toLine >= 0) return text; //源没有 / 目标已有（已有优先，不覆盖）
+                int e0 = lines[fromLine].IndexOf('=');
+                if (e0 <= 0) return text;
+                string val = lines[fromLine].Substring(e0 + 1).Trim();
+                // "未设置"的值不用搬（None = KeyCode.None；0 = 枚举序号 0）
+                if (val.Length == 0 || val == "None" || val == "0") return text;
+                List<string> outp = new List<string>(lines);
+                string newLine = keyTo + " = " + val;
+                if (toHdr < 0) {
+                    outp.Add("");
+                    outp.Add("[" + to + "]");
+                    outp.Add(newLine);
+                } else {
+                    outp.Insert(toHdr + 1, newLine);
+                }
+                return string.Join("\n", outp.ToArray());
+            } catch (Exception __ex) { SR.Guard.Log("cfg 键值合并", __ex); return text; }
+        }
+
         // 返回 true 表示文件被改写过（调用方应随后 ConfigFile.Reload()）
         public static bool Migrate(string cfgPath) {
             try {
@@ -170,6 +222,12 @@ namespace SR_UCH.Tweaks {
                     "PlaceForm Steps", "PlaceForm Preview", "PlaceForm Log", "PlaceForm Modifier"
                 });
                 text = RemoveKeys(text, "Online", new[] { "Filter Limit", "Filter Mods", "Column Widths", "Sort" });
+                // [Online] 段的三条隐形快捷键已删除（联机页按钮本来就走 [Hotkeys] 的在线自动快捷键）：
+                // 先把用户绑过的键搬进 [Hotkeys] 对应 id（Disband Key 与 Main Menu Key 是同一个动作），再删源键。
+                text = MergeKeyValue(text, "Online", "Refresh Lobbies Key", "Hotkeys", "online.lobbies");
+                text = MergeKeyValue(text, "Online", "Disband Key", "Hotkeys", "online.disband");
+                text = MergeKeyValue(text, "Online", "Main Menu Key", "Hotkeys", "online.disband");
+                text = RemoveKeys(text, "Online", new[] { "Refresh Lobbies Key", "Disband Key", "Main Menu Key" });
                 if (text == orig) return false;
                 //不生成 .bak 备份：迁移幂等、只改 section/key 名（值原样保留），多出的旧配置容易被误读
                 File.WriteAllText(cfgPath, text, new UTF8Encoding(false));

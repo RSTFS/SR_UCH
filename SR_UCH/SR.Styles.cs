@@ -60,24 +60,36 @@ public partial class SR {
             "WenQuanYi Micro Hei", "PingFang SC", "Heiti SC"
         };
 
+        //整轮字体创建失败时的退避状态（见 EnsureFont）：候选字体全都不存在时，原来会**每帧**把 7 个候选
+        //重新 FindOSFont 一遍（PrepareGuiSkin 每帧调用）；系统字体运行期不会凭空出现，故失败后退避 3 秒再试。
+        private static int _fontFailSize = -1;   //上次整轮失败的目标字号（-1 = 没有失败记录）
+        private static float _fontNextTryAt;
+
         //font size follows the UI scale so layout height matches rendered text height
         private static void EnsureFont() {
             int fs = Mathf.RoundToInt(14f * Mathf.Clamp(_uiScaleEntry.Value, 1f, 1.8f));
-            if (_font == null || _font.fontSize != fs) {
-                //缩放变化时 _font 已存在：原代码的循环条件 `_font == null` 直接让循环体不执行 → 字号永远不变。
-                //这里先把旧字体摘下来再重建，失败则回退旧字体（避免中文变豆腐块）。
-                Font old = _font;
-                _font = null;
-                for (int i = 0; i < FontCandidates.Length && _font == null; i++) {
-                    try {
-                        Font nf = Font.CreateDynamicFontFromOSFont(FontCandidates[i], fs);
-                        if (nf == null) continue; //字体不存在：返回 null 而非抛异常，必须显式判空
-                        UnityEngine.Object.DontDestroyOnLoad(nf);
-                        _font = nf;
-                    } catch (Exception __ex) { Guard.Log("创建中文字体(" + FontCandidates[i] + ")", __ex); }
-                }
-                if (_font == null) _font = old;
-                try { if (_font != null) GUI.skin.font = _font; } catch { }
+            if (_font != null && _font.fontSize == fs) return; //正常路径：字号没变，直接返回
+            //这一档字号刚刚整轮失败过：退避期内不再重试（否则每帧 7 次系统字体查找）
+            if (_fontFailSize == fs && Time.unscaledTime < _fontNextTryAt) return;
+            //缩放变化时 _font 已存在：原代码的循环条件 `_font == null` 直接让循环体不执行 → 字号永远不变。
+            //这里先把旧字体摘下来再重建，失败则回退旧字体（避免中文变豆腐块）。
+            Font old = _font;
+            _font = null;
+            for (int i = 0; i < FontCandidates.Length && _font == null; i++) {
+                try {
+                    Font nf = Font.CreateDynamicFontFromOSFont(FontCandidates[i], fs);
+                    if (nf == null) continue; //字体不存在：返回 null 而非抛异常，必须显式判空
+                    UnityEngine.Object.DontDestroyOnLoad(nf);
+                    _font = nf;
+                } catch (Exception __ex) { Guard.Log("创建中文字体(" + FontCandidates[i] + ")", __ex); }
+            }
+            if (_font == null) {
+                _font = old;                      //回退旧字体（可能也是 null：启动时就没有可用字体）
+                _fontFailSize = fs;               //记下失败的字号档，3 秒内不再尝试
+                _fontNextTryAt = Time.unscaledTime + 3f;
+            } else {
+                _fontFailSize = -1;               //成功：清掉失败记录，后续缩放变化照常即时生效
+                try { GUI.skin.font = _font; } catch { }
             }
         }
 

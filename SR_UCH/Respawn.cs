@@ -78,7 +78,9 @@ public class Respawn : ITweak {
         SR.RegisterKey("重生点-设置", _setKey, "press");
         SR.RegisterKey("重生点-重生", _respawnKey, "press");
         SR.RegisterKey("重生点-恢复", _resetKey, "press");
-        SceneManager.activeSceneChanged += (a, b) => { DefaultPoint = null; };
+        //换场景：默认出生点作废；"等待延迟重生"的集合也必须清空 —— 旧场景的 Character 已被销毁，
+        //残留引用既不会自己消失（只在下一次重生完成时移除），也永远匹配不到新角色 → 纯粹累积。
+        SceneManager.activeSceneChanged += (a, b) => { DefaultPoint = null; _pending.Clear(); };
 
         //② 出生无敌时长
         _immunityTime = _mp.Config.Bind(

@@ -6,7 +6,7 @@ namespace SR_UCH.Tweaks {
     //自由相机（BuildingPlus 风格）：按键切换；开启后滚轮缩放视野（透视相机改 FOV，
     //正交相机改 orthoSize），关闭后完全恢复游戏相机。任何模式/场景可用，挑战模式对局内禁用。
     //文件名是 Camera.cs（T4 改名），类名仍保留 FovAdjust：SR 内部多处按这个名字引用
-    //（FovAdjust.GameCamera / ApplyToCamera / LockView / TickInput 等），改名要同步全部引用点、
+    //（FovAdjust.GameCamera / ApplyToCamera / LockView / WheelZoom 等），改名要同步全部引用点、
     //收益只是"文件名与类名一致"，故保持现状并在此说明（与 Level.cs 的情况不同——那里必须避开 global::Level 遮蔽）。
     public class FovAdjust : ITweak {
         private const float MinFov = 1f;
@@ -78,7 +78,8 @@ namespace SR_UCH.Tweaks {
             if (_fovEntry.Value < MinFov || _fovEntry.Value > MaxFov) {
                 _fovEntry.Value = 10f;
             }
-            _mp.Config.Save();
+            //落盘交给节流器（启动时这一条"恢复默认关"的值也一样能写下去，不必当场写盘）
+            SR.MarkConfigDirty(_mp.Config);
         }
 
         //开启时把滑条同步到当前相机；关闭时让游戏立即重算相机（完全回到默认视角）
@@ -98,7 +99,7 @@ namespace SR_UCH.Tweaks {
                     }
                 } catch (Exception __ex) { SR.Guard.Log("地图相机强制刷新取景", __ex); }
             }
-            if (_mp != null) _mp.Config.Save();
+            if (_mp != null) SR.MarkConfigDirty(_mp.Config);   //开关自由相机：标记落盘（FlushConfig 每秒最多一次），不在这里写盘
         }
 
         public static void CheckKey() {
@@ -145,21 +146,22 @@ namespace SR_UCH.Tweaks {
             return cam.orthographic ? cam.orthographicSize : cam.fieldOfView;
         }
 
-        //输入每帧只处理一次（由 ManagerUI.Update 调用，不在每个相机/钩子里跑）；滚轮缩放，相机不跟随鼠标
-        public static void TickInput() {
-            if (!SR.GateMaster) return;
-            if (!LockView) return;
-            if (SR.MapOpen) return;
-            Camera cam = GameCamera();
-            if (cam == null) return;
-
-            float wheel = Input.GetAxis("Mouse ScrollWheel");
-            if (ChatWindow.WheelFrame == Time.frameCount) return; //本帧滚轮已给聊天窗口用（滚动/缩放聊天框），不再缩放视野
-            if (Mathf.Abs(wheel) >= 0.0001f) {
+        //输入每帧只处理一次（由 ManagerUI.Update 调用，不在每个相机/钩子里跑）。
+        //注意：这里的**滚轮**部分已挪到 SR.PostGuiWheel（OnGUI 末尾）—— Update 先于 OnGUI，
+        //看不到"本帧滚轮已被界面件吃掉"的记录，会和下拉框/滑块/联机列表抢滚轮。
+        //把滚轮增量应用到视野（滚轮是离散事件量，不能乘 Time.deltaTime）。
+        //返回是否真的应用了（调用方据此标记滚轮已被用掉）。
+        public static bool WheelZoom(float wheel) {
+            try {
+                if (!SR.GateMaster) return false;
+                if (!LockView) return false;
+                if (SR.MapOpen) return false;   //地图编辑器优先
+                Camera cam = GameCamera();
+                if (cam == null) return false;
+                if (Mathf.Abs(wheel) < 0.0001f) return false;
                 if (cam.orthographic) {
                     _fovEntry.Value = Mathf.Clamp(cam.orthographicSize - wheel * 5f, MinFov, MaxFov);
                 } else {
-                    //滚轮是离散事件量，不能乘 Time.deltaTime。
                     //灵敏度直接乘 ZoomSensitivity：旧写法还乘了 ratio*100f，那是 FOV 范围还是 2-125
                     //时的遗留系数（见 Initialize 里"把旧范围（2-125）遗留的存档值夹回合法区间"）。
                     //范围缩到 1-32 后系数没跟着调 → 滚一格就跳到端点（0.1×7×0.606×100 ≈ 42 档）。
@@ -168,7 +170,8 @@ namespace SR_UCH.Tweaks {
                     _fovEntry.Value = Mathf.Clamp(nv, MinFov, MaxFov);
                 }
                 //滚轮不即时落盘：由 SR.FlushConfig 每秒最多写一次（避免每格一次磁盘 IO）
-            }
+                return true;
+            } catch { return false; }
         }
 
         //每个相机都会调用（每帧多次，必须幂等）：锁定时相机 FOV 跟随滑条值

@@ -23,7 +23,7 @@ public partial class SR {
             FlushConfig(); //配置节流落盘（改过的值最多延迟 1 秒写盘）
             //加载后清理（配置在 Experiments、实现在 LevelTools）：FadeOut 后 1 秒执行一次
             LevelTools.TickCleanup();
-            ExpOnline.CheckHotkeys(); //联机列表：退出联机 / 返回主界面 / 刷新列表 的快捷键
+            Online.CheckHotkeys();    //联机：返回主界面 / 刷新列表 的快捷键
             _uiAlpha = Mathf.Clamp01(_uiAlpha + (_visible ? 8f : -8f) * Time.unscaledDeltaTime);
             //总开关/地图总开关关闭时强制退出已打开的地图
             if ((!GateMaster || !MapEnabled) && Freeplay.Visible) {
@@ -35,13 +35,8 @@ public partial class SR {
                 Time.timeScale = _pauseSavedTs;
                 _pauseApplied = false;
             }
-            if (Freeplay.Visible) {
-                //地图上滚轮缩放：调整自由相机 FOV (视野页"当前 FOV"跟随)
-                float wheel = Input.GetAxis("Mouse ScrollWheel");
-                if (Mathf.Abs(wheel) > 0.0001f) {
-                    FovAdjust.SetFov(FovAdjust.FovValue - wheel * 3f);
-                }
-            }
+            //（地图滚轮缩放原来在这里读 Input.GetAxis：Update 先于 OnGUI，看不到同一帧界面件吃掉滚轮的记录，
+            //  会"在下拉框上滚轮同时缩放地图"→ 已挪到 PostGuiWheel，见 SR.Input.cs）
             //自动保存：拖动滑块/窗口时先不写，松手即保存（避免拖动中每帧写盘）
             if (_dirty && !Input.GetMouseButton(0) && !Input.GetMouseButton(1)) {
                 _dirty = false;
@@ -221,7 +216,7 @@ public partial class SR {
         private static void DrawGUI() {
             if (!_visible && _uiAlpha <= 0.01f && !Freeplay.Visible) {
                 //面板已经关掉：把自绘页当帧声明的系统光标形状收掉（否则 ↔/✥ 光标会留在屏幕上）
-                ExpOnline.EndFrameCursor();
+                Online.EndFrameCursor();
                 return;
             }
             _scaled = Mathf.Clamp(_uiScaleEntry.Value, 1f, 1.8f);
@@ -389,7 +384,7 @@ public partial class SR {
                 GUI.matrix = prevMatrix;
                 GUI.color = prevColor;
                 if (_prevFont != null) GUI.skin.font = _prevFont;
-                ExpOnline.EndFrameCursor();
+                Online.EndFrameCursor();
                 return;
             }
             float barH = DrawTitleBar(winRect.width - Sc(8));
@@ -400,7 +395,9 @@ public partial class SR {
             ContentArea = new Rect(winRect.x + Sc(4) + sbw + Sc(2), winRect.y + Sc(4),
                                    winRect.width - Sc(8) - sbw - Sc(2), winRect.height - Sc(8));
             GUILayout.BeginVertical(GUILayout.Width(sbw));
+            Vector2 leftBefore = _leftScroll;
             _leftScroll = GUILayout.BeginScrollView(_leftScroll);
+            if (_leftScroll != leftBefore) WheelFrame = Time.frameCount; //侧栏滚动区吃掉了滚轮
             foreach (string s in _internalSections) {
                 if (GUILayout.Button(ZhSection(s), _mode == Mode.Internal && s == _selectedInternalSection ? _selItem : _item, GUILayout.Height(Sc(26)), GUILayout.ExpandWidth(true))) {
                     _mode = Mode.Internal;
@@ -457,9 +454,11 @@ public partial class SR {
             //鼠标悬停在下拉框上滚轮 = 换选项：先于滚动区把滚轮事件吞掉，免得页面跟着滚
             SR.ComboWheelShield();
             //自绘页（联机列表）要求不要页面级滚动条：把两条都换成 none（内容由页面自己铺满窗口）
+            Vector2 pageBefore = _scroll;
             _scroll = NoPageScrollBars
                 ? GUILayout.BeginScrollView(_scroll, false, false, GUIStyle.none, GUIStyle.none, GUIStyle.none)
                 : GUILayout.BeginScrollView(_scroll);
+            if (_scroll != pageBefore) WheelFrame = Time.frameCount; //页面滚动区吃掉了滚轮
             ConfigFile curConfig = _mode == Mode.Internal
                 ? _internalConfig
                 : (_mode == Mode.External && CurrentExternalPlugin() != null ? CurrentExternalPlugin().config : null);
@@ -549,7 +548,7 @@ public partial class SR {
             if (_prevFont != null) GUI.skin.font = _prevFont;
             //自绘页本帧声明的鼠标形状在这里统一应用（并复位）：
             //页面没画（切走栏目）或本帧没声明 → 自动回到"不强制"，特殊光标不会残留
-            ExpOnline.EndFrameCursor();
+            Online.EndFrameCursor();
             }
             //地图窗口最后绘制，保证在最上层
             if (Freeplay.Visible) Freeplay.DrawMapWindow();
@@ -594,7 +593,7 @@ public partial class SR {
                     RefAudit(); //反射成员总览（各功能 SelfReg 里声明的私有成员是否还在）
                 }
                 FovAdjust.CheckKey(); //view hotkey works in every scene (no ZoomCamera needed)
-                FovAdjust.TickInput(); //wheel zoom, once per frame
+                //（自由相机的滚轮缩放已挪到 OnGUI 末尾的 SR.PostGuiWheel：那里才能用上滚轮仲裁）
                 SR.Tick();
                 SR.CheckOpenKey();
                 Freeplay.CheckMapKey();
@@ -605,9 +604,13 @@ public partial class SR {
 
             private void OnGUI() {
                 SR.DrawGUI();
+                //滚轮仲裁收口：放在 DrawGUI **之后**，这时面板/地图里所有界面件都已经处理过这一帧的滚轮
+                //（谁吃掉谁 MarkWheelUsed），再用 Input 读轴的缩放路径就不会和界面抢滚轮了。
+                SR.PostGuiWheel();
             }
         }
 
 	}
 }
+
 

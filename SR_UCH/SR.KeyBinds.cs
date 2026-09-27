@@ -51,6 +51,7 @@ public partial class SR {
                     } catch { }
                     _keyModEntries[entry] = modEntry;
                     _watchDirty = true;
+                    NoteEntryBound();   //新增了一个条目：让 SectionEntries 的缓存失效
                     string v = modEntry.Value;
                     ComboMod m = ParseComboMod(v);
                     if (m != ComboMod.None) _keyMods[entry] = m;
@@ -82,11 +83,21 @@ public partial class SR {
             return s;
         }
 
+        //按住中的修饰键：同一帧内结果必然相同，而它经 ComboModDown → ComboKeyDown/ComboKeyHeld 被全项目
+        //42 处调用点使用（每帧约 100 次）→ 按帧缓存，避免每帧上百次 Input.GetKey。
+        //注意：GetKeyDown 是边沿触发，**不能**按帧缓存（那条路径是 ComboDown，不走这里）。
+        private static ComboMod _heldModsCache;
+        private static int _heldModsFrame = -1;
         public static ComboMod HeldComboMods() {
+            if (_heldModsFrame == Time.frameCount) return _heldModsCache;
+            _heldModsFrame = Time.frameCount;
             ComboMod m = ComboMod.None;
-            if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) m |= ComboMod.Shift;
-            if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) m |= ComboMod.Ctrl;
-            if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) m |= ComboMod.Alt;
+            try {
+                if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) m |= ComboMod.Shift;
+                if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) m |= ComboMod.Ctrl;
+                if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) m |= ComboMod.Alt;
+            } catch { }
+            _heldModsCache = m;
             return m;
         }
 
@@ -387,6 +398,7 @@ public partial class SR {
                     it.Key = _internalConfig.Bind(HkSec, it.Id, KeyCode.None,
                         "自动快捷键：" + (it.Label ?? it.Id) + "（在管理界面右键对应开关/按钮绑定，再右键删除）");
                     RegisterComboEntry(it.Key);
+                    NoteEntryBound();   //新增了一个条目：让 SectionEntries 的缓存失效
                     _watchDirty = true;
                 } catch (Exception __ex) { Guard.Log("建立自动快捷键条目", __ex); }
             }

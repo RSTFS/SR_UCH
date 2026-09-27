@@ -15,7 +15,39 @@ using UnityEngine.UI;
 namespace SR_UCH.Tweaks {
 public partial class SR {
 
-// ==== 分区：Input（打开/关闭键 / 输入冻结 / EventSystem 门控 / 角色冻结）====
+// ==== 分区：Input（打开/关闭键 / 输入冻结 / EventSystem 门控 / 角色冻结 / 滚轮仲裁）====
+
+        //================ 滚轮仲裁（按帧） ================
+        //为什么需要：IMGUI 里"谁先处理谁 Use() 吃掉事件"只对 IMGUI 事件有效；而地图缩放 / 自由相机缩放 /
+        //聊天框字号缩放是用 Input.GetAxis("Mouse ScrollWheel") 读的 —— 它们看不到事件有没有被界面吃掉，
+        //于是会出现"在下拉框/滑块/联机列表上滚轮，地图（或视野）同时被缩放"。
+        //约定：
+        //  · 凡是吃掉滚轮的界面件都 MarkWheelUsed()（下拉框/滑块盾、联机列表表格、聊天框…）；
+        //  · 读轴的每帧路径统一放到 PostGuiWheel() 里处理 —— 它在 ManagerUI.OnGUI 末尾、DrawGUI 之后调用，
+        //    也就是"同一个 ScrollWheel 事件趟里、所有界面件都处理完之后"，才能看到同一帧的标记
+        //    （放在 Update 里读是先于 OnGUI 的，永远看不到这一帧的吃掉记录）。
+        public static int WheelFrame = -1;
+        public static void MarkWheelUsed() { WheelFrame = Time.frameCount; }
+        public static bool WheelTakenThisFrame { get { return WheelFrame == Time.frameCount; } }
+
+        //滚轮趟的统一收口：界面件之后决定这个滚轮给谁用（地图缩放 → 自由相机缩放）
+        public static void PostGuiWheel() {
+            try {
+                Event e = Event.current;
+                if (e == null || e.type != EventType.ScrollWheel) return;   //一个滚轮事件只处理一趟
+                if (WheelTakenThisFrame) return;                            //本帧已被界面件吃掉（不允许重复消费）
+                float wheel = 0f;
+                try { wheel = Input.GetAxis("Mouse ScrollWheel"); } catch { wheel = 0f; }
+                if (Mathf.Abs(wheel) < 0.0001f) return;
+                if (Freeplay.Visible) {
+                    //地图上滚轮缩放：调整自由相机 FOV（视野页"当前 FOV"跟随）
+                    FovAdjust.SetFov(FovAdjust.FovValue - wheel * 3f);
+                    MarkWheelUsed();
+                    return;
+                }
+                if (FovAdjust.WheelZoom(wheel)) MarkWheelUsed();            //自由相机（内部自带门控判定）
+            } catch (Exception __ex) { Guard.Log("滚轮仲裁", __ex); }
+        }
 
         //外部模块页的开关行快捷键（无视模式限制 / 冻结角色）由外部模块自己轮询；
         //这里保留入口是为了兼容 SR 侧的调用点（当前无操作）。

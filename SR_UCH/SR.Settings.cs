@@ -90,15 +90,9 @@ public partial class SR {
         }
 
         private static List<ConfigEntryBase> InternalSectionEntries() {
-            List<ConfigEntryBase> result = new List<ConfigEntryBase>();
-            if (_internalConfig == null) return result;
-            foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
-                if (e.Definition.Section != _selectedInternalSection) continue;
-                //功能可注册"本行是否显示"（如 DestroyBlocks 的「追踪玩家」只在列表模式=普通时显示）
-                if (!SR.RowVisible(e)) continue;
-                result.Add(e);
-            }
-            return result;
+            //性能：原来是"每帧 new List + 全表遍历"，而 SectionEntries 早就有按 _entryVersion 失效的缓存
+            //（同一套过滤：段名 + RowVisible）→ 直接复用，栏目切换时各段各自缓存。
+            return SectionEntries(_selectedInternalSection);
         }
 
         //设置页条目按类别分组（无关项之间留视觉间隔）；顺序与 config 绑定顺序一致，插件组最后
@@ -166,17 +160,25 @@ public partial class SR {
             if (_sidebarWEntry != null) _sidebarWEntry.Value = px;
         }
 
+        //设置页条目：原来每帧 new List + 全表遍历（设置页条目最多）。与 SectionEntries 同一套版本失效缓存，
+        //只是多一条「组合键 XXX 内部条目不显示」的过滤，所以单独缓存一份（而不是塞进 SectionEntries）。
+        private static List<ConfigEntryBase> _settingsCache;
+        private static int _settingsCacheVer = -1;
         private static List<ConfigEntryBase> SettingsEntries() {
+            if (_settingsCache != null && _settingsCacheVer == _entryVersion) return _settingsCache;
             List<ConfigEntryBase> result = new List<ConfigEntryBase>();
-            if (_internalConfig == null) return result;
-            foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
-                if (e.Definition.Section != "Settings") continue;
-                //这些项在会话页/搜索栏已有专用开关，设置页不再重复渲染（是否显示由功能自己注册，见 SR.RowFilters）
-                if (!SR.RowVisible(e)) continue;
-                //「组合键 XXX」是修饰键的内部持久化条目（RegisterComboEntry 建立），不显示在设置页
-                if (e.Definition.Key.StartsWith("组合键 ")) continue;
-                result.Add(e);
+            if (_internalConfig != null) {
+                foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
+                    if (e.Definition.Section != "Settings") continue;
+                    //这些项在会话页/搜索栏已有专用开关，设置页不再重复渲染（是否显示由功能自己注册，见 SR.RowFilters）
+                    if (!SR.RowVisible(e)) continue;
+                    //「组合键 XXX」是修饰键的内部持久化条目（RegisterComboEntry 建立），不显示在设置页
+                    if (e.Definition.Key.StartsWith("组合键 ")) continue;
+                    result.Add(e);
+                }
             }
+            _settingsCache = result;
+            _settingsCacheVer = _entryVersion;
             return result;
         }
 
@@ -243,9 +245,18 @@ public partial class SR {
             return result;
         }
 
-        //BepInEx 5.4：GetConfigEntries 为公开 API（第三方管理器常把私有 Entries 打空）
+        //配置条目表。BepInEx 5.4.23 起 GetConfigEntries() 被标为过时（提示 "Use Values instead"）：
+        //ConfigFile 显式实现了 IDictionary<ConfigDefinition, ConfigEntryBase>，过时提示里说的 Values 就是它
+        //（这个版本**没有**公开的 Values 属性，只有这个显式接口成员）。取 Values 还省掉了原来 ToArray 的复制。
+        //老版本 BepInEx 若没有实现该接口，仍回退到过时方法（用 pragma 压掉警告，保证跨版本都能读到条目）。
+        private static readonly ConfigEntryBase[] NoEntries = new ConfigEntryBase[0];
         private static IEnumerable<ConfigEntryBase> AllEntries(ConfigFile config) {
-            return config != null ? config.GetConfigEntries() : new ConfigEntryBase[0];
+            if (config == null) return NoEntries;
+            IDictionary<ConfigDefinition, ConfigEntryBase> dict = config as IDictionary<ConfigDefinition, ConfigEntryBase>;
+            if (dict != null) return dict.Values;
+#pragma warning disable CS0618 //过时兜底：仅当该 BepInEx 版本没实现 IDictionary 时才走到
+            return config.GetConfigEntries();
+#pragma warning restore CS0618
         }
 
         //侧栏宽度：0 = 自动，>0 = 用户拖出的宽度
@@ -294,22 +305,57 @@ public partial class SR {
         }
 
         //某 section 的可见条目（功能自绘页用它拼自己的页面；自动应用功能注册的行可见性）
+        //性能：原来每次调用都 new List + 全表遍历；调用方（BuilderEnhancements / ChatWindow / Freeplay）
+        //每帧各一次、IMGUI 一帧还有 Layout+Repaint 两趟 → 按 section 缓存，条目表版本变化时整体失效。
+        private static readonly Dictionary<string, List<ConfigEntryBase>> _secCache = new Dictionary<string, List<ConfigEntryBase>>();
+        private static readonly Dictionary<string, int> _secCacheVer = new Dictionary<string, int>();
         internal static List<ConfigEntryBase> SectionEntries(string section) {
-            List<ConfigEntryBase> result = new List<ConfigEntryBase>();
+            int ver = _entryVersion;
+            List<ConfigEntryBase> cached;
+            int oldVer;
+            if (_secCache.TryGetValue(section, out cached) && _secCacheVer.TryGetValue(section, out oldVer) && oldVer == ver) return cached;
+            cached = new List<ConfigEntryBase>();
             ConfigFile cfg = SR.Ctl.InternalConfig;
-            if (cfg == null) return result;
+            if (cfg == null) return cached;
             foreach (ConfigEntryBase e in AllEntries(cfg)) {
                 if (e.Definition.Section != section) continue;
                 if (!SR.RowVisible(e)) continue;
-                result.Add(e);
+                cached.Add(e);
             }
-            return result;
+            _secCache[section] = cached;
+            _secCacheVer[section] = ver;
+            return cached;
+        }
+
+        //条目表版本 + 查找缓存：FindInternalEntry 原来是"每次线性全表扫描"（AllEntries 每调用一次都新建枚举器）。
+        //每帧调用点很多（QuickAdjust 9 处、Level 3、Experiments 3、Freeplay 2、联机 3、通用条目行 2），
+        //IMGUI 一帧至少 Layout + Repaint 两趟 → 这里按 section+key 做字典缓存。
+        //注意：组合键 / [Reflection] / 自动快捷键等条目是**惰性 Bind** 的，所以：
+        //  · 未命中必须回退扫描；
+        //  · **只把命中结果写进缓存**（查不到就不记，避免把"还没绑定"永久记成 null）；
+        //  · SR 自己新增绑定处调 NoteEntryBound() 让 SectionEntries 的缓存失效。
+        private static readonly Dictionary<string, ConfigEntryBase> _entryCache = new Dictionary<string, ConfigEntryBase>();
+        private static int _entryVersion;
+
+        internal static void NoteEntryBound() { _entryVersion++; }
+
+        internal static void ClearEntryCache() {
+            _entryCache.Clear();
+            _secCache.Clear();
+            _secCacheVer.Clear();
+            _entryVersion++;
         }
 
         private static ConfigEntryBase FindInternalEntry(string section, string key) {
             if (_internalConfig == null) return null;
+            string k = section + "\t" + key;
+            ConfigEntryBase hit;
+            if (_entryCache.TryGetValue(k, out hit)) return hit;
             foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
-                if (e.Definition.Section == section && e.Definition.Key == key) return e;
+                if (e.Definition.Section == section && e.Definition.Key == key) {
+                    _entryCache[k] = e;   //只缓存命中（未命中不记，惰性绑定的条目下次还能查到）
+                    return e;
+                }
             }
             return null;
         }
@@ -472,6 +518,7 @@ public partial class SR {
                 float step = intStep ? 1f : Mathf.Max((max - min) / 100f, 0.01f);
                 value = Mathf.Clamp(value + (ev.delta.y > 0f ? -step : step) * (intStep ? 1f : 5f), min, max);
                 ev.Use();
+                SR.MarkWheelUsed();   //滚轮已给滑块：地图/自由相机别再缩放
                 return value;
             }
             //几何按最终 t 计算：轨道两端各留半个把手，使 t=0/1 时把手完整落在 rect 内
@@ -661,9 +708,10 @@ public partial class SR {
             try {
                 Event e = Event.current;
                 if (e == null || e.type != EventType.ScrollWheel) return;
-                if (_comboWheelValid && _comboWheelRect.Contains(e.mousePosition)) { e.Use(); return; }
-                if (_comboListValid && _comboListRect.Contains(e.mousePosition)) { e.Use(); return; }
-                if (_sliderWheelValid && _sliderWheelRect.Contains(e.mousePosition)) { e.Use(); return; }
+                //吃掉滚轮的同时记一笔：地图/自由相机那些用 Input.GetAxis 读轴的路径据此让步（见 SR.PostGuiWheel）
+                if (_comboWheelValid && _comboWheelRect.Contains(e.mousePosition)) { e.Use(); SR.MarkWheelUsed(); return; }
+                if (_comboListValid && _comboListRect.Contains(e.mousePosition)) { e.Use(); SR.MarkWheelUsed(); return; }
+                if (_sliderWheelValid && _sliderWheelRect.Contains(e.mousePosition)) { e.Use(); SR.MarkWheelUsed(); return; }
             } catch { }
         }
 
@@ -695,6 +743,7 @@ public partial class SR {
                     if (ni < 0) ni = options.Length - 1;
                     if (ni >= options.Length) ni = 0;
                     clicked = ni;
+                    SR.MarkWheelUsed();   //滚轮已给下拉框换选项：地图/自由相机别再缩放
                 }
             }
             if (drew) {
