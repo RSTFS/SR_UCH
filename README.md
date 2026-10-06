@@ -1,57 +1,127 @@
-﻿# SR_UCH
+# SR_UCH
 
-> Ultimate Chicken Horse 模组整合增强包（免费开源）· A quality-of-life mod suite for **Ultimate Chicken Horse**（BepInEx / Harmony）
+> 《Ultimate Chicken Horse》游戏内增强模组 · A quality-of-life mod suite for **Ultimate Chicken Horse**（BepInEx 5 / Harmony）
 
-**中文 / English**：游戏内可切换界面语言，即时生效 / switch in-game language anytime.
+一个装上就能用的游戏内设置面板：把关卡、建造、聊天、联机、实验类功能都收进一个可搜索的侧栏，
+不用改游戏文件、不用进 BepInEx 配置文件翻选项。界面语言可随时切换，切换后立即生效。
+
+**中文 / English**：游戏内设置页随时切换，切换即刻生效。
 
 ---
 
 ## 安装 Install
-装好 **BepInEx 5.4** 后，把 `SR_UCH.dll` 放进 `Ultimate Chicken Horse\BepInEx\plugins\`。
-Put `SR_UCH.dll` into `Ultimate Chicken Horse\BepInEx\plugins\`. 首次启动生成 `BepInEx\config\com.gamingbeast.SR_UCH.cfg`（可改）。
+
+1. 装好 **BepInEx 5.4**（第一次装需要先跑一次游戏让它生成加载器）。
+2. 把 `SR_UCH.dll` 放进 `Ultimate Chicken Horse\BepInEx\plugins\`。
+3. （可选）`SR_UCH_EX.dll` —— 扩展模块，装了才会多出「EX」那几页。
+4. （可选）`Others\` 目录下的独立小插件，按需单独放。
+
+首次启动会生成配置文件 `BepInEx\config\SR_UCH_data.cfg`，之后所有改动都从面板里点，
+点一下就存盘。
 
 ---
 
 ## 快速开始 Quick Start
-- 打开管理器：**`Insert`**（可改）· open the manager: `Insert`
-- 总开关 **All Enabled** 默认**关**，打开后各功能才生效 · master switch default **OFF**
-- 默认英文界面，可在设置页切中文 · English by default, switch to 中文 in Settings
+
+| | |
+|---|---|
+| 打开面板 | **`Insert`**（可在设置页改键） |
+| 总开关 | **All Enabled** 默认**关**，打开后各功能才生效 |
+| 界面语言 | 默认英文，可在设置页切中文 |
+| 改按键 | 面板里点按键框：`Esc` 清空，`Shift+Esc` 取消 |
+
+设置页底部有「自检」块：显示按名绑定的补丁目标与反射成员的可用数，失效项会逐条列出。
+若游戏更新导致部分功能失效，这里是首先该看的地方。
 
 ---
 
 ## 功能 Features
 
-**移动轨迹 Player Tracker**
-- 给每位玩家画**移动轨迹线**，可调长度/跳帧/粗细 · trailing line per player (length / skip frames / width)
+面板左侧是栏目，右侧是页面。下面按栏目列。
 
-**快速调整 Quick Adjust**
-- **评分折扣**（平衡板 handicap）/ **快速切换** 行动↔建造（长按 B）/ **快速重试**（挑战模式）/ **快速自杀** · score discount / quick switch / quick retry (challenge) / quick suicide
+### 建造 build
 
-**建造 Builder**
-- **无视碰撞**：方块可放任意位置（重叠/空中/交叉）(`F1`) · ignore collision rules (F1)
-- **自由放置**：方块不再吸附 1 单位网格，可微调摆放 (`F2`) · free placement / fine snap (F2)
-- **解除建造上限**：树屋保存/发布的满度上限 500 → 自定义（默认 1000000）· lift build-fullness cap
+- **无视碰撞** —— 方块可以放在任意位置：重叠、悬空、交叉都可以。快捷键 `F1` 开关。
+- **自由放置** —— 关掉 1 单位网格吸附，摆放可以微调。快捷键 `F2` 开关。
+- **解除建造上限** —— 树屋里保存 / 发布的"满度"上限（默认 500）可以自己定。
 
-**方块破坏 Destroy Blocks**
-- `Alt` 进入删除模式、滚轮切换、`Backspace` 删除；显示放置者；可允许客户端删 · delete blocks, show owner, allow clients
+### 关卡 Level
 
-**关卡 Level**（仅派对/创意局内、房主）
-- **重载关卡**：真重载当前场景，保留已放方块；按模式保留或重置分数 · reload level, keep blocks (keep/reset score)
-- **广播方块快照**：把房主视角方块重发，全员重建（修不同步，不重载）· broadcast snapshot to resync blocks
-- **派对盒炸弹**：全员发「炸弹！」快捷消息即在派对盒生成炸弹（不需要 EX）· party-box bomb when all send "Bomb!" (no EX needed)
+- **重载关卡** —— 真正重载当前场景，**已放好的方块全部保留**；分数可选择保留或重置。
+- **广播方块快照** —— 房主把自己看到的方块重发给全场，全员就地重建（修不同步，不用重载关卡）。
+- **放弃道具** —— 排队模式里手上拿着道具又不想放了，按键丢掉。走游戏自己的通道，**全员可见**。
+- **关卡背景** —— 给关卡换一个背景色，**原版关卡的对局里也生效**。
+- **派对盒炸弹** —— 所有人发一句「炸弹！」快捷消息，就在派对盒里生成炸弹。
+- **联机房间列表** —— 按区域、模式、进度、满员等条件筛选，排序、刷新、加入。
 
-**自由模式 / 地图 Freeplay & Map**
-- **地图** `M`（俯视，T 传送）；**树屋地图**；**地图总开关**；**地图网格**（行动阶段也显示网格）· map (M), treehouse map, map grid
-- **视野**：自由相机滚轮缩放 (`F3`) · free camera FOV (F3)
-- **重生**：重生无敌 / 重生延迟 / 自定义重生点 `O`/`P`/`K` · spawn invincibility / delay / custom points
+### 方块破坏 Destroy Blocks
 
-**会话内容 Chat**
-- 会话聊天记录面板（记录/发送；过滤快捷消息 / 隐藏游戏内聊天窗口）· in-session chat log panel
+- 按 `Alt` 进入删除模式，滚轮切换目标，`Backspace` 删除。
+- 删除时会显示**是谁放的**这个方块，可以追踪某个玩家。
+- 另有列表模式：直接列出场上所有方块，刷新后点选。
+- 可以选择允许客户端也能删（需要对应扩展模块支持）。
 
-**实验 Experiments**
-- **加载后清理**（进关卡 GC 减卡顿）· GC after level load
-- **树屋问号**：给指定关卡的门加问号（解锁盒）· question marks on treehouse portals
-- **声音静音**（自己/他人）/ **读取统计** / **作弊标识** / **功能解锁进度** · mute sounds, stats, cheat flag, unlock progress
+### 会话 Chat
+
+**对话窗口**页
+
+- 按住 `Z` 显示聊天窗口，或按一下切成常驻（可改键）。
+- 窗口缩放 `X` + 滚轮，文字大小 `C` + 滚轮。
+- 可以关掉自动弹出、关掉淡入淡出、开启清晰度、调整窗口位置。
+- 把「启用增强」关掉，游戏原本的字号 / 缩放 / 位置会**还原一次**后完全交回原版。
+
+**对话内容**页
+
+- 会话内的聊天记录面板，可以记录和发送。
+- 可过滤快捷消息、可隐藏游戏自带的聊天窗口、可显示每条消息的时间。
+
+### 快速调整 Quick Adjust
+
+- **分数折扣** —— 把自己的 handicap 设成 100 减折扣，这一局立刻生效，平衡板上能看到；可一键恢复原值。
+- **快速切换** —— 长按 `B` 在行动 ↔ 建造之间来回切。
+- **死后自动重试** / **快速重试** —— 挑战模式里死了自动重来。
+- **快速自杀** —— `Shift+0`。
+
+### 实验 Experiments
+
+**关卡边界**页
+
+- **解除关卡边界** —— 走出原关卡边界。每边外扩多少可调；「硬解除」能让光标和相机走得更远，
+  半径可调；方块的越界放置会一并打开。
+- **相机跟随** —— 相机移动速度可调。
+- **解除 UI3 覆盖** —— 去掉关卡里那块挡住画面的黑幕。
+
+**场景**页
+
+- 跳过加载动画、温柔加载（延后加载以避开卡顿）。
+- **立即开始** —— 在树屋里直接开始关卡（需要至少有一扇门被选中）。
+
+**其它**页
+
+- **加载后清理** —— 进关卡后做一次 GC，减少卡顿。
+- **自由相机** —— 滚轮缩放视野，视野大小与相机移动速度均可调。
+
+> 地图（`M` 打开、`T` 传送）与树屋地图、生死设置（重生无敌 / 延迟 / 自定义重生点）也在这一带，
+> 同样在面板里配置。
+
+### 附加模块 EX（需 `SR_UCH_EX.dll`）
+
+**控制台**页
+
+- 无敌、**完美无敌**、飞天、无视对象、无视碰撞、蹲移、冻结角色。
+
+**其它**页
+
+- **派对盒**：重抽道具、刷新派对盒、清空道具、关闭派对盒
+  （关闭后已拿到道具的人照常进入放置阶段）。
+- **地图网格** —— 行动阶段也显示网格，不透明度 / 淡入淡出 / 刷新颜色可调。
+
+**高级**页
+
+- 加分（可选分值类型）、传送目标过来、全体加分、全体复活、踢人。
+- 可以选择**无视模式限制**、**无视房主限制**、允许客户端使用方块破坏。
+
+> 扩展模块受总开关约束；部分条目只有房主能用，界面上会标出来。
 
 ---
 
@@ -64,14 +134,36 @@ Put `SR_UCH.dll` into `Ultimate Chicken Horse\BepInEx\plugins\`. 首次启动生
 | 自由相机 Free camera | `F3` |
 | 无视碰撞 Ignore collision | `F1` |
 | 自由放置 Free placement | `F2` |
-| 方块破坏（切换/删除）Destroy | `Alt` / `Backspace` |
+| 方块破坏（切换 / 删除）Destroy | `Alt` / `Backspace` |
 | 快速自杀 Quick suicide | `Shift+0` |
-| 重生点 设置/传送/恢复 Spawn | `O` / `P` / `K` |
+| 聊天窗口（显示 / 缩放 / 字号）Chat window | `Z` / `X` / `C`（后两个配滚轮） |
+| 重生点（设置 / 传送 / 恢复）Spawn | `O` / `P` / `K` |
 
-> 在管理器内点击按键框即可改绑：`Esc` 清空，`Shift+Esc` 取消。
+> 所有按键都能在面板里改绑。
 
+---
+
+## 说明 Notes
+
+- 面板里的改动**点一下就存盘**，不需要手动保存或重启。
+- 大部分功能在联机里可用，但**涉及世界状态改动的那几项（重载关卡、广播快照、放弃道具、关闭派对盒等）
+  需要房主权限**，界面上会标注。
+- 关卡边界、相机这类改动在**切换场景后**会重新生效；若发现没反应，开关一次面板或切一下场景即可。
+- 界面语言切到中文后，配置里的中文显示需要游戏客户端本身是中文才能正常显示。
 
 ---
 
 ## 致谢 Credits
-BetterFreeplay · BetterNight · BuildingPlus · BuildUnlimiter · UCH Freeplay Spawn Setter · UCH Tweaks · UCH-PlayerTracker-Mod · UltimateBuilder
+
+BetterFreeplay · BetterNight · BuildingPlus · BuildUnlimiter · UCH Freeplay Spawn Setter ·
+UCH Tweaks · UCH-PlayerTracker-Mod · UltimateBuilder
+
+以及 [Dear ImGui](https://github.com/ocornut/imgui) —— 本项目的面板交互与视觉风格参照了它。
+
+---
+
+## 关于游戏本体 About the Game
+
+本项目是《Ultimate Chicken Horse》的第三方模组，仅通过 BepInEx 与游戏进程交互，
+**不包含、不修改、不分发游戏的任何代码或资源**。游戏本体及其相关内容版权归
+Clever Endeavour Games 所有，请自行前往官方渠道获取。

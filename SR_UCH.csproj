@@ -1,9 +1,11 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- SR_UCH 主模块：入口 MainPlugin.cs + SR_UCH/ 下全部源码。
+  <!-- SR_UCH 主模块：入口 MainPlugin.cs + SR_UCH/ 下的核心（管理器）+ Features/ 下各功能源码。
        本工程只服务于 IDE / MSBuild（VS、Rider、dotnet build）里看代码、查游戏 API 与编译；
        ⚠ 要部署进游戏的那一份必须由 _tools\build_sr_uch.ps1 产出（csc + 游戏自带 mscorlib/
-       UnityEngine），本工程用的是 .NET Framework 参考程序集，二者不可混用 → 输出刻意分家。 -->
+       UnityEngine），本工程用的是 .NET Framework 参考程序集，二者不可混用 → 输出刻意分家。
+       运行期结构：SR_UCH.dll = 只提供 UI/控件/注册表/门控的基础管理器；
+                  SR_UCH_<功能>.dll = 每个侧栏页面一个独立 DLL，实现 ITweak 即被自动发现。 -->
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
     <AssemblyName>SR_UCH</AssemblyName>
@@ -33,6 +35,9 @@
   <ItemGroup>
     <Compile Include="MainPlugin.cs" />
     <Compile Include="SR_UCH\**\*.cs" />
+    <!-- 功能源码（运行时各自编译成独立 DLL；这里一起编进 MSBuild 产物只为 IDE 里能看代码/查游戏 API，
+         该产物不部署 —— 部署用 _tools\build_sr_uch.ps1 产出的 11 个 DLL） -->
+    <Compile Include="Features\*.cs" />
   </ItemGroup>
 
   <!-- net472 目标包：让只装了 .NET SDK、没装 .NET Framework 开发包的机器也能编译 -->
