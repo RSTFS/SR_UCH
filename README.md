@@ -1,114 +1,119 @@
 # SR_UCH
 
-> 《Ultimate Chicken Horse》游戏内增强模组 · A quality-of-life mod suite for **Ultimate Chicken Horse**（BepInEx 5 / Harmony）
+**English** | [简体中文](README.zh-CN.md)
 
-一个装上就能用的游戏内设置面板：把关卡、建造、聊天、联机、实验类功能都收进一个可搜索的侧栏，
-不用改游戏文件、不用进 BepInEx 配置文件翻选项。界面语言可随时切换，切换后立即生效。
+> A quality-of-life mod suite for **Ultimate Chicken Horse** (BepInEx 5 / Harmony)
 
-**中文 / English**：游戏内设置页随时切换，切换即刻生效。
+An in-game settings panel you can just install and use: levels, building, chat, online play and
+experimental features are all gathered into one searchable sidebar. No game files to edit, no
+digging through BepInEx config files for options. The UI language can be switched at any time and
+takes effect immediately.
 
----
-
-## 安装 Install
-
-1. 装好 **BepInEx 5.4**（第一次装需要先跑一次游戏让它生成加载器）。
-2. 把 `SR_UCH.dll` 放进 `Ultimate Chicken Horse\BepInEx\plugins\`。
-
-首次启动会生成配置文件 `BepInEx\config\SR_UCH_data.cfg`
+**Chinese / English**: switch any time on the in-game Settings page; changes apply instantly.
 
 ---
 
-## 快速开始 Quick Start
+## Install
+
+1. Install **BepInEx 5.4** (on first setup, run the game once so it generates the loader).
+2. Put `SR_UCH.dll` into `Ultimate Chicken Horse\BepInEx\plugins\`.
+
+On first launch a config file `BepInEx\config\SR_UCH_data.cfg` is generated.
+
+---
+
+## Quick Start
 
 | | |
 |---|---|
-| 打开面板 | **`Insert`**（可在设置页改键） |
-| 总开关 | **All Enabled** 默认**关**，打开后各功能才生效 |
-| 界面语言 | 默认英文，可在设置页切中文 |
-| 改按键 | 面板里点按键框：`Esc` 清空，`Shift+Esc` 取消 |
+| Open panel | **`Insert`** (rebindable on the Settings page) |
+| Master switch | **All Enabled** defaults to **off**; turn it on for the features to take effect |
+| UI language | English by default; switch to Chinese on the Settings page |
+| Rebind keys | Click the key box in the panel: `Esc` clears, `Shift+Esc` cancels |
 
-设置页底部有「自检」块：显示按名绑定的补丁目标与反射成员的可用数，失效项会逐条列出。
-若游戏更新导致部分功能失效，这里是首先该看的地方。
-
----
-
-## 功能 Features
-
-面板左侧是栏目，右侧是页面。下面按栏目列。
-
-### 建造 build
-
-- **无视碰撞** —— 方块可以放在任意位置：重叠、悬空、交叉都可以。快捷键 `F1` 开关。
-- **自由放置** —— 关掉 1 单位网格吸附，摆放可以微调。快捷键 `F2` 开关。
-- **解除建造上限** —— 树屋里保存 / 发布的"满度"上限（默认 500）可以自己定。
-
-### 关卡 Level
-
-- **重载关卡** —— 真正重载当前场景，**已放好的方块全部保留**；分数可选择保留或重置。
-- **广播方块快照** —— 房主把自己看到的方块重发给全场，全员就地重建（修不同步，不用重载关卡）。
-- **放弃道具** —— 排队模式里手上拿着道具又不想放了，按键丢掉。走游戏自己的通道，**全员可见**。
-- **关卡背景** —— 给关卡换一个背景色，**原版关卡的对局里也生效**。
-- **派对盒炸弹** —— 所有人发一句「炸弹！」快捷消息，就在派对盒里生成炸弹。
-- **联机房间列表** —— 按区域、模式、进度、满员等条件筛选，排序、刷新、加入。
-
-### 方块破坏 Destroy Blocks
-
-- 按 `Alt` 进入删除模式，滚轮切换目标，`Backspace` 删除。
-- 删除时会显示**是谁放的**这个方块，可以追踪某个玩家。
-- 另有列表模式：直接列出场上所有方块，刷新后点选。
-- 可以选择允许客户端也能删（需要对应扩展模块支持）。
-
-### 会话 Chat
-
-**对话窗口**页
-
-- 按住 `Z` 显示聊天窗口，或按一下切成常驻（可改键）。
-- 窗口缩放 `X` + 滚轮，文字大小 `C` + 滚轮。
-- 可以关掉自动弹出、关掉淡入淡出、开启清晰度、调整窗口位置。
-- 把「启用增强」关掉，游戏原本的字号 / 缩放 / 位置会**还原一次**后完全交回原版。
-
-**对话内容**页
-
-- 会话内的聊天记录面板，可以记录和发送。
-- 可过滤快捷消息、可隐藏游戏自带的聊天窗口、可显示每条消息的时间。
-
-### 快速调整 Quick Adjust
-
-- **分数折扣** —— 把自己的 handicap 设成 100 减折扣，这一局立刻生效，平衡板上能看到；可一键恢复原值。
-- **快速切换** —— 长按 `B` 在行动 ↔ 建造之间来回切。
-- **死后自动重试** / **快速重试** —— 挑战模式里死了自动重来。
-- **快速自杀** —— `Shift+0`。
-
-### 实验 Experiments
-
-**关卡边界**页
-
-- **解除关卡边界** —— 走出原关卡边界。每边外扩多少可调；「硬解除」能让光标和相机走得更远，
-  半径可调；方块的越界放置会一并打开。
-- **解除 UI3 覆盖** —— 去掉关卡里那块挡住画面的黑幕。
-
-**场景**页
-
-- 跳过加载动画、温柔加载（延后加载以避开卡顿）。
-- **立即开始** —— 在树屋里直接开始关卡（需要至少有一扇门被选中）。
-
-**其它**页
-
-- **加载后清理** —— 进关卡后做一次 GC，减少卡顿。
-- **自由相机** —— 滚轮缩放视野，视野大小与相机移动速度均可调。
-- **相机跟随** —— 相机移动速度可调。
+At the bottom of the Settings page there is a **Self-check** block: it shows how many name-bound
+patch targets and reflection members are available, and lists any that failed, one by one.
+If a game update breaks part of the features, this is the first place to look.
 
 ---
 
-## 致谢 Credits
+## Features
+
+The panel has sections on the left and pages on the right. Listed by section below.
+
+### Build
+
+- **Ignore Collision** -- blocks can be placed anywhere: overlapping, floating, intersecting. Toggle with `F1`.
+- **Free Placement** -- turns off 1-unit grid snapping so placement can be fine-tuned. Toggle with `F2`.
+- **Unlock Build Limit** -- the "fullness" limit for saving / publishing in the treehouse (default 500) becomes configurable.
+
+### Level
+
+- **Reload Level** -- truly reloads the current scene with **all placed blocks kept**; scores can be kept or reset.
+- **Broadcast Block Snapshot** -- the host re-sends the blocks it sees to everyone, who rebuild them in place (fixes desync without reloading the level).
+- **Drop Piece** -- in queue mode, if you are holding a piece you no longer want to place, press a key to drop it. Uses the game's own channel, so it is **visible to everyone**.
+- **Level Background** -- give a level a different background color; **works in matches on vanilla levels too**.
+- **Party Box Bomb** -- have everyone send a "Bomb!" quick message and a bomb spawns in the party box.
+- **Online Room List** -- filter by region, mode, progress, full / not-full and more; sort, refresh and join.
+
+### Destroy Blocks
+
+- Press `Alt` to enter delete mode, scroll to switch the target, `Backspace` to delete.
+- When deleting, it shows **who placed** that block, so you can track a specific player.
+- There is also a list mode: it lists every block on the field; refresh and click to pick.
+- You can optionally allow clients to delete too (requires the matching extension module).
+
+### Chat
+
+**Chat Window** page
+
+- Hold `Z` to show the chat window, or tap once to make it always-on (rebindable).
+- Resize the window with `X` + scroll; change the font size with `C` + scroll.
+- Turn off auto-open, turn off fade, enable sharpness, adjust the window position.
+- Turn "Enable Enhancements" off and the game's original font size / scale / position are **restored once**, then handed fully back to vanilla.
+
+**Chat Content** page
+
+- A chat log panel for the session that can record and send.
+- Filter quick messages, hide the game's own chat window, show a timestamp on each message.
+
+### Quick Adjust
+
+- **Score Discount** -- sets your handicap to 100 minus the discount; it takes effect in that round immediately and is visible on the balance board; restore the original value with one click.
+- **Quick Toggle** -- hold `B` to switch back and forth between action and build.
+- **Auto Retry After Death** / **Quick Retry** -- automatically retry when you die in challenge mode.
+- **Quick Suicide** -- `Shift+0`.
+
+### Experiments
+
+**Level Bounds** page
+
+- **Unlock Level Bounds** -- walk outside the original level bounds. How far each side extends is adjustable; "hard unlock" lets the cursor and camera go further, with an adjustable radius; out-of-bounds block placement is enabled along with it.
+- **Remove UI3 Overlay** -- removes the black screen that covers the view in a level.
+
+**Scene** page
+
+- Skip the loading animation, gentle loading (delay loading to avoid stutter).
+- **Start Immediately** -- start a level directly from the treehouse (requires at least one door to be selected).
+
+**Misc** page
+
+- **Cleanup After Load** -- run a GC once after entering a level to reduce stutter.
+- **Free Camera** -- scroll to zoom the view; both the view size and the camera move speed are adjustable.
+- **Camera Follow** -- adjustable camera move speed.
+
+---
+
+## Credits
 
 BetterFreeplay · BetterNight · BuildingPlus · BuildUnlimiter · UCH Freeplay Spawn Setter ·
 UCH Tweaks · UCH-PlayerTracker-Mod · UltimateBuilder
 
 ---
 
-## 关于游戏本体 About the Game
+## About the Game
 
-本项目是《Ultimate Chicken Horse》的第三方模组，仅通过 BepInEx 与游戏进程交互，
-**不包含、不修改、不分发游戏的任何代码或资源**。游戏本体及其相关内容版权归
-Clever Endeavour Games 所有，请自行前往官方渠道获取。
+This project is a third-party mod for Ultimate Chicken Horse. It only interacts with the game
+process through BepInEx and **contains, modifies and distributes none of the game's code or
+assets**. The game itself and all related content are copyright Clever Endeavour Games; please
+obtain it through official channels.
