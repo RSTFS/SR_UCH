@@ -1,0 +1,20 @@
+# SR_UCH 源码风格（与项目硬约束一致）
+root = true
+
+[*]
+charset = utf-8-bom
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = false
+
+[*.cs]
+indent_style = space
+indent_size = 4
+tab_width = 4
+# 硬约束：BepInEx 5.4 / Harmony 2 / Unity 老 Mono → C# 7.3
+# （禁止 switch 表达式、可空引用类型、using 声明、默认接口方法、目标类型 new 等）
+# 语言版本在 SR_UCH.csproj 里用 <LangVersion>7.3</LangVersion> 显式锁定。
+
+[*.{csproj,props,targets}]
+indent_style = space
+indent_size = 2
