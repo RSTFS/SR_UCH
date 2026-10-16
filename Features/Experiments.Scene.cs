@@ -1,5 +1,4 @@
-﻿// 实验 · 场景页。加载遮罩、温柔加载、树屋立即开始。
-// 整个实验栏目的总览看同目录的 Experiments.cs。
+﻿// 实验 · 场景页：加载遮罩、温柔加载、树屋立即开始。
 
 using System;
 using System.Collections.Generic;
@@ -12,10 +11,10 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
 public partial class Experiments : ITweak
 	{
-		// **场景页**：树屋 / 加载与切场景
+		// 场景页：树屋 / 加载与切场景
 		public static void RenderPage3() {
 			try {
-				// 树屋：立即开始（**R413**：自动投票已按用户要求整块删除）
+				// 树屋：立即开始
 			GUILayout.Space(SR.Ctl.Sc(6));
 			GUILayout.Label(new GUIContent("- " + SR.T("树屋", "Treehouse") + " -",
 				SR.T("在树屋大厅里直接开始关卡.",
@@ -50,8 +49,7 @@ public partial class Experiments : ITweak
 }
 
 
-    // 一、加载遮罩（2.3）+ 温柔加载（2.4-#25）
-    // Coroutine 宿主（MonoBehaviour）：SR 核心不是 MonoBehaviour，起协程需要一个挂载点
+    // 加载遮罩 + 温柔加载。SRHost 为协程挂载点（SR 核心不是 MonoBehaviour）。
     internal sealed class SRHost : MonoBehaviour { }
 
     public class SplashTools : ITweak {
@@ -62,10 +60,7 @@ public partial class Experiments : ITweak
         internal static string Note = "";
 
         private static void SelfReg() {
-            // Scene段的条目全部渲染在场景页（Experiments.RenderPage3），
-            //  所以这里必须 NavHide, 否则 RebuildSections 的"兜底"分支（既没 Nav 也没 NavHide
-            //  的 cfg 段自动进侧栏，SR.Core.cs:940-947）会把它加成一个独立侧栏栏目，
-            //  出现场景页里有一份、侧栏又有一份的双入口。
+            // Scene 段条目全部渲染在场景页，必须 NavHide，否则兜底分支会再加一个独立侧栏栏目。
             SR.NavHide("Scene");
             SR.LocKey("Scene", "Splash Skip Load", "跳过加载动画", "Skip load animation");
             SR.LocDesc("Scene", "Splash Skip Load",
@@ -97,29 +92,18 @@ public partial class Experiments : ITweak
         private static void Tick() {
             try {
                 SplashPatch.Tick();
-                // **Opt-9（审计 F3）**：这里原来是 `if (!SR.GateMaster) return; ApplySkip();` ——
-                //  总开关一关，ApplySkip 就不再执行，可 SkipBool 是**游戏里的**标志位
-                //  （显示过一次就永远是 true，游戏 Update 每帧把 stateTime 压到 50），
-                //  于是"跳过加载动画"关不掉、只能重开游戏。基座对此没有兜底：唯一挂在总开关上的
-                //  收尾路径依赖 AnyUiBlocked()，而它当前恒 false（见 SR.Core 的说明）。
-                //  所以门控不能再挡住 ApplySkip —— 门控本身移进 ApplySkip 的 want 判据里，
-                //  这样"总开关关闭 / 开关关闭"都会走到 ClearSkip 那一支。
+                // 门控不得挡住 ApplySkip：总开关关闭时也须走到 ClearSkip 分支清掉游戏标志位。
                 ApplySkip();
             } catch (Exception __ex) { SR.Guard.Log("加载遮罩 Tick", __ex); }
         }
 
-        // **问题 3跳过加载动画不能随开随关的修法**：
-        //  游戏的 Skip()(116972) 只设 SkipBool = true，没有任何"取消"路径,
-        //  SkipBool 只在 Start()(116867) 里被清一次，而 Start 只跑一次。
-        //  -> 一旦开过就**永远跳**，把开关关掉也回不来。
-        //  现在：开 -> 调 Skip()；关 -> **自己把 SkipBool 写回 false**（反射 protected 字段），
-        //  恢复成正常的按时间推进。
+        // 游戏 Skip() 只把 SkipBool 置真且无取消路径，一旦开过就永远跳。
+        // 故关闭时反射把 SkipBool 写回 false，恢复正常的按时间推进。
         private static System.Reflection.FieldInfo _fiSkip;
         private static bool _fiSkipTried;
         private static void ApplySkip() {
             try {
-                // **Opt-9（审计 F3）**：总开关也参与"想不想跳"的判定（不改的话，总开关关闭时
-                //  会继续主动去 Skip）。为 false 时下面走 ClearSkip，把游戏标志清回去。
+                // 总开关参与判定；为 false 时走 ClearSkip 把游戏标志清回去。
                 bool want = SR.GateMaster && _skipLoad != null && _skipLoad.Value;
                 LoadingInterstitialSplash sp = FindSplash();
                 if (sp == null) return;
@@ -133,7 +117,7 @@ public partial class Experiments : ITweak
             } catch (Exception __ex) { SR.Guard.Log("跳过加载动画", __ex); }
         }
 
-        //清掉 SkipBool（protected 字段，没有公开的关闭接口）
+        // 清掉 SkipBool（protected 字段，无公开的关闭接口）。
         private static void ClearSkip(UISplashScreen sp) {
             try {
                 if (!_fiSkipTried) {
@@ -146,9 +130,7 @@ public partial class Experiments : ITweak
             } catch (Exception __ex) { SR.Guard.Log("清 SkipBool", __ex); }
         }
 
-        // **P2-24**：Instance 是静态属性，读它几乎零开销；只有它为空时才回退全场景扫描。
-        //  而那个回退原来**每帧都可能跑**（正在加载的那段时间 Instance 恰好是空的），
-        //  这里加 15 帧节流 —— 找到实例最迟也就晚 1/4 秒，不影响观感。
+        // Instance 为空时才回退全场景扫描，回退路径 15 帧节流。
         private static int _splashScanAt = -9999;
         private static LoadingInterstitialSplash FindSplash() {
             try { LoadingInterstitialSplash inst = LoadingInterstitialSplash.Instance; if (inst != null) return inst; } catch { }
@@ -160,7 +142,7 @@ public partial class Experiments : ITweak
         internal static bool GentleOn() { return _gentleLoad != null && _gentleLoad.Value && SR.GateMaster; }
     }
 
-    // **温柔加载**：前置 SceneManagerWrapper 的两个入口，改走游戏自己的 DoGentleSceneLoad
+    // 温柔加载：前置 SceneManagerWrapper 的两个入口，改走游戏自己的 DoGentleSceneLoad。
     internal static class SplashPatch {
         private static SRHost _host;
         private static float _runningUntil = -1f;
@@ -174,14 +156,12 @@ public partial class Experiments : ITweak
             UnityEngine.Object.DontDestroyOnLoad(go);
         }
 
-        // R396 A2：Prefix 返回 false = 抑制游戏自己的加载。**抑制之后必须保证"我起不来"时能回落**，
-        //  否则场景请求被吞掉、游戏永远停在当前场景（R395 查出的阻断级问题）。
-        //  回落约定：Start 返回 true = 温柔加载已接管；false = 没能接管 -> Prefix 放行原版。
+        // Prefix 返回 false = 抑制游戏自己的加载，抑制后必须保证接管失败时能回落，否则场景请求被吞掉。
+        // 约定：Start 返回 true = 已接管；false = 未接管，Prefix 放行原版。
         [HarmonyPatch(typeof(SceneManagerWrapper), "LoadScene")]
         [HarmonyPrefix]
         static bool PreLoadScene(string sceneName) {
-            // **Opt-52**：补丁里抛异常会被 Harmony 吞掉并**每次都记一条日志**（每帧补丁就是每帧刷屏），
-            //  而且功能会静默失效。统一在这里兜住，失败经 SR.Guard.Log（内部按调用点去重）留一条痕。
+            // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SR.Guard.Log（按调用点去重）留痕。
             try {
                         if (!Should(sceneName)) return true;
                         return !Start(sceneName);
@@ -191,8 +171,7 @@ public partial class Experiments : ITweak
         [HarmonyPatch(typeof(SceneManagerWrapper), "LoadSceneAsync")]
         [HarmonyPrefix]
         static bool PreLoadSceneAsync(string sceneName) {
-            // **Opt-52**：补丁里抛异常会被 Harmony 吞掉并**每次都记一条日志**（每帧补丁就是每帧刷屏），
-            //  而且功能会静默失效。统一在这里兜住，失败经 SR.Guard.Log（内部按调用点去重）留一条痕。
+            // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SR.Guard.Log（按调用点去重）留痕。
             try {
                         if (!Should(sceneName)) return true;
                         return !Start(sceneName);
@@ -203,12 +182,12 @@ public partial class Experiments : ITweak
             try {
                 if (!SplashTools.GentleOn()) return false;
                 if (string.IsNullOrEmpty(sceneName)) return false;
-                if (sceneName == "MainMenu") return false;   //游戏走 AbortGameInProgress 特例，必须让路
+                if (sceneName == "MainMenu") return false;   // MainMenu 走 AbortGameInProgress 特例，必须让路
                 return true;
             } catch { return false; }
         }
 
-        // 返回 true = 温柔加载已接管（Prefix 可以抑制原版）；false = 没能接管（Prefix 必须放行）
+        // 返回 true = 已接管（Prefix 可抑制原版）；false = 未接管（Prefix 必须放行）。
         private static bool Start(string sceneName) {
             try {
                 EnsureHost();
@@ -217,19 +196,19 @@ public partial class Experiments : ITweak
                     return false;
                 }
                 if (_runningUntil > 0f && Time.realtimeSinceStartup < _runningUntil) {
-                    // **不能静默 return**：Prefix 已经决定抑制原版了，这里放弃 = 请求被吞掉 = 游戏卡死
+                    // 不能静默返回：Prefix 已决定抑制原版，放弃即请求被吞掉。
                     SR.LogWarn("[场景] 温柔加载已在进行中，本次请求回落原版（" + sceneName + "）");
                     return false;
                 }
                 _target = sceneName;
                 _host.StartCoroutine(SceneManagerWrapper.DoGentleSceneLoad(sceneName));
-                //协程没有 isDone；用场景是否已变成目标判完成，5 秒后自动解锁
+                // 协程无 isDone：场景已切换到目标即视为完成，5 秒后自动解锁。
                 _runningUntil = Time.realtimeSinceStartup + 5f;
                 SR.LogInfo("[场景] 温柔加载：" + sceneName);
                 return true;
             } catch (Exception __ex) {
                 SR.Guard.Log("温柔加载", __ex);
-                return false;   // **异常也回落，绝不吞掉场景请求**
+                return false;   // 异常也回落，不吞掉场景请求
             }
         }
 
@@ -242,10 +221,9 @@ public partial class Experiments : ITweak
             } catch { }
         }
     }
-    // 树屋：立即开始
-    // **R413**：自动投票（配置项 / 下拉框 / 记票反射 / 瞬移分支）已按用户要求整块删除，只留立即开始。
+    // 树屋：立即开始。
     public class LobbyTools : ITweak {
-        private static ConfigEntry<KeyCode> _launchKey;        // #2
+        private static ConfigEntry<KeyCode> _launchKey;
 
         internal static string Note = "";
 
@@ -285,11 +263,7 @@ public partial class Experiments : ITweak
         }
 
         private static void DoLaunch(LevelSelectController lsc) {
-            // **R396 S2**：原来用 SR.CanDoHost()，它判的是"有无广播能力"（CanDo 的 Cap.HostOnly 分支
-            //  查 Env.HasServer = NetworkServer.active）-> **离线/本地树屋恒 false**，
-            //  于是单机玩（UCH 最主流玩法）里立即开始永远只弹"只有房主能做这个操作"，
-            //  而 LaunchLevel(134288) 明明是纯本地调用。
-            //  改判 Env.IsHost（离线时为 true，语义=本机即权威）。
+            // 判 SR.CanControlLocally（离线时为真）；LaunchLevel 是纯本地调用，与广播能力无关。
             if (!SR.CanControlLocally) { SR.Notify(SR.T("仅房主可开始关卡", "Host only")); return; }
             LevelPortal[] portals = lsc.portals;
             if (portals == null || portals.Length == 0) { SR.Notify(SR.T("未找到可用关卡门", "No level portal available")); return; }
@@ -299,7 +273,7 @@ public partial class Experiments : ITweak
                 int v = portals[i].Votes != null ? portals[i].Votes.Count : 0;
                 if (v > bestV) { bestV = v; best = i; }
             }
-            // **R412**：一票都没有 = 没有选中关卡 -> 不生效（原来会进"得票最多的门"= 实际是第一个门）
+            // 零票视为未选定关卡，不启动。
             if (best < 0 || bestV <= 0 || portals[best] == null) {
                 SR.Notify(SR.T("尚未选定关卡，请先投票", "No level selected yet - vote first"));
                 return;

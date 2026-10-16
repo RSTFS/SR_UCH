@@ -1,5 +1,4 @@
-﻿// 建造增强。自由放置（网格覆盖 + 吸附到 0.01 单位）和建造上限放宽。
-// BuildUnlimiter 也并在本文件里。
+﻿// 建造增强：自由放置（网格覆盖，吸附到 0.01 单位）+ 建造上限放宽（BuildUnlimiter）。
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -10,28 +9,28 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 namespace SR_UCH.Tweaks {
     public class BuildingTools : ITweak {
-        private static IFeatureHost _mp;   //只用来读 Config（契约类型）
+        private static IFeatureHost _mp;   // 只用来读 Config（契约类型）
         private static bool _collisionOverride;
         private static ConfigEntry<bool> _collisionEntry;
         private static ConfigEntry<KeyCode> _toggleCollisionKey;
-        //自由放置（网格覆盖）：方块不再吸附 1 单位网格，改为吸附 0.01 单位，可自由微调摆放
+        // 自由放置（网格覆盖）：方块吸附 0.01 单位而非 1 单位网格。
         private static bool _gridOverride;
         private static ConfigEntry<bool> _gridEntry;
         private static ConfigEntry<KeyCode> _toggleGridKey;
-        //runtime toggles (also controlled by the in-game manager)
+        // 运行期开关：游戏内管理器同时也可改。
         public static bool Enabled = true;
         public static bool GridOverride { get { return _gridOverride; } set { _gridOverride = value; } }
 
         private static void SelfReg() {
-//本文件反射的游戏私有成员（游戏更新改名时：启动自检会在日志里告警；改名需等新版模组适配）
+            // 本文件反射的游戏私有成员，改名时启动自检会在日志里告警。
             SR.RefOverride("PiecePlacementCursor.SetPiece", "自由放置（改写放置结果）");
             SR.RefOverride("PiecePlacementCursor.FixedUpdate", "自由放置（补丁目标）");
             SR.RefOverride("PiecePlacementCursor.heldPositionOffset", "自由放置（关闭网格吸附）");
-            SR.RowCompanions.Add(BuilderCompanion); //通用条目行扩展点：覆盖与它的快捷键同行显示
-            SR.RowFilters.Add(BuilderRowVisible);   //两个开关键位不单独成行
-            SR.RegisterPage("build", RenderPage); //本功能页自绘（含建造上限小分区）
+            SR.RowCompanions.Add(BuilderCompanion); // 通用条目行扩展点：覆盖项与快捷键同行显示
+            SR.RowFilters.Add(BuilderRowVisible);   // 两个开关键位不单独成行
+            SR.RegisterPage("build", RenderPage); // 本功能页自绘（含建造上限分区）
             SR.LocSec("build", "建造", "Build");
-            SR.Nav("build", 50); //侧栏栏目顺序 50
+            SR.Nav("build", 50); // 侧栏栏目顺序 50
             SR.LocKey("build", "Collision Override", "无视碰撞", null);
             SR.LocDesc("build", "Collision Override", "关掉放置规则, 方块可以互相重叠, 也可以悬空放着, 想放哪放哪.", "Ignore collision: pieces ignore placement rules and can go anywhere (overlap/air/crossing)");
             SR.LocKey("build", "Collision Toggle Key", "无视碰撞开关", null);
@@ -42,14 +41,13 @@ namespace SR_UCH.Tweaks {
             SR.LocDesc("build", "Grid Toggle Key", "游戏里按这个键临时开关自由放置, 默认 F2.", "Toggle free placement in-game (default F2)");
         }
 
-        //当前生效的满度上限（只读框显示用）：直接读游戏字段。
-        //不借建造上限功能的取值接口（那会造成功能间横向依赖），直接读游戏字段本身
-        //（取值语义完全相同：读不到时回退游戏原版上限 500）。
+        // 当前生效的满度上限（只读框显示用）：直接读游戏字段，不借其它功能的接口以避免横向依赖。
+        // 读不到时回退游戏原版上限 500。
         private static int CurrentCapShown() {
             try { return GameSettings.GetInstance().LevelFullnessScoreLimit; } catch { return 500; }
         }
 
-        //覆盖条目的同行同伴：它的开关键位（通用条目行按注册的 key 再渲染一个控件）
+        // 覆盖条目的同行同伴：其开关键位（通用条目行按注册的 key 再渲染一个控件）。
         private static string BuilderCompanion(ConfigEntryBase e) {
             if (e.Definition.Section != "build") return null;
             if (e.Definition.Key == "Collision Override") return "Collision Toggle Key";
@@ -57,14 +55,13 @@ namespace SR_UCH.Tweaks {
             return null;
         }
 
-        //两个开关键位并进覆盖行显示，不单独成行
+        // 两个开关键位并进覆盖行显示，不单独成行。
         private static bool BuilderRowVisible(ConfigEntryBase e) {
             if (e.Definition.Section != "build") return true;
             return e.Definition.Key != "Collision Toggle Key" && e.Definition.Key != "Grid Toggle Key";
         }
 
-        //本功能的自绘页：先画建造上限小分区（分隔标题 + 当前生效值），再逐行渲染本段条目
-        //分区判据（键名来自 Initialize 里的 Config.Bind；Toggle Key 那两条已被可见性过滤掉）
+        // 自绘页：按分区标题 + 条目逐行渲染（分区判据取自 Initialize 里 Bind 的键名）。
         private static bool IsEnhanceKey(string k) { return k == "Collision Override" || k == "Grid Override"; }
         private static bool IsLimitKey(string k) { return k == "Lift Build Cap" || k == "Build Cap Value"; }
         private static void RenderPage() {
@@ -72,12 +69,9 @@ namespace SR_UCH.Tweaks {
             List<ConfigEntryBase> entries = SR.Ctl.SectionEntries("build");
             bool any = false;
 
-            // #1 分区**按条目键显式划分**，不依赖遍历顺序。
-            //为什么必须这样：SectionEntries 是按键名排序的，Build Cap Value(B) 排在
-            //Collision Override(C) 前面, 原来"循环里遇到第一条上限条目才插标题"会让
-            //建造上限正好插在建造增强标题下方，无视碰撞/自由放置反而落到建造上限里面。
+            // 分区按条目键显式划分，不依赖遍历顺序（SectionEntries 按键名排序，顺序与分区无关）。
 
-            // 分区一：建造增强（无视碰撞 / 自由放置）
+            // 分区一：建造增强
             GUILayout.Label(new GUIContent("- " + SR.T("建造", "Build") + " -",
                 SR.T("建造增强：让方块无视放置规则、按更细的网格自由微调摆放。",
                      "Build: place pieces ignoring the placement rules and snap on a finer grid.")),
@@ -90,19 +84,16 @@ namespace SR_UCH.Tweaks {
                 SR.Ctl.DrawEntryRow(e, col);
             }
 
-            // 分区二：建造上限（解除上限 + 上限值 + 当前生效值）
+            // 分区二：建造上限
             GUILayout.Space(SR.Ctl.Sc(6));
             GUILayout.Label(new GUIContent("- " + SR.T("建造上限", "Build Limit") + " -",
                 SR.T("建造上限（BuildUnlimiter）：解除树屋保存/发布界面的关卡满度限制，超满的关卡也能正常发布/上传。",
                      "Build Limit (BuildUnlimiter): lifts the treehouse save/publish fullness cap so over-full levels can be published.")),
                 SR.Ctl.SecHeader);
             GUILayout.Space(SR.Ctl.Sc(2));
-            // R384：这一行是**手搓**的（不是通用条目行），原来用 FlexibleSpace 把只读框推到行最右，
-            //  与下面解除上限 / 上限值两行的编辑框不在同一列。现在按通用条目行的排版走：
-            //  标签占名称列宽度 + 间隔 6 + 主控件列（与下面两行的编辑框左边缘对齐）。
+            // 该行为手工排版：标签占名称列宽度 + 间隔 6 + 主控件列，与下方两行的编辑框左边缘对齐。
             GUILayout.BeginHorizontal();
-            // R385：这里用的是 GUILayout.Label（**不会**像 RestoreLabel 那样自动收缩到文字宽度），
-            //  所以必须自己按文字实测，否则当前上限右侧会空一大块、只读框被推离标签。
+            // GUILayout.Label 不会像 RestoreLabel 那样收缩到文字宽度，宽度需按文字实测。
             float lw = SR.Ctl.Label.CalcSize(new GUIContent(SR.T("当前上限", "Current limit"))).x + SR.Ctl.Sc(12);
             GUILayout.Label(new GUIContent(SR.T("当前上限", "Current limit"),
                 SR.T("当前生效的满度上限；游戏原版为 500", "The current effective fullness cap; vanilla is 500")),
@@ -111,10 +102,8 @@ namespace SR_UCH.Tweaks {
             bool oldEn = GUI.enabled;
             try {
             GUI.enabled = false;
-            //SR.T(zh, en) 的两个参数都会被求值：先取到局部变量再拼接，避免同帧算两次。
-            //上限值直接读游戏字段（不借别的功能的接口，避免横向依赖）
+            // SR.T(zh, en) 的两个参数都会被求值：前缀为常量、只有末尾数字在变，故字符串只拼一次。
             int curLimit = CurrentCapShown();
-            //前缀是常量、只有末尾数字在变 -> 把数字挪到 T() 外面接，字符串只拼一次
             GUILayout.TextField(SR.T("当前上限：", "Current: ") + curLimit,
                 SR.Ctl.SearchBox, GUILayout.Width(SR.Ctl.Sc(170)), GUILayout.Height(SR.Ctl.Sc(26)));
             } finally { GUI.enabled = oldEn; }
@@ -127,7 +116,7 @@ namespace SR_UCH.Tweaks {
                 SR.Ctl.DrawEntryRow(e, col);
             }
 
-            // 其余条目（将来新增的，归到建造增强之下，避免"看不见的条目"）
+            // 其余条目：避免出现未渲染的条目
             for (int i = 0; i < entries.Count; i++) {
                 ConfigEntryBase e = entries[i];
                 if (IsEnhanceKey(e.Definition.Key) || IsLimitKey(e.Definition.Key)) continue;
@@ -167,7 +156,7 @@ namespace SR_UCH.Tweaks {
                 "Key to toggle free placement (grid override) in-game");
             SR.RegisterKey("建造增强-自由放置开关", _toggleGridKey, "toggle");
 
-            //分开注册：嵌套类的 CreateAndPatchAll 不递归，需显式注册，单个失败不影响其他。
+            // 嵌套类的 CreateAndPatchAll 不递归，需显式注册；单个失败不影响其他。
             try { Harmony.CreateAndPatchAll(typeof(BuildingTools)); } catch (Exception e) { SR.LogWarn("BuildingTools 补丁失败: " + e.Message); }
             try { Harmony.CreateAndPatchAll(typeof(FreePlacementPatch)); } catch (Exception e) { SR.LogError("自由放置补丁注册失败: " + e.Message); }
         }
@@ -183,14 +172,13 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void Notify(string name, bool state) {
-            SR.Notify(name + (state ? SR.T("：开", ": ON") : SR.T("：关", ": OFF")));   // **走核心通道**：原来只弹提示不写日志（快捷键切换查不到）
+            SR.Notify(name + (state ? SR.T("：开", ": ON") : SR.T("：关", ": OFF")));   // 走核心通道，便于日志追溯
         }
 
         [HarmonyPatch(typeof(PiecePlacementCursor), "ReceiveEvent")]
         [HarmonyPostfix]
         static void OnPieceInput(PiecePlacementCursor __instance) {
-            // **Opt-52**：补丁里抛异常会被 Harmony 吞掉并**每次都记一条日志**（每帧补丁就是每帧刷屏），
-            //  而且功能会静默失效。统一在这里兜住，失败经 SR.Guard.Log（内部按调用点去重）留一条痕。
+            // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SR.Guard.Log（按调用点去重）留痕。
             try {
                         if (!SR.GateMaster) return;
                         if (!Enabled) return;
@@ -200,15 +188,12 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SR.Guard.Log("自由放置：忽略放置规则", __ex); }
         }
 
-        //自由放置：游戏把 Piece 放到吸附后的 gridPosition 后，用 Postfix 改成未取整的光标位置，
-        //实现自由微调摆放（Postfix 比 transpiler 可靠）。
+        // 自由放置：SetPiece/FixedUpdate 后用 Postfix 把方块位置改为未取整的光标位置。
         [HarmonyPatch]
         static class FreePlacementPatch {
             private static FieldInfo _heldOffsetField;
             static IEnumerable<MethodBase> TargetMethods() {
-                //不能直接 yield return RefMethod(...)：反射失效时它返回 null，
-                //Harmony 遍历到 null 会抛异常 -> 整个自由放置功能一起丢（连另一个目标也用不了）。
-                //逐个判空后 yield，单个目标失效只丢对应的那个，与"分开注册、单个失败不影响其他"一致。
+                // 逐个判空后再 yield：Harmony 遍历到 null 会抛异常，导致自由放置整体失效。
                 MethodInfo m = SR.RefMethod(typeof(PiecePlacementCursor), "SetPiece", "自由放置（改写放置结果）");
                 if (m != null) yield return m;
                 m = SR.RefMethod(typeof(PiecePlacementCursor), "FixedUpdate", "自由放置（补丁目标）");
@@ -216,20 +201,17 @@ namespace SR_UCH.Tweaks {
             }
             static void Postfix(PiecePlacementCursor __instance) {
                 try {
-                    if (!SR.GateMaster) return; //总开关关闭时自由放置同样失效（与本文件另两个补丁一致）
+                    if (!SR.GateMaster) return; // 总开关关闭时失效
                     if (!GridOverride) return;
                     if (__instance == null || __instance.Piece == null) return;
-                    // **R396 S5**：复刻游戏 PiecePlacementCursor.FixedUpdate（反编译 71952-71958）的守卫。
-                    //  这些状态下**游戏自己刻意不动位置**，原来我们照写不误 ->
-                    //  等待服务器确认放置期间方块被拽到未取整的原始位置；若这次放置随后被服务器否决，
-                    //  方块已经出现在非法位置（联机房客最易撞上，表现为"方块偶尔自己跳一下"）。
-                    // disabled 是 protected（编译不可直接访问），走 SafeBool
+                    // 复刻游戏 FixedUpdate 的守卫：这些状态下游戏刻意不动位置，照写会把方块拽到非法位置。
+                    // disabled 等为 protected，经 SafeBool 读取。
                     if (SafeBool(__instance, "disabled")) return;
                     if (__instance.WaitingForPlaceMessageResponse) return;
                     if (SafeBool(__instance, "waitingForFixedUpdate")) return;
                     if (SafeBool(__instance, "tryingToCancel")) return;
                     if (SafeBool(__instance, "placementPhysicsLock")) return;
-                    //自由位置 = 光标位置 + 手持偏移 + 变体偏移（不取整）
+                    // 自由位置 = 光标位置 + 手持偏移 + 变体偏移（不取整）
                     Vector2 offset = __instance.Piece.GetTransformedPlacementOffset();
                     Vector3 cp = __instance.transform.position;
                     if (_heldOffsetField == null)
@@ -240,15 +222,14 @@ namespace SR_UCH.Tweaks {
                     }
                     Vector2 freePos = new Vector2(cp.x + held.x + offset.x, cp.y + held.y + offset.y);
                     Vector3 cur = __instance.Piece.transform.position;
-                    //受约束件只能沿一个轴移动：与原版 SetPiece/FixedUpdate 的分支一致，保留另一轴当前值
+                    // 受约束件只能沿一个轴移动，保留另一轴当前值。
                     if (__instance.Piece.ConstrainX) freePos = new Vector2(cur.x, freePos.y);
                     else if (__instance.Piece.ConstrainY) freePos = new Vector2(freePos.x, cur.y);
                     __instance.Piece.transform.position = new Vector3(freePos.x, freePos.y, cur.z);
                 } catch (Exception __ex) { SR.Guard.Log("BuildingTools.Vector3", __ex); }
             }
 
-            // **R396 S5**：读一个 private/protected bool 字段，取不到就当 false（不抛）。
-            //  这些字段游戏改名时只是少一条守卫，不会让功能崩。
+            // 读取 private/protected bool 字段，取不到按 false（字段改名只是少一条守卫）。
             private static bool SafeBool(object target, string field) {
                 try {
                     System.Reflection.FieldInfo fi = SR.RefField(target.GetType(), field, "建造增强：自由放置守卫");
@@ -261,9 +242,9 @@ namespace SR_UCH.Tweaks {
     }
 }
 
-// 以下由 BuildUnlimiter.cs 并入（UI 在 BuildingTools.cs -> 文件跟着 UI 走）
+// 以下由 BuildUnlimiter.cs 并入（UI 在本文件，配置与实现同归一处）。
 namespace SR_UCH.Tweaks {
-    //建造上限：放宽 GameSettings.LevelFullnessScoreLimit（移植自 Osqat/UCH-BuildUnlimiter）
+    // 建造上限：放宽 GameSettings.LevelFullnessScoreLimit。
     public class BuildUnlimiter : ITweak {
         public const int VanillaLimit = 500;
         private const int DefaultLimit = 1000000;
@@ -297,19 +278,12 @@ namespace SR_UCH.Tweaks {
             }
             _enabled.SettingChanged += (s, e) => Apply();
             _limitEntry.SettingChanged += (s, e) => Apply();
-            Apply(); //启动时归位：关闭则保持原版 500
-            //启动时 GameSettings 可能还没加载完（BepInEx 插件的 Awake 早于游戏首个场景），
-            //GetInstance() 返回 null -> Apply 静默失败，而之后没有任何重试时机 ->
-            //已勾选的解除建造上限要等用户手动切换一次开关才生效（建造页只读框显示 500，与勾选状态矛盾）。
-            //挂场景切换重试：与 DestroyBlocks / Respawn / ExModule 等其它 tweak 的做法一致。
+            Apply(); // 启动时归位：关闭则保持原版 500
+            // 启动时 GameSettings 可能尚未加载（GetInstance() 返回 null），故挂场景切换重试；
+            // 与 DestroyBlocks / Respawn / ExModule 等其它 tweak 的做法一致。
             SceneManager.activeSceneChanged += (a, b) => Apply();
-            // R396 S6：Apply() 的求值依赖 SR.GateMaster，所以总开关一关必须有人调它。
-            // **Opt-1（审计 F15）修正**：原文写"没有任何东西在总开关变化时调用它"——这在当时成立
-            //  （唯一挂在总开关上的收尾路径依赖 AnyUiBlocked()，而它恒 false）。现在 SR.Core 已经在
-            //  `_allEnabledEntry.SettingChanged` 里补了 FireDismissUi()（与"换场景/对局开始/EX 踢人"
-            //  并列的第四条触发路径），所以下面这个 DismissHook 在关总开关时会**真的被调到**。
-            //  两条都保留：DismissHook 负责"关总开关"，SceneHook 负责"启动早期 GameSettings 还没就绪"的重试。
-            //  模式照抄 Experiments.LevelBoundsUnlock.Reeval。
+            // Apply() 的求值依赖 SR.GateMaster，总开关关闭时需要有人调用它。
+            // DismissHook 负责关总开关，SceneHook 负责启动早期 GameSettings 未就绪时的重试。
             SR.RegisterDismissHook(delegate { if (!SR.GateMaster) Apply(); });
             SR.RegisterSceneHook(delegate { if (!SR.GateMaster) Apply(); });
         }
@@ -319,8 +293,7 @@ namespace SR_UCH.Tweaks {
                 GameSettings gs = GameSettings.GetInstance();
                 if (gs == null) return; //场景还没加载完：交给下次场景切换重试（见 Initialize 里的订阅）
                 gs.LevelFullnessScoreLimit = (SR.GateMaster && Enabled) ? LimitValue : VanillaLimit;
-                //注：这里只写游戏的字段、不改任何配置项，原来还调了一次 Config.Save(), 纯属无谓的磁盘写
-                //（挂了场景切换重试后会变成每次换场景都写一次），故去掉；配置落盘统一由 SR.FlushConfig 节流。
+                // 只写游戏字段，不调 Config.Save（配置落盘统一由 SR.FlushConfig 节流）。
             } catch (Exception __ex) {
                 SR.Guard.Log("应用建造上限", __ex);
             }

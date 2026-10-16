@@ -19,7 +19,7 @@ public partial class SR {
             public BaseUnityPlugin instance;
         }
 
-        //外部插件可运行时启用/禁用，状态持久化在配置里
+        //外部插件的禁用状态（持久化在配置项 DisabledPlugins 中）。
         private static readonly Dictionary<string, bool> _extDisabled = new Dictionary<string, bool>();
 
 
@@ -28,13 +28,12 @@ public partial class SR {
             return _extDisabled.TryGetValue(guid, out v) && v;
         }
 
-        //设置页里不渲染原始的禁用 GUID 字符串条目（改为顶部按钮清单）
+        //设置页不渲染原始的禁用 GUID 字符串条目（改由顶部按钮清单呈现）。
         private static bool SettingsHiddenDisabledPlugins(ConfigEntryBase e) {
             return !(e.Definition.Section == Keys.Settings && e.Definition.Key == Keys.DisabledPlugins);
         }
 
-        //窗口宽高/XY 不再做成可自定义条目（窗口直接拖右下角缩放、拖标题栏移动即可）：
-        //配置项本身保留（用于持久化），只是不在设置页显示
+        //窗口宽高 / XY 配置项仅用于持久化，不在设置页显示（窗口可直接拖动缩放与移动）。
         private static bool SettingsHiddenWindowGeometry(ConfigEntryBase e) {
             if (e.Definition.Section != Keys.Settings) return true;
             string k = e.Definition.Key;
@@ -48,7 +47,7 @@ public partial class SR {
             return null;
         }
 
-        //该 GUID 对应插件的程序集（用于"按程序集认领补丁"的兜底解绑；取不到 = null，只按 owner 比对）
+        //该 GUID 对应插件的程序集，供按程序集认领补丁的兜底解绑；取不到返回 null。
         private static Assembly AssemblyOf(string guid) {
             try {
                 PluginEntry p = EntryByGuid(guid);
@@ -57,12 +56,8 @@ public partial class SR {
             return null;
         }
 
-        //这个补丁是不是属于该插件？两条判据：
-        //  1) owner == GUID（BepInEx 惯例：插件用 new Harmony(GUID) 打补丁）；
-        //  2) PatchMethod 所在程序集 == 该插件程序集, 覆盖"插件用了别的 Harmony id"和
-        //     "插件在 Awake 里自己 PatchAll"这两种按 owner 认不出来的情况（否则禁用时清不干净，
-        //     再次启用就会把同一 patch 再打一份 -> 双重执行）。
-        //绝不认领 SR_UCH 自己的程序集，避免误删本 mod 的补丁。
+        //判断补丁是否属于该插件：owner 等于 GUID，或 PatchMethod 所在程序集等于该插件程序集。
+        //不认领 SR_UCH 自身程序集，避免误删本 mod 的补丁。
         private static bool PatchOwnedBy(HarmonyLib.Patch patch, string guid, Assembly target, Assembly mine) {
             try {
                 if (patch == null) return false;
@@ -77,9 +72,8 @@ public partial class SR {
             } catch { return false; }
         }
 
-        //撤销该插件的全部 Harmony 补丁（先按 ID，再扫描补丁表兜底：按 owner 或按程序集认领）
-        // **P2-04**：解绑用的 Harmony 实例复用一份静态的。原来每次 UnpatchPlugin 都 new 一个，
-        //  频繁启用/禁用插件时会在 Harmony 内部不断堆积同一个 id 的补丁器状态。
+        //撤销该插件的全部 Harmony 补丁：先按 ID，再扫描补丁表按 owner / 程序集兜底解绑。
+        //解绑共用一份静态 Harmony 实例。
         private static HarmonyLib.Harmony _unpatcher;
         private static void UnpatchPlugin(string guid) {
             Guard.Try("撤销外部插件补丁(UnpatchID): " + guid, () => HarmonyLib.Harmony.UnpatchID(guid));
@@ -100,19 +94,15 @@ public partial class SR {
         }
 
         private static void DisablePlugin(PluginEntry p) {
-            // BepInEx 把**所有**插件都 AddComponent 到同一个 "BepInEx_Manager" GameObject 上
-            //（Chainloader.Start：new GameObject -> AddComponent(每个插件类型)）。
-            //所以这里绝不能遍历 GetComponents<Behaviour>() 全关：那会把同物体上的其它插件（包括
-            //ConfigurationManager，按 HOME 打不开 GUI）一起关掉。只关这个插件自己这一个组件。
+            //所有插件同挂在一个 BepInEx_Manager 物体上，只能关本插件自身组件，不可遍历该物体的全部组件。
             if (p.instance != null) p.instance.enabled = false;
             UnpatchPlugin(p.guid);
         }
 
         private static void EnablePlugin(PluginEntry p) {
             if (p.instance != null) {
-                p.instance.enabled = true; //同理：只开它自己（全开会顺带把用户禁用的其它插件也打开）
-                //启用前先解绑干净（解绑是幂等的）：以前只依赖"禁用时解绑成功"，插件若用了别的 Harmony id
-                //或在 Awake 里自打补丁，禁用时清不掉 -> 这里不经解绑直接 PatchAll 就会把同一 patch 打第二份（双重执行）。
+                p.instance.enabled = true; //只开本插件自身组件
+                //先解绑再 PatchAll（解绑幂等），否则会重复打上未被清掉的补丁。
                 UnpatchPlugin(p.guid);
                 try {
                     new HarmonyLib.Harmony(p.guid).PatchAll(p.instance.GetType().Assembly);
@@ -120,18 +110,17 @@ public partial class SR {
             }
         }
 
-        //外部插件默认启用（deny-list）：只有用户手动禁用的插件 GUID 会记入列表并禁用。
+        //外部插件默认启用：配置项只记录用户手动禁用的 GUID。
         private static void SaveEnabledPlugins() {
             List<string> list = new List<string>();
             foreach (var kv in _extDisabled) {
                 if (kv.Value) list.Add(kv.Key);
             }
             _disabledPluginsEntry.Value = string.Join(";", list.ToArray());
-            MarkConfigDirty(_disabledPluginsEntry.ConfigFile); //交给 SR.FlushConfig 节流落盘，不在点击当帧写磁盘
+            MarkConfigDirty(_disabledPluginsEntry.ConfigFile); //交给 SR.FlushConfig 节流落盘
         }
 
-        //插件扫描后执行一次：默认启用所有外部 mod（各自由 BepInEx 独立加载、独立初始化）；
-        //用户手动禁用过的（持久化禁用列表内）保持禁用，重启后仍生效。
+        //插件扫描后执行一次：启用全部外部 mod，仅保持持久化禁用列表中记录的插件为禁用。
         private static void ApplyDisabledPlugins() {
             if (_appliedDisabled) return;
             _appliedDisabled = true;
@@ -157,7 +146,7 @@ public partial class SR {
             }
             if (changed) {
                 _disabledPluginsEntry.Value = string.Join(";", disabledSet);
-                MarkConfigDirty(_disabledPluginsEntry.ConfigFile); //清理失效 GUID 的结果同样交给节流落盘
+                MarkConfigDirty(_disabledPluginsEntry.ConfigFile);
             }
         }
 
@@ -166,7 +155,7 @@ public partial class SR {
             _extDisabled[p.guid] = disabled;
             if (disabled) DisablePlugin(p);
             else EnablePlugin(p);
-            SaveEnabledPlugins(); //启用/禁用都立即落盘，重启后保持本次状态
+            SaveEnabledPlugins(); //立即落盘
         }
 
         private static PluginEntry CurrentExternalPlugin() {
@@ -174,13 +163,12 @@ public partial class SR {
             return _externalPlugins.Count > 0 ? _externalPlugins[0] : null;
         }
 
-        //设置页顶部的插件清单：一行一个插件 = 启用/禁用按钮 + 名字（悬停显示 GUID）。
-        //原来这里只有一个 "Disabled Plugins" 原始字符串条目（分号分隔的 GUID），既不好看也不好点。
+        //设置页顶部的插件清单：每行 = 启用/禁用按钮 + 插件名（悬停显示 GUID）。
         private static void RenderPluginList() {
             try {
                 if (_externalPlugins.Count == 0) return;
                 GUILayout.Label(T("- 外部插件（运行时启用/禁用）-", "- External plugins (enable/disable at runtime) -"), _secHeader);
-                //按可用宽度自动换行（原来用 _label 不换行，窄窗口会被截断）
+                //按可用宽度自动换行
                 WrapLabel(T("禁用会立刻卸载该插件的 Harmony 补丁并停掉它，重启后保持；启用会重新应用补丁。",
                             "Disabling unpatches and stops the plugin immediately and persists after a restart; enabling re-applies its patches."));
                 GUILayout.Space(Sc(2));
@@ -195,7 +183,7 @@ public partial class SR {
                     GUILayout.Space(Sc(6));
                     Color prev = GUI.color;
                     try {
-                    if (dis) GUI.color = new Color(1f, 1f, 1f, 0.55f);   // **R412**：禁用标记 [x] -> *
+                    if (dis) GUI.color = new Color(1f, 1f, 1f, 0.55f);   //禁用项用半透明标记
                     GUILayout.Label(new GUIContent((dis ? "* " : "") + p.name, p.guid + "\n" + (dis ? T("已禁用", "disabled") : T("已启用", "enabled"))),
                         _labelClip, GUILayout.Width(w - Sc(70)), GUILayout.Height(Sc(24)));
                     } finally { GUI.color = prev; }

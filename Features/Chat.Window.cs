@@ -1,6 +1,5 @@
-﻿// 会话 · 对话窗口页。游戏内聊天窗口的增强：显示方式（按住 / 常驻）、关闭自动弹出、
-// 淡入淡出、缩放 / 字号 / 清晰度 / 位置。
-// 整个会话栏目的总览看同目录的 Chat.cs。
+﻿// 会话 · 对话窗口页：游戏内聊天窗口的增强 —— 显示方式（按住 / 常驻）、关闭自动弹出、
+// 淡入淡出、缩放 / 字号 / 清晰度 / 位置。栏目总览见 Chat.cs。
 
 using System;
 using System.Collections.Generic;
@@ -35,7 +34,7 @@ public partial class Chat : ITweak {
         private static ConfigEntry<bool> _defaultsV3;      //内部：字号默认值 0->18 迁移标记（不出现在页面上）
 
         private static bool _toggleOn;         //Toggle 模式下的常驻状态
-        private static bool _wasShowing;       //上一帧是不是我们在"按住显示"（松开后要把续的计时器清一次）
+        private static bool _wasShowing;       //上一帧是否由本模组在"按住显示"（松开后需清一次续期的计时器）
         private static bool _diagDone;
 
         private static int _origFontSize;
@@ -52,32 +51,24 @@ public partial class Chat : ITweak {
         private static bool _posHaveBase, _posApplied;
         private static float _posLastDx, _posLastDy;
 
-        // R396 N3：ChatCanvasGroup / ChatHolder / ChatMode 在游戏里都是 **public 字段**，
-        //  已改成直接访问、不再需要反射句柄（这三个字段是它们的遗留）。
-        //  只有 VisibilityTimer 是 protected，那个继续走反射。
+        // 仅 VisibilityTimer 是 protected，走 SR.RefField；ChatCanvasGroup / ChatHolder / ChatMode 均为 public 字段，直接访问。
         private static FieldInfo _fVisTimer;   //ChatDisplay.VisibilityTimer（可见计时器，游戏自己的淡入淡出用它）
 
-        //滚轮被本功能吃掉的帧号：转发 SR 的通用滚轮仲裁（见 SR.Input.cs 的 WheelFrame/MarkWheelUsed）。
-        //保留这个名字是因为它原来就在这里，外部引用点（曾用于自由相机让路）不用改。
+        // 滚轮被本功能吃掉的帧号，转发 SR 的通用滚轮仲裁（SR.Input 的 WheelFrame）。
         public static int WheelFrame { get { return SR.WheelFrame; } set { SR.WheelFrame = value; } }
-
-        // 分区：Chat Window
 
         internal static void InitWindow(IFeatureHost plugin) {
             SelfRegWindow(plugin);
-            //向核心注册"是否正在打字"接点：SR 的键位轮询（SR.KeyBinds.ComboKeyDown/Held）据此避让，
-            //核心不再编译期引用 ChatWindow。
-            //补丁注册已随类一起交给 SR 统一处理（见 Chat.Initialize）
+            // 向核心注册"是否正在打字"接点：SR 的键位轮询据此避让。
             SR.RegisterTypingProvider(() => ChatTyping);
         }
 
         private static void SelfRegWindow(IFeatureHost plugin) {
-            // **R396 N3**：下面三个已改直接访问，从反射自检清单里移除（否则启动会报"未登记的反射依赖"）。
-            //  ChatDisplay.VisibilityTimer 仍是 protected，保留登记。
+            // ChatCanvasGroup / ChatHolder / ChatMode 为 public 字段，已改为直接访问，不登记；仅 VisibilityTimer 保留登记。
             SR.RefOverride("ChatDisplay.VisibilityTimer", "聊天窗口（可见计时器：保持显示但不自己写 alpha，淡入淡出交给游戏）");
 
-            //与对话内容合并到会话栏目：本页是第 1 个子页（配置段仍是 Chat Window，界面显示在会话栏目下）
-            SR.NavHide(Sec); //不再单独成侧栏栏目
+            // 本页是会话栏目的第 1 个子页，配置段仍为 Chat Window。
+            SR.NavHide(Sec); // 本页不单独成侧栏栏目
             SR.RegisterPage("Chat", "ChatWindow", "对话窗口", "ChatWindows", 10, RenderPage);
             SR.LocEnum("Hold", "按住显示");
             SR.LocEnum("Toggle", "切换常驻");
@@ -121,8 +112,6 @@ public partial class Chat : ITweak {
             _key = plugin.Config.Bind(Sec, "Window Key", KeyCode.Z, "显示聊天窗口的按键（默认 Z）");
             _boxScale = plugin.Config.Bind(Sec, "Box Scale", 1f, new ConfigDescription(
                 "聊天框整体缩放（0.5 - 2，1 = 游戏原版）。", new AcceptableValueRange<float>(0.5f, 2f)));
-            // **Opt-49 文案纠错**：游戏自己的 ChatMessageFontSize 默认是 **20**（反编译 129034 `= 20`），
-            //  不是 18。原来这句话把 18 说成"游戏原版"，等于让用户以为调回原版要填 18（填了反而变小）。
             _fontSize = plugin.Config.Bind(Sec, "Font Size", 18, new ConfigDescription(
                 "聊天文字字号（1 - 50）。游戏自带的默认是 20，模组默认 18；填什么值我们就按什么值改，"
                 + "现存消息也会一起改。", new AcceptableValueRange<int>(1, 50)));
@@ -138,8 +127,7 @@ public partial class Chat : ITweak {
             //合并到同一行的条目
             _mode = plugin.Config.Bind(Sec, "Window Mode", WinMode.Hold, "按住显示 / 切换常驻。");
             _boxScaleKey = plugin.Config.Bind(Sec, "Box Scale Key", KeyCode.X, "按住 + 滚轮 = 调缩放（默认 X）");
-            //一次性默认值迁移：老版本这两项默认是 Alt / Ctrl。只把"仍是旧默认值"的配置改成新默认（Z / X），
-            //之后用户自己再改成 Alt/Ctrl 也不会被覆盖（开关只生效一次）。
+            // 一次性默认值迁移：只改仍是旧默认值（Alt / Ctrl）的配置，开关仅生效一次。
             _keyDefaultsV2 = plugin.Config.Bind(Sec, "Key Defaults v2", false, "内部：快捷键默认值已迁移（显示窗口 Z / 缩放键 X）");
             if (!_keyDefaultsV2.Value) {
                 try {
@@ -148,8 +136,7 @@ public partial class Chat : ITweak {
                     _keyDefaultsV2.Value = true;
                 } catch (Exception __ex) { SR.Guard.Log("聊天窗口快捷键默认值迁移", __ex); }
             }
-            //一次性默认值迁移 v3：字号默认值 0（=原版不动字号）-> 18（=游戏原版字号），范围也改成 1 - 50，
-            //老配置里的 0 会被范围夹成 1（字变得很小），所以必须在这里改成 18。
+            // 一次性默认值迁移：字号范围改为 1 - 50 后，老配置的 0 会被夹成 1，需改成 18。
             _defaultsV3 = plugin.Config.Bind(Sec, "Defaults v3", false, "内部：字号默认值已迁移到 18");
             if (!_defaultsV3.Value) {
                 try {
@@ -163,7 +150,7 @@ public partial class Chat : ITweak {
             SR.RegisterKey("聊天窗口-字号键", _fontKey, "hold");
         }
 
-        //自绘页：在可见的启用位置调整行前加小分区标题（注意：不能拿被隐藏的行当锚点，否则标题永远不显示）
+        // 自绘页：在"启用位置调整"行前插入分区标题；锚点行必须在可见行上，否则标题永不显示。
         private static void RenderPage() {
             float col = Mathf.Max(SR.Ctl.Sc(180), SR.Ctl.WinWidth - SR.Ctl.SidebarWidth() - SR.Ctl.Sc(240));
             List<ConfigEntryBase> entries = SR.Ctl.SectionEntries(Sec);
@@ -180,8 +167,7 @@ public partial class Chat : ITweak {
         private static bool RowVisibleFilter(ConfigEntryBase e) {
             if (e.Definition.Section != Sec) return true;
             string k = e.Definition.Key;
-            //隐藏：两个"合并到别的行"的同伴控件 + 两个内部迁移标记
-            //（启用字号现在单独成行，所以不再隐藏）
+            // 隐藏两个"合并到别的行"的同伴控件与两个内部迁移标记。
             return k != "Window Mode" && k != "Box Scale Key" && k != "Font Key"
                 && k != "Key Defaults v2" && k != "Defaults v3";
         }
@@ -206,7 +192,7 @@ public partial class Chat : ITweak {
             return e.Definition.Section == Sec && e.Definition.Key == "Font Size";
         }
 
-        //位置 X/Y 也画成滑块，范围取当前分辨率：X = 0 - 屏宽，Y = -屏高 - 0（0 = 游戏默认位置）
+        // 位置 X/Y 画成滑块，范围取当前分辨率，0 = 游戏默认位置。
         private static bool PosSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
             min = 0f; max = 0f; fmt = "0";
             if (e.Definition.Section != Sec) return false;
@@ -216,12 +202,7 @@ public partial class Chat : ITweak {
             return false;
         }
 
-        // R396 N3：这三个成员在游戏里**都是 public 字段**（反编译 83966 ChatHolder /
-        //  83968 ChatCanvasGroup / 83982 ChatMode），原来却统一走 SR.RefField + FieldInfo.GetValue，
-        //  而这三个访问点在 ChatDisplay.Update 后缀上**每帧执行**（Chat Window 默认开启 = 常驻开销），
-        //  其中 bool / float 还要各装箱一次。
-        //  只有 VisibilityTimer（83980）是 protected，那个继续走反射。
-        //  -> 直接访问，去掉每帧的 GetValue + 装箱。
+        // 三个游戏成员均为 public 字段，直接访问，省去每帧的反射取值与装箱；VisibilityTimer 为 protected，仍走 SR.RefField。
         private static CanvasGroup GroupOf(ChatDisplay d) {
             try { return d != null ? d.ChatCanvasGroup : null; } catch { return null; }
         }
@@ -234,7 +215,7 @@ public partial class Chat : ITweak {
             try { return d != null && d.ChatMode; } catch { return false; }
         }
 
-        //游戏自己的淡入淡出速度（GameSettings.ChatMessagingFadeSpeed，默认 0.8/秒；淡入是它的 10 倍）
+        // 游戏自己的淡入淡出速度（GameSettings.ChatMessagingFadeSpeed，默认 0.8/秒，淡入为其 10 倍）。
         private static float FadeSpeed() {
             try {
                 GameSettings gs = GameSettings.GetInstance();
@@ -243,9 +224,8 @@ public partial class Chat : ITweak {
             return 0.8f;
         }
 
-        //游戏自己的聊天输入框正在输入中吗（ChatDisplay.ChatMode）-> 打字期间屏蔽所有快捷键。
-        //给 SR 自己的键轮询（SR.ComboKeyDown/ComboKeyHeld）与外部模块用；缓存 ChatDisplay 实例，避免每帧 FindObjectOfType。
-        //ChatMode 是私有字段、只能反射读 -> 结果按帧缓存（每帧十几次调用会重复读同一个字段）。
+        // 游戏聊天输入框是否正在输入（ChatDisplay.ChatMode）：打字期间屏蔽所有快捷键，供 SR 键位轮询与外部模块使用。
+        // 结果按帧缓存，并缓存 ChatDisplay 实例，避免每帧 FindObjectOfType 与重复反射读取。
         private static ChatDisplay _typingProbe;
         private static bool _chatTypingCache;
         private static int _chatTypingFrame = -1;
@@ -261,8 +241,7 @@ public partial class Chat : ITweak {
             }
         }
 
-        //可见计时器续期：游戏 Update 里 VisibilityTimer>0 才会朝 alpha=1 淡入（速度 ChatMessagingFadeSpeed10），
-        //并且每帧自减；我们只要在"该显示"时把它抬到一个很小的正数，淡入/淡出就完全由游戏自己的动画负责。
+        // 可见计时器续期：游戏在 VisibilityTimer>0 时朝 alpha=1 淡入并每帧自减；这里只在"该显示"时把它抬到一个很小的正数，淡入淡出交给游戏动画。
         private static void BumpVisibility(ChatDisplay d) {
             try {
                 if (_fVisTimer == null) _fVisTimer = SR.RefField(typeof(ChatDisplay), "VisibilityTimer", "聊天窗口（可见计时器）");
@@ -273,7 +252,7 @@ public partial class Chat : ITweak {
             } catch (Exception __ex) { SR.Guard.Log("聊天窗口可见计时器续期", __ex); }
         }
 
-        //清零：让游戏按自己的速度淡出（而不是我们直接把 alpha 写成 0）
+        // 清零：让游戏按自己的速度淡出，而不是直接写 alpha = 0。
         private static void ZeroVisibility(ChatDisplay d) {
             try {
                 if (_fVisTimer == null) _fVisTimer = SR.RefField(typeof(ChatDisplay), "VisibilityTimer", "聊天窗口（可见计时器）");
@@ -292,8 +271,7 @@ public partial class Chat : ITweak {
                 CanvasGroup cg = GroupOf(__instance);
                 RectTransform holder = HolderOf(__instance);
                 if (cg == null) return;
-                //总开关关掉：把我们改过的东西**还原一次**（游戏字号 / 文字尺寸 / 缩放 / 像素对齐 / 位置偏移），
-                //然后彻底不再插手, 这样"关掉 = 原版"才是真的（旧写法只是停止写入，字号/缩放会一直留到重启）。
+                // 总开关关闭：把改动过的游戏字号 / 文字尺寸 / 缩放 / 像素对齐 / 位置偏移一次性还原，之后不再介入。
                 if (!EnabledOn) {
                     if (_touched) RestoreVanilla(__instance, holder, cg);
                     return;
@@ -312,34 +290,28 @@ public partial class Chat : ITweak {
                 bool typing = ChatInputActive(__instance);
                 bool wantShow = force || typing;
                 if (_noFade != null && _noFade.Value) {
-                    //关闭淡入淡出开着：直接写 alpha（瞬切）
+                    // 关闭淡入淡出开启：直接写 alpha 瞬切。
                     cg.alpha = wantShow ? 1f : 0f;
                     cg.interactable = wantShow; cg.blocksRaycasts = wantShow;
                 } else if (wantShow) {
-                    //没开关闭淡入淡出：按**游戏自己的速度**淡入（fadeSpeed*10），并且持续把 alpha 推向 1。
-                    //注意：不能只靠游戏的 VisibilityTimer, 游戏只有在"窗口里有消息 或 输入框开着"时才朝向 1，
-                    //消息清空后按住显示键就完全不动（这就是"按住显示在 No Fade 关着时无效"的原因）。
+                    // 未关闭淡入淡出：按游戏速度（fadeSpeed*10）把 alpha 持续推向 1；游戏只在有消息或输入框打开时才朝向 1，故须同时续期可见计时器。
                     if (!cg.interactable) { cg.interactable = true; cg.blocksRaycasts = true; }
-                    BumpVisibility(__instance); //同时让游戏也认为"该显示"（有消息时它会一起朝 1 淡入）
+                    BumpVisibility(__instance); // 同时让游戏也认为"该显示"
                     cg.alpha = Mathf.MoveTowards(cg.alpha, 1f, FadeSpeed() * 10f * Time.unscaledDeltaTime);
                     _wasShowing = true;
                 } else if (_noAutoShow != null && _noAutoShow.Value) {
-                    //关闭自动弹出开着且当前不该显示：自己按游戏速度淡出（不硬切），并把计时器清零让新消息也弹不出来
+                    // 关闭自动弹出开启且当前不该显示：按游戏速度淡出，并清零计时器使新消息也弹不出。
                     if (cg.interactable) { cg.interactable = false; cg.blocksRaycasts = false; }
                     ZeroVisibility(__instance);
                     cg.alpha = Mathf.MoveTowards(cg.alpha, 0f, FadeSpeed() * Time.unscaledDeltaTime);
                     _wasShowing = false;
                 } else {
-                    //其余情况：交给游戏自己。若上一帧是我们在"按住显示"，把续的计时器清零一次，
-                    //让游戏立刻开始按自己的速度淡出（而不是因为我们续过 0.15 秒而多显示一会儿）。
+                    // 其余情况交给游戏：若上一帧由本模组在"按住显示"，清一次续期的计时器，让游戏立刻开始淡出。
                     if (_wasShowing) { _wasShowing = false; ZeroVisibility(__instance); }
                 }
 
-                //2) 滚轮：字号键 调字号 / 缩放键 调缩放（按住调节键即生效，不要求窗口当时可见）
-                // **G6 修复**：改取 SR.TakeWheelEvent()。原来读 Input.GetAxis("Mouse ScrollWheel")
-                // 该值在本环境恒为 0（_IMGUI_LESSONS.md 八.2 已定论）-> 下面 Mathf.Abs(wheel) > 0.0001f
-                //  恒为假，字号/缩放的滚轮快捷键从未生效（同页滑块仍可用，所以只是"没坏"）。
-                //  TakeWheelEvent 由每帧总执行的 ManagerUI.OnGUI 从事件 delta 记录。
+                // 2) 滚轮：字号键调字号 / 缩放键调缩放（按住调节键即生效，不要求窗口当时可见）。
+                // 滚轮量取 SR.TakeWheelEvent()：Input.GetAxis("Mouse ScrollWheel") 在本环境恒为 0。
                 float wheel = SR.TakeWheelEvent();
                 if (Mathf.Abs(wheel) > 0.0001f) {
                     bool scaleKey = _boxScaleKey != null && _boxScaleKey.Value != KeyCode.None && SR.ComboKeyHeld(_boxScaleKey);
@@ -369,21 +341,9 @@ public partial class Chat : ITweak {
             } catch (Exception __ex) { SR.Guard.Log("聊天窗口增强", __ex); }
         }
 
-        //字号：写游戏自己的 GameSettings.ChatMessageFontSize, 游戏新建消息时会用它设头像尺寸
-        //（ChatUnit.SetChatUnitMessage: sizeDelta = 字号2），所以新消息的头像会跟着字号变大（这是游戏自己的规则）。
-        //我们额外逐条改的是消息文字：正文 chatText、冒号 colonText、玩家名字（UGCNameTag.usernameText）；
-        //现存头像一概不碰。注意绝不能遍历 holder 下所有 Text：游戏自己的聊天输入框（ChatInputField 挂在
-        //ChatHolder 下）也带 Text，字号一大它那点固定高度就放不下，表现为"输入框里的字消失"。
-        // **Opt-49（正确性 + 性能，真机诊断查出的根因）**：消息列表改为**直接读游戏自己的**
-        //  `ChatDisplay.currentMessages`，不再靠"层级扫描 + 指纹缓存"。
-        //  原来那套指纹是 `childCount + 最后一个子物体上挂的 ChatUnit`，但游戏在 DisplayNewMessage 里
-        //  **每次都执行 `currentChatInputField.transform.SetAsLastSibling()`**（反编译 84113）——
-        //  于是**输入框永远是 holder 的最后一个子物体**，它身上没有 ChatUnit -> `lastUnit` 恒为 null ->
-        //  指纹条件 `(_unitCache.Length > 0 && !ReferenceEquals(末位, lastUnit))` **恒为真** ->
-        //  每一帧都重建缓存（正是那段注释要避免的"每帧数组分配 + 递归遍历子树"），
-        //  而"末位 ChatUnit"这个判断等于从来没生效过。
-        //  `currentMessages` 由游戏自己维护（加消息时 Add；超过 maxVisibleMessages 时**先 Remove 再 Destroy**），
-        //  永远等于"当前真实存在的消息" -> 不需要缓存、不会失效、不分配。
+        // 字号：写入游戏自己的 GameSettings.ChatMessageFontSize（游戏新建消息时按它算头像尺寸）。
+        // 额外逐条改消息文字与玩家名字；不可遍历 holder 下的全部 Text —— 聊天输入框也带 Text，会因固定高度放不下而看不见字。
+        // 消息列表直接读游戏自己的 ChatDisplay.currentMessages：由游戏维护，恒等于当前真实存在的消息，无需缓存也不分配。
         private static void ApplyFont(ChatDisplay inst, RectTransform holder) {
             int want = _fontSize != null ? _fontSize.Value : 0;
             try {
@@ -402,17 +362,14 @@ public partial class Chat : ITweak {
             } catch (Exception __ex) { SR.Guard.Log("聊天窗口字号", __ex); }
         }
 
-        // 对**一条消息**应用字号（want = 0 表示还原成游戏原字号），并让头像尺寸一起跟随。
+        // 对一条消息应用字号（want = 0 表示还原游戏原字号），头像尺寸一并跟随。
         private static void ApplyUnitFont(ChatUnit u, int want) {
             if (u == null) return;
             ApplyTextSize(u.chatText, want);
             ApplyTextSize(u.colonText, want);
             if (u.nameTag != null) ApplyTextSize(u.nameTag.usernameText, want); //名字也跟着字号
             try {
-                // **Opt-49**：头像尺寸是游戏**按字号算的方形**（SetChatUnitMessage: sizeDelta = 字号*2，反编译 84492），
-                //  但它只在"建消息"那一次算。现存消息若不动头像，就会出现"文字变大了、头像和行高还是旧尺寸"
-                //  -> 文字被行高裁掉（Text 默认 verticalOverflow=Truncate），看起来正是"字号调整没生效"。
-                //  所以这里跟着一起改；want=0 时还原成游戏原字号那一档。
+                // 头像尺寸是游戏按字号*2 算出的方形，且只在建消息时算一次；现存消息不同步改会导致文字被行高裁掉。
                 int px = want > 0 ? want : _origGameFontSize;
                 if (px > 0 && u.chatPortrait != null) {
                     Vector2 sz = new Vector2(px * 2f, px * 2f);
@@ -422,7 +379,7 @@ public partial class Chat : ITweak {
             } catch (Exception __ex) { SR.Guard.Log("聊天窗口头像尺寸", __ex); }
         }
 
-        //单段消息文字：want > 0 用配置字号（同时关掉 best-fit），want = 0 还原游戏原字号/best-fit
+        // 单段消息文字：want > 0 用配置字号并关闭 best-fit，want = 0 还原游戏原字号与 best-fit。
         private static void ApplyTextSize(Text t, int want) {
             try {
                 if (t == null) return;
@@ -432,18 +389,15 @@ public partial class Chat : ITweak {
                     if (t.fontSize != want) t.fontSize = want;
                 } else if (_origFontSize > 0) {
                     if (t.resizeTextForBestFit != _origBestFit) t.resizeTextForBestFit = _origBestFit;
-                    //还原要用"游戏真正的原字号"：_origFontSize 是本方法第一次见到的字号，而那时
-                    //gs.ChatMessageFontSize 已被我们改成 want，抓到的可能是 18 而不是原版 20。
+                    // 还原须用游戏真正的原字号：_origFontSize 抓到的可能已是配置值而非原值。
                     int restore = _origGameFontSize > 0 ? _origGameFontSize : _origFontSize;
                     if (t.fontSize != restore) t.fontSize = restore;
                 }
             } catch (Exception __ex) { SR.Guard.Log("聊天窗口文字尺寸", __ex); }
         }
 
-        //清晰度：pixelPerfect（+ 有 CanvasScaler 时才写 dynamicPixelsPerUnit）；系数变化时重建字库
-        // **R396 N5**：Canvas 查找缓存。ApplyClarity 每帧被调（挂在 ChatDisplay.Update 后缀），
-        //  而 GetComponentInParent<Canvas>() 是**无缓存的层级遍历**，发生在常驻路径上。
-        //  holder 变了才重查（与 _fontHolderId 同样的失效机制）。
+        // 清晰度：写 canvas.pixelPerfect；系数变化时让全部文字 SetAllDirty 重建字库。
+        // Canvas 查找按 holder 缓存：本方法每帧执行，GetComponentInParent 是无缓存的层级遍历。
         private static Canvas _canvasCached;
         private static int _canvasHolderId = -1;
         private static Canvas CanvasOf(RectTransform holder) {
@@ -458,12 +412,10 @@ public partial class Chat : ITweak {
             try {
                 Canvas canvas = CanvasOf(holder);
                 if (canvas == null) return;
-                if (!_havePp) { _origPp = canvas.pixelPerfect; _havePp = true; } //先记原值，再改
+                if (!_havePp) { _origPp = canvas.pixelPerfect; _havePp = true; }
                 if (_crisp != null && canvas.pixelPerfect != _crisp.Value) canvas.pixelPerfect = _crisp.Value;
-                //注：本游戏这块画布挂的是自定义 SafeAreaScaler（没有 CanvasScaler），
-                //所以只做能生效的两件事：pixelPerfect（像素对齐）+ 字号取整（见 ApplyFont）。
-                //变化检测：v 必须跟着开关走。原来写成常量 1f，首次执行后 _lastClarity 就恒等于 1，
-                //此后条件永远为假 -> 切换启用清晰度不会再重建字库（与这行原本的注释描述不符）。
+                // 本游戏该画布挂的是自定义 SafeAreaScaler（无 CanvasScaler），故只做 pixelPerfect 与字号取整两件能生效的事。
+                // 变化检测值必须跟随开关，否则切换清晰度不会再重建字库。
                 float v = (_crisp != null && _crisp.Value) ? 1f : 0f;
                 if (Mathf.Abs(_lastClarity - v) > 0.001f) {
                     _lastClarity = v;
@@ -473,8 +425,7 @@ public partial class Chat : ITweak {
             } catch (Exception __ex) { SR.Guard.Log("聊天窗口清晰度", __ex); }
         }
 
-        //总开关关掉时的一次性还原：游戏字号 / 每段文字的字号与 bestFit / 聊天框缩放 / 画布 pixelPerfect /
-        //我们施加过的位置偏移，全部交回游戏原值，然后不再插手（对应启用增强的说明）。
+        // 总开关关闭时的一次性还原：游戏字号 / 每段文字的字号与 bestFit / 缩放 / pixelPerfect / 位置偏移全部交回游戏原值。
         private static void RestoreVanilla(ChatDisplay inst, RectTransform holder, CanvasGroup cg) {
             try {
                 GameSettings gs = GameSettings.GetInstance();
@@ -483,7 +434,7 @@ public partial class Chat : ITweak {
                 if (holder != null) {
                     if (Mathf.Abs(holder.localScale.x - 1f) > 0.0001f) holder.localScale = Vector3.one;
                     if (_origFontSize > 0) {
-                        //同样只还原消息文字（输入框不归我们管）；名字与头像一起还原（见 ApplyUnitFont）
+                        // 只还原消息文字，输入框不归本模组管；名字与头像一并还原。
                         List<ChatUnit> msgs = inst != null ? inst.currentMessages : null;
                         if (msgs != null) for (int i = 0; i < msgs.Count; i++) ApplyUnitFont(msgs[i], 0);
                     }
@@ -493,15 +444,13 @@ public partial class Chat : ITweak {
                 RectTransform node = cg != null ? cg.transform as RectTransform : null;
                 if (node != null && _posApplied)
                     node.anchoredPosition = node.anchoredPosition - new Vector2(_posLastDx, _posLastDy);
-                _lastClarity = -1f; //下次再打开时重建一次字库
+                _lastClarity = -1f; // 下次打开时重建字库
             } catch (Exception __ex) { SR.Guard.Log("聊天窗口还原原版", __ex); }
             _posApplied = false; _posHaveBase = false;
             _touched = false;
         }
 
-        //位置：**只在总开关打开时**才动锚点位置，而且以"当前实际位置"反推基准（游戏自己移动会被跟随，不会打架）。
-        //关掉开关时，只把我们的偏移减掉一次，然后完全不再碰位置, 之前写成"每帧还原到最初位置"，
-        //遇到游戏自己会换位置的场景（不同大厅/树屋/分辨率变化）就会错位。
+        // 位置：仅在总开关打开时动锚点，以"当前实际位置"反推基准，游戏自身的移动会被跟随；开关关闭时只减去一次本模组的偏移。
         private static void ApplyPosition(CanvasGroup cg) {
             try {
                 RectTransform node = cg != null ? cg.transform as RectTransform : null;
@@ -510,7 +459,7 @@ public partial class Chat : ITweak {
                 float dx = on && _posX != null ? _posX.Value : 0f;
                 float dy = on && _posY != null ? _posY.Value : 0f;
                 if (!on) {
-                    if (_posApplied) { //撤掉我们最后一次施加的偏移，之后不再干预
+                    if (_posApplied) { // 撤掉最后一次施加的偏移
                         try { node.anchoredPosition = node.anchoredPosition - new Vector2(_posLastDx, _posLastDy); } catch { }
                         _posApplied = false; _posHaveBase = false;
                     }
@@ -519,7 +468,7 @@ public partial class Chat : ITweak {
                 Vector2 cur = node.anchoredPosition;
                 Vector2 want = cur;
                 if (!_posHaveBase) { _posBase = cur; _posHaveBase = true; }
-                else if ((cur - _posLast).sqrMagnitude > 0.25f) { _posBase = cur - new Vector2(_posLastDx, _posLastDy); } //游戏自己动了 -> 反推基准
+                else if ((cur - _posLast).sqrMagnitude > 0.25f) { _posBase = cur - new Vector2(_posLastDx, _posLastDy); } // 游戏自己移动了，反推基准
                 want = _posBase + new Vector2(dx, dy);
                 if ((cur - want).sqrMagnitude > 0.0001f) node.anchoredPosition = want;
                 _posLast = node.anchoredPosition;
@@ -528,11 +477,7 @@ public partial class Chat : ITweak {
             } catch (Exception __ex) { SR.Guard.Log("聊天窗口位置", __ex); }
         }
 
-        // **Opt-49**：诊断升级。旧版只打印"子树里第一个 Text"（那多半是**输入框**的字，
-        //  它的字号由游戏自己写、不归我们管），所以看到 `size=18` 也无法判断聊天文字到底改没改。
-        //  现在打印**真实消息**（currentMessages[0]）上我们管的三个文字 + 头像尺寸 + 配置值/游戏值，
-        //  并且"第一次有消息"和"每次字号变化"各记一条（最多 6 条）——
-        //  改一次字号，下一行日志就能看出有没有落到文字上。
+        // 诊断：打印当前消息（currentMessages[0]）上受管的文字与头像尺寸及配置值/游戏值；"首次有消息"与"每次字号变化"各记一条，最多 6 条。
         private static int _lastDiagWant = int.MinValue;
         private static int _diagCount;
         private static void DiagOnce(ChatDisplay inst, RectTransform holder, CanvasGroup cg) {

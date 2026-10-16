@@ -1,6 +1,4 @@
-﻿// 控件与页面能力门面。管理器里的通用控件（按键录制、右键绑键、开关、滑块、下拉）、首页，
-// 给功能页用的能力门面 Ctl、通用条目行扩展点 RowHooks，
-// 以及固定表头表格 TableArgs -> TableDraw（列宽拖拽 / 换序 / 隐藏 / 点击回调 / 滚轮）。
+﻿// 控件与页面能力门面：管理器通用控件（按键录制/右键绑键/开关/滑块/下拉）、首页、Ctl 门面、行页扩展点 RowHooks、表格控件 TableArgs -> TableDraw。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -11,27 +9,22 @@ using BepInEx.Bootstrap;
 namespace SR_UCH.Tweaks {
 public partial class SR {
 // 分区：Ctl（功能页能力门面 + 管理器通用控件 + 首页 + 行/页扩展点）
-// 本文件三部分：SR.Ctl（**只转发不放逻辑**，供功能页/外部模块调用）、通用控件与首页、行/页扩展点注册表。
-// Ctl 是功能页与外部模块的规范入口 —— 全仓大量调用点走 SR.Ctl 这层门面，而 SR 上的同名成员是核心内部实现。所以：
-//   功能页/外部模块走 SR.Ctl，核心内部（SR 各分部文件）直接调 SR；给功能页加新能力时在 Ctl 里补一个纯转发成员。
-// **历史教训**：曾把 facade 成员误插进 Ctl 本体，造成 GroupBegin 无限递归，而且编译器不报错。
-//   所以新逻辑一律写在 SR，Ctl 只加转发。
+// Ctl 只转发不放逻辑：功能页与外部模块走 SR.Ctl，核心内部（SR 各分部文件）直接调 SR；新能力在 Ctl 里补纯转发成员。
 
     public static class Ctl {
 
-        // UI 缩放系数（各页的像素尺寸都乘它）
+        // UI 缩放系数（各页像素尺寸都乘它）
         public static float Sc(float v) { return SR.Sc(v); }
 
-        // 通用条目控件
         // 条目标签（可点击恢复默认值；tooltip = 说明 + 默认值 + 提示）
         public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey = null) { SR.RestoreLabel(content, entry, w, h, hotkey); }
         public static void RenderControl(ConfigEntryBase entry) { SR.RenderControl(entry); }
         public static void RenderEntryRow(ConfigEntryBase entry, bool isInternal, float colWidth) { SR.RenderEntryRow(entry, isInternal, colWidth); }
         public static ConfigEntryBase FindEntry(string section, string key) { return SR.FindInternalEntry(section, key); }
         public static IEnumerable<ConfigEntryBase> AllEntries(ConfigFile config) { return SR.AllEntries(config); }
-        // 某 section 的可见条目（功能自绘页拼装通用条目行时用；已应用功能注册的行可见性）
+        // 某 section 的可见条目（已应用功能注册的行可见性过滤）。
         public static List<ConfigEntryBase> SectionEntries(string section) { return SR.SectionEntries(section); }
-        // 条目行（功能自绘页用）与名称列宽
+        // 条目行与名称列宽
         public static void DrawEntryRow(ConfigEntryBase entry, float colWidth) { SR.RenderEntryRow(entry, true, colWidth); }
         public static float EntryNameWidth() { return SR.EntryNameWidth(); }
         public static float TextHeight(string text, float width) { return SR.TextHeight(text, width); }
@@ -46,7 +39,7 @@ public partial class SR {
 
         // 按键按钮（含右键绑键 / 组合键录制）
         public static string RecText() { return SR.RecText(); }
-        // **全局泄漏修复**：把"原始字体"暴露给窗口恢复用（原字体由 SR.Styles 在第一次改皮肤前记录）
+        // 原始皮肤字体（由 SR.Styles 在首次改皮肤前记录），供窗口恢复用。
         public static Font OrigSkinFont() { return SR.OrigSkinFontValue; }
         public static string KeySuffix(ConfigEntry<KeyCode> e) { return SR.KeySuffix(e); }
         public static void RegisterRowHotkey(ConfigEntry<KeyCode> entry) { SR.RegisterRowHotkey(entry); }
@@ -78,11 +71,11 @@ public partial class SR {
         public static GUIStyle SelItem { get { return _selItem; } }
         public static GUIStyle Btn { get { return _btn; } }
         public static GUIStyle BtnClip { get { return _btnClip; } }
-        //表格列偏好（列顺序 + 隐藏列）的统一持久化组件：三处表格共用，格式 "o=0,1,2;h=1,3"
+        // 表格列偏好的统一持久化组件（三处表格共用）：格式 "o=0,1,2;h=1,3;w=..."
         public class TablePrefs {
             private readonly BepInEx.Configuration.ConfigEntry<string> _entry;
             private readonly int _count;
-            private long _sig; //上次落盘的签名（用于 SaveIfDirty，避免每帧写盘；R411 起为 64 位哈希）
+            private long _sig; // 上次落盘的签名（SaveIfDirty 用，避免每帧写盘）
             public int[] Order;
             public readonly System.Collections.Generic.HashSet<int> Hidden = new System.Collections.Generic.HashSet<int>();
             private float[] _savedW;   //配置里读到的列宽（下标->像素）
@@ -101,7 +94,7 @@ public partial class SR {
             public void Load() {
                 try {
                     if (_entry == null || string.IsNullOrEmpty(_entry.Value)) return;
-                    //旧格式（老版本只存纯列顺序，如 "0,1,2,3,4,5"，没有 o=/h= 前缀）：当成列顺序读，避免升级后自定义列序被丢
+                    // 旧格式（只存纯列顺序、无 o=/h= 前缀）按列顺序读。
                     if (_entry.Value.IndexOf('=') < 0) {
                         List<int> legacy = new List<int>();
                         foreach (string raw in _entry.Value.Split(',')) {
@@ -141,7 +134,7 @@ public partial class SR {
                             }
                         }
                     }
-                    // **R411**：配置里读到"全部隐藏"时一次性修掉（至少留一列）。
+                    // 读到“全部隐藏”时一次性修掉（至少留一列）。
                     if (Hidden.Count >= _count) {
                         List<int> __hs = new List<int>(Hidden);
                         Hidden.Clear();
@@ -150,13 +143,10 @@ public partial class SR {
                 } catch (Exception __ex) { Guard.Log("表格列偏好读取", __ex); }
             }
 
-            //把配置里存的列宽套到调用方的列宽数组上（页面先把默认值填好，再调这里覆盖）
-            // 只套用**一次**：页面每帧渲染（IMGUI 一帧 Layout+Repaint 至少两趟），若每帧都套用，
-            //  用户拖动改过的列宽会在下一趟被 _savedW（落盘前还是旧值）覆盖回去 -> 列宽拖动永远存不下来。
-            //  （ResetAll 走 _defaults 直接写回，不依赖这里；想重新套用可置 Rebind() 后的新实例。）
+            // 把配置里存的列宽套到调用方的列宽数组上（页面先填默认值，再调这里覆盖）；只套用一次。
             public void BindWidths(float[] colW) {
                 if (colW == null) return;
-                //首次绑定前页面刚填好默认值 -> 留一份作"还原全部"的基准
+                // 首次绑定前页面刚填好默认值，留一份作“还原全部”的基准。
                 if (_defaults == null || _defaults.Length != colW.Length) _defaults = (float[])colW.Clone();
                 _widths = colW;
                 if (_applied || _savedW == null) return;
@@ -164,8 +154,7 @@ public partial class SR {
                 _applied = true;
             }
 
-            // **R411**：64 位 FNV 折叠（零分配）。原来每帧建 StringBuilder + ToString 只为和上一帧比一比
-            //  （EX 表在 Repaint 每帧调一次 SaveIfDirty）。哈希碰撞的后果只是"这一帧没落盘"，可接受。
+            // 64 位 FNV 折叠签名（零分配），供 SaveIfDirty 判脏。
             private long Sig() {
                 unchecked {
                     ulong h = 1469598103934665603UL;
@@ -188,7 +177,7 @@ public partial class SR {
                     sb.Append(";h=");
                     bool first = true;
                     foreach (int h in Hidden) { if (!first) sb.Append(','); first = false; sb.Append(h); }
-                    //列宽（像素，整数；页面每次都会用默认值初始化，所以整份写出即可）
+                    // 列宽（像素，整数；页面每次都用默认值初始化，整份写出即可）
                     if (_widths != null && _widths.Length > 0) {
                         sb.Append(";w=");
                         for (int i = 0; i < _widths.Length; i++) {
@@ -197,9 +186,7 @@ public partial class SR {
                         }
                     }
                     _entry.Value = sb.ToString();
-                    // **回写 _savedW**：页面每帧先用默认值填好列宽数组，再靠 BindWidths 用 _savedW 覆盖。
-                    //  这里不同步的话，下一帧列宽会被"上一次读到的旧值"覆盖回去（表现为拖完一松手就弹回），
-                    //  且 Sig() 随之变回旧值 -> 下一帧又判定"脏了"再写一次 -> 每帧写盘、值在两数间反复横跳。
+                    // 回写 _savedW：与 _widths 同步，否则下一帧会用旧值覆盖回去并反复判脏写盘。
                     if (_widths != null && _widths.Length > 0) {
                         if (_savedW == null || _savedW.Length != _widths.Length) _savedW = new float[_widths.Length];
                         for (int i = 0; i < _widths.Length; i++) _savedW[i] = _widths[i];
@@ -222,10 +209,7 @@ public partial class SR {
                 } catch (Exception __ex) { Guard.Log("表格列偏好还原", __ex); }
             }
 
-            //每帧调用：顺序/隐藏列被用户改动（如右键隐藏）时才落盘
-            // **R411**："至少留一列"的兜底从这里挪到 Load()（配置读到全隐藏时一次性修）。
-            //  原来每帧这里都要 new 一份 List 只为删掉一个元素，而真正挡住"全隐藏"的是
-            //  TableDraw 加隐藏列前的判据，两处并存语义还不一样强 -> 只留一处。
+            // 每帧调用：顺序/隐藏列被改动时才落盘。
             public void SaveIfDirty() {
                 if (Sig() != _sig) Save();
             }
@@ -240,27 +224,23 @@ public partial class SR {
         //滚到底（新消息到达时用；不要拿属性返回值去改 y，那是副本，改了不生效）
         public static void ScrollToBottom() { _scroll.y = float.MaxValue; }
         public static ConfigFile InternalConfig { get { return _internalConfig; } }
-        //界面是否英文系= 内置英文 **或** 外部语言包声明回退英文（外部模块页强制中文时仍为 false）。
-        //不能写 _langEn：装了语言包时它恒为 false，但 FallbackId="English" 的语言包下未收录词条
-        //应回退英文, 与 T() / ZhKey / EnumNameZh 等出口保持一致（统一走 UseEn）。
+        // 界面是否英文系 = 内置英文或语言包声明回退英文（外部模块页强制中文时为 false）。
         public static bool LangEn { get { return UseEn; } }
         // 外部模块页豁免：渲染期间置 true（该页始终中文）
         public static bool ForceZh { get { return _forceZh; } set { _forceZh = value; } }
-        // **R416**：滑块提交改为「值变了就写」（ImGui 的 v_last 模式）。
-        // 外部模块用滑块时：拿到 DrawSlider 的返回值，变了就调本方法（或直接 SetValue）。
-        // 旧的 SliderCommitWasMine / SliderCommitted 跨帧布尔接口已删除（R413-R415 三轮都因它失效）。
+        // 滑块提交为“值变了就写”（ImGui 的 v_last 模式）：取 DrawSlider 返回值，变了就调本方法或 SetValue。
         public static Dictionary<ConfigEntryBase, bool> EditOpen { get { return _editOpen; } }
         public static Dictionary<ConfigEntryBase, string> EditText { get { return _editText; } }
-        //配置落盘节流 + 条目缓存失效：功能（含将来独立编译的 DLL）通过门面调用，不必用 SR 的 internal 成员
+        // 配置落盘节流 + 条目缓存失效的门面（外部 DLL 无需访问 SR 的 internal 成员）。
         public static void MarkConfigDirty(ConfigFile cfg) { SR.MarkConfigDirty(cfg); }
         public static void NoteEntryBound() { SR.NoteEntryBound(); }
 
     }
 
 // 分区：Controls（管理器通用控件：按键录制/右键绑键/开关按钮 + 首页）
-// 功能页已下放到各自模块文件，这里只留全页面共用控件；功能页通过 SR.Ctl（SR.Ctl.cs）调用。
+// 功能页已在各自模块文件，这里只留全页面共用控件；功能页通过 SR.Ctl 调用。
 
-        //按钮矩形登记（右键绑键用）记录"当前 GUI 组（滚动视图内容）内坐标"；命中检测须放在同一组内（见 SR.Window），坐标系一致、无需转换。
+        // 按钮矩形登记（右键绑键用）：坐标取当前 GUI 组（滚动视图内容）内坐标，命中检测须在同一组内。
 
         //录制中显示已录到的按键顺序（按钮/键位行共用）：如 "Shift -> 9 -> 0"
         private static string RecText() {
@@ -293,23 +273,20 @@ public partial class SR {
             if (!rect.Contains(ev.mousePosition)) return;
             _rmbConsumedFrame = Time.frameCount;
             HandleHotkeyRightClick(entry, false);
-            //不吞事件（旧代码这里是 ev.Use()）：在 Layout/Repaint 期间吞掉 MouseDown 会让 IMGUI 把该事件
-            //当作已处理，界面会闪一下；_rmbConsumedFrame 已能保证"一次右键只绑一个控件"。
+            // 不吞事件：_rmbConsumedFrame 已保证一次右键只绑一个控件，吞事件会让界面闪一下。
         }
 
-        //自身状态开关按钮：左键切换 on/off，按钮显示当前绑定键；右键绑键用绘制后的 GetLastRect 取矩形
-        //（鼠标事件期间 GetRect 取到的矩形不可靠，会让个别按钮绑不上）；width=0 用默认宽。
+        // 自身状态开关按钮：左键切换 on/off 且显示当前绑定键；bindable 时支持右键绑键（用绘制后的 GetLastRect 取矩形）。
         private static bool SelfToggleButton(string label, string tooltip, bool on, ConfigEntry<KeyCode> keyEntry, float width = 0f, bool bindable = false) {
             bool capturing = keyEntry != null && _capturing == keyEntry;
-            //键后缀统一走 SR.KeySuffix：未绑定 ""、已绑定 " [Shift+K]"、录制中紧凑的 " [...]" / " [1]"
-            //（旧写法拼 RecText 会显示"请按键..."而把窄按钮撑成两行）
+            // 键后缀统一走 SR.KeySuffix：未绑定 ""、已绑定 " [Shift+K]"、录制中 " [...]"。
             string text = label + (on ? T("开", "ON") : T("关", "OFF")) + SR.KeySuffix(keyEntry);
             float w = width > 0f ? width : Sc(150);
             Event e = Event.current;
             int evBtn = e != null ? e.button : 0;
             bool clicked = GUILayout.Button(new GUIContent(text, tooltip), capturing ? _capture : _btn,
-                GUILayout.Width(w), GUILayout.Height(Sc(30)));   //EX 控件统一 30px（与编辑框/下拉框一致）
-            //GUI.Button 对右键也会返回 true -> 必须按"触发按键"过滤：右键绝不触发左键动作
+                GUILayout.Width(w), GUILayout.Height(Sc(30))); // 控件统一 30px
+            // 右键也会让 GUI.Button 返回 true，须按触发按键过滤。
             if (clicked && evBtn != 0) clicked = false;
             //只有 bindable 的按钮才支持右键绑键；其余按钮右键什么也不会发生
             if (bindable && keyEntry != null && e != null) {
@@ -321,13 +298,12 @@ public partial class SR {
         //操作按钮：左键触发操作。bindable=true 时该按钮支持右键绑定快捷键（其余按钮右键无反应）。
         private static bool HotkeyActionButton(string label, string tooltip, ConfigEntry<KeyCode> keyEntry, float width = 0f, bool bindable = false) {
             bool capturing = keyEntry != null && _capturing == keyEntry;
-            //同 SelfToggleButton：键后缀统一走 SR.KeySuffix（录制中为紧凑的 [...] / [1]）
             string text = label + SR.KeySuffix(keyEntry);
             float w = width > 0f ? width : Sc(150);
             Event e = Event.current;
             int evBtn = e != null ? e.button : 0;
             bool clicked = GUILayout.Button(new GUIContent(text, tooltip), capturing ? _capture : _btn,
-                GUILayout.Width(w), GUILayout.Height(Sc(30)));   //EX 控件统一 30px（同上）
+                GUILayout.Width(w), GUILayout.Height(Sc(30))); // 控件统一 30px
             if (clicked && evBtn != 0) clicked = false;
             if (bindable && keyEntry != null && e != null) {
                 TryBindByRightClick(keyEntry, GUILayoutUtility.GetLastRect()); //当帧判定（不跨帧存矩形）
@@ -335,8 +311,7 @@ public partial class SR {
             return clicked && !capturing; //左键（非捕捉）触发操作
         }
 
-        //右键处理：未捕捉 -> 进入捕捉（等待按键设为快捷键）；捕捉中再右键 -> 删除快捷键。
-        //（删除也可在捕捉中直接按 Esc，由 SR 的按键捕捉机制处理。）
+        // 右键处理：未捕捉 -> 进入捕捉；捕捉中再右键 -> 删除快捷键（Esc 也可清空）。
         private static void HandleHotkeyRightClick(ConfigEntry<KeyCode> keyEntry, bool capturing) {
             if (keyEntry == null) return;
             if (capturing) {
@@ -365,7 +340,6 @@ public partial class SR {
             int evBtn = e != null ? e.button : 0;
             float bw = width > 0f ? width : Sc(150);
             float bh = height > 0f ? height : Sc(30);
-            //录制中 KeySuffix 已返回 " [...]" / " [1]"，故不用再拼 RecText（旧写法会变成 "[1]1"）
             bool clicked = GUILayout.Button(new GUIContent(label + SR.KeySuffix(key), tip),
                 capturing ? _capture : _btn, GUILayout.Width(bw), GUILayout.Height(bh));
             if (clicked && evBtn != 0) clicked = false; //右键绝不触发左键动作
@@ -375,8 +349,7 @@ public partial class SR {
 
         private static void RenderHomePage() {
             GUILayout.Label(T("- 欢迎使用 SR＿UCH -", "- Welcome to SR＿UCH -"), _secHeader);
-            //地基可见性：自检发现按名绑定的目标失效时，在最上方显著提示。
-            //详细清单在 设置页 -> 自检块。平时不占位置。
+            // 启动自检发现按名绑定的目标失效时，在首页最上方提示；详细清单在 设置 -> 自检。
             if (SR.AuditHasIssues) {
                 Color __pc = GUI.color;
                 try {
@@ -408,9 +381,6 @@ public partial class SR {
             WrapLabelTight(T("按键：点键位框后按键录制，支持组合键与 9->0 序列；Esc 清空，Shift+Esc 恢复原值。",
                 "Keys: click the key box and press keys to record; combos and sequences like 9->0 work; Esc clears, Shift+Esc restores the previous value."));
             WrapLabelTight(T("条目：点名称恢复默认值，右键名称绑定快捷键。", "Entries: click a name to restore its default, right-click a name to bind a hotkey."));
-            // **G9 修复**：原文案写侧栏：长按右键栏目并上下拖动 = 调整栏目顺序，但该功能早已移除
-            //（SR.Settings.cs 那个 HandleSidebarOrderDrag 当时就是段无调用点的死代码，_ordPrev 也从未被写入，后来已删）->
-            //  用户照做完全没有反应。改为指向真实的入口（设置页自定义栏目拖动列头）。
             WrapLabelTight(T("侧栏：在设置页的自定义栏目里拖动列头，即可调整栏目顺序。",
                 "Sidebar: reorder sections by dragging a header under Settings - Custom sections."));
 
@@ -428,20 +398,15 @@ public partial class SR {
             GUILayout.Label(text, _labelWrap, GUILayout.Width(w), GUILayout.Height(TextHeight(text, w)));
         }
 
-        //紧凑版换行标签：高度用**实测值**（不裁切），靠"负间距"把条目贴紧, 既不会显示不全，也不留空行。
-        //用哪个成组的多条提示 -> Tight；单独段落 -> WrapLabel。
+        // 紧凑版换行标签：高度用实测值，靠负间距把条目贴紧。
         private static void WrapLabelTight(string text) {
             float w = Mathf.Max(Sc(140), _winWidth - SidebarWidth() - Sc(36));
             GUILayout.Label(text, _labelWrap, GUILayout.Width(w), GUILayout.Height(TextHeight(text, w)));
-            GUILayout.Space(-Sc(5));   // **贴紧**：抵消样式自带的行距（不会裁切文字）
+            GUILayout.Space(-Sc(5)); // 贴紧：抵消样式自带的行距
         }
 
-        //悬浮提示框：最后绘制以保证在最上层。
-        //不再按固定 380px 强行折行（中文/英文混排会被切得很难看）：
-        //先按最宽的一行决定宽度（只在 '\n' 处换行），只有整行真的超过屏幕 80% 时才回退到自动折行。
-        // **R411**：测量结果按 tip 原文缓存。同一次悬浮里 tip 几乎不变，而原来每帧都要
-        //  Split（数组 + N 个子串）+ N 次 CalcSize + CalcHeight，一悬浮就是一帧一堆分配。
-        //  （窗口尺寸变化时 limit 会旧一档，tip 一换就重算，可忽略。）
+        // 悬浮提示框：最后绘制以保证在最上层；按最宽一行定宽，仅当整行超过屏幕 80% 才自动折行。
+        // 测量结果按 tip 原文缓存（窗口尺寸变化时可能沿用旧 limit，tip 一变即重算）。
         private static string _tipKey;
         private static string[] _tipLines = new string[0];
         private static readonly GUIContent _tipContent = new GUIContent();
@@ -473,21 +438,17 @@ public partial class SR {
             GUI.Box(new Rect(x, y, _tipW, _tipH + 8), _tipContent, _tooltip);
         }
 // 分区：RowHooks（功能对通用条目行的扩展点）
-// SR.Settings 渲染条目行时不再硬编码任何 section/key，功能在自己的 Initialize/SelfReg 里注册：
+// SR.Settings 渲染条目行时不硬编码 section/key，功能在 Initialize/SelfReg 里注册以下扩展点。
 // 行可见性、同伴条目（同一行右侧再画一个控件）、行专用滑块范围、下拉框宽度、枚举选项过滤。
-// RowFilters 是**布局过滤**：只决定条目是否单独成行 / 是否在设置页重复渲染，
-//   **不是权限门禁** —— 不做灰显、不写拒绝原因（现有 5 个过滤器全是布局用途）。
-//   想做"没权限就灰显 + tooltip 说明原因"，得另起一套机制，别往这里塞。
+// RowFilters 是布局过滤而非权限门禁：只决定条目是否单独成行 / 是否在设置页重复渲染。
 
     public delegate bool RowFilterFn(ConfigEntryBase entry);
     public delegate string RowCompanionFn(ConfigEntryBase entry);
     public delegate bool RowSliderFn(ConfigEntryBase entry, out float min, out float max, out string fmt);
     public delegate float RowComboWidthFn(ConfigEntryBase entry);
     public delegate bool RowEnumFilterFn(ConfigEntryBase entry, string enumName, int value);
-    // **Opt-38（扩展性）**：字符串条目的"下拉候选"扩展点。
-    //  values = 落盘值，displayNames = 界面显示（两者等长）。命中即用下拉框渲染这个条目。
-    //  核心自己的"界面语言"就走这条（见 SR.Settings.SettingsComboOptions），不再按 section/key 硬编码；
-    //  功能/外部模块也能用它给自己的字符串条目做下拉，不必改核心。
+    // 字符串条目的下拉候选扩展点：命中即用下拉框渲染该条目。
+    // values = 落盘值，displayNames = 界面显示（两者等长）。
     public delegate bool RowComboOptionsFn(ConfigEntryBase entry, out string[] values, out string[] displayNames);
     public delegate void PageRenderFn();
 
@@ -498,10 +459,6 @@ public partial class SR {
     public static readonly List<RowComboWidthFn> RowComboWidths = new List<RowComboWidthFn>();
     public static readonly List<RowEnumFilterFn> RowEnumFilters = new List<RowEnumFilterFn>();
     public static readonly List<RowComboOptionsFn> RowComboOptions = new List<RowComboOptionsFn>();
-    // **R432**：原来这里有一套"页面块扩展点"（PageBlocks + RegisterPageBlock + RenderPageBlocks），
-    //  是给"功能把 UI 块挂进**别人的**页面"用的（EX 曾把派对盒块挂进关卡页）。R431 按
-    //  「UI 在哪功能在哪」把派对盒搬回关卡功能后，全项目零调用，整块删除。
-    //  需要给别人的页面加内容时，正确做法是把功能也搬过去，而不是跨模块插块。
 
     // 该条目当前是否显示（任一过滤器返回 false 即不显示）
     public static bool RowVisible(ConfigEntryBase entry) {
@@ -536,9 +493,7 @@ public partial class SR {
         return false;
     }
 
-    // **Opt-54（扩展性）**：行滑块的**浮点步进**（可选）。原来 float 条目在轨道上是连续值，
-    //  只有 int 条目有步进（见 RenderControl 里的 hstep）；要"每格 0.1"就只能靠显示位数糊过去。
-    //  单独开一个扩展点，既有 RowSliders 签名一个字都不用改（功能不会被这个新钩子影响）。
+    // 行滑块的浮点步进（可选）：float 条目按 step 步进。
     public delegate bool RowSliderStepFn(ConfigEntryBase entry, out float step);
     public static readonly List<RowSliderStepFn> RowSliderSteps = new List<RowSliderStepFn>();
 
@@ -585,8 +540,7 @@ public partial class SR {
         return true;
     }
 
-    // 功能自绘页：功能用通用条目行拼自己的页面（如 建造增强 的建造上限小分区）
-    // 注册后 SR.Window 优先调用它，不再走"纯通用条目列表"兜底分支。
+    // 功能自绘页：功能用通用条目行拼自己的页面；注册后 SR.Window 优先调用它。
     public static readonly Dictionary<string, PageRenderFn> PageRenderers = new Dictionary<string, PageRenderFn>();
 
     public static void RegisterPage(string section, PageRenderFn render) {
@@ -607,15 +561,8 @@ public partial class SR {
     private static readonly Dictionary<string, List<PageInfo>> _pageLists = new Dictionary<string, List<PageInfo>>();
     private static readonly Dictionary<string, string> _pageSel = new Dictionary<string, string>();
 
-    // 多页用法（核心化：功能只需注册，不要自己画页签）,
-    //   1) 单页：SR.RegisterPage("段名", Render);
-    //   2) 多页：第一页照旧用单页注册（或也用下面的 6 参形式），其余页用
-    //        SR.RegisterPage("段名", "页id", "中文名", "English", 顺序, RenderXxx);
-    // 注册 ≥2 页后，核心自动在页面顶部画页签（RenderPageTabs）、记录选中页（_pageSel）、
-    //         并在 SR.Window 分派时只渲染当前选中页（RenderPage）。
-    //   3) 某页要自己的顶栏/底栏：SR.RegisterPageChrome("段名", 顶栏, 底栏)，配合 SR.Ctl.SelectedPageId("段名") 判断。
-    //   参考实现：EX 三页（目标/其它/高级）、实验两页（实验区一 / 实验区二）。
-    // **要点**：多页注册会清掉该段的单页渲染器（见本方法末尾 PageRenderers.Remove），所以不要混用。
+    // 多页注册：单页走 SR.RegisterPage(section, render)；多页用 6 参重载逐页注册（段名 + 页id + 中英文名 + 顺序 + 渲染）。
+    // 注册 ≥2 页后核心自动画页签并只渲染当前页；多页注册会清掉该段的单页渲染器，两种注册不可混用。
     public static void RegisterPage(string section, string pageId, string nameZh, string nameEn, int order, PageRenderFn render) {
         if (string.IsNullOrEmpty(section) || string.IsNullOrEmpty(pageId) || render == null) return;
         List<PageInfo> list;
@@ -641,7 +588,7 @@ public partial class SR {
         return null;
     }
 
-    // **#5 Ctrl+滚轮切页**：在当前栏目的页列表里前后移动一位（循环，顺序 = 注册时的 order）
+    // Ctrl+滚轮切页：在栏目页列表里循环前后移动一位（顺序 = 注册的 order）。
     public static void CyclePage(string section, int dir) {
         try {
             List<PageInfo> list;
@@ -692,12 +639,11 @@ public partial class SR {
         public System.Func<int, string[]> rowCells;     //整行文本（行号 -> 各列文本）
         public System.Func<int, float> rowAlpha;       //行透明度（可选；不可用的行压暗）
         public bool drawHeader = true;                 //是否画表头（表头另外画时置 false）
-        // **#5 竖向排列**：格子沿 Y 叠放（每项一行）。默认 false -> 对现有横向表格零影响。
+        // 竖向排列：格子沿 Y 叠放（每项一行），默认 false。
         public bool vertical;
-        public float[] defaultColW;   // **#1 默认列宽（Shift+右键时核心会还原成它）**
-        public System.Func<int, bool> rowSelected;   // **某行是否"选中"（核心据此画整行高亮）**
-        public bool headerLeft;                      // **#2 表头文字靠左（默认居中）**
-        // **#1 默认列宽**：Shift+右键（resetAll）时核心会把 colW 还原成这一份，再调 resetAll
+        public float[] defaultColW; // 默认列宽（Shift+右键还原时核心会还原成它）
+        public System.Func<int, bool> rowSelected; // 某行是否“选中”（核心据此画整行高亮）
+        public bool headerLeft; // 表头文字靠左（默认居中）
         public bool resizable;                         //表头分隔线可拖动改列宽（与房间列表同款）
         public int dragCol = -1;                       //列宽拖动状态（由参数对象自己持有，跨帧保持）
         public float dragX0, dragW0;
@@ -709,7 +655,7 @@ public partial class SR {
         public System.Action saveWidths;               //列宽拖动松开时落盘（可选；核心自己处理 MouseUp 清状态）
         public System.Action<int> click;               //单击列头（可选）
         public System.Action resetAll;                 //Shift+右键=还原全部（可选）
-        // **把"钉住列按钮"与"空列表提示"也纳入本控件**：三处列表只提供内容，不再各自实现
+        // 钉住列按钮与空列表提示也由本控件负责绘制：三处列表只提供内容。
         public System.Action<int, Rect, int> pinDraw;  //(数据行下标, 钉住列绝对矩形, 可见序号)
         public System.Func<string> emptyHint;          //无行时的居中提示（返回 null/空 = 不画）
         public float moveX0, moveDx;
@@ -731,9 +677,7 @@ public partial class SR {
     public static void TableDraw(TableArgs a) {
         if (a == null || a.colW == null || a.vis == null) return;
         try {
-            // 由 order + hidden **自行推导 vis**：TableColMove 换位后只调 applyOrder 更新 order，
-            //  而画表头用的是 vis, 原来"谁更新 vis"全靠调用方自觉（联机页写了 _visCache = null 才正常，
-            //  其它表都没写）-> 表现就是"拖了完全没变化"。这里由核心统一推导，调用方不必再维护。
+            // vis 由 order + hidden 自行推导：TableColMove 换位后只更新 order，调用方无需再维护 vis。
             if (a.order != null && a.colW != null && a.order.Length == a.colW.Length) {
                 a.vis.Clear();
                 for (int i = 0; i < a.order.Length; i++) {
@@ -744,16 +688,10 @@ public partial class SR {
                 }
             }
             float headerH = a.headerH > 0f ? a.headerH : Sc(24);
-            if (a.vertical) headerH = (a.headerH > 0f ? a.headerH : Sc(22)) * Mathf.Max(1, a.vis != null ? a.vis.Count : 0);   // **#5**
+            if (a.vertical) headerH = (a.headerH > 0f ? a.headerH : Sc(22)) * Mathf.Max(1, a.vis != null ? a.vis.Count : 0); // 纵向时表头高 = 单格高 × 列数
             float rowH = a.rowH > 0f ? a.rowH : Sc(26);
-            // order 是换列算法的必需输入，但它在文档里是"可选的显示顺序" -> 调用方很容易漏。
-            //  这里兜底成恒等序：即使调用方没赋 order，拖动换列也能工作（不再是静默失效）。
+            // order 是换列算法的必需输入；调用方未赋时这里兜底成恒等序。
             if (a.drawHeader && (a.order == null || a.order.Length != a.colW.Length)) {
-                // **Opt-29（审计 A/V7）**：这里原来把**同一个静态数组实例**发给所有表格当 order。
-                //  只要有任何一处原地写 a.order[i]（换列 / 还原），就等于串改所有同列数的表格；
-                //  多张表轮流共用一个实例，语义上也不是"这张表自己的顺序"。
-                //  改成本次这张表自己的恒等序：只在"order 缺失或长度不符"时进来，**不是每帧**分配，
-                //  所以不会回到当初"每帧 new"的开销问题（那是 #2 修掉的）。
                 int[] ident = new int[a.colW.Length];
                 for (int i = 0; i < ident.Length; i++) ident[i] = i;
                 a.order = ident;
@@ -761,15 +699,11 @@ public partial class SR {
             if (a.drawHeader) {
                 DrawTableHeader(a.vis, a.pinCol, a.colW, a.scrollX, a.box, a.stripW, headerH, a.mp, a.title, a.moveCol,
                     a.pinW, a.pinX, a.pinTitle, a.headerCells, a.headerCols, a.vertical, a.scrollY, a.headerLeft, out a.pinHeader);
-                //表头下的横线：只在核心自己画表头时画（调用方自己画表头的，如联机页，会自己画一条，
-                //否则会出现两条宽度不同的线叠在一起, #3）
+                // 表头下的横线：只在核心自己画表头时画一条（drawHeader=false 时由调用方自己画）。
                 DrawLine(new Rect(a.box.x, a.box.y + headerH - 1f, a.stripW, 1f), CurStyle.LineStrong);
             }
-            // 这里**不能**再无条件画一条：drawHeader=true 时上面刚画过（同一位置叠两次会更深），
-            //  drawHeader=false 时调用方（联机页）自己画, 两种情况都只需一条。
             TableRowRects(a.rowCount, rowH, a.scrollY, a.rowsH, a.box.y, headerH, a.rowsClip, a.box.x, a.stripW, a.rowRects, a.rowRows);
-            // **行选中高亮**：核心原来没有"选中行"的概念（联机页靠行透明度区分），
-            //  XML 列表这类"点一行选中一行"的表格因此完全没有选中表现。这里统一支持。
+            // 行选中高亮：rowSelected 指定的行由核心画整行高亮。
             if (a.rowSelected != null && a.rowRects != null && a.rowRects.Count > 0) {
                 try {
                     for (int __i = 0; __i < a.rowRects.Count; __i++) {
@@ -781,7 +715,7 @@ public partial class SR {
                 } catch (Exception __ex) { Guard.Log("行选中高亮", __ex); }
             }
             //表头分隔线拖列宽 + 悬停换 <-> 光标（与房间列表完全同一实现）
-            if (a.headerCells.Count > 0 && !a.vertical) {   // **#5 纵向不做列宽/行高拖动**
+            if (a.headerCells.Count > 0 && !a.vertical) { // 纵向不做列宽/行高拖动
                 bool inBox = a.box.Contains(a.mp);
                 for (int k = 0; k < a.headerCells.Count; k++) {
                     Rect cell = a.headerCells[k];
@@ -792,7 +726,7 @@ public partial class SR {
                         try { tip = a.tip(ci); } catch { tip = null; }
                         if (!string.IsNullOrEmpty(tip)) GUI.tooltip = tip;
                     }
-                    //排序方向指示（调用方给了 sortCol 才画）： 升序 /  降序
+                    // 排序方向指示（给了 sortCol 才画）。
                     if (a.sortCol >= 0 && ci == a.sortCol) {
                         SR.Ctl.SecHeaderCenter.Draw(new Rect(cell.xMax - Sc(14), cell.y, Sc(12), cell.height),
                             new GUIContent(a.sortAsc ? "\u25B2" : "\u25BC"), false, false, false, false);
@@ -806,17 +740,13 @@ public partial class SR {
                 //列头拖动换位（与房间列表同一实现；需要调用方给出 order/回调）
                 if (a.reorderable && a.order != null) {
                     if (a.allCols.Count != a.colW.Length) { a.allCols.Clear(); for (int i = 0; i < a.colW.Length; i++) a.allCols.Add(i); }
-                    // **#2 列序规范化**：Order 长度与该表列数不一致时（例如 EX 误用/串用了房间列表的 11 列列序），
-                    //    按本表列数重建, 否则拖动虽然生效，但视觉上"看不出变化"（只映射了前 N 列的排列）。
-                    //    重建后的第一次 applyOrder 落盘即把持久化数据修正为本表列数。
+                    // 列序长度与该表列数不一致时按本表列数重建，否则拖动看不出变化。
                     if (a.order != null && a.colW != null && a.colW.Length > 0 && a.order.Length != a.colW.Length) {
                         int[] __ord = new int[a.colW.Length];
                         for (int i = 0; i < __ord.Length; i++) __ord[i] = i;
                         a.order = __ord;
                     }
-                    // **#2 拖动进行中**：只把"当初按下的那一列"交给 TableColMove，
-                    //  这样松开时 moveCol == ci 必然成立（否则 headerCols 映射一旦在拖动期间漂移，
-                    //  松开事件就会落到别的 ci 上 -> moveCol != ci -> 换位静默失效，正是 EX 暴露的问题）。
+                    // 拖动中只把“按下时的那一列”交给 TableColMove，保证松开时 moveCol == ci。
                     int __dragK = -1;
                     if (a.moveCol >= 0) {
                         for (int k = 0; k < a.headerCells.Count; k++) {
@@ -825,19 +755,16 @@ public partial class SR {
                         }
                         if (__dragK < 0 && a.moveCol < a.headerCells.Count) __dragK = a.moveCol;   //兜底：按下时记录的就是本表列下标
                     }
-                    // 落点列列表必须用 headerCols（显示位 -> 数据列），不能用 allCols（自然序）：
-                    //  有列被隐藏、或钉住列不在最后时 headerCols[k] != k，用 allCols 会"移动错列"。
-                    //  （EX 页早就这么做并留了注释，核心这里漏了, 现在统一。）
+                    // 落点列列表用 headerCols（显示位 -> 数据列），不能用 allCols（自然序）。
                     List<int> __cols = (a.headerCols != null && a.headerCols.Count > 0) ? a.headerCols : a.allCols;
                     for (int k = 0; k < a.headerCells.Count; k++) {
-                        if (__dragK >= 0 && k != __dragK) continue;   // **#2 拖动中**：只处理拖动的那一列
+                        if (__dragK >= 0 && k != __dragK) continue; // 拖动中：只处理拖动的那一列
                         int ci = k < a.headerCols.Count ? a.headerCols[k] : k;
                         TableColMove(Event.current, a.headerCells[k], ci, k, __cols, a.mp, inBox, a.headerCells, a.order,
                             a.applyOrder, a.saveOrder, a.click, ref a.moveCol, ref a.moveX0, ref a.moveDx,
                             ref a.scrollColsTmp, ref a.scrollColsAtDragTmp, a.vertical);
                     }
-                    // **#2 兜底**：逐格循环没命中也不能让换位丢失, 只要仍处于拖动状态且这一帧是 MouseUp，就地完成换位。
-                    //  （命中时循环内已把 moveCol 清成 -1，故不会重复处理。）
+                    // 兜底：拖动中逐格循环未命中且本帧为 MouseUp 时就地完成换位。
                     if (a.moveCol >= 0 && Event.current != null && Event.current.type == EventType.MouseUp && Event.current.button == 0) {
                         int __mv = a.moveCol; int __k = -1;
                         for (int k = 0; k < a.headerCells.Count; k++) { int __c3 = (a.headerCols.Count > k) ? a.headerCols[k] : k; if (__c3 == __mv) { __k = k; break; } }
@@ -850,8 +777,7 @@ public partial class SR {
                     }
                 }
             }
-            // #4 列头拖拽动画（仅 Repaint）：跟手浮动块 + 目标位置插入指示线。
-            //  纯绘制，不改数据；GUI.color 用 try/finally 复位（防泄漏污染其它 UI）。
+            // 列头拖拽动画（仅 Repaint）：跟手浮动块 + 插入指示线，纯绘制不改数据。
             if (a.moveCol >= 0 && Event.current != null && Event.current.type == EventType.Repaint) {
                 try {
                     int __mk = -1;
@@ -888,7 +814,6 @@ public partial class SR {
                 try { eh = a.emptyHint(); } catch { eh = null; }
                 if (!string.IsNullOrEmpty(eh)) {
                     Rect rc = a.rowsClip;
-                    // **用 rowsClip 的坐标**：原来写死 x=0（且 rc 取了没用），空提示会跑到屏幕最左边而不是表格里
                     SR.Ctl.LabelClipCenter.Draw(new Rect(rc.x, rc.y + Mathf.Max(0f, (a.rowsH - rowH * 2f) * 0.5f), Mathf.Max(Sc(60), a.stripW), rowH * 2f),
                         new GUIContent(eh), false, false, false, false);
                 }
@@ -896,22 +821,20 @@ public partial class SR {
             Color clipSavedColor = GUI.color; // 异常时也要还原（GUI.color 泄漏会污染游戏界面）
             GUI.BeginClip(new Rect(a.box.x, a.box.y + headerH, a.stripW, a.rowsH));
             try {
-            // **R411**：行悬停用的"裁剪区内坐标"（原点 = 裁剪框左上；mp 是进裁剪前抓的屏幕坐标）
+            // 行悬停用的裁剪区内坐标（原点 = 裁剪框左上；mp 是进裁剪前抓的屏幕坐标）。
             Vector2 __lm = new Vector2(a.mp.x - a.box.x, a.mp.y - a.box.y - headerH);
             for (int i = 0; i < a.rowCount; i++) {
                 float y = i * rowH - a.scrollY;
                 if (y > a.rowsH || y + rowH < 0f) continue;
                 string[] rc = a.rowCells != null ? a.rowCells(i) : null;
                 float alpha = a.rowAlpha != null ? a.rowAlpha(i) : 1f;
-                // 隔行底（ImGui 的 TableRowBgAlt）：按**真实行号** i 取奇偶，而不是"可见序号",
-                //  行号不随滚动变化，条纹才稳定（用可见序号会一滚就抖）。行号只有这里知道，
-                //  所以接线必须在核心，不能丢给各功能页。行透明时（如不可加入的暗行）底也跟着淡。
+                // 隔行底：按真实行号取奇偶（行号不随滚动变化，条纹稳定）；行透明时底也跟着淡。
                 if ((i & 1) == 1) {
                     Color ab = CurStyle.RowAltBg;
                     if (alpha < 1f) ab.a *= alpha;
                     DrawFill(new Rect(0f, y, a.stripW, rowH), ab);
                 }
-                // **R411**：行悬停反馈（ImGui 表格 hovered 行亮一档）。加在隔行底之上、文字之下。
+                // 行悬停反馈：加在隔行底之上、文字之下。
                 float __hy0 = Mathf.Max(y, 0f), __hy1 = Mathf.Min(y + rowH, a.rowsH);
                 if (__hy1 > __hy0 && __lm.x >= 0f && __lm.x < a.stripW && __lm.y >= __hy0 && __lm.y < __hy1) {
                     Color __hc = new Color(1f, 1f, 1f, 0.05f);
@@ -931,7 +854,7 @@ public partial class SR {
                 if (e.type == EventType.MouseDown && e.button == 1) {
                     if (e.shift) {
                         if (a.hidden != null && a.hidden.Count > 0) a.hidden.Clear();
-            // #1 列宽也一并还原到默认值（原来只还原隐藏列 -> 列宽拉歪后 Shift+右键回不来）
+            // Shift+右键还原时列宽也一并还原到默认值。
             if (a.defaultColW != null && a.colW != null && a.defaultColW.Length == a.colW.Length) {
                 for (int __i = 0; __i < a.colW.Length; __i++) a.colW[__i] = a.defaultColW[__i];
             }
@@ -948,10 +871,7 @@ public partial class SR {
                     }
                 }
             }
-            //（原+N恢复按钮已按需求删除：还原统一走 Shift+右键 = resetAll）
-            // **列宽拖动的收尾**：TableColResize 只处理 MouseDown/MouseDrag，没人清 MouseUp。
-            //  原来 dragCol 要等 1.2 秒兜底才复位，且期间列宽改了也**从不落盘**（联机页靠自己那段
-            //  MouseUp 处理才正常，EX/方块表没有 -> 拖完松手就弹回）。这里补上：清状态 + 回调落盘。
+            // 列宽拖动收尾：TableColResize 只处理 MouseDown/MouseDrag，这里清状态并回调落盘。
             if (a.dragCol >= 0 && Event.current != null && Event.current.type == EventType.MouseUp) {
                 a.dragCol = -1;
                 BlockWindowDrag = false;
@@ -965,13 +885,12 @@ public partial class SR {
         Vector2 mp, System.Func<int, string> title, int moveCol, float pinW, float pinX, string pinTitle,
         List<Rect> cells, List<int> cellCols, bool vertical, float scrollY, bool headerLeft, out Rect pinHeader) {
         cells.Clear(); cellCols.Clear(); pinHeader = new Rect(0f, 0f, 0f, 0f);
-        float __vh = vertical ? (headerH * Mathf.Max(1, vis.Count)) : headerH;   // **#5 纵向**：裁剪区是"总高"
+        float __vh = vertical ? (headerH * Mathf.Max(1, vis.Count)) : headerH; // 纵向：裁剪区是总高
         GUI.BeginClip(new Rect(box.x, box.y, stripW, vertical ? __vh : headerH));
         try {
-        // 表头底（ImGui 的 TableHeaderBg）：原来表头**只有文字、没有底**，与行的区分全靠线。
-        //  铺在最前（裁剪坐标系内，原点已是 box.x/box.y），颜色走 CurStyle -> 单表可覆盖。
+        // 表头底（ImGui TableHeaderBg）：颜色走 CurStyle，可单表覆盖。
         DrawFill(new Rect(0f, 0f, stripW, vertical ? __vh : headerH), CurStyle.HeaderBg);
-        float x = -scrollX, y = -scrollY;   // **#5 纵向用 y 叠放**
+        float x = -scrollX, y = -scrollY; // 纵向用 y 叠放
         for (int k = 0; k < vis.Count; k++) {
             int ci = vis[k];
             if (ci == pinCol) continue;
@@ -981,19 +900,18 @@ public partial class SR {
             cellCols.Add(ci);
             if (x + w > -Sc(4) && x < stripW + Sc(4)) {   //只画看得见的
                 Rect __cr = new Rect(vertical ? 0f : x, vertical ? y : 0f, vertical ? stripW : w, h);
-                // **R411**：列头悬停反馈（ImGui 的 TableHeader 有 hovered 态）。
-                //  裁剪区里的绘制坐标以裁剪框左上为原点，而 mp 是进裁剪前抓的屏幕坐标 -> 先减掉原点。
+                // 列头悬停反馈（裁剪区内坐标：mp 减掉裁剪原点）。
                 Vector2 __lmh = new Vector2(mp.x - box.x, mp.y - box.y);
                 if (__lmh.x >= 0f && __lmh.x < stripW && __lmh.y >= 0f && __lmh.y < (vertical ? __vh : headerH)
                     && __cr.Contains(__lmh) && moveCol != ci) DrawRect(__cr, 0.06f);
                 if (moveCol == ci) DrawRect(__cr, 0.22f);
                 (headerLeft ? SR.Ctl.LabelClip : SR.Ctl.SecHeaderCenter).Draw(__cr,
                     new GUIContent(title != null ? title(ci) : ""), false, false, false, false);
-                //横向画竖分隔线； #5 纵向画横分隔线。表头/外框用**强线**（ImGui TableBorderStrong）。
+                // 横向画竖分隔线、纵向画横分隔线；表头/外框用强线。
                 if (vertical) DrawLine(new Rect(0f, y + h - 1f, stripW, 1f), CurStyle.LineStrong);
                 else DrawLine(new Rect(x + w - 1f, 0f, 1f, headerH), CurStyle.LineStrong);
             }
-            if (vertical) y += h; else x += w;   // **#5**
+            if (vertical) y += h; else x += w;
         }
         if (moveCol >= 0) {   //拖动中：在目标位置画竖线（裁剪空间里 x 要减掉裁剪原点）
             for (int k = 0; k < cells.Count; k++) {
@@ -1006,8 +924,7 @@ public partial class SR {
             pinHeader = new Rect(pinX, box.y, pinW, headerH);
             GUI.BeginClip(new Rect(pinX, box.y, pinW, headerH));
             try {
-            //钉住列表头：先铺统一表头底，再叠一层极淡 accent, 保留"这一列被钉住"的可辨识度
-            //（原来只有 accent 0.10；加了表头底之后若不再叠，它会与普通表头长得一样）。
+            // 钉住列表头：统一表头底上叠一层淡 accent，保留可辨识度。
             DrawFill(new Rect(0f, 0f, pinW, headerH), CurStyle.HeaderBg);
             DrawRect(new Rect(0f, 0f, pinW, headerH), 0.10f);
             SR.Ctl.SecHeaderCenter.Draw(new Rect(0f, 0f, pinW, headerH),
@@ -1017,9 +934,7 @@ public partial class SR {
         }
     }
 
-    // 数组版（推荐）：TableDraw 走这一条, 原来每行都要 new 一个 Func 闭包来包 rc[ci]，
-    //  一张 100 行的表 × IMGUI 每帧两趟 = 每帧 200 个委托 + 200 个闭包对象，纯 GC 垃圾。
-    //  直接传数组后这里只是索引取值，零分配；越界的列按空串处理（不再抛异常打断整表绘制）。
+    // 数组版（TableDraw 走这条）：直接索引取值、零分配；越界列按空串处理。
     public static void DrawTableCells(List<int> vis, int skipCol, int alignLeftCol, float rowH, float scrollX, float y,
         float[] colW, string[] cells) {
         float x = -scrollX;
@@ -1036,29 +951,22 @@ public partial class SR {
         }
     }
 
-    //复用同一个 GUIContent：单元格文本每帧数百次，原来每次都 new 一个（含内部字符串拷贝）。
-    //GUIStyle.Draw 是同步绘制，不持有该引用，复用安全。
+    // 复用同一个 GUIContent（每帧数百次调用）；GUIStyle.Draw 同步绘制、不持有引用，复用安全。
     private static readonly GUIContent _cellContent = new GUIContent();
     private static GUIContent CellContent(string s) {
         _cellContent.text = s != null ? s : "";
         return _cellContent;
     }
 
-    //拖拽兜底：超过 1.2s 没鼠标事件就复位所有拖拽状态（只有真漏收 MouseUp 才触发）。
-    //联机页的拖拽状态与落盘回调以 ref/回调注入，核心不持有功能数据。
+    // 拖拽兜底：超过 1.2s 无鼠标事件就复位所有拖拽状态（仅漏收 MouseUp 时触发）。
+    // 拖拽状态与落盘回调由调用方以 ref/回调注入，核心不持有功能数据。
     public static void TableDragWatchdog(Event e, ref float watchdog,
         ref bool sbDragging, ref int moveCol, ref float moveDx, ref int dragCol, ref bool dragH,
         System.Action saveWidths, System.Action saveTableH, System.Action resetJoinDown) {
-        // #2 治本（第二刀）：**松开的那一帧不做超时复位**。
-        //  第一刀只挡了"鼠标仍按住"，但 MouseUp 帧按键已抬起 -> 若距上次事件超过 1.2 秒，
-        //  看门狗会抢在核心换位块之前把 moveCol 清成 -1 -> 松开判定失败（只有"按下"日志）。
-        //  有 MouseUp 在飞行时跳过复位，让拖动处理先跑；下一帧再照常兜底。
+        // 松开的那一帧不做超时复位，让拖动处理先跑；下一帧再兜底。
         if (e != null && e.type == EventType.MouseUp) return;
         if (watchdog > 0f && Time.unscaledTime > watchdog) {
-            // #2 治本：**鼠标键仍按住时绝不复位**拖动状态。
-            //  原逻辑只按"1.2 秒没收到鼠标事件"就复位 moveCol/dragCol：玩家按下后停顿再松开时，
-            //  拖动状态已被清掉 -> 松开时 moveCol != ci，列头换位静默失效（列宽拖动同理会受影响）。
-            //  按住期间直接返回，等真正松开（不再有按键）后再由下一帧完成复位。
+            // 鼠标键仍按住时绝不复位拖动状态，否则松开时 moveCol != ci、换位静默失效。
             if (UnityEngine.Input.GetMouseButton(0) || UnityEngine.Input.GetMouseButton(1) || UnityEngine.Input.GetMouseButton(2))
                 return;
             sbDragging = false;
@@ -1078,12 +986,12 @@ public partial class SR {
         }
     }
 
-    //表格滚轮：Ctrl=横向；没有纵向余量时自动转横向。返回 true = 已消费（并会标记滚轮已用）
+    // 表格滚轮：Shift+滚轮横向；无纵向余量时自动转横向。返回 true = 已消费。
     public static bool TableWheelInput(Event e, Rect box, Vector2 mp, float maxX, float maxY,
         ref Vector2 scrollCols, ref Vector2 scrollRows) {
         if (e == null || e.type != EventType.ScrollWheel || !box.Contains(mp)) return false;
         float amt = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
-        // #1 Shift+滚轮 也可横向滚动（原来只认 Ctrl；同时保留"无纵向余量时自动转横向"）
+        // Shift+滚轮横向滚动；无纵向余量时自动转横向。
         if (e.shift && maxX > 0f) {
             scrollCols.x = Mathf.Clamp(scrollCols.x + amt * Sc(60), 0f, maxX);
             e.Use(); MarkWheelUsed(); return true;
@@ -1136,28 +1044,26 @@ public partial class SR {
         List<Rect> headerCells, int[] order, System.Action<int[]> applyOrder, System.Action save, System.Action<int> click,
         ref int moveCol, ref float moveX0, ref float moveDx, ref Vector2 scrollCols, ref Vector2 scrollColsAtDrag, bool vertical = false) {
         if (e == null) return false;
-        // **#5 轴感知**：横向时"分隔线在右、可拖区在左"；纵向时"分隔线在下、可拖区在上"
+        // 横向：分隔线在右、可拖区在左；纵向：分隔线在下、可拖区在上。
         Rect sep = vertical ? new Rect(cell.x, cell.yMax - Sc(3), cell.width, Sc(7)) : new Rect(cell.xMax - Sc(3), cell.y, Sc(7), cell.height);
         Rect body = vertical ? new Rect(cell.x, cell.y, cell.width, cell.height - Sc(4)) : new Rect(cell.x, cell.y, cell.width - Sc(4), cell.height);
         if (e.type == EventType.MouseDown && e.button == 0 && inBox && body.Contains(mp) && !sep.Contains(mp)) {
-            moveCol = ci; moveX0 = vertical ? mp.y : mp.x; moveDx = 0f; scrollColsAtDrag = scrollCols;   // **#5 moveX0 存"本轴起点"**
+            moveCol = ci; moveX0 = vertical ? mp.y : mp.x; moveDx = 0f; scrollColsAtDrag = scrollCols; // moveX0 存本轴起点
             BlockWindowDrag = true; e.Use(); return true;
         }
         if (e.type == EventType.MouseDrag && moveCol == ci) {
-            moveDx = (vertical ? mp.y : mp.x) - moveX0;   // **#5 离开列表也继续跟手**
+            moveDx = (vertical ? mp.y : mp.x) - moveX0; // 离开列表也继续跟手
             scrollCols = scrollColsAtDrag;
             BlockWindowDrag = true; e.Use(); return true;
         }
         if (e.type == EventType.MouseUp && moveCol == ci) {
-            // 换列需要 order 才能算 from/to；order 为空时**必须**先把拖动状态清干净再返回，
-            //  否则 moveCol 会一直挂着（原来这里直接 order.Length -> NRE，被 TableDraw 的
-            //  try/catch 吞掉，表现为"拖了没反应且没有任何提示"）。
+            // 换列需要 order 才能算 from/to；order 为空时清干净拖动状态再返回，避免 moveCol 一直挂着。
             if (order == null || order.Length == 0) { moveCol = -1; moveDx = 0f; BlockWindowDrag = false; e.Use(); return true; }
             bool dragged = Mathf.Abs(moveDx) > Sc(4);  //1~3px 手抖不算拖动
             int target = k;
             if (dragged && headerCells.Count > 0) {
                 for (int j = 0; j < headerCells.Count; j++) {
-                    if (vertical ? (mp.y < headerCells[j].yMax) : (mp.x < headerCells[j].xMax)) { target = j; break; }   // **#5**
+                    if (vertical ? (mp.y < headerCells[j].yMax) : (mp.x < headerCells[j].xMax)) { target = j; break; }
                     target = headerCells.Count - 1;
                 }
             }
@@ -1232,21 +1138,16 @@ public partial class SR {
         }
     }
 
-    //表格通用绘制原语（从联机房间列表抽到核心，供所有表格共用）
-    // **R411**：纯白填充直接用 Unity 内置 whiteTexture（全白、常驻、不用自己建/销毁）。
-    //  原来自建 1x1：既没挂 DontDestroyOnLoad（换场景被回收后靠伪 null 重建）也不在 EnsureStyles
-    //  的销毁清单里，与其它运行时贴图两套生命周期策略。DrawTexture 把整张贴图拉伸进目标矩形，
-    //  全白纹理 1x1 还是 4x4 视觉完全一致 -> 直接替换，行为零差异。
+    // 表格通用绘制原语（三处列表共用）。
+    // 纯白填充用 Unity 内置 whiteTexture（常驻，无需自建/销毁）。
     public static Texture2D Px() { return Texture2D.whiteTexture; }
-    // 默认色保持不变（1,1,1,0.22）：本方法对外，功能页自绘的线也在用它，不能悄悄换色。
-    //  表格内部要按 ImGui 的"强线/弱线"分开，所以另开一个带颜色的重载。
+    // 默认色 (1,1,1,0.22) 保持不变：本方法对外，功能页自绘的线也在用。
     public static void DrawLine(Rect r) { DrawLine(r, new Color(1f, 1f, 1f, 0.22f)); }
 
     public static void DrawLine(Rect r, Color c) { DrawFill(r, c); }
 
-    // 纯色填充（仅 Repaint 趟画）：表头底与隔行底用。
-    //  alpha <= 0 直接跳过, 这样"关掉表头底/隔行底"只需把颜色 alpha 设为 0，不必改绘制代码。
-    // **R426**：public —— 功能（独立程序集）自绘滚动条等要用它。
+    // 纯色填充（仅 Repaint 趟画），供表头底与隔行底使用。
+    // alpha <= 0 直接跳过：关闭表头底/隔行底只需把颜色 alpha 设为 0。
     public static void DrawFill(Rect r, Color c) {
         if (c.a <= 0f) return;
         if (Event.current == null || Event.current.type != EventType.Repaint) return;
@@ -1268,18 +1169,9 @@ public partial class SR {
         } finally { GUI.color = old; }
     }
 
-    //表格外观配置：绘制一律读 _tableStyle（私有字段，本文件内的 CurStyle 也是直接读它）。
-    //  **E4**：原注释写"改 SR.DefaultTableStyle 即可全局调"是**误导** —— _tableStyle 是 readonly
-    //  且没有 setter，外部拿到的只是一个只读视图，改不了。要调配色就改下面 TableStyle 里的字段默认值。
-    //  将来若要"按表不同外观"，给 TableArgs 加 style 字段、TableDraw 取它即可（getter 保留给扩展方读）。
+    // 表格外观配置：绘制一律读 _tableStyle（本文件的 CurStyle 直接读它）；配色只能改下面 TableStyle 的字段默认值。
     public sealed class TableStyle {
-        // 表格配色（默认值逐字取自 Dear ImGui 的表格主题，见 _UI_PORT_IMGUI.md 一）：
-        //  表头底 TableHeaderBg (0.19,0.19,0.20)；强线（表头/外框）TableBorderStrong (0.31,0.31,0.35)；
-        //  弱线（格内）TableBorderLight (0.23,0.23,0.25)；隔行底 TableRowBgAlt（白 6%）。
-        //  原来这些颜色是**硬编码在绘制里**的（表头根本没有底、两种线共用一个白色 0.22），
-        //  所以没法调、也没法按表区分。现在统一走这里（全局一套；目前没有单表覆盖入口，
-        //  需要的话给 TableArgs 加个 style 字段、TableDraw 取它即可）。
-        //  想回到"无表头底 / 无隔行"的老观感：把 HeaderBg / RowAltBg 的 alpha 设为 0 即可。
+        // 表格配色（取自 Dear ImGui 表格主题）：表头底 / 强线（表头、外框）/ 弱线（格内）/ 隔行底。
         public Color HeaderBg = new Color(0.19f, 0.19f, 0.20f, 1f);
         public Color LineStrong = new Color(0.31f, 0.31f, 0.35f, 1f);
         public Color LineLight = new Color(0.23f, 0.23f, 0.25f, 1f);
@@ -1290,11 +1182,8 @@ public partial class SR {
     private static TableStyle CurStyle { get { return _tableStyle; } }
 
     //页签行（多子页栏目）：要在页面外框（RenderPageHeader）之前调用，页签才会永远在最上面。
-    //页签行左侧的"前缀"绘制点（每个栏目一个）。
-    //用途：有些模块需要在**与页签同一行**的最左侧放一个自己的控件（如 EX 的总开关）,
-    //核心不关心它画什么，只负责在最左侧留位，这样"开关 + 页签"是同一行而不是两行。
+    // 页签行左侧的“前缀”绘制点（每个栏目一个）：模块可在与页签同一行最左侧放自己的控件。
     private static readonly Dictionary<string, Action> _tabPrefix = new Dictionary<string, Action>();
-    //控件高度（设计像素，0 = 默认 26）：页面渲染开始处设置、结束处复位
 
     public static void RegisterTabPrefix(string section, Action draw) {
         if (!string.IsNullOrEmpty(section) && draw != null) _tabPrefix[section] = draw;
@@ -1339,9 +1228,7 @@ public partial class SR {
         try { f(); } catch (Exception __ex) { Guard.Log("功能页渲染(" + section + ")", __ex); }
     }
 
-    // 功能页"外框"部件：滚动区之外的自绘内容（顶部工具行 / 底部输入行）
-    // 会话内容页的这两块必须画在滚动区外（不随内容滚动），但布局位置属于管理器 ->
-    // 由功能自己注册，管理器在对应栏目被选中时调用；核心不再写 section == "Chat" 这种硬编码判断。
+    // 功能页“外框”：滚动区之外的自绘内容（顶部工具行 / 底部输入行），由功能注册、管理器在栏目选中时调用。
     private static readonly Dictionary<string, Action> _pageHeaders = new Dictionary<string, Action>();
     private static readonly Dictionary<string, Action> _pageFooters = new Dictionary<string, Action>();
 

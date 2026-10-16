@@ -1,6 +1,5 @@
-﻿// 会话 · 对话内容页。全量聊天记录、过滤、文本构建与高度缓存，
-// 顶部工具行（清空 / 复制 / 两个开关）和底部发送行。
-// 整个会话栏目的总览看同目录的 Chat.cs。
+﻿// 会话 · 对话内容页：全量聊天记录、过滤、文本与高度缓存、顶部工具行、底部发送行。
+// 栏目总览见 Chat.cs。
 
 using System;
 using System.Collections.Generic;
@@ -26,40 +25,35 @@ public partial class Chat : ITweak {
         public static List<ChatEntry> Entries { get { return _log; } }
 
         private static ConfigEntry<bool> _chatFilterQuickEntry;
-        private static bool _chatFilterQuick;   //过滤快捷消息（表情/预设消息不显示）
+        private static bool _chatFilterQuick;   //过滤快捷消息（表情/预设消息）
         private static ConfigEntry<bool> _chatShowTimeEntry;
-        // **可配**：聊天记录保留条数（原来硬编码 500 条滚动淘汰）,  调大可翻更久的历史
+        // 聊天记录保留条数，超出后从最旧的开始淘汰。
         private static ConfigEntry<int> _chatLogLimitEntry;
-        // R396 N9：原来直接返回配置值，而 AcceptableValueRange(100,5000) **只约束 UI**。
-        //  cfg 被手改/旧版本残留越界值时，下面那行 if (_log.Count > LogLimit()) RemoveAt(0)
-        //  每次都成立 -> **聊天记录永久为空**，界面毫无提示。
-        //  写法照抄 PlayerTracker.SkipFrames（同项目已有先例）。
+        // 取值必须夹紧在 100-5000：AcceptableValueRange 只约束 UI，配置文件被手改成越界值时会导致聊天记录恒被清空。
         private static int LogLimit() {
             try { if (_chatLogLimitEntry != null) return Mathf.Clamp(_chatLogLimitEntry.Value, 100, 5000); } catch { }
             return 500;
         }
         private static bool _chatShowTime = true; //每条消息前显示具体时间
         private static string _chatTextCache;   //消息文本缓存（每秒重建一次，避免每帧拼接）
-        //文本是否已构建过：全过滤时 BuildChatText 返回 null，"缓存==null"会每帧成立 -> 每帧白遍历 500 条。
-        //用独立标志区分还没构建与构建结果就是空，重构只由计时器/开关变化触发。
+        // 文本是否已构建过：全被过滤时 BuildChatText 返回 null，不能用"缓存为 null"表示尚未构建。
         private static bool _chatBuilt;
-        //高度缓存：CalcHeight 是对最多 500 条消息的全量排版测量，而文本每秒才重建一次 ->
-        //没必要每帧重算（OnGUI 每帧至少跑两次：Layout + Repaint）。
-        //_chatHeightW 记录"算这个高度时用的宽度"，窗口缩放导致宽度变化时强制重算。
+        // 高度缓存：CalcHeight 是对全部消息的全量排版测量，文本每秒才重建一次，无需每帧重算。
+        // _chatHeightW 记录计算时所用宽度，宽度变化即失效重算。
         private static float _chatHeightCache;
         private static float _chatHeightW = -1f;
         private static float _chatTextTimer;
-        private static int _lastChatCount;      //上次渲染的条目数（判断是否有新消息 -> 滚到底）
-        private static int _chatTickFrame = -1; //计时器上次递减的帧号（按帧而非按 OnGUI 事件）
+        private static int _lastChatCount;      //上次渲染的条目数（有新消息时滚到底）
+        private static int _chatTickFrame = -1; //计时器上次递减的帧号（按帧，不按 OnGUI 事件）
         private static bool _chatCacheFilter, _chatCacheShowTime;
         private static string _chatInputText = ""; //底部发送框内容
 
         public static void Clear() {
             _log.Clear();
-            _lastChatCount = 0;   //清空后新消息应能立刻触发"滚到底"（否则要等条数重新超过旧值）
+            _lastChatCount = 0;   //清零后新消息才能立刻触发滚到底
         }
 
-        //从会话内容页发送聊天，走游戏原生 ChatSent 消息。
+        // 从本页发送聊天，走游戏原生 ChatSent 消息。
         public static void SendChatText(string text) {
             if (string.IsNullOrEmpty(text)) return;
             try {
@@ -88,15 +82,14 @@ public partial class Chat : ITweak {
 
         internal static void SelfRegLog() {
                         SR.RegisterPage("Chat", "ChatLog", "对话内容", "ChatLog", 20, Render); //会话栏目第 2 页
-            //顶部工具行 / 底部输入行必须画在滚动区之外（不随内容滚动）-> 注册成"页面外框"部件，
-            //由管理器在选中本栏目时调用（核心不再写 section == "Chat" 这种判断）
+            // 顶部工具行与底部输入行必须画在滚动区之外（不随内容滚动），故注册为页面外框部件。
             SR.RegisterPageChrome("Chat", RenderToolbar, RenderInputRow);
-            //两个开关的文案（配置已在本文件 Bind 到 Chat 段；即使被通用条目行渲染也是中文）
+            // 两个开关的本地化文案（配置在本文件 Bind 到 Chat 段）。
             SR.LocKey("Chat", "Filter Quick Msgs", "过滤快捷消息", null);
             SR.LocDesc("Chat", "Filter Quick Msgs", "把表情和预设消息从聊天记录里藏起来, 只留玩家真正打的字.", "Hide quick messages (emotes/presets) from the log");
             SR.LocKey("Chat", "Show Time", "显示时间", null);
             SR.LocDesc("Chat", "Show Time", "在每条聊天记录前面显示一下时间.", "Show the timestamp before each message");
-            // **预登记本页自动快捷键**：不用等页面首次渲染，否则重启后不打开会话页就按不出这些键。
+            // 预登记本页自动快捷键：不预登记则重启后在首次打开本页前按键无效。
             SR.HotkeyAction("chat.clear", "清空", () => { Clear(); _chatTextCache = null; _chatBuilt = false; });
             SR.HotkeyAction("chat.copy", "复制", () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (System.Exception __ex) { SR.Guard.Log("复制聊天记录", __ex); } });
             SR.HotkeyAction("chat.send", "发送", () => { SendChatText(_chatInputText); _chatInputText = ""; });
@@ -112,17 +105,16 @@ public partial class Chat : ITweak {
                 if (_chatShowTime) {
                     sb.Append(ce.time).Append(' ');
                 }
-                //"<名字>" 与正文之间用不换行空格：宽度不够时不会正好从 ">" 后面折到下一行（看着像正文跑到了下一行）
+                // 名字与正文之间用不换行空格，避免宽度不足时在 ">" 后折行。
                 sb.Append('<').Append(ce.sender).Append(">\u00A0").Append(ce.text).Append('\n');
             }
             return any ? sb.ToString() : null;
         }
 
         public static void Render() {
-            //大型滚动区显示全部记录；每秒重建一次文本（跟随新消息），避免每帧拼接字符串。
+            // 大型滚动区显示全部记录；文本每秒重建一次跟随新消息，避免每帧拼接字符串。
             List<ChatEntry> entries = Entries;
-            //每次 Render 都会被 Layout/Repaint 及若干输入事件调用多次：计时器必须按帧递减，
-            //否则"每秒重建"实际每秒重建 N 次（BuildChatText/CalcHeight 高频重跑）。
+            // Render 每帧被 Layout/Repaint 及输入事件调用多次，计时器必须按帧递减，否则每秒会重建多次。
             if (_chatTickFrame != Time.frameCount) {
                 _chatTickFrame = Time.frameCount;
                 _chatTextTimer -= Time.unscaledDeltaTime;
@@ -134,7 +126,7 @@ public partial class Chat : ITweak {
                 _chatCacheShowTime = _chatShowTime;
                 _chatTextCache = BuildChatText(entries);
                 _chatBuilt = true;
-                _chatHeightW = -1f; //文本变了 -> 高度作废，下次渲染重算
+                _chatHeightW = -1f; //文本变了，高度作废
             }
             if (entries.Count == 0) {
                 GUILayout.Label(SR.T("（暂无消息）", "(no messages)"), SR.Ctl.Label);
@@ -143,16 +135,15 @@ public partial class Chat : ITweak {
             } else {
                 float w = Mathf.Max(SR.Ctl.Sc(140), SR.Ctl.WinWidth - SR.Ctl.SidebarWidth() - SR.Ctl.Sc(36));
                 float innerW = w - SR.Ctl.Sc(20);
-                //聊天文本直接放外层滚动区，避免文本框与外层内容区双滚动条。
-                //高度按文本 + 宽度缓存：文本每秒重建一次时作废（见上方 _chatHeightW = -1f），
-                //宽度随窗口缩放变化时也会重算，其余帧直接复用。
+                // 文本直接放外层滚动区，避免文本框与外层内容区双滚动条。
+                // 高度按文本 + 宽度缓存，其余帧复用。
                 if (_chatHeightW != innerW || _chatHeightCache <= 0f) {
                     _chatHeightW = innerW;
                     _chatHeightCache = SR.Ctl.ChatLabel.CalcHeight(new GUIContent(_chatTextCache), innerW) + SR.Ctl.Sc(8);
                 }
                 float th = Mathf.Max(SR.Ctl.Sc(200), _chatHeightCache);
-                //只读编辑框：文本可像编辑框那样选中、Ctrl+A / Ctrl+C 复制（游戏本身没有文本选择功能）。
-                //IMGUI 的 TextArea 会返回编辑后的文本，这里直接忽略（不回写）-> 只读，但不影响选择/复制。
+                // 只读编辑框：借助 TextArea 获得文本选中与 Ctrl+A / Ctrl+C 复制（游戏本身没有文本选择功能）。
+                // 忽略 TextArea 返回的编辑结果，不回写。
                 GUILayout.TextArea(_chatTextCache, SR.Ctl.ChatArea, GUILayout.Width(innerW), GUILayout.Height(th));
                 if (entries.Count > _lastChatCount) { SR.Ctl.ScrollToBottom(); } //新消息滚到底
                 _lastChatCount = entries.Count;
@@ -168,10 +159,10 @@ public partial class Chat : ITweak {
                 SR.Ctl.Sc(56), SR.Ctl.Sc(26))) {
                 Clear();
                 _chatTextCache = null;
-                _chatBuilt = false; //清空后强制重建（否则要等下一个 1 秒计时点）
+                _chatBuilt = false; //强制重建，不等下一个计时点
             }
             GUILayout.Space(SR.Ctl.Sc(4));
-            //复制：把当前显示（应用了"过滤快捷消息"）的聊天记录整段复制到剪贴板, 原来这里是纯标签，没法选中复制
+            // 复制当前显示的聊天记录（已应用过滤）到剪贴板。
             if (SR.Ctl.HotkeyButton("chat.copy", SR.T("复制", "Copy"),
                 SR.T("把当前显示的聊天记录复制到剪贴板（游戏里没有文本选择功能，用这个代替）", "Copy the currently shown chat log to the clipboard"),
                 () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (Exception __ex) { SR.Guard.Log("复制聊天记录", __ex); } },
@@ -179,7 +170,7 @@ public partial class Chat : ITweak {
                 try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (Exception __ex) { SR.Guard.Log("复制聊天记录", __ex); }
             }
             GUILayout.Space(SR.Ctl.Sc(8));
-            //两个开关：标签（左键恢复默认 / 右键绑快捷键）+ 复选框，与通用条目行同一套写法
+            // 两个开关：标签（左键恢复默认 / 右键绑快捷键）+ 复选框。
             SR.Ctl.RestoreLabel(new GUIContent(SR.T("过滤快捷消息", "Hide quick msgs"), SR.T("过滤快捷消息（表情/预设消息不显示）", "Hide quick msgs (emotes/presets)")),
                 _chatFilterQuickEntry, SR.Ctl.Sc(120), SR.Ctl.Sc(26));
             if (_chatFilterQuickEntry != null) SR.Ctl.RenderControl(_chatFilterQuickEntry);
@@ -197,8 +188,8 @@ public partial class Chat : ITweak {
             if (SR.SelectedPageId("Chat") != "ChatLog") return; //输入行只属于对话内容页
             GUILayout.Space(SR.Ctl.Sc(10));
             GUILayout.BeginHorizontal();
-            //Enter/小键盘 Enter 必须在 TextField 绘制前拦截：IMGUI 单行 TextField 会消费
-            //KeyDown Return（提交并失焦）；先捕获并 Use() 可保持焦点连续发送（空文本不发送）。
+            // Enter / 小键盘 Enter 必须在 TextField 绘制前拦截并 Use()：IMGUI 单行 TextField 会消费
+            // KeyDown Return 导致提交并失焦；空文本不发送。
             if (Event.current.type == EventType.KeyDown
                 && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter)
                 && _chatInputText.Length > 0) {
@@ -220,12 +211,12 @@ public partial class Chat : ITweak {
 
         internal static void InitLog(IFeatureHost plugin) {
             SelfRegLog();
-            //三个开关绑在 Chat 段（与"功能自包含"一致：本功能的配置跟本功能走；老配置由 ConfigMigration 从 Settings 搬过来）
+            // 本功能的配置随本功能绑在 Chat 段。
             _chatFilterQuickEntry = plugin.Config.Bind("Chat", "Filter Quick Msgs", false, "会话内容页：过滤快捷消息（表情/预设消息不显示）");
             _chatFilterQuick = _chatFilterQuickEntry.Value;
             _chatFilterQuickEntry.SettingChanged += (s, e) => _chatFilterQuick = _chatFilterQuickEntry.Value;
             _chatShowTimeEntry = plugin.Config.Bind("Chat", "Show Time", true, "会话内容页：每条消息前显示具体时间。默认开启。");
-            // **可配**：保留条数（原来硬编码 500）
+            // 保留条数可配，默认 500。
             _chatLogLimitEntry = plugin.Config.Bind("Chat", "Log Limit", 500,
                 new ConfigDescription("会话内容页保留多少条消息（100-5000，超出后滚动淘汰最旧的）。调大可翻更久的历史。",
                     new AcceptableValueRange<int>(100, 5000)));
@@ -236,33 +227,21 @@ public partial class Chat : ITweak {
         [HarmonyPatch(typeof(ChatDisplay), "DisplayNewMessage")]
         [HarmonyPostfix]
         static void OnMessage(object[] __args) {
-            //Harmony 补丁不在 SR 页面 try/catch 覆盖范围内：异常会穿到游戏网络消息接收路径，
-            //与同功能其它补丁一致，这里整段兜住只记日志。
+            // Harmony 补丁不在 SR 页面的 try/catch 覆盖范围内，异常会穿到游戏的网络消息接收路径，故整段兜住只记日志。
             try {
                 if (!SR.GateMaster) return;
                 if (__args == null || __args.Length == 0) return;
                 if (!(__args[0] is ChatMessageDetails)) return;
                 ChatMessageDetails details = (ChatMessageDetails)__args[0];
-                // **Opt-11（审计 F12）**：这里原来是一条"按语义猜系统消息"的守卫
-                //     if (details.Animal == Character.Animals.NONE && !string.IsNullOrEmpty(details.Message)) return;
-                //  它会把**合法玩家消息**一起丢掉：游戏处理玩家聊天时
-                //     Animal = lobbyPlayer.PickedAnimal（反编译 84257-84267），
-                //  而 Animals.NONE 是枚举默认值 -> 发送者当前没选角色（树屋/大厅里还没选、或取消选角）
-                //  时他打的字会被当成系统消息，SR 的"对话内容"页不再记录
-                //  （游戏原生聊天窗口照常显示，所以表现为"聊天记录偶尔少几条"，很难复现）。
-                //
-                //  另外 R396 N8 那段注释也不成立：isChatMessage **不是**死字段 ——
-                //  反编译 84265 就是 `isChatMessage = msgChat.isChatMessage`（来自网络包），
-                //  41495 / 42017 / 112290 也会置 false，84480 / 84531 在消费它。
-                //  所以直接按游戏自己的判据来：isChatMessage 为假的是系统事件/系统提示。
+                // 按游戏自己的判据区分玩家消息与系统消息：isChatMessage 为假的是系统事件/系统提示。
                 if (!details.isChatMessage) return;
-                // 系统事件常常没有发送者名（如 PlayerVotedToKick）-> 也不进玩家聊天记录。
+                // 系统事件常常没有发送者名（如 PlayerVotedToKick），同样不记录。
                 if (string.IsNullOrEmpty(details.UserName)) return;
                 bool isQuick = false;
                 string text = details.Message;
                 if (string.IsNullOrEmpty(text)) {
                     if (details.EmoteType == EmoteMeanings.CHAT_Text) return; //空文字消息不记录
-                    //快捷消息：直接取游戏内气泡同一段文字（EmoteConverter -> I2 本地化，随游戏语言变化）。
+                    // 快捷消息取游戏内气泡的同一段文字（EmoteConverter -> I2 本地化，随游戏语言变化）。
                     text = EmoteSystem.EmoteConverter(details.EmoteType);
                     isQuick = true;
                 }
