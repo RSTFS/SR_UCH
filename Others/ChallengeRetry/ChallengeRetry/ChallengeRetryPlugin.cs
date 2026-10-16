@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace ChallengeRetry {
 
-    [BepInPlugin("com.gamingbeast.challenge_retry", "Challenge Retry", "1.0.0")]
+    [BepInPlugin("com.rs.challenge_retry", "Challenge Retry", "1.0.0")]
     public class ChallengeRetryPlugin : BaseUnityPlugin {
         public static ManualLogSource ModLogger;
 
