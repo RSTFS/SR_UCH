@@ -10,7 +10,7 @@ using UnityEngine.Networking;
 
 namespace PartyBoxBomb {
 
-    [BepInPlugin("com.gamingbeast.partybox_bomb", "Party Box Bomb", "1.0.0")]
+    [BepInPlugin("com.rs.partybox_bomb", "Party Box Bomb", "1.0.0")]
     public class PartyBoxBombPlugin : BaseUnityPlugin {
         public static ManualLogSource ModLogger;
 
