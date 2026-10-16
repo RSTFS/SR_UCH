@@ -1,4 +1,4 @@
-﻿// 配置迁移：把老版本 cfg 里的中文 section / key 换成英文，并清掉已删功能留下的配置段。
+﻿﻿// 配置迁移：把老版本 cfg 里的中文 section / key 换成英文，并清掉已删功能留下的配置段。
 // 必须赶在任何 Config.Bind 之前运行；文件被改写后调用方随后 ConfigFile.Reload()。
 using System;
 using System.Collections.Generic;
@@ -7,7 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 namespace SR_UCH.Tweaks {
-    internal static class ConfigMigration {
+    public static class ConfigMigration {
         // 已删除功能的 cfg 段名名单：SR.Core 启动时统一 NavHide，侧栏不再显示这些段。
         public static readonly string[] DeletedSections = new string[] {
             "Saved Lobby Details",
