@@ -1,2 +1,2 @@
-# 保留每个文件自身的行尾风格与 BOM 差异（git 不做行尾/BOM 转换）
+# Keep each file's own line-ending style and BOM presence: disable git's EOL/BOM conversion.
 * -text
