@@ -42,7 +42,7 @@ namespace ChatWindowsPlus {
     [BepInPlugin(Guid, "Chat Windows Plus", "1.0.0")]
     public class ChatWindowsPlusPlugin : BaseUnityPlugin {
 
-        public const string Guid = "com.gamingbeast.ChatWindowsPlus";
+        public const string Guid = "com.rs.ChatWindowsPlus";
         private const string Sec = "Chat Window";
 
         public static ManualLogSource Log;
