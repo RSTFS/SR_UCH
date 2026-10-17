@@ -64,7 +64,7 @@ public partial class Chat : ITweak {
                     GameState.ChatSystem.NewChatMessage(text, EmoteMeanings.CHAT_Text, num);
                 }
             } catch (Exception e) {
-                SR.LogWarn("Chat: send failed: " + e.Message);
+                SRApi.LogWarn("Chat: send failed: " + e.Message);
             }
         }
 

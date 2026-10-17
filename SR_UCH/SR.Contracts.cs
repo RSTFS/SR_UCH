@@ -182,10 +182,25 @@ namespace SR_UCH {
     // API 门面（SMAPI 的 SMAPI.Mod* 助手对应物）：功能层只允许用这里的成员。
     // 契约层不引用实现层，日志出口由核心在启动时注入（SRApi.SetLogSink）。
     public static class SRApi {
-        private static Action<string> _warn;
-        // 核心启动时注入：把契约层的告警接到实现的日志系统（无注入时静默丢弃，不影响功能）。
+        private static Action<string> _info, _warn, _error;
+        private static Action<string> _notify;
+        // 核心启动时注入：把契约层的日志/提示接到实现（无注入时静默丢弃，不影响功能）。
         public static void SetLogSink(Action<string> warn) { _warn = warn; }
+        public static void SetLogSinks(Action<string> info, Action<string> warn, Action<string> error) {
+            _info = info; _warn = warn; _error = error;
+        }
+        public static void SetNotifySink(Action<string> notify) { _notify = notify; }
         internal static void Warn(string msg) { try { Action<string> w = _warn; if (w != null) w(msg); } catch { } }
+        private static string Str(object m) { try { return m == null ? "" : m.ToString(); } catch { return "<ToString 失败>"; } }
+        public static void LogInfo(object m) { try { Action<string> a = _info; if (a != null) a(Str(m)); } catch { } }
+        public static void LogWarn(object m) { try { Action<string> a = _warn; if (a != null) a(Str(m)); } catch { } }
+        public static void LogError(object m) { try { Action<string> a = _error; if (a != null) a(Str(m)); } catch { } }
+        // 用户提示（右下角/系统消息）：实现层注入 ShowUserMessage（同时会写日志）。
+        public static void Notify(string text) { try { Action<string> n = _notify; if (n != null) n(text ?? ""); } catch { } }
+        public static void Notify(string text, params object[] args) {
+            if (args == null || args.Length == 0) { Notify(text); return; }
+            try { Notify(string.Format(text, args)); } catch { Notify(text); }
+        }
 
         // 统一带日志的 try / catch 包装：同一条 what 5 秒内只记一次，每帧路径上也安全。
         public static class Guard {

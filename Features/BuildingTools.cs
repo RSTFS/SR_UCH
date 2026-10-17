@@ -158,8 +158,8 @@ namespace SR_UCH.Tweaks {
             SR.RegisterKey("建造增强-自由放置开关", _toggleGridKey, "toggle");
 
             // 嵌套类的 CreateAndPatchAll 不递归，需显式注册；单个失败不影响其他。
-            try { Harmony.CreateAndPatchAll(typeof(BuildingTools)); } catch (Exception e) { SR.LogWarn("BuildingTools 补丁失败: " + e.Message); }
-            try { Harmony.CreateAndPatchAll(typeof(FreePlacementPatch)); } catch (Exception e) { SR.LogError("自由放置补丁注册失败: " + e.Message); }
+            try { Harmony.CreateAndPatchAll(typeof(BuildingTools)); } catch (Exception e) { SRApi.LogWarn("BuildingTools 补丁失败: " + e.Message); }
+            try { Harmony.CreateAndPatchAll(typeof(FreePlacementPatch)); } catch (Exception e) { SRApi.LogError("自由放置补丁注册失败: " + e.Message); }
         }
 
         [HarmonyPatch(typeof(GameState), "Update")]
@@ -173,7 +173,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void Notify(string name, bool state) {
-            SR.Notify(name + (state ? SR.T("：开", ": ON") : SR.T("：关", ": OFF")));   // 走核心通道，便于日志追溯
+            SRApi.Notify(name + (state ? SR.T("：开", ": ON") : SR.T("：关", ": OFF")));   // 走核心通道，便于日志追溯
         }
 
         [HarmonyPatch(typeof(PiecePlacementCursor), "ReceiveEvent")]

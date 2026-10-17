@@ -71,10 +71,10 @@ public partial class Level {
 			if (!_reloadBusy) return false;
 			if (ReloadLockStuck()) {
 				SetReloadBusy(false);
-				SR.LogWarn("[重载] 检测到残留的忙碌锁（超过 45 秒未复位），已自动放锁");
+				SRApi.LogWarn("[重载] 检测到残留的忙碌锁（超过 45 秒未复位），已自动放锁");
 				return false;
 			}
-			SR.Notify(SR.T("重载进行中，请稍候", "Reload in progress"));
+			SRApi.Notify(SR.T("重载进行中，请稍候", "Reload in progress"));
 			return true;
 		}
 
@@ -109,12 +109,12 @@ public partial class Level {
 			{
 				if (!SR.GateMaster)
 				{
-					SR.Notify(SR.Msg.MasterOff());
+					SRApi.Notify(SR.Msg.MasterOff());
 					return;
 				}
 				if (!IsPartyCreativeOrFreeplay())
 				{
-					SR.Notify(feature + SR.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
+					SRApi.Notify(feature + SR.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
 					return;
 				}
 				// 房主判定走统一门控 GateHost（= IsHost || OverrideHost）
@@ -132,31 +132,31 @@ public partial class Level {
 				LobbyManager lm = LobbyManager.instance;
 				if ((UnityEngine.Object)(object)lm == (UnityEngine.Object)null)
 				{
-					SR.Notify(SR.T("当前不在对局中", "Not in a match"));
+					SRApi.Notify(SR.T("当前不在对局中", "Not in a match"));
 					return;
 				}
 				GameControl gc = lm.CurrentGameController as GameControl;
 				if ((UnityEngine.Object)(object)gc == (UnityEngine.Object)null)
 				{
-					SR.Notify(SR.T("未进入有效对局", "No active match"));
+					SRApi.Notify(SR.T("未进入有效对局", "No active match"));
 					return;
 				}
 				QuickSaver qs = gc.GetComponent<QuickSaver>();
 				if ((UnityEngine.Object)(object)qs == (UnityEngine.Object)null)
 				{
-					SR.Notify(SR.T("当前对局不支持该操作", "Unsupported in the current match"));
+					SRApi.Notify(SR.T("当前对局不支持该操作", "Unsupported in the current match"));
 					return;
 				}
 				GameState gs = GameState.GetInstance();
 				if (gs == null)
 				{
-					SR.Notify(SR.T("游戏状态尚未就绪", "Game state not ready"));
+					SRApi.Notify(SR.T("游戏状态尚未就绪", "Game state not ready"));
 					return;
 				}
 				if (ReloadBlocked()) return; // 含锁残留自愈
 				// 快照刚广播过（3 秒内）先别重载，等方块重建落定
 				if (Time.unscaledTime - _lastSnapshotAt < 3f) {
-					SR.Notify(SR.T("快照刚广播，请稍后重载", "Snapshot just broadcast; retry later"));
+					SRApi.Notify(SR.T("快照刚广播，请稍后重载", "Snapshot just broadcast; retry later"));
 					return;
 				}
 				SetReloadBusy(true);
@@ -166,7 +166,7 @@ public partial class Level {
 				if (doc == null || string.IsNullOrEmpty(doc.OuterXml))
 				{
 					SetReloadBusy(false); // 失败路径复位
-					SR.Notify(SR.T("当前场景没有可同步的方块", "No blocks to sync in the current scene"));
+					SRApi.Notify(SR.T("当前场景没有可同步的方块", "No blocks to sync in the current scene"));
 					return;
 				}
 				try
@@ -176,7 +176,7 @@ public partial class Level {
 				catch
 				{
 					SetReloadBusy(false); // 失败路径复位
-					SR.Notify(SR.T("快照写入失败", "Failed to write the snapshot"));
+					SRApi.Notify(SR.T("快照写入失败", "Failed to write the snapshot"));
 					return;
 				}
 				// KeepScore 先置保分标志：重载后按原类型广播补分，下回合结算显示；KeepBlocksOnly 不置标志，分数重置。
@@ -185,7 +185,7 @@ public partial class Level {
 				GameSettings gsForMode = GameSettings.GetInstance();
 				if (gsForMode == null)
 				{
-					SR.Notify(SR.T("游戏加载中，请稍后再试",
+					SRApi.Notify(SR.T("游戏加载中，请稍后再试",
 						"Still loading; try again later"));
 					SetReloadBusy(false);
 					return;
@@ -213,7 +213,7 @@ public partial class Level {
 			{
 				// 仅协程未启动（StartCoroutine 之前的异常）时手动复位，否则锁残留
 				if (!coroutineStarted) SetReloadBusy(false);
-				SR.LogWarn((object)(feature + "失败: " + ex.Message));
+				SRApi.LogWarn((object)(feature + "失败: " + ex.Message));
 			}
 		}
 
@@ -235,16 +235,16 @@ public partial class Level {
 			}
 			catch (Exception ex)
 			{
-				SR.LogWarn((object)("重载场景失败: " + ex.Message));
+				SRApi.LogWarn((object)("重载场景失败: " + ex.Message));
 			}
 			if (ok)
 			{
-				SR.Notify(feature + SR.T("：重载中，方块保留，", ": reloading, blocks kept, ") +
+				SRApi.Notify(feature + SR.T("：重载中，方块保留，", ": reloading, blocks kept, ") +
 					(ReloadKeepsScore ? SR.T("分数保留", "scores kept") : SR.T("分数重置", "scores reset")));
 			}
 			else
 			{
-				SR.Notify(feature + SR.T("：重载失败", ": reload failed"));
+				SRApi.Notify(feature + SR.T("：重载失败", ": reload failed"));
 			}
 			_reloadStartedAt = Time.unscaledTime;
 			_reloadLoadedAt = -1f; // 等待 LoadingInterstitialSplash.FadeOut 置位
@@ -291,12 +291,12 @@ public partial class Level {
 			{
 				if (!SR.GateMaster)
 				{
-					SR.Notify(SR.Msg.MasterOff());
+					SRApi.Notify(SR.Msg.MasterOff());
 					return;
 				}
 				if (!IsPartyCreativeOrFreeplay())
 				{
-					SR.Notify(feature + SR.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
+					SRApi.Notify(feature + SR.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
 					return;
 				}
 				// 房主判定走统一门控 GateHost（= IsHost || OverrideHost）
@@ -314,37 +314,37 @@ public partial class Level {
 				LobbyManager lm = LobbyManager.instance;
 				if ((UnityEngine.Object)(object)lm == (UnityEngine.Object)null)
 				{
-					SR.Notify(SR.T("当前不在对局中", "Not in a match"));
+					SRApi.Notify(SR.T("当前不在对局中", "Not in a match"));
 					return;
 				}
 				GameControl gc = lm.CurrentGameController as GameControl;
 				if ((UnityEngine.Object)(object)gc == (UnityEngine.Object)null)
 				{
-					SR.Notify(SR.T("未进入有效对局", "No active match"));
+					SRApi.Notify(SR.T("未进入有效对局", "No active match"));
 					return;
 				}
 				QuickSaver qs = gc.GetComponent<QuickSaver>();
 				if ((UnityEngine.Object)(object)qs == (UnityEngine.Object)null)
 				{
-					SR.Notify(SR.T("当前对局不支持该操作", "Unsupported in the current match"));
+					SRApi.Notify(SR.T("当前对局不支持该操作", "Unsupported in the current match"));
 					return;
 				}
 				// 重载进行中不放广播快照（与场景重载共用同一把锁）
 				if (ReloadBlocked()) return; // 含锁残留自愈
 				float _now = Time.unscaledTime;
-				if (_now - _lastSnapshotAt < 3f) { SR.Notify(SR.T("快照广播冷却中，请稍后", "Snapshot broadcast on cooldown")); return; }
+				if (_now - _lastSnapshotAt < 3f) { SRApi.Notify(SR.T("快照广播冷却中，请稍后", "Snapshot broadcast on cooldown")); return; }
 				_lastSnapshotAt = _now;
 				// 生成房主当前视角的完整快照 XML（含位置/旋转/缩放/胶水 parentID/mainID 等属性）
 				System.Xml.XmlDocument doc = qs.GetCurrentXmlSnapshot(false);
 				if (doc == null)
 				{
-					SR.Notify(SR.T("快照生成失败", "Failed to generate the snapshot"));
+					SRApi.Notify(SR.T("快照生成失败", "Failed to generate the snapshot"));
 					return;
 				}
 				string xml = doc.OuterXml;
 				if (string.IsNullOrEmpty(xml))
 				{
-					SR.Notify(SR.T("快照内容为空", "The snapshot is empty"));
+					SRApi.Notify(SR.T("快照内容为空", "The snapshot is empty"));
 					return;
 				}
 				// 走游戏原生机制广播：房主压缩 -> RPC 全员 -> LoadSnapshotFromXmlDocument 重建；不重载场景，分数保留。
@@ -353,7 +353,7 @@ public partial class Level {
 			}
 			catch (Exception ex)
 			{
-				SR.LogWarn((object)(feature + "失败: " + ex.Message));
+				SRApi.LogWarn((object)(feature + "失败: " + ex.Message));
 			}
 		}
 
@@ -372,7 +372,7 @@ public partial class Level {
 				d.DocumentElement.SetAttribute("srSnapshot", "1");
 				return d.OuterXml;
 			} catch (Exception __ex) {
-				SR.LogWarn("[快照] 打标记失败，按原样发送: " + __ex.Message);
+				SRApi.LogWarn("[快照] 打标记失败，按原样发送: " + __ex.Message);
 				return xml;
 			}
 		}
@@ -392,14 +392,14 @@ public partial class Level {
 		{
 			// 打 srSnapshot 标记：客户端据此只在 SR 的快照上补发阶段事件，不碰游戏自己的开局/重载路径。
 			xml = MarkSnapshotXml(xml);
-			if (xml.Length > 1500000) SR.Notify(SR.T("快照较大（" + (xml.Length / 1000) + " KB），应用时可能卡顿", "Large snapshot (" + (xml.Length / 1000) + " KB); may hitch"));
+			if (xml.Length > 1500000) SRApi.Notify(SR.T("快照较大（" + (xml.Length / 1000) + " KB），应用时可能卡顿", "Large snapshot (" + (xml.Length / 1000) + " KB); may hitch"));
 			System.Diagnostics.Stopwatch _sw = new System.Diagnostics.Stopwatch(); _sw.Start();
 			byte[] xmlBytes = Encoding.UTF8.GetBytes(xml);
 			_sw.Stop();
-			SR.LogInfo("[快照] 序列化耗时 " + _sw.ElapsedMilliseconds + "ms");
-			SR.Notify(feature + SR.T("：广播快照（", ": broadcasting (") + xmlBytes.Length + SR.T(" 字节），全员按房主状态重建", " bytes), everyone rebuilds from the host's state"));
+			SRApi.LogInfo("[快照] 序列化耗时 " + _sw.ElapsedMilliseconds + "ms");
+			SRApi.Notify(feature + SR.T("：广播快照（", ": broadcasting (") + xmlBytes.Length + SR.T(" 字节），全员按房主状态重建", " bytes), everyone rebuilds from the host's state"));
 			gc.CompressAndSendSnapshotBytes(xmlBytes, delegate {
-				SR.Notify(feature + SR.T("：方块已重建，分数保留", ": blocks rebuilt, scores kept"));
+				SRApi.Notify(feature + SR.T("：方块已重建，分数保留", ": blocks rebuilt, scores kept"));
 			});
 			// CompressAndSendSnapshotBytes 走 ClientRpc，不在房主本地执行，故这里补一次本地应用。
 			try {
@@ -413,7 +413,7 @@ public partial class Level {
 					_srSnapshotLoad = true;
 					try {
 						if (!selfQs.LoadSnapshotFromXmlDocument(selfDoc))
-							SR.Notify(SR.T("本地应用快照失败", "Failed to apply the snapshot locally"));
+							SRApi.Notify(SR.T("本地应用快照失败", "Failed to apply the snapshot locally"));
 					} finally { _srSnapshotLoad = false; }
 				}
 			} catch (Exception __ex) { SRApi.Guard.Log("本地应用快照", __ex); }
@@ -426,12 +426,12 @@ public partial class Level {
 			qs = null;
 			if (!SR.GateMaster)
 			{
-				SR.Notify(SR.Msg.MasterOff());
+				SRApi.Notify(SR.Msg.MasterOff());
 				return false;
 			}
 			if (!IsPartyCreativeOrFreeplay())
 			{
-				SR.Notify(feature + SR.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
+				SRApi.Notify(feature + SR.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
 				return false;
 			}
 			if (!SR.GateHost)
@@ -448,19 +448,19 @@ public partial class Level {
 			LobbyManager lm = LobbyManager.instance;
 			if ((UnityEngine.Object)(object)lm == (UnityEngine.Object)null)
 			{
-				SR.Notify(SR.T("当前不在对局中", "Not in a match"));
+				SRApi.Notify(SR.T("当前不在对局中", "Not in a match"));
 				return false;
 			}
 			GameControl g = lm.CurrentGameController as GameControl;
 			if ((UnityEngine.Object)(object)g == (UnityEngine.Object)null)
 			{
-				SR.Notify(SR.T("未进入有效对局", "No active match"));
+				SRApi.Notify(SR.T("未进入有效对局", "No active match"));
 				return false;
 			}
 			QuickSaver q = g.GetComponent<QuickSaver>();
 			if ((UnityEngine.Object)(object)q == (UnityEngine.Object)null)
 			{
-				SR.Notify(SR.T("当前对局不支持该操作", "Unsupported in the current match"));
+				SRApi.Notify(SR.T("当前对局不支持该操作", "Unsupported in the current match"));
 				return false;
 			}
 			if (ReloadBlocked()) return false; // 含锁残留自愈
@@ -493,7 +493,7 @@ public partial class Level {
 		// 清除玩家放置的方块（全员可见，房客也能用）：逐块网络销毁，不走 <destroyed> 快照路径。
 		public static void ClearPlacedBlocks(List<Placeable> targets, string feature) {
 			try {
-				if (targets == null || targets.Count == 0) { SR.Notify(SR.T("地图上没有玩家放置的道具", "No player-placed props on the map")); return; }
+				if (targets == null || targets.Count == 0) { SRApi.Notify(SR.T("地图上没有玩家放置的道具", "No player-placed props on the map")); return; }
 				GameControl gc; QuickSaver qs;
 				if (!TryGetSnapshotContext(feature, out gc, out qs)) return;
 				FallbackClearPlacedBlocks(targets); // 直接逐块网络销毁（不用快照）
@@ -518,7 +518,7 @@ public partial class Level {
                 // GameControl.Phase / GameEvent.StartPhaseEvent / GameEventManager.SendEvent 均为 public，直接调用，无需反射。
                 GameControl.GamePhase phv = gc.Phase;
                 GameEvent.GameEventManager.SendEvent(new GameEvent.StartPhaseEvent(phv));
-                SR.LogInfo("[快照] 加载后补发阶段事件: " + phv);
+                SRApi.LogInfo("[快照] 加载后补发阶段事件: " + phv);
                 // 只补发一次当前真实阶段（伪造 PLACE/PLAY 边沿会让客户端与服务器状态机错位）；快照方块无需照抄 WaitForPlacement 的 isKinematic/layer=9：prefab 默认已 Kinematic，而 layer 9(Placed) 与自身及 Fixed 都不碰撞。
                 // 快照路径真正缺的只有放置计数 GameState.IncrementPieceCount 与一次 Tint()。
                 try {
@@ -537,7 +537,7 @@ public partial class Level {
                             nFix++;
                         } catch (Exception __pe) { SRApi.Guard.Log("快照方块收尾", __pe); }
                     }
-                    if (nFix > 0) SR.LogInfo("[快照] 已为 " + nFix + " 个方块补放置计数并着色");
+                    if (nFix > 0) SRApi.LogInfo("[快照] 已为 " + nFix + " 个方块补放置计数并着色");
                 } catch (Exception __fx) { SRApi.Guard.Log("快照方块收尾", __fx); }
                 // 归属登记必须在加载之后：方块是加载时创建的，加载前集合为空。
                 try {
@@ -552,9 +552,9 @@ public partial class Level {
                     Action<List<Placeable>> attributeToHost = SR.Require<Action<List<Placeable>>>(SlotAttributeToHost);
                     if (attributeToHost != null) {
                         attributeToHost(built);
-                        SR.LogInfo("[快照] 已把 " + built.Count + " 个快照方块归属房主(#1)");
+                        SRApi.LogInfo("[快照] 已把 " + built.Count + " 个快照方块归属房主(#1)");
                     } else {
-                        SR.LogWarn("[快照] 方块破坏功能未加载，跳过 " + built.Count + " 个方块的归属登记");
+                        SRApi.LogWarn("[快照] 方块破坏功能未加载，跳过 " + built.Count + " 个方块的归属登记");
                     }
                 } catch (Exception __ahx) { SRApi.Guard.Log("构建归属房主", __ahx); }
             } catch (Exception __ex) { SRApi.Guard.Log("快照后补发阶段事件", __ex); }
@@ -573,7 +573,7 @@ public partial class Level {
 		        }
 		        int n2 = bad.Count;
 		        for (int i = 0; i < n2; i++) root.RemoveChild(bad[i]);
-		        if (n2 > 0) SR.LogInfo("[快照] 已剥掉快照内 <destroyed> 节点: " + n2 + " 个");
+		        if (n2 > 0) SRApi.LogInfo("[快照] 已剥掉快照内 <destroyed> 节点: " + n2 + " 个");
 		        return doc.OuterXml;
 		    } catch (Exception __ex) { SRApi.Guard.Log("剥离 destroyed", __ex); return xml; }
 		}
@@ -587,7 +587,7 @@ public partial class Level {
 				if (p == null || p.MarkedForDestruction) continue;
 				try { p.DestroySelf(destroyChildren: false, useSmoke: false); n++; } catch (Exception __ex) { SRApi.Guard.Log("清场.兜底单项", __ex); }
 			}
-			SR.LogInfo("[清场] 快照路径不可用，已退回逐块网络销毁: " + n + " 个");
+			SRApi.LogInfo("[清场] 快照路径不可用，已退回逐块网络销毁: " + n + " 个");
 		}
 
 // 分区 Reload：重载关卡保分补分 / 折扣保留 / 重载宽限。
@@ -677,7 +677,7 @@ public partial class Level {
                 } catch (Exception __ex) { SRApi.Guard.Log("读取玩家 handicap", __ex); }
             }
             if (_handicapBackup.Count > 0) {
-                SR.LogInfo("[折扣] 重载前备份 " + _handicapBackup.Count + " 名玩家 handicap");
+                SRApi.LogInfo("[折扣] 重载前备份 " + _handicapBackup.Count + " 名玩家 handicap");
             }
         } catch (Exception __ex) { SRApi.Guard.Log("备份 handicap", __ex); }
     }
@@ -701,7 +701,7 @@ public partial class Level {
                     if (gp != null) gp.NetworkHandicap = kv.Value;
                 } catch (Exception __ex) { SRApi.Guard.Log("恢复 GamePlayer handicap", __ex); }
             }
-            SR.LogInfo("[折扣] 重载后恢复 " + backup.Count + " 名玩家 handicap");
+            SRApi.LogInfo("[折扣] 重载后恢复 " + backup.Count + " 名玩家 handicap");
         } catch (Exception __ex) { SRApi.Guard.Log("恢复 handicap", __ex); }
     }
 
@@ -789,22 +789,22 @@ public partial class Level {
                 List<PointBlock> hist = hf != null ? hf.GetValue(__instance) as List<PointBlock> : null;
                 if (hist != null) blocks.AddRange(hist);
             } catch (Exception ex) {
-                SR.LogWarn("[保分] 备份 historyPointBlocks 失败: " + ex.Message);
+                SRApi.LogWarn("[保分] 备份 historyPointBlocks 失败: " + ex.Message);
             }
             try {
                 List<PointBlock> npb = __instance.newPointBlocks; // public 字段，直接读
                 if (npb != null) blocks.AddRange(npb);
             } catch (Exception ex) {
-                SR.LogWarn("[保分] 备份 newPointBlocks 失败: " + ex.Message);
+                SRApi.LogWarn("[保分] 备份 newPointBlocks 失败: " + ex.Message);
             }
             if (_clearedExternBlocks != null && _clearedExternBlocks.Count > 0) {
                 // 结算时被 Clear 的外部加分分块：合并进备份，重载后补回
                 blocks.AddRange(_clearedExternBlocks);
-                SR.LogInfo("[保分] 合并被清除的外部加分分块 " + _clearedExternBlocks.Count + " 条");
+                SRApi.LogInfo("[保分] 合并被清除的外部加分分块 " + _clearedExternBlocks.Count + " 条");
                 _clearedExternBlocks.Clear();
             }
             if (blocks.Count == 0) {
-                SR.LogWarn("[保分] 重载时无可备份的分块（history+new+外部加分均为空）");
+                SRApi.LogWarn("[保分] 重载时无可备份的分块（history+new+外部加分均为空）");
                 return;
             }
             _scoreBackupBlocks = new Dictionary<int, List<PointBlock>>();
@@ -817,9 +817,9 @@ public partial class Level {
                 }
                 list.Add(pb);
             }
-            SR.LogInfo("[保分] 重载备份分块 " + blocks.Count + " 条，涉及 " + _scoreBackupBlocks.Count + " 名玩家");
+            SRApi.LogInfo("[保分] 重载备份分块 " + blocks.Count + " 条，涉及 " + _scoreBackupBlocks.Count + " 名玩家");
         } catch (Exception ex) {
-            SR.LogWarn("[保分] 备份分块失败: " + ex.Message);
+            SRApi.LogWarn("[保分] 备份分块失败: " + ex.Message);
         }
     }
 
@@ -831,7 +831,7 @@ public partial class Level {
                 bool fresh = _preserveScoresOnReload && _preserveMarkedAt >= 0f
                     && (Time.unscaledTime - _preserveMarkedAt) <= PreserveStaleAfter;
                 if (_preserveScoresOnReload && !fresh) {
-                    SR.LogWarn("[保分] 保分标志已过期（" + ((int)(Time.unscaledTime - _preserveMarkedAt))
+                    SRApi.LogWarn("[保分] 保分标志已过期（" + ((int)(Time.unscaledTime - _preserveMarkedAt))
                         + " 秒没被结算），本次按普通开局处理");
                 }
                 _refillPending = fresh;
@@ -875,14 +875,14 @@ public partial class Level {
                 if (capped) break; // 已达上限，外层同步停止
             }
             if (capped) {
-                SR.LogWarn("[补分] 备份分块 " + total + " 条超过上限 " + FillTotalCap
+                SRApi.LogWarn("[补分] 备份分块 " + total + " 条超过上限 " + FillTotalCap
                     + "，仅补回前 " + queue.Count + " 条（" + (total - queue.Count) + " 条被丢弃，重载后分数会偏少）");
             }
             if (queue.Count == 0) return;
             lm.StartCoroutine(FillScoresCoroutine(queue));
-            SR.LogInfo("[补分] 队列 " + queue.Count + " 条，分帧发送（每帧 " + FillPerFrame + " 条）");
+            SRApi.LogInfo("[补分] 队列 " + queue.Count + " 条，分帧发送（每帧 " + FillPerFrame + " 条）");
         } catch (Exception ex) {
-            SR.LogWarn("[补分] 初始化失败: " + ex.Message);
+            SRApi.LogWarn("[补分] 初始化失败: " + ex.Message);
         }
     }
 
@@ -893,12 +893,12 @@ public partial class Level {
             for (int i = 0; i < batch; i++) {
                 try {
                     // 服务器权威广播：房客的 ScoreKeeper 收到后自行进入 newPointBlocks，非权威端等广播即可。
-                    if (!NetworkServer.active) { SR.LogWarn("[补分] 已非服务器权威，中止补分"); yield break; }
+                    if (!NetworkServer.active) { SRApi.LogWarn("[补分] 已非服务器权威，中止补分"); yield break; }
                     NetworkServer.SendToAll(NetMsgTypes.PointAwarded, new MsgPointAwarded {
                         PlayerNumber = queue[sent].Key, PointType = queue[sent].Value, AlwaysAward = true
                     });
                 } catch (Exception ex) {
-                    SR.LogWarn("[补分] 发送失败: " + ex.Message);
+                    SRApi.LogWarn("[补分] 发送失败: " + ex.Message);
                 }
                 sent++;
             }

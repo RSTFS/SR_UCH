@@ -83,7 +83,7 @@ public partial class Experiments : ITweak
                 SR.RegisterTick("加载遮罩", Tick);
                 SR.RegisterSceneHook(Reset);
                 try { Harmony.CreateAndPatchAll(typeof(SplashPatch)); }
-                catch (Exception __ex) { SR.LogWarn("加载遮罩 补丁注册失败: " + __ex.Message); }
+                catch (Exception __ex) { SRApi.LogWarn("加载遮罩 补丁注册失败: " + __ex.Message); }
             } catch (Exception __ex) { SRApi.Guard.Log("加载遮罩 初始化", __ex); }
         }
 
@@ -194,19 +194,19 @@ public partial class Experiments : ITweak
             try {
                 EnsureHost();
                 if (_host == null) {
-                    SR.LogWarn("[场景] 温柔加载宿主不可用，本次请求回落原版（" + sceneName + "）");
+                    SRApi.LogWarn("[场景] 温柔加载宿主不可用，本次请求回落原版（" + sceneName + "）");
                     return false;
                 }
                 if (_runningUntil > 0f && Time.realtimeSinceStartup < _runningUntil) {
                     // 不能静默返回：Prefix 已决定抑制原版，放弃即请求被吞掉。
-                    SR.LogWarn("[场景] 温柔加载已在进行中，本次请求回落原版（" + sceneName + "）");
+                    SRApi.LogWarn("[场景] 温柔加载已在进行中，本次请求回落原版（" + sceneName + "）");
                     return false;
                 }
                 _target = sceneName;
                 _host.StartCoroutine(SceneManagerWrapper.DoGentleSceneLoad(sceneName));
                 // 协程无 isDone：场景已切换到目标即视为完成，5 秒后自动解锁。
                 _runningUntil = Time.realtimeSinceStartup + 5f;
-                SR.LogInfo("[场景] 温柔加载：" + sceneName);
+                SRApi.LogInfo("[场景] 温柔加载：" + sceneName);
                 return true;
             } catch (Exception __ex) {
                 SRApi.Guard.Log("温柔加载", __ex);
@@ -267,9 +267,9 @@ public partial class Experiments : ITweak
 
         private static void DoLaunch(LevelSelectController lsc) {
             // 判 SR.CanControlLocally（离线时为真）；LaunchLevel 是纯本地调用，与广播能力无关。
-            if (!SR.CanControlLocally) { SR.Notify(SR.T("仅房主可开始关卡", "Host only")); return; }
+            if (!SR.CanControlLocally) { SRApi.Notify(SR.T("仅房主可开始关卡", "Host only")); return; }
             LevelPortal[] portals = lsc.portals;
-            if (portals == null || portals.Length == 0) { SR.Notify(SR.T("未找到可用关卡门", "No level portal available")); return; }
+            if (portals == null || portals.Length == 0) { SRApi.Notify(SR.T("未找到可用关卡门", "No level portal available")); return; }
             int best = -1, bestV = -1;
             for (int i = 0; i < portals.Length; i++) {
                 if (portals[i] == null) continue;
@@ -278,11 +278,11 @@ public partial class Experiments : ITweak
             }
             // 零票视为未选定关卡，不启动。
             if (best < 0 || bestV <= 0 || portals[best] == null) {
-                SR.Notify(SR.T("尚未选定关卡，请先投票", "No level selected yet - vote first"));
+                SRApi.Notify(SR.T("尚未选定关卡，请先投票", "No level selected yet - vote first"));
                 return;
             }
             lsc.LaunchLevel(portals[best]);
-            SR.Notify(SR.T("关卡已开始", "Level started"));
+            SRApi.Notify(SR.T("关卡已开始", "Level started"));
         }
 
 

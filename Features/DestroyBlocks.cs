@@ -313,7 +313,7 @@ namespace SR_UCH.Tweaks {
             _trackMode.SettingChanged += (s, e) => _listDirty = true;
 
             // 补丁注册失败不能连带跳过后面的 Listener 注册与场景订阅。
-            try { Harmony.CreateAndPatchAll(typeof(DestroyBlocks)); } catch (Exception e) { SR.LogError("方块破坏 补丁注册失败: " + e.Message); }
+            try { Harmony.CreateAndPatchAll(typeof(DestroyBlocks)); } catch (Exception e) { SRApi.LogError("方块破坏 补丁注册失败: " + e.Message); }
             PlacementListener listener = new PlacementListener();
             GameEventManager.ChangeListener<GameEvent.PiecePlacedEvent>(listener, true);
             GameEventManager.ChangeListener<GameEvent.DestroyPieceEvent>(listener, true);

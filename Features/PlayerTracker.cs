@@ -278,7 +278,7 @@ namespace SR_UCH.Tweaks {
                 if (sh == null) {
                     if (!_shaderMissingWarned) {
                         _shaderMissingWarned = true;
-                        SR.LogWarn("[移动轨迹] 找不到可用着色器（Sprites/Default、UI/Default、Unlit/Transparent 都没有），移动轨迹将不显示");
+                        SRApi.LogWarn("[移动轨迹] 找不到可用着色器（Sprites/Default、UI/Default、Unlit/Transparent 都没有），移动轨迹将不显示");
                     }
                     return null;
                 }

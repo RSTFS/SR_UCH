@@ -160,7 +160,7 @@ namespace SR_UCH.Tweaks {
 
         // 回家（解散 / 退出 / 返回主界面）
         private static void Notes(string zh, string en) {
-            SR.Notify(SR.T(zh, en));
+            SRApi.Notify(SR.T(zh, en));
         }
 
         private static void ArmWatchdog() {
@@ -189,9 +189,9 @@ namespace SR_UCH.Tweaks {
             _pendingJoin = "";
             _pendingSteamId = 0;   // 取消待加入，Steam 房号一并作废
             // reason 不能传自定义串：游戏会把它当成玩家可见提示弹出；传 null 则不覆盖游戏自己设的 abortReason。
-            try { SR.LogInfo("[联机] 请求返回主界面（reason 传 null，避免把调试串弹给玩家）"); } catch { }
+            try { SRApi.LogInfo("[联机] 请求返回主界面（reason 传 null，避免把调试串弹给玩家）"); } catch { }
             try { Matchmaker.ReturnToMainMenu(null); }
-            catch (Exception e) { SR.LogWarn("返回主界面失败: " + e.Message); }
+            catch (Exception e) { SRApi.LogWarn("返回主界面失败: " + e.Message); }
             // 不等游戏的优雅收尾，先做无损的部分：放出被等待的加载遮罩、清房间列表与表格几何缓存、收界面状态。
             // 动游戏状态机的收尾（Disconnect / 销毁 LobbyManager / 切场景）只交给看门狗。
             NudgeSplash();
@@ -228,7 +228,7 @@ namespace SR_UCH.Tweaks {
             _pendingSteamId = 0; // Steam 房号随之作废
             _abortDeadline = 0f;
             _forceDeadline = 0f;
-            SR.LogWarn("[联机] 强制返回主界面（手动）");
+            SRApi.LogWarn("[联机] 强制返回主界面（手动）");
             NudgeSplash();
             try {
                 LobbyManager lm = LobbyManager.instance;
@@ -240,7 +240,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：收尾联机状态", __ex); }
             try { SR.ForceResetUiState(); } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：重置界面状态", __ex); }
             try { SceneManagerWrapper.LoadScene("MainMenu"); }
-            catch (Exception e) { SR.LogWarn("强制加载主界面失败: " + e.Message); }
+            catch (Exception e) { SRApi.LogWarn("强制加载主界面失败: " + e.Message); }
             _forceRawDeadline = Time.unscaledTime + 2f;   //5) 二级兜底
         }
 
@@ -275,13 +275,13 @@ namespace SR_UCH.Tweaks {
                 _abortDeadline = 0f;
                 string sc = SceneManager.GetActiveScene().name;
                 if (sc == "MainMenu") { _forceDeadline = 0f; return; }
-                SR.LogWarn("[联机] 回家超时（场景 " + sc + "）-> 放出加载遮罩让流程继续");
+                SRApi.LogWarn("[联机] 回家超时（场景 " + sc + "）-> 放出加载遮罩让流程继续");
                 NudgeSplash();
             }
             if (_forceDeadline > 0f && now >= _forceDeadline) {
                 _forceDeadline = 0f;
                 if (SceneManager.GetActiveScene().name == "MainMenu") return;
-                SR.LogWarn("[联机] 仍卡在加载动画 -> 强制回主界面");
+                SRApi.LogWarn("[联机] 仍卡在加载动画 -> 强制回主界面");
                 NudgeSplash();   // 先放出被等待的遮罩再收尾
                 try {
                     LobbyManager lm = LobbyManager.instance;
@@ -292,16 +292,16 @@ namespace SR_UCH.Tweaks {
                     }
                 } catch (Exception __ex) { SRApi.Guard.Log("超时兜底：收尾联机状态", __ex); }
                 try { SceneManagerWrapper.LoadScene("MainMenu"); }
-                catch (Exception e) { SR.LogWarn("强制加载主界面失败: " + e.Message); }
+                catch (Exception e) { SRApi.LogWarn("强制加载主界面失败: " + e.Message); }
                 _forceRawDeadline = now + 2f;
             }
             // 二级兜底：温和加载 2 秒后仍未进主界面则直接切场景。
             if (_forceRawDeadline > 0f && now >= _forceRawDeadline) {
                 _forceRawDeadline = 0f;
                 if (SceneManager.GetActiveScene().name == "MainMenu") return;
-                SR.LogWarn("[联机] 温和加载仍未进主界面 -> 直接切场景 MainMenu");
+                SRApi.LogWarn("[联机] 温和加载仍未进主界面 -> 直接切场景 MainMenu");
                 try { SceneManager.LoadScene("MainMenu"); }
-                catch (Exception e) { SR.LogWarn("直接切主界面失败: " + e.Message); }
+                catch (Exception e) { SRApi.LogWarn("直接切主界面失败: " + e.Message); }
             }
         }
 
@@ -330,7 +330,7 @@ namespace SR_UCH.Tweaks {
                 ArmWatchdog();
                 if (wasPending) Notes("房主已解散房间，已取消加入", "Host disbanded; join cancelled");
                 else Notes("房主已解散房间", "Host disbanded");
-                SR.LogInfo("[联机] 收到 HostEndedGame：已清待加入队列并解除看门狗");
+                SRApi.LogInfo("[联机] 收到 HostEndedGame：已清待加入队列并解除看门狗");
             } catch (Exception __ex) { SRApi.Guard.Log("处理房主解散", __ex); }
         }
 
@@ -362,7 +362,7 @@ namespace SR_UCH.Tweaks {
                 _lobbySearching = false;
                 _lobbyErr = true;
                 _lobbyMsg = SR.T("搜索失败: ", "Search failed: ") + e.Message;
-                SR.LogWarn("刷新房间列表失败: " + e.Message);
+                SRApi.LogWarn("刷新房间列表失败: " + e.Message);
             }
         }
 
@@ -411,7 +411,7 @@ namespace SR_UCH.Tweaks {
                 "联机：判断客户端是否已在平台房间里（加入前必须先退出）");
             bool InLobby() { try { return inLobby != null && (bool)inLobby.GetValue(mm); } catch { return false; } }
             if (InLobby()) {
-                try { SR.LogInfo("[联机] 已在房间中，先离开..."); } catch { }
+                try { SRApi.LogInfo("[联机] 已在房间中，先离开..."); } catch { }
                 try {
                     // LeaveLobby 声明在基类 Matchmaker 上，直接调用交由虚方法分发。
                     try { mm.LeaveLobby(null, UserMessageManager.UserMsgPriority.lo); }
@@ -423,10 +423,10 @@ namespace SR_UCH.Tweaks {
                 if (InLobby()) {
                     try {
                         mm.LeaveLobby(null, UserMessageManager.UserMsgPriority.hi);
-                        SR.LogWarn("[联机] 等待离开超时，已补发一次 LeaveLobby");
+                        SRApi.LogWarn("[联机] 等待离开超时，已补发一次 LeaveLobby");
                     } catch (Exception __lv3) { SRApi.Guard.Log("联机.补发离开房间", __lv3); }
                 }
-                try { SR.LogInfo("[联机] 离开完成(inLobby=" + InLobby() + ")，开始加入"); } catch { }
+                try { SRApi.LogInfo("[联机] 离开完成(inLobby=" + InLobby() + ")，开始加入"); } catch { }
             }
             // Steam 通道判定放在 JoinFlow：它是两条加入路径（直接加入 / 延时加入）的汇聚点。
             // sLobbyID 在 Steam 平台是 GUID，真正的 Steam 房间号在 UnityMatchID。
@@ -437,11 +437,11 @@ namespace SR_UCH.Tweaks {
                     // 保持反射：源码里写 SteamMatchmaker 会因同族重载的 CSteamID 形参被迫引入 Steamworks 程序集依赖。
                     System.Reflection.MethodInfo jsu = mm.GetType().GetMethod("JoinSteamLobby", new System.Type[] { typeof(ulong) });
                     if (jsu != null) {
-                        SR.LogInfo("[联机] 走 JoinSteamLobby(ulong) " + sid);
+                        SRApi.LogInfo("[联机] 走 JoinSteamLobby(ulong) " + sid);
                         jsu.Invoke(mm, new object[] { sid });
                         yield break;   // 已按 Steam 通道发出加入请求，不再走通用 JoinLobby
                     }
-                    SR.LogWarn("[联机] 无 JoinSteamLobby(ulong)，退回通用流程");
+                    SRApi.LogWarn("[联机] 无 JoinSteamLobby(ulong)，退回通用流程");
                 } catch (Exception __jsl) { SRApi.Guard.Log("联机.JoinSteamLobby", __jsl); }
             }
             try { mm.JoinLobby(id, useCode, null); } catch (Exception __jl) { SRApi.Guard.Log("联机.加入", __jl); }
@@ -484,10 +484,10 @@ namespace SR_UCH.Tweaks {
                 if (mm != null) {
                     // reason 不能传自定义串：LeaveLobby 会把它弹成 3 秒高优先级提示，传 null 则跳过。
                     // 第二个参数必须保留：LeaveLobby 只有 (string, UserMsgPriority) 一个重载。
-                    try { SR.LogInfo("[联机] 离开当前房间以切换（reason 传 null，不弹提示）"); } catch { }
+                    try { SRApi.LogInfo("[联机] 离开当前房间以切换（reason 传 null，不弹提示）"); } catch { }
                     mm.LeaveLobby(null, UserMessageManager.UserMsgPriority.hi);
                 }
-            } catch (Exception e) { SR.LogWarn("切换房间前退出失败: " + e.Message); }
+            } catch (Exception e) { SRApi.LogWarn("切换房间前退出失败: " + e.Message); }
             ArmWatchdog();
         }
 
@@ -518,13 +518,13 @@ namespace SR_UCH.Tweaks {
                 // 加入前必须把 StartAsHost 置 false，否则 Steam 侧会把请求当成创建房间。
                 try {
                     GameSettings.GetInstance().StartAsHost = false;
-                    SR.LogInfo("[联机] StartAsHost=false（加入而非创建）");
+                    SRApi.LogInfo("[联机] StartAsHost=false（加入而非创建）");
                 } catch (Exception __sa) { SRApi.Guard.Log("联机.StartAsHost", __sa); }
-                try { SR.LogInfo("[联机] 加入请求 id=" + id + " mm=" + mm.GetType().FullName + " useCode=" + useCode); } catch { }
+                try { SRApi.LogInfo("[联机] 加入请求 id=" + id + " mm=" + mm.GetType().FullName + " useCode=" + useCode); } catch { }
                 // 必须在这里清掉待加入队列：它是每帧轮询的，不清会重复发起同一次加入。
                 _pendingJoin = "";
                 try { mm.StartCoroutine(JoinFlow(id, useCode, mm)); return; } catch (Exception __jf) { SRApi.Guard.Log("联机.加入流程", __jf); }
-                try { SR.LogInfo("[联机] 协程启动失败，退回直接 JoinLobby"); } catch { }
+                try { SRApi.LogInfo("[联机] 协程启动失败，退回直接 JoinLobby"); } catch { }
                 mm.JoinLobby(id, useCode, new UnityEngine.Events.UnityAction<bool>(ok => {
                     try {
                         _pendingJoin = "";
@@ -534,7 +534,7 @@ namespace SR_UCH.Tweaks {
                 // 发出即算完成：这里立刻清空，避免回调未触发时 TickPendingJoin 反复重发。
                 _pendingJoin = "";
             } catch (Exception e) {
-                SR.LogWarn("加入房间失败: " + e.Message);
+                SRApi.LogWarn("加入房间失败: " + e.Message);
                 _pendingJoin = "";
             }
         }
@@ -555,7 +555,7 @@ namespace SR_UCH.Tweaks {
                     float waited = now - _pendingWaitFrom;
                     if (waited > 2.5f && !_pendingNudged) {
                         _pendingNudged = true;
-                        SR.LogWarn("[联机] 离开房间已等 " + waited.ToString("0.0") + " 秒，放出加载遮罩加速");
+                        SRApi.LogWarn("[联机] 离开房间已等 " + waited.ToString("0.0") + " 秒，放出加载遮罩加速");
                         NudgeSplash();
                     }
                     return;
@@ -1393,7 +1393,7 @@ namespace SR_UCH.Tweaks {
                 // 只在按下到松开之间阻止窗口拖动：无条件设 true 会让鼠标悬停即锁住窗口拖动。
                 if (e.type == EventType.MouseDown && e.button == 0) { _joinDownRow = si; _joinDownId = li.sLobbyID; SR.BlockWindowDrag = true; e.Use(); }
                 else if (e.type == EventType.MouseUp && e.button == 0 && !string.IsNullOrEmpty(_joinDownId) && _joinDownId == li.sLobbyID) {
-                    try { SR.LogInfo("[联机] 列表项 sLobbyID=" + li.sLobbyID + " UnityMatchID=" + li.UnityMatchID + " (UnityMatchID=0 表示该列表不是 Steam 大厅数据)"); } catch { }
+                    try { SRApi.LogInfo("[联机] 列表项 sLobbyID=" + li.sLobbyID + " UnityMatchID=" + li.UnityMatchID + " (UnityMatchID=0 表示该列表不是 Steam 大厅数据)"); } catch { }
                     _joinDownRow = -1; _joinDownId = null; SR.BlockWindowDrag = false; JoinLobbySteam(li.UnityMatchID, li.sLobbyID); e.Use();
                 }
                 break;

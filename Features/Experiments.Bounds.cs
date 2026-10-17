@@ -343,7 +343,7 @@ public partial class Experiments : ITweak
                         catch (Exception __ze) { SRApi.Guard.Log("还原 ZoomCamera.enabled", __ze); }
                         _zcTouched = false;
                     }
-                    if (nb > 0) SR.LogInfo("[关卡边界] 相机项关闭，已把相机交回游戏（" + nb + " 个相机控制器重新接管）");
+                    if (nb > 0) SRApi.LogInfo("[关卡边界] 相机项关闭，已把相机交回游戏（" + nb + " 个相机控制器重新接管）");
                     return;
                 }
                 for (int i = 0; i < fs.Length; i++) {
@@ -419,7 +419,7 @@ public partial class Experiments : ITweak
                 if (_radius != null) {
                     float r = (float)_radius.Value;
                     if (r > 0f) return r;
-                    SR.LogWarn("[关卡边界] 硬解除半径必须大于 0, 已按 1 处理（填 0 会让取景框塌成一个点）");
+                    SRApi.LogWarn("[关卡边界] 硬解除半径必须大于 0, 已按 1 处理（填 0 会让取景框塌成一个点）");
                     return 1f;
                 }
             } catch { }
@@ -473,7 +473,7 @@ public partial class Experiments : ITweak
                 try { kv.Key.SetBounds(kv.Value); nb++; } catch { }
             }
             _curOrig.Clear();
-            if (nb > 0) SR.LogInfo("[关卡边界] " + why + "，已还原 " + nb + " 个光标");
+            if (nb > 0) SRApi.LogInfo("[关卡边界] " + why + "，已还原 " + nb + " 个光标");
         }
 
         private static void ApplyHardBounds() {
@@ -629,7 +629,7 @@ public partial class Experiments : ITweak
                          + " " + curs;
                 if (!_camDiagDone && (fr.size.x > 400f || fr.size.y > 400f)) {
                     _camDiagDone = true;
-                    SR.LogWarn("[关卡边界] 取景框被拉得很大（" + ((int)fr.size.x) + "x" + ((int)fr.size.y)
+                    SRApi.LogWarn("[关卡边界] 取景框被拉得很大（" + ((int)fr.size.x) + "x" + ((int)fr.size.y)
                         + "） -  取景框被撑到这么大时，画面里所有东西都会小到看不见。");
                 }
                 return s;

@@ -15,7 +15,7 @@ public partial class Chat : ITweak {
             InitLog(plugin);
             // CreateAndPatchAll 按程序集扫描：一次调用即覆盖本类两个 partial 文件的全部补丁，不可分两处重复注册。
             try { HarmonyLib.Harmony.CreateAndPatchAll(typeof(Chat), (string)null); }
-            catch (Exception e) { SR.LogError("会话(聊天窗口/聊天记录) 补丁注册失败: " + e.Message); }
+            catch (Exception e) { SRApi.LogError("会话(聊天窗口/聊天记录) 补丁注册失败: " + e.Message); }
         }
 }
 }

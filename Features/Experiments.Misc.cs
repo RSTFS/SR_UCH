@@ -50,7 +50,7 @@ public partial class Experiments : ITweak
 			SR.RegisterTick("加载后清理", TickCleanup); // 每帧钩子（加载完成 1 秒后执行一次 GC）
 			// CreateAndPatchAll 不会自动发现带 [HarmonyPatch] 的类型，必须显式注册一次。
 			try { Harmony.CreateAndPatchAll(typeof(Experiments), (string)null); }
-			catch (Exception e) { SR.LogError("实验页(加载后清理) 补丁注册失败: " + e.Message); }
+			catch (Exception e) { SRApi.LogError("实验页(加载后清理) 补丁注册失败: " + e.Message); }
 		}
 
 		// 分区：加载后清理（UI 在本页，配置与实现同在本文件）。
@@ -208,7 +208,7 @@ public partial class Experiments : ITweak
         private static void OnLockChanged(object s, EventArgs e) {
             try {
                 if (_on != null && _on.Value) { float v = CurrentFov(); _fov.Value = Mathf.Clamp(v, MinFov, MaxFov); _savedFov = v; Camera g = GameCamera(); if (g != null) { try { if (g.orthographic) g.orthographicSize = _fov.Value; else g.fieldOfView = _fov.Value; } catch { } } }
-                SR.Notify((_on != null && _on.Value) ? SR.T("自由相机：开", "Free camera: ON")
+                SRApi.Notify((_on != null && _on.Value) ? SR.T("自由相机：开", "Free camera: ON")
                                                  : SR.T("自由相机：关（已还原）", "Free camera: OFF (restored)"));
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 开关变化", __ex); }
         }

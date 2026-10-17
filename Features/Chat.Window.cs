@@ -498,7 +498,7 @@ public partial class Chat : ITweak {
                         + " 名字=" + (u.nameTag != null && u.nameTag.usernameText != null ? (u.nameTag.usernameText.fontSize + (u.nameTag.gameObject.activeSelf ? "" : "隐藏")) : "?")
                         + " 头像=" + (u.chatPortrait != null ? u.chatPortrait.rectTransform.sizeDelta.x.ToString() : "?");
                 }
-                SR.LogInfo("[Chat] 字号诊断：配置字号=" + want
+                SRApi.LogInfo("[Chat] 字号诊断：配置字号=" + want
                     + " 游戏字号=" + (gs != null ? gs.ChatMessageFontSize.ToString() : "?")
                     + " 消息数=" + (msgs != null ? msgs.Count.ToString() : "?")
                     + " holder缩放=" + holder.localScale.x

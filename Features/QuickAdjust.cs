@@ -210,7 +210,7 @@ public class QuickAdjust : ITweak {
 			_quickRetryHoldTime = cfg.Bind<float>("Quick Adjust", "Quick Retry Hold", 0.5f, "快速重试的长按等待秒数（0-2，0=立即；挑战模式死亡后长按 B 达到该秒数自动重试）。");
         // 本类自带 [HarmonyPatch] 但 ITweak 为反射发现，须手动 CreateAndPatchAll；单个目标失效只丢本类功能。
 			try { Harmony.CreateAndPatchAll(typeof(QuickAdjust), (string)null); }
-			catch (Exception e) { SR.LogError("快速调整 补丁注册失败: " + e.Message); }
+			catch (Exception e) { SRApi.LogError("快速调整 补丁注册失败: " + e.Message); }
     }
 
 		public static bool QuickSwitchOn => _quickSwitchEnabled != null && _quickSwitchEnabled.Value;
@@ -441,28 +441,28 @@ public class QuickAdjust : ITweak {
 			{
 				if (!SR.GateMaster)
 				{
-					SR.Notify(SR.Msg.MasterOff());
+					SRApi.Notify(SR.Msg.MasterOff());
 					return;
 				}
 				int scoreDiscount = ScoreDiscount;
 				if (scoreDiscount <= 0)
 				{
-					SR.Notify(SR.T("评分折扣为 0，未应用", "Score discount is 0, not applied"));
+					SRApi.Notify(SR.T("评分折扣为 0，未应用", "Score discount is 0, not applied"));
 					return;
 				}
 				int target = Mathf.Clamp(100 - scoreDiscount, 10, 100);
 				if (ApplyOwnHandicap(target))
 				{
-					SR.Notify(SR.T("评分折扣已应用：自己 handicap ", "Score discount applied: own handicap ") + target + SR.T("%，本局生效", "%, effective this round"));
+					SRApi.Notify(SR.T("评分折扣已应用：自己 handicap ", "Score discount applied: own handicap ") + target + SR.T("%，本局生效", "%, effective this round"));
 				}
 				else
 				{
-					SR.Notify(SR.Msg.NotLobby());
+					SRApi.Notify(SR.Msg.NotLobby());
 				}
 			}
 			catch (Exception ex)
 			{
-				SR.LogWarn((object)("评分折扣失败: " + ex.Message));
+				SRApi.LogWarn((object)("评分折扣失败: " + ex.Message));
 			}
 		}
 
@@ -497,21 +497,21 @@ public class QuickAdjust : ITweak {
 			{
 				if (!SR.GateMaster)
 				{
-					SR.Notify(SR.Msg.MasterOff());
+					SRApi.Notify(SR.Msg.MasterOff());
 					return;
 				}
 				if (ApplyOwnHandicap(100))
 				{
-					SR.Notify(SR.T("已恢复：自己 handicap 100%", "Restored: own handicap 100%"));
+					SRApi.Notify(SR.T("已恢复：自己 handicap 100%", "Restored: own handicap 100%"));
 				}
 				else
 				{
-					SR.Notify(SR.Msg.NotLobby());
+					SRApi.Notify(SR.Msg.NotLobby());
 				}
 			}
 			catch (Exception ex)
 			{
-				SR.LogWarn((object)("恢复评分折扣失败: " + ex.Message));
+				SRApi.LogWarn((object)("恢复评分折扣失败: " + ex.Message));
 			}
 		}
 }
@@ -548,7 +548,7 @@ public class TreehouseSuicide : ITweak {
         }
         // 单个补丁目标失效只丢本类功能。
         try { Harmony.CreateAndPatchAll(typeof(TreehouseSuicide), (string)null); }
-        catch (Exception e) { SR.LogError("快速自杀 补丁注册失败: " + e.Message); }
+        catch (Exception e) { SRApi.LogError("快速自杀 补丁注册失败: " + e.Message); }
     }
 
     // FixedUpdate 一帧可能跑多次，而 ComboKeyDown 是边沿判定（GetKeyDown 在整个渲染帧内为真），
