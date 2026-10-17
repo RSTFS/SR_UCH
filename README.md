@@ -90,7 +90,6 @@ The panel has sections on the left and pages on the right. Listed by section bel
 - **Score Discount** -- sets your handicap to 100 minus the discount; it takes effect in that round immediately and is visible on the balance board; restore the original value with one click.
 - **Quick Toggle** -- hold `B` to switch back and forth between action and build.
 - **Auto Retry After Death** / **Quick Retry** -- automatically retry when you die in challenge mode.
-- **Quick Suicide** -- `Shift+0`.
 
 ### Experiments
 
