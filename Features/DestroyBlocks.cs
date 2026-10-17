@@ -241,21 +241,21 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec("Destroy Blocks", "方块破坏", null);
             SRApi.Nav("Destroy Blocks", 60); // 侧栏栏目顺序
             SRApi.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);
-            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "按住进入删除模式, 最近放的方块会高亮, 松手退出.", "Hold to enter delete mode and highlight the most recently placed block (release to exit)");
+            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "是什么：删除模式切换键\n干什么：按住进入删除模式并高亮最近放置的方块，松手退出\n注意事项：点键框后按新键改绑，支持组合键\n默认值：左 Alt", "What: delete-mode key\nDoes: hold to enter delete mode and highlight the most recently placed block; release to exit\nNotes: click the key box and press a new key to rebind (combos supported)\nDefault: Left Alt");
             SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
-            SRApi.LocDesc("Destroy Blocks", "Delete Key", "删掉当前选中的方块. 滚轮可以在几个之间换.", "Delete the currently selected block (mouse wheel cycles selection)");
+            SRApi.LocDesc("Destroy Blocks", "Delete Key", "是什么：删除键\n干什么：删除当前选中的方块\n注意事项：滚轮可在候选方块之间切换\n默认值：退格键", "What: delete key\nDoes: deletes the currently selected block\nNotes: the mouse wheel cycles through candidate blocks\nDefault: Backspace");
             SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
-            SRApi.LocDesc("Destroy Blocks", "Enabled", "这一页的总开关, 关掉就整个功能停用.", "");
+            SRApi.LocDesc("Destroy Blocks", "Enabled", "是什么：方块破坏总开关\n干什么：决定本页功能是否生效\n注意事项：仅房主能删除；房客删除需要 EX 扩展的允许客户端删除\n默认值：关", "What: master switch for block destruction\nDoes: enables or disables the feature on this page\nNotes: host only; client-side deletion needs the EX module permission\nDefault: OFF");
             SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
-            SRApi.LocDesc("Destroy Blocks", "Select Mode", "按距离就是离你近的先选, 按放置顺序就是最后放的先选.", "Select mode: Distance = sorted by distance to you (nearest first); Placement = most recently placed first");
+            SRApi.LocDesc("Destroy Blocks", "Select Mode", "是什么：候选方块排序方式\n干什么：距离＝按离自己的距离由近到远；放置顺序＝最后放置的优先\n注意事项：只影响选择顺序，不影响列表内容\n默认值：距离", "What: candidate ordering\nDoes: Distance = nearest to you first; Placement = most recently placed first\nNotes: affects selection order only, not the list contents\nDefault: Distance");
             SRApi.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
-            SRApi.LocDesc("Destroy Blocks", "List Mode", "普通模式只列玩家亲手放的方块, 多物件道具的子部件也算, 炸弹这类临时的不算. 进阶模式把场上所有方块都单独列出来.", "List mode: Normal = only blocks actually placed by players (sub-parts of multi-object props count too, resolved through ParentPiece; temporary items such as bombs are excluded); Advanced = every block listed individually");
+            SRApi.LocDesc("Destroy Blocks", "List Mode", "是什么：列表模式\n干什么：普通＝只列玩家亲手放置的方块；进阶＝场上所有方块单独列出\n注意事项：普通模式排除炸弹等临时物件\n默认值：普通", "What: list mode\nDoes: Normal = only blocks placed by players; Advanced = every block listed individually\nNotes: Normal excludes temporary items such as bombs\nDefault: Normal");
             SRApi.LocKey("Destroy Blocks", "Track Player", "追踪玩家", null);
-            SRApi.LocDesc("Destroy Blocks", "Track Player", "不追踪就找所有人的方块, 填 1 就只找玩家 1 的. 只影响列表, 配合列表模式用.", "Track player: NoTrack = find every player's blocks; #1 = only blocks placed by player 1, #2/#3/#4 likewise (affects the list, used with list mode)");
+            SRApi.LocDesc("Destroy Blocks", "Track Player", "是什么：按玩家号过滤\n干什么：不追踪＝所有玩家的方块；1 到 4＝只看对应玩家号\n注意事项：仅影响列表，需配合列表模式\n默认值：不追踪", "What: player filter\nDoes: NoTrack = all players; 1-4 = only blocks placed by that player number\nNotes: affects the list only; used with list mode\nDefault: NoTrack");
             SRApi.LocEnum("Realtime", "实时");
             SRApi.LocEnum("Snapshot", "暂存");
             SRApi.LocKey("Destroy Blocks", "Refresh Mode", "列表刷新", null);
-            SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "实时是在你按住切换键时列表一直刷新, 别人刚放的马上能看到, 有节流所以开销不大. 暂存是只在你按下的那一刻建一次, 最省但按住期间看不到别人的变化.", "Refresh mode: Realtime = the candidate list stays up to date while you hold the toggle key (blocks placed/removed by others show up instantly; throttled and event-driven, cost only while held); Snapshot = rebuilt once when you press the key (cheapest, but you won't see others' changes while holding)");
+            SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "是什么：候选列表刷新方式\n干什么：实时＝按住切换键期间持续更新；暂存＝按下时重建一次\n注意事项：实时模式已节流，仅在按住时有开销\n默认值：实时", "What: refresh mode for the candidate list\nDoes: Realtime = keeps updating while the toggle key is held; Snapshot = rebuilt once on press\nNotes: Realtime is throttled and only costs while held\nDefault: Realtime");
         }
 
         // 是否走实时列表（默认实时）
