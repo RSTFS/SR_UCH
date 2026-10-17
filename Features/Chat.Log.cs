@@ -82,6 +82,9 @@ public partial class Chat : ITweak {
 				if (num < 0) return; 
 				if (GameState.ChatSystem != null) {
 					GameState.ChatSystem.NewChatMessage(text, EmoteMeanings.CHAT_Text, num);
+					// 自己刚发的消息：即使正在回看也直接回到底部；仅在对话内容页可见时动页面滚动，
+					// 避免把别的页面/栏目的页面滚动位置也改掉。
+					if (SRApi.SelectedPageId("Chat") == "ChatLog") { _autoScroll = true; ChatScrollBottom(); }
 				}
 			} catch (Exception e) {
 				SRApi.LogWarn("Chat: send failed: " + e.Message);
@@ -264,7 +267,7 @@ public partial class Chat : ITweak {
 						ChatScrollBottom();
 					}
 				}
-				_lastY = y;
+				_lastY = y >= 1000000f ? -1f : y; //布局趟的极大值不记录，避免下一帧误判成用户上滚
 			} catch (Exception __ex) {
 				if (!_scrollErr) { _scrollErr = true; SRApi.Guard.Log("聊天记录自动滚动", __ex); }
 			}
