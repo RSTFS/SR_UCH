@@ -500,6 +500,13 @@ namespace SR_UCH {
             public static GUIStyle ChatLabel { get { return Style("ChatLabel"); } }
             public static GUIStyle ChatArea { get { return Style("ChatArea"); } }
             public static GUIStyle SecHeader { get { return Style("SecHeader"); } }
+        // 分区标题：宽度收缩到文字实际宽度，悬浮提示只在标题文字上出现（不再整行生效）。
+        public static void SectionTitle(string title, string tip = null) {
+            try {
+                GUIContent c = new GUIContent(title, tip);
+                GUILayout.Label(c, SecHeader, GUILayout.Width(SecHeader.CalcSize(c).x));
+            } catch { try { GUILayout.Label(title, SecHeader); } catch { } }
+        }
             public static GUIStyle Btn { get { return Style("Btn"); } }
             public static GUIStyle BtnClip { get { return Style("BtnClip"); } }
             public static GUIStyle SearchBox { get { return Style("SearchBox"); } }

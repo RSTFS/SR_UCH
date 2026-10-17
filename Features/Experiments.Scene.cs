@@ -16,10 +16,8 @@ public partial class Experiments : ITweak
 			try {
 				// 树屋：立即开始
 			GUILayout.Space(SRApi.Ctl.Sc(6));
-			GUILayout.Label(new GUIContent("- " + SRApi.T("树屋", "Treehouse") + " -",
-				SRApi.T("在树屋大厅里直接开始关卡.",
-					   "Start the level immediately from the treehouse.")),
-				SRApi.Ctl.SecHeader);
+			SRApi.Ctl.SectionTitle("- " + SRApi.T("树屋", "Treehouse") + " -", SRApi.T("在树屋大厅里直接开始关卡.",
+					   "Start the level immediately from the treehouse."));
 			SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
 				return e.Definition.Key.StartsWith("Lobby ");
 			});
@@ -30,10 +28,8 @@ public partial class Experiments : ITweak
 
 				// 加载与切场景
 				GUILayout.Space(SRApi.Ctl.Sc(6));
-				GUILayout.Label(new GUIContent("- " + SRApi.T("加载与切场景", "Loading and scene switch") + " -",
-					SRApi.T("跳过加载动画. 温柔加载在切换场景时先卸载再回收.",
-						 "Skip the loading animation. Gentle load unloads and collects before switching.")),
-					SRApi.Ctl.SecHeader);
+				SRApi.Ctl.SectionTitle("- " + SRApi.T("加载与切场景", "Loading and scene switch") + " -", SRApi.T("跳过加载动画. 温柔加载在切换场景时先卸载再回收.",
+						 "Skip the loading animation. Gentle load unloads and collects before switching."));
 				SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
 					return e.Definition.Key.StartsWith("Splash ") || e.Definition.Key == "Gentle Load";
 				});

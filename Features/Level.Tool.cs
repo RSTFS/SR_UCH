@@ -17,7 +17,7 @@ public partial class Level {
 
 
     public static void RenderTools() {
-        GUILayout.Label(SRApi.T("- 关卡工具 -", "- Level tools -"), SRApi.Ctl.SecHeader);
+        SRApi.Ctl.SectionTitle(SRApi.T("- 关卡工具 -", "- Level tools -"));
         GUILayout.BeginHorizontal();
         if (SRApi.Ctl.HotkeyButton("level.reload", SRApi.T("重载关卡", "Reload level"),
             SRApi.T("房主把当前看到的方块都写进关卡快照, 然后真的重载一次当前关卡, 全员一起重新加载.\n重载完按快照把方块重建出来并广播, 玩家放的方块和能动的道具都不会丢.\n要不要顺手把分数补回来, 看下面那个重载模式.\n 只在派对和创意模式的对局里生效, 而且只有房主能用.", "Host writes the current blocks into the snapshot and really reloads the level scene, so everyone reloads.\nBlocks are rebuilt from the snapshot and nothing is lost.\nWhether the score is filled back depends on the Reload mode below.\n Party/Creative matches only, host only."),

@@ -41,7 +41,7 @@ public partial class Experiments : ITweak
 
 		public static void Render() {
         try {
-            GUILayout.Label(SRApi.T("- 解除关卡边界 -", "- Unlock level bounds -"), SRApi.Ctl.SecHeader);
+            SRApi.Ctl.SectionTitle(SRApi.T("- 解除关卡边界 -", "- Unlock level bounds -"));
             // 五个子项已全部并入主开关；条目仍在 cfg 里，由代码统一驱动。
             Row("解除关卡边界", "Unlock level bounds",
                 "一次解开关卡的空间边界, 共五项一起生效: 三面实体墙 / 放置光标边界 / 相机取景边界 / 界外黑幕(UI3 覆盖) / 方块越界放置.\n"
@@ -51,7 +51,7 @@ public partial class Experiments : ITweak
                 + "'Hard unlock' decides how far it reaches; 'Extra margin' expands the level edges and measurement boxes. Turning it off restores every one of them.",
                 "Level Bounds");
             GUILayout.Space(SRApi.Ctl.Sc(6));
-            GUILayout.Label(SRApi.T("- 进阶（一般不用改）-", "- Advanced (rarely needed) -"), SRApi.Ctl.SecHeader);
+            SRApi.Ctl.SectionTitle(SRApi.T("- 进阶（一般不用改）-", "- Advanced (rarely needed) -"));
             // 提示只写默认值，不写范围（AcceptableValueRange 已删除）。
             AdvRow("Level Bounds Radius", "越界范围", "Unlock radius",
                 "能走到关卡外面多远, 不限范围. 相机取景/放置光标的边界都按这个值换掉.",

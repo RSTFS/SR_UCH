@@ -19,7 +19,7 @@ public partial class Level {
         });
 
         // 派对盒炸弹：对局内所有成员都发过炸弹！快捷短语才生成
-        GUILayout.Label(SRApi.T("- 派对盒子炸弹 -", "- Party-box bomb -"), SRApi.Ctl.SecHeader);
+        SRApi.Ctl.SectionTitle(SRApi.T("- 派对盒子炸弹 -", "- Party-box bomb -"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase pbe = SRApi.Ctl.FindEntry("Level", "Party Bomb"); // Bind 在 Level 段，查 [EX] 段取不到
         SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("派对盒子炸弹", "Party-box bomb"), SRApi.T("房主开启后，对局内所有成员都发过炸弹！快捷短语时，往当前派对盒子塞入炸弹。", "Host on: when every member sends the Bomb quick-phrase, spawn a bomb in the current party box.")), pbe, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(40));
@@ -40,7 +40,7 @@ public partial class Level {
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(2));
 
-        GUILayout.Label(SRApi.T("- 派对盒（重抽 / 开箱 / 关闭）-", "- Party box -"), SRApi.Ctl.SecHeader);
+        SRApi.Ctl.SectionTitle(SRApi.T("- 派对盒（重抽 / 开箱 / 关闭）-", "- Party box -"));
         GUILayout.BeginHorizontal();
         if (SRApi.Ctl.HotkeyActionButton(SRApi.T("刷新派对盒", "Reroll + reopen box"), SRApi.T("完整重走一遍游戏自己的派对盒流程：按本轮权重重抽道具 + 重新开箱（全员可再选一次）", "Run the game own party-box flow again: reroll with this round weights and reopen the box so everyone can pick again"), LevelPartyBox.RefreshPartyBoxKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBox();
         GUILayout.Space(SRApi.Ctl.Sc(8));

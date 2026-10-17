@@ -73,10 +73,8 @@ namespace SR_UCH.Tweaks {
             // 分区按条目键显式划分，不依赖遍历顺序（SectionEntries 按键名排序，顺序与分区无关）。
 
             // 分区一：建造增强
-            GUILayout.Label(new GUIContent("- " + SRApi.T("建造", "Build") + " -",
-                SRApi.T("建造增强：让方块无视放置规则、按更细的网格自由微调摆放。",
-                     "Build: place pieces ignoring the placement rules and snap on a finer grid.")),
-                SRApi.Ctl.SecHeader);
+            SRApi.Ctl.SectionTitle("- " + SRApi.T("建造", "Build") + " -", SRApi.T("建造增强：让方块无视放置规则、按更细的网格自由微调摆放。",
+                     "Build: place pieces ignoring the placement rules and snap on a finer grid."));
             GUILayout.Space(SRApi.Ctl.Sc(2));
             for (int i = 0; i < entries.Count; i++) {
                 ConfigEntryBase e = entries[i];
@@ -87,10 +85,8 @@ namespace SR_UCH.Tweaks {
 
             // 分区二：建造上限
             GUILayout.Space(SRApi.Ctl.Sc(6));
-            GUILayout.Label(new GUIContent("- " + SRApi.T("建造上限", "Build Limit") + " -",
-                SRApi.T("建造上限（BuildUnlimiter）：解除树屋保存/发布界面的关卡满度限制，超满的关卡也能正常发布/上传。",
-                     "Build Limit (BuildUnlimiter): lifts the treehouse save/publish fullness cap so over-full levels can be published.")),
-                SRApi.Ctl.SecHeader);
+            SRApi.Ctl.SectionTitle("- " + SRApi.T("建造上限", "Build Limit") + " -", SRApi.T("建造上限（BuildUnlimiter）：解除树屋保存/发布界面的关卡满度限制，超满的关卡也能正常发布/上传。",
+                     "Build Limit (BuildUnlimiter): lifts the treehouse save/publish fullness cap so over-full levels can be published."));
             GUILayout.Space(SRApi.Ctl.Sc(2));
             // 该行为手工排版：标签占名称列宽度 + 间隔 6 + 主控件列，与下方两行的编辑框左边缘对齐。
             GUILayout.BeginHorizontal();

@@ -158,7 +158,7 @@ public partial class Chat : ITweak {
                 ConfigEntryBase e = entries[i];
                 if (e.Definition.Key == "Pos Enabled") {
                     GUILayout.Space(SRApi.Ctl.Sc(6));
-                    GUILayout.Label(SRApi.T("- 聊天框位置 -", "- Chat box position -"), SRApi.Ctl.SecHeader);
+                    SRApi.Ctl.SectionTitle(SRApi.T("- 聊天框位置 -", "- Chat box position -"));
                 }
                 SRApi.Ctl.RenderEntryRow(e, true, col);
             }

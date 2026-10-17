@@ -58,7 +58,7 @@ public class QuickAdjust : ITweak {
         try {
         // 每对 BeginHorizontal/EndHorizontal 之间都有会抛异常的控件，任一抛出会使 IMGUI 布局栈失衡，
         // 故整段包 try/catch。
-        GUILayout.Label(SRApi.T("- 分数折扣 -", "- Score discount -"), SRApi.Ctl.SecHeader);
+        SRApi.Ctl.SectionTitle(SRApi.T("- 分数折扣 -", "- Score discount -"));
         // 折扣默认整十滑块，开启更多折扣数值后改为自由输入框。
         GUILayout.BeginHorizontal();
         ConfigEntryBase disc = SRApi.Ctl.FindEntry("Quick Adjust", "Score Discount");
@@ -109,7 +109,7 @@ public class QuickAdjust : ITweak {
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(6));
 
-        GUILayout.Label(SRApi.T("- 快速重试 -", "- Quick retry -"), SRApi.Ctl.SecHeader);
+        SRApi.Ctl.SectionTitle(SRApi.T("- 快速重试 -", "- Quick retry -"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase qr = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry");
         SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("死后自动重试", "Auto retry on death"), SRApi.T("仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n默认关闭；对局中开关立即生效。", "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nOFF by default; takes effect immediately.")), qr, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
@@ -147,7 +147,7 @@ public class QuickAdjust : ITweak {
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(6));
 
-        GUILayout.Label(SRApi.T("- 快速切换 -", "- Quick switch -"), SRApi.Ctl.SecHeader);
+        SRApi.Ctl.SectionTitle(SRApi.T("- 快速切换 -", "- Quick switch -"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase qs = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Switch");
         SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("快速切换", "Quick switch"), SRApi.T("仅自由模式：长按 B 到设定等待秒数切换 行动<->建造 模式。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n默认关闭；对局中开关立即生效。", "Freeplay only: hold B for the set seconds to switch Action<->Build.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nOFF by default; takes effect immediately.")), qs, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
@@ -177,7 +177,7 @@ public class QuickAdjust : ITweak {
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(6));
 
-        GUILayout.Label(SRApi.T("- 快速自杀 -", "- Quick suicide -"), SRApi.Ctl.SecHeader);
+        SRApi.Ctl.SectionTitle(SRApi.T("- 快速自杀 -", "- Quick suicide -"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase se = SRApi.Ctl.FindEntry("Quick Adjust", "Enabled");
         SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("快速自杀", "Quick suicide"), SRApi.T("总开关：开启后按 组合键（自杀键）快速自杀（树屋和局内都有效，只杀自己，默认 Shift+0）", "Master switch: press the suicide combo to die instantly (treehouse and in-match, only yourself, default Shift+0)")), se, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
