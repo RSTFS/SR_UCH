@@ -52,8 +52,6 @@ public class QuickAdjust : ITweak {
         // 预登记本页自动快捷键。
         SRApi.HotkeyAction("qa.apply_discount", "应用折扣", () => QuickAdjust.ApplyScoreDiscount());
         SRApi.HotkeyAction("qa.restore_discount", "恢复原值", () => QuickAdjust.RestoreScoreDiscount());
-        // 待定折扣的落地钩子：树屋改的折扣会在进入对局（本地玩家出现）后自动应用一次。
-        SRApi.RegisterTick("快速调整-待定折扣", TickPendingHandicap);
     }
 
     public static void Render() {
@@ -264,9 +262,6 @@ public class QuickAdjust : ITweak {
 		// 故 patch set_NetworkHandicap + OnDeserialize，仅在值变化时刷新。
 		private static readonly Dictionary<GamePlayer, int> _lastHandicapShown = new Dictionary<GamePlayer, int>();
 
-		// 树屋/大厅外改折扣时本地还没有 LobbyPlayer，先记下目标值，进入对局后自动落地一次。
-		private static int _pendingHandicap = 100;
-		private static bool _pendingSet;
 
 		[HarmonyPatch(typeof(GamePlayer), "set_NetworkHandicap")]
 		[HarmonyPostfix]
@@ -441,17 +436,6 @@ public class QuickAdjust : ITweak {
 			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.Send", __ex); }
 		}
 
-		// 待定折扣落地：树屋（没有本地 LobbyPlayer）里改的折扣，等本地玩家出现后应用一次。
-		private static void TickPendingHandicap() {
-			if (!_pendingSet) return;
-			try {
-				if (ApplyOwnHandicap(_pendingHandicap)) {
-					_pendingSet = false;
-					SRApi.Notify(SRApi.T("评分折扣已自动生效", "Score discount applied automatically"));
-				}
-			} catch (Exception __ex) { SRApi.Guard.Log("待定折扣落地", __ex); }
-		}
-
 		public static void ApplyScoreDiscount()
 		{
 			try
@@ -474,9 +458,7 @@ public class QuickAdjust : ITweak {
 				}
 				else
 				{
-					_pendingHandicap = target;
-					_pendingSet = true;
-					SRApi.Notify(SRApi.T("当前不在对局：折扣已记录，进入对局后自动生效", "Not in a match: discount recorded, it will apply automatically in the next match"));
+					SRApi.Notify(SRApi.T("需要在房间内（大厅或树屋）才能修改评分折扣", "Change the score discount while in a room (lobby or treehouse)"));
 				}
 			}
 			catch (Exception ex)
@@ -486,27 +468,42 @@ public class QuickAdjust : ITweak {
 		}
 
 		// 同时写 LobbyPlayer（平衡板/下一局）与 GamePlayer（本局立即生效）。
+		// 原生方案：直接改当前房间本地玩家的 LobbyPlayer.handicap（服务器权威值，重载场景/回合都保留）。
+		// 换房间 = 新的 LobbyPlayer（默认 100），折扣自然重置；不做任何每帧/每局自动重放。
 		private static bool ApplyOwnHandicap(int value)
 		{
 			try
 			{
-				foreach (Player p in PlayerManager.GetInstance())
+				// 走房间玩家表：树屋（单人大厅）与对局内都能取到本地 LobbyPlayer。
+				LobbyManager lm = LobbyManager.instance;
+				if (lm != null && lm.PlayerTracker != null)
 				{
-					if (p == null || p.AssociatedLobbyPlayer == null) continue;
-					if (!p.AssociatedLobbyPlayer.IsLocalPlayer) continue;
-					p.AssociatedLobbyPlayer.SetPlayerHandicap(value);
-					if (p.AssociatedGamePlayer != null)
+					for (int i = 0; i < lm.PlayerTracker.NumPlayers; i++)
 					{
 						try
 						{
-							p.AssociatedGamePlayer.CallCmdSetPlayerHandicap(value);
+							NetworkPlayerTracker.NetPlayerInfo info = lm.PlayerTracker.GetPlayerInfoByIndex(i);
+							LobbyPlayer lp = lm.PlayerTracker.GetLobbyPlayer(info.NetworkNumber);
+							if (lp == null || !lp.IsLocalPlayer) continue;
+							lp.SetPlayerHandicap(value);   // 原生字段，本房间持续有效
+							// 已在本局里：同步 GamePlayer，让平衡板立刻刷新（不改的话等下一局才变）。
+							foreach (Player p in PlayerManager.GetInstance())
+							{
+								if (p == null || p.AssociatedLobbyPlayer != lp) continue;
+								if (p.AssociatedGamePlayer != null)
+								{
+									try { p.AssociatedGamePlayer.CallCmdSetPlayerHandicap(value); }
+									catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.CallCmdSetPlayerHandicap", __ex); }
+								}
+								break;
+							}
+							return true;
 						}
-						catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.CallCmdSetPlayerHandicap", __ex); }
+						catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.FindLocalLobbyPlayer", __ex); }
 					}
-					return true;
 				}
 			}
-			catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.CallCmdSetPlayerHandicap", __ex); }
+			catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.ApplyOwnHandicap", __ex); }
 			return false;
 		}
 
@@ -525,9 +522,7 @@ public class QuickAdjust : ITweak {
 				}
 				else
 				{
-					_pendingHandicap = 100;
-					_pendingSet = true;
-					SRApi.Notify(SRApi.T("当前不在对局：恢复已记录，进入对局后自动生效", "Not in a match: restore recorded, it will apply automatically in the next match"));
+					SRApi.Notify(SRApi.T("需要在房间内（大厅或树屋）才能恢复评分折扣", "Restore the score discount while in a room (lobby or treehouse)"));
 				}
 			}
 			catch (Exception ex)
