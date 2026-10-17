@@ -181,12 +181,11 @@ namespace SR_UCH {
         }
     }
     // API 门面（SMAPI 的 SMAPI.Mod* 助手对应物）：功能层只允许用这里的成员。
-    // 契约层不引用实现层，日志出口由核心在启动时注入（SRApi.SetLogSink）。
+    // 契约层不引用实现层，日志出口由核心在启动时注入（SRApi.SetLogSinks）。
     public static class SRApi {
         private static Action<string> _info, _warn, _error;
         private static Action<string> _notify;
         // 核心启动时注入：把契约层的日志/提示接到实现（无注入时静默丢弃，不影响功能）。
-        public static void SetLogSink(Action<string> warn) { _warn = warn; }
         public static void SetLogSinks(Action<string> info, Action<string> warn, Action<string> error) {
             _info = info; _warn = warn; _error = error;
         }

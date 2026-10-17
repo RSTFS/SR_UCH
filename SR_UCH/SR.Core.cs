@@ -771,27 +771,7 @@ public partial class SR : ITweak {
 
         // 共用提示文案（高频消息只生成一次），各功能直接用 SR.Msg。
         public static class Msg {
-            private static string _masterOff, _notLobby;
-            private static int _msgLangVer = -1;   // 缓存生成时的语言版本（见 MsgSync）
 
-            // 按语言版本号失效：切语言、注册语言包都会让 LangVer +1，缓存随之重建。
-            private static void MsgSync() {
-                if (_msgLangVer == LangVer) return;
-                _msgLangVer = LangVer;
-                _masterOff = null;
-                _notLobby = null;
-            }
-
-            public static string MasterOff() {
-                MsgSync();
-                if (_masterOff == null) _masterOff = T("本 Mod 总开关已关闭", "The mod's master switch is off");
-                return _masterOff;
-            }
-            public static string NotLobby() {
-                MsgSync();
-                if (_notLobby == null) _notLobby = T("不在大厅或找不到本地玩家", "Not in a lobby or cannot find the local player");
-                return _notLobby;
-            }
         }
 
         // 每帧钩子：功能在 Initialize 里 RegisterTick 注册，SR.Tick 按注册顺序逐个 try/catch 调用。

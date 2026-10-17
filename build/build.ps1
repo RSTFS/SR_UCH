@@ -251,9 +251,9 @@ function Invoke-MigrationRuleCheck {
     return $ok
 }
 function Invoke-ApiSurfaceCheck {
-    # 微内核 API 棘轮：功能层只允许使用 _tools\api_surface.txt 里的 SR.* 成员，新增耦合会被拦下。
+    # 微内核 API 棘轮：功能层只允许使用 build\api_surface.txt 里的 SRApi.* 成员，新增耦合会被拦下。
     $api = Join-Path $PSScriptRoot 'api_surface.txt'
-    if (-not (Test-Path -LiteralPath $api)) { Write-Host '  [FAIL] 缺少 _tools\api_surface.txt'; return $false }
+    if (-not (Test-Path -LiteralPath $api)) { Write-Host '  [FAIL] 缺少 build\api_surface.txt'; return $false }
     $allow = @{}
     foreach ($l in [System.IO.File]::ReadAllLines($api)) { $s = $l.Trim(); if ($s -and -not $s.StartsWith('#')) { $allow[$s] = $true } }
     $bad = @{}
@@ -261,14 +261,14 @@ function Invoke-ApiSurfaceCheck {
     if (Test-Path -LiteralPath $featDir) {
         foreach ($f in Get-ChildItem -LiteralPath $featDir -Filter '*.cs' -File) {
             $txt = [System.IO.File]::ReadAllText($f.FullName)
-            foreach ($m in [regex]::Matches($txt, '\bSR\.(\w+)')) {
+            foreach ($m in [regex]::Matches($txt, '\bSRApi\.(\w+)')) {
                 $n = $m.Groups[1].Value
                 if (-not $allow.ContainsKey($n)) { $bad[$n] = $true }
             }
         }
     }
     if ($bad.Count -gt 0) {
-        Write-Host ('  [FAIL] 功能层使用了白名单外的 SR.* 成员: ' + (($bad.Keys | Sort-Object) -join ', ') + '（要么改代码，要么加进 api_surface.txt）')
+        Write-Host ('  [FAIL] 功能层使用了白名单外的 SRApi.* 成员: ' + (($bad.Keys | Sort-Object) -join ', ') + '（要么改代码，要么加进 api_surface.txt）')
         return $false
     }
     Write-Host ('  [ OK ] 功能层只使用白名单内的 API（' + $allow.Count + ' 个）')

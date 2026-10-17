@@ -21,13 +21,13 @@ function Check-ApiSurface {
     $bad = @{}
     foreach ($f in Get-ChildItem -LiteralPath $feat -Filter '*.cs' -File) {
         $txt = Read-Text $f.FullName
-        foreach ($m in [regex]::Matches($txt, '\bSR\.(\w+)')) {
+        foreach ($m in [regex]::Matches($txt, '\bSRApi\.(\w+)')) {
             $n = $m.Groups[1].Value
             if (-not $allow.ContainsKey($n)) { $bad[$n] = $true }
         }
     }
-    if ($bad.Count -gt 0) { Bad ('功能层使用了白名单外的 SR.* 成员: ' + (($bad.Keys | Sort-Object) -join ', ')) }
-    else { Ok ('API 棘轮：功能层只使用白名单内的 SR.* 成员（白名单 ' + $allow.Count + ' 个）') }
+    if ($bad.Count -gt 0) { Bad ('功能层使用了白名单外的 SRApi.* 成员: ' + (($bad.Keys | Sort-Object) -join ', ')) }
+    else { Ok ('API 棘轮：功能层只使用白名单内的 SRApi.* 成员（白名单 ' + $allow.Count + ' 个）') }
 }
 
 # ---------- 2) 契约层不得出现实现层标识 ----------
