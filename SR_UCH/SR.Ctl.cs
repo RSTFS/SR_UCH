@@ -16,7 +16,7 @@ public partial class SR {
         // UI 缩放系数（各页像素尺寸都乘它）
         public static float Sc(float v) { return SR.Sc(v); }
 
-        // 条目标签（可点击恢复默认值；tooltip = 说明 + 默认值 + 提示）
+        // 条目标签（可点击恢复默认值；tooltip = 说明 + 后缀追加的默认值，不再带恢复提示）
         public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey = null) { SR.RestoreLabel(content, entry, w, h, hotkey); }
         public static void RenderControl(ConfigEntryBase entry) { SR.RenderControl(entry); }
         public static void RenderEntryRow(ConfigEntryBase entry, bool isInternal, float colWidth) { SR.RenderEntryRow(entry, isInternal, colWidth); }
@@ -198,9 +198,37 @@ public partial class SR {
             }
 
             // 每帧调用：顺序/隐藏列被改动时才落盘。
+            //还原全部：列序回默认、取消隐藏、列宽回默认（对应 Shift+右键）
+            public void ResetAll() {
+                try {
+                    for (int i = 0; i < Order.Length; i++) Order[i] = i;
+                    Hidden.Clear();
+                    _savedW = null;
+                    if (_widths != null && _defaults != null) {
+                        int n = Mathf.Min(_defaults.Length, _widths.Length);
+                        for (int i = 0; i < n; i++) _widths[i] = _defaults[i];
+                    }
+                    Save();
+                } catch (Exception __ex) { Guard.Log("表格列偏好还原", __ex); }
+            }
+
             public void SaveIfDirty() {
                 if (Sig() != _sig) Save();
             }
+        }
+
+        // 绝对矩形复选框（表格钉住列用）：与设置页开关同款 —— CheckOn/CheckOff 样式 + 勾选贴图叠加。
+        public static bool CheckboxAt(Rect r, bool value, string tip) {
+            bool clicked;
+            try {
+                GUIContent c = (value && _checkTex == null) ? new GUIContent("✓", tip) : new GUIContent("", tip);
+                clicked = GUI.Button(r, c, value ? _checkOn : _checkOff);
+                if (value && _checkTex != null) {
+                    float m = r.width * 0.18f;
+                    GUI.DrawTexture(new Rect(r.x + m, r.y + m, r.width - m * 2f, r.height - m * 2f), _checkTex);
+                }
+            } catch { clicked = false; }
+            return clicked;
         }
 
         public static GUIStyle CheckOn { get { return _checkOn; } }

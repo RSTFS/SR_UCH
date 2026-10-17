@@ -35,11 +35,11 @@ namespace SR_UCH.Tweaks {
             SRApi.LocKey("build", "Collision Override", "无视碰撞", null);
             SRApi.LocDesc("build", "Collision Override", "无视碰撞放置开关\n放开放置规则，方块可重叠、悬空或相互穿插\n仅影响放置判定，不改变物理与玩法\n关", "ignore-collision placement switch\npieces may overlap, float or intersect anything\nplacement rules only; physics and gameplay are unchanged\nOFF");
             SRApi.LocKey("build", "Collision Toggle Key", "无视碰撞开关", null);
-            SRApi.LocDesc("build", "Collision Toggle Key", "无视碰撞快捷键\n游戏中临时开关无视碰撞放置\n可改绑，支持组合键\n默认：F1", "ignore-collision key\ntemporarily toggles ignore-collision placement in-game\nrebindable, combos supported\nDefault: F1");
+            SRApi.LocDesc("build", "Collision Toggle Key", "无视碰撞快捷键\n游戏中临时开关无视碰撞放置\n可改绑，支持组合键", "ignore-collision key\ntemporarily toggles ignore-collision placement in-game\nrebindable, combos supported");
             SRApi.LocKey("build", "Grid Override", "自由放置", null);
             SRApi.LocDesc("build", "Grid Override", "自由放置开关\n吸附精度由 1 格改为 0.01 格，可微调位置\n仅影响放置取整，只在建造阶段生效；关闭立即回到整格吸附\n关", "free placement switch\nchanges grid snapping from 1 unit to 0.01 units for fine-tuning\nplacement rounding only, build phase only; turning it off restores 1-unit snapping immediately\nOFF");
             SRApi.LocKey("build", "Grid Toggle Key", "自由放置开关", null);
-            SRApi.LocDesc("build", "Grid Toggle Key", "自由放置快捷键\n游戏中临时开关自由放置\n可改绑，支持组合键\n默认：F2", "free placement key\ntemporarily toggles free placement in-game\nrebindable, combos supported\nDefault: F2");
+            SRApi.LocDesc("build", "Grid Toggle Key", "自由放置快捷键\n游戏中临时开关自由放置\n可改绑，支持组合键", "free placement key\ntemporarily toggles free placement in-game\nrebindable, combos supported");
         }
 
         // 当前生效的满度上限（只读框显示用）：直接读游戏字段，不借其它功能的接口以避免横向依赖。
@@ -262,7 +262,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocKey("build", "Lift Build Cap", "解除建造上限", null);
             SRApi.LocDesc("build", "Lift Build Cap", "满度上限解除开关\n把关卡满度上限从原版 500 提升到设定值\n用于树屋保存/发布；关闭后恢复 500\n关", "build cap unlock switch\nraises the level fullness cap from the vanilla 500 to the configured value\napplies to treehouse save/publish; turning it off restores 500\nOFF");
             SRApi.LocKey("build", "Build Cap Value", "上限数值", "Limit Value");
-            SRApi.LocDesc("build", "Build Cap Value", "满度上限数值\n设置解除后的满度上限\n范围 500 到 10000000，改完立即生效\n默认：1000000", "build cap value\nsets the fullness cap used when the unlock is on\nrange 500-10000000, applies immediately\nDefault: 1000000");
+            SRApi.LocDesc("build", "Build Cap Value", "满度上限数值\n设置解除后的满度上限\n范围 500 到 10000000，改完立即生效", "build cap value\nsets the fullness cap used when the unlock is on\nrange 500-10000000, applies immediately");
         }
 
         public void Initialize(IFeatureHost plugin) {

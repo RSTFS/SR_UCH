@@ -63,7 +63,7 @@ public partial class Experiments : ITweak
             SRApi.LocKey("Scene", "Splash Skip Load", "跳过加载动画", "Skip load animation");
             SRApi.LocDesc("Scene", "Splash Skip Load", "跳过加载动画开关\n加载画面出现后立即跳过\n无副作用，仅省去等待\n关", "skip loading animation switch\nskips the loading splash as soon as it appears\nno side effects; only removes the wait\nOFF");
             SRApi.LocKey("Scene", "Gentle Load", "温柔加载", "Gentle load");
-            SRApi.LocDesc("Scene", "Gentle Load", "温和加载开关\n切换场景时走游戏的卸载加 GC 流程，减轻卡顿\n切换到主菜单时交由游戏自身流程\n默认：关", "gentle loading switch\nuses the game unload plus GC routine when switching scenes to reduce stutter\nmain-menu transitions use the game own routine\nDefault: OFF");
+            SRApi.LocDesc("Scene", "Gentle Load", "温和加载开关\n切换场景时走游戏的卸载加 GC 流程，减轻卡顿\n切换到主菜单时交由游戏自身流程", "gentle loading switch\nuses the game unload plus GC routine when switching scenes to reduce stutter\nmain-menu transitions use the game own routine");
         }
 
         public void Initialize(IFeatureHost plugin) {

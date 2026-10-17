@@ -1147,23 +1147,23 @@ public partial class SR : ITweak {
             SR.RegisterPage("Home", RenderHomePage); // 首页也走自绘页注册表（SR.Window 不做 if-else 分派）
             SR.LocKey(Keys.Settings, Keys.UiScale, "界面缩放", null);
             // 统一登记：功能页里没有自带 LocDesc 的可见条目（4 行：用途 / 行为 / 注意 / 默认）。
-            SR.LocDesc("Chat", "Log Limit", "聊天记录保留条数\n超过上限时丢弃最旧的消息\n仅影响本模组的聊天记录面板\n默认：500", "Chat log size\nolder messages are dropped beyond the limit\naffects this mod chat log panel only\nDefault: 500");
+            SR.LocDesc("Chat", "Log Limit", "聊天记录保留条数\n超过上限时丢弃最旧的消息\n仅影响本模组的聊天记录面板", "Chat log size\nolder messages are dropped beyond the limit\naffects this mod chat log panel only");
             SR.LocDesc("Level", "Party Bomb", "派对盒炸弹开关\n开箱后按概率生成炸弹\n需要房主权限，仅派对盒阶段\n关", "Party box bomb\nspawns a bomb by chance when the box opens\nhost only; party-box phase only\nOFF");
-            SR.LocDesc("Level", "Party Bomb Type", "派对盒炸弹类型\n选择生成的炸弹种类\n取值与游戏内炸弹类型一致\n默认：0", "Party box bomb type\nselects which bomb is spawned\nmatches the game bomb types\nDefault: 0");
-            SR.LocDesc("Level", "Refresh Party Box Key", "刷新派对盒快捷键\n按下重走派对盒流程，按权重重新开箱\n不绑键则不生效\n默认：未绑定", "Reroll party box key\npress to reroll and reopen the box\ninactive while unbound\nDefault: unbound");
-            SR.LocDesc("Level", "Refresh Pieces Key", "刷新道具快捷键\n按下只重抽道具，不重新开箱\n不绑键则不生效\n默认：未绑定", "Reroll items key\npress to reroll items only\ninactive while unbound\nDefault: unbound");
-            SR.LocDesc("Level", "Close Party Box Key", "关闭派对盒快捷键\n按下结束选择，进入游玩阶段\n不绑键则不生效\n默认：未绑定", "Close party box key\npress to end picking and enter play\ninactive while unbound\nDefault: unbound");
+            SR.LocDesc("Level", "Party Bomb Type", "派对盒炸弹类型\n选择生成的炸弹种类\n取值与游戏内炸弹类型一致", "Party box bomb type\nselects which bomb is spawned\nmatches the game bomb types");
+            SR.LocDesc("Level", "Refresh Party Box Key", "刷新派对盒快捷键\n按下重走派对盒流程，按权重重新开箱\n不绑键则不生效", "Reroll party box key\npress to reroll and reopen the box\ninactive while unbound");
+            SR.LocDesc("Level", "Refresh Pieces Key", "刷新道具快捷键\n按下只重抽道具，不重新开箱\n不绑键则不生效", "Reroll items key\npress to reroll items only\ninactive while unbound");
+            SR.LocDesc("Level", "Close Party Box Key", "关闭派对盒快捷键\n按下结束选择，进入游玩阶段\n不绑键则不生效", "Close party box key\npress to end picking and enter play\ninactive while unbound");
             SR.LocDesc("Online", "Filter Region", "区域筛选\n只显示指定区域的房间\n从下拉选择；留空表示不过滤\n空", "Region filter\nshows lobbies from the selected region only\npick from the dropdown; empty means no filter\nempty");
-            SR.LocDesc("Online", "Filter Mode", "模式筛选\n只显示指定模式的房间\n留空表示不过滤\n默认：空", "Mode filter\nshows lobbies of the selected game mode only\nempty means no filter\nDefault: empty");
-            SR.LocDesc("Online", "Filter Tag", "标签筛选\n只显示含指定标签的房间\n留空表示不过滤\n默认：空", "Tag filter\nshows lobbies with the selected tag only\nempty means no filter\nDefault: empty");
-            SR.LocDesc("Online", "Filter State", "状态筛选\n按房间状态过滤\n留空全部，join 可加入，full 已满，playing 进行中\n默认：空", "State filter\nfilters lobbies by state\nempty = all, join = joinable, full = full, playing = in match\nDefault: empty");
+            SR.LocDesc("Online", "Filter Mode", "模式筛选\n只显示指定模式的房间\n留空表示不过滤", "Mode filter\nshows lobbies of the selected game mode only\nempty means no filter");
+            SR.LocDesc("Online", "Filter Tag", "标签筛选\n只显示含指定标签的房间\n留空表示不过滤", "Tag filter\nshows lobbies with the selected tag only\nempty means no filter");
+            SR.LocDesc("Online", "Filter State", "状态筛选\n按房间状态过滤\n留空全部，join 可加入，full 已满，playing 进行中", "State filter\nfilters lobbies by state\nempty = all, join = joinable, full = full, playing = in match");
             SR.LocDesc("Online", "Filter Min Players", "最少人数筛选\n只显示人数不少于该值的房间\n留空全部；填 1 到 3；lt4 表示少于 4 人\n空", "Min players filter\nshows lobbies with at least that many players\nempty = all; 1-3; lt4 = fewer than 4\nempty");
-            SR.LocDesc("Online", "Filter AFK", "AFK 筛选\n按房主是否挂机过滤\n留空全部，hide 隐藏挂机，only 只看挂机\n默认：hide", "AFK filter\nfilters by whether the host is AFK\nempty = all, hide = hide AFK, only = AFK only\nDefault: hide");
+            SR.LocDesc("Online", "Filter AFK", "AFK 筛选\n按房主是否挂机过滤\n留空全部，hide 隐藏挂机，only 只看挂机", "AFK filter\nfilters by whether the host is AFK\nempty = all, hide = hide AFK, only = AFK only");
             SR.LocDesc("Online", "Search Timeout", "搜索超时秒数\n超过该时间后停止等待房间列表\n仅作为兜底，通常不必修改\n15", "Search timeout\nstops waiting for the lobby list after this many seconds\nfallback only; usually no need to change\n15");
             SR.LocDesc("Online", "Sort Column", "排序列索引\n指定房间列表按哪一列排序\n一般由表头操作维护，不建议手改\n-1（默认排序）", "Sort column index\nselects the column used to sort the lobby list\nnormally maintained by the header; avoid editing manually\n-1 (default order)");
-            SR.LocDesc("Online", "Sort Descending", "排序方向\n开启为从大到小，关闭为从小到大\n与排序列配合使用\n默认：关", "Sort direction\ndescending when on, ascending when off\nused together with the sort column\nDefault: OFF");
-            SR.LocDesc("Chat Window", "Key Defaults v2", "内部标记：快捷键默认值已迁移\n仅用于配置迁移，不需要修改\n修改它不会产生任何效果\n默认：关", "Internal flag: key defaults migrated\nused for config migration only\nchanging it has no effect\nDefault: OFF");
-            SR.LocDesc("Chat Window", "Defaults v3", "内部标记：字号默认值已迁移\n仅用于配置迁移，不需要修改\n修改它不会产生任何效果\n默认：关", "Internal flag: font defaults migrated\nused for config migration only\nchanging it has no effect\nDefault: OFF");
+            SR.LocDesc("Online", "Sort Descending", "排序方向\n开启为从大到小，关闭为从小到大\n与排序列配合使用", "Sort direction\ndescending when on, ascending when off\nused together with the sort column");
+            SR.LocDesc("Chat Window", "Key Defaults v2", "内部标记：快捷键默认值已迁移\n仅用于配置迁移，不需要修改\n修改它不会产生任何效果", "Internal flag: key defaults migrated\nused for config migration only\nchanging it has no effect");
+            SR.LocDesc("Chat Window", "Defaults v3", "内部标记：字号默认值已迁移\n仅用于配置迁移，不需要修改\n修改它不会产生任何效果", "Internal flag: font defaults migrated\nused for config migration only\nchanging it has no effect");
             SR.LocDesc(Keys.Settings, Keys.UiScale, "整个界面放大多少. 1.0 是原始大小, 1.3 是默认值. 嫌字小就调大一点.", "UI zoom, default 1.3.");
             // 核心自己的设置项也走"行扩展点"：设置页因此只有一份滑块绘制代码，语言下拉不按 section/key 硬编码。
             SRApi.RowSliders.Add(SettingsSliderRange);

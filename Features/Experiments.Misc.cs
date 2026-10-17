@@ -101,14 +101,14 @@ public partial class Experiments : ITweak
     
         private static void SelfReg2() {
             SRApi.LocKey("Experiments", "Free Camera", "自由相机", null);
-            SRApi.LocDesc("Experiments", "Free Camera", "自由相机开关\n开启后可用滚轮缩放视野\n菜单与暂停界面不生效\n默认：关", "free camera switch\nenables wheel zoom of the field of view\ndoes not apply in menus or the pause screen\nDefault: OFF");
+            SRApi.LocDesc("Experiments", "Free Camera", "自由相机开关\n开启后可用滚轮缩放视野\n菜单与暂停界面不生效", "free camera switch\nenables wheel zoom of the field of view\ndoes not apply in menus or the pause screen");
             SRApi.LocKey("Experiments", "Free Camera FOV", "视野大小", null);
             SRApi.LocDesc("Experiments", "Free Camera FOV", "自由相机视野大小\n设置视野范围，越小越近，越大越远\n范围 1 到 32；自由相机开启时滚轮也会同步修改\n10", "free camera FOV\nsets the field of view; smaller is closer, larger is farther\nrange 1-32; the wheel also changes it while free camera is on\n10");
             // 必须登记 LocKey/LocDesc，否则界面回退显示英文键名。
             SRApi.LocKey("Experiments", "Free Camera Speed", "相机移动速度", null);
-            SRApi.LocDesc("Experiments", "Free Camera Speed", "相机跟随速度\n设置相机跟随角色的速度\n范围 0.5 到 5，步长 0.5\n默认：1（原版）", "camera follow speed\nsets how fast the camera follows the character\nrange 0.5-5 in steps of 0.5\nDefault: 1 (vanilla)");
+            SRApi.LocDesc("Experiments", "Free Camera Speed", "相机跟随速度\n设置相机跟随角色的速度\n范围 0.5 到 5，步长 0.5", "camera follow speed\nsets how fast the camera follows the character\nrange 0.5-5 in steps of 0.5");
             SRApi.LocKey("Experiments", "Free Camera Key", "视野快捷键", null);
-            SRApi.LocDesc("Experiments", "Free Camera Key", "自由相机快捷键\n按该键开关自由相机\n可改绑，支持组合键\n默认：F3", "free camera key\ntoggles the free camera\nrebindable, combos supported\nDefault: F3");
+            SRApi.LocDesc("Experiments", "Free Camera Key", "自由相机快捷键\n按该键开关自由相机\n可改绑，支持组合键", "free camera key\ntoggles the free camera\nrebindable, combos supported");
             SRApi.RowSliders.Add(FovSlider);                       // FOV 用滑块渲染
             SRApi.RowSliders.Add(SpeedSlider);                     // 相机移动速度用滑块渲染
             SRApi.RowCompanions.Add(CameraCompanion);              // 自由相机行右侧并排快捷键框

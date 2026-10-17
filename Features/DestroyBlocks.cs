@@ -243,7 +243,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);
             SRApi.LocDesc("Destroy Blocks", "Toggle Key", "删除模式切换键\n按住进入删除模式并高亮最近放置的方块，松手退出\n点键框后按新键改绑，支持组合键\n左 Alt", "delete-mode key\nhold to enter delete mode and highlight the most recently placed block; release to exit\nclick the key box and press a new key to rebind (combos supported)\nLeft Alt");
             SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
-            SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除键\n删除当前选中的方块\n滚轮可在候选方块之间切换\n默认：退格键", "delete key\ndeletes the currently selected block\nthe mouse wheel cycles through candidate blocks\nDefault: Backspace");
+            SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除键\n删除当前选中的方块\n滚轮可在候选方块之间切换", "delete key\ndeletes the currently selected block\nthe mouse wheel cycles through candidate blocks");
             SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
             SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n决定本页功能是否生效\n仅房主能删除；房客删除需要 EX 扩展的允许客户端删除\n关", "master switch for block destruction\nenables or disables the feature on this page\nhost only; client-side deletion needs the EX module permission\nOFF");
             SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
