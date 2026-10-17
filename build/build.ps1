@@ -16,7 +16,7 @@
 #     并把文件名加进下面的 $rspFeatures；合并模式的 sr_uch.rsp 也要补上该 .cs。
 # 注：本机无 dotnet SDK 时会自动回退到 tasks\net472\csc.exe。
 # ============================================================
-param([switch]$All, [switch]$Split, [switch]$Check, [switch]$Deploy, [switch]$Separate, [string]$GameDir = '', [string]$PluginsDir = '', [string]$Root = (Split-Path -Parent $PSScriptRoot))
+param([switch]$All, [switch]$Split, [switch]$Check, [switch]$Deploy, [switch]$Separate, [string]$GameDir = '', [switch]$ExportAudit, [string]$PluginsDir = '', [string]$Root = (Split-Path -Parent $PSScriptRoot))
 # 拆分模式核心的**文件名**（程序集标识仍是 SR_UCH，改名只动文件名）。
 # 目的：与合并模式的 SR_UCH.dll 区分开 —— 否则同一个 bin\Release 里会有两份同名不同内容的核心。
 $splitCoreName = 'SR_Manager'
@@ -480,4 +480,31 @@ if ($Separate -and $Deploy) {
         Copy-Item -LiteralPath $srcC -Destination (Join-Path $coreDir 'SR.Contracts.dll') -Force
         Write-Host ('已部署契约程序集: ' + (Join-Path $coreDir 'SR.Contracts.dll'))
     }
+}
+# P1-2：从运行日志导出启动审计报告（补丁/反射/功能表/API通道/自检结论）
+if ($ExportAudit) {
+    $log = Join-Path $GameDir 'BepInEx\LogOutput.log'
+    if (-not (Test-Path -LiteralPath $log)) { Write-Host ('找不到日志: ' + $log); exit 1 }
+    $lines = [System.IO.File]::ReadAllLines($log)
+    $ver = 'unknown'
+    foreach ($l in $lines) { if ($l -match '游戏版本=([^\s]+)') { $ver = $Matches[1]; break } }
+    $docs = Join-Path $Root 'docs'
+    if (-not (Test-Path -LiteralPath $docs)) { New-Item -ItemType Directory -Force -Path $docs | Out-Null }
+    $out = Join-Path $docs ('audit-' + $ver + '.md')
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.AppendLine('# SR_UCH 启动审计报告')
+    [void]$sb.AppendLine('')
+    [void]$sb.AppendLine('- 游戏版本: ' + $ver)
+    [void]$sb.AppendLine('- 导出时间: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
+    $dll = Join-Path $GameDir 'BepInEx\plugins\SR_UCH.dll'
+    if (Test-Path -LiteralPath $dll) { [void]$sb.AppendLine('- SR_UCH.dll SHA256(前16位): ' + (Get-FileHash $dll -Algorithm SHA256).Hash.Substring(0,16)) }
+    [void]$sb.AppendLine('')
+    [void]$sb.AppendLine('## 审计行')
+    [void]$sb.AppendLine('')
+    [void]$sb.AppendLine('```')
+    foreach ($l in $lines) { if ($l -match '\[SR\.(Patch|Ref|Feat|Api|SelfTest|GateAudit)\]') { [void]$sb.AppendLine($l.Trim()) } }
+    [void]$sb.AppendLine('```')
+    [IO.File]::WriteAllText($out, $sb.ToString(), (New-Object System.Text.UTF8Encoding($true)))
+    Write-Host ('已导出: ' + $out)
+    exit 0
 }
