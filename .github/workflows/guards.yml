@@ -1,0 +1,20 @@
+name: guards
+
+# 只跑"不需要游戏 DLL / 不需要 csc"的文本类守卫：
+# API 棘轮白名单、契约层边界、功能层边界、rsp 覆盖一致性、编码合法性。
+# 编译类守卫（契约层独立编译 / csproj 构建 / 拆分构建）需要游戏 Managed 程序集，在本地 build\build.ps1 -Check 里跑。
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  text-guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 运行文本类守卫
+        shell: pwsh
+        run: ./build/guards-text.ps1
