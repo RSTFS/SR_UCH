@@ -81,7 +81,7 @@ if (-not $csc) {
 if (-not $csc) { Write-Host '找不到 csc：需要 dotnet SDK（含 Roslyn），或把 roslyn_toolset 放回 _tools\'; exit 1 }
 Write-Host "csc: $csc"
 $rspDir = Join-Path $PSScriptRoot '.cache'
-if ($Separate) { $rspDir = Join-Path $Root '_tools\rsp_separate' }             # 编译清单（非工具链，独立目录）
+if ($Separate) { Write-Host '本仓库构建链不含 -Separate（契约程序集分离）：请改用本机 _tools 构建链（_tools\build_sr_uch.ps1 -Separate）'; exit 2 }
 $rspMain = Join-Path $rspDir 'sr_uch.rsp'          # 合并模式：核心 + 全部功能
 $rspCore = Join-Path $rspDir 'sr_uch_core.rsp'     # 拆分模式：仅核心
 
