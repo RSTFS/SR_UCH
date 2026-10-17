@@ -96,7 +96,7 @@ namespace SR_UCH.Tweaks {
 			SRApi.Ref.Override("VersusControl.levelTimer", "回合计时（对局已用时间）");
 			SRApi.Ref.Override("VersusControl.countdownTimer", "回合计时（决胜倒计时）");
 			SRApi.LocSec("Round HUD", "回合 HUD");
-			SRApi.Nav("Round HUD", 40); // 侧栏顺序 40
+			SRApi.Nav("Round HUD", 25); // 侧栏顺序 25：移动轨迹(20) 之后、快速调整(30) 之前
 			SRApi.RegisterPage("Round HUD", Render);
 			SRApi.LocKey("Round HUD", "Enabled", "回合计时 HUD", null);
 			SRApi.LocDesc("Round HUD", "Enabled", "回合计时 HUD 开关\n在画面上显示当前阶段、阶段倒计时和回合信息\n纯本地只读，不发送任何网络消息，不影响游戏判定", "round HUD switch\nshows the current phase, phase countdown and round info on screen\nlocal read-only; sends no network messages and does not affect gameplay");
