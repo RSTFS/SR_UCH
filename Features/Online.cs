@@ -321,8 +321,9 @@ namespace SR_UCH.Tweaks {
             // 本页无页面级滚动：表头 / 筛选必须始终可见，房间只在下方框内滚动。
             SRApi.PageScroll = Vector2.zero;
             SRApi.NoPageScrollBars = true;   // 页面级横纵向滚动条都关闭
+            // 列宽拖动的 MouseUp 收尾由核心 TableDraw 统一处理（清 dragCol + saveWidths 回调）；
+            // 这里只收尾表格高度拖动（核心的拖拽看门狗不管高度）。
             if (Event.current != null && Event.current.type == EventType.MouseUp) {
-                if (_tableArgs.dragCol >= 0) { _tableArgs.dragCol = -1; SRApi.BlockWindowDrag = false; SaveWidths(); }
                 if (_dragH) { _dragH = false; SRApi.BlockWindowDrag = false; SaveTableH(); }
             }
             EnsureWidths();
@@ -424,11 +425,10 @@ namespace SR_UCH.Tweaks {
             float boxH = hPx > 0f
                 ? Mathf.Clamp(SRApi.Ctl.Sc(hPx), SRApi.Ctl.Sc(120), availH)
                 : availH;
-            List<int> vis = VisibleCols();
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
-            TableDraw(box, vis);
-            TableInput(box, vis, Event.current);
+            TableDraw(box);
+            TableInput(box, Event.current);
             HeightGrip();   // 表格底边：拖动改高度
         }
 
@@ -720,28 +720,8 @@ namespace SR_UCH.Tweaks {
         // 行裁剪框 / 表头裁剪框 / 滚动条矩形
         private static Rect _rowsClipPage, _joinHeaderPage;
         private static Rect _sbTrackPage = new Rect(0f, 0f, 0f, 0f), _sbThumbPage = new Rect(0f, 0f, 0f, 0f);
-        private static List<int> _visCache;
-        private static int _visFrame = -1;
 
-        private static List<int> VisibleCols() {
-            if (_visCache != null && _visFrame == Time.frameCount) return _visCache;
-            _visFrame = Time.frameCount;
-            List<int> v = new List<int>(ColCount);
-            for (int i = 0; i < ColCount; i++) {
-                int ci = _order != null && i < _order.Length ? _order[i] : i;
-                if (ci == JoinCol || !_hiddenCols.Contains(ci)) v.Add(ci);
-            }
-            _visCache = v;
-            return v;
-        }
-
-        // 绘制原语已抽到核心 SR，本页只保留房间列表的数据与布局。
-
-        // 悬停在表头分隔线 / 单元格时声明特殊光标；由 SR 主窗口 每帧统一绘制并复位。
-        private static void SetMouseCursor(bool resize, bool move) {
-            SRApi.CursorResize = resize;
-            SRApi.CursorMove = move;
-        }
+        // 可见列（order + hidden -> 显示顺序）现由核心 TableDraw 自行推导，本页不再维护副本。
 
         // 单击一帧只处理一次，避免多条命中路径同时命中导致来回切换。
         private static void HeaderClickOnce(int ci) {

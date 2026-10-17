@@ -166,7 +166,10 @@ namespace SR_UCH.Tweaks {
             return buf;
         }
 
-        private static void TableDraw(Rect box, List<int> vis) {
+        private static readonly List<int> _visScratch = new List<int>(ColCount);   // 交给核心按 order+hidden 填充
+        private static int _hiddenColsBeforeTable;                                // 本帧核心处理右键隐藏前的列数
+
+        private static void TableDraw(Rect box) {
             Event e = Event.current;
             Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
             CollectShown();
@@ -177,11 +180,16 @@ namespace SR_UCH.Tweaks {
             float sbW = overflow ? SRApi.Ctl.Sc(13) : 0f;
             float viewW = Mathf.Max(SRApi.Ctl.Sc(60), box.width - sbW);
             // 操作列钉在表格右边缘，不参与横向滚动，加入按钮始终可见可点。
-            float joinW = 0f;
-            for (int i = 0; i < vis.Count; i++) if (vis[i] == JoinCol) joinW = SRApi.Ctl.Sc(_cw[JoinCol]);
+            float joinW = SRApi.Ctl.Sc(_cw[JoinCol]);
             float stripW = Mathf.Max(SRApi.Ctl.Sc(40), viewW - joinW);     //可横向滚动的列区
+            // 可见列由核心 TableDraw 按 order + hidden 自行推导（本页不再维护可见列副本），
+            // 这里只按同一规则提前算横向滚动上限。
             float totalW = 0f;
-            for (int i = 0; i < vis.Count; i++) if (vis[i] != JoinCol) totalW += SRApi.Ctl.Sc(_cw[vis[i]]);
+            for (int i = 0; i < ColCount; i++) {
+                int ci = _order != null && i < _order.Length ? _order[i] : i;
+                if (ci == JoinCol || _hiddenCols.Contains(ci)) continue;
+                totalW += SRApi.Ctl.Sc(_cw[ci]);
+            }
             _joinW = joinW;
             _joinXPage = box.x + viewW - joinW;
             _rowsClipPage = new Rect(box.x, box.y + headerH, stripW, rowsH);
@@ -191,22 +199,23 @@ namespace SR_UCH.Tweaks {
             _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _tableMaxY);
             if (e == null) return;
             if (e.type == EventType.Repaint) GUI.Box(box, GUIContent.none, SRApi.Ctl.Footer);
-                DrawTableRows(vis, box, headerH, rowH, stripW, rowsH, viewW, mp);
+            DrawTableRows(box, headerH, rowH, stripW, rowsH, viewW, mp);
         }
 
 
-        private static void DrawTableRows(List<int> vis, Rect box, float headerH, float rowH, float stripW, float rowsH, float viewW, Vector2 mp) {
+        private static void DrawTableRows(Rect box, float headerH, float rowH, float stripW, float rowsH, float viewW, Vector2 mp) {
             // _rowRows 必须与 _rowRectsPage 一起清空：两者是"行矩形 -> _shownLobbies 下标"的一一对应。
             // 表头 / 行命中 / 行绘制统一交给核心入口。
             _tableArgs.box = box; _tableArgs.rowsClip = _rowsClipPage;
             _tableArgs.headerH = headerH; _tableArgs.rowH = rowH; _tableArgs.rowsH = rowsH; _tableArgs.stripW = stripW;
-            _tableArgs.colW = _cw; _tableArgs.vis = vis; _tableArgs.rowCount = _shownLobbies.Count;
+            _tableArgs.colW = _cw; _tableArgs.vis = _visScratch; _tableArgs.rowCount = _shownLobbies.Count;
             _tableArgs.pinCol = JoinCol; _tableArgs.alignLeftCol = HostCol;
             _tableArgs.scrollX = _scrollCols.x; _tableArgs.scrollY = _scrollRows.y; _tableArgs.mp = mp;
             _tableArgs.pinW = _joinW; _tableArgs.pinX = _joinXPage; _tableArgs.drawHeader = true;   // 表头交给核心绘制
             // 核心画表头需要列标题回调，缺失会导致表头空白。
             _tableArgs.title = delegate(int ci) { return SRApi.T(Titles[ci], TitlesEn[ci]); };
-            _tableArgs.pinCol = JoinCol;
+            // 表头悬停说明交给核心的 tip 回调（核心负责 inBox/单元格命中并设置 GUI.tooltip）。
+            _tableArgs.tip = TipText;
             _tableArgs.pinTitle = SRApi.T(Titles[JoinCol], TitlesEn[JoinCol]);
         // 隐藏列交由核心 TableDraw 处理（右键隐藏 / Shift+右键还原全部）。
         _tableArgs.hidden = _hiddenCols; _tableArgs.hideable = true;
@@ -215,7 +224,7 @@ namespace SR_UCH.Tweaks {
         _tableArgs.reorderable = true;
         // 把本页的列序源与换位回调注入核心。
         _tableArgs.order = _order;
-        _tableArgs.applyOrder = delegate(int[] o) { _order = o; _visCache = null; SaveCols(); };
+        _tableArgs.applyOrder = delegate(int[] o) { _order = o; SaveCols(); };
             // Shift+右键 = 还原全部：接到本表自己的还原例程 ResetTable。
             _tableArgs.resetAll = delegate { ResetTable(); };
         _tableArgs.click = HeaderClickOnce;
@@ -224,34 +233,15 @@ namespace SR_UCH.Tweaks {
             _tableArgs.headerCells = _headerCellsPage; _tableArgs.headerCols = _headerCols;
             _tableArgs.rowRects = _rowRectsPage; _tableArgs.rowRows = _rowRows;
             _tableArgs.pinRects = _joinRectsPage; _tableArgs.pinRows = _joinRows;
+            // 钉住列按钮：位置/裁剪由核心算好，本页只负责画按钮内容。
+            _tableArgs.pinDraw = delegate(int row, Rect r, int visible) { DrawJoinButton(row, r, mp); };
             _tableArgs.emptyHint = delegate { return SRApi.T("（没有符合筛选的房间）", "(no lobbies match the filters)"); };
+            _hiddenColsBeforeTable = _hiddenCols.Count;
             SRApi.TableDraw(_tableArgs);
             // 收回核心算出的钉住列表头矩形，供下方命中判定显示"操作"列 tooltip。
             _joinHeaderPage = _tableArgs.pinHeader;
             // 空提示由核心的 emptyHint 在行区裁剪内绘制。
-            // 钉住的操作列：加入按钮始终在表格右边缘且可点。
-            if (_joinW > 0f) {
-                int vk = 0;
-                GUI.BeginClip(new Rect(_joinXPage, box.y + headerH, _joinW, rowsH));
-                try {
-                for (int i = 0; i < _shownLobbies.Count; i++) {
-                    float y = i * rowH - _scrollRows.y;
-                    if (y > rowsH || y + rowH < 0f) continue;
-                    Matchmaker.LobbyListInfo li = _shownLobbies[i];
-                    bool can = IsJoinable(li);
-                    Rect rp = vk < _joinRectsPage.Count ? _joinRectsPage[vk] : new Rect(0f, 0f, 0f, 0f);
-                    vk++;
-                    bool hov = can && rp.Contains(mp);
-                    Color pc = GUI.color;
-                    if (!can) GUI.color = new Color(1f, 1f, 1f, 0.5f);
-                    // 窄格子按钮：用内边距小的样式，避免文字被裁掉。
-                    SRApi.Ctl.BtnClip.Draw(new Rect(SRApi.Ctl.Sc(2), y + SRApi.Ctl.Sc(1), _joinW - SRApi.Ctl.Sc(4), rowH - SRApi.Ctl.Sc(2)),
-                        new GUIContent(JoinText(li)), hov, hov && _joinDownRow == i, false, false);
-                    GUI.color = pc;
-                }
-                } finally { GUI.EndClip(); }
-                SRApi.DrawLine(new Rect(_joinXPage - 1f, box.y + headerH, 1f, rowsH), SRApi.TableLineStrong);   // 钉住列分隔线
-            }
+            if (_joinW > 0f) SRApi.DrawLine(new Rect(_joinXPage - 1f, box.y + headerH, 1f, rowsH), SRApi.TableLineStrong);   // 钉住列分隔线
             // 竖向滚动条：几何字段必须在这里赋值，否则核心 TableScrollbarInput 的 track.width > 0 判据不成立。
             // 颜色对齐 ImGui 的 ScrollbarBg / Grab / GrabHovered / GrabActive。
             if (_shownLobbies.Count * rowH > rowsH + 0.5f) {
@@ -270,7 +260,62 @@ namespace SR_UCH.Tweaks {
                 _sbThumbPage = new Rect(0f, 0f, 0f, 0f);
             }
         }
-        private static void TableInput(Rect box, List<int> vis, Event e) {
+
+        // 钉住列的加入按钮：核心 pinDraw 已给出裁剪后的矩形，这里只画按钮与悬停/按下态。
+        private static void DrawJoinButton(int row, Rect r, Vector2 mp) {
+            try {
+                if (row < 0 || row >= _shownLobbies.Count) return;
+                Matchmaker.LobbyListInfo li = _shownLobbies[row];
+                bool can = IsJoinable(li);
+                bool hov = can && r.Contains(mp);
+                // 与旧版一样把按钮限制在行区裁剪框内（最后一行只露出一半时不越界画到页脚）。
+                float y0 = r.y + SRApi.Ctl.Sc(1);
+                float y1 = Mathf.Min(r.y + r.height, _rowsClipPage.yMax - SRApi.Ctl.Sc(1));
+                float bh = Mathf.Max(0f, y1 - y0);
+                if (bh <= 0f) return;
+                Color pc = GUI.color;
+                if (!can) GUI.color = new Color(1f, 1f, 1f, 0.5f);
+                // 窄格子按钮：用内边距小的样式，避免文字被裁掉。
+                SRApi.Ctl.BtnClip.Draw(new Rect(r.x, y0, r.width, bh),
+                    new GUIContent(JoinText(li)), hov, hov && _joinDownRow == row, false, false);
+                GUI.color = pc;
+            } catch (Exception __ex) { SRApi.Guard.Log("联机表格加入按钮", __ex); }
+        }
+        // 表头说明：由核心 TableDraw 在命中表头单元格时回调（核心负责 inBox / 单元格命中 / GUI.tooltip）。
+        // 分隔线悬停与滚动条拖动时不显示，保持与旧版一致的观感。
+        private static string TipText(int ci) {
+            try {
+                if (ci < 0 || ci >= TitleTips.Length) return null;
+                Vector2 mp = _tableArgs != null ? _tableArgs.mp : Vector2.zero;
+                if (_sbDragging || HoveringSeparatorNow(mp)) return null;
+                string tip = SRApi.T(TitleTips[ci], TitleTipsEn[ci]);
+                if (ci == SkillCol) {
+                    // 悬浮提示里带上自己的技能系数（存档中的 SkillMean）。
+                    string mine = MySkillText();
+                    tip += "\n" + SRApi.T("你自己的技能系数：", "your own skill: ") + (mine != null ? mine : "?");
+                    tip += "\n" + SRApi.T("当前显示：", "showing: ") + SkillModeName(SkillModeCfg());
+                } else if (ci == QualityCol) {
+                    bool on = _showQualityCoeff != null && _showQualityCoeff.Value;
+                    tip += "\n" + SRApi.T(on ? "当前：显示匹配质量系数" : "当前：不显示匹配质量系数（点一下打开）",
+                                         on ? "now: coefficient shown" : "now: coefficient hidden (click to show)");
+                }
+                return tip;
+            } catch { return null; }
+        }
+
+        // 表头分隔线（可拖列宽）当前是否被悬停：用于抑制 core tip 回调（旧版同样在分隔线上不弹说明）。
+        private static bool HoveringSeparatorNow(Vector2 mp) {
+            try {
+                for (int k = 0; k < _headerCellsPage.Count; k++) {
+                    Rect cell = _headerCellsPage[k];
+                    Rect sep = new Rect(cell.xMax - SRApi.Ctl.Sc(3), cell.y, SRApi.Ctl.Sc(7), cell.height);
+                    if (sep.Contains(mp)) return true;
+                }
+            } catch { }
+            return false;
+        }
+
+        private static void TableInput(Rect box, Event e) {
             if (e == null) return;
             Vector2 mp = e.mousePosition;
             // 拖拽兜底复位：不能用 Input.GetMouseButton(0) 判断（与 IMGUI 事件流不同步），改为超时无鼠标事件才复位。
@@ -282,80 +327,54 @@ namespace SR_UCH.Tweaks {
             if (SRApi.TableScrollbarInput(e, mp, _sbTrackPage, _sbThumbPage, _tableMaxY, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y)) return;
             //滚轮（纵向 / Ctrl 横向 / 无纵向余量转横向）-> 核心实现
             SRApi.TableWheelInput(e, box, mp, _tableMaxX, _tableMaxY, ref _scrollCols, ref _scrollRows);
-            // 表头：分隔线调宽（<->）/ 表头换位（+）/ 单击切换 / 右键隐藏 / Shift+右键还原
-            bool hoverSep = false, hoverCell = false;
+            // 光标：调整光标（分隔线悬停 / 拖列宽）由核心 TableDraw 统一置位，本页只补拖拽期间与移动光标。
+            if (_tableArgs.dragCol >= 0) SRApi.CursorResize = true;
             bool inBox = box.Contains(mp);   // 横向滚出的列会落到框外，故把判定收回框内
-            for (int k = 0; k < _headerCellsPage.Count; k++) {
-                int ci = _headerCols[k];
-                Rect cell = _headerCellsPage[k];
-                Rect sep = new Rect(cell.xMax - SRApi.Ctl.Sc(3), cell.y, SRApi.Ctl.Sc(7), cell.height);
-                bool onSep = inBox && sep.Contains(mp);
-                if (onSep) hoverSep = true;
-                else if (inBox && cell.Contains(mp)) hoverCell = true;
+            bool hoverCell = false;
+            if (inBox) {
+                for (int k = 0; k < _headerCellsPage.Count; k++) {
+                    if (_headerCellsPage[k].Contains(mp)) { hoverCell = true; break; }
+                }
             }
-            SetMouseCursor(hoverSep || _tableArgs.dragCol >= 0, hoverCell || _tableArgs.moveCol >= 0);
-            // 悬停在表头：显示该列说明（GUI.tooltip 在 OnGUI 末尾统一画）
-            if (inBox && !_sbDragging && !hoverSep) {
+            SRApi.CursorMove = hoverCell || _tableArgs.moveCol >= 0;
+            // 表头说明已交给核心 tip 回调；核心没有钉住列的 tip，这里只补"操作"列表头。
+            if (inBox && !_sbDragging && _joinHeaderPage.width > 0f && _joinHeaderPage.Contains(mp)) {
+                GUI.tooltip = SRApi.T(TitleTips[JoinCol], TitleTipsEn[JoinCol]);
+            }
+            // 右键：表头 = 隐藏该列（核心已处理，本页只负责落盘与提示）；Shift+右键 = 还原全部（核心清列并回调
+            // resetAll）；房间行 = 隐藏该房间（本功能自己的状态，无核心 API）。
+            if (e.type == EventType.MouseDown && e.button == 1 && inBox) {
+                if (e.shift) return;   // 核心 TableDraw 已清空隐藏列并回调 resetAll
                 int hitCol = -1;
                 for (int k = 0; k < _headerCellsPage.Count; k++) {
                     if (!_headerCellsPage[k].Contains(mp)) continue;
                     hitCol = _headerCols[k];
                     break;
                 }
-                if (hitCol < 0 && _joinHeaderPage.width > 0f && _joinHeaderPage.Contains(mp)) hitCol = JoinCol;
                 if (hitCol >= 0) {
-                    string tip = SRApi.T(TitleTips[hitCol], TitleTipsEn[hitCol]);
-                    if (hitCol == SkillCol) {
-                        // 悬浮提示里带上自己的技能系数（存档中的 SkillMean）。
-                        string mine = MySkillText();
-                        tip += "\n" + SRApi.T("你自己的技能系数：", "your own skill: ") + (mine != null ? mine : "?");
-                        tip += "\n" + SRApi.T("当前显示：", "showing: ") + SkillModeName(SkillModeCfg());
-                    } else if (hitCol == QualityCol) {
-                        bool on = _showQualityCoeff != null && _showQualityCoeff.Value;
-                        tip += "\n" + SRApi.T(on ? "当前：显示匹配质量系数" : "当前：不显示匹配质量系数（点一下打开）",
-                                             on ? "now: coefficient shown" : "now: coefficient hidden (click to show)");
+                    // 隐藏动作由核心 TableDraw 完成；确实新增了隐藏列才落盘与提示。
+                    if (_hiddenCols.Contains(hitCol) && _hiddenCols.Count > _hiddenColsBeforeTable) {
+                        SaveCols();
+                        string nm = SRApi.T(Titles[hitCol], TitlesEn[hitCol]);
+                        // SRApi.T(zh, en) 两个实参都会求值：两参相同时先拼一次再传。
+                        string hiddenColMsg = SRApi.T("已隐藏列：", "Hidden column: ") + nm;
+                        Notes(hiddenColMsg, hiddenColMsg);
                     }
-                    GUI.tooltip = tip;
-                }
-            }
-            // 右键：表头 = 隐藏该列 / Shift = 还原；房间行 = 隐藏该房间
-            if (e.type == EventType.MouseDown && e.button == 1 && box.Contains(mp)) {
-                if (e.shift) {
-                    ResetTable();
-                    e.Use();
                 } else {
-                    bool handled = false;
-                    for (int k = 0; k < _headerCellsPage.Count; k++) {
-                        if (!_headerCellsPage[k].Contains(mp)) continue;
-                        int ci = _headerCols[k];
-                        if (_headerCols.Count > 2) {      //至少留 2 列（操作列是钉住的，不参与）
-                            _hiddenCols.Add(ci);
-                            _visCache = null;
-                            SaveCols();
-                            string nm = SRApi.T(Titles[ci], TitlesEn[ci]);
-                            // SRApi.T(zh, en) 两个实参都会求值：两参相同时先拼一次再传。
-                            string hiddenColMsg = SRApi.T("已隐藏列：", "Hidden column: ") + nm;
-                            Notes(hiddenColMsg, hiddenColMsg);
+                    for (int i = 0; i < _rowRectsPage.Count; i++) {
+                        if (!_rowRectsPage[i].Contains(mp)) continue;
+                        int si = _rowRows[i];
+                        Matchmaker.LobbyListInfo li = si >= 0 && si < _shownLobbies.Count ? _shownLobbies[si] : null;
+                        if (li != null) {
+                            _hidden.Add(li.sLobbyID);
+                            _lobbiesDirty = true;   // 可见集合变了，需重算"筛选后 N 个"
+                            Notes("已隐藏房间：" + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner),
+                                  "Hidden: " + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner));
                         }
-                        handled = true;
                         break;
                     }
-                    if (!handled) {
-                        for (int i = 0; i < _rowRectsPage.Count; i++) {
-                            if (!_rowRectsPage[i].Contains(mp)) continue;
-                            int si = _rowRows[i];
-                            Matchmaker.LobbyListInfo li = si >= 0 && si < _shownLobbies.Count ? _shownLobbies[si] : null;
-                            if (li != null) {
-                                _hidden.Add(li.sLobbyID);
-                                _lobbiesDirty = true;   // 可见集合变了，需重算"筛选后 N 个"
-                                Notes("已隐藏房间：" + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner),
-                                      "Hidden: " + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner));
-                            }
-                            break;
-                        }
-                    }
-                    e.Use();
                 }
+                e.Use();
             }
             // 加入按钮：手动点击
             for (int i = 0; i < _joinRectsPage.Count; i++) {
@@ -383,7 +402,6 @@ namespace SR_UCH.Tweaks {
                 _order = new int[ColCount];
                 for (int i = 0; i < ColCount; i++) _order[i] = i;
                 _hiddenCols.Clear();
-                _visCache = null;
                 if (_tableH != null) _tableH.Value = 0;
                 _hidden.Clear();
                 _lobbiesDirty = true;

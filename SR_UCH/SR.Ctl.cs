@@ -648,15 +648,7 @@ public partial class SR {
         if (a == null || a.colW == null || a.vis == null) return;
         try {
             // vis 由 order + hidden 自行推导：TableColMove 换位后只更新 order，调用方无需再维护 vis。
-            if (a.order != null && a.colW != null && a.order.Length == a.colW.Length) {
-                a.vis.Clear();
-                for (int i = 0; i < a.order.Length; i++) {
-                    int ci = a.order[i];
-                    if (ci < 0 || ci >= a.colW.Length) continue;
-                    if (a.hidden != null && a.hidden.Contains(ci)) continue;
-                    a.vis.Add(ci);
-                }
-            }
+            DeriveVisibleCols(a);
             float headerH = a.headerH > 0f ? a.headerH : Sc(24);
             if (a.vertical) headerH = (a.headerH > 0f ? a.headerH : Sc(22)) * Mathf.Max(1, a.vis != null ? a.vis.Count : 0); // 纵向时表头高 = 单格高 × 列数
             float rowH = a.rowH > 0f ? a.rowH : Sc(26);
@@ -848,6 +840,20 @@ public partial class SR {
                 if (a.saveWidths != null) { try { a.saveWidths(); } catch (Exception __sw) { Guard.Log("表格列宽保存", __sw); } }
             }
         } catch (Exception __ex) { Guard.Log("表格绘制", __ex); }
+    }
+
+    // 从 order + hidden 推导可见列（三处表格共用同一规则）：调用方只维护 order/hidden，无需再维护 vis 副本。
+    // TableDraw 在绘制前调用；order 与 colW 尺寸不一致时保持调用方给的 vis 不变。
+    private static void DeriveVisibleCols(SRApi.TableArgs a) {
+        if (a == null || a.order == null || a.colW == null || a.order.Length != a.colW.Length) return;
+        if (a.vis == null) a.vis = new List<int>(a.order.Length);
+        a.vis.Clear();
+        for (int i = 0; i < a.order.Length; i++) {
+            int ci = a.order[i];
+            if (ci < 0 || ci >= a.colW.Length) continue;
+            if (a.hidden != null && a.hidden.Contains(ci)) continue;
+            a.vis.Add(ci);
+        }
     }
 
     //表头绘制（联机房间列表同款）：可滚动列 + 钉住右列；输出每格屏幕矩形（命中用）与钉住列表头矩形。
