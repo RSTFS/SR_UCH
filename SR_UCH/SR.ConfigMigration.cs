@@ -538,6 +538,14 @@ namespace SR_UCH.Tweaks {
                 text = RemoveKeys(text, "Freeplay", new[] { "Map Key", "Map Enabled", "Treehouse Map" });
                 text = RemoveKeys(text, "Support", new[] { "Cross Platform" });
                 text = RemoveKeys(text, "Reflection", new[] { "Last Game Version" });
+            // P2 配置瘦身：清理已删除功能的废弃键（静态校验过：主模块源码里已无任何引用）。
+            text = RemoveKeys(text, "Experiments", new[] { "Mute Own", "Mute Others", "Level Background Scale", "Level Bounds Treehouse", "Level Bounds Death Line", "Level Bounds Death Drop", "Level Bounds Only In Place", "Level Bounds Direction", "Level Bounds Key" });
+            text = RemoveKeys(text, "Scene", new[] { "Render Hide Skybox", "Render Bg Color", "Scene Bounds", "Scene Spawn", "Scene Death Line", "Scene Death Line Len" });
+            text = RemoveKeys(text, "Level", new[] { "Build Mode", "Build File", "Score Fill Per Frame", "Score Fill Total Cap", "Party Bomb Radius", "Party Bomb Trigger Ratio" });
+            text = RemoveKeys(text, "Online", new[] { "Column Widths 3" });
+            text = RemoveKeys(text, "Player Tracker", new[] { "Show Own Trail" });
+            text = RemoveKeys(text, "Destroy Blocks", new[] { "Realtime Interval" });
+            text = RemoveKeys(text, "Settings", new[] { "Show Advanced" });
                 text = RemoveKeys(text, "Respawn", new[] {
                     "Enabled", "Spawn Immunity", "Delay", "Spawn Points Enabled",
                     "Set Spawn Key", "Respawn Key", "Reset Spawn Keys"
