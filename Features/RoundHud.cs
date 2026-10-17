@@ -1,8 +1,8 @@
-// 回合计时 / 阶段提醒：本地只读 HUD，显示阶段倒计时、回合进度与玩家面板。
-// 阶段切换来自 GameControl.handleEvent 的 Harmony Postfix；倒计时优先读取游戏公开设置与
-// VersusControl 的计时字段，读不到时退化为"已用时间"计时，不发送任何网络消息。
+// HUD：阶段倒计时 / 回合进度 / 关卡 / 获胜积分 / 玩家面板 / 额外信息行。
+// 阶段切换来自 GameControl.handleEvent 的 Harmony Postfix；本地只读，不发送网络消息。
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using BepInEx.Configuration;
 using GameEvent;
@@ -13,7 +13,10 @@ namespace SR_UCH.Tweaks {
 	// 本类自带 [HarmonyPatch]，由 ITweak 反射发现后手动 CreateAndPatchAll。
 	[SrFeature("sr.roundhud", "RoundHUD", "1.0")]
 	public class RoundHud : ITweak {
-		// HUD 布局：四角模式按 Edge Margin 距屏幕边缘定位；Custom 用运行期拖动位置（会话内有效）。
+		private const string Sec = "Round HUD";
+		private const int WinScoreFallback = 250;
+
+		// 布局：四角按固定边距贴边；Custom 用拖动后的运行期位置（会话内有效）。
 		public enum HudLayout {
 			TopLeft,
 			TopRight,
@@ -22,136 +25,184 @@ namespace SR_UCH.Tweaks {
 			Custom
 		}
 
+		// 显示键的工作方式。
+		public enum ShowMode {
+			Hold,
+			Toggle
+		}
+
+		// 页面 2 的内容条目：开关键 + 颜色键 + 名称/说明（说明 3 行，与 LocDesc 共用）。
+		private sealed class ContentDef {
+			public string Key, ColorKey, LabelZh, LabelEn, DescZh, DescEn;
+		}
+
+		private static readonly ContentDef[] _content = new ContentDef[] {
+			new ContentDef {
+				Key = "Show Phase", ColorKey = "Color Phase",
+				LabelZh = "阶段名", LabelEn = "Phase name",
+				DescZh = "显示阶段名\n在 HUD 中显示当前阶段（建造/游玩/决胜等）\n关闭后不显示该行",
+				DescEn = "show phase name\nshows the current phase in the HUD (build/play/sudden death, etc.)\nwhen off this line is hidden"
+			},
+			new ContentDef {
+				Key = "Show Countdown", ColorKey = "Color Countdown",
+				LabelZh = "倒计时", LabelEn = "Countdown",
+				DescZh = "显示倒计时\n显示阶段倒计时，读不到时长时显示已用时间\n关闭后不显示该行",
+				DescEn = "show countdown\nshows the phase countdown, or elapsed time when no duration is available\nwhen off this line is hidden"
+			},
+			new ContentDef {
+				Key = "Show Round", ColorKey = "Color Round",
+				LabelZh = "回合进度", LabelEn = "Round progress",
+				DescZh = "显示回合进度\n显示格式为「回合：当前/最大」，最大回合取游戏设置\n取不到回合信息时隐藏该行",
+				DescEn = "show round progress\ndisplays \"Round: current/max\", with max taken from game settings\nhidden when round info is unavailable"
+			},
+			new ContentDef {
+				Key = "Show Level", ColorKey = "Color Level",
+				LabelZh = "关卡/模式", LabelEn = "Level / mode",
+				DescZh = "显示关卡/模式\n显示「关卡名 · 模式」，不带前缀\n取不到时隐藏该行",
+				DescEn = "show level/mode\nshows \"level name · mode\" without a prefix\nhidden when unavailable"
+			},
+			new ContentDef {
+				Key = "Show Win Score", ColorKey = "Color Win Score",
+				LabelZh = "获胜积分", LabelEn = "Win score",
+				DescZh = "显示获胜积分\n读取游戏设置的目标分，读不到时显示 250\n关闭后不显示该行",
+				DescEn = "show win score\nreads the target score from game settings, falls back to 250\nwhen off this line is hidden"
+			},
+			new ContentDef {
+				Key = "Show Player Panel", ColorKey = "Color Player Panel",
+				LabelZh = "玩家面板", LabelEn = "Player panel",
+				DescZh = "显示玩家面板\n每个玩家一行：玩家号、玩家名、角色、积分、评分折扣\n折扣为 100 时不显示；玩家号/名使用玩家颜色",
+				DescEn = "show player panel\none line per player: number, name, character, score, score discount\ndiscount 100 is hidden; number/name use the game player color"
+			},
+			new ContentDef {
+				Key = "Extra Line 1", ColorKey = "Color Extra 1",
+				LabelZh = "额外信息行 1", LabelEn = "Extra line 1",
+				DescZh = "额外信息行 1\n自定义文本，按原文显示（不做翻译）\n留空则不显示",
+				DescEn = "extra line 1\ncustom text shown as typed (not translated)\nempty = hidden"
+			},
+			new ContentDef {
+				Key = "Extra Line 2", ColorKey = "Color Extra 2",
+				LabelZh = "额外信息行 2", LabelEn = "Extra line 2",
+				DescZh = "额外信息行 2\n自定义文本，按原文显示（不做翻译）\n留空则不显示",
+				DescEn = "extra line 2\ncustom text shown as typed (not translated)\nempty = hidden"
+			}
+		};
+
+		// ---- 配置项 ----
 		private static ConfigEntry<bool> _enabled;
+		private static ConfigEntry<bool> _fade;
+		private static ConfigEntry<KeyCode> _showKey;
+		private static ConfigEntry<ShowMode> _showMode;
 		private static ConfigEntry<HudLayout> _layout;
-		private static ConfigEntry<int> _edgeMargin;
 		private static ConfigEntry<int> _fontSize;
 		private static ConfigEntry<float> _opacity;
+		private static ConfigEntry<float> _bgOpacity;
 		private static ConfigEntry<int> _warnSeconds;
 		private static ConfigEntry<bool> _blink;
 		private static ConfigEntry<bool> _phaseNotice;
-		private static ConfigEntry<bool> _showScores;
-		private static ConfigEntry<bool> _showRound;
-		private static ConfigEntry<bool> _beep;
-		private static ConfigEntry<float> _beepVolume;
+		private static ConfigEntry<bool> _roundNotice;
 		private static ConfigEntry<bool> _showPhase;
 		private static ConfigEntry<bool> _showCountdown;
-		private static ConfigEntry<bool> _showPlayers;
-		private static ConfigEntry<bool> _showEliminations;
+		private static ConfigEntry<bool> _showRound;
 		private static ConfigEntry<bool> _showLevel;
+		private static ConfigEntry<bool> _showWin;
 		private static ConfigEntry<bool> _showPanel;
-		private static ConfigEntry<string> _extraLine1;
-		private static ConfigEntry<string> _extraLine2;
+		private static ConfigEntry<string> _extra1;
+		private static ConfigEntry<string> _extra2;
+		private static ConfigEntry<string> _colPhase;
+		private static ConfigEntry<string> _colCountdown;
+		private static ConfigEntry<string> _colRound;
+		private static ConfigEntry<string> _colLevel;
+		private static ConfigEntry<string> _colWin;
+		private static ConfigEntry<string> _colPanel;
+		private static ConfigEntry<string> _colExtra1;
+		private static ConfigEntry<string> _colExtra2;
 
-		// 阶段状态：Harmony 补丁写，RegisterTick 读。
+		// ---- 阶段/对局状态 ----
 		private static GameControl _gc;
 		private static GameControl.GamePhase _phase = GameControl.GamePhase.NONE;
 		private static float _phaseStart;
 		private static bool _eventSeen;
 		private static bool _hasGame;
-		private static bool _wasEnabled;        // 关闭后重新打开时重置阶段起点
-		// 帧缓存：Tick 算好，OnGUI 只负责画。
+		private static bool _wasEnabled;
+		private static bool _toggleOn;          // 切换显示模式的运行期状态
+		private static float _hudAlpha = 1f;    // 淡入淡出后的总透明度
 		private static string _timerText = "00:00";
-		private static int _warnLevel;          // 0 = 正常，1 = 黄，2 = 红
+		private static int _warnLevel;
 		private static string _roundText;
-		private static string _noticeText;
-		private static float _noticeUntil;
-		private static bool _vsPlaceSeen;       // placementTimer 是否已初始化（0 也在用）
-		// 内容块缓存（Tick 里按开关更新，OnGUI 只取字符串）。
 		private static string _levelText;
-		private static string _playerCountText;
-		private static string _extra1;
-		private static string _extra2;
+		private static string _winText;
+		private static int _lastRound;
+		private static bool _vsPlaceSeen;
 
-		// 反射缓存：VersusControl 的三个计时字段（protected float）。
+		// ---- 提示 ----
+		private static string _phaseNoticeText;
+		private static float _phaseNoticeUntil;
+		private static string _roundNoticeText;
+		private static float _roundNoticeUntil;
+
+		// ---- 玩家面板 ----
+		private static readonly string[] _playerPlain = new string[8];
+		private static readonly string[] _playerRich = new string[8];
+		private static int _playerRowCount;
+
+		// ---- 额外信息行 ----
+		private static string _extra1Text;
+		private static string _extra2Text;
+
+		// ---- 反射缓存（VersusControl 计时字段）----
 		private static FieldInfo _fPlacementTimer;
 		private static FieldInfo _fLevelTimer;
 		private static FieldInfo _fCountdownTimer;
 
-		// 旧的"得分列表"（Show Scores）：Tick 里排序并缓存成最多 4 行文本。
-		private struct ScoreRow {
-			public string name;
-			public int score;
-			public bool outFlag;
-		}
-		private static readonly ScoreRow[] _scoreRows = new ScoreRow[8];
-		private static readonly string[] _scoreLines = new string[4];
-		private static int _scoreLineCount;
-		private static int _scoreSig;
-		private static int _scoreRowCount;
-
-		// 新的"玩家面板"：所有玩家的名字/角色/分数/达标/房主/投票。
-		private struct PlayerRow {
-			public string name;
-			public string animal;
-			public int score;
-			public bool hasScore;
-			public bool goalReached;
-			public bool eliminated;
-			public bool host;
-			public string vote;
-		}
-		private static readonly PlayerRow[] _playerRows = new PlayerRow[8];
-		private static int _playerRowCount;
-		private static readonly string[] _panelLines = new string[10];
-		private static int _panelLineCount;
-		private static int _panelSig;
-
-		// 最后 5 秒提示音：AudioSource + 运行时生成的正弦波，不依赖游戏音频资源。
-		private static AudioSource _audio;
-		private static AudioClip _beepClip;
-		private static bool _beepedPhase;       // 每个阶段只响一次
-
-		// HUD 绘制缓存（首次 OnGUI 时创建）。
+		// ---- HUD 绘制 ----
 		private static GUIStyle _phaseStyle;
 		private static GUIStyle _timerStyle;
 		private static GUIStyle _smallStyle;
 		private static GUIStyle _noticeStyle;
+		private static GUIStyle _panelStyle;   // 允许富文本（玩家名/号用玩家颜色）
 		private static int _styleFont = -1;
 		private static Texture2D _white;
-		// 行类型：0 = 阶段（粗体），1 = 倒计时（大字），2 = 普通小字，3 = 阶段提示，4 = 阶段+倒计时同行。
 		private const int LinePhase = 0;
 		private const int LineTimer = 1;
 		private const int LineSmall = 2;
 		private const int LineNotice = 3;
-		private const int LinePhaseTimer = 4;
-		// 本帧要画的行（复用数组，避免每帧分配）；_hudDim = 该行是否压暗（淘汰玩家）。
-		private static readonly string[] _hudLines = new string[24];
+		private const int LinePanel = 4;
+		private static readonly string[] _hudPlain = new string[24];
+		private static readonly string[] _hudRich = new string[24];
 		private static readonly int[] _hudKinds = new int[24];
-		private static readonly bool[] _hudDim = new bool[24];
+		private static readonly Color[] _hudColors = new Color[24];
 		private static readonly float[] _hudHeights = new float[24];
-		// HUD 尺寸缓存：首帧用估算值，之后每帧在绘制前按实际内容校正（四角定位据此换算）。
 		private static float _hudW = 260f;
 		private static float _hudH = 150f;
-		// 自定义布局位置：只存运行期内存，会话内保持，不写配置（Pos X/Pos Y 已删除）。
+		// Custom 布局位置：运行期内存，会话内保持，不写配置。
 		private static float _customX = 16f;
-		private static float _customY = 120f;
-		// 拖动状态。
+		private static float _customY = 16f;
 		private static bool _dragging;
 		private static float _dragOffX;
 		private static float _dragOffY;
 
-		// 设置页分组用的键集合（第一页：内容/外观/行为；第二页：玩家面板）。
-		private static readonly HashSet<string> _keysContent = new HashSet<string> {
-			"Show Phase", "Show Countdown", "Show Round", "Show Level", "Extra Line 1", "Extra Line 2"
-		};
-		private static readonly HashSet<string> _keysAppearance = new HashSet<string> {
-			"Layout", "Edge Margin", "Font Size", "Opacity"
-		};
-		private static readonly HashSet<string> _keysBehavior = new HashSet<string> {
-			"Enabled", "Warning Seconds", "Blink", "Phase Notice", "Beep", "Beep Volume"
-		};
-		private static readonly HashSet<string> _keysPlayerPanel = new HashSet<string> {
-			"Show Player Panel", "Show Scores", "Show Players", "Show Eliminations"
-		};
+		// ---- 设置页 ----
+		private static readonly HashSet<string> _keysConfig = new HashSet<string> { "Enabled", "Fade", "Show Key" };
+		private static readonly HashSet<string> _keysAppearance = new HashSet<string> { "Layout", "Font Size", "Opacity", "Background Opacity" };
+		private static readonly HashSet<string> _keysBehavior = new HashSet<string> { "Warning Seconds", "Blink", "Phase Notice", "Round Notice" };
+		private static string _openColorKey;   // 当前展开调色板的内容颜色键
+		private static float _pickR = 1f, _pickG = 1f, _pickB = 1f;
 
-		// ---- 配置取值（全部 Clamp：手改 cfg 可能拿到超范围值）----
+		// ================= 配置取值 =================
 		private static bool IsEnabled() {
 			try { return _enabled != null && _enabled.Value; } catch { return false; }
 		}
 
-		private static int EdgeMargin() {
-			try { return _edgeMargin != null ? Mathf.Clamp(_edgeMargin.Value, 0, 200) : 16; } catch { return 16; }
+		private static bool FadeOn() {
+			try { return _fade != null && _fade.Value; } catch { return true; }
+		}
+
+		private static ShowMode ModeValue() {
+			try { return _showMode != null ? _showMode.Value : ShowMode.Hold; } catch { return ShowMode.Hold; }
+		}
+
+		private static HudLayout LayoutValue() {
+			try { return _layout != null ? _layout.Value : HudLayout.TopLeft; } catch { return HudLayout.TopLeft; }
 		}
 
 		private static int FontSize() {
@@ -160,6 +211,10 @@ namespace SR_UCH.Tweaks {
 
 		private static float Opacity() {
 			try { return _opacity != null ? Mathf.Clamp(_opacity.Value, 0.2f, 1f) : 0.85f; } catch { return 0.85f; }
+		}
+
+		private static float BgOpacity() {
+			try { return _bgOpacity != null ? Mathf.Clamp(_bgOpacity.Value, 0f, 1f) : 0.55f; } catch { return 0.55f; }
 		}
 
 		private static int WarnSeconds() {
@@ -174,252 +229,367 @@ namespace SR_UCH.Tweaks {
 			try { return _phaseNotice != null && _phaseNotice.Value; } catch { return true; }
 		}
 
-		private static bool ShowScoresOn() {
-			try { return _showScores != null && _showScores.Value; } catch { return false; }
+		private static bool RoundNoticeOn() {
+			try { return _roundNotice != null && _roundNotice.Value; } catch { return true; }
 		}
 
-		private static bool ShowRoundOn() {
-			try { return _showRound != null && _showRound.Value; } catch { return true; }
+		private static bool ShowOn(ConfigEntry<bool> e) {
+			try { return e != null && e.Value; } catch { return false; }
 		}
 
-		private static bool BeepOn() {
-			try { return _beep != null && _beep.Value; } catch { return true; }
+		private static string EntryHex(ConfigEntry<string> e) {
+			try { return e != null ? e.Value : null; } catch { return null; }
 		}
 
-		private static float BeepVolume() {
-			try { return _beepVolume != null ? Mathf.Clamp(_beepVolume.Value, 0f, 1f) : 0.5f; } catch { return 0.5f; }
+		private static Color ParseHex(string hex, Color fallback) {
+			try {
+				if (!string.IsNullOrEmpty(hex)) {
+					string t = hex.Trim();
+					if (t.StartsWith("#")) t = t.Substring(1);
+					if (t.Length == 6) {
+						int v;
+						if (int.TryParse(t, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out v)) {
+							return new Color(((v >> 16) & 0xFF) / 255f, ((v >> 8) & 0xFF) / 255f, (v & 0xFF) / 255f, 1f);
+						}
+					}
+				}
+			} catch { }
+			return fallback;
 		}
 
-		private static HudLayout LayoutValue() {
-			try { return _layout != null ? _layout.Value : HudLayout.TopLeft; } catch { return HudLayout.TopLeft; }
+		private static string ToHex(Color c) {
+			try {
+				int r = Mathf.Clamp(Mathf.RoundToInt(c.r * 255f), 0, 255);
+				int g = Mathf.Clamp(Mathf.RoundToInt(c.g * 255f), 0, 255);
+				int b = Mathf.Clamp(Mathf.RoundToInt(c.b * 255f), 0, 255);
+				return "#" + r.ToString("X2") + g.ToString("X2") + b.ToString("X2");
+			} catch { return "#FFFFFF"; }
 		}
 
-		private static bool ShowPhaseOn() {
-			try { return _showPhase != null && _showPhase.Value; } catch { return true; }
+		private static Color Col(ConfigEntry<string> e, Color fallback) {
+			return ParseHex(EntryHex(e), fallback);
 		}
 
-		private static bool ShowCountdownOn() {
-			try { return _showCountdown != null && _showCountdown.Value; } catch { return true; }
-		}
-
-		private static bool ShowPlayersOn() {
-			try { return _showPlayers != null && _showPlayers.Value; } catch { return false; }
-		}
-
-		private static bool ShowEliminationsOn() {
-			try { return _showEliminations != null && _showEliminations.Value; } catch { return true; }
-		}
-
-		private static bool ShowLevelOn() {
-			try { return _showLevel != null && _showLevel.Value; } catch { return false; }
-		}
-
-		private static bool ShowPanelOn() {
-			try { return _showPanel != null && _showPanel.Value; } catch { return false; }
-		}
-
+		// ================= 注册 =================
 		private static void SelfReg() {
 			// 本文件反射的游戏私有成员，改名时启动自检会在日志里告警。
-			SRApi.Ref.Override("VersusControl.placementTimer", "回合计时（建造阶段剩余时间）");
-			SRApi.Ref.Override("VersusControl.levelTimer", "回合计时（对局已用时间）");
-			SRApi.Ref.Override("VersusControl.countdownTimer", "回合计时（决胜倒计时）");
+			SRApi.Ref.Override("VersusControl.placementTimer", "HUD（建造阶段剩余时间）");
+			SRApi.Ref.Override("VersusControl.levelTimer", "HUD（对局已用时间）");
+			SRApi.Ref.Override("VersusControl.countdownTimer", "HUD（决胜倒计时）");
 			// 枚举下拉框的中文显示名（英文模式仍显示枚举原名）。
 			SRApi.LocEnum("TopLeft", "左上");
 			SRApi.LocEnum("TopRight", "右上");
 			SRApi.LocEnum("BottomLeft", "左下");
 			SRApi.LocEnum("BottomRight", "右下");
 			SRApi.LocEnum("Custom", "自定义");
-			// 侧栏显示名改成 "HUD"；配置段名保持 "Round HUD" 避免迁移。
-			SRApi.LocSec("Round HUD", "HUD", "HUD");
-			SRApi.Nav("Round HUD", 25); // 侧栏顺序 25：移动轨迹(20) 之后、快速调整(30) 之前
-			// 两页：第一页 HUD（内容/外观/行为），第二页玩家面板。
-			SRApi.RegisterPage("Round HUD", "hud", "HUD", "HUD", 10, RenderPage1);
-			SRApi.RegisterPage("Round HUD", "players", "玩家面板", "Players", 20, RenderPage2);
-			SRApi.LocKey("Round HUD", "Enabled", "回合计时 HUD", null);
-			SRApi.LocDesc("Round HUD", "Enabled", "回合计时 HUD 开关\n在画面上显示当前阶段、阶段倒计时和回合信息\n纯本地只读，不发送任何网络消息，不影响游戏判定", "round HUD switch\nshows the current phase, phase countdown and round info on screen\nlocal read-only; sends no network messages and does not affect gameplay");
-			SRApi.LocKey("Round HUD", "Layout", "布局", null);
-			SRApi.LocDesc("Round HUD", "Layout", "HUD 布局\n左上/右上/左下/右下按 Edge Margin 自动贴边，自定义用运行期拖动位置\n自定义位置只在本次会话内保持，不写入配置", "HUD layout\nthe four corner modes stick to the screen edges according to Edge Margin; custom uses the runtime drag position\ncustom position lasts for this session only and is not written to config");
-			SRApi.LocKey("Round HUD", "Edge Margin", "四角边距", null);
-			SRApi.LocDesc("Round HUD", "Edge Margin", "四角布局边距\n左上/右上/左下/右下布局下 HUD 距屏幕边缘的像素数\n范围 0 到 200", "corner layout margin\ndistance in pixels between the HUD and the screen edge in the four corner layouts\nrange 0-200");
-			SRApi.LocKey("Round HUD", "Font Size", "字体大小", null);
-			SRApi.LocDesc("Round HUD", "Font Size", "HUD 字体大小\nHUD 文字的基础字号，会随界面缩放一起放大\n范围 10 到 48", "HUD font size\nbase font size of the HUD text, scaled with the UI scale\nrange 10-48");
-			SRApi.LocKey("Round HUD", "Opacity", "不透明度", null);
-			SRApi.LocDesc("Round HUD", "Opacity", "HUD 不透明度\n同时控制背景和文字的透明程度\n范围 0.2 到 1，1 为完全不透明", "HUD opacity\ncontrols the transparency of both the background and the text\nrange 0.2-1, 1 = fully opaque");
-			SRApi.LocKey("Round HUD", "Warning Seconds", "警告秒数", null);
-			SRApi.LocDesc("Round HUD", "Warning Seconds", "倒计时警告秒数\n剩余时间低于该秒数时倒计时文字变黄\n最后 5 秒固定变红，可配合闪烁开关；范围 5 到 60", "countdown warning seconds\nthe countdown turns yellow when less time than this remains\nit always turns red in the last 5 seconds; can blink; range 5-60");
-			SRApi.LocKey("Round HUD", "Blink", "闪烁提醒", null);
-			SRApi.LocDesc("Round HUD", "Blink", "最后 5 秒闪烁\n倒计时进入最后 5 秒时文字闪烁提醒\n关闭则只在最后 5 秒显示红色", "blink in the last 5 seconds\nmakes the countdown blink during the final 5 seconds\nOFF shows a steady red countdown instead");
-			SRApi.LocKey("Round HUD", "Phase Notice", "阶段提示", null);
-			SRApi.LocDesc("Round HUD", "Phase Notice", "阶段切换提示\n阶段切换时在 HUD 里短暂显示新阶段名称\n显示约 2 秒后自动消失", "phase change notice\nbriefly shows the new phase name in the HUD when the phase changes\nfades out automatically after about 2 seconds");
-			SRApi.LocKey("Round HUD", "Show Phase", "显示阶段名", null);
-			SRApi.LocDesc("Round HUD", "Show Phase", "显示阶段名\n阶段名与倒计时显示在同一行（如「游玩 0:42」）\n关闭后只保留其他已启用内容", "show phase name\nshows the phase name on the same line as the countdown (e.g. Play 0:42)\nwhen off only the other enabled lines are shown");
-			SRApi.LocKey("Round HUD", "Show Countdown", "显示倒计时", null);
-			SRApi.LocDesc("Round HUD", "Show Countdown", "显示倒计时\n显示阶段倒计时（读不到时长时显示已用时间）\n关闭后仍会计算最后 5 秒提示音", "show countdown\nshows the phase countdown (elapsed time when no duration is available)\nthe last-5-seconds beep is still evaluated when off");
-			SRApi.LocKey("Round HUD", "Show Round", "显示回合进度", null);
-			SRApi.LocDesc("Round HUD", "Show Round", "显示回合进度\n在 HUD 中显示第 N 回合与目标回合/胜场数\n取不到回合信息时自动隐藏该行", "show round progress\nshows the current round and the target round/win count in the HUD\nhidden automatically when round info is unavailable");
-			SRApi.LocKey("Round HUD", "Show Level", "显示关卡/模式", null);
-			SRApi.LocDesc("Round HUD", "Show Level", "显示关卡/模式\n在 HUD 中显示当前关卡名与对局模式\n关卡或模式取不到时只显示能读到的部分，都取不到则隐藏", "show level/mode\nshows the current level name and game mode in the HUD\nshows whichever part is available; hidden when neither is available");
-			SRApi.LocKey("Round HUD", "Extra Line 1", "额外信息行 1", null);
-			SRApi.LocDesc("Round HUD", "Extra Line 1", "额外信息行 1\n自定义文本，按原文显示在 HUD 里（不做翻译）\n留空则不显示；过长会截断到 120 字符", "extra line 1\ncustom text shown in the HUD as typed (not translated)\nempty = hidden; truncated to 120 characters");
-			SRApi.LocKey("Round HUD", "Extra Line 2", "额外信息行 2", null);
-			SRApi.LocDesc("Round HUD", "Extra Line 2", "额外信息行 2\n自定义文本，按原文显示在 HUD 里（不做翻译）\n留空则不显示；过长会截断到 120 字符", "extra line 2\ncustom text shown in the HUD as typed (not translated)\nempty = hidden; truncated to 120 characters");
-			SRApi.LocKey("Round HUD", "Beep", "最后 5 秒提示音", null);
-			SRApi.LocDesc("Round HUD", "Beep", "最后 5 秒提示音\n倒计时进入最后 5 秒时响一声，每个阶段只响一次\n使用运行时生成的简单提示音，不依赖游戏音频资源", "last-5-seconds beep\nplays one beep when the countdown enters its final 5 seconds, once per phase\nuses a beep generated at runtime; no game audio assets are used");
-			SRApi.LocKey("Round HUD", "Beep Volume", "提示音音量", null);
-			SRApi.LocDesc("Round HUD", "Beep Volume", "提示音音量\n最后 5 秒提示音的音量\n范围 0 到 1，0 为静音", "beep volume\nvolume of the last-5-seconds beep\nrange 0-1, 0 = silent");
-			SRApi.LocKey("Round HUD", "Show Player Panel", "显示玩家面板", null);
-			SRApi.LocDesc("Round HUD", "Show Player Panel", "玩家面板\n显示所有玩家的名字、角色、分数与是否达到制胜目标\n树屋/大厅额外显示房主标识与投票关卡；取不到玩家数据时整段隐藏", "player panel\nshows every player's name, character, score and whether the win target is reached\nin the treehouse/lobby it also shows the host mark and voted level; hidden when player data is unavailable");
-			SRApi.LocKey("Round HUD", "Show Scores", "显示得分列表", null);
-			SRApi.LocDesc("Round HUD", "Show Scores", "显示得分列表\nHUD 内增加最多 4 行的玩家得分列表，按分数从高到低排序\n只读取本局得分与淘汰状态，取不到时整段隐藏", "show score list\nadds a list of up to 4 players to the HUD, sorted from highest to lowest score\nreads this match's scores and eliminated state only; hidden when unavailable");
-			SRApi.LocKey("Round HUD", "Show Players", "显示玩家数", null);
-			SRApi.LocDesc("Round HUD", "Show Players", "显示玩家数\n在 HUD 中显示当前玩家数量\n取不到玩家列表时隐藏该行", "show player count\nshows the number of players in the HUD\nhidden when the player list is unavailable");
-			SRApi.LocKey("Round HUD", "Show Eliminations", "显示淘汰标记", null);
-			SRApi.LocDesc("Round HUD", "Show Eliminations", "显示淘汰标记\n在玩家面板与得分列表里给已淘汰玩家追加标记\n仅影响文字标记，不影响排序与压暗", "show eliminated marks\nappends an eliminated marker to dead players in the player panel and score list\naffects the text marker only; sorting and dimming still apply");
+			SRApi.LocEnum("Hold", "按住显示");
+			SRApi.LocEnum("Toggle", "切换显示");
+			SRApi.LocSec(Sec, "HUD", "HUD");
+			SRApi.Nav(Sec, 25); // 移动轨迹(20) 之后
+			SRApi.RegisterPage(Sec, "hud", "HUD", "HUD", 10, RenderPage1);
+			SRApi.RegisterPage(Sec, "content", "显示内容", "Content", 20, RenderPage2);
+
+			Loc("Enabled", "显示HUD", "Show HUD",
+				"HUD 总开关\n关闭后完全不绘制 HUD\n纯本地只读，不发送任何网络消息",
+				"HUD master switch\nwhen off the HUD is not drawn at all\nlocal read-only; sends no network messages");
+			Loc("Fade", "淡入淡出", "Fade",
+				"淡入淡出\nHUD 显示或隐藏时平滑过渡\n关闭则立即显示或隐藏",
+				"fade in/out\nsmoothly transitions the HUD when showing or hiding\nwhen off the HUD appears/disappears instantly");
+			Loc("Show Key", "显示按键", "Show key",
+				"显示按键\n按住或切换用于显示 HUD 的按键，默认 ~\n点右侧键框后按新键改绑，Esc 取消",
+				"show key\nkey used to show the HUD by holding or toggling, default ~\nclick the key box, then press a new key (Esc cancels)");
+			Loc("Show Mode", "显示方式", "Show mode",
+				"显示方式\n按住显示：按住显示键期间显示 HUD\n切换显示：按一下在显示与隐藏之间切换",
+				"show mode\nHold = visible while the show key is held\nToggle = tap the show key to switch visibility");
+			Loc("Layout", "布局", "Layout",
+				"HUD 布局\n左上/右上/左下/右下按固定边距贴边\n自定义用拖动后的位置，仅本次会话有效",
+				"HUD layout\nthe four corner modes stick to the screen edges with a fixed margin\ncustom uses the dragged position, kept for this session only");
+			Loc("Font Size", "字体大小", "Font size",
+				"HUD 字体大小\nHUD 文字的基础字号\n范围 10 到 48",
+				"HUD font size\nbase font size of the HUD text\nrange 10-48");
+			Loc("Opacity", "不透明度", "Text opacity",
+				"HUD 文字不透明度\n控制所有 HUD 文字的不透明度\n范围 0.2 到 1，1 为完全不透明",
+				"HUD text opacity\nopacity of all HUD text\nrange 0.2-1, 1 = fully opaque");
+			Loc("Background Opacity", "背景透明度", "Background opacity",
+				"HUD 背景透明度\nHUD 半透明底色的透明度\n范围 0 到 1，0 为完全透明",
+				"HUD background opacity\nopacity of the HUD's translucent background\nrange 0-1, 0 = fully transparent");
+			Loc("Warning Seconds", "警告秒数", "Warning seconds",
+				"警告秒数\n倒计时剩余该秒数时文字变黄，最后 5 秒变红\n范围 5 到 60",
+				"warning seconds\nthe countdown turns yellow when less time than this remains and red in the last 5 seconds\nrange 5-60");
+			Loc("Blink", "闪烁提醒", "Blink",
+				"闪烁提醒\n最后 5 秒时倒计时文字闪烁\n关闭则只变红不闪",
+				"blink warning\nblinks the countdown text during the final 5 seconds\nwhen off it only turns red");
+			Loc("Phase Notice", "阶段提示", "Phase notice",
+				"阶段提示\n阶段切换时短暂显示新阶段名称（约 2 秒）\n关闭则不显示",
+				"phase notice\nbriefly shows the new phase name when the phase changes (about 2 seconds)\nwhen off it is hidden");
+			Loc("Round Notice", "回合提示", "Round notice",
+				"回合提示\n回合数变化时短暂显示当前回合（约 2 秒）\n关闭则不显示",
+				"round notice\nbriefly shows the current round when the round number changes (about 2 seconds)\nwhen off it is hidden");
+
+			// 第二页内容：开关 + 颜色（颜色说明统一模板）。
+			for (int i = 0; i < _content.Length; i++) {
+				ContentDef d = _content[i];
+				Loc(d.Key, d.LabelZh, d.LabelEn, d.DescZh, d.DescEn);
+				SRApi.LocKey(Sec, d.ColorKey, d.LabelZh + "颜色", d.LabelEn + " color");
+				SRApi.LocDesc(Sec, d.ColorKey,
+					d.LabelZh + "的文字颜色\n十六进制颜色值，例如 #FFFFFF\n点同内容行右侧色块可打开调色板并实时生效",
+					"text color for " + d.LabelEn.ToLowerInvariant() + "\nhex color value, for example #FFFFFF\nclick the swatch on the right of the same row to open the picker; applies immediately");
+			}
 		}
 
-		// ---- 设置页渲染：两页（第一页再按内容/外观/行为分组）----
-		private static bool IsHudEntry(ConfigEntryBase e, HashSet<string> keys) {
-			try {
-				return e != null && keys != null && e.Definition.Section == "Round HUD" && keys.Contains(e.Definition.Key);
-			} catch { return false; }
+		private static void Loc(string key, string zh, string en, string descZh, string descEn) {
+			SRApi.LocKey(Sec, key, zh, en);
+			SRApi.LocDesc(Sec, key, descZh, descEn);
 		}
 
-		private static bool RowContent(ConfigEntryBase e) { return IsHudEntry(e, _keysContent); }
-		private static bool RowAppearance(ConfigEntryBase e) { return IsHudEntry(e, _keysAppearance); }
-		private static bool RowBehavior(ConfigEntryBase e) { return IsHudEntry(e, _keysBehavior); }
-		private static bool RowPlayerPanel(ConfigEntryBase e) { return IsHudEntry(e, _keysPlayerPanel); }
+		// ================= 设置页 =================
+		private static bool IsSec(ConfigEntryBase e) {
+			try { return e != null && e.Definition.Section == Sec; } catch { return false; }
+		}
 
-		private static bool RowOther(ConfigEntryBase e) {
+		private static bool InSet(ConfigEntryBase e, HashSet<string> set) {
+			try { return e != null && e.Definition.Section == Sec && set.Contains(e.Definition.Key); } catch { return false; }
+		}
+
+		private static bool RowConfig(ConfigEntryBase e) { return InSet(e, _keysConfig); }
+		private static bool RowAppearance(ConfigEntryBase e) { return InSet(e, _keysAppearance); }
+		private static bool RowBehavior(ConfigEntryBase e) { return InSet(e, _keysBehavior); }
+
+		// 行可见性：颜色键用同行的色块渲染，显示方式跟随显示按键行，都不单独成行。
+		private static bool RowVisible(ConfigEntryBase e) {
 			try {
-				if (e == null || e.Definition.Section != "Round HUD") return false;
+				if (!IsSec(e)) return true;
 				string k = e.Definition.Key;
-				return !_keysContent.Contains(k) && !_keysAppearance.Contains(k) && !_keysBehavior.Contains(k) && !_keysPlayerPanel.Contains(k);
-			} catch { return false; }
+				if (k == "Show Mode") return false;
+				if (k.StartsWith("Color ")) return false;
+				return true;
+			} catch { return true; }
 		}
 
-		private static readonly Func<ConfigEntryBase, bool> _rowContent = RowContent;
+		// 显示按键行的同行附加控件：显示方式下拉框。
+		private static string RowExtra(ConfigEntryBase e) {
+			try {
+				if (!IsSec(e)) return null;
+				return e.Definition.Key == "Show Key" ? "Show Mode" : null;
+			} catch { return null; }
+		}
+
+		private static readonly Func<ConfigEntryBase, bool> _rowConfig = RowConfig;
 		private static readonly Func<ConfigEntryBase, bool> _rowAppearance = RowAppearance;
 		private static readonly Func<ConfigEntryBase, bool> _rowBehavior = RowBehavior;
-		private static readonly Func<ConfigEntryBase, bool> _rowPlayerPanel = RowPlayerPanel;
-		private static readonly Func<ConfigEntryBase, bool> _rowOther = RowOther;
 
 		private static void RenderPage1() {
 			try {
-				List<ConfigEntryBase> list = SRApi.SectionEntries("Round HUD");
+				List<ConfigEntryBase> list = SRApi.SectionEntries(Sec);
 				if (list == null || list.Count == 0) { GUILayout.Label(SRApi.T("（无匹配条目）", "(no matching entries)"), SRApi.Ctl.Label); return; }
-				SRApi.Ctl.SectionTitle(SRApi.T("- 显示内容 -", "- Content -"));
-				SRApi.RenderSectionEntries("Round HUD", _rowContent);
+				SRApi.Ctl.SectionTitle(SRApi.T("- 配置 -", "- Config -"));
+				SRApi.RenderSectionEntries(Sec, _rowConfig);
 				SRApi.Ctl.SectionTitle(SRApi.T("- 外观 -", "- Appearance -"));
-				SRApi.RenderSectionEntries("Round HUD", _rowAppearance);
+				SRApi.RenderSectionEntries(Sec, _rowAppearance);
 				SRApi.Ctl.SectionTitle(SRApi.T("- 行为 -", "- Behavior -"));
-				SRApi.RenderSectionEntries("Round HUD", _rowBehavior);
-				SRApi.RenderSectionEntries("Round HUD", _rowOther);
-			} catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 页", __ex); }
+				SRApi.RenderSectionEntries(Sec, _rowBehavior);
+			} catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 设置页", __ex); }
 		}
 
 		private static void RenderPage2() {
 			try {
-				List<ConfigEntryBase> list = SRApi.SectionEntries("Round HUD");
-				if (list == null || list.Count == 0) { GUILayout.Label(SRApi.T("（无匹配条目）", "(no matching entries)"), SRApi.Ctl.Label); return; }
+				SRApi.Ctl.SectionTitle(SRApi.T("- 一般 -", "- General -"));
+				for (int i = 0; i <= 4; i++) RenderContentRow(_content[i]);
 				SRApi.Ctl.SectionTitle(SRApi.T("- 玩家面板 -", "- Player panel -"));
-				SRApi.RenderSectionEntries("Round HUD", _rowPlayerPanel);
-			} catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 玩家面板页", __ex); }
+				RenderContentRow(_content[5]);
+				SRApi.Ctl.SectionTitle(SRApi.T("- 其它 -", "- Other -"));
+				RenderContentRow(_content[6]);
+				RenderContentRow(_content[7]);
+			} catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 显示内容页", __ex); }
 		}
 
-		// 字体/透明度/四角边距用滑块条渲染（注册到核心的条目行滑块范围扩展点）。
-		private static bool IsHudKey(ConfigEntryBase e, string key) {
-			try { return e != null && e.Definition.Section == "Round HUD" && e.Definition.Key == key; } catch { return false; }
+		// 一行：标签 + 开关/文本框 + 右侧颜色色块；点色块展开 RGB 调色板。
+		private static void RenderContentRow(ContentDef d) {
+			try {
+				ConfigEntryBase show = SRApi.Ctl.FindEntry(Sec, d.Key);
+				ConfigEntryBase color = SRApi.Ctl.FindEntry(Sec, d.ColorKey);
+				GUIContent label = new GUIContent(SRApi.T(d.LabelZh, d.LabelEn), SRApi.T(d.DescZh, d.DescEn));
+				GUILayout.BeginHorizontal();
+				SRApi.Ctl.RestoreLabel(label, show, SRApi.Ctl.Sc(150f), SRApi.Ctl.Sc(28f));
+				if (show != null) SRApi.Ctl.RenderControl(show);
+				GUILayout.Space(SRApi.Ctl.Sc(6f));
+				DrawColorSwatch(d, color);
+				GUILayout.FlexibleSpace();
+				GUILayout.EndHorizontal();
+				if (color != null && _openColorKey == d.ColorKey) DrawColorPicker(d, color);
+			} catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 内容行", __ex); }
 		}
 
-		private static bool FontSizeSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
+		private static void DrawColorSwatch(ContentDef d, ConfigEntryBase color) {
+			try {
+				Color cur = ReadEntryColor(color);
+				Color oldBg = GUI.backgroundColor;
+				GUI.backgroundColor = new Color(cur.r, cur.g, cur.b, 1f);
+				string tip = SRApi.T("点击打开调色板", "Click to open the color picker");
+				bool clicked = GUILayout.Button(new GUIContent("", tip), SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(64f)), GUILayout.Height(SRApi.Ctl.Sc(26f)));
+				GUI.backgroundColor = oldBg;
+				if (!clicked) return;
+				if (_openColorKey == d.ColorKey) { _openColorKey = null; return; }
+				_openColorKey = d.ColorKey;
+				Color cur2 = ReadEntryColor(color);
+				_pickR = cur2.r; _pickG = cur2.g; _pickB = cur2.b;
+			} catch (Exception __ex) { SRApi.Guard.Log("HUD 颜色色块", __ex); }
+		}
+
+		private static void DrawColorPicker(ContentDef d, ConfigEntryBase color) {
+			try {
+				GUILayout.BeginHorizontal();
+				GUILayout.Space(SRApi.Ctl.Sc(150f));
+				GUILayout.BeginVertical();
+				SRApi.Ctl.SectionTitle(SRApi.T(d.LabelZh + "颜色", d.LabelEn + " color"));
+				bool changed = false;
+				changed |= DrawChannel("R", ref _pickR);
+				changed |= DrawChannel("G", ref _pickG);
+				changed |= DrawChannel("B", ref _pickB);
+				if (changed) SRApi.Ctl.SetValue(color, ToHex(new Color(_pickR, _pickG, _pickB, 1f)));
+				GUILayout.BeginHorizontal();
+				Color oldBg = GUI.backgroundColor;
+				GUI.backgroundColor = new Color(_pickR, _pickG, _pickB, 1f);
+				GUILayout.Box(GUIContent.none, SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(90f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+				GUI.backgroundColor = oldBg;
+				GUILayout.Label(ToHex(new Color(_pickR, _pickG, _pickB, 1f)), SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(80f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+				if (GUILayout.Button(SRApi.T("关闭", "Close"), SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(64f)), GUILayout.Height(SRApi.Ctl.Sc(24f)))) _openColorKey = null;
+				GUILayout.EndHorizontal();
+				GUILayout.EndVertical();
+				GUILayout.FlexibleSpace();
+				GUILayout.EndHorizontal();
+			} catch (Exception __ex) { SRApi.Guard.Log("HUD 调色板", __ex); }
+		}
+
+		private static bool DrawChannel(string name, ref float value) {
+			GUILayout.BeginHorizontal();
+			GUILayout.Label(name, SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(18f)), GUILayout.Height(SRApi.Ctl.Sc(22f)));
+			Rect r = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(180f), SRApi.Ctl.Sc(22f));
+			float nv = SRApi.Ctl.DrawSlider(r, value, 0f, 1f, false);
+			bool changed = Mathf.Abs(nv - value) > 0.0001f;
+			if (changed) value = nv;
+			GUILayout.Label(Mathf.RoundToInt(value * 255f).ToString(), SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(40f)), GUILayout.Height(SRApi.Ctl.Sc(22f)));
+			GUILayout.EndHorizontal();
+			return changed;
+		}
+
+		private static Color ReadEntryColor(ConfigEntryBase e) {
+			try {
+				string s = e != null ? e.BoxedValue as string : null;
+				return ParseHex(s, Color.white);
+			} catch { return Color.white; }
+		}
+
+		// 滑块范围注册：字体大小 / 文字不透明度 / 背景透明度 / 警告秒数。
+		private static bool IsKey(ConfigEntryBase e, string key) {
+			try { return e != null && e.Definition.Section == Sec && e.Definition.Key == key; } catch { return false; }
+		}
+
+		private static bool FontSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
 			min = 10f; max = 48f; fmt = "0";
-			return IsHudKey(e, "Font Size");
+			return IsKey(e, "Font Size");
 		}
 
 		private static bool OpacitySlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
 			min = 0.2f; max = 1f; fmt = "0.00";
-			return IsHudKey(e, "Opacity");
+			return IsKey(e, "Opacity");
 		}
 
-		private static bool EdgeMarginSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
-			min = 0f; max = 200f; fmt = "0";
-			return IsHudKey(e, "Edge Margin");
+		private static bool BgOpacitySlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
+			min = 0f; max = 1f; fmt = "0.00";
+			return IsKey(e, "Background Opacity");
 		}
 
-		// 初始化需整段 try：中途抛异常会留下常驻对象且功能静默消失。
+		private static bool WarnSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
+			min = 5f; max = 60f; fmt = "0";
+			return IsKey(e, "Warning Seconds");
+		}
+
+		// ================= 初始化 =================
 		public void Initialize(IFeatureHost plugin) {
 			try {
 				SelfReg();
 				ConfigFile cfg = plugin.Config;
-				_enabled = cfg.Bind("Round HUD", "Enabled", true, "总开关：在画面上显示当前阶段、阶段倒计时和回合信息（纯本地只读）。");
-				_layout = cfg.Bind("Round HUD", "Layout", HudLayout.TopLeft, "HUD 布局：左上/右上/左下/右下按边距贴边；自定义用运行期拖动位置。");
-				_edgeMargin = cfg.Bind("Round HUD", "Edge Margin", 16,
-					new ConfigDescription("四角布局边距（0-200 像素）：HUD 距屏幕边缘的距离。", new AcceptableValueRange<int>(0, 200)));
-				_fontSize = cfg.Bind("Round HUD", "Font Size", 18,
-					new ConfigDescription("HUD 字体大小：基础字号（10-48），会随界面缩放放大。", new AcceptableValueRange<int>(10, 48)));
-				_opacity = cfg.Bind("Round HUD", "Opacity", 0.85f,
-					new ConfigDescription("HUD 不透明度（0.2-1）：同时控制背景和文字，1 为完全不透明。", new AcceptableValueRange<float>(0.2f, 1f)));
-				_showPhase = cfg.Bind("Round HUD", "Show Phase", true, "显示阶段名：阶段名与倒计时显示在同一行。");
-				_showCountdown = cfg.Bind("Round HUD", "Show Countdown", true, "显示倒计时：显示阶段倒计时（读不到时长时显示已用时间）。");
-				_showRound = cfg.Bind("Round HUD", "Show Round", true, "显示回合进度：在 HUD 中显示第 N 回合与目标回合/胜场数（取不到时隐藏）。");
-				_showLevel = cfg.Bind("Round HUD", "Show Level", false, "显示关卡/模式：在 HUD 中显示当前关卡名与对局模式（取不到时隐藏）。");
-				_extraLine1 = cfg.Bind("Round HUD", "Extra Line 1", "", "额外信息行 1：自定义文本，按原文显示（不做翻译），留空则不显示。");
-				_extraLine2 = cfg.Bind("Round HUD", "Extra Line 2", "", "额外信息行 2：自定义文本，按原文显示（不做翻译），留空则不显示。");
-				_warnSeconds = cfg.Bind("Round HUD", "Warning Seconds", 10,
-					new ConfigDescription("倒计时警告秒数（5-60）：剩余时间低于该值时文字变黄；最后 5 秒固定变红。", new AcceptableValueRange<int>(5, 60)));
-				_blink = cfg.Bind("Round HUD", "Blink", false, "最后 5 秒闪烁：倒计时进入最后 5 秒时文字闪烁提醒。");
-				_phaseNotice = cfg.Bind("Round HUD", "Phase Notice", true, "阶段切换提示：阶段切换时在 HUD 里短暂显示新阶段名称（约 2 秒）。");
-				_beep = cfg.Bind("Round HUD", "Beep", true, "最后 5 秒提示音：倒计时进入最后 5 秒时响一声，每个阶段只响一次。");
-				_beepVolume = cfg.Bind("Round HUD", "Beep Volume", 0.5f,
-					new ConfigDescription("提示音音量（0-1）：最后 5 秒提示音的音量，0 为静音。", new AcceptableValueRange<float>(0f, 1f)));
-				_showPanel = cfg.Bind("Round HUD", "Show Player Panel", false, "显示玩家面板：显示所有玩家的名字、角色、分数与达标状态；树屋/大厅显示房主与投票关卡。");
-				_showScores = cfg.Bind("Round HUD", "Show Scores", false, "显示得分列表：在 HUD 内增加最多 4 行玩家得分/淘汰列表（只读本局数据，取不到时隐藏）。");
-				_showPlayers = cfg.Bind("Round HUD", "Show Players", false, "显示玩家数：在 HUD 中显示当前玩家数量（取不到时隐藏）。");
-				_showEliminations = cfg.Bind("Round HUD", "Show Eliminations", true, "显示淘汰标记：在玩家面板与得分列表里给已淘汰玩家追加标记。");
+				// 第一页：配置 / 外观 / 行为。
+				_enabled = cfg.Bind(Sec, "Enabled", true, "显示HUD：总开关。");
+				_fade = cfg.Bind(Sec, "Fade", true, "淡入淡出：HUD 显示/隐藏时平滑过渡。");
+				_showKey = cfg.Bind(Sec, "Show Key", KeyCode.BackQuote, "显示按键：用于显示 HUD 的按键（默认 ~）。");
+				_showMode = cfg.Bind(Sec, "Show Mode", ShowMode.Hold, "显示方式：按住显示 / 切换显示。");
+				_layout = cfg.Bind(Sec, "Layout", HudLayout.TopLeft, "HUD 布局：四角贴边或自定义拖动位置。");
+				_fontSize = cfg.Bind(Sec, "Font Size", 18,
+					new ConfigDescription("字体大小（10-48）。", new AcceptableValueRange<int>(10, 48)));
+				_opacity = cfg.Bind(Sec, "Opacity", 0.85f,
+					new ConfigDescription("文字不透明度（0.2-1）。", new AcceptableValueRange<float>(0.2f, 1f)));
+				_bgOpacity = cfg.Bind(Sec, "Background Opacity", 0.55f,
+					new ConfigDescription("背景透明度（0-1，0 为完全透明）。", new AcceptableValueRange<float>(0f, 1f)));
+				_warnSeconds = cfg.Bind(Sec, "Warning Seconds", 10,
+					new ConfigDescription("警告秒数（5-60）。", new AcceptableValueRange<int>(5, 60)));
+				_blink = cfg.Bind(Sec, "Blink", false, "闪烁提醒：最后 5 秒倒计时文字闪烁。");
+				_phaseNotice = cfg.Bind(Sec, "Phase Notice", true, "阶段提示：阶段切换时短暂显示新阶段名称。");
+				_roundNotice = cfg.Bind(Sec, "Round Notice", true, "回合提示：回合数变化时短暂显示当前回合。");
+				// 第二页：显示内容 + 颜色。
+				_showPhase = cfg.Bind(Sec, "Show Phase", true, "显示阶段名。");
+				_colPhase = cfg.Bind(Sec, "Color Phase", "#FFFFFF", "阶段名文字颜色（#RRGGBB）。");
+				_showCountdown = cfg.Bind(Sec, "Show Countdown", true, "显示倒计时。");
+				_colCountdown = cfg.Bind(Sec, "Color Countdown", "#FFFFFF", "倒计时文字颜色（#RRGGBB）。");
+				_showRound = cfg.Bind(Sec, "Show Round", true, "显示回合进度。");
+				_colRound = cfg.Bind(Sec, "Color Round", "#FFFFFF", "回合进度文字颜色（#RRGGBB）。");
+				_showLevel = cfg.Bind(Sec, "Show Level", true, "显示关卡/模式。");
+				_colLevel = cfg.Bind(Sec, "Color Level", "#FFFFFF", "关卡/模式文字颜色（#RRGGBB）。");
+				_showWin = cfg.Bind(Sec, "Show Win Score", true, "显示获胜积分。");
+				_colWin = cfg.Bind(Sec, "Color Win Score", "#FFD24A", "获胜积分文字颜色（#RRGGBB）。");
+				_showPanel = cfg.Bind(Sec, "Show Player Panel", false, "显示玩家面板。");
+				_colPanel = cfg.Bind(Sec, "Color Player Panel", "#FFFFFF", "玩家面板文字颜色（#RRGGBB）。");
+				_extra1 = cfg.Bind(Sec, "Extra Line 1", "", "额外信息行 1：按原文显示，留空则不显示。");
+				_colExtra1 = cfg.Bind(Sec, "Color Extra 1", "#FFFFFF", "额外信息行 1 文字颜色（#RRGGBB）。");
+				_extra2 = cfg.Bind(Sec, "Extra Line 2", "", "额外信息行 2：按原文显示，留空则不显示。");
+				_colExtra2 = cfg.Bind(Sec, "Color Extra 2", "#FFFFFF", "额外信息行 2 文字颜色（#RRGGBB）。");
 
-				// 条目行滑块范围扩展点：让设置页把这三项渲染成滑块条而不是编辑框。
+				// 行扩展点：隐藏颜色/显示方式行、显示方式跟随显示按键行、四个滑块。
+				try { SRApi.RowFilters.Add(RowVisible); } catch (Exception __ex) { SRApi.Guard.Log("HUD 行过滤", __ex); }
+				try { SRApi.RowExtras.Add(RowExtra); } catch (Exception __ex) { SRApi.Guard.Log("HUD 行附加", __ex); }
 				try {
-					SRApi.RowSliders.Add(FontSizeSlider);
+					SRApi.RowSliders.Add(FontSlider);
 					SRApi.RowSliders.Add(OpacitySlider);
-					SRApi.RowSliders.Add(EdgeMarginSlider);
-				} catch (Exception __ex) { SRApi.Guard.Log("回合计时 滑块注册", __ex); }
+					SRApi.RowSliders.Add(BgOpacitySlider);
+					SRApi.RowSliders.Add(WarnSlider);
+				} catch (Exception __ex) { SRApi.Guard.Log("HUD 滑块注册", __ex); }
 
-				// 已删除的配置键：自动从旧 cfg 清理（幂等；原文件由核心备份）。
-				try { SRApi.Migration.Remove("Round HUD", "Pos X", "Pos Y"); }
-				catch (Exception __ex) { SRApi.Guard.Log("回合计时 清理旧键", __ex); }
+				// 旧版已删除的键：自动从旧 cfg 清理（幂等；原文件由核心备份）。
+				try {
+					SRApi.Migration.Remove(Sec,
+						"Pos X", "Pos Y", "Edge Margin", "Show Scores", "Show Players", "Show Eliminations", "Beep", "Beep Volume");
+				} catch (Exception __ex) { SRApi.Guard.Log("HUD 清理旧键", __ex); }
+
+				// 显示键接入核心键位系统（用于按键显示/冲突提示）。
+				try { SRApi.RegisterKey("HUD-显示键", _showKey, "hold"); }
+				catch (Exception __ex) { SRApi.Guard.Log("HUD 键位注册", __ex); }
 
 				SRApi.RegisterTick("sr.roundhud", Tick);
 				SRApi.RegisterSceneHook(ResetStateSafe);
 
-				// 常驻对象：承载 OnGUI 绘制与提示音播放。
+				// 常驻对象：只承载 OnGUI 绘制。
 				GameObject go = new GameObject("SR_UCHRoundHud");
 				UnityEngine.Object.DontDestroyOnLoad(go);
 				go.AddComponent<HudComponent>();
-				// 2D 音源；AudioClip 懒生成（只在第一次需要响提示音时创建）。
-				_audio = go.AddComponent<AudioSource>();
-				_audio.playOnAwake = false;
-				_audio.spatialBlend = 0f;
-				_audio.volume = 1f;
 
 				// 本类自带 [HarmonyPatch] 但 ITweak 为反射发现，须手动 CreateAndPatchAll；失败只丢本类功能。
 				try { Harmony.CreateAndPatchAll(typeof(RoundHud), (string)null); }
-				catch (Exception e) { SRApi.LogError("回合计时 补丁注册失败: " + e.Message); }
-			} catch (Exception __ex) { SRApi.Guard.Log("回合计时 初始化", __ex); }
+				catch (Exception e) { SRApi.LogError("HUD 补丁注册失败: " + e.Message); }
+			} catch (Exception __ex) { SRApi.Guard.Log("HUD 初始化", __ex); }
 		}
 
-		// 监听 GameControl.handleEvent 的所有派发结果：StartPhaseEvent / EndPhaseEvent。
-		// 各模式子类（Versus/FreePlay/Challenge）的 override 都会调 base.handleEvent，故只补基类一次。
+		// ================= 阶段事件 =================
 		[HarmonyPatch(typeof(GameControl), "handleEvent")]
 		[HarmonyPostfix]
 		private static void OnGameControlEvent(GameControl __instance, global::GameEvent.GameEvent e) {
-			// Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 Guard.Log（按调用点去重）留痕。
 			try {
 				if (__instance == null || e == null) return;
 				StartPhaseEvent start = e as StartPhaseEvent;
 				if (start != null) { OnPhaseStarted(__instance, start.Phase); return; }
 				EndPhaseEvent end = e as EndPhaseEvent;
 				if (end != null) { OnPhaseEnded(end.Phase); }
-			} catch (Exception __ex) { SRApi.Guard.Log("回合计时 阶段事件", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("HUD 阶段事件", __ex); }
 		}
 
 		private static void OnPhaseStarted(GameControl gc, GameControl.GamePhase phase) {
@@ -428,74 +598,96 @@ namespace SR_UCH.Tweaks {
 			_phase = phase;
 			_phaseStart = Time.unscaledTime;
 			_vsPlaceSeen = false;
-			_beepedPhase = false;   // 新阶段重新允许最后 5 秒提示音
-			_noticeText = SRApi.T("阶段：", "Phase: ") + PhaseName(phase);
-			_noticeUntil = _phaseStart + 2f;
+			_phaseNoticeText = SRApi.T("阶段：", "Phase: ") + PhaseName(phase);
+			_phaseNoticeUntil = _phaseStart + 2f;
 		}
 
 		private static void OnPhaseEnded(GameControl.GamePhase phase) {
-			// 结束事件紧随其后的开始事件；这里只把倒计时钳到 0，避免 End 与 Start 之间出现负值。
 			if (phase != _phase) return;
 			if (Time.unscaledTime < _phaseStart) _phaseStart = Time.unscaledTime;
 		}
 
+		// ================= 每帧状态 =================
 		private static void Tick() {
 			try {
-				if (!IsEnabled()) { _hasGame = false; _wasEnabled = false; return; }
+				if (!IsEnabled()) {
+					_hasGame = false;
+					_wasEnabled = false;
+					StepAlpha(false);
+					return;
+				}
 				if (!_wasEnabled) {
-					// 首次启用或从关闭切回：丢弃旧阶段起点，让下面的兜底按当前 Phase 重新计时。
 					_wasEnabled = true;
 					_eventSeen = false;
 					_phase = GameControl.GamePhase.NONE;
 					_phaseStart = Time.unscaledTime;
+					_lastRound = 0;
 				}
 				LobbyManager lm = LobbyManager.instance;
 				GameControl gc = (lm != null) ? lm.CurrentGameController : null;
 				if (gc == null) {
-					// 不在对局：清掉对局内容，但玩家面板仍可在树屋/大厅显示。
 					if (_gc != null || _hasGame) ResetGameState();
-					bool needLobbyPanel = ShowPanelOn() || ShowPlayersOn();
-					GameSettings gsLobby = needLobbyPanel ? ReadSettings() : null;
-					UpdatePlayerPanel(null, gsLobby);
-					UpdateExtraText();
+					StepAlpha(false);
 					return;
 				}
 				if (!ReferenceEquals(gc, _gc)) {
-					// 换对局/换关卡：先清空，等新的 StartPhaseEvent 或下面的一次性兜底。
 					_gc = gc;
 					_phase = GameControl.GamePhase.NONE;
 					_phaseStart = Time.unscaledTime;
 					_eventSeen = false;
 					_vsPlaceSeen = false;
-					_roundText = null;
 					_timerText = "00:00";
 					_warnLevel = 0;
+					_lastRound = 0;
 				}
 				if (!_eventSeen) {
-					// 补丁注册晚于对局开始（热重载/中途装 Mod）时的兜底：用公开的 Phase 属性补一次。
 					GameControl.GamePhase p = gc.Phase;
 					if (p != GameControl.GamePhase.NONE && p != _phase) {
 						_phase = p;
 						_phaseStart = Time.unscaledTime;
+						_phaseNoticeText = SRApi.T("阶段：", "Phase: ") + PhaseName(p);
+						_phaseNoticeUntil = _phaseStart + 2f;
 					}
 				}
-				if (_phase == GameControl.GamePhase.NONE) { _hasGame = false; return; }
+				if (_phase == GameControl.GamePhase.NONE) { _hasGame = false; StepAlpha(false); return; }
 				_hasGame = true;
+
 				GameSettings gs = ReadSettings();
 				UpdateTimer(gc, gs);
-				if (ShowRoundOn()) UpdateRound(gc, gs); else _roundText = null;
-				UpdateScores(gc);
-				UpdateLevelBlock(gs);
-				UpdatePlayerPanel(gc, gs);
+				UpdateRound(gc, gs);
+				UpdateLevel(gs);
+				UpdateWin(gs);
+				UpdatePanel(gc);
 				UpdateExtraText();
-			} catch (Exception __ex) { SRApi.Guard.Log("回合计时 状态更新", __ex); }
+				UpdateRoundNotice(gc);
+				UpdateVisible();
+			} catch (Exception __ex) { SRApi.Guard.Log("HUD 状态更新", __ex); }
+		}
+
+		// 显示按键 + 淡入淡出：设置窗口打开时强制可见（便于拖动/预览）。
+		private static void UpdateVisible() {
+			bool keyVis;
+			try {
+				if (SRApi.UiOpen) keyVis = true;
+				else if (ModeValue() == ShowMode.Hold) keyVis = SRApi.ComboKeyHeld(_showKey);
+				else {
+					if (SRApi.ComboKeyDown(_showKey)) _toggleOn = !_toggleOn;
+					keyVis = _toggleOn;
+				}
+			} catch { keyVis = false; }
+			StepAlpha(IsEnabled() && _hasGame && keyVis);
+		}
+
+		private static void StepAlpha(bool target) {
+			float want = target ? 1f : 0f;
+			if (FadeOn()) _hudAlpha = Mathf.MoveTowards(_hudAlpha, want, 6f * Time.unscaledDeltaTime);
+			else _hudAlpha = want;
 		}
 
 		private static GameSettings ReadSettings() {
 			try { return GameSettings.GetInstance(); } catch { return null; }
 		}
 
-		// 阶段时长优先走游戏字段；所有失败路径都退化为"已用时间"，不会画错或崩。
 		private static void UpdateTimer(GameControl gc, GameSettings gs) {
 			float elapsed = Mathf.Max(0f, Time.unscaledTime - _phaseStart);
 			float remaining = -1f;
@@ -508,12 +700,10 @@ namespace SR_UCH.Tweaks {
 				break;
 			}
 			case GameControl.GamePhase.PLACE: {
-				// 建造时长：设置里开了建造计时才有；能读到 VersusControl.placementTimer 时以它为准
-				// （最后几回合会缩短，公共 PlaceTime 并不等于实际剩余）。
 				bool useTimer = gs != null && gs.UsePlaceTimer;
 				if (useTimer) {
 					if (vs != null) {
-						float t = ReadFloat(ref _fPlacementTimer, vs, "placementTimer", "回合计时（建造剩余时间）");
+						float t = ReadFloat(ref _fPlacementTimer, vs, "placementTimer", "HUD（建造剩余时间）");
 						if (t >= 0f) {
 							if (t > 0.01f) _vsPlaceSeen = true;
 							if (_vsPlaceSeen) { countdown = true; remaining = t; break; }
@@ -525,22 +715,20 @@ namespace SR_UCH.Tweaks {
 				break;
 			}
 			case GameControl.GamePhase.PLAY: {
-				// 只有"时间上限"规则才有可倒数的对局总时长；按 VersusControl.levelTimer（已用）换算。
 				if (gs != null && gs.GameLimitType == GameLimitType.TIME && vs != null) {
-					float used = ReadFloat(ref _fLevelTimer, vs, "levelTimer", "回合计时（对局已用时间）");
+					float used = ReadFloat(ref _fLevelTimer, vs, "levelTimer", "HUD（对局已用时间）");
 					if (used >= 0f) { countdown = true; remaining = (float)gs.MaxTime - used; }
 				}
 				break;
 			}
 			case GameControl.GamePhase.SUDDENDEATH: {
 				if (vs != null) {
-					float t = ReadFloat(ref _fCountdownTimer, vs, "countdownTimer", "回合计时（决胜倒计时）");
+					float t = ReadFloat(ref _fCountdownTimer, vs, "countdownTimer", "HUD（决胜倒计时）");
 					if (t > 0.01f) { countdown = true; remaining = t; }
 				}
 				break;
 			}
 			case GameControl.GamePhase.END: {
-				// 结算阶段按 WinTime 倒数（VersusControl 用同一个字段决定何时回大厅；平局时会改成 4 秒）。
 				float d = gc.WinTime;
 				if (d > 0.05f && d < 3600f) { countdown = true; remaining = d - elapsed; }
 				break;
@@ -554,321 +742,27 @@ namespace SR_UCH.Tweaks {
 				float warn = WarnSeconds();
 				float red = Mathf.Min(5f, warn);
 				_warnLevel = remaining <= red ? 2 : (remaining <= warn ? 1 : 0);
-				// 进入最后 5 秒的那一帧响一次（每个阶段一次，_beepedPhase 在 StartPhaseEvent 重置）。
-				if (_warnLevel >= 2) MaybeBeep();
 			} else {
 				_timerText = FormatClock(Mathf.FloorToInt(elapsed));
 				_warnLevel = 0;
 			}
 		}
 
-		// 回合进度：只读 GameControl.RoundNumber；目标按游戏规则取 MaxRounds 或 MaxScore。
+		// 回合进度格式：「回合：当前/最大」。
 		private static void UpdateRound(GameControl gc, GameSettings gs) {
 			try {
 				int round = gc.RoundNumber;
 				if (round <= 0) { _roundText = null; return; }
-				string head = SRApi.T("第 ", "Round ") + round + SRApi.T(" 回合", " round");
-				if (gs == null) { _roundText = head; return; }
-				if (gs.GameLimitType == GameLimitType.ROUNDS) {
-					int rounds = gs.MaxRounds;
-					_roundText = rounds > 0 ? head + SRApi.T(" / 目标 ", " / target ") + rounds : head;
-				} else {
-					int wins = gs.MaxScore;
-					_roundText = wins > 0 ? head + SRApi.T(" / 目标 ", " / target ") + wins + SRApi.T(" 胜", " wins") : head;
-				}
+				int max = 0;
+				try { if (gs != null) max = gs.MaxRounds; } catch { max = 0; }
+				_roundText = max > 0
+					? SRApi.T("回合：", "Round: ") + round + "/" + max
+					: SRApi.T("回合：", "Round: ") + round;
 			} catch { _roundText = null; }
 		}
 
-		// 旧的得分列表：只读 ScoreKeeper（玩家总分）与 GamePlayer（名字、角色死亡状态），最多 4 行。
-		private static void UpdateScores(GameControl gc) {
-			try {
-				if (!ShowScoresOn()) { ClearScores(); return; }
-				// ScoreKeeper 只在 Versus 系模式（派对/创造）里 Setup；其他模式整段隐藏。
-				if (!(gc is VersusControl)) { ClearScores(); return; }
-				ScoreKeeper sk;
-				try { sk = ScoreKeeper.Instance; } catch { sk = null; }
-				if (sk == null) { ClearScores(); return; }
-				int n = 0;
-				Queue<GamePlayer> queue = gc.CurrentPlayerQueue;
-				if (queue != null) {
-					foreach (GamePlayer gp in queue) {
-						if (gp == null) continue;
-						if (n >= _scoreRows.Length) break;
-						int total;
-						try { total = sk.GetPlayerTotal(gp); } catch { total = 0; }
-						bool outFlag = false;
-						try {
-							Character c = gp.CharacterInstance;
-							if (c != null && (c.Dead || c.Dying)) outFlag = true;
-						} catch { outFlag = false; }
-						_scoreRows[n].name = PlayerDisplayName(gp);
-						_scoreRows[n].score = total;
-						_scoreRows[n].outFlag = outFlag;
-						n++;
-					}
-				}
-				_scoreRowCount = n;
-				if (n == 0) { ClearScores(); return; }
-				// 插入排序：按分数从高到低；同分保持队列顺序，避免每帧互换导致抖动。
-				for (int i = 1; i < n; i++) {
-					ScoreRow key = _scoreRows[i];
-					int j = i - 1;
-					while (j >= 0 && _scoreRows[j].score < key.score) { _scoreRows[j + 1] = _scoreRows[j]; j--; }
-					_scoreRows[j + 1] = key;
-				}
-				int shown = Mathf.Min(n, _scoreLines.Length);
-				int sig = SRApi.LangVer;
-				sig = sig * 31 + shown;
-				sig = sig * 31 + (ShowEliminationsOn() ? 1 : 0);
-				for (int i = 0; i < shown; i++) {
-					sig = sig * 31 + _scoreRows[i].score;
-					sig = sig * 31 + (_scoreRows[i].outFlag ? 1 : 0);
-					sig = sig * 31 + (_scoreRows[i].name != null ? _scoreRows[i].name.GetHashCode() : 0);
-				}
-				if (sig != _scoreSig) {
-					_scoreSig = sig;
-					for (int i = 0; i < shown; i++) {
-						string line = _scoreRows[i].name + "  " + _scoreRows[i].score + SRApi.T(" 分", " pts");
-						if (_scoreRows[i].outFlag && ShowEliminationsOn()) line += SRApi.T(" · 淘汰", " · out");
-						_scoreLines[i] = line;
-					}
-					for (int i = shown; i < _scoreLines.Length; i++) _scoreLines[i] = null;
-				}
-				_scoreLineCount = shown;
-			} catch (Exception __ex) {
-				ClearScores();
-				SRApi.Guard.Log("回合计时 得分列表", __ex);
-			}
-		}
-
-		private static void ClearScores() {
-			_scoreLineCount = 0;
-			_scoreRowCount = 0;
-			_scoreSig = 0;
-			for (int i = 0; i < _scoreLines.Length; i++) _scoreLines[i] = null;
-		}
-
-		private static string PlayerDisplayName(GamePlayer gp) {
-			string name = null;
-			try { name = gp.playerName; } catch { }
-			if (string.IsNullOrEmpty(name)) {
-				try { name = gp.ValidatedDisplayName; } catch { }
-			}
-			if (!string.IsNullOrEmpty(name)) name = name.Trim();
-			int num = 0;
-			try { num = gp.networkNumber; } catch { num = 0; }
-			if (string.IsNullOrEmpty(name)) name = "P" + num;
-			return Truncate(name, 12);
-		}
-
-		// ---- 玩家面板：所有玩家的状态（名字/角色/分数/达标；树屋/大厅加房主/投票）----
-		private static void UpdatePlayerPanel(GameControl gc, GameSettings gs) {
-			try {
-				bool needRows = ShowPanelOn() || ShowPlayersOn();
-				if (!needRows) {
-					ClearPanel();
-					_playerCountText = null;
-					return;
-				}
-				int target;
-				bool roundsMode;
-				CalcTarget(gs, out target, out roundsMode);
-				int n = 0;
-				if (gc != null) CollectGamePlayers(gc, target, roundsMode, ref n);
-				else CollectLobbyPlayers(ref n);
-				_playerRowCount = n;
-				_playerCountText = (ShowPlayersOn() && n > 0) ? (SRApi.T("玩家：", "Players: ") + n) : null;
-				if (!ShowPanelOn() || n == 0) { ClearPanelLines(); return; }
-				int sig = SRApi.LangVer;
-				sig = sig * 31 + (ShowEliminationsOn() ? 1 : 0);
-				sig = sig * 31 + target;
-				sig = sig * 31 + (roundsMode ? 1 : 0);
-				sig = sig * 31 + n;
-				for (int i = 0; i < n; i++) {
-					PlayerRow r = _playerRows[i];
-					sig = sig * 31 + r.score;
-					sig = sig * 31 + (r.hasScore ? 1 : 0);
-					sig = sig * 31 + (r.goalReached ? 1 : 0);
-					sig = sig * 31 + (r.eliminated ? 1 : 0);
-					sig = sig * 31 + (r.host ? 1 : 0);
-					sig = sig * 31 + (r.name != null ? r.name.GetHashCode() : 0);
-					sig = sig * 31 + (r.animal != null ? r.animal.GetHashCode() : 0);
-					sig = sig * 31 + (r.vote != null ? r.vote.GetHashCode() : 0);
-				}
-				if (sig == _panelSig) { return; }
-				_panelSig = sig;
-				int line = 0;
-				string head = SRApi.T("玩家 ", "Players ") + "(" + n + ")";
-				if (target > 0) {
-					head += SRApi.T(" · 制胜目标 ", " · Win target ") + target
-						+ (roundsMode ? SRApi.T(" 回合", " rounds") : SRApi.T(" 胜", " wins"));
-				}
-				_panelLines[line++] = head;
-				for (int i = 0; i < n && line < _panelLines.Length; i++) {
-					PlayerRow r = _playerRows[i];
-					string text = r.name;
-					if (!string.IsNullOrEmpty(r.animal)) text += " · " + r.animal;
-					if (r.hasScore) text += "  " + r.score + SRApi.T(" 分", " pts");
-					if (r.goalReached) text += SRApi.T(" 达标", " GOAL");
-					if (r.eliminated && ShowEliminationsOn()) text += SRApi.T(" 淘汰", " OUT");
-					if (r.host) text += SRApi.T(" 房主", " HOST");
-					if (!string.IsNullOrEmpty(r.vote)) text += SRApi.T(" 投票：", " vote: ") + r.vote;
-					_panelLines[line++] = text;
-				}
-				_panelLineCount = line;
-			} catch (Exception __ex) {
-				ClearPanel();
-				SRApi.Guard.Log("回合计时 玩家面板", __ex);
-			}
-		}
-
-		// 制胜积分/回合目标：ROUNDS 规则取 MaxRounds，其他规则取 MaxScore。
-		private static void CalcTarget(GameSettings gs, out int target, out bool roundsMode) {
-			target = 0;
-			roundsMode = false;
-			try {
-				if (gs == null) return;
-				if (gs.GameLimitType == GameLimitType.ROUNDS) {
-					roundsMode = true;
-					target = Mathf.Max(0, gs.MaxRounds);
-				} else {
-					target = Mathf.Max(0, gs.MaxScore);
-				}
-			} catch { target = 0; roundsMode = false; }
-		}
-
-		private static void CollectGamePlayers(GameControl gc, int target, bool roundsMode, ref int n) {
-			try {
-				bool versus = gc is VersusControl;
-				ScoreKeeper sk = null;
-				if (versus) {
-					try { sk = ScoreKeeper.Instance; } catch { sk = null; }
-				}
-				Queue<GamePlayer> queue = gc.CurrentPlayerQueue;
-				if (queue == null) return;
-				foreach (GamePlayer gp in queue) {
-					if (gp == null) continue;
-					if (n >= _playerRows.Length) break;
-					PlayerRow r = default(PlayerRow);
-					r.name = PlayerDisplayName(gp);
-					try { r.animal = AnimalName(gp.PickedAnimal, gp.IsWearingSkin); } catch { r.animal = null; }
-					if (sk != null) {
-						try { r.score = sk.GetPlayerTotal(gp); r.hasScore = true; } catch { r.hasScore = false; }
-					}
-					r.goalReached = r.hasScore && !roundsMode && target > 0 && r.score >= target;
-					try {
-						Character c = gp.CharacterInstance;
-						if (c != null && (c.Dead || c.Dying)) r.eliminated = true;
-					} catch { r.eliminated = false; }
-					_playerRows[n] = r;
-					n++;
-				}
-			} catch (Exception __ex) { SRApi.Guard.Log("回合计时 收集玩家", __ex); }
-		}
-
-		private static void CollectLobbyPlayers(ref int n) {
-			try {
-				LobbyManager lm = LobbyManager.instance;
-				if (lm == null) return;
-				foreach (LobbyPlayer lp in lm.GetLobbyPlayers()) {
-					if (lp == null) continue;
-					if (n >= _playerRows.Length) break;
-					PlayerRow r = default(PlayerRow);
-					r.name = LobbyDisplayName(lp);
-					try { r.animal = AnimalName(lp.PickedAnimal, lp.IsWearingSkin); } catch { r.animal = null; }
-					try { r.host = lp.IsHost; } catch { r.host = false; }
-					r.vote = FindVote(lp);
-					_playerRows[n] = r;
-					n++;
-				}
-			} catch (Exception __ex) { SRApi.Guard.Log("回合计时 收集大厅玩家", __ex); }
-		}
-
-		private static string LobbyDisplayName(LobbyPlayer lp) {
-			string name = null;
-			try { name = lp.playerName; } catch { }
-			if (string.IsNullOrEmpty(name)) {
-				try { name = lp.ValidatedDisplayName; } catch { }
-			}
-			if (!string.IsNullOrEmpty(name)) name = name.Trim();
-			int num = 0;
-			try { num = lp.networkNumber; } catch { num = 0; }
-			if (string.IsNullOrEmpty(name)) name = "P" + num;
-			return Truncate(name, 12);
-		}
-
-		// 角色名：游戏本地化的动物名（如 鸡 / Chicken）。
-		private static string AnimalName(Character.Animals animal, bool altSkin) {
-			try {
-				string n = Character.GetLocalizedAnimal(animal, altSkin);
-				return string.IsNullOrEmpty(n) ? null : Truncate(n, 10);
-			} catch { return null; }
-		}
-
-		// 树屋/大厅：从 LevelSelectController 的关卡传送门投票表里找该玩家投的关卡。
-		private static string FindVote(LobbyPlayer lp) {
-			try {
-				if (lp == null) return null;
-				Character ch = lp.CharacterInstance;
-				if (ch == null) return null;
-				LobbyManager lm = LobbyManager.instance;
-				if (lm == null) return null;
-				LevelSelectController lsc = lm.CurrentLevelSelectController;
-				if (lsc == null) return null;
-				if (lsc.portals != null) {
-					for (int i = 0; i < lsc.portals.Length; i++) {
-						LevelPortal p = lsc.portals[i];
-						if (p == null || p.Votes == null) continue;
-						if (p.Votes.ContainsKey(ch)) return PortalName(p);
-					}
-				}
-				if (lsc.snapshotPortals != null) {
-					for (int i = 0; i < lsc.snapshotPortals.Length; i++) {
-						LevelPortal p = lsc.snapshotPortals[i];
-						if (p == null || p.Votes == null) continue;
-						if (p.Votes.ContainsKey(ch)) return PortalName(p);
-					}
-				}
-			} catch (Exception __ex) { SRApi.Guard.Log("回合计时 读取投票", __ex); }
-			return null;
-		}
-
-		private static string PortalName(LevelPortal p) {
-			try {
-				CustomLevelPortal cp = p as CustomLevelPortal;
-				if (cp != null && cp.snapshotInfo != null && !string.IsNullOrEmpty(cp.snapshotInfo.snapshotName)) {
-					return Truncate(cp.snapshotInfo.snapshotName, 14);
-				}
-				if (p.TargetLevel == GameState.LevelName.RANDOM) return SRApi.T("随机", "Random");
-				string lv = GameState.GetLevelLocalizedName(p.TargetLevel);
-				if (string.IsNullOrEmpty(lv) || lv.IndexOf("default Level name error", StringComparison.Ordinal) >= 0) {
-					lv = p.TargetLevel.ToString();
-				}
-				return Truncate(lv, 14);
-			} catch { return null; }
-		}
-
-		private static void ClearPanelLines() {
-			_panelLineCount = 0;
-			_panelSig = 0;
-			for (int i = 0; i < _panelLines.Length; i++) _panelLines[i] = null;
-		}
-
-		private static void ClearPanel() {
-			ClearPanelLines();
-			_playerRowCount = 0;
-		}
-
-		private static string Truncate(string s, int max) {
-			if (string.IsNullOrEmpty(s)) return s;
-			if (max <= 3 || s.Length <= max) return s;
-			return s.Substring(0, max - 2) + "..";
-		}
-
-		// 关卡/模式行：只读 GameState.SelectedLevel 与 GameSettings.GameMode，取不到就隐藏或只显示能读到的部分。
-		private static void UpdateLevelBlock(GameSettings gs) {
-			_levelText = null;
-			if (!ShowLevelOn()) return;
+		// 关卡/模式行：「关卡名 · 模式」，不带前缀。
+		private static void UpdateLevel(GameSettings gs) {
 			try {
 				string level = null;
 				try {
@@ -877,26 +771,104 @@ namespace SR_UCH.Tweaks {
 				} catch { level = null; }
 				if (!string.IsNullOrEmpty(level) && level.IndexOf("default Level name error", StringComparison.Ordinal) >= 0) level = null;
 				string mode = (gs != null) ? ModeName(gs.GameMode) : null;
-				string body = level;
-				if (!string.IsNullOrEmpty(mode)) body = string.IsNullOrEmpty(body) ? mode : body + " · " + mode;
-				if (!string.IsNullOrEmpty(body)) _levelText = SRApi.T("关卡：", "Level: ") + body;
+				if (!string.IsNullOrEmpty(level) && !string.IsNullOrEmpty(mode)) _levelText = level + " · " + mode;
+				else if (!string.IsNullOrEmpty(level)) _levelText = level;
+				else if (!string.IsNullOrEmpty(mode)) _levelText = mode;
+				else _levelText = null;
 			} catch { _levelText = null; }
 		}
 
-		private static string ModeName(GameState.GameMode mode) {
-			switch (mode) {
-			case GameState.GameMode.FREEPLAY: return SRApi.T("自由", "Freeplay");
-			case GameState.GameMode.CREATIVE: return SRApi.T("创造", "Creative");
-			case GameState.GameMode.PARTY: return SRApi.T("派对", "Party");
-			case GameState.GameMode.CHALLENGE: return SRApi.T("挑战", "Challenge");
-			default: return null;
+		// 获胜积分：取游戏设置的目标分，读不到时用 250。
+		private static void UpdateWin(GameSettings gs) {
+			int target = WinScoreFallback;
+			try {
+				if (gs != null) {
+					int ms = gs.MaxScore;
+					if (ms > 0) target = ms;
+				}
+			} catch { target = WinScoreFallback; }
+			_winText = SRApi.T("获胜积分：", "Win score: ") + target;
+		}
+
+		private static void UpdateRoundNotice(GameControl gc) {
+			try {
+				int round = gc.RoundNumber;
+				if (round <= 0 || round == _lastRound) return;
+				_lastRound = round;
+				if (!RoundNoticeOn()) return;
+				_roundNoticeText = SRApi.T("回合：", "Round: ") + round;
+				_roundNoticeUntil = Time.unscaledTime + 2f;
+			} catch { }
+		}
+
+		// 玩家面板：每行 [玩家号][玩家名][角色][积分][评分折扣]，玩家号/名用游戏玩家颜色。
+		private static void UpdatePanel(GameControl gc) {
+			try {
+				if (!ShowOn(_showPanel)) { _playerRowCount = 0; return; }
+				bool versus = gc is VersusControl;
+				ScoreKeeper sk = null;
+				if (versus) {
+					try { sk = ScoreKeeper.Instance; } catch { sk = null; }
+				}
+				int n = 0;
+				Queue<GamePlayer> queue = gc.CurrentPlayerQueue;
+				if (queue != null) {
+					foreach (GamePlayer gp in queue) {
+						if (gp == null) continue;
+						if (n >= _playerPlain.Length) break;
+						string name = gp.playerName;
+						if (string.IsNullOrEmpty(name)) { try { name = gp.ValidatedDisplayName; } catch { } }
+						if (!string.IsNullOrEmpty(name)) name = name.Trim();
+						int num = 0;
+						try { num = gp.networkNumber; } catch { num = 0; }
+						if (string.IsNullOrEmpty(name)) name = "P" + num;
+						name = SafeText(Truncate(name, 12));
+						string animal = null;
+						try { animal = AnimalName(gp.PickedAnimal, gp.IsWearingSkin); } catch { animal = null; }
+						int score = 0;
+						bool hasScore = false;
+						if (sk != null) {
+							try { score = sk.GetPlayerTotal(gp); hasScore = true; } catch { hasScore = false; }
+						}
+						int handicap = 100;
+						try { handicap = gp.Handicap; } catch { handicap = 100; }
+						string hex = "#FFFFFF";
+						try { hex = ToHex(gp.PlayerColor); } catch { hex = "#FFFFFF"; }
+						string plain = "#" + num + " " + name;
+						if (!string.IsNullOrEmpty(animal)) plain += " · " + animal;
+						if (hasScore) plain += "  " + score + SRApi.T(" 分", " pts");
+						if (handicap != 100) plain += SRApi.T("  折扣 ", "  discount ") + handicap + "%";
+						string rich = "<color=" + hex + ">#" + num + " " + name + "</color>";
+						if (!string.IsNullOrEmpty(animal)) rich += " · " + animal;
+						if (hasScore) rich += "  " + score + SRApi.T(" 分", " pts");
+						if (handicap != 100) rich += SRApi.T("  折扣 ", "  discount ") + handicap + "%";
+						_playerPlain[n] = plain;
+						_playerRich[n] = rich;
+						n++;
+					}
+				}
+				_playerRowCount = n;
+			} catch (Exception __ex) {
+				_playerRowCount = 0;
+				SRApi.Guard.Log("HUD 玩家面板", __ex);
 			}
 		}
 
-		// 额外信息行：原文显示、不翻译；换行压成空格、最长 120 字符，防超宽/多行撑破 HUD。
+		private static string SafeText(string s) {
+			if (string.IsNullOrEmpty(s)) return s;
+			try { return s.Replace('<', '‹').Replace('>', '›'); } catch { return s; }
+		}
+
+		private static string AnimalName(Character.Animals animal, bool altSkin) {
+			try {
+				string n = Character.GetLocalizedAnimal(animal, altSkin);
+				return string.IsNullOrEmpty(n) ? null : SafeText(Truncate(n, 10));
+			} catch { return null; }
+		}
+
 		private static void UpdateExtraText() {
-			_extra1 = ReadExtraLine(_extraLine1);
-			_extra2 = ReadExtraLine(_extraLine2);
+			_extra1Text = ReadExtraLine(_extra1);
+			_extra2Text = ReadExtraLine(_extra2);
 		}
 
 		private static string ReadExtraLine(ConfigEntry<string> entry) {
@@ -909,36 +881,20 @@ namespace SR_UCH.Tweaks {
 			} catch { return null; }
 		}
 
-		// 最后 5 秒提示音：每次阶段只响一次；AudioClip 懒生成（纯正弦，0.18 秒，淡入淡出防爆音）。
-		private static void MaybeBeep() {
-			if (!BeepOn() || _beepedPhase || !SRApi.GateMaster) return;
-			// 只在有实际倒计时的阶段响：准备/结算阶段的最后 5 秒没有必要提示。
-			if (_phase != GameControl.GamePhase.PLACE && _phase != GameControl.GamePhase.PLAY && _phase != GameControl.GamePhase.SUDDENDEATH) return;
-			_beepedPhase = true;
-			try {
-				float vol = BeepVolume();
-				if (vol <= 0f) return;
-				EnsureBeepClip();
-				if (_audio == null || _beepClip == null) return;
-				_audio.PlayOneShot(_beepClip, vol);
-			} catch (Exception __ex) { SRApi.Guard.Log("回合计时 提示音", __ex); }
+		private static string Truncate(string s, int max) {
+			if (string.IsNullOrEmpty(s)) return s;
+			if (max <= 3 || s.Length <= max) return s;
+			return s.Substring(0, max - 2) + "..";
 		}
 
-		private static void EnsureBeepClip() {
-			if (_beepClip != null) return;
-			const int rate = 44100;
-			int samples = Mathf.Max(1, Mathf.RoundToInt((float)rate * 0.18f));
-			float[] data = new float[samples];
-			for (int i = 0; i < samples; i++) {
-				float t = (float)i / (float)rate;
-				float env = 1f;
-				if (t < 0.012f) env = t / 0.012f;                 // 起音淡入
-				float tail = (float)(samples - i) / (float)samples;
-				if (tail < 0.3f) env *= tail / 0.3f;              // 收尾淡出
-				data[i] = Mathf.Sin(2f * Mathf.PI * 880f * t) * 0.6f * env;
+		private static string ModeName(GameState.GameMode mode) {
+			switch (mode) {
+			case GameState.GameMode.FREEPLAY: return SRApi.T("自由", "Freeplay");
+			case GameState.GameMode.CREATIVE: return SRApi.T("创造", "Creative");
+			case GameState.GameMode.PARTY: return SRApi.T("派对", "Party");
+			case GameState.GameMode.CHALLENGE: return SRApi.T("挑战", "Challenge");
+			default: return null;
 			}
-			_beepClip = AudioClip.Create("SR_RoundHudBeep", samples, 1, rate, false);
-			_beepClip.SetData(data, 0);
 		}
 
 		private static float ReadFloat(ref FieldInfo f, object owner, string name, string feature) {
@@ -972,7 +928,6 @@ namespace SR_UCH.Tweaks {
 			}
 		}
 
-		// 只清对局相关状态；自定义布局位置（_customX/_customY）与玩家面板/额外文本按会话保留。
 		private static void ResetGameState() {
 			_gc = null;
 			_phase = GameControl.GamePhase.NONE;
@@ -982,14 +937,15 @@ namespace SR_UCH.Tweaks {
 			_timerText = "00:00";
 			_warnLevel = 0;
 			_roundText = null;
-			_noticeText = null;
-			_noticeUntil = 0f;
-			_vsPlaceSeen = false;
-			_beepedPhase = false;
 			_levelText = null;
-			_playerCountText = null;
-			ClearScores();
-			ClearPanel();
+			_winText = null;
+			_phaseNoticeText = null;
+			_phaseNoticeUntil = 0f;
+			_roundNoticeText = null;
+			_roundNoticeUntil = 0f;
+			_lastRound = 0;
+			_vsPlaceSeen = false;
+			_playerRowCount = 0;
 			_dragging = false;
 		}
 
@@ -998,13 +954,13 @@ namespace SR_UCH.Tweaks {
 		}
 
 		private static void ResetStateSafe() {
-			try { ResetState(); } catch (Exception __ex) { SRApi.Guard.Log("回合计时 重置", __ex); }
+			try { ResetState(); } catch (Exception __ex) { SRApi.Guard.Log("HUD 重置", __ex); }
 		}
 
-		// ---- OnGUI HUD ----
+		// ================= HUD 绘制 =================
 		private sealed class HudComponent : MonoBehaviour {
 			private void OnGUI() {
-				try { DrawHud(); } catch (Exception __ex) { SRApi.Guard.Log("回合计时 HUD 绘制", __ex); }
+				try { DrawHud(); } catch (Exception __ex) { SRApi.Guard.Log("HUD 绘制", __ex); }
 			}
 		}
 
@@ -1027,8 +983,11 @@ namespace SR_UCH.Tweaks {
 				_timerStyle = new GUIStyle(_phaseStyle);
 				_smallStyle = new GUIStyle(_phaseStyle);
 				_smallStyle.fontStyle = FontStyle.Normal;
+				_smallStyle.richText = false;
 				_noticeStyle = new GUIStyle(_smallStyle);
 				_noticeStyle.fontStyle = FontStyle.Italic;
+				_panelStyle = new GUIStyle(_smallStyle);
+				_panelStyle.richText = true;
 			}
 			int baseFont = FontSize();
 			float scale = SRApi.Ctl.Sc(1f);
@@ -1040,63 +999,96 @@ namespace SR_UCH.Tweaks {
 				_timerStyle.fontSize = Mathf.Max(f + 4, Mathf.RoundToInt((float)f * 1.7f));
 				_smallStyle.fontSize = Mathf.Max(8, Mathf.RoundToInt((float)f * 0.85f));
 				_noticeStyle.fontSize = Mathf.Max(8, Mathf.RoundToInt((float)f * 0.9f));
+				_panelStyle.fontSize = _smallStyle.fontSize;
+			}
+		}
+
+		private static void AddLine(ref int n, string plain, string rich, int kind, Color col) {
+			if (string.IsNullOrEmpty(plain)) return;
+			if (n < _hudPlain.Length) {
+				_hudPlain[n] = plain;
+				_hudRich[n] = string.IsNullOrEmpty(rich) ? plain : rich;
+				_hudKinds[n] = kind;
+				_hudColors[n] = col;
+			}
+			n++;
+		}
+
+		private static GUIStyle LineStyle(int kind) {
+			switch (kind) {
+			case LinePhase: return _phaseStyle;
+			case LineTimer: return _timerStyle;
+			case LineNotice: return _noticeStyle;
+			case LinePanel: return _panelStyle;
+			default: return _smallStyle;
 			}
 		}
 
 		private static void DrawHud() {
-			if (!IsEnabled() || !SRApi.GateMaster) return;
-			bool inGame = _hasGame && _phase != GameControl.GamePhase.NONE;
-			bool boardOn = ShowPanelOn() && _panelLineCount > 0;
-			bool countOn = ShowPlayersOn() && _playerCountText != null;
-			if (!inGame && !boardOn && !countOn) return;
+			if (_hudAlpha <= 0.004f) return;
+			if (!SRApi.GateMaster) return;
+			if (!_hasGame || _phase == GameControl.GamePhase.NONE) return;
 			EnsureStyles();
-			float op = Opacity();
+			float hudA = _hudAlpha;
+			float textA = Opacity() * hudA;
+			float bgA = BgOpacity() * hudA;
 
-			// 1) 按内容开关拼行（状态字符串由 Tick 算好，这里只取）。
+			// 1) 拼行。
 			int n = 0;
-			if (inGame) {
-				bool ph = ShowPhaseOn();
-				bool cd = ShowCountdownOn();
-				// 阶段名与倒计时同一行：「游玩 0:42」。
-				if (ph && cd) AddLine(ref n, PhaseName(_phase) + "  " + _timerText, LinePhaseTimer, false);
-				else if (cd) AddLine(ref n, _timerText, LineTimer, false);
-				else if (ph) AddLine(ref n, PhaseName(_phase), LinePhase, false);
-				if (ShowRoundOn() && _roundText != null) AddLine(ref n, _roundText, LineSmall, false);
-				if (ShowLevelOn() && _levelText != null) AddLine(ref n, _levelText, LineSmall, false);
-			}
-			if (ShowPlayersOn() && _playerCountText != null) AddLine(ref n, _playerCountText, LineSmall, false);
-			if (boardOn) {
-				for (int i = 0; i < _panelLineCount; i++) {
-					string line = _panelLines[i];
-					if (line != null) AddLine(ref n, line, LineSmall, i > 0 && PlayerRowEliminated(i - 1));
-				}
-			}
-			if (inGame && ShowScoresOn()) {
-				for (int i = 0; i < _scoreLineCount; i++) {
-					string line = _scoreLines[i];
-					if (line == null) continue;
-					bool dim = i < _scoreRowCount && _scoreRows[i].outFlag;
-					AddLine(ref n, line, LineSmall, dim);
-				}
-			}
-			if (_extra1 != null) AddLine(ref n, _extra1, LineSmall, false);
-			if (_extra2 != null) AddLine(ref n, _extra2, LineSmall, false);
-			if (inGame && PhaseNoticeOn() && Time.unscaledTime < _noticeUntil && !string.IsNullOrEmpty(_noticeText)) AddLine(ref n, _noticeText, LineNotice, false);
-			if (n > _hudLines.Length) n = _hudLines.Length;
-			if (n == 0) return; // 全部内容关闭时不画空框
+			Color cPhase = Col(_colPhase, Color.white);
+			Color cCountdown = Col(_colCountdown, Color.white);
+			Color cRound = Col(_colRound, Color.white);
+			Color cLevel = Col(_colLevel, Color.white);
+			Color cWin = Col(_colWin, new Color(1f, 0.82f, 0.29f, 1f));
+			Color cPanel = Col(_colPanel, Color.white);
+			Color cExtra1 = Col(_colExtra1, Color.white);
+			Color cExtra2 = Col(_colExtra2, Color.white);
 
-			// 2) 量尺寸：宽度用 CalcSize，行高用核心 TextHeight（实测 CJK 字形下沉，避免裁字）。
+			if (ShowOn(_showPhase)) AddLine(ref n, PhaseName(_phase), null, LinePhase, WithA(cPhase, textA));
+			if (ShowOn(_showCountdown)) {
+				if (_warnLevel == 2) {
+					float blink = 1f;
+					if (BlinkOn()) blink = (Mathf.Sin(Time.unscaledTime * 12f) > 0f) ? 1f : 0.25f;
+					AddLine(ref n, _timerText, null, LineTimer, new Color(1f, 0.3f, 0.25f, textA * blink));
+				} else if (_warnLevel == 1) {
+					AddLine(ref n, _timerText, null, LineTimer, WithA(new Color(1f, 0.85f, 0.2f, 1f), textA));
+				} else {
+					AddLine(ref n, _timerText, null, LineTimer, WithA(cCountdown, textA));
+				}
+			}
+			if (ShowOn(_showRound) && !string.IsNullOrEmpty(_roundText)) AddLine(ref n, _roundText, null, LineSmall, WithA(cRound, textA));
+			if (ShowOn(_showLevel) && !string.IsNullOrEmpty(_levelText)) AddLine(ref n, _levelText, null, LineSmall, WithA(cLevel, textA));
+			if (ShowOn(_showWin) && !string.IsNullOrEmpty(_winText)) AddLine(ref n, _winText, null, LineSmall, WithA(cWin, textA));
+			if (ShowOn(_showPanel) && _playerRowCount > 0) {
+				for (int i = 0; i < _playerRowCount && i < _playerPlain.Length; i++) {
+					string plain = _playerPlain[i];
+					if (string.IsNullOrEmpty(plain)) continue;
+					AddLine(ref n, plain, _playerRich[i], LinePanel, WithA(cPanel, textA));
+				}
+			}
+			if (!string.IsNullOrEmpty(_extra1Text)) AddLine(ref n, _extra1Text, null, LineSmall, WithA(cExtra1, textA));
+			if (!string.IsNullOrEmpty(_extra2Text)) AddLine(ref n, _extra2Text, null, LineSmall, WithA(cExtra2, textA));
+			if (PhaseNoticeOn() && Time.unscaledTime < _phaseNoticeUntil && !string.IsNullOrEmpty(_phaseNoticeText)) {
+				AddLine(ref n, _phaseNoticeText, null, LineNotice, WithA(cPhase, textA));
+			}
+			if (RoundNoticeOn() && Time.unscaledTime < _roundNoticeUntil && !string.IsNullOrEmpty(_roundNoticeText)) {
+				AddLine(ref n, _roundNoticeText, null, LineNotice, WithA(cRound, textA));
+			}
+			if (n > _hudPlain.Length) n = _hudPlain.Length;
+			if (n == 0) return;
+
+			// 2) 量尺寸（宽 CalcSize，行高 TextHeight 防 CJK 裁字）。
 			float pad = SRApi.Ctl.Sc(9f);
 			float gap = SRApi.Ctl.Sc(3f);
 			float contentW = 0f;
-			for (int i = 0; i < n; i++) contentW = Mathf.Max(contentW, Measure(_hudLines[i], LineStyle(_hudKinds[i])));
+			for (int i = 0; i < n; i++) contentW = Mathf.Max(contentW, Measure(_hudPlain[i], LineStyle(_hudKinds[i])));
 			float panelW = Mathf.Max(contentW + pad * 2f + SRApi.Ctl.Sc(4f), SRApi.Ctl.Sc(120f));
 			float textW = Mathf.Max(1f, panelW - pad * 2f);
 			float contentH = 0f;
 			for (int i = 0; i < n; i++) {
 				GUIStyle st = LineStyle(_hudKinds[i]);
 				float th = 0f;
-				try { th = SRApi.Ctl.TextHeight(_hudLines[i], textW); } catch { th = 0f; }
+				try { th = SRApi.Ctl.TextHeight(_hudPlain[i], textW); } catch { th = 0f; }
 				if (th <= 0f) th = (st != null ? st.fontSize : 14);
 				_hudHeights[i] = th + gap;
 				contentH += _hudHeights[i];
@@ -1105,7 +1097,7 @@ namespace SR_UCH.Tweaks {
 			_hudW = panelW;
 			_hudH = panelH;
 
-			// 3) 布局（四角按 Edge Margin；Custom 用运行期位置）与拖动命中。
+			// 3) 布局 + 拖动命中。
 			float x, y;
 			LayoutPosition(_hudW, _hudH, out x, out y);
 			x = Mathf.Clamp(x, 0f, Mathf.Max(0f, (float)Screen.width - panelW));
@@ -1115,92 +1107,42 @@ namespace SR_UCH.Tweaks {
 
 			Event ev = Event.current;
 			if (ev == null || ev.type != EventType.Repaint) return;
-			GUI.depth = 1; // 低于核心窗口（0）的层级，设置页打开时 HUD 不会盖住窗口
+			GUI.depth = 1;
 
-			// 4) 半透明底 + 警告色边框（黄/红；正常时淡白边）。
-			Color bg = new Color(0f, 0f, 0f, 0.55f * op);
-			GUI.color = bg;
+			// 4) 半透明底。
+			GUI.color = new Color(0f, 0f, 0f, bgA);
 			GUI.DrawTexture(panel, _white);
-			GUI.color = Color.white;
-			Color edge = (_warnLevel >= 2)
-				? new Color(1f, 0.3f, 0.25f, 0.9f * op)
-				: (_warnLevel == 1 ? new Color(1f, 0.85f, 0.2f, 0.8f * op) : new Color(1f, 1f, 1f, 0.18f * op));
-			float bw = Mathf.Max(1f, SRApi.Ctl.Sc(2f));
-			GUI.color = edge;
-			GUI.DrawTexture(new Rect(panel.x, panel.y, panel.width, bw), _white);
-			GUI.DrawTexture(new Rect(panel.x, panel.yMax - bw, panel.width, bw), _white);
-			GUI.DrawTexture(new Rect(panel.x, panel.y, bw, panel.height), _white);
-			GUI.DrawTexture(new Rect(panel.xMax - bw, panel.y, bw, panel.height), _white);
 			GUI.color = Color.white;
 
 			// 5) 逐行绘制。
-			float blink = 1f;
-			if (_warnLevel >= 2 && BlinkOn()) blink = (Mathf.Sin(Time.unscaledTime * 12f) > 0f) ? 1f : 0.25f;
-			Color phaseCol = new Color(1f, 1f, 1f, op);
-			Color timerCol = (_warnLevel >= 2)
-				? new Color(1f, 0.3f, 0.25f, op * blink)
-				: (_warnLevel == 1 ? new Color(1f, 0.85f, 0.2f, op) : new Color(1f, 1f, 1f, op));
-			Color smallCol = new Color(1f, 1f, 1f, 0.75f * op);
-			Color dimCol = new Color(1f, 0.62f, 0.62f, 0.45f * op);
-			Color noticeCol = new Color(1f, 0.9f, 0.4f, op);
-
 			float tw = panel.width - pad * 2f;
 			float ty = panel.y + pad;
 			for (int i = 0; i < n; i++) {
 				GUIStyle st = LineStyle(_hudKinds[i]);
 				if (st == null) continue;
 				float lh = _hudHeights[i];
-				int kind = _hudKinds[i];
-				Color col;
-				if (kind == LineTimer || kind == LinePhaseTimer) col = timerCol;
-				else if (kind == LinePhase) col = phaseCol;
-				else if (kind == LineNotice) col = noticeCol;
-				else col = _hudDim[i] ? dimCol : smallCol;
-				st.normal.textColor = col;
-				GUI.Label(new Rect(panel.x + pad, ty, tw, lh), _hudLines[i], st);
+				st.normal.textColor = _hudColors[i];
+				GUI.Label(new Rect(panel.x + pad, ty, tw, lh), _hudRich[i], st);
 				ty += lh;
 			}
 		}
 
-		private static bool PlayerRowEliminated(int index) {
-			try { return index >= 0 && index < _playerRowCount && _playerRows[index].eliminated; } catch { return false; }
-		}
+		private static Color WithA(Color c, float a) { return new Color(c.r, c.g, c.b, Mathf.Clamp01(a)); }
 
-		private static void AddLine(ref int n, string text, int kind, bool dim) {
-			if (string.IsNullOrEmpty(text)) return;
-			if (n < _hudLines.Length) {
-				_hudLines[n] = text;
-				_hudKinds[n] = kind;
-				_hudDim[n] = dim;
-			}
-			n++;
-		}
-
-		private static GUIStyle LineStyle(int kind) {
-			switch (kind) {
-			case LinePhase: return _phaseStyle;
-			case LineTimer: return _timerStyle;
-			case LinePhaseTimer: return _phaseStyle;
-			case LineNotice: return _noticeStyle;
-			default: return _smallStyle;
-			}
-		}
-
-		// 四角布局：Edge Margin 为距对应屏幕边缘的距离（一一对应四个枚举值）；Custom 用运行期坐标。
 		private static void LayoutPosition(float w, float h, out float x, out float y) {
 			float sw = (float)Screen.width;
 			float sh = (float)Screen.height;
-			float m = Mathf.Clamp((float)EdgeMargin(), 0f, 200f);
+			float m = SRApi.Ctl.Sc(16f);
 			switch (LayoutValue()) {
-			case HudLayout.TopRight:      // 右上：右边、上边各留 m
+			case HudLayout.TopRight:
 				x = sw - w - m; y = m; break;
-			case HudLayout.BottomLeft:    // 左下：左边、下边各留 m
+			case HudLayout.BottomLeft:
 				x = m; y = sh - h - m; break;
-			case HudLayout.BottomRight:   // 右下：右边、下边各留 m
+			case HudLayout.BottomRight:
 				x = sw - w - m; y = sh - h - m; break;
-			case HudLayout.Custom:        // 自定义：运行期拖动后的绝对坐标
+			case HudLayout.Custom:
 				x = _customX; y = _customY; break;
-			case HudLayout.TopLeft:       // 左上：左边、上边各留 m
+			case HudLayout.TopLeft:
 			default:
 				x = m; y = m; break;
 			}
@@ -1213,7 +1155,7 @@ namespace SR_UCH.Tweaks {
 			try { return style.CalcSize(new GUIContent(text)).x; } catch { return 0f; }
 		}
 
-		// 拖动：仅在"设置窗口打开 + Layout=自定义"时允许；位置只更新运行期字段，不写配置。
+		// 拖动：仅在"设置窗口打开 + Layout=自定义"时允许；只更新运行期位置，不写配置。
 		private static void HandleDrag(Rect panel) {
 			Event e = Event.current;
 			if (e == null) return;
