@@ -14,8 +14,8 @@ public partial class Experiments : ITweak
 		public static void RenderPage2() {
 			try {
 				// 自由相机
-				GUILayout.Label(new GUIContent("- " + SR.T("自由相机", "Free camera") + " -",
-					SR.T("开启后可以用滚轮自由缩放视野. 关闭后完全恢复游戏默认相机. 只在自由模式有效.",
+				GUILayout.Label(new GUIContent("- " + SRApi.T("自由相机", "Free camera") + " -",
+					SRApi.T("开启后可以用滚轮自由缩放视野. 关闭后完全恢复游戏默认相机. 只在自由模式有效.",
 					 "While on, the wheel zooms the view freely. Off = fully restores the default camera. Freeplay only.")),
 					SR.Ctl.SecHeader);
 				SR.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
@@ -30,8 +30,8 @@ public partial class Experiments : ITweak
 
 				// 加载后清理
 				GUILayout.Space(SR.Ctl.Sc(6));
-				GUILayout.Label(new GUIContent("- " + SR.T("加载后清理", "Cleanup after load") + " -",
-					SR.T("进关卡时执行一次垃圾回收和资源卸载. 减少对局内卡顿. 不影响结算速度.",
+				GUILayout.Label(new GUIContent("- " + SRApi.T("加载后清理", "Cleanup after load") + " -",
+					SRApi.T("进关卡时执行一次垃圾回收和资源卸载. 减少对局内卡顿. 不影响结算速度.",
 					 "Runs GC and asset unload once on level load, reducing in-match stutter. Does not affect scoring.")),
 					SR.Ctl.SecHeader);
 				SR.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
@@ -42,8 +42,8 @@ public partial class Experiments : ITweak
 		}
 		// 加载后清理的初始化：配置 + 每帧钩子 + 补丁注册（UI 在上面的加载后清理分区）。
 		internal static void InitCleanup(IFeatureHost plugin) {
-			SR.LocKey("Experiments", "GC After Load", "加载后清理", "GC after load");
-			SR.LocDesc("Experiments", "GC After Load",
+			SRApi.LocKey("Experiments", "GC After Load", "加载后清理", "GC after load");
+			SRApi.LocDesc("Experiments", "GC After Load",
 				"进关卡的时候回收一次垃圾和没用的资源, 对局里会少卡一点. 只在第一次加载后做, 同关卡换回合不做.",
 				"Run GC and asset unload once on level load, reducing in-match stutter.");
 			_gcAfterLoadEntry = plugin.Config.Bind<bool>("Experiments", "GC After Load", false, "进关卡/换关卡时执行一次 GC 回收 + 资源卸载，减少对局内卡顿。同关卡回合切换不清理（场景名不变自动跳过），不影响结算速度。");
@@ -106,17 +106,17 @@ public partial class Experiments : ITweak
         private static ConfigEntry<float> _followSpeed;
     
         private static void SelfReg2() {
-            SR.LocKey("Experiments", "Free Camera", "自由相机", null);
-            SR.LocDesc("Experiments", "Free Camera", "开了以后滚轮能自由缩放视野, 1 到 32. 关掉就完全交回游戏. 菜单和暂停界面里不生效, 因为那时候光标是可见的.", "Free camera: wheel zooms the FOV (1-32); works in all modes (menus excluded). Still bound to the mod master switch.");
-            SR.LocKey("Experiments", "Free Camera FOV", "视野大小", null);
-            SR.LocDesc("Experiments", "Free Camera FOV", "视野范围, 1 到 32. 数字越小拉得越近, 越大看得越远. 自由相机开着的时候滚轮也会同步改它.", "FOV 1-32.");
+            SRApi.LocKey("Experiments", "Free Camera", "自由相机", null);
+            SRApi.LocDesc("Experiments", "Free Camera", "开了以后滚轮能自由缩放视野, 1 到 32. 关掉就完全交回游戏. 菜单和暂停界面里不生效, 因为那时候光标是可见的.", "Free camera: wheel zooms the FOV (1-32); works in all modes (menus excluded). Still bound to the mod master switch.");
+            SRApi.LocKey("Experiments", "Free Camera FOV", "视野大小", null);
+            SRApi.LocDesc("Experiments", "Free Camera FOV", "视野范围, 1 到 32. 数字越小拉得越近, 越大看得越远. 自由相机开着的时候滚轮也会同步改它.", "FOV 1-32.");
             // 必须登记 LocKey/LocDesc，否则界面回退显示英文键名。
-            SR.LocKey("Experiments", "Free Camera Speed", "相机移动速度", null);
-            SR.LocDesc("Experiments", "Free Camera Speed",
+            SRApi.LocKey("Experiments", "Free Camera Speed", "相机移动速度", null);
+            SRApi.LocDesc("Experiments", "Free Camera Speed",
                 "相机追角色有多快, 0.5 到 5, 每次 0.5. 1 是原版. 角色跑太快相机跟不上就把它调大.",
                 "How fast the camera follows the character: 0.5 to 5 in steps of 0.5. 1 = the game default.");
-            SR.LocKey("Experiments", "Free Camera Key", "视野快捷键", null);
-            SR.LocDesc("Experiments", "Free Camera Key", "按这个键开关自由相机. 想用组合键就点按钮, 按住 Shift 或 Ctrl 再按主键.", "Key to toggle the free camera.");
+            SRApi.LocKey("Experiments", "Free Camera Key", "视野快捷键", null);
+            SRApi.LocDesc("Experiments", "Free Camera Key", "按这个键开关自由相机. 想用组合键就点按钮, 按住 Shift 或 Ctrl 再按主键.", "Key to toggle the free camera.");
             SR.RowSliders.Add(FovSlider);                       // FOV 用滑块渲染
             SR.RowSliders.Add(SpeedSlider);                     // 相机移动速度用滑块渲染
             SR.RowCompanions.Add(CameraCompanion);              // 自由相机行右侧并排快捷键框
@@ -208,8 +208,8 @@ public partial class Experiments : ITweak
         private static void OnLockChanged(object s, EventArgs e) {
             try {
                 if (_on != null && _on.Value) { float v = CurrentFov(); _fov.Value = Mathf.Clamp(v, MinFov, MaxFov); _savedFov = v; Camera g = GameCamera(); if (g != null) { try { if (g.orthographic) g.orthographicSize = _fov.Value; else g.fieldOfView = _fov.Value; } catch { } } }
-                SRApi.Notify((_on != null && _on.Value) ? SR.T("自由相机：开", "Free camera: ON")
-                                                 : SR.T("自由相机：关（已还原）", "Free camera: OFF (restored)"));
+                SRApi.Notify((_on != null && _on.Value) ? SRApi.T("自由相机：开", "Free camera: ON")
+                                                 : SRApi.T("自由相机：关（已还原）", "Free camera: OFF (restored)"));
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 开关变化", __ex); }
         }
         internal static void CheckKey() {

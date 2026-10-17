@@ -106,6 +106,16 @@ namespace SR_UCH {
                     delegate (string __s) { return SR.SelectedPageId(__s); },
                     delegate (bool __v) { SR.BlockWindowDrag = __v; },
                     delegate (int __v) { SR.WheelFrame = __v; });
+                SRApi.SetLangSinks(
+                    delegate (string __z, string __e) { return SR.T(__z, __e); },
+                    delegate (string __s, string __z) { SR.LocSec(__s, __z); },
+                    delegate (string __s, string __z, string __e) { SR.LocSec(__s, __z, __e); },
+                    delegate (string __s, string __k, string __z, string __e) { SR.LocKey(__s, __k, __z, __e); },
+                    delegate (string __s, string __k, string __z, string __e) { SR.LocDesc(__s, __k, __z, __e); },
+                    delegate (string __n, string __z) { SR.LocEnum(__n, __z); },
+                    delegate { return SR.CurrentLanguageId; },
+                    delegate { return SR.LangVer; },
+                    delegate (string __z, string __e, object[] __a) { SR.NotifyT(__z, __e, __a); });
             } catch { }
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。

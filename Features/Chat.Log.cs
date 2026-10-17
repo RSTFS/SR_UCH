@@ -86,10 +86,10 @@ public partial class Chat : ITweak {
             // 顶部工具行与底部输入行必须画在滚动区之外（不随内容滚动），故注册为页面外框部件。
             SR.RegisterPageChrome("Chat", RenderToolbar, RenderInputRow);
             // 两个开关的本地化文案（配置在本文件 Bind 到 Chat 段）。
-            SR.LocKey("Chat", "Filter Quick Msgs", "过滤快捷消息", null);
-            SR.LocDesc("Chat", "Filter Quick Msgs", "把表情和预设消息从聊天记录里藏起来, 只留玩家真正打的字.", "Hide quick messages (emotes/presets) from the log");
-            SR.LocKey("Chat", "Show Time", "显示时间", null);
-            SR.LocDesc("Chat", "Show Time", "在每条聊天记录前面显示一下时间.", "Show the timestamp before each message");
+            SRApi.LocKey("Chat", "Filter Quick Msgs", "过滤快捷消息", null);
+            SRApi.LocDesc("Chat", "Filter Quick Msgs", "把表情和预设消息从聊天记录里藏起来, 只留玩家真正打的字.", "Hide quick messages (emotes/presets) from the log");
+            SRApi.LocKey("Chat", "Show Time", "显示时间", null);
+            SRApi.LocDesc("Chat", "Show Time", "在每条聊天记录前面显示一下时间.", "Show the timestamp before each message");
             // 预登记本页自动快捷键：不预登记则重启后在首次打开本页前按键无效。
             SRApi.HotkeyAction("chat.clear", "清空", () => { Clear(); _chatTextCache = null; _chatBuilt = false; });
             SRApi.HotkeyAction("chat.copy", "复制", () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (System.Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); } });
@@ -130,9 +130,9 @@ public partial class Chat : ITweak {
                 _chatHeightW = -1f; //文本变了，高度作废
             }
             if (entries.Count == 0) {
-                GUILayout.Label(SR.T("（暂无消息）", "(no messages)"), SR.Ctl.Label);
+                GUILayout.Label(SRApi.T("（暂无消息）", "(no messages)"), SR.Ctl.Label);
             } else if (string.IsNullOrEmpty(_chatTextCache)) {
-                GUILayout.Label(SR.T("（已过滤全部消息）", "(all messages filtered)"), SR.Ctl.Label);
+                GUILayout.Label(SRApi.T("（已过滤全部消息）", "(all messages filtered)"), SR.Ctl.Label);
             } else {
                 float w = Mathf.Max(SR.Ctl.Sc(140), SR.Ctl.WinWidth - SR.Ctl.SidebarWidth() - SR.Ctl.Sc(36));
                 float innerW = w - SR.Ctl.Sc(20);
@@ -155,7 +155,7 @@ public partial class Chat : ITweak {
             if (SRApi.SelectedPageId("Chat") != "ChatLog") return; //顶栏只属于对话内容页
             GUILayout.BeginHorizontal();
             //清空（可右键绑定快捷键）
-            if (SR.Ctl.HotkeyButton("chat.clear", SR.T("清空", "Clear"), SR.T("清空聊天记录", "Clear the chat log"),
+            if (SR.Ctl.HotkeyButton("chat.clear", SRApi.T("清空", "Clear"), SRApi.T("清空聊天记录", "Clear the chat log"),
                 () => { Clear(); _chatTextCache = null; _chatBuilt = false; },
                 SR.Ctl.Sc(56), SR.Ctl.Sc(26))) {
                 Clear();
@@ -164,19 +164,19 @@ public partial class Chat : ITweak {
             }
             GUILayout.Space(SR.Ctl.Sc(4));
             // 复制当前显示的聊天记录（已应用过滤）到剪贴板。
-            if (SR.Ctl.HotkeyButton("chat.copy", SR.T("复制", "Copy"),
-                SR.T("把当前显示的聊天记录复制到剪贴板（游戏里没有文本选择功能，用这个代替）", "Copy the currently shown chat log to the clipboard"),
+            if (SR.Ctl.HotkeyButton("chat.copy", SRApi.T("复制", "Copy"),
+                SRApi.T("把当前显示的聊天记录复制到剪贴板（游戏里没有文本选择功能，用这个代替）", "Copy the currently shown chat log to the clipboard"),
                 () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); } },
                 SR.Ctl.Sc(56), SR.Ctl.Sc(26))) {
                 try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); }
             }
             GUILayout.Space(SR.Ctl.Sc(8));
             // 两个开关：标签（左键恢复默认 / 右键绑快捷键）+ 复选框。
-            SR.Ctl.RestoreLabel(new GUIContent(SR.T("过滤快捷消息", "Hide quick msgs"), SR.T("过滤快捷消息（表情/预设消息不显示）", "Hide quick msgs (emotes/presets)")),
+            SR.Ctl.RestoreLabel(new GUIContent(SRApi.T("过滤快捷消息", "Hide quick msgs"), SRApi.T("过滤快捷消息（表情/预设消息不显示）", "Hide quick msgs (emotes/presets)")),
                 _chatFilterQuickEntry, SR.Ctl.Sc(120), SR.Ctl.Sc(26));
             if (_chatFilterQuickEntry != null) SR.Ctl.RenderControl(_chatFilterQuickEntry);
             GUILayout.Space(SR.Ctl.Sc(16));
-            SR.Ctl.RestoreLabel(new GUIContent(SR.T("显示具体时间", "Show time"), SR.T("每条消息前显示具体时间", "Show a timestamp before each message")),
+            SR.Ctl.RestoreLabel(new GUIContent(SRApi.T("显示具体时间", "Show time"), SRApi.T("每条消息前显示具体时间", "Show a timestamp before each message")),
                 _chatShowTimeEntry, SR.Ctl.Sc(110), SR.Ctl.Sc(26));
             if (_chatShowTimeEntry != null) SR.Ctl.RenderControl(_chatShowTimeEntry);
             GUILayout.FlexibleSpace();
@@ -200,7 +200,7 @@ public partial class Chat : ITweak {
             }
             GUI.SetNextControlName("SRUCH_ChatInput");
             _chatInputText = SR.ClearableTextField(_chatInputText, SR.Ctl.SearchBox, GUILayout.Height(SR.Ctl.Sc(26)));
-            if (SR.Ctl.HotkeyButton("chat.send", SR.T("发送", "Send"), SR.T("把输入内容作为聊天消息发到游戏聊天里", "Send the text as a chat message"),
+            if (SR.Ctl.HotkeyButton("chat.send", SRApi.T("发送", "Send"), SRApi.T("把输入内容作为聊天消息发到游戏聊天里", "Send the text as a chat message"),
                 () => { SendChatText(_chatInputText); _chatInputText = ""; },
                 SR.Ctl.Sc(56), SR.Ctl.Sc(26))) {
                 SendChatText(_chatInputText);
@@ -248,7 +248,7 @@ public partial class Chat : ITweak {
                 }
                 _log.Add(new ChatEntry {
                     time = DateTime.Now.ToString("HH:mm:ss"),
-                    sender = string.IsNullOrEmpty(details.UserName) ? SR.T("未知", "Unknown") : details.UserName,
+                    sender = string.IsNullOrEmpty(details.UserName) ? SRApi.T("未知", "Unknown") : details.UserName,
                     color = details.UserNameColor,
                     text = text,
                     isQuick = isQuick

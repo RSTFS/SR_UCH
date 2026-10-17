@@ -16,8 +16,8 @@ public partial class Experiments : ITweak
 			try {
 				// 树屋：立即开始
 			GUILayout.Space(SR.Ctl.Sc(6));
-			GUILayout.Label(new GUIContent("- " + SR.T("树屋", "Treehouse") + " -",
-				SR.T("在树屋大厅里直接开始关卡.",
+			GUILayout.Label(new GUIContent("- " + SRApi.T("树屋", "Treehouse") + " -",
+				SRApi.T("在树屋大厅里直接开始关卡.",
 					   "Start the level immediately from the treehouse.")),
 				SR.Ctl.SecHeader);
 			SR.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
@@ -30,8 +30,8 @@ public partial class Experiments : ITweak
 
 				// 加载与切场景
 				GUILayout.Space(SR.Ctl.Sc(6));
-				GUILayout.Label(new GUIContent("- " + SR.T("加载与切场景", "Loading and scene switch") + " -",
-					SR.T("跳过加载动画. 温柔加载在切换场景时先卸载再回收.",
+				GUILayout.Label(new GUIContent("- " + SRApi.T("加载与切场景", "Loading and scene switch") + " -",
+					SRApi.T("跳过加载动画. 温柔加载在切换场景时先卸载再回收.",
 						 "Skip the loading animation. Gentle load unloads and collects before switching.")),
 					SR.Ctl.SecHeader);
 				SR.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
@@ -64,12 +64,12 @@ public partial class Experiments : ITweak
         private static void SelfReg() {
             // Scene 段条目全部渲染在场景页，必须 NavHide，否则兜底分支会再加一个独立侧栏栏目。
             SRApi.NavHide("Scene");
-            SR.LocKey("Scene", "Splash Skip Load", "跳过加载动画", "Skip load animation");
-            SR.LocDesc("Scene", "Splash Skip Load",
+            SRApi.LocKey("Scene", "Splash Skip Load", "跳过加载动画", "Skip load animation");
+            SRApi.LocDesc("Scene", "Splash Skip Load",
                 "加载画面一出现就跳掉, 不用干等.",
                 "Skip the loading splash immediately.");
-            SR.LocKey("Scene", "Gentle Load", "温柔加载", "Gentle load");
-            SR.LocDesc("Scene", "Gentle Load",
+            SRApi.LocKey("Scene", "Gentle Load", "温柔加载", "Gentle load");
+            SRApi.LocDesc("Scene", "Gentle Load",
                 "切场景时先卸载再回收垃圾, 长时间玩会顺很多. 切到主菜单时自动让路, 那边游戏自己要走另一套.",
                 "Use the game's own DoGentleSceneLoad for scene switches (unload + GC before loading).");
         }
@@ -231,8 +231,8 @@ public partial class Experiments : ITweak
         internal static string Note = "";
 
         private static void SelfReg() {
-            SR.LocKey("Scene", "Lobby Launch Key", "立即开始键", "Launch now key");
-            SR.LocDesc("Scene", "Lobby Launch Key",
+            SRApi.LocKey("Scene", "Lobby Launch Key", "立即开始键", "Launch now key");
+            SRApi.LocDesc("Scene", "Lobby Launch Key",
                 "按这个键跳过等待直接开始关卡, 自动选票最多的那扇门. 要房主才能用.",
                 "Press to start the level immediately (host only).");
 
@@ -267,9 +267,9 @@ public partial class Experiments : ITweak
 
         private static void DoLaunch(LevelSelectController lsc) {
             // 判 SRApi.CanControlLocally（离线时为真）；LaunchLevel 是纯本地调用，与广播能力无关。
-            if (!SRApi.CanControlLocally) { SRApi.Notify(SR.T("仅房主可开始关卡", "Host only")); return; }
+            if (!SRApi.CanControlLocally) { SRApi.Notify(SRApi.T("仅房主可开始关卡", "Host only")); return; }
             LevelPortal[] portals = lsc.portals;
-            if (portals == null || portals.Length == 0) { SRApi.Notify(SR.T("未找到可用关卡门", "No level portal available")); return; }
+            if (portals == null || portals.Length == 0) { SRApi.Notify(SRApi.T("未找到可用关卡门", "No level portal available")); return; }
             int best = -1, bestV = -1;
             for (int i = 0; i < portals.Length; i++) {
                 if (portals[i] == null) continue;
@@ -278,11 +278,11 @@ public partial class Experiments : ITweak
             }
             // 零票视为未选定关卡，不启动。
             if (best < 0 || bestV <= 0 || portals[best] == null) {
-                SRApi.Notify(SR.T("尚未选定关卡，请先投票", "No level selected yet - vote first"));
+                SRApi.Notify(SRApi.T("尚未选定关卡，请先投票", "No level selected yet - vote first"));
                 return;
             }
             lsc.LaunchLevel(portals[best]);
-            SRApi.Notify(SR.T("关卡已开始", "Level started"));
+            SRApi.Notify(SRApi.T("关卡已开始", "Level started"));
         }
 
 

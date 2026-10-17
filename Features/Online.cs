@@ -83,7 +83,7 @@ namespace SR_UCH.Tweaks {
         private static readonly float[] DefWidths = { 62f, 44f, 76f, 62f, 66f, 80f, 50f, 86f, 78f, 50f, 54f, 70f };
 
         public void Initialize(IFeatureHost plugin) {
-            SR.LocSec(SecOnline, "联机", "Online");
+            SRApi.LocSec(SecOnline, "联机", "Online");
             SRApi.Nav(SecOnline, 90);   // 侧栏顺序 90：会话(80) 之后、实验(100) 之前
             SR.RegisterPage(SecOnline, RenderOnlinePage);
             SRApi.RegisterTick("联机看门狗", CheckHotkeys); // 每帧：回家看门狗 + 延时加入
@@ -140,10 +140,10 @@ namespace SR_UCH.Tweaks {
                 // 配置被手改成越界值或指向操作列时当作不排序。
                 if (_sortCol < 0 || _sortCol >= ColCount || _sortCol == JoinCol) _sortCol = -1;
             } catch { _sortCol = -1; _sortDesc = false; }
-            SR.LocKey(SecOnline, "Show Quality Coeff", "显示技能匹配质量", null);
-            SR.LocDesc(SecOnline, "Show Quality Coeff", "打开后, 游戏质量那一列的勾后面会多出一个 0 到 1 的匹配系数. 按住 Shift 点一下这一列的表头就能开关.", null);
-            SR.LocKey(SecOnline, "Skill Mode", "技能系数取值", null);
-            SR.LocDesc(SecOnline, "Skill Mode", "技能系数那一列显示最大值, 平均值还是最小值. 按住 Shift 点这一列的表头就能换.", null);
+            SRApi.LocKey(SecOnline, "Show Quality Coeff", "显示技能匹配质量", null);
+            SRApi.LocDesc(SecOnline, "Show Quality Coeff", "打开后, 游戏质量那一列的勾后面会多出一个 0 到 1 的匹配系数. 按住 Shift 点一下这一列的表头就能开关.", null);
+            SRApi.LocKey(SecOnline, "Skill Mode", "技能系数取值", null);
+            SRApi.LocDesc(SecOnline, "Skill Mode", "技能系数那一列显示最大值, 平均值还是最小值. 按住 Shift 点这一列的表头就能换.", null);
         }
 
         // 清空房间列表与表格几何缓存（返回主界面 / 房主解散时调用）；不动列宽 / 列序 / 隐藏列偏好。
@@ -160,7 +160,7 @@ namespace SR_UCH.Tweaks {
 
         // 回家（解散 / 退出 / 返回主界面）
         private static void Notes(string zh, string en) {
-            SRApi.Notify(SR.T(zh, en));
+            SRApi.Notify(SRApi.T(zh, en));
         }
 
         private static void ArmWatchdog() {
@@ -347,7 +347,7 @@ namespace SR_UCH.Tweaks {
                 Matchmaker mm = MatchmakerOrNull();
                 // 判空必须放最前：下面的 _pendingSteamId 分支会立刻调用 mm.GetType()。
                 if (mm == null) {
-                    _lobbyMsg = SR.T("联机未初始化：请先进入游戏的联机界面一次", "Online not initialised: open the game's online screen once first");
+                    _lobbyMsg = SRApi.T("联机未初始化：请先进入游戏的联机界面一次", "Online not initialised: open the game's online screen once first");
                     _lobbyErr = true;
                     return;
                 }
@@ -355,13 +355,13 @@ namespace SR_UCH.Tweaks {
                 _regionCodeCache.Clear();
                 _lobbySearching = true;
                 _lobbyErr = false;          // 本次搜索开始，清掉上一次的错误提示
-                _lobbyMsg = SR.T("搜索中...", "Searching...");
+                _lobbyMsg = SRApi.T("搜索中...", "Searching...");
                 _lobbySearchAt = Time.unscaledTime;
                 mm.FindLobbies(new Matchmaker.LobbyListingCallback(OnLobbyInfo));
             } catch (Exception e) {
                 _lobbySearching = false;
                 _lobbyErr = true;
-                _lobbyMsg = SR.T("搜索失败: ", "Search failed: ") + e.Message;
+                _lobbyMsg = SRApi.T("搜索失败: ", "Search failed: ") + e.Message;
                 SRApi.LogWarn("刷新房间列表失败: " + e.Message);
             }
         }
@@ -369,7 +369,7 @@ namespace SR_UCH.Tweaks {
         private static void OnLobbyInfo(Matchmaker.LobbyListInfo info) {
             try {
                 if (info == null) return;
-                if (info.error) { _lobbySearching = false; _lobbyErr = true; _lobbyMsg = SR.T("搜索出错", "Search error"); return; }
+                if (info.error) { _lobbySearching = false; _lobbyErr = true; _lobbyMsg = SRApi.T("搜索出错", "Search error"); return; }
                 // 同一 sLobbyID 的回调可能重复到达：去重替换，否则会画出重复行、计数虚高、排序时行闪。
                 int exist = -1;
                 for (int i = 0; i < _lobbies.Count; i++) {
@@ -585,9 +585,9 @@ namespace SR_UCH.Tweaks {
         // 界面语言为英文系时不使用游戏术语，改用自己的英文；判据必须走 SR.Ctl.LangEn（兼容外部语言包）。
         private static bool En { get { return SR.Ctl.LangEn; } }
 
-        // 语言包优先：SR.T 命中外部语言包即为译文，未收录时按英文系 / 中文回落。
+        // 语言包优先：SRApi.T 命中外部语言包即为译文，未收录时按英文系 / 中文回落。
         private static string G(string i2Key, string zh, string en) {
-            string own = SR.T(zh, en);
+            string own = SRApi.T(zh, en);
             if (En) return own;                 //英文系：我们自己的英文（或语言包译文）
             return Tr(i2Key, own);              //中文系：优先游戏自己的术语，取不到再用我们自己的中文
         }
@@ -662,13 +662,13 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string DispRegion(string code) {
-            // 先过 SR.T：语言包可覆盖"亚太/欧盟/美国"，也可覆盖 "AP"/"EU"/"US" 这些英文原名。
-            if (code == "AP") { string ap = SR.T("亚太", "AP"); return En ? ap : ZhTerm("Network/region_shortname_ap", ap); }
-            if (code == "EU") { string eu = SR.T("欧盟", "EU"); return En ? eu : ZhTerm("Network/region_shortname_eu", eu); }
-            if (code == "US") { string us = SR.T("美国", "US"); return En ? us : ZhTerm("Network/region_shortname_us", us); }
+            // 先过 SRApi.T：语言包可覆盖"亚太/欧盟/美国"，也可覆盖 "AP"/"EU"/"US" 这些英文原名。
+            if (code == "AP") { string ap = SRApi.T("亚太", "AP"); return En ? ap : ZhTerm("Network/region_shortname_ap", ap); }
+            if (code == "EU") { string eu = SRApi.T("欧盟", "EU"); return En ? eu : ZhTerm("Network/region_shortname_eu", eu); }
+            if (code == "US") { string us = SRApi.T("美国", "US"); return En ? us : ZhTerm("Network/region_shortname_us", us); }
             // 区域对象为 null（游戏没给该字段 / id 对不上）：说明是取不到，而非某个区域。
-            if (code == NoneCode) return SR.T("未知(无区域数据)", "unknown (no region)");
-            if (string.IsNullOrEmpty(code)) return SR.T("未知", "unknown");
+            if (code == NoneCode) return SRApi.T("未知(无区域数据)", "unknown (no region)");
+            if (string.IsNullOrEmpty(code)) return SRApi.T("未知", "unknown");
             return code;
         }
 
@@ -690,13 +690,13 @@ namespace SR_UCH.Tweaks {
         // 按钮 / 提示文字：说明不能加入的原因。
         private static string JoinText(Matchmaker.LobbyListInfo li) {
             // "房间已空"必须在 IsJoinable 之前判定：IsJoinable 只看 Players >= 4，0 人会被算作可加入。
-            if (li.Players == 0) return SR.T("房间已空", "empty");
-            if (IsJoinable(li)) return SR.T("加入", "Join");
-            if (li.error || !li.InfoReceived) return SR.T("信息不全", "no info");
-            if (li.matchProgress != 0) return SR.T("对局中", "in match");
-            if (li.isAFK) return SR.T("房主AFK", "host AFK");
-            if (IsFull(li)) return SR.T("人满", "full");
-            return SR.T("不可加入", "closed");
+            if (li.Players == 0) return SRApi.T("房间已空", "empty");
+            if (IsJoinable(li)) return SRApi.T("加入", "Join");
+            if (li.error || !li.InfoReceived) return SRApi.T("信息不全", "no info");
+            if (li.matchProgress != 0) return SRApi.T("对局中", "in match");
+            if (li.isAFK) return SRApi.T("房主AFK", "host AFK");
+            if (IsFull(li)) return SRApi.T("人满", "full");
+            return SRApi.T("不可加入", "closed");
         }
 
         // 房主是否已失联（僵尸房间）：房主每 10 秒上报一次心跳，断 10 秒即视为房间已死。
@@ -782,7 +782,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string FlagsText(Matchmaker.LobbyListInfo li) {
-            string s = li.usingMods ? SR.T("模组", "mods") : "";
+            string s = li.usingMods ? SRApi.T("模组", "mods") : "";
             if (li.isAFK) s += (s.Length > 0 ? "+" : "") + "AFK";
             return s;
         }
@@ -901,7 +901,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void UpdateLobbyMsg() {
-            _lobbyMsg = string.Format(SR.T("共 {0} 个房间，筛选后 {1} 个", "{0} lobbies, {1} after filters"), _lobbies.Count, CountShown());
+            _lobbyMsg = string.Format(SRApi.T("共 {0} 个房间，筛选后 {1} 个", "{0} lobbies, {1} after filters"), _lobbies.Count, CountShown());
         }
 
         // 页面：联机
@@ -920,21 +920,21 @@ namespace SR_UCH.Tweaks {
 
             // 按钮顺序：刷新列表 / 退出联机 / 房间码。
             GUILayout.BeginHorizontal();
-            if (SR.Ctl.HotkeyButton("online.lobbies", SR.T("刷新列表", "Refresh"),
-                SR.T("向匹配服务查一次公开房间, 能加入的排在表格最上面, 点里面的加入就行.\n如果你正待在某个房间里, 点加入会先退出当前房间, 退完立刻自动进新的.",
+            if (SR.Ctl.HotkeyButton("online.lobbies", SRApi.T("刷新列表", "Refresh"),
+                SRApi.T("向匹配服务查一次公开房间, 能加入的排在表格最上面, 点里面的加入就行.\n如果你正待在某个房间里, 点加入会先退出当前房间, 退完立刻自动进新的.",
                      "Query the public lobby list, joinable lobbies on top. Click Join in the table.\nIf you are already in a lobby, clicking Join leaves it first and joins the new one right away."),
                 RefreshLobbies, SR.Ctl.Sc(140), SR.Ctl.Sc(30))) RefreshLobbies();
             // 返回倒计时中按钮文字改为"强制返回"，再点一次即立刻返回。
             bool returning = _abortDeadline > 0f || _forceDeadline > 0f || _forceRawDeadline > 0f;
             if (SR.Ctl.HotkeyButton("online.disband",
-                returning ? SR.T("强制返回", "Force return") : SR.T("返回主界面", "Back to main menu"),
-                SR.T("回主界面, 走的就是游戏自己的离开房间流程. 房主会先广播 HostEndedGame, 全员一起回去; 房客只退自己.\n点下去当帧就放出加载遮罩并清掉本页房间列表; 1.5 秒还没回去就自己收尾, 4 秒硬切主界面.\n再点一次这个按钮 = 立刻强制返回, 完全不等游戏自己的加载流程.",
+                returning ? SRApi.T("强制返回", "Force return") : SRApi.T("返回主界面", "Back to main menu"),
+                SRApi.T("回主界面, 走的就是游戏自己的离开房间流程. 房主会先广播 HostEndedGame, 全员一起回去; 房客只退自己.\n点下去当帧就放出加载遮罩并清掉本页房间列表; 1.5 秒还没回去就自己收尾, 4 秒硬切主界面.\n再点一次这个按钮 = 立刻强制返回, 完全不等游戏自己的加载流程.",
                      "Back to the main menu, using the game's own leave-lobby flow. Host: broadcasts HostEndedGame and everyone returns; guest: only you leave.\nThe moment you click it releases the loading splash and clears this page's lobby list; self-recovery at 1.5s / 4s.\nClick it again to force an immediate return, skipping the game's own loading flow."),
                 DisbandOrLeave, SR.Ctl.Sc(140), SR.Ctl.Sc(30))) DisbandOrLeave();
             // 房间码加入，走游戏自己的 Matchmaker.JoinLobby(code, useCode:true)。
             GUILayout.Space(SR.Ctl.Sc(14));
-            GUILayout.Label(new GUIContent(SR.T("房间码", "Lobby code"),
-                SR.T("输入 4 个大写字母的房间码直接加入（和游戏里按码加入一样；在对局内会先退出当前房间）。",
+            GUILayout.Label(new GUIContent(SRApi.T("房间码", "Lobby code"),
+                SRApi.T("输入 4 个大写字母的房间码直接加入（和游戏里按码加入一样；在对局内会先退出当前房间）。",
                      "Enter the 4-letter lobby code to join directly (same as the game's join-by-code; while in a session it leaves the current one first).")),
                 SR.Ctl.Label, GUILayout.Width(SR.Ctl.Sc(CodeLabelW)), GUILayout.Height(SR.Ctl.Sc(30)));
             string typed = SR.ClearableTextField(_joinCode ?? "", 4, SR.Ctl.SearchBox,
@@ -945,7 +945,7 @@ namespace SR_UCH.Tweaks {
                          && _joinCode.Length == 4;
             bool oldEnabled = GUI.enabled;
             GUI.enabled = _joinCode.Length == 4;   // 不足 4 位不可点
-            bool clickJoin = GUILayout.Button(SR.T("加入", "Join"), SR.Ctl.Btn, GUILayout.Width(SR.Ctl.Sc(46)), GUILayout.Height(SR.Ctl.Sc(24)));
+            bool clickJoin = GUILayout.Button(SRApi.T("加入", "Join"), SR.Ctl.Btn, GUILayout.Width(SR.Ctl.Sc(46)), GUILayout.Height(SR.Ctl.Sc(24)));
             GUI.enabled = oldEnabled;
             if (_joinCode.Length == 4 && (clickJoin || enter)) JoinByCode(_joinCode);
             GUILayout.FlexibleSpace();
@@ -971,12 +971,12 @@ namespace SR_UCH.Tweaks {
                 SortLobbies();
                 if (refreshMsg) UpdateLobbyMsg();
             }
-            string hint = SR.T("（点刷新列表查询）表头：左键点=按该列排序（升->降->默认），拖分隔线=调列宽（<->），拖表头=换列位置（+），Shift+点游戏质量=显示/隐藏匹配质量系数，Shift+点技能系数=最大/平均/最小，右键=隐藏该列，Shift+右键=还原；右键某行=隐藏该房间；滚轮=上下，Ctrl+滚轮=左右；表格底边可拖高度",
+            string hint = SRApi.T("（点刷新列表查询）表头：左键点=按该列排序（升->降->默认），拖分隔线=调列宽（<->），拖表头=换列位置（+），Shift+点游戏质量=显示/隐藏匹配质量系数，Shift+点技能系数=最大/平均/最小，右键=隐藏该列，Shift+右键=还原；右键某行=隐藏该房间；滚轮=上下，Ctrl+滚轮=左右；表格底边可拖高度",
                                "(click 'Refresh' to query) Header: left-click = sort by that column (asc/desc/default), drag a separator = resize (<->), drag a header = reorder (+), Shift+click 'Quality' = show/hide the skill-match coefficient, Shift+click 'Skill' = max/avg/min, right-click = hide that column, Shift+right-click = reset; right-click a row = hide that lobby; wheel = up/down, Ctrl+wheel = left/right; drag the table's bottom edge to resize height");
             GUILayout.Label(string.IsNullOrEmpty(_lobbyMsg) ? hint : _lobbyMsg, SR.Ctl.Label);
             int hiddenNow = CountHidden();   // 只数当前列表里还存在的
             if (hiddenNow > 0) {
-                GUILayout.Label(string.Format(SR.T("已隐藏 {0} 个房间（Shift+右键表格可恢复）", "{0} lobbies hidden (Shift+right-click the table to restore)"), hiddenNow), SR.Ctl.Label);
+                GUILayout.Label(string.Format(SRApi.T("已隐藏 {0} 个房间（Shift+右键表格可恢复）", "{0} lobbies hidden (Shift+right-click the table to restore)"), hiddenNow), SR.Ctl.Label);
             }
 
             // 筛选：第一行 区域 / 模式 / 标签，第二行 人数 / AFK / 状态；下拉框固定宽度，同时只开一个。
@@ -1091,7 +1091,7 @@ namespace SR_UCH.Tweaks {
                         }
                         // Notes(zh, en) 两个实参都会求值：先取一次名字，避免重复计算。
                         string skillName = SkillModeName(next);
-                        Notes(SR.T("技能系数：", "Skill coefficient: ") + skillName, "Skill coefficient: " + skillName);
+                        Notes(SRApi.T("技能系数：", "Skill coefficient: ") + skillName, "Skill coefficient: " + skillName);
                         return;
                     }
                 }
@@ -1110,9 +1110,9 @@ namespace SR_UCH.Tweaks {
                 if (_sortDescEntry != null) { _sortDescEntry.Value = _sortDesc; SaveEntry(_sortDescEntry); }
                 SortLobbies();
                 // Notes(zh, en) 两个实参都会求值：先拼一次再传。
-                string nm = SR.T(Titles[ci], TitlesEn[ci]);
-                string state = _sortCol < 0 ? SR.T("默认排序（可加入优先）", "default order (joinable first)")
-                             : (_sortDesc ? SR.T("降序", "descending") : SR.T("升序", "ascending"));
+                string nm = SRApi.T(Titles[ci], TitlesEn[ci]);
+                string state = _sortCol < 0 ? SRApi.T("默认排序（可加入优先）", "default order (joinable first)")
+                             : (_sortDesc ? SRApi.T("降序", "descending") : SRApi.T("升序", "ascending"));
                 string msg = nm + " · " + state;
                 Notes(msg, msg);
             } catch (Exception __ex) { SRApi.Guard.Log("列排序切换", __ex); }
@@ -1124,9 +1124,9 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string SkillModeName(string mode) {
-            if (mode == "max") return SR.T("最大技能", "max");
-            if (mode == "min") return SR.T("最小技能", "min");
-            return SR.T("平均技能", "average");
+            if (mode == "max") return SRApi.T("最大技能", "max");
+            if (mode == "min") return SRApi.T("最小技能", "min");
+            return SRApi.T("平均技能", "average");
         }
         private static readonly List<Matchmaker.LobbyListInfo> _shownLobbies = new List<Matchmaker.LobbyListInfo>();
         private static readonly List<Rect> _headerCellsPage = new List<Rect>();   //可滚动列的表头单元格（页面坐标）
@@ -1232,9 +1232,9 @@ namespace SR_UCH.Tweaks {
             _tableArgs.scrollX = _scrollCols.x; _tableArgs.scrollY = _scrollRows.y; _tableArgs.mp = mp;
             _tableArgs.pinW = _joinW; _tableArgs.pinX = _joinXPage; _tableArgs.drawHeader = true;   // 表头交给核心绘制
             // 核心画表头需要列标题回调，缺失会导致表头空白。
-            _tableArgs.title = delegate(int ci) { return SR.T(Titles[ci], TitlesEn[ci]); };
+            _tableArgs.title = delegate(int ci) { return SRApi.T(Titles[ci], TitlesEn[ci]); };
             _tableArgs.pinCol = JoinCol;
-            _tableArgs.pinTitle = SR.T(Titles[JoinCol], TitlesEn[JoinCol]);
+            _tableArgs.pinTitle = SRApi.T(Titles[JoinCol], TitlesEn[JoinCol]);
         // 隐藏列交由核心 TableDraw 处理（右键隐藏 / Shift+右键还原全部）。
         _tableArgs.hidden = _hiddenCols; _tableArgs.hideable = true;
         // 列宽拖动 / 列头换位全部交给核心，本页只提供列定义与回调；拖拽状态由核心持有，本页不镜像。
@@ -1251,7 +1251,7 @@ namespace SR_UCH.Tweaks {
             _tableArgs.headerCells = _headerCellsPage; _tableArgs.headerCols = _headerCols;
             _tableArgs.rowRects = _rowRectsPage; _tableArgs.rowRows = _rowRows;
             _tableArgs.pinRects = _joinRectsPage; _tableArgs.pinRows = _joinRows;
-            _tableArgs.emptyHint = delegate { return SR.T("（没有符合筛选的房间）", "(no lobbies match the filters)"); };
+            _tableArgs.emptyHint = delegate { return SRApi.T("（没有符合筛选的房间）", "(no lobbies match the filters)"); };
             SR.TableDraw(_tableArgs);
             // 收回核心算出的钉住列表头矩形，供下方命中判定显示"操作"列 tooltip。
             _joinHeaderPage = _tableArgs.pinHeader;
@@ -1331,15 +1331,15 @@ namespace SR_UCH.Tweaks {
                 }
                 if (hitCol < 0 && _joinHeaderPage.width > 0f && _joinHeaderPage.Contains(mp)) hitCol = JoinCol;
                 if (hitCol >= 0) {
-                    string tip = SR.T(TitleTips[hitCol], TitleTipsEn[hitCol]);
+                    string tip = SRApi.T(TitleTips[hitCol], TitleTipsEn[hitCol]);
                     if (hitCol == SkillCol) {
                         // 悬浮提示里带上自己的技能系数（存档中的 SkillMean）。
                         string mine = MySkillText();
-                        tip += "\n" + SR.T("你自己的技能系数：", "your own skill: ") + (mine != null ? mine : "?");
-                        tip += "\n" + SR.T("当前显示：", "showing: ") + SkillModeName(SkillModeCfg());
+                        tip += "\n" + SRApi.T("你自己的技能系数：", "your own skill: ") + (mine != null ? mine : "?");
+                        tip += "\n" + SRApi.T("当前显示：", "showing: ") + SkillModeName(SkillModeCfg());
                     } else if (hitCol == QualityCol) {
                         bool on = _showQualityCoeff != null && _showQualityCoeff.Value;
-                        tip += "\n" + SR.T(on ? "当前：显示匹配质量系数" : "当前：不显示匹配质量系数（点一下打开）",
+                        tip += "\n" + SRApi.T(on ? "当前：显示匹配质量系数" : "当前：不显示匹配质量系数（点一下打开）",
                                              on ? "now: coefficient shown" : "now: coefficient hidden (click to show)");
                     }
                     GUI.tooltip = tip;
@@ -1359,9 +1359,9 @@ namespace SR_UCH.Tweaks {
                             _hiddenCols.Add(ci);
                             _visCache = null;
                             SaveCols();
-                            string nm = SR.T(Titles[ci], TitlesEn[ci]);
-                            // SR.T(zh, en) 两个实参都会求值：两参相同时先拼一次再传。
-                            string hiddenColMsg = SR.T("已隐藏列：", "Hidden column: ") + nm;
+                            string nm = SRApi.T(Titles[ci], TitlesEn[ci]);
+                            // SRApi.T(zh, en) 两个实参都会求值：两参相同时先拼一次再传。
+                            string hiddenColMsg = SRApi.T("已隐藏列：", "Hidden column: ") + nm;
                             Notes(hiddenColMsg, hiddenColMsg);
                         }
                         handled = true;
@@ -1425,15 +1425,15 @@ namespace SR_UCH.Tweaks {
 
         // 下拉显示名（内部值 -> 界面名）：选项列表与当前选中项共用，避免两处不一致。
         private static string DispName(string key, string v) {
-            if (string.IsNullOrEmpty(v)) return SR.T("全部", "All");
+            if (string.IsNullOrEmpty(v)) return SRApi.T("全部", "All");
             if (key == "Filter Region") return DispRegion(v);
-            if (key == "Filter Mode") return SR.T(v == "OTHER" ? "其它" : v == "FREEPLAY" ? "自由" : v == "CREATIVE" ? "创意" : v == "PARTY" ? "派对" : "挑战",
+            if (key == "Filter Mode") return SRApi.T(v == "OTHER" ? "其它" : v == "FREEPLAY" ? "自由" : v == "CREATIVE" ? "创意" : v == "PARTY" ? "派对" : "挑战",
                                                   v == "FREEPLAY" ? "Freeplay" : v == "CREATIVE" ? "Creative" : v == "PARTY" ? "Party" : "Challenge");
-            if (key == "Filter Tag") return SR.T(v == "Fun" ? "好玩" : v == "Competitive" ? "竞技" : v == "Beginner" ? "新手" : "自定义关卡",
+            if (key == "Filter Tag") return SRApi.T(v == "Fun" ? "好玩" : v == "Competitive" ? "竞技" : v == "Beginner" ? "新手" : "自定义关卡",
                                                  v == "Fun" ? "Fun" : v == "Competitive" ? "Competitive" : v == "Beginner" ? "Beginner" : "Custom levels");
             if (key == "Filter Min Players") return v == "lt4" ? "<4" : "≥" + v;
-            if (key == "Filter AFK") return v == "hide" ? SR.T("隐藏AFK", "hide AFK") : SR.T("仅AFK", "only AFK");
-            if (key == "Filter State") return v == "join" ? SR.T("可加入", "joinable") : v == "full" ? SR.T("人满", "full") : v == "playing" ? SR.T("对局中", "in match") : SR.T("全部", "all");
+            if (key == "Filter AFK") return v == "hide" ? SRApi.T("隐藏AFK", "hide AFK") : SRApi.T("仅AFK", "only AFK");
+            if (key == "Filter State") return v == "join" ? SRApi.T("可加入", "joinable") : v == "full" ? SRApi.T("人满", "full") : v == "playing" ? SRApi.T("对局中", "in match") : SRApi.T("全部", "all");
             return v; // 区域等：值本身就是显示名
         }
 
@@ -1460,7 +1460,7 @@ namespace SR_UCH.Tweaks {
         private static int RegionLangStamp() {
             unchecked {
                 int h = 17;
-                string s = SR.CurrentLanguageId + "|" + SR.LangVer;
+                string s = SRApi.CurrentLanguageId + "|" + SRApi.LangVer;
                 for (int i = 0; i < s.Length; i++) h = h * 31 + s[i];
                 int n = -1;
                 try { if (RelayConstants.AVAILABLE_REGIONS != null) n = RelayConstants.AVAILABLE_REGIONS.Count; } catch { }
@@ -1495,12 +1495,12 @@ namespace SR_UCH.Tweaks {
 
         private static string[] FilterOptions(string key, string[] values) {
             // 语言戳必须带语言 id + 版本号：只用 "en"/"zh" 时从语言包 A 切到 B 戳不变，选项会停在旧译文。
-            string stamp = SR.CurrentLanguageId + SR.LangVer + "|" + (values == null ? "-" : values.Length.ToString());
+            string stamp = SRApi.CurrentLanguageId + SRApi.LangVer + "|" + (values == null ? "-" : values.Length.ToString());
             string[] cached;
             string old;
             if (_optCache.TryGetValue(key, out cached) && _optStamp.TryGetValue(key, out old) && old == stamp) return cached;
             List<string> opts = new List<string>(1 + (values != null ? values.Length : 0));
-            opts.Add(SR.T("全部", "All"));
+            opts.Add(SRApi.T("全部", "All"));
             if (values != null) {
                 for (int i = 0; i < values.Length; i++) opts.Add(DispName(key, values[i]));
             }
@@ -1513,7 +1513,7 @@ namespace SR_UCH.Tweaks {
         // 与 FilterOptions 一一对应的"值"数组（vals[0]="全部"对应空串）。
         private static readonly Dictionary<string, string[]> _optValsCache = new Dictionary<string, string[]>();
         private static string[] FilterVals(string key, string[] values) {
-            string stamp = SR.CurrentLanguageId + SR.LangVer + "|" + (values == null ? "-" : values.Length.ToString());
+            string stamp = SRApi.CurrentLanguageId + SRApi.LangVer + "|" + (values == null ? "-" : values.Length.ToString());
             string[] cached;
             string old;
             if (_optValsCache.TryGetValue(key, out cached) && _optStamp.TryGetValue(key, out old) && old == stamp) return cached;
@@ -1530,10 +1530,10 @@ namespace SR_UCH.Tweaks {
         private static float _filterLabelW = -1f;
         private static string _filterLabelLKey;
         private static float FilterLabelWidth() {
-            string lk = SR.CurrentLanguageId + "|" + SR.LangVer;
+            string lk = SRApi.CurrentLanguageId + "|" + SRApi.LangVer;
             if (_filterLabelW >= 0f && _filterLabelLKey == lk) return _filterLabelW;
             float w = 0f;
-            string[] ls = { SR.T("区域", "Region"), SR.T("模式", "Mode"), SR.T("标签", "Tag"), SR.T("人数", "Players"), SR.T("AFK", "AFK") };
+            string[] ls = { SRApi.T("区域", "Region"), SRApi.T("模式", "Mode"), SRApi.T("标签", "Tag"), SRApi.T("人数", "Players"), SRApi.T("AFK", "AFK") };
             for (int i = 0; i < ls.Length; i++) w = Mathf.Max(w, SR.Ctl.Label.CalcSize(new GUIContent(ls[i])).x);
             _filterLabelW = Mathf.Max(SR.Ctl.Sc(FilterLabelW), w + SR.Ctl.Sc(8));
             _filterLabelLKey = lk;
@@ -1547,7 +1547,7 @@ namespace SR_UCH.Tweaks {
                 float labelW = FilterLabelWidth();
                 float comboW = SR.Ctl.Sc(FilterComboW);
                 GUILayout.BeginHorizontal(GUILayout.Width(labelW + comboW + SR.Ctl.Sc(14)));
-                GUILayout.Label(new GUIContent(SR.T(labelZh, labelEn), SR.T(tipZh, tipEn)), SR.Ctl.Label,
+                GUILayout.Label(new GUIContent(SRApi.T(labelZh, labelEn), SRApi.T(tipZh, tipEn)), SR.Ctl.Label,
                     GUILayout.Width(labelW), GUILayout.Height(SR.Ctl.Sc(26)));
                 // 选项走缓存（见 FilterOptions），不每帧新建 List；改值不带动页面滚动条。
                 string[] opts = FilterOptions(key, values);

@@ -127,29 +127,29 @@ namespace SR_UCH.Tweaks {
         private static bool _linesReady() { return _lines != null; }
 
         private static void SelfReg() {
-            SR.LocSec("Player Tracker", "移动轨迹", null);
+            SRApi.LocSec("Player Tracker", "移动轨迹", null);
             SRApi.Nav("Player Tracker", 20); // 侧栏顺序 20
             // 每个栏目自己声明自己的页面：缺了它只会靠核心兜底分支成页，外部模块无法替换这一页。
             SR.RegisterPage("Player Tracker", Render);
-            SR.LocKey("Player Tracker", "Tracking Length", "轨迹长度", null);
-            SR.LocDesc("Player Tracker", "Tracking Length", "记录多长时间的移动轨迹, 单位是格, 60 格大概一秒.", "How long of a movement trail to record (60 ticks ≈ 1 second)");
-            SR.LocKey("Player Tracker", "Skip Frames", "跳帧数", null);
-            SR.LocDesc("Player Tracker", "Skip Frames", "每跳过几帧才记一个点, 数字越大轨迹越稀.", "Record a point every N frames (higher = sparser trail)");
-            SR.LocKey("Player Tracker", "Line Start Width", "起点宽度", null);
-            SR.LocDesc("Player Tracker", "Line Start Width", "轨迹靠近当前位置那一头有多粗.", "Trail start width (near the current position)");
-            SR.LocKey("Player Tracker", "Line End Width", "终点宽度", null);
-            SR.LocDesc("Player Tracker", "Line End Width", "轨迹最老那一头有多粗.", "Trail end width (at the oldest point)");
-            SR.LocKey("Player Tracker", "Teleport Threshold", "瞬移清除距离", null);
-            SR.LocDesc("Player Tracker", "Teleport Threshold", "一帧里移动超过这个距离就算瞬移, 把画好的线擦掉重画. 不然会拖出一条穿全图的直线. 最小 1.", "Teleport clear distance (units): if a character moves farther than this in one frame (teleport/warp/party-box pick), delete the drawn trail and restart, so no giant line spans the map. Min 1.");
-            SR.LocKey("Player Tracker", "Enabled", "移动轨迹总开关", null);
-            SR.LocDesc("Player Tracker", "Enabled", "在画面上把其他玩家走过的轨迹画出来.", "Master switch: draw movement trails for other players on screen");
+            SRApi.LocKey("Player Tracker", "Tracking Length", "轨迹长度", null);
+            SRApi.LocDesc("Player Tracker", "Tracking Length", "记录多长时间的移动轨迹, 单位是格, 60 格大概一秒.", "How long of a movement trail to record (60 ticks ≈ 1 second)");
+            SRApi.LocKey("Player Tracker", "Skip Frames", "跳帧数", null);
+            SRApi.LocDesc("Player Tracker", "Skip Frames", "每跳过几帧才记一个点, 数字越大轨迹越稀.", "Record a point every N frames (higher = sparser trail)");
+            SRApi.LocKey("Player Tracker", "Line Start Width", "起点宽度", null);
+            SRApi.LocDesc("Player Tracker", "Line Start Width", "轨迹靠近当前位置那一头有多粗.", "Trail start width (near the current position)");
+            SRApi.LocKey("Player Tracker", "Line End Width", "终点宽度", null);
+            SRApi.LocDesc("Player Tracker", "Line End Width", "轨迹最老那一头有多粗.", "Trail end width (at the oldest point)");
+            SRApi.LocKey("Player Tracker", "Teleport Threshold", "瞬移清除距离", null);
+            SRApi.LocDesc("Player Tracker", "Teleport Threshold", "一帧里移动超过这个距离就算瞬移, 把画好的线擦掉重画. 不然会拖出一条穿全图的直线. 最小 1.", "Teleport clear distance (units): if a character moves farther than this in one frame (teleport/warp/party-box pick), delete the drawn trail and restart, so no giant line spans the map. Min 1.");
+            SRApi.LocKey("Player Tracker", "Enabled", "移动轨迹总开关", null);
+            SRApi.LocDesc("Player Tracker", "Enabled", "在画面上把其他玩家走过的轨迹画出来.", "Master switch: draw movement trails for other players on screen");
         }
 
         // 本页内容 = 该段的条目列表。
         private static void Render() {
             try {
                 List<ConfigEntryBase> list = SR.SectionEntries("Player Tracker");
-                if (list == null || list.Count == 0) { GUILayout.Label(SR.T("（无匹配条目）", "(no matching entries)"), SR.Ctl.Label); return; }
+                if (list == null || list.Count == 0) { GUILayout.Label(SRApi.T("（无匹配条目）", "(no matching entries)"), SR.Ctl.Label); return; }
                 SR.RenderSectionEntries("Player Tracker");
             } catch (Exception __ex) { SRApi.Guard.Log("渲染移动轨迹页", __ex); }
         }
@@ -196,8 +196,8 @@ namespace SR_UCH.Tweaks {
                 1f,
                 new ConfigDescription("轨迹透明度（0.05-1，默认 1 = 完全不透明）。调低可让轨迹不遮挡画面。",
                     new AcceptableValueRange<float>(0.05f, 1f)));
-            SR.LocKey("Player Tracker", "Trail Alpha", "轨迹透明度", "Trail opacity");
-            SR.LocDesc("Player Tracker", "Trail Alpha",
+            SRApi.LocKey("Player Tracker", "Trail Alpha", "轨迹透明度", "Trail opacity");
+            SRApi.LocDesc("Player Tracker", "Trail Alpha",
                 "轨迹有多不透明, 0.05 到 1, 默认 1 是完全不透明. 调低就不挡画面.",
                 "Trail opacity (1 = fully opaque).");
             // 宽度只在 CreateLine 里读一次，配置变更时需刷新已存在的线。

@@ -30,16 +30,16 @@ namespace SR_UCH.Tweaks {
             SR.RowCompanions.Add(BuilderCompanion); // 通用条目行扩展点：覆盖项与快捷键同行显示
             SR.RowFilters.Add(BuilderRowVisible);   // 两个开关键位不单独成行
             SR.RegisterPage("build", RenderPage); // 本功能页自绘（含建造上限分区）
-            SR.LocSec("build", "建造", "Build");
+            SRApi.LocSec("build", "建造", "Build");
             SRApi.Nav("build", 50); // 侧栏栏目顺序 50
-            SR.LocKey("build", "Collision Override", "无视碰撞", null);
-            SR.LocDesc("build", "Collision Override", "关掉放置规则, 方块可以互相重叠, 也可以悬空放着, 想放哪放哪.", "Ignore collision: pieces ignore placement rules and can go anywhere (overlap/air/crossing)");
-            SR.LocKey("build", "Collision Toggle Key", "无视碰撞开关", null);
-            SR.LocDesc("build", "Collision Toggle Key", "游戏里按这个键临时开关无视碰撞, 默认 F1.", "Toggle ignore-collision in-game (default F1)");
-            SR.LocKey("build", "Grid Override", "自由放置", null);
-            SR.LocDesc("build", "Grid Override", "把吸附精度从 1 格调到 0.01 格, 放歪一点也能摆. 只改放置取整, 不改玩法和物理, 只在建造阶段生效. 关掉立刻回到整格.", "Free placement: pieces no longer snap to the 1-unit grid - they snap to 0.01 units, so you can fine-tune placement.\nOnly changes placement rounding precision, not gameplay/physics; build phase only.\nNo key needed while on; turning it off restores the standard grid snap.");
-            SR.LocKey("build", "Grid Toggle Key", "自由放置开关", null);
-            SR.LocDesc("build", "Grid Toggle Key", "游戏里按这个键临时开关自由放置, 默认 F2.", "Toggle free placement in-game (default F2)");
+            SRApi.LocKey("build", "Collision Override", "无视碰撞", null);
+            SRApi.LocDesc("build", "Collision Override", "关掉放置规则, 方块可以互相重叠, 也可以悬空放着, 想放哪放哪.", "Ignore collision: pieces ignore placement rules and can go anywhere (overlap/air/crossing)");
+            SRApi.LocKey("build", "Collision Toggle Key", "无视碰撞开关", null);
+            SRApi.LocDesc("build", "Collision Toggle Key", "游戏里按这个键临时开关无视碰撞, 默认 F1.", "Toggle ignore-collision in-game (default F1)");
+            SRApi.LocKey("build", "Grid Override", "自由放置", null);
+            SRApi.LocDesc("build", "Grid Override", "把吸附精度从 1 格调到 0.01 格, 放歪一点也能摆. 只改放置取整, 不改玩法和物理, 只在建造阶段生效. 关掉立刻回到整格.", "Free placement: pieces no longer snap to the 1-unit grid - they snap to 0.01 units, so you can fine-tune placement.\nOnly changes placement rounding precision, not gameplay/physics; build phase only.\nNo key needed while on; turning it off restores the standard grid snap.");
+            SRApi.LocKey("build", "Grid Toggle Key", "自由放置开关", null);
+            SRApi.LocDesc("build", "Grid Toggle Key", "游戏里按这个键临时开关自由放置, 默认 F2.", "Toggle free placement in-game (default F2)");
         }
 
         // 当前生效的满度上限（只读框显示用）：直接读游戏字段，不借其它功能的接口以避免横向依赖。
@@ -73,8 +73,8 @@ namespace SR_UCH.Tweaks {
             // 分区按条目键显式划分，不依赖遍历顺序（SectionEntries 按键名排序，顺序与分区无关）。
 
             // 分区一：建造增强
-            GUILayout.Label(new GUIContent("- " + SR.T("建造", "Build") + " -",
-                SR.T("建造增强：让方块无视放置规则、按更细的网格自由微调摆放。",
+            GUILayout.Label(new GUIContent("- " + SRApi.T("建造", "Build") + " -",
+                SRApi.T("建造增强：让方块无视放置规则、按更细的网格自由微调摆放。",
                      "Build: place pieces ignoring the placement rules and snap on a finer grid.")),
                 SR.Ctl.SecHeader);
             GUILayout.Space(SR.Ctl.Sc(2));
@@ -87,25 +87,25 @@ namespace SR_UCH.Tweaks {
 
             // 分区二：建造上限
             GUILayout.Space(SR.Ctl.Sc(6));
-            GUILayout.Label(new GUIContent("- " + SR.T("建造上限", "Build Limit") + " -",
-                SR.T("建造上限（BuildUnlimiter）：解除树屋保存/发布界面的关卡满度限制，超满的关卡也能正常发布/上传。",
+            GUILayout.Label(new GUIContent("- " + SRApi.T("建造上限", "Build Limit") + " -",
+                SRApi.T("建造上限（BuildUnlimiter）：解除树屋保存/发布界面的关卡满度限制，超满的关卡也能正常发布/上传。",
                      "Build Limit (BuildUnlimiter): lifts the treehouse save/publish fullness cap so over-full levels can be published.")),
                 SR.Ctl.SecHeader);
             GUILayout.Space(SR.Ctl.Sc(2));
             // 该行为手工排版：标签占名称列宽度 + 间隔 6 + 主控件列，与下方两行的编辑框左边缘对齐。
             GUILayout.BeginHorizontal();
             // GUILayout.Label 不会像 RestoreLabel 那样收缩到文字宽度，宽度需按文字实测。
-            float lw = SR.Ctl.Label.CalcSize(new GUIContent(SR.T("当前上限", "Current limit"))).x + SR.Ctl.Sc(12);
-            GUILayout.Label(new GUIContent(SR.T("当前上限", "Current limit"),
-                SR.T("当前生效的满度上限；游戏原版为 500", "The current effective fullness cap; vanilla is 500")),
+            float lw = SR.Ctl.Label.CalcSize(new GUIContent(SRApi.T("当前上限", "Current limit"))).x + SR.Ctl.Sc(12);
+            GUILayout.Label(new GUIContent(SRApi.T("当前上限", "Current limit"),
+                SRApi.T("当前生效的满度上限；游戏原版为 500", "The current effective fullness cap; vanilla is 500")),
                 SR.Ctl.Label, GUILayout.Width(Mathf.Max(SR.Ctl.Sc(60), lw)), GUILayout.Height(SR.Ctl.Sc(26)));
             GUILayout.Space(SR.Ctl.Sc(6));
             bool oldEn = GUI.enabled;
             try {
             GUI.enabled = false;
-            // SR.T(zh, en) 的两个参数都会被求值：前缀为常量、只有末尾数字在变，故字符串只拼一次。
+            // SRApi.T(zh, en) 的两个参数都会被求值：前缀为常量、只有末尾数字在变，故字符串只拼一次。
             int curLimit = CurrentCapShown();
-            GUILayout.TextField(SR.T("当前上限：", "Current: ") + curLimit,
+            GUILayout.TextField(SRApi.T("当前上限：", "Current: ") + curLimit,
                 SR.Ctl.SearchBox, GUILayout.Width(SR.Ctl.Sc(170)), GUILayout.Height(SR.Ctl.Sc(26)));
             } finally { GUI.enabled = oldEn; }
             GUILayout.EndHorizontal();
@@ -124,7 +124,7 @@ namespace SR_UCH.Tweaks {
                 any = true;
                 SR.Ctl.DrawEntryRow(e, col);
             }
-            if (!any) GUILayout.Label(SR.T("（无匹配条目）", "(no matching entries)"), SR.Ctl.Label);
+            if (!any) GUILayout.Label(SRApi.T("（无匹配条目）", "(no matching entries)"), SR.Ctl.Label);
         }
 
         public void Initialize(IFeatureHost plugin) {
@@ -168,12 +168,12 @@ namespace SR_UCH.Tweaks {
             if (!SRApi.GateMaster) return;
             if (!Enabled) return;
             if (SRApi.UiOpen && SRApi.BlockInput) return; 
-            if (SR.ComboKeyDown(_toggleCollisionKey)) { _collisionEntry.Value = !_collisionEntry.Value; Notify(SR.T("无视碰撞", "Collision Override"), _collisionEntry.Value); }
-            if (SR.ComboKeyDown(_toggleGridKey)) { _gridEntry.Value = !_gridEntry.Value; Notify(SR.T("自由放置", "Free Placement"), _gridEntry.Value); }
+            if (SR.ComboKeyDown(_toggleCollisionKey)) { _collisionEntry.Value = !_collisionEntry.Value; Notify(SRApi.T("无视碰撞", "Collision Override"), _collisionEntry.Value); }
+            if (SR.ComboKeyDown(_toggleGridKey)) { _gridEntry.Value = !_gridEntry.Value; Notify(SRApi.T("自由放置", "Free Placement"), _gridEntry.Value); }
         }
 
         private static void Notify(string name, bool state) {
-            SRApi.Notify(name + (state ? SR.T("：开", ": ON") : SR.T("：关", ": OFF")));   // 走核心通道，便于日志追溯
+            SRApi.Notify(name + (state ? SRApi.T("：开", ": ON") : SRApi.T("：关", ": OFF")));   // 走核心通道，便于日志追溯
         }
 
         [HarmonyPatch(typeof(PiecePlacementCursor), "ReceiveEvent")]
@@ -263,10 +263,10 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void SelfReg() {
-            SR.LocKey("build", "Lift Build Cap", "解除建造上限", null);
-            SR.LocDesc("build", "Lift Build Cap", "把关卡满度上限从原版 500 提到下面那个数, 默认 1000000. 装太满的关卡也能发出去. 不用按键, 关掉就回到 500.", "Lift the level fullness cap: the treehouse save/publish cap rises from 500 to the Limit value (default 1000000), so over-full levels can be published.\nWorks from anywhere; turning it off restores 500.");
-            SR.LocKey("build", "Build Cap Value", "上限数值", "Limit Value");
-            SR.LocDesc("build", "Build Cap Value", "满度上限具体填多少, 500 到 10000000, 原版是 500. 改完立刻生效, 越大能放的方块越多.", "Fullness cap value (500 - 10000000; vanilla is 500).\nTakes effect immediately; higher allows more blocks before publish is blocked.");
+            SRApi.LocKey("build", "Lift Build Cap", "解除建造上限", null);
+            SRApi.LocDesc("build", "Lift Build Cap", "把关卡满度上限从原版 500 提到下面那个数, 默认 1000000. 装太满的关卡也能发出去. 不用按键, 关掉就回到 500.", "Lift the level fullness cap: the treehouse save/publish cap rises from 500 to the Limit value (default 1000000), so over-full levels can be published.\nWorks from anywhere; turning it off restores 500.");
+            SRApi.LocKey("build", "Build Cap Value", "上限数值", "Limit Value");
+            SRApi.LocDesc("build", "Build Cap Value", "满度上限具体填多少, 500 到 10000000, 原版是 500. 改完立刻生效, 越大能放的方块越多.", "Fullness cap value (500 - 10000000; vanilla is 500).\nTakes effect immediately; higher allows more blocks before publish is blocked.");
         }
 
         public void Initialize(IFeatureHost plugin) {

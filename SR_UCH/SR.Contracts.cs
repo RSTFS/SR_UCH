@@ -202,6 +202,41 @@ namespace SR_UCH {
             try { Notify(string.Format(text, args)); } catch { Notify(text); }
         }
 
+        // 本地化门面：语言引擎（语言包 / 词条表 / 缓存）留在核心，契约层只转发，行为不变。
+        private static Func<string, string, string> _t;
+        private static Action<string, string> _locSec2;
+        private static Action<string, string, string> _locSec3;
+        private static Action<string, string, string, string> _locKey, _locDesc;
+        private static Action<string, string> _locEnum;
+        private static Func<string> _currentLanguageId;
+        private static Func<int> _langVer;
+        private static Action<string, string, object[]> _notifyT;
+        public static void SetLangSinks(Func<string, string, string> t,
+                                        Action<string, string> locSec2, Action<string, string, string> locSec3,
+                                        Action<string, string, string, string> locKey,
+                                        Action<string, string, string, string> locDesc,
+                                        Action<string, string> locEnum,
+                                        Func<string> currentLanguageId, Func<int> langVer,
+                                        Action<string, string, object[]> notifyT) {
+            _t = t; _locSec2 = locSec2; _locSec3 = locSec3; _locKey = locKey; _locDesc = locDesc;
+            _locEnum = locEnum; _currentLanguageId = currentLanguageId; _langVer = langVer; _notifyT = notifyT;
+        }
+        // 取译文：zh 为源码中文原文，en 为英文回退
+        public static string T(string zh, string en) { Func<string, string, string> f = _t; return f != null ? f(zh, en) : zh; }
+        // 本地化注册：栏目 / 键名 / 描述 / 枚举值
+        public static void LocSec(string sec, string zh) { Action<string, string> f = _locSec2; if (f != null) f(sec, zh); }
+        public static void LocSec(string sec, string zh, string en) { Action<string, string, string> f = _locSec3; if (f != null) f(sec, zh, en); }
+        public static void LocKey(string sec, string key, string zh, string en) { Action<string, string, string, string> f = _locKey; if (f != null) f(sec, key, zh, en); }
+        public static void LocDesc(string sec, string key, string zh, string en) { Action<string, string, string, string> f = _locDesc; if (f != null) f(sec, key, zh, en); }
+        public static void LocEnum(string name, string zh) { Action<string, string> f = _locEnum; if (f != null) f(name, zh); }
+        public static string CurrentLanguageId { get { Func<string> f = _currentLanguageId; return f != null ? f() : "English"; } }
+        public static int LangVer { get { Func<int> f = _langVer; return f != null ? f() : 0; } }
+        public static void NotifyT(string zh, string en, params object[] args) {
+            Action<string, string, object[]> f = _notifyT;
+            if (f != null) f(zh, en, args);
+            else Notify(string.Format(T(zh, en), args ?? new object[0]));
+        }
+
         // 门控/UI 状态门面：状态在核心，契约层只读（provider 注入）。
         public const int ApiVersion = 3;   //与核心 SR.ApiVersion 同步
         private static Func<bool> _hasServer, _gateMaster, _gateHost, _canControl, _canDoHost, _uiOpen, _blockInput, _blockWindowDrag;

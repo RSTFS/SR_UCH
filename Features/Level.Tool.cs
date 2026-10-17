@@ -17,24 +17,24 @@ public partial class Level {
 
 
     public static void RenderTools() {
-        GUILayout.Label(SR.T("- 关卡工具 -", "- Level tools -"), SR.Ctl.SecHeader);
+        GUILayout.Label(SRApi.T("- 关卡工具 -", "- Level tools -"), SR.Ctl.SecHeader);
         GUILayout.BeginHorizontal();
-        if (SR.Ctl.HotkeyButton("level.reload", SR.T("重载关卡", "Reload level"),
-            SR.T("房主把当前看到的方块都写进关卡快照, 然后真的重载一次当前关卡, 全员一起重新加载.\n重载完按快照把方块重建出来并广播, 玩家放的方块和能动的道具都不会丢.\n要不要顺手把分数补回来, 看下面那个重载模式.\n 只在派对和创意模式的对局里生效, 而且只有房主能用.", "Host writes the current blocks into the snapshot and really reloads the level scene, so everyone reloads.\nBlocks are rebuilt from the snapshot and nothing is lost.\nWhether the score is filled back depends on the Reload mode below.\n Party/Creative matches only, host only."),
+        if (SR.Ctl.HotkeyButton("level.reload", SRApi.T("重载关卡", "Reload level"),
+            SRApi.T("房主把当前看到的方块都写进关卡快照, 然后真的重载一次当前关卡, 全员一起重新加载.\n重载完按快照把方块重建出来并广播, 玩家放的方块和能动的道具都不会丢.\n要不要顺手把分数补回来, 看下面那个重载模式.\n 只在派对和创意模式的对局里生效, 而且只有房主能用.", "Host writes the current blocks into the snapshot and really reloads the level scene, so everyone reloads.\nBlocks are rebuilt from the snapshot and nothing is lost.\nWhether the score is filled back depends on the Reload mode below.\n Party/Creative matches only, host only."),
             () => Level.ReloadLevel(), SR.Ctl.Sc(170), SR.Ctl.Sc(30))) {
             Level.ReloadLevel();
         }
         ConfigEntryBase rlm = SR.Ctl.FindEntry("Level", "Reload Mode");
-        SR.Ctl.RestoreLabel(new GUIContent(SR.T("重载模式", "Reload mode"),
-            SR.T("重载关卡模式：\n保留方块和分数（允许补分）= 重载后当前方块保留；房主按原类型分块给全员广播补分，下一回合结算时全员得分板显示与重载前一致的分数和类型。\n仅保留方块（跳过补分）= 重载后当前方块保留，分数重置。", "Reload level mode:\nKeep blocks & score (allow fill) = blocks kept; the host fills scores so everyone sees the same score/types next tally.\nKeep blocks only (skip fill) = blocks kept, score resets.")),
+        SR.Ctl.RestoreLabel(new GUIContent(SRApi.T("重载模式", "Reload mode"),
+            SRApi.T("重载关卡模式：\n保留方块和分数（允许补分）= 重载后当前方块保留；房主按原类型分块给全员广播补分，下一回合结算时全员得分板显示与重载前一致的分数和类型。\n仅保留方块（跳过补分）= 重载后当前方块保留，分数重置。", "Reload level mode:\nKeep blocks & score (allow fill) = blocks kept; the host fills scores so everyone sees the same score/types next tally.\nKeep blocks only (skip fill) = blocks kept, score resets.")),
             rlm, SR.Ctl.Sc(140), SR.Ctl.Sc(52));
         if (rlm != null) SR.Ctl.RenderControl(rlm);
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         GUILayout.Space(SR.Ctl.Sc(2));
         GUILayout.BeginHorizontal();
-        if (SR.Ctl.HotkeyButton("level.broadcast", SR.T("广播方块快照", "Broadcast snapshot"),
-            SR.T("房主把当前看到的方块连位置, 旋转和属性一起打包广播出去, 全员按房主那边的样子重建方块.\n局内偶尔出现的方块自己这边看不见或者不同步, 就用这个修.\n不会重载场景: 对局进度和分数都留着, 全员会卡一下, 然后方块就回来了.\n 只在派对和创意模式的对局里生效, 而且只有房主能用.", "Host packages the blocks they see and broadcasts them, so everyone rebuilds from the host snapshot.\nUse this when blocks occasionally disappear or desync on your side mid-match.\nNo scene reload: progress and scores stay.\n Party/Creative matches only, host only."),
+        if (SR.Ctl.HotkeyButton("level.broadcast", SRApi.T("广播方块快照", "Broadcast snapshot"),
+            SRApi.T("房主把当前看到的方块连位置, 旋转和属性一起打包广播出去, 全员按房主那边的样子重建方块.\n局内偶尔出现的方块自己这边看不见或者不同步, 就用这个修.\n不会重载场景: 对局进度和分数都留着, 全员会卡一下, 然后方块就回来了.\n 只在派对和创意模式的对局里生效, 而且只有房主能用.", "Host packages the blocks they see and broadcasts them, so everyone rebuilds from the host snapshot.\nUse this when blocks occasionally disappear or desync on your side mid-match.\nNo scene reload: progress and scores stay.\n Party/Creative matches only, host only."),
             () => Level.BroadcastSnapshot(), SR.Ctl.Sc(170), SR.Ctl.Sc(30))) {
             Level.BroadcastSnapshot();
         }
@@ -74,7 +74,7 @@ public partial class Level {
 				SRApi.LogWarn("[重载] 检测到残留的忙碌锁（超过 45 秒未复位），已自动放锁");
 				return false;
 			}
-			SRApi.Notify(SR.T("重载进行中，请稍候", "Reload in progress"));
+			SRApi.Notify(SRApi.T("重载进行中，请稍候", "Reload in progress"));
 			return true;
 		}
 
@@ -97,7 +97,7 @@ public partial class Level {
 		// 仅房主可调用（ReloadScene 是服务器操作），仅派对 / 创意 / 自由建造关卡内生效。
 		public static void ReloadLevel()
 		{
-			ReloadLevelImpl(SR.T("重载关卡", "Reload Level"));
+			ReloadLevelImpl(SRApi.T("重载关卡", "Reload Level"));
 		}
 
 		// 重载关卡实现：模式限制 + 快照写入 levelPortalXml。
@@ -114,49 +114,49 @@ public partial class Level {
 				}
 				if (!IsPartyCreativeOrFreeplay())
 				{
-					SRApi.Notify(feature + SR.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
+					SRApi.Notify(feature + SRApi.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
 					return;
 				}
 				// 房主判定走统一门控 GateHost（= IsHost || OverrideHost）
 				if (!SRApi.GateHost)
 				{
-					SR.NotifyT("仅房主可执行：", "Host only: ", feature);
+					SRApi.NotifyT("仅房主可执行：", "Host only: ", feature);
 					return;
 				}
 				// 必须服务器权威：GateHost 会放行开了无视房主限制的房客，但 NetworkServer.SendToAll 与 ReloadScene / CompressAndSendSnapshotBytes 在客户端都不执行，会假成功。
 				if (!NetworkServer.active)
 				{
-					SR.NotifyT("仅房主可执行：", "Host only: ", feature);
+					SRApi.NotifyT("仅房主可执行：", "Host only: ", feature);
 					return;
 				}
 				LobbyManager lm = LobbyManager.instance;
 				if ((UnityEngine.Object)(object)lm == (UnityEngine.Object)null)
 				{
-					SRApi.Notify(SR.T("当前不在对局中", "Not in a match"));
+					SRApi.Notify(SRApi.T("当前不在对局中", "Not in a match"));
 					return;
 				}
 				GameControl gc = lm.CurrentGameController as GameControl;
 				if ((UnityEngine.Object)(object)gc == (UnityEngine.Object)null)
 				{
-					SRApi.Notify(SR.T("未进入有效对局", "No active match"));
+					SRApi.Notify(SRApi.T("未进入有效对局", "No active match"));
 					return;
 				}
 				QuickSaver qs = gc.GetComponent<QuickSaver>();
 				if ((UnityEngine.Object)(object)qs == (UnityEngine.Object)null)
 				{
-					SRApi.Notify(SR.T("当前对局不支持该操作", "Unsupported in the current match"));
+					SRApi.Notify(SRApi.T("当前对局不支持该操作", "Unsupported in the current match"));
 					return;
 				}
 				GameState gs = GameState.GetInstance();
 				if (gs == null)
 				{
-					SRApi.Notify(SR.T("游戏状态尚未就绪", "Game state not ready"));
+					SRApi.Notify(SRApi.T("游戏状态尚未就绪", "Game state not ready"));
 					return;
 				}
 				if (ReloadBlocked()) return; // 含锁残留自愈
 				// 快照刚广播过（3 秒内）先别重载，等方块重建落定
 				if (Time.unscaledTime - _lastSnapshotAt < 3f) {
-					SRApi.Notify(SR.T("快照刚广播，请稍后重载", "Snapshot just broadcast; retry later"));
+					SRApi.Notify(SRApi.T("快照刚广播，请稍后重载", "Snapshot just broadcast; retry later"));
 					return;
 				}
 				SetReloadBusy(true);
@@ -166,7 +166,7 @@ public partial class Level {
 				if (doc == null || string.IsNullOrEmpty(doc.OuterXml))
 				{
 					SetReloadBusy(false); // 失败路径复位
-					SRApi.Notify(SR.T("当前场景没有可同步的方块", "No blocks to sync in the current scene"));
+					SRApi.Notify(SRApi.T("当前场景没有可同步的方块", "No blocks to sync in the current scene"));
 					return;
 				}
 				try
@@ -176,7 +176,7 @@ public partial class Level {
 				catch
 				{
 					SetReloadBusy(false); // 失败路径复位
-					SRApi.Notify(SR.T("快照写入失败", "Failed to write the snapshot"));
+					SRApi.Notify(SRApi.T("快照写入失败", "Failed to write the snapshot"));
 					return;
 				}
 				// KeepScore 先置保分标志：重载后按原类型广播补分，下回合结算显示；KeepBlocksOnly 不置标志，分数重置。
@@ -185,7 +185,7 @@ public partial class Level {
 				GameSettings gsForMode = GameSettings.GetInstance();
 				if (gsForMode == null)
 				{
-					SRApi.Notify(SR.T("游戏加载中，请稍后再试",
+					SRApi.Notify(SRApi.T("游戏加载中，请稍后再试",
 						"Still loading; try again later"));
 					SetReloadBusy(false);
 					return;
@@ -239,12 +239,12 @@ public partial class Level {
 			}
 			if (ok)
 			{
-				SRApi.Notify(feature + SR.T("：重载中，方块保留，", ": reloading, blocks kept, ") +
-					(ReloadKeepsScore ? SR.T("分数保留", "scores kept") : SR.T("分数重置", "scores reset")));
+				SRApi.Notify(feature + SRApi.T("：重载中，方块保留，", ": reloading, blocks kept, ") +
+					(ReloadKeepsScore ? SRApi.T("分数保留", "scores kept") : SRApi.T("分数重置", "scores reset")));
 			}
 			else
 			{
-				SRApi.Notify(feature + SR.T("：重载失败", ": reload failed"));
+				SRApi.Notify(feature + SRApi.T("：重载失败", ": reload failed"));
 			}
 			_reloadStartedAt = Time.unscaledTime;
 			_reloadLoadedAt = -1f; // 等待 LoadingInterstitialSplash.FadeOut 置位
@@ -281,7 +281,7 @@ public partial class Level {
 		// 广播方块快照：房主重发当前关卡快照，全员按房主视角重建方块。
 		public static void BroadcastSnapshot()
 		{
-			RebuildBlocksFromHost(SR.T("广播方块快照", "Broadcast Snapshot"));
+			RebuildBlocksFromHost(SRApi.T("广播方块快照", "Broadcast Snapshot"));
 		}
 
 		// 生成房主当前快照并经 CompressAndSendSnapshotBytes 广播，全员按房主视角重建；不重载场景，分数保留；仅房主可调用。
@@ -296,55 +296,55 @@ public partial class Level {
 				}
 				if (!IsPartyCreativeOrFreeplay())
 				{
-					SRApi.Notify(feature + SR.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
+					SRApi.Notify(feature + SRApi.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
 					return;
 				}
 				// 房主判定走统一门控 GateHost（= IsHost || OverrideHost）
 				if (!SRApi.GateHost)
 				{
-					SR.NotifyT("仅房主可执行：", "Host only: ", feature);
+					SRApi.NotifyT("仅房主可执行：", "Host only: ", feature);
 					return;
 				}
 				// 必须服务器权威：GateHost 会放行开了无视房主限制的房客，但 SendToAll 与 CompressAndSendSnapshotBytes 在客户端都不执行，会假成功。
 				if (!NetworkServer.active)
 				{
-					SR.NotifyT("仅房主可执行：", "Host only: ", feature);
+					SRApi.NotifyT("仅房主可执行：", "Host only: ", feature);
 					return;
 				}
 				LobbyManager lm = LobbyManager.instance;
 				if ((UnityEngine.Object)(object)lm == (UnityEngine.Object)null)
 				{
-					SRApi.Notify(SR.T("当前不在对局中", "Not in a match"));
+					SRApi.Notify(SRApi.T("当前不在对局中", "Not in a match"));
 					return;
 				}
 				GameControl gc = lm.CurrentGameController as GameControl;
 				if ((UnityEngine.Object)(object)gc == (UnityEngine.Object)null)
 				{
-					SRApi.Notify(SR.T("未进入有效对局", "No active match"));
+					SRApi.Notify(SRApi.T("未进入有效对局", "No active match"));
 					return;
 				}
 				QuickSaver qs = gc.GetComponent<QuickSaver>();
 				if ((UnityEngine.Object)(object)qs == (UnityEngine.Object)null)
 				{
-					SRApi.Notify(SR.T("当前对局不支持该操作", "Unsupported in the current match"));
+					SRApi.Notify(SRApi.T("当前对局不支持该操作", "Unsupported in the current match"));
 					return;
 				}
 				// 重载进行中不放广播快照（与场景重载共用同一把锁）
 				if (ReloadBlocked()) return; // 含锁残留自愈
 				float _now = Time.unscaledTime;
-				if (_now - _lastSnapshotAt < 3f) { SRApi.Notify(SR.T("快照广播冷却中，请稍后", "Snapshot broadcast on cooldown")); return; }
+				if (_now - _lastSnapshotAt < 3f) { SRApi.Notify(SRApi.T("快照广播冷却中，请稍后", "Snapshot broadcast on cooldown")); return; }
 				_lastSnapshotAt = _now;
 				// 生成房主当前视角的完整快照 XML（含位置/旋转/缩放/胶水 parentID/mainID 等属性）
 				System.Xml.XmlDocument doc = qs.GetCurrentXmlSnapshot(false);
 				if (doc == null)
 				{
-					SRApi.Notify(SR.T("快照生成失败", "Failed to generate the snapshot"));
+					SRApi.Notify(SRApi.T("快照生成失败", "Failed to generate the snapshot"));
 					return;
 				}
 				string xml = doc.OuterXml;
 				if (string.IsNullOrEmpty(xml))
 				{
-					SRApi.Notify(SR.T("快照内容为空", "The snapshot is empty"));
+					SRApi.Notify(SRApi.T("快照内容为空", "The snapshot is empty"));
 					return;
 				}
 				// 走游戏原生机制广播：房主压缩 -> RPC 全员 -> LoadSnapshotFromXmlDocument 重建；不重载场景，分数保留。
@@ -392,14 +392,14 @@ public partial class Level {
 		{
 			// 打 srSnapshot 标记：客户端据此只在 SR 的快照上补发阶段事件，不碰游戏自己的开局/重载路径。
 			xml = MarkSnapshotXml(xml);
-			if (xml.Length > 1500000) SRApi.Notify(SR.T("快照较大（" + (xml.Length / 1000) + " KB），应用时可能卡顿", "Large snapshot (" + (xml.Length / 1000) + " KB); may hitch"));
+			if (xml.Length > 1500000) SRApi.Notify(SRApi.T("快照较大（" + (xml.Length / 1000) + " KB），应用时可能卡顿", "Large snapshot (" + (xml.Length / 1000) + " KB); may hitch"));
 			System.Diagnostics.Stopwatch _sw = new System.Diagnostics.Stopwatch(); _sw.Start();
 			byte[] xmlBytes = Encoding.UTF8.GetBytes(xml);
 			_sw.Stop();
 			SRApi.LogInfo("[快照] 序列化耗时 " + _sw.ElapsedMilliseconds + "ms");
-			SRApi.Notify(feature + SR.T("：广播快照（", ": broadcasting (") + xmlBytes.Length + SR.T(" 字节），全员按房主状态重建", " bytes), everyone rebuilds from the host's state"));
+			SRApi.Notify(feature + SRApi.T("：广播快照（", ": broadcasting (") + xmlBytes.Length + SRApi.T(" 字节），全员按房主状态重建", " bytes), everyone rebuilds from the host's state"));
 			gc.CompressAndSendSnapshotBytes(xmlBytes, delegate {
-				SRApi.Notify(feature + SR.T("：方块已重建，分数保留", ": blocks rebuilt, scores kept"));
+				SRApi.Notify(feature + SRApi.T("：方块已重建，分数保留", ": blocks rebuilt, scores kept"));
 			});
 			// CompressAndSendSnapshotBytes 走 ClientRpc，不在房主本地执行，故这里补一次本地应用。
 			try {
@@ -413,7 +413,7 @@ public partial class Level {
 					_srSnapshotLoad = true;
 					try {
 						if (!selfQs.LoadSnapshotFromXmlDocument(selfDoc))
-							SRApi.Notify(SR.T("本地应用快照失败", "Failed to apply the snapshot locally"));
+							SRApi.Notify(SRApi.T("本地应用快照失败", "Failed to apply the snapshot locally"));
 					} finally { _srSnapshotLoad = false; }
 				}
 			} catch (Exception __ex) { SRApi.Guard.Log("本地应用快照", __ex); }
@@ -431,36 +431,36 @@ public partial class Level {
 			}
 			if (!IsPartyCreativeOrFreeplay())
 			{
-				SRApi.Notify(feature + SR.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
+				SRApi.Notify(feature + SRApi.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
 				return false;
 			}
 			if (!SRApi.GateHost)
 			{
-				SR.NotifyT("仅房主可执行：", "Host only: ", feature);
+				SRApi.NotifyT("仅房主可执行：", "Host only: ", feature);
 				return false;
 			}
 			// 服务器权威守卫：房客开了无视房主限制也会被放行到这里。
 			if (!NetworkServer.active)
 			{
-				SR.NotifyT("仅房主可执行：", "Host only: ", feature);
+				SRApi.NotifyT("仅房主可执行：", "Host only: ", feature);
 				return false;
 			}
 			LobbyManager lm = LobbyManager.instance;
 			if ((UnityEngine.Object)(object)lm == (UnityEngine.Object)null)
 			{
-				SRApi.Notify(SR.T("当前不在对局中", "Not in a match"));
+				SRApi.Notify(SRApi.T("当前不在对局中", "Not in a match"));
 				return false;
 			}
 			GameControl g = lm.CurrentGameController as GameControl;
 			if ((UnityEngine.Object)(object)g == (UnityEngine.Object)null)
 			{
-				SRApi.Notify(SR.T("未进入有效对局", "No active match"));
+				SRApi.Notify(SRApi.T("未进入有效对局", "No active match"));
 				return false;
 			}
 			QuickSaver q = g.GetComponent<QuickSaver>();
 			if ((UnityEngine.Object)(object)q == (UnityEngine.Object)null)
 			{
-				SRApi.Notify(SR.T("当前对局不支持该操作", "Unsupported in the current match"));
+				SRApi.Notify(SRApi.T("当前对局不支持该操作", "Unsupported in the current match"));
 				return false;
 			}
 			if (ReloadBlocked()) return false; // 含锁残留自愈
@@ -493,7 +493,7 @@ public partial class Level {
 		// 清除玩家放置的方块（全员可见，房客也能用）：逐块网络销毁，不走 <destroyed> 快照路径。
 		public static void ClearPlacedBlocks(List<Placeable> targets, string feature) {
 			try {
-				if (targets == null || targets.Count == 0) { SRApi.Notify(SR.T("地图上没有玩家放置的道具", "No player-placed props on the map")); return; }
+				if (targets == null || targets.Count == 0) { SRApi.Notify(SRApi.T("地图上没有玩家放置的道具", "No player-placed props on the map")); return; }
 				GameControl gc; QuickSaver qs;
 				if (!TryGetSnapshotContext(feature, out gc, out qs)) return;
 				FallbackClearPlacedBlocks(targets); // 直接逐块网络销毁（不用快照）

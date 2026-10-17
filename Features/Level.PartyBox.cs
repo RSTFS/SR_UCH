@@ -19,17 +19,17 @@ public partial class Level {
         });
 
         // 派对盒炸弹：对局内所有成员都发过炸弹！快捷短语才生成
-        GUILayout.Label(SR.T("- 派对盒子炸弹 -", "- Party-box bomb -"), SR.Ctl.SecHeader);
+        GUILayout.Label(SRApi.T("- 派对盒子炸弹 -", "- Party-box bomb -"), SR.Ctl.SecHeader);
         GUILayout.BeginHorizontal();
         ConfigEntryBase pbe = SR.Ctl.FindEntry("Level", "Party Bomb"); // Bind 在 Level 段，查 [EX] 段取不到
-        SR.Ctl.RestoreLabel(new GUIContent(SR.T("派对盒子炸弹", "Party-box bomb"), SR.T("房主开启后，对局内所有成员都发过炸弹！快捷短语时，往当前派对盒子塞入炸弹。", "Host on: when every member sends the Bomb quick-phrase, spawn a bomb in the current party box.")), pbe, SR.Ctl.Sc(140), SR.Ctl.Sc(40));
+        SR.Ctl.RestoreLabel(new GUIContent(SRApi.T("派对盒子炸弹", "Party-box bomb"), SRApi.T("房主开启后，对局内所有成员都发过炸弹！快捷短语时，往当前派对盒子塞入炸弹。", "Host on: when every member sends the Bomb quick-phrase, spawn a bomb in the current party box.")), pbe, SR.Ctl.Sc(140), SR.Ctl.Sc(40));
         if (pbe != null) SR.Ctl.RenderControl(pbe);
         GUILayout.Space(SR.Ctl.Sc(10));
-        GUILayout.Label(SR.T("炸弹种类", "Bomb type"), SR.Ctl.Label, GUILayout.Height(SR.Ctl.Sc(26)));
+        GUILayout.Label(SRApi.T("炸弹种类", "Bomb type"), SR.Ctl.Label, GUILayout.Height(SR.Ctl.Sc(26)));
         ConfigEntryBase pbtype = SR.Ctl.FindEntry("Level", "Party Bomb Type");
         if (pbtype != null) {
             // 三档：0 小 / 1 大 / 2 超级（对应游戏内 99abombmini / 99bomb / 99bbombmega）
-            string[] opts = new[] { SR.T("小炸弹", "Small"), SR.T("大炸弹", "Big"), SR.T("超级炸弹", "Mega") };
+            string[] opts = new[] { SRApi.T("小炸弹", "Small"), SRApi.T("大炸弹", "Big"), SRApi.T("超级炸弹", "Mega") };
             int curIdx = Mathf.Clamp((int)pbtype.BoxedValue, 0, 2);
             bool open; if (!SR.Ctl.EditOpen.TryGetValue(pbtype, out open)) open = false;
             int pbSel = SR.Ctl.ComboBox(pbtype, opts[curIdx], BombTypeVals, opts, ref open, SR.Ctl.Sc(150));
@@ -40,16 +40,16 @@ public partial class Level {
         GUILayout.EndHorizontal();
         GUILayout.Space(SR.Ctl.Sc(2));
 
-        GUILayout.Label(SR.T("- 派对盒（重抽 / 开箱 / 关闭）-", "- Party box -"), SR.Ctl.SecHeader);
+        GUILayout.Label(SRApi.T("- 派对盒（重抽 / 开箱 / 关闭）-", "- Party box -"), SR.Ctl.SecHeader);
         GUILayout.BeginHorizontal();
-        if (SR.Ctl.HotkeyActionButton(SR.T("刷新派对盒", "Reroll + reopen box"), SR.T("完整重走一遍游戏自己的派对盒流程：按本轮权重重抽道具 + 重新开箱（全员可再选一次）", "Run the game own party-box flow again: reroll with this round weights and reopen the box so everyone can pick again"), LevelPartyBox.RefreshPartyBoxKeyEntry, SR.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBox();
+        if (SR.Ctl.HotkeyActionButton(SRApi.T("刷新派对盒", "Reroll + reopen box"), SRApi.T("完整重走一遍游戏自己的派对盒流程：按本轮权重重抽道具 + 重新开箱（全员可再选一次）", "Run the game own party-box flow again: reroll with this round weights and reopen the box so everyone can pick again"), LevelPartyBox.RefreshPartyBoxKeyEntry, SR.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBox();
         GUILayout.Space(SR.Ctl.Sc(8));
-        if (SR.Ctl.HotkeyActionButton(SR.T("刷新道具", "Reroll items"), SR.T("只重抽派对盒里的道具，不重新开箱、不切换相位", "Only reroll the items; no reopen and no phase change"), LevelPartyBox.RefreshPiecesKeyEntry, SR.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBoxPieces();
+        if (SR.Ctl.HotkeyActionButton(SRApi.T("刷新道具", "Reroll items"), SRApi.T("只重抽派对盒里的道具，不重新开箱、不切换相位", "Only reroll the items; no reopen and no phase change"), LevelPartyBox.RefreshPiecesKeyEntry, SR.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBoxPieces();
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         GUILayout.Space(SR.Ctl.Sc(6));
         GUILayout.BeginHorizontal();
-        if (SR.Ctl.HotkeyActionButton(SR.T("关闭派对盒", "Close party box"), SR.T("结束派对盒选择，进入游玩阶段（走游戏原生相位切换，全员同步）", "End the party-box selection and enter the play phase (native phase change, synced)"), LevelPartyBox.ClosePartyBoxKeyEntry, SR.Ctl.Sc(150), true)) LevelPartyBox.ClosePartyBox();
+        if (SR.Ctl.HotkeyActionButton(SRApi.T("关闭派对盒", "Close party box"), SRApi.T("结束派对盒选择，进入游玩阶段（走游戏原生相位切换，全员同步）", "End the party-box selection and enter the play phase (native phase change, synced)"), LevelPartyBox.ClosePartyBoxKeyEntry, SR.Ctl.Sc(150), true)) LevelPartyBox.ClosePartyBox();
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         GUILayout.Space(SR.Ctl.Sc(4));
@@ -216,8 +216,8 @@ public partial class Level {
 
         public void Initialize(IFeatureHost plugin) {
             try {
-                SR.LocKey("Level", "Drop Held Piece", "放弃道具", "Drop held piece");
-                SR.LocDesc("Level", "Drop Held Piece",
+                SRApi.LocKey("Level", "Drop Held Piece", "放弃道具", "Drop held piece");
+                SRApi.LocDesc("Level", "Drop Held Piece",
                     "排队模式里手上拿着道具又不想放了, 按这个键丢掉. 走游戏自己的通道, 全员都能看到, 之后正常进下一阶段.",
                     "In the queue phase, press this to discard the piece you are holding. Goes through the game's own channel; everyone sees it.");
                 _key = plugin.Config.Bind("Level", "Drop Held Piece", KeyCode.None,
@@ -238,14 +238,14 @@ public partial class Level {
             try {
                 if (!SRApi.GateMaster) return;
                 PiecePlacementCursor c = FindCursor();
-                if (c == null) { SRApi.Notify(SR.T("未找到放置光标", "Placement cursor not found")); return; }
-                if (c.Piece == null) { SRApi.Notify(SR.T("手上没有方块", "No piece in hand")); return; }
+                if (c == null) { SRApi.Notify(SRApi.T("未找到放置光标", "Placement cursor not found")); return; }
+                if (c.Piece == null) { SRApi.Notify(SRApi.T("手上没有方块", "No piece in hand")); return; }
                 if (!CallNativeRemoveUnplaced()) {
-                    SRApi.Notify(SR.T("放弃失败", "Failed to drop the piece"));
+                    SRApi.Notify(SRApi.T("放弃失败", "Failed to drop the piece"));
                     SRApi.LogWarn("[放弃道具] 原生放弃接口不可用");
                     return;
                 }
-                SRApi.Notify(SR.T("已放弃当前方块", "Piece dropped"));
+                SRApi.Notify(SRApi.T("已放弃当前方块", "Piece dropped"));
             } catch (Exception __ex) { SRApi.Guard.Log("放弃道具", __ex); }
         }
 
@@ -347,9 +347,9 @@ public class LevelPartyBox : ITweak {
         public static void RefreshPartyBox() {
             try {
                 VersusControl vc = UnityEngine.Object.FindObjectOfType<VersusControl>();
-                if (vc == null) { SRApi.Notify(SR.T("请先进入派对模式对局", "Not in a party match")); return; }
+                if (vc == null) { SRApi.Notify(SRApi.T("请先进入派对模式对局", "Not in a party match")); return; }
                 PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
-                if (pb == null) { SRApi.Notify(SR.T("未找到派对盒", "Party box not found")); return; }
+                if (pb == null) { SRApi.Notify(SRApi.T("未找到派对盒", "Party box not found")); return; }
                 // 权限判定走 SRApi.CanDoHost()：道具由房主端生成并需服务器广播，提示文案由 SR 统一给出。
                 if (!SRApi.CanDoHost()) return;
                 int oldPieces = DestroyPartyBoxPieces(pb); // 旧道具必须广播销毁：ChoosePieces 内部的 ClearPieces 只用 Object.Destroy
@@ -357,7 +357,7 @@ public class LevelPartyBox : ITweak {
                 if (show != null) {
                     show.Invoke(vc, null);
                     try { vc.CallRpcShowPartyBox(); } catch (System.Exception __ex) { SRApi.LogWarn("重新开箱(通知客户端)失败: " + __ex.Message); }
-                    SRApi.Notify(SR.T("已重抽道具并重新开箱", "Rerolled the items and reopened the box"));
+                    SRApi.Notify(SRApi.T("已重抽道具并重新开箱", "Rerolled the items and reopened the box"));
                 } else {
                     FallbackRefresh(pb, oldPieces); // 兜底：找不到 showPartyBox 时手工走同样两步
                 }
@@ -393,14 +393,14 @@ public class LevelPartyBox : ITweak {
         internal static void RefreshPartyBoxPieces() {
             try {
                 VersusControl vc = UnityEngine.Object.FindObjectOfType<VersusControl>();
-                if (vc == null) { SRApi.Notify(SR.T("请先进入派对模式对局", "Not in a party match")); return; }
+                if (vc == null) { SRApi.Notify(SRApi.T("请先进入派对模式对局", "Not in a party match")); return; }
                 PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
-                if (pb == null) { SRApi.Notify(SR.T("未找到派对盒", "Party box not found")); return; }
+                if (pb == null) { SRApi.Notify(SRApi.T("未找到派对盒", "Party box not found")); return; }
                 if (!SRApi.CanDoHost()) return; // 重建道具同样需要服务器权限
                 int oldPieces = DestroyPartyBoxPieces(pb);
                 int amount = oldPieces > 0 ? oldPieces : 1;
                 pb.ChoosePieces(amount, null);
-                SRApi.Notify(SR.T("已刷新派对盒道具（", "Rerolled the party box items (") + amount + SR.T(" 件）", " items)"));
+                SRApi.Notify(SRApi.T("已刷新派对盒道具（", "Rerolled the party box items (") + amount + SRApi.T(" 件）", " items)"));
             } catch (System.Exception e) { SRApi.LogWarn("刷新派对盒道具失败: " + e.Message); }
         }
 
@@ -410,7 +410,7 @@ public class LevelPartyBox : ITweak {
         internal static void ClosePartyBox() {
             try {
                 VersusControl vc = UnityEngine.Object.FindObjectOfType<VersusControl>();
-                if (vc == null) { SRApi.Notify(SR.T("请先进入派对模式对局", "Not in a party match")); return; }
+                if (vc == null) { SRApi.Notify(SRApi.T("请先进入派对模式对局", "Not in a party match")); return; }
                 // 相位推进是服务器权限（原生 RPC 也只在房主侧发）。
                 if (!SRApi.CanDoHost()) return;
                 // placementTimer / showingPlacementWarning 是 VersusControl 的 protected 字段，必须走 SRApi.Ref.Field 并登记。
@@ -419,14 +419,14 @@ public class LevelPartyBox : ITweak {
                 System.Reflection.FieldInfo pw = SRApi.Ref.Field(typeof(VersusControl), "showingPlacementWarning",
                     "关卡派对盒：关闭（进入原生的放置结束提示窗口）");
                 if (pt == null || pw == null) {
-                    SRApi.Notify(SR.T("关闭派对盒失败（游戏成员不可用）", "Failed to close the party box (member unavailable)"));
+                    SRApi.Notify(SRApi.T("关闭派对盒失败（游戏成员不可用）", "Failed to close the party box (member unavailable)"));
                     return;
                 }
                 // 计时归零并进入警告窗口：下一帧游戏自己走完剩余原生流程。
                 pt.SetValue(vc, 0f);
                 pw.SetValue(vc, true);
                 SRApi.LogInfo("[关卡派对盒] 已把原生放置计时推到结束，后续交给游戏自己的流程（关盒/同步/光标）");
-                SRApi.Notify(SR.T("已关闭派对盒", "Party box closed"));
+                SRApi.Notify(SRApi.T("已关闭派对盒", "Party box closed"));
             } catch (Exception __ex) { SRApi.LogWarn("关闭派对盒失败: " + __ex.Message); }
         }
 
@@ -459,7 +459,7 @@ public class LevelPartyBox : ITweak {
                 if (amount <= 0) amount = 1; // 件数由调用方在销毁前传入（此处 pieces 已清空）
                 pb.ChoosePieces(amount, null);
                 ReopenPartyBox(pb);
-                SRApi.Notify(SR.T("已重抽派对盒道具", "Rerolled the party box items"));
+                SRApi.Notify(SRApi.T("已重抽派对盒道具", "Rerolled the party box items"));
             } catch (System.Exception e) { SRApi.LogWarn("刷新派对盒(兜底)失败: " + e.Message); }
         }
 

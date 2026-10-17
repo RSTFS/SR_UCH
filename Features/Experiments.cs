@@ -9,7 +9,7 @@ public partial class Experiments : ITweak
 	{
 		// 栏目注册：本地化文案、侧栏顺序、三页页签。
 		private static void SelfReg() {
-			SR.LocSec("Experiments", "实验", null);
+			SRApi.LocSec("Experiments", "实验", null);
             SRApi.Nav("Experiments", 100); //侧栏栏目顺序 100
             // 本栏目自绘，共三页。页签顺序由 Order 决定：p3 场景(10) / p1 关卡边界(20) / p2 其它(30)，id 与文件对应关系固定。
 			SR.RegisterPage("Experiments", "p1", "关卡边界", "Bounds", 20, Render);

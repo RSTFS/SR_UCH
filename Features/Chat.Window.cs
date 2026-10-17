@@ -70,40 +70,40 @@ public partial class Chat : ITweak {
             // 本页是会话栏目的第 1 个子页，配置段仍为 Chat Window。
             SRApi.NavHide(Sec); // 本页不单独成侧栏栏目
             SR.RegisterPage("Chat", "ChatWindow", "对话窗口", "ChatWindows", 10, RenderPage);
-            SR.LocEnum("Hold", "按住显示");
-            SR.LocEnum("Toggle", "切换常驻");
+            SRApi.LocEnum("Hold", "按住显示");
+            SRApi.LocEnum("Toggle", "切换常驻");
             SR.RowFilters.Add(RowVisibleFilter);
             SR.RowExtras.Add(RowExtraFor);
             SR.RowSliders.Add(BoxScaleSlider);
             SR.RowSliders.Add(FontSizeSlider);
             SR.RowSliders.Add(PosSlider); //位置 X/Y：滑块范围按当前分辨率给
 
-            SR.LocKey(Sec, "Enabled", "启用增强", "Enable tweaks");
-            SR.LocDesc(Sec, "Enabled", "这一页的总开关. 关掉之后聊天窗口按原版跑, 字号缩放位置都不动.", "Master switch: when off, nothing on this page applies and the chat window runs exactly like vanilla (font size, scale and position are left untouched).");
-            SR.LocKey(Sec, "No Auto Show", "关闭自动弹出", "Suppress auto show");
-            SR.LocDesc(Sec, "No Auto Show", "来新消息不再自动把聊天框弹出来. 按住显示键还是能看, 自己按 Enter 打字也会弹.", "New messages no longer pop the chat window up; the hold/pin show key still reveals it, and typing (Enter) still shows it.");
-            SR.LocKey(Sec, "No Fade", "关闭淡入淡出动画", "No fade in/out");
-            SR.LocDesc(Sec, "No Fade", "聊天框出现和消失直接切, 不播原版那段淡入淡出. 和自动弹出那个互不干扰.", "The chat window appears/disappears instantly instead of the vanilla fade (independent of \"Suppress auto show\"). When off, the game's own fade in/out speed is used.");
-            SR.LocKey(Sec, "Window Key", "显示窗口键", "Show window key");
-            SR.LocDesc(Sec, "Window Key", "按这个键显示聊天窗口, 默认 Z. 想换键就点右边的框再按新键, 鼠标键也能绑, Esc 取消.", "Key that shows the chat window, default Z. To bind: click the key box on the right, then press the key you want (middle/side mouse buttons work too); Esc cancels and clears it. Hold = visible while held; Pin = tap to switch between pinned-on and vanilla.");
-            SR.LocKey(Sec, "Window Mode", "显示方式", "Show mode");
-            SR.LocDesc(Sec, "Window Mode", "配合显示键用. 按住型是按着才显示, 切换型是按一下在常驻显示和交回原版之间切.", "Works with the show key: Hold = visible while that key is held; Pin = tap the key to switch between pinned-on and vanilla.");
-            SR.LocKey(Sec, "Box Scale", "聊天框缩放", "Chat box scale");
-            SR.LocDesc(Sec, "Box Scale", "聊天框整体放大缩小, 0.5 到 2, 1 是原版. 也可以按住缩放键滚轮调, 每格 0.05.", "Overall chat box scale, 0.5 - 2 (1 = vanilla). Applied to the message holder's localScale; the scale key + wheel also adjusts it live (0.05 per notch).");
-            SR.LocKey(Sec, "Box Scale Key", "缩放键", "Scale key");
-            SR.LocDesc(Sec, "Box Scale Key", "按住它再滚滚轮就缩放聊天框, 默认 X, 每格 0.05. 换键方法和显示键一样.", "Key used with the wheel, default X. Hold it + wheel = chat box scale (0.05 per notch). Bound the same way as the show key (click the box, press a key, Esc clears). Use the key on the 'Chat font size' row for the font size.");
-            SR.LocKey(Sec, "Font Size", "聊天文字大小", "Chat font size");
-            SR.LocDesc(Sec, "Font Size", "聊天文字字号, 1 到 50, 默认 18. 也可以按住行尾那个键滚轮调, 每格 1. 现存消息的文字/名字/头像一起改, 输入框不归这里管.", "Chat font size, 1 - 50, default 18. The font key at the end of this row + wheel also adjusts it.\nExisting messages get their text, player name and portrait resized together (the input field is not touched).");
-            SR.LocKey(Sec, "Font Key", "字号键", "Font key");
-            SR.LocDesc(Sec, "Font Key", "按住它再滚滚轮调字号, 默认 C, 每格 1. 换键方法和显示键一样.", "Key that adjusts the chat font size, default C. Hold it + wheel = font size (1 per notch). Bound like the show key.");
-            SR.LocKey(Sec, "Crisp Text", "启用清晰度", "Crisp text");
-            SR.LocDesc(Sec, "Crisp Text", "把聊天那块画布对齐像素, 字看着没那么糊. 改的时候会重画一次文字.", "Text crispness: sets the chat canvas to pixel-perfect (sharper, less blur) and rebuilds the texts when it changes.");
-            SR.LocKey(Sec, "Pos Enabled", "启用位置调整", "Enable position");
-            SR.LocDesc(Sec, "Pos Enabled", "位置调整的总开关. 关掉会把我们加的偏移撤一次, 之后位置完全交给游戏, 游戏自己挪位置也不会打架.", "Master switch for position tweaks: when off, the offset we applied is removed once and the game fully controls the position again (its own moves are followed correctly, no fighting).");
-            SR.LocKey(Sec, "Pos X", "位置 X", "Position X");
-            SR.LocDesc(Sec, "Pos X", "聊天框往右挪多少像素, 0 是原版位置. 只在位置调整打开时有效.", "Horizontal offset in pixels, slider range 0 - current screen width; 0 = the game's default position, positive moves right. Only applies while \"Enable position\" is on.");
-            SR.LocKey(Sec, "Pos Y", "位置 Y", "Position Y");
-            SR.LocDesc(Sec, "Pos Y", "聊天框往下挪多少像素, 0 是原版位置. 只在位置调整打开时有效.", "Vertical offset in pixels, slider range -current screen height - 0; 0 = the game's default position, negative moves down. Only applies while \"Enable position\" is on.");
+            SRApi.LocKey(Sec, "Enabled", "启用增强", "Enable tweaks");
+            SRApi.LocDesc(Sec, "Enabled", "这一页的总开关. 关掉之后聊天窗口按原版跑, 字号缩放位置都不动.", "Master switch: when off, nothing on this page applies and the chat window runs exactly like vanilla (font size, scale and position are left untouched).");
+            SRApi.LocKey(Sec, "No Auto Show", "关闭自动弹出", "Suppress auto show");
+            SRApi.LocDesc(Sec, "No Auto Show", "来新消息不再自动把聊天框弹出来. 按住显示键还是能看, 自己按 Enter 打字也会弹.", "New messages no longer pop the chat window up; the hold/pin show key still reveals it, and typing (Enter) still shows it.");
+            SRApi.LocKey(Sec, "No Fade", "关闭淡入淡出动画", "No fade in/out");
+            SRApi.LocDesc(Sec, "No Fade", "聊天框出现和消失直接切, 不播原版那段淡入淡出. 和自动弹出那个互不干扰.", "The chat window appears/disappears instantly instead of the vanilla fade (independent of \"Suppress auto show\"). When off, the game's own fade in/out speed is used.");
+            SRApi.LocKey(Sec, "Window Key", "显示窗口键", "Show window key");
+            SRApi.LocDesc(Sec, "Window Key", "按这个键显示聊天窗口, 默认 Z. 想换键就点右边的框再按新键, 鼠标键也能绑, Esc 取消.", "Key that shows the chat window, default Z. To bind: click the key box on the right, then press the key you want (middle/side mouse buttons work too); Esc cancels and clears it. Hold = visible while held; Pin = tap to switch between pinned-on and vanilla.");
+            SRApi.LocKey(Sec, "Window Mode", "显示方式", "Show mode");
+            SRApi.LocDesc(Sec, "Window Mode", "配合显示键用. 按住型是按着才显示, 切换型是按一下在常驻显示和交回原版之间切.", "Works with the show key: Hold = visible while that key is held; Pin = tap the key to switch between pinned-on and vanilla.");
+            SRApi.LocKey(Sec, "Box Scale", "聊天框缩放", "Chat box scale");
+            SRApi.LocDesc(Sec, "Box Scale", "聊天框整体放大缩小, 0.5 到 2, 1 是原版. 也可以按住缩放键滚轮调, 每格 0.05.", "Overall chat box scale, 0.5 - 2 (1 = vanilla). Applied to the message holder's localScale; the scale key + wheel also adjusts it live (0.05 per notch).");
+            SRApi.LocKey(Sec, "Box Scale Key", "缩放键", "Scale key");
+            SRApi.LocDesc(Sec, "Box Scale Key", "按住它再滚滚轮就缩放聊天框, 默认 X, 每格 0.05. 换键方法和显示键一样.", "Key used with the wheel, default X. Hold it + wheel = chat box scale (0.05 per notch). Bound the same way as the show key (click the box, press a key, Esc clears). Use the key on the 'Chat font size' row for the font size.");
+            SRApi.LocKey(Sec, "Font Size", "聊天文字大小", "Chat font size");
+            SRApi.LocDesc(Sec, "Font Size", "聊天文字字号, 1 到 50, 默认 18. 也可以按住行尾那个键滚轮调, 每格 1. 现存消息的文字/名字/头像一起改, 输入框不归这里管.", "Chat font size, 1 - 50, default 18. The font key at the end of this row + wheel also adjusts it.\nExisting messages get their text, player name and portrait resized together (the input field is not touched).");
+            SRApi.LocKey(Sec, "Font Key", "字号键", "Font key");
+            SRApi.LocDesc(Sec, "Font Key", "按住它再滚滚轮调字号, 默认 C, 每格 1. 换键方法和显示键一样.", "Key that adjusts the chat font size, default C. Hold it + wheel = font size (1 per notch). Bound like the show key.");
+            SRApi.LocKey(Sec, "Crisp Text", "启用清晰度", "Crisp text");
+            SRApi.LocDesc(Sec, "Crisp Text", "把聊天那块画布对齐像素, 字看着没那么糊. 改的时候会重画一次文字.", "Text crispness: sets the chat canvas to pixel-perfect (sharper, less blur) and rebuilds the texts when it changes.");
+            SRApi.LocKey(Sec, "Pos Enabled", "启用位置调整", "Enable position");
+            SRApi.LocDesc(Sec, "Pos Enabled", "位置调整的总开关. 关掉会把我们加的偏移撤一次, 之后位置完全交给游戏, 游戏自己挪位置也不会打架.", "Master switch for position tweaks: when off, the offset we applied is removed once and the game fully controls the position again (its own moves are followed correctly, no fighting).");
+            SRApi.LocKey(Sec, "Pos X", "位置 X", "Position X");
+            SRApi.LocDesc(Sec, "Pos X", "聊天框往右挪多少像素, 0 是原版位置. 只在位置调整打开时有效.", "Horizontal offset in pixels, slider range 0 - current screen width; 0 = the game's default position, positive moves right. Only applies while \"Enable position\" is on.");
+            SRApi.LocKey(Sec, "Pos Y", "位置 Y", "Position Y");
+            SRApi.LocDesc(Sec, "Pos Y", "聊天框往下挪多少像素, 0 是原版位置. 只在位置调整打开时有效.", "Vertical offset in pixels, slider range -current screen height - 0; 0 = the game's default position, negative moves down. Only applies while \"Enable position\" is on.");
 
             //绑定顺序 = 页面显示顺序
             _enabled = plugin.Config.Bind(Sec, "Enabled", true, "总开关：关闭后本页所有改动都不生效。");
@@ -158,7 +158,7 @@ public partial class Chat : ITweak {
                 ConfigEntryBase e = entries[i];
                 if (e.Definition.Key == "Pos Enabled") {
                     GUILayout.Space(SR.Ctl.Sc(6));
-                    GUILayout.Label(SR.T("- 聊天框位置 -", "- Chat box position -"), SR.Ctl.SecHeader);
+                    GUILayout.Label(SRApi.T("- 聊天框位置 -", "- Chat box position -"), SR.Ctl.SecHeader);
                 }
                 SR.Ctl.RenderEntryRow(e, true, col);
             }

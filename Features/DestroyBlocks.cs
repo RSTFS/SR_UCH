@@ -238,24 +238,24 @@ namespace SR_UCH.Tweaks {
 
         private static void SelfReg() {
             SR.RowFilters.Add(TrackPlayerRowVisible); // 通用条目行扩展点
-            SR.LocSec("Destroy Blocks", "方块破坏", null);
+            SRApi.LocSec("Destroy Blocks", "方块破坏", null);
             SRApi.Nav("Destroy Blocks", 60); // 侧栏栏目顺序
-            SR.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);
-            SR.LocDesc("Destroy Blocks", "Toggle Key", "按住进入删除模式, 最近放的方块会高亮, 松手退出.", "Hold to enter delete mode and highlight the most recently placed block (release to exit)");
-            SR.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
-            SR.LocDesc("Destroy Blocks", "Delete Key", "删掉当前选中的方块. 滚轮可以在几个之间换.", "Delete the currently selected block (mouse wheel cycles selection)");
-            SR.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
-            SR.LocDesc("Destroy Blocks", "Enabled", "这一页的总开关, 关掉就整个功能停用.", "");
-            SR.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
-            SR.LocDesc("Destroy Blocks", "Select Mode", "按距离就是离你近的先选, 按放置顺序就是最后放的先选.", "Select mode: Distance = sorted by distance to you (nearest first); Placement = most recently placed first");
-            SR.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
-            SR.LocDesc("Destroy Blocks", "List Mode", "普通模式只列玩家亲手放的方块, 多物件道具的子部件也算, 炸弹这类临时的不算. 进阶模式把场上所有方块都单独列出来.", "List mode: Normal = only blocks actually placed by players (sub-parts of multi-object props count too, resolved through ParentPiece; temporary items such as bombs are excluded); Advanced = every block listed individually");
-            SR.LocKey("Destroy Blocks", "Track Player", "追踪玩家", null);
-            SR.LocDesc("Destroy Blocks", "Track Player", "不追踪就找所有人的方块, 填 1 就只找玩家 1 的. 只影响列表, 配合列表模式用.", "Track player: NoTrack = find every player's blocks; #1 = only blocks placed by player 1, #2/#3/#4 likewise (affects the list, used with list mode)");
-            SR.LocEnum("Realtime", "实时");
-            SR.LocEnum("Snapshot", "暂存");
-            SR.LocKey("Destroy Blocks", "Refresh Mode", "列表刷新", null);
-            SR.LocDesc("Destroy Blocks", "Refresh Mode", "实时是在你按住切换键时列表一直刷新, 别人刚放的马上能看到, 有节流所以开销不大. 暂存是只在你按下的那一刻建一次, 最省但按住期间看不到别人的变化.", "Refresh mode: Realtime = the candidate list stays up to date while you hold the toggle key (blocks placed/removed by others show up instantly; throttled and event-driven, cost only while held); Snapshot = rebuilt once when you press the key (cheapest, but you won't see others' changes while holding)");
+            SRApi.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);
+            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "按住进入删除模式, 最近放的方块会高亮, 松手退出.", "Hold to enter delete mode and highlight the most recently placed block (release to exit)");
+            SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
+            SRApi.LocDesc("Destroy Blocks", "Delete Key", "删掉当前选中的方块. 滚轮可以在几个之间换.", "Delete the currently selected block (mouse wheel cycles selection)");
+            SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
+            SRApi.LocDesc("Destroy Blocks", "Enabled", "这一页的总开关, 关掉就整个功能停用.", "");
+            SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
+            SRApi.LocDesc("Destroy Blocks", "Select Mode", "按距离就是离你近的先选, 按放置顺序就是最后放的先选.", "Select mode: Distance = sorted by distance to you (nearest first); Placement = most recently placed first");
+            SRApi.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
+            SRApi.LocDesc("Destroy Blocks", "List Mode", "普通模式只列玩家亲手放的方块, 多物件道具的子部件也算, 炸弹这类临时的不算. 进阶模式把场上所有方块都单独列出来.", "List mode: Normal = only blocks actually placed by players (sub-parts of multi-object props count too, resolved through ParentPiece; temporary items such as bombs are excluded); Advanced = every block listed individually");
+            SRApi.LocKey("Destroy Blocks", "Track Player", "追踪玩家", null);
+            SRApi.LocDesc("Destroy Blocks", "Track Player", "不追踪就找所有人的方块, 填 1 就只找玩家 1 的. 只影响列表, 配合列表模式用.", "Track player: NoTrack = find every player's blocks; #1 = only blocks placed by player 1, #2/#3/#4 likewise (affects the list, used with list mode)");
+            SRApi.LocEnum("Realtime", "实时");
+            SRApi.LocEnum("Snapshot", "暂存");
+            SRApi.LocKey("Destroy Blocks", "Refresh Mode", "列表刷新", null);
+            SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "实时是在你按住切换键时列表一直刷新, 别人刚放的马上能看到, 有节流所以开销不大. 暂存是只在你按下的那一刻建一次, 最省但按住期间看不到别人的变化.", "Refresh mode: Realtime = the candidate list stays up to date while you hold the toggle key (blocks placed/removed by others show up instantly; throttled and event-driven, cost only while held); Snapshot = rebuilt once when you press the key (cheapest, but you won't see others' changes while holding)");
         }
 
         // 是否走实时列表（默认实时）

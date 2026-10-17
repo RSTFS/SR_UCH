@@ -9,7 +9,7 @@ namespace SR_UCH.Tweaks {
 public partial class Chat : ITweak {
 
         public void Initialize(IFeatureHost plugin) {
-            SR.LocSec("Chat", "会话", null);
+            SRApi.LocSec("Chat", "会话", null);
             SRApi.Nav("Chat", 80); //侧栏栏目顺序 80
             InitWindow(plugin);
             InitLog(plugin);

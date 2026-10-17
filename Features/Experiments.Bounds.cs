@@ -17,7 +17,7 @@ public partial class Experiments : ITweak
 				ConfigEntryBase e = SR.Ctl.FindEntry("Experiments", key);
 				if (e == null) return;
 				GUILayout.BeginHorizontal();
-				SR.Ctl.RestoreLabel(new GUIContent(SR.T(zh, en), SR.T(zhTip, enTip)), e, SR.Ctl.Sc(200), SR.Ctl.Sc(26));
+				SR.Ctl.RestoreLabel(new GUIContent(SRApi.T(zh, en), SRApi.T(zhTip, enTip)), e, SR.Ctl.Sc(200), SR.Ctl.Sc(26));
 				GUILayout.Space(SR.Ctl.Sc(6));
 				SR.Ctl.RenderControl(e);
 				GUILayout.FlexibleSpace();
@@ -31,7 +31,7 @@ public partial class Experiments : ITweak
 				ConfigEntryBase e = SR.Ctl.FindEntry("Experiments", key);
 				if (e == null) return;
 				GUILayout.BeginHorizontal();
-				SR.Ctl.RestoreLabel(new GUIContent(SR.T(zh, en), SR.T(zhTip, enTip)), e, SR.Ctl.Sc(200), SR.Ctl.Sc(26));
+				SR.Ctl.RestoreLabel(new GUIContent(SRApi.T(zh, en), SRApi.T(zhTip, enTip)), e, SR.Ctl.Sc(200), SR.Ctl.Sc(26));
 				GUILayout.Space(SR.Ctl.Sc(6));
 				SR.Ctl.RenderControl(e);
 				GUILayout.FlexibleSpace();
@@ -41,7 +41,7 @@ public partial class Experiments : ITweak
 
 		public static void Render() {
         try {
-            GUILayout.Label(SR.T("- 解除关卡边界 -", "- Unlock level bounds -"), SR.Ctl.SecHeader);
+            GUILayout.Label(SRApi.T("- 解除关卡边界 -", "- Unlock level bounds -"), SR.Ctl.SecHeader);
             // 五个子项已全部并入主开关；条目仍在 cfg 里，由代码统一驱动。
             Row("解除关卡边界", "Unlock level bounds",
                 "一次解开关卡的空间边界, 共五项一起生效: 三面实体墙 / 放置光标边界 / 相机取景边界 / 界外黑幕(UI3 覆盖) / 方块越界放置.\n"
@@ -51,7 +51,7 @@ public partial class Experiments : ITweak
                 + "'Hard unlock' decides how far it reaches; 'Extra margin' expands the level edges and measurement boxes. Turning it off restores every one of them.",
                 "Level Bounds");
             GUILayout.Space(SR.Ctl.Sc(6));
-            GUILayout.Label(SR.T("- 进阶（一般不用改）-", "- Advanced (rarely needed) -"), SR.Ctl.SecHeader);
+            GUILayout.Label(SRApi.T("- 进阶（一般不用改）-", "- Advanced (rarely needed) -"), SR.Ctl.SecHeader);
             // 提示只写默认值，不写范围（AcceptableValueRange 已删除）。
             AdvRow("Level Bounds Radius", "越界范围", "Unlock radius",
                 "能走到关卡外面多远, 不限范围. 相机取景/放置光标的边界都按这个值换掉.",
@@ -129,35 +129,35 @@ public partial class Experiments : ITweak
             // 两处反射均需登记，否则改名后静默返回 null（表现为解除边界无效）。
             SRApi.Ref.Override("Cursor.boundary", "解除关卡边界：放置光标边界快照");
             SRApi.Ref.Override("ZoomCamera.frame", "解除关卡边界：相机取景框");
-            SR.LocKey("Experiments", "Level Bounds", "解除关卡边界", null);
-            SR.LocDesc("Experiments", "Level Bounds",
+            SRApi.LocKey("Experiments", "Level Bounds", "解除关卡边界", null);
+            SRApi.LocDesc("Experiments", "Level Bounds",
                 "把关卡的空间边界解开, 方块能放到外面, 角色也能走出去.",
                 "Removes the spatial boundary limit.");
-            SR.LocDesc("Experiments", "Level Bounds Piece Ignore",
+            SRApi.LocDesc("Experiments", "Level Bounds Piece Ignore",
                 "允许把方块放到边界外. 只影响放置, 关闭时逐个恢复原值.",
                 "Set Placeable.IgnoreBounds on every piece (restored one by one when disabled).");
-            SR.LocKey("Experiments", "Level Bounds Margin", "边界外扩", "Extra margin");
-            SR.LocDesc("Experiments", "Level Bounds Margin",
+            SRApi.LocKey("Experiments", "Level Bounds Margin", "边界外扩", "Extra margin");
+            SRApi.LocDesc("Experiments", "Level Bounds Margin",
                 "边界每边往外扩多少, 默认 500, 不限范围.",
                 "Expand the boundary on each side (default 500, no limit).");
-            SR.LocKey("Experiments", "Level Bounds Walls", "实体墙", "Solid walls");
-            SR.LocDesc("Experiments", "Level Bounds Walls",
+            SRApi.LocKey("Experiments", "Level Bounds Walls", "实体墙", "Solid walls");
+            SRApi.LocDesc("Experiments", "Level Bounds Walls",
                 "去掉挡人的三面实体墙, 角色才真的能走出去. 默认关.",
                 "Remove the three solid walls so characters can walk out. Off by default.");
-            SR.LocKey("Experiments", "Level Bounds Cursor", "光标越界", "Cursor beyond bounds");
-            SR.LocDesc("Experiments", "Level Bounds Cursor",
+            SRApi.LocKey("Experiments", "Level Bounds Cursor", "光标越界", "Cursor beyond bounds");
+            SRApi.LocDesc("Experiments", "Level Bounds Cursor",
                 "把放置光标的边界换成硬解除半径, 光标才能拿到关卡外面. 需要硬解除也开着. 默认关.",
                 "Give the placement cursor the hard radius. Needs Hard unlock. Off by default.");
-            SR.LocKey("Experiments", "Level Bounds Camera", "相机", "Camera");
-            SR.LocDesc("Experiments", "Level Bounds Camera",
+            SRApi.LocKey("Experiments", "Level Bounds Camera", "相机", "Camera");
+            SRApi.LocDesc("Experiments", "Level Bounds Camera",
                 "把相机的取景边界也一起放开. 默认关: 开着时派对盒阶段相机会被拉得很远.",
                 "Widen the camera framing too. Off by default (it pulls the camera far out in the party-box phase).");
-            SR.LocKey("Experiments", "Level Bounds Hard", "硬解除", "Hard unlock");
-            SR.LocDesc("Experiments", "Level Bounds Hard",
+            SRApi.LocKey("Experiments", "Level Bounds Hard", "硬解除", "Hard unlock");
+            SRApi.LocDesc("Experiments", "Level Bounds Hard",
                 "光标越界与相机两项的前置开关, 决定放开到多大的范围.",
                 "Prerequisite for the cursor and camera entries; sets how far they reach.");
-            SR.LocKey("Experiments", "Level Bounds Radius", "硬解除半径", "Hard radius");
-            SR.LocDesc("Experiments", "Level Bounds Radius",
+            SRApi.LocKey("Experiments", "Level Bounds Radius", "硬解除半径", "Hard radius");
+            SRApi.LocDesc("Experiments", "Level Bounds Radius",
                 "硬解除能走多远, 默认 10 万, 不限范围.",
                 "How far the hard unlock lets you go: 100000 to 1000000, default 100000.");
         }
@@ -722,8 +722,8 @@ public partial class Experiments : ITweak
         private static string _scanScene;    // 上次扫描的场景名（换场景立即重扫）
 
         private static void SelfReg() {
-            SR.LocKey("Experiments", "Remove UI3", "解除 UI3 覆盖", "Remove UI3 overlay");
-            SR.LocDesc("Experiments", "Remove UI3",
+            SRApi.LocKey("Experiments", "Remove UI3", "解除 UI3 覆盖", "Remove UI3 overlay");
+            SRApi.LocDesc("Experiments", "Remove UI3",
                 "界外一片黑是 UI3 层上的黑方块挡的, 不画它们就没了. (已并入「解除关卡边界」, 不再单独显示)",
                 "Stops drawing the black squares on the UI 3 layer. (Merged into 'Unlock level bounds'; no longer listed on its own.)");
         }
