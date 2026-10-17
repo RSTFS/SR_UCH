@@ -33,6 +33,14 @@ namespace SR_UCH.Tweaks {
 		private static bool ReloadBlocked()
 		{
 			if (!_reloadBusy) return false;
+			// 其它功能（布局预设）正在重载时同样拦下，避免两套重载并发。
+			try {
+				Func<bool> other = Slots.Require<Func<bool>>("presets.reloadBusy");
+				if (other != null && other()) {
+					SRApi.Notify(SRApi.T("布局预设正在加载，请稍候", "A layout preset is loading; please wait"));
+					return true;
+				}
+			} catch (Exception __ex) { SRApi.Guard.Log("重载互斥检查", __ex); }
 			if (ReloadLockStuck()) {
 				SetReloadBusy(false);
 				SRApi.LogWarn("[重载] 检测到残留的忙碌锁（超过 45 秒未复位），已自动放锁");

@@ -657,6 +657,14 @@ namespace SR_UCH.Tweaks {
 		private static bool ReloadBlocked() {
 			try {
 				if (!_reloadBusy) return false;
+				// 关卡重载正在进行时拦下，避免与 Level 的重载并发。
+				try {
+					Func<bool> other = Slots.Require<Func<bool>>("level.reloadBusy");
+					if (other != null && other()) {
+						SRApi.Notify(SRApi.T("关卡正在重载，请稍候", "Level reload in progress; please wait"));
+						return true;
+					}
+				} catch (Exception __ex) { SRApi.Guard.Log("预设/重载互斥检查", __ex); }
 				if (_reloadBusyAt >= 0f && Time.unscaledTime - _reloadBusyAt > ReloadLockStale) {
 					SetReloadBusy(false);
 					SRApi.LogWarn("[布局预设] 检测到残留的忙碌锁（超过 45 秒未复位），已自动放锁");

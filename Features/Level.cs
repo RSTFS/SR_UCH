@@ -33,6 +33,8 @@ public partial class Level : ITweak {
         SelfReg();
         // 对外槽位：其它功能经 Slots.Require 取用清场能力，无需引用 Level 类型。
         Slots.Provide(SlotClearPlacedBlocks, (Action<List<Placeable>, string>)ClearPlacedBlocks);
+        // 对外槽位：关卡重载忙碌状态（布局预设等功能据此避免与本功能的重载并发）。
+        Slots.Provide("level.reloadBusy", (Func<bool>)(() => _reloadBusy));
         _reloadMode = plugin.Config.Bind<ReloadMode>("Level", "Reload Mode", ReloadMode.KeepScore, "重载关卡模式：\n保留方块和分数（允许补分）= 重载后当前方块保留；房主按重载前的分类型分块（获胜/金币/陷阱等原样）给全员广播补分，下一回合结算时全员得分板显示与重载前一致的分数和类型（含未装 mod 的房客；补分不立即结算，图标随正常结算显示）。\n仅保留方块（跳过补分）= 重载后当前方块保留，分数重置（重新对局，不补分）。");
 			// CreateAndPatchAll 不自动发现带 [HarmonyPatch] 的独立类，必须显式注册；单个补丁目标失效只丢本类功能，不影响其它功能。
         try { Harmony.CreateAndPatchAll(typeof(Level), (string)null); }

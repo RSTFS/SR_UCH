@@ -1,4 +1,4 @@
-﻿# SR 功能层 API 白名单（微内核棘轮 / SMAPI 式 API 表面）
+# SR 功能层 API 白名单（微内核棘轮 / SMAPI 式 API 表面）
 # 规则：SR_UCH\Features\*.cs 只允许使用本文件列出的 SRApi.* 成员；新增 API 必须同时改代码与本清单（-Check / CI 会拦）。
 # 演进方向（只减不增）：功能层只走契约层门面，实现层随便改都不破坏功能。
 BlockInput
