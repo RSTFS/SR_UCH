@@ -191,6 +191,20 @@ namespace SR_UCH {
                 SRApi.Migration.SetSinks(
                     delegate (string __s, string[] __k) { ConfigMigration.Remove(__s, __k); },
                     delegate (string __f, string __t3, string __k) { ConfigMigration.Move(__f, __t3, __k); });
+                SRApi.SetExSinks(
+                    delegate { return SR.AllEnabled; },
+                    delegate (bool __v) { SR.AllEnabled = __v; },
+                    delegate { return SR.IgnoreModeLimit; },
+                    delegate (string __s) { return SR.HasPage(__s); },
+                    delegate (string __t4, string __x) { SR.NotifyTag(__t4, __x); },
+                    delegate (string __t4, object[] __a) { return SR.Cat(__t4, __a); },
+                    delegate (string __n) { return SR.EnumNameZh(__n); },
+                    delegate { return SR.ControlHeight; },
+                    delegate (float __v) { SR.ControlHeight = __v; },
+                    delegate (Func<bool> __f) { SR.RegisterModeOverride(__f); },
+                    delegate (Func<bool> __f) { SR.RegisterHostOverride(__f); },
+                    delegate (Func<bool> __f) { SR.RegisterPauseProvider(__f); },
+                    delegate (string __s, Action __d) { SR.RegisterTabPrefix(__s, __d); });
                 // P0-1：API 通道自检 —— 漏注入的 sink 会让对应功能静默失效，这里必须报错。
                 try { ModLogger.LogInfo("[SR] 游戏版本=" + UnityEngine.Application.version + " | 契约=v" + SRContract.Version); } catch { }
                 string[] __miss = SRApi.MissingSinks();

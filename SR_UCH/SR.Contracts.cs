@@ -226,6 +226,40 @@ namespace SR_UCH {
         public static void RegisterPage(string section, Action render) { Action<string, Action> f = _registerPageSimple; if (f != null) f(section, render); }
         public static void RegisterPage(string section, string pageId, string nameZh, string nameEn, int order, Action render) { Action<string, string, string, string, int, Action> f = _registerPageFull; if (f != null) f(section, pageId, nameZh, nameEn, order, render); }
 
+        // P2：EX 模块所需的其余 API（委托注入，行为不变）
+        private static Func<bool> _allEnabled, _ignoreModeLimit;
+        private static Action<bool> _setAllEnabled;
+        private static Func<string, bool> _hasPage;
+        private static Action<string, string> _notifyTag;
+        private static Func<string, object[], string> _cat;
+        private static Func<string, string> _enumNameZh;
+        private static Func<float> _controlHeight;
+        private static Action<float> _setControlHeight;
+        private static Action<Func<bool>> _modeOverride, _hostOverride, _pauseProvider;
+        private static Action<string, Action> _tabPrefix;
+        public static void SetExSinks(Func<bool> allEnabled, Action<bool> setAllEnabled, Func<bool> ignoreModeLimit,
+                                      Func<string, bool> hasPage, Action<string, string> notifyTag,
+                                      Func<string, object[], string> cat, Func<string, string> enumNameZh,
+                                      Func<float> controlHeight, Action<float> setControlHeight,
+                                      Action<Func<bool>> modeOverride, Action<Func<bool>> hostOverride,
+                                      Action<Func<bool>> pauseProvider, Action<string, Action> tabPrefix) {
+            _allEnabled = allEnabled; _setAllEnabled = setAllEnabled; _ignoreModeLimit = ignoreModeLimit;
+            _hasPage = hasPage; _notifyTag = notifyTag; _cat = cat; _enumNameZh = enumNameZh;
+            _controlHeight = controlHeight; _setControlHeight = setControlHeight;
+            _modeOverride = modeOverride; _hostOverride = hostOverride; _pauseProvider = pauseProvider; _tabPrefix = tabPrefix;
+        }
+        public static bool AllEnabled { get { Func<bool> f = _allEnabled; return f != null && f(); } set { Action<bool> a = _setAllEnabled; if (a != null) a(value); } }
+        public static bool IgnoreModeLimit { get { Func<bool> f = _ignoreModeLimit; return f != null && f(); } }
+        public static bool HasPage(string section) { Func<string, bool> f = _hasPage; return f != null && f(section); }
+        public static void NotifyTag(string tag, string text) { Action<string, string> f = _notifyTag; if (f != null) f(tag, text); }
+        public static string Cat(string text, object[] args) { Func<string, object[], string> f = _cat; return f != null ? f(text, args) : text; }
+        public static string EnumNameZh(string n) { Func<string, string> f = _enumNameZh; return f != null ? f(n) : n; }
+        public static float ControlHeight { get { Func<float> f = _controlHeight; return f != null ? f() : 0f; } set { Action<float> a = _setControlHeight; if (a != null) a(value); } }
+        public static void RegisterModeOverride(Func<bool> f2) { Action<Func<bool>> f = _modeOverride; if (f != null) f(f2); }
+        public static void RegisterHostOverride(Func<bool> f2) { Action<Func<bool>> f = _hostOverride; if (f != null) f(f2); }
+        public static void RegisterPauseProvider(Func<bool> f2) { Action<Func<bool>> f = _pauseProvider; if (f != null) f(f2); }
+        public static void RegisterTabPrefix(string section, Action draw) { Action<string, Action> f = _tabPrefix; if (f != null) f(section, draw); }
+
         // 迁移规则门面：规则注册表与 cfg 改写都在核心，契约层只转发。
         public static class Migration {
             private static Action<string, string[]> _remove;
