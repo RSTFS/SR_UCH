@@ -301,6 +301,12 @@ namespace SR_UCH {
                         // 功能：只收没有 BepInPlugin 入口的 DLL；带入口的插件自行调 SR.RegisterTweak。
                         if (isBepInPlugin) continue;
                         if (!typeof(ITweak).IsAssignableFrom(t)) continue;
+                        // 阶段C（SMAPI 行为）：功能清单要求的最低契约版本高于当前核心时拒绝加载，而不是带病初始化。
+                        FeatureInfo __fi = Features.FromType(t);
+                        if (__fi != null && __fi.MinContract > SRContract.Version) {
+                            ModLogger.LogError("[SR.Feat] 拒绝加载 " + __fi.Id + "：" + __fi.ToString());
+                            continue;
+                        }
                         var tweak = (ITweak)Activator.CreateInstance(t);
                         tweak.Initialize(this);
                         ModLogger.LogInfo("[SR] 已加载外部功能: " + t.Name + " (" + name + ".dll)");
