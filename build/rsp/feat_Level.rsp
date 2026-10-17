@@ -27,4 +27,5 @@
 Features\Level.cs
 Features\Level.PartyBox.cs
 Features\Level.Tool.cs
+Features\Level.Reload.cs
 Features\Level.Snapshot.cs
