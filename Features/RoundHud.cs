@@ -132,7 +132,7 @@ namespace SR_UCH.Tweaks {
 			SRApi.Ref.Override("VersusControl.placementTimer", "回合计时（建造阶段剩余时间）");
 			SRApi.Ref.Override("VersusControl.levelTimer", "回合计时（对局已用时间）");
 			SRApi.Ref.Override("VersusControl.countdownTimer", "回合计时（决胜倒计时）");
-			SRApi.LocSec("Round HUD", "回合 HUD");
+			SRApi.LocSec("Round HUD", "回合 HUD", "Round HUD");
 			SRApi.Nav("Round HUD", 25); // 侧栏顺序 25：移动轨迹(20) 之后、快速调整(30) 之前
 			SRApi.RegisterPage("Round HUD", Render);
 			SRApi.LocKey("Round HUD", "Enabled", "回合计时 HUD", null);

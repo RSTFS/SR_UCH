@@ -151,7 +151,7 @@ public class MatchReplay : ITweak {
 	}
 
 	private static void SelfReg() {
-		SRApi.LocSec(Sec, "对局回放", null);
+		SRApi.LocSec(Sec, "对局回放", "Match Replay");
 		SRApi.Nav(Sec, 65); // 侧栏栏目顺序 65：关卡工具(60) 之后、会话(80) 之前
 		SRApi.RegisterPage(Sec, Render); // 本功能页自绘：设置行 + 会话列表 + 只读时间线
 		SRApi.LocKey(Sec, "Enabled", "记录总开关", "Recording");
