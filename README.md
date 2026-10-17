@@ -1,5 +1,7 @@
 ﻿# SR_UCH
 
+**English** | [简体中文](README.zh-CN.md)
+
 > A quality-of-life mod suite for **Ultimate Chicken Horse** (BepInEx 5 / Harmony)
 
 An in-game settings panel you can just install and use: levels, building, chat, online play and
@@ -104,9 +106,22 @@ The panel has sections on the left and pages on the right. Listed by section bel
 
 ---
 
+## Build
+
+`powershell
+# Requires: .NET SDK (provides Roslyn csc) + a local game install (provides reference assemblies)
+.\build\build.ps1                                        # -> bin\Release\SR_UCH.dll
+.\build\build.ps1 -Deploy                                # build and copy to <game>\BepInEx\plugins
+.\build\build.ps1 -GameDir "D:\...\Ultimate Chicken Horse"
+`
+
+The game folder is auto-detected from common Steam paths; set the UCH_DIR environment variable to override.
+
+---
+
 ## Credits
 
-BetterFreeplay · BetterNight · BuildingPlus · BuildUnlimiter · UCH Freeplay Spawn Setter ·
+BetterFreeplay · BuildingPlus · BuildUnlimiter · UCH Freeplay Spawn Setter ·
 UCH Tweaks · UCH-PlayerTracker-Mod · UltimateBuilder
 
 ---
@@ -117,8 +132,3 @@ This project is a third-party mod for Ultimate Chicken Horse. It only interacts 
 process through BepInEx and **contains, modifies and distributes none of the game's code or
 assets**. The game itself and all related content are copyright Clever Endeavour Games; please
 obtain it through official channels.
-## 模块边界（微内核）
-
-- 本仓库只包含主模块（契约层 SR.Contracts.cs + 核心 + 内置功能）。
-- 私密扩展模块 SR_UCH_EX 不在此仓库；它通过 SRApi 契约与核心交互（约 98% 的调用已走契约，剩余少量低频实现层特性为已知例外）。
-- 外部功能 DLL 只应引用 SRApi / Slots（不能引用实现层 SR.*）；-Check 与 CI 文本守卫会强制这条边界。
