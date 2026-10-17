@@ -222,6 +222,20 @@ namespace SR_UCH {
         public static void SetDefaultCombo(ConfigEntryBase entry, ComboMod mod) { Action<ConfigEntryBase, int> f = _setDefaultCombo; if (f != null) f(entry, (int)mod); }
         public static string ClearableTextField(string text, GUIStyle style, params GUILayoutOption[] options) { Func<string, int, GUIStyle, GUILayoutOption[], string> f = _clearableTextField; return f != null ? f(text, -1, style, options) : text; }
         public static string ClearableTextField(string text, int maxLength, GUIStyle style, params GUILayoutOption[] options) { Func<string, int, GUIStyle, GUILayoutOption[], string> f = _clearableTextField; return f != null ? f(text, maxLength, style, options) : text; }
+        // 底栏按钮扩展点：核心在「设置」按钮右侧依次绘制；功能可注册自己的入口（如配置工具）。
+        public sealed class FooterButton {
+            public string Id, LabelZh, LabelEn; public Action OnClick;
+            public FooterButton(string id, string zh, string en, Action onClick) { Id = id; LabelZh = zh; LabelEn = en; OnClick = onClick; }
+        }
+        public static readonly List<FooterButton> FooterButtons = new List<FooterButton>();
+        public static void RegisterFooterButton(string id, string zh, string en, Action onClick) {
+            if (string.IsNullOrEmpty(id)) return;
+            for (int i = 0; i < FooterButtons.Count; i++) {
+                if (FooterButtons[i].Id == id) { FooterButtons[i].LabelZh = zh; FooterButtons[i].LabelEn = en; FooterButtons[i].OnClick = onClick; return; }
+            }
+            FooterButtons.Add(new FooterButton(id, zh, en, onClick));
+        }
+
         public static void RegisterPage(string section, Action render) { Action<string, Action> f = _registerPageSimple; if (f != null) f(section, render); }
         public static void RegisterPage(string section, string pageId, string nameZh, string nameEn, int order, Action render) { Action<string, string, string, string, int, Action> f = _registerPageFull; if (f != null) f(section, pageId, nameZh, nameEn, order, render); }
 

@@ -81,7 +81,7 @@ namespace SR_UCH.Tweaks {
 		// 栏目注册：与 PlayerTracker 的写法一致（LocSec / Nav / RegisterPage 三件套）。
 		private static void SelfReg() {
 			SRApi.LocSec(Section, "配置工具", "Config Tools");
-			SRApi.Nav(Section, 70); // 清场(60) 之后、聊天(80) 之前
+			SRApi.RegisterFooterButton(Section, "配置工具", "Config Tools", null); // 底栏入口，不再占侧栏
 			SRApi.RegisterPage(Section, Render);
 			SRApi.LocKey(Section, "Enabled", "配置导出/导入总开关", "Config export/import");
 			SRApi.LocDesc(Section, "Enabled",

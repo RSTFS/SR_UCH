@@ -528,6 +528,23 @@ public partial class SR {
                 _editOpen.Clear();
                 _capturing = null;
             }
+            // 功能注册的底栏按钮（如配置工具）：排在「设置」右侧
+            foreach (SRApi.FooterButton fb in SRApi.FooterButtons) {
+                if (fb == null || string.IsNullOrEmpty(fb.Id)) continue;
+                string fbLabel = T(fb.LabelZh, fb.LabelEn);
+                if (string.IsNullOrEmpty(fbLabel)) continue;
+                float fbW = _btn.CalcSize(new GUIContent(fbLabel)).x + Sc(18);
+                bool fbSel = _mode == Mode.Internal && _selectedInternalSection == fb.Id;
+                if (GUILayout.Button(fbLabel, fbSel ? _selItem : _btn, GUILayout.Width(fbW))) {
+                    try { if (fb.OnClick != null) fb.OnClick(); } catch (Exception __ex) { Guard.Log("底栏按钮", __ex); }
+                    _mode = Mode.Internal;
+                    _selectedInternalSection = fb.Id;
+                    NoPageScrollBars = false;
+                    _editText.Clear();
+                    _editOpen.Clear();
+                    _capturing = null;
+                }
+            }
             GUILayout.FlexibleSpace();   // 底栏不显示 SR 内部版本号
             GUILayout.Label(ModeLabel(), _label, GUILayout.Width(Sc(160)), GUILayout.Height(Sc(26)));
             GUILayout.EndHorizontal();

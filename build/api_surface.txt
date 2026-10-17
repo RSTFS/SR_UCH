@@ -71,3 +71,4 @@ TableWheelInput
 TakeWheelEvent
 UiOpen
 WheelFrame
+RegisterFooterButton
