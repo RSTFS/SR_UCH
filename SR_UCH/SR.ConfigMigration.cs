@@ -542,6 +542,9 @@ namespace SR_UCH.Tweaks {
             text = RemoveKeys(text, "Online", new[] { "Hidden Columns" });
             // EX 模块的遗留键（EX 在仓库外，无法自带清理规则）：已确认没有任何代码再读。
             text = RemoveKeys(text, "EX", new[] { "Clear Party Box Key", "Coin Amount" });
+            // 快速自杀功能已删除：清理其遗留键。
+            text = RemoveKeys(text, "Quick Adjust", new[] { "Enabled", "Keybind" });
+            text = RemoveKeys(text, "Internal", new[] { "P Suicide Migrated" });
             // P2 配置瘦身：清理已删除功能的废弃键（静态校验过：主模块源码里已无任何引用）。
             text = RemoveKeys(text, "Experiments", new[] { "Mute Own", "Mute Others", "Level Background Scale", "Level Bounds Treehouse", "Level Bounds Death Line", "Level Bounds Death Drop", "Level Bounds Only In Place", "Level Bounds Direction", "Level Bounds Key" });
             text = RemoveKeys(text, "Scene", new[] { "Render Hide Skybox", "Render Bg Color", "Scene Bounds", "Scene Spawn", "Scene Death Line", "Scene Death Line Len" });

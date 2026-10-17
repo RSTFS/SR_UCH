@@ -177,22 +177,6 @@ public class QuickAdjust : ITweak {
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(6));
 
-        SRApi.Ctl.SectionTitle(SRApi.T("- 快速自杀 -", "- Quick suicide -"));
-        GUILayout.BeginHorizontal();
-        ConfigEntryBase se = SRApi.Ctl.FindEntry("Quick Adjust", "Enabled");
-        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("快速自杀", "Quick suicide"), SRApi.T("总开关：开启后按 组合键（自杀键）快速自杀（树屋和局内都有效，只杀自己，默认 Shift+0）", "Master switch: press the suicide combo to die instantly (treehouse and in-match, only yourself, default Shift+0)")), se, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
-        if (se != null) SRApi.Ctl.RenderControl(se);
-        GUILayout.FlexibleSpace();
-        GUILayout.EndHorizontal();
-        GUILayout.Space(SRApi.Ctl.Sc(2));
-        GUILayout.BeginHorizontal();
-        ConfigEntryBase sk = SRApi.Ctl.FindEntry("Quick Adjust", "Keybind");
-        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("自杀键", "Suicide key"), SRApi.T("自杀键（组合键）：点按钮后在按住 Shift/Ctrl/Alt 的同时按主键即可设为组合键（默认 Shift+0）。\n树屋和局内都有效，只杀自己。", "Suicide key (combo): click the button then hold Shift/Ctrl/Alt while pressing the main key (default Shift+0).\nWorks in the treehouse and in-match; only kills yourself.")), sk, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
-        if (sk != null) SRApi.Ctl.RenderControl(sk);
-        GUILayout.FlexibleSpace();
-        GUILayout.EndHorizontal();
-        GUILayout.Space(SRApi.Ctl.Sc(4));
-        GUILayout.Space(SRApi.Ctl.Sc(6));
         } catch (Exception __ex) { SRApi.Guard.Log("快速调整页 渲染", __ex); }
     }
 
@@ -532,64 +516,6 @@ public class QuickAdjust : ITweak {
 		}
 }
 
-[SrFeature("sr.treehousesuicide", "TreehouseSuicide", "1.0")]
-
-public class TreehouseSuicide : ITweak {
-    private static IFeatureHost _mp;   // 只用来读 Config（契约类型）
-    private static ConfigEntry<KeyCode> _keybind;
-    public static bool Enabled = true;
-    public void Initialize(IFeatureHost plugin) {
-        _mp = plugin;
-        ConfigEntry<bool> enabled = _mp.Config.Bind("Quick Adjust", "Enabled", false, "总开关");
-        Enabled = enabled.Value;
-        enabled.SettingChanged += (s, e) => Enabled = enabled.Value;
-        _keybind = _mp.Config.Bind(
-            "Quick Adjust",
-            "Keybind",
-            KeyCode.Alpha0,
-            "自杀键（组合键设置：点按钮后在按住 Shift/Ctrl/Alt 的同时按主键，即可设为组合键，如 Shift+0）");
-        // 配置兼容：旧默认 P 一次性迁移到 Shift+0；无隐藏标记会导致每次启动都覆盖已绑定的设置。
-        ConfigEntry<bool> pMigrated = _mp.Config.Bind("Internal", "P Suicide Migrated", false,
-            "内部用: 自杀键从 P 改成 Shift+0 的迁移有没有跑过.");
-        if (!pMigrated.Value)
-        {
-            if (_keybind.Value == KeyCode.P) _keybind.Value = KeyCode.Alpha0;
-            pMigrated.Value = true;
-        }
-        // 未设置过修饰键时默认 Shift。
-        SRApi.RegisterKey("快捷自杀", _keybind, "hold");
-        if (SRApi.KeyComboMod(_keybind) == SRApi.ComboMod.None)
-        {
-            SRApi.SetDefaultCombo(_keybind, SRApi.ComboMod.Shift);
-        }
-        // 单个补丁目标失效只丢本类功能。
-        try { Harmony.CreateAndPatchAll(typeof(TreehouseSuicide), (string)null); }
-        catch (Exception e) { SRApi.LogError("快速自杀 补丁注册失败: " + e.Message); }
-    }
-
-    // FixedUpdate 一帧可能跑多次，而 ComboKeyDown 是边沿判定（GetKeyDown 在整个渲染帧内为真），
-    // 同一帧的多个物理步会各判一次，故按帧去重。
-    private static int _suicideFrame = -1;
-
-    [HarmonyPatch(typeof(Character), "FixedUpdate")]
-    [HarmonyPostfix]
-    private static void CharacterPatch(Character __instance) {
-        // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SRApi.Guard.Log（按调用点去重）留痕。
-        try {
-                if (!SRApi.GateMaster) return;
-                if (!Enabled) return;
-                if (SRApi.UiOpen && SRApi.BlockInput) return;
-                if (!__instance.hasAuthority) return;
-                // 本帧已判过输入（无论是否触发），后续物理步不再判定
-                if (_suicideFrame == Time.frameCount) return;
-                _suicideFrame = Time.frameCount;
-                // 组合键判定：修饰键在键位捕捉时设置（默认 Shift）。
-                if (SRApi.ComboKeyDown(_keybind) && !__instance.Frozen) {
-                    __instance.KillCharacter("Suicide", false, __instance.networkNumber);
-                }
-        } catch (Exception __ex) { SRApi.Guard.Log("自杀键", __ex); }
-    }
-}
 }
 
 
