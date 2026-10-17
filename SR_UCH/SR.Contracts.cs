@@ -202,6 +202,27 @@ namespace SR_UCH {
             try { Notify(string.Format(text, args)); } catch { Notify(text); }
         }
 
+        // 反射门面：实际实现（缓存 / 登记 RefOverride / 启动自检）在核心，契约层只转发，行为不变。
+        public static class Ref {
+            internal static Func<Type, string, string, FieldInfo> FieldFn;
+            internal static Func<Type, string, string, MethodInfo> MethodFn;
+            internal static Func<Type, string, Type[], string, MethodInfo> MethodArgsFn;
+            internal static Action<string, string> OverrideFn;
+            internal static Func<string, Type> TypeFn;
+            public static void SetSinks(Func<Type, string, string, FieldInfo> field,
+                                        Func<Type, string, string, MethodInfo> method,
+                                        Func<Type, string, Type[], string, MethodInfo> methodArgs,
+                                        Action<string, string> over,
+                                        Func<string, Type> type) {
+                FieldFn = field; MethodFn = method; MethodArgsFn = methodArgs; OverrideFn = over; TypeFn = type;
+            }
+            public static FieldInfo Field(Type owner, string name, string feature) { Func<Type, string, string, FieldInfo> f = FieldFn; return f != null ? f(owner, name, feature) : null; }
+            public static MethodInfo Method(Type owner, string name, string feature) { Func<Type, string, string, MethodInfo> f = MethodFn; return f != null ? f(owner, name, feature) : null; }
+            public static MethodInfo Method(Type owner, string name, Type[] parameters, string feature) { Func<Type, string, Type[], string, MethodInfo> f = MethodArgsFn; return f != null ? f(owner, name, parameters, feature) : null; }
+            public static void Override(string member, string feature) { Action<string, string> f = OverrideFn; if (f != null) f(member, feature); }
+            public static Type Type(string name) { Func<string, Type> f = TypeFn; return f != null ? f(name) : null; }
+        }
+
         // 统一带日志的 try / catch 包装：同一条 what 5 秒内只记一次，每帧路径上也安全。
         public static class Guard {
             private static readonly Dictionary<string, int> _lastWarn = new Dictionary<string, int>();

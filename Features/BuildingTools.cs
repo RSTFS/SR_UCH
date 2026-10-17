@@ -24,9 +24,9 @@ namespace SR_UCH.Tweaks {
 
         private static void SelfReg() {
             // 本文件反射的游戏私有成员，改名时启动自检会在日志里告警。
-            SR.RefOverride("PiecePlacementCursor.SetPiece", "自由放置（改写放置结果）");
-            SR.RefOverride("PiecePlacementCursor.FixedUpdate", "自由放置（补丁目标）");
-            SR.RefOverride("PiecePlacementCursor.heldPositionOffset", "自由放置（关闭网格吸附）");
+            SRApi.Ref.Override("PiecePlacementCursor.SetPiece", "自由放置（改写放置结果）");
+            SRApi.Ref.Override("PiecePlacementCursor.FixedUpdate", "自由放置（补丁目标）");
+            SRApi.Ref.Override("PiecePlacementCursor.heldPositionOffset", "自由放置（关闭网格吸附）");
             SR.RowCompanions.Add(BuilderCompanion); // 通用条目行扩展点：覆盖项与快捷键同行显示
             SR.RowFilters.Add(BuilderRowVisible);   // 两个开关键位不单独成行
             SR.RegisterPage("build", RenderPage); // 本功能页自绘（含建造上限分区）
@@ -195,9 +195,9 @@ namespace SR_UCH.Tweaks {
             private static FieldInfo _heldOffsetField;
             static IEnumerable<MethodBase> TargetMethods() {
                 // 逐个判空后再 yield：Harmony 遍历到 null 会抛异常，导致自由放置整体失效。
-                MethodInfo m = SR.RefMethod(typeof(PiecePlacementCursor), "SetPiece", "自由放置（改写放置结果）");
+                MethodInfo m = SRApi.Ref.Method(typeof(PiecePlacementCursor), "SetPiece", "自由放置（改写放置结果）");
                 if (m != null) yield return m;
-                m = SR.RefMethod(typeof(PiecePlacementCursor), "FixedUpdate", "自由放置（补丁目标）");
+                m = SRApi.Ref.Method(typeof(PiecePlacementCursor), "FixedUpdate", "自由放置（补丁目标）");
                 if (m != null) yield return m;
             }
             static void Postfix(PiecePlacementCursor __instance) {
@@ -216,7 +216,7 @@ namespace SR_UCH.Tweaks {
                     Vector2 offset = __instance.Piece.GetTransformedPlacementOffset();
                     Vector3 cp = __instance.transform.position;
                     if (_heldOffsetField == null)
-                        _heldOffsetField = SR.RefField(typeof(PiecePlacementCursor), "heldPositionOffset", "自由放置（关闭网格吸附）");
+                        _heldOffsetField = SRApi.Ref.Field(typeof(PiecePlacementCursor), "heldPositionOffset", "自由放置（关闭网格吸附）");
                     Vector3 held = Vector3.zero;
                     if (_heldOffsetField != null) {
                         try { held = (Vector3)_heldOffsetField.GetValue(__instance); } catch (Exception __ex) { SRApi.Guard.Log("BuildingTools.Field", __ex); }
@@ -233,7 +233,7 @@ namespace SR_UCH.Tweaks {
             // 读取 private/protected bool 字段，取不到按 false（字段改名只是少一条守卫）。
             private static bool SafeBool(object target, string field) {
                 try {
-                    System.Reflection.FieldInfo fi = SR.RefField(target.GetType(), field, "建造增强：自由放置守卫");
+                    System.Reflection.FieldInfo fi = SRApi.Ref.Field(target.GetType(), field, "建造增强：自由放置守卫");
                     if (fi == null) return false;
                     object v = fi.GetValue(target);
                     return v is bool && (bool)v;

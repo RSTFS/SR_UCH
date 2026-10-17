@@ -14,9 +14,9 @@ public partial class Level : ITweak {
     // 栏目注册：本地化文案、侧栏顺序、页签、快捷键。
     private static void SelfReg() {
 // 反射游戏私有成员登记：改名时启动自检会在日志告警。
-        SR.RefOverride("ScoreKeeper.historyPointBlocks", "重载保分（历史分块）");
+        SRApi.Ref.Override("ScoreKeeper.historyPointBlocks", "重载保分（历史分块）");
         // 快照加载后据此区分关卡自带方块与玩家放置方块。
-        SR.RefOverride("QuickSaver.initialLevelPlaceables", "快照加载后的初始方块集合（关卡自带件）");
+        SRApi.Ref.Override("QuickSaver.initialLevelPlaceables", "快照加载后的初始方块集合（关卡自带件）");
         SR.LocSec("Level", "关卡", null);
         SR.Nav("Level", 40); //侧栏栏目顺序 40
         // 一个栏目两页，页签切换。

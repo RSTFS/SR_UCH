@@ -127,8 +127,8 @@ public partial class Experiments : ITweak
         // 判据为「BLANKLEVEL + 四边齐全」，不判游戏模式。界外的黑来自无背景时的相机清除色，与相机无关。
         private static void SelfReg() {
             // 两处反射均需登记，否则改名后静默返回 null（表现为解除边界无效）。
-            SR.RefOverride("Cursor.boundary", "解除关卡边界：放置光标边界快照");
-            SR.RefOverride("ZoomCamera.frame", "解除关卡边界：相机取景框");
+            SRApi.Ref.Override("Cursor.boundary", "解除关卡边界：放置光标边界快照");
+            SRApi.Ref.Override("ZoomCamera.frame", "解除关卡边界：相机取景框");
             SR.LocKey("Experiments", "Level Bounds", "解除关卡边界", null);
             SR.LocDesc("Experiments", "Level Bounds",
                 "把关卡的空间边界解开, 方块能放到外面, 角色也能走出去.",

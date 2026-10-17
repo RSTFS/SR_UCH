@@ -96,12 +96,12 @@ namespace SR_UCH.Tweaks {
             SR.HotkeyAction("online.disband", "返回主界面", DisbandOrLeave);
 
             // 反射成员登记：本文件的反射同样要登记，否则游戏改名后静默失效。
-            // SR.RefType() 按简单名解析类型，只能登记全局命名空间下的类型；带命名空间的类型不登记（会误报失效）。
+            // SRApi.Ref.Type() 按简单名解析类型，只能登记全局命名空间下的类型；带命名空间的类型不登记（会误报失效）。
             try {
-                SR.RefOverride("LevelSelectController.FadeOut", "联机：强制返回主界面（放出加载遮罩）");
+                SRApi.Ref.Override("LevelSelectController.FadeOut", "联机：强制返回主界面（放出加载遮罩）");
                 // JoinSteamLobby 保留反射：源码里写 SteamMatchmaker 会引入 Steamworks 程序集依赖。
-                SR.RefOverride("SteamMatchmaker.JoinSteamLobby", "联机：按 Steam 房间号加入");
-                SR.RefOverride("UnityMatchmaker.inPlatformLobbyNoRelay", "联机：判断是否在平台房间里");
+                SRApi.Ref.Override("SteamMatchmaker.JoinSteamLobby", "联机：按 Steam 房间号加入");
+                SRApi.Ref.Override("UnityMatchmaker.inPlatformLobbyNoRelay", "联机：判断是否在平台房间里");
             } catch (Exception __ro) { SRApi.Guard.Log("联机反射登记", __ro); }
 
             // 房主解散感知：订阅游戏的网络消息事件总线；房主返回主界面会 SendToAll(HostEndedGame)。
@@ -405,9 +405,9 @@ namespace SR_UCH.Tweaks {
         // 加入流程：先离开当前房间 -> 轮询等待离开完成 -> 再加入目标房间。
         // inPlatformLobbyNoRelay 是私有字段且声明在子类上，必须用 mm.GetType()（运行时类型）反射。
         private static System.Collections.IEnumerator JoinFlow(string id, bool useCode, Matchmaker mm) {
-            // 反射游戏私有成员必须走 SR.RefField（带功能名提示、失败告警与结果缓存）。
+            // 反射游戏私有成员必须走 SRApi.Ref.Field（带功能名提示、失败告警与结果缓存）。
             // 类型必须是运行时类型：Steam 与 Unity 的匹配器是两条独立继承链，字段声明在各自的链上。
-            System.Reflection.FieldInfo inLobby = SR.RefField(mm.GetType(), "inPlatformLobbyNoRelay",
+            System.Reflection.FieldInfo inLobby = SRApi.Ref.Field(mm.GetType(), "inPlatformLobbyNoRelay",
                 "联机：判断客户端是否已在平台房间里（加入前必须先退出）");
             bool InLobby() { try { return inLobby != null && (bool)inLobby.GetValue(mm); } catch { return false; } }
             if (InLobby()) {

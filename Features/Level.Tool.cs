@@ -472,13 +472,13 @@ public partial class Level {
 		// QuickSaver.initialLevelPlaceables 的反射字段缓存。
 		private static System.Reflection.FieldInfo _initialPiecesField;
 
-		// 关卡自带件集合（QuickSaver.initialLevelPlaceables，私有字段 -> 走 SR.RefField 反射）。
+		// 关卡自带件集合（QuickSaver.initialLevelPlaceables，私有字段 -> 走 SRApi.Ref.Field 反射）。
 		// 这些件不能列入清场目标：QuickClear 删后会 RestoreSaveables 恢复，本路径只删不恢复，会连可动方块一起删掉。
 		private static System.Collections.Generic.HashSet<Placeable> InitialLevelPieces(QuickSaver qs) {
 			System.Collections.Generic.HashSet<Placeable> set = new System.Collections.Generic.HashSet<Placeable>();
 			try {
-				// 反射游戏成员必须走 SR.RefField（自带缓存与失败告警）；外层字段缓存只省一次字典查找。
-				if (_initialPiecesField == null) _initialPiecesField = SR.RefField(typeof(QuickSaver), "initialLevelPlaceables", "快照加载后的初始方块集合（关卡自带件）");
+				// 反射游戏成员必须走 SRApi.Ref.Field（自带缓存与失败告警）；外层字段缓存只省一次字典查找。
+				if (_initialPiecesField == null) _initialPiecesField = SRApi.Ref.Field(typeof(QuickSaver), "initialLevelPlaceables", "快照加载后的初始方块集合（关卡自带件）");
 				System.Collections.IEnumerable list = (_initialPiecesField != null && qs != null) ? _initialPiecesField.GetValue(qs) as System.Collections.IEnumerable : null;
 				if (list == null) return set;
 				foreach (object o in list) {
@@ -785,7 +785,7 @@ public partial class Level {
             // 备份 historyPointBlocks（已 tally）+ newPointBlocks（本回合未结算）。
             List<PointBlock> blocks = new List<PointBlock>();
             try {
-                FieldInfo hf = SR.RefField(typeof(ScoreKeeper), "historyPointBlocks", "重载保分（历史分块）");
+                FieldInfo hf = SRApi.Ref.Field(typeof(ScoreKeeper), "historyPointBlocks", "重载保分（历史分块）");
                 List<PointBlock> hist = hf != null ? hf.GetValue(__instance) as List<PointBlock> : null;
                 if (hist != null) blocks.AddRange(hist);
             } catch (Exception ex) {

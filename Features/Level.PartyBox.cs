@@ -71,7 +71,7 @@ public partial class Level {
         public void Initialize(IFeatureHost plugin) {
             SR.RegisterDismissHook(delegate { _bombSent.Clear(); });
             // 本文件反射的游戏私有成员：必须在此登记，游戏改名时启动自检会告警。
-            SR.RefOverride("PartyBox.pieces", "派对盒炸弹（生成/清理）");
+            SRApi.Ref.Override("PartyBox.pieces", "派对盒炸弹（生成/清理）");
             _enabled = plugin.Config.Bind("Level", "Party Bomb", false,
                 "派对盒子炸弹: 房主开启后, 对局里所有人都发过炸弹这个快捷短语, 才会往派对盒子里塞炸弹. 只有房主生效.");
             _bombSize = plugin.Config.Bind("Level", "Party Bomb Type", 0,
@@ -149,8 +149,8 @@ public partial class Level {
                 Placeable bombPlaceable = PickBombPlaceable(pb, BombSize);
                 if (bombPlaceable == null || bombPlaceable.PickableBlock == null) { SRApi.LogWarn("[PartyBomb] 炸弹档 " + BombSize + " 无 PickableBlock"); return; }
 
-                // pieces 是 private，必须走 SR.RefField 反射获取后加入
-                var f = SR.RefField(typeof(PartyBox), "pieces", "派对盒炸弹（生成/清理）");
+                // pieces 是 private，必须走 SRApi.Ref.Field 反射获取后加入
+                var f = SRApi.Ref.Field(typeof(PartyBox), "pieces", "派对盒炸弹（生成/清理）");
                 if (f == null) return;
                 IList pieces = f.GetValue(pb) as IList;
                 if (pieces == null) return;
@@ -323,12 +323,12 @@ public class LevelPartyBox : ITweak {
                 SR.RegisterKey("关卡-关闭派对盒", _closePartyBoxKey, "press");
                 SR.RegisterTick("派对盒快捷键", Tick);
                 // 反射成员登记：游戏改名时启动自检会告警。
-                SR.RefOverride("PartyBox.pieces", "关卡派对盒道具（清场/重抽）");
-                SR.RefOverride("VersusControl.showPartyBox", "关卡派对盒：完整流程");
-                SR.RefOverride("VersusControl.IsSecondBox", "关卡派对盒：第二次开箱");
-                SR.RefOverride("VersusControl.ToPlaceMode", "关卡派对盒：房客一起进建造状态");
-                SR.RefOverride("VersusControl.SetupPlacementCursors", "关卡派对盒：同步放置光标");
-                SR.RefOverride("GameControl.nextPhase", "关卡派对盒：结束放置阶段");
+                SRApi.Ref.Override("PartyBox.pieces", "关卡派对盒道具（清场/重抽）");
+                SRApi.Ref.Override("VersusControl.showPartyBox", "关卡派对盒：完整流程");
+                SRApi.Ref.Override("VersusControl.IsSecondBox", "关卡派对盒：第二次开箱");
+                SRApi.Ref.Override("VersusControl.ToPlaceMode", "关卡派对盒：房客一起进建造状态");
+                SRApi.Ref.Override("VersusControl.SetupPlacementCursors", "关卡派对盒：同步放置光标");
+                SRApi.Ref.Override("GameControl.nextPhase", "关卡派对盒：结束放置阶段");
             } catch (Exception __ex) { SRApi.Guard.Log("关卡派对盒 初始化", __ex); }
         }
 
@@ -353,7 +353,7 @@ public class LevelPartyBox : ITweak {
                 // 权限判定走 SR.CanDoHost()：道具由房主端生成并需服务器广播，提示文案由 SR 统一给出。
                 if (!SR.CanDoHost()) return;
                 int oldPieces = DestroyPartyBoxPieces(pb); // 旧道具必须广播销毁：ChoosePieces 内部的 ClearPieces 只用 Object.Destroy
-                System.Reflection.MethodInfo show = SR.RefMethod(typeof(VersusControl), "showPartyBox", "关卡派对盒流程");
+                System.Reflection.MethodInfo show = SRApi.Ref.Method(typeof(VersusControl), "showPartyBox", "关卡派对盒流程");
                 if (show != null) {
                     show.Invoke(vc, null);
                     try { vc.CallRpcShowPartyBox(); } catch (System.Exception __ex) { SRApi.LogWarn("重新开箱(通知客户端)失败: " + __ex.Message); }
@@ -371,18 +371,18 @@ public class LevelPartyBox : ITweak {
         private static void ForcePlacePhase(VersusControl vc) {
             try {
                 if (vc == null) return;
-                System.Reflection.MethodInfo toPlace = SR.RefMethod(typeof(VersusControl), "ToPlaceMode", "关卡派对盒：房客一起进建造状态");
+                System.Reflection.MethodInfo toPlace = SRApi.Ref.Method(typeof(VersusControl), "ToPlaceMode", "关卡派对盒：房客一起进建造状态");
                 if (toPlace != null) {
                     try { toPlace.Invoke(vc, null); return; } catch (System.Exception __t) { SRApi.LogWarn("ToPlaceMode 失败，回退: " + __t.Message); }
                 }
-                System.Reflection.FieldInfo np = SR.RefField(typeof(GameControl), "nextPhase", "关卡派对盒：结束放置阶段");
+                System.Reflection.FieldInfo np = SRApi.Ref.Field(typeof(GameControl), "nextPhase", "关卡派对盒：结束放置阶段");
                 if (np != null) {
                     object cur = np.GetValue(vc);
                     if (cur == null || cur.ToString() != "PLACE") np.SetValue(vc, System.Enum.Parse(np.FieldType, "PLACE"));
                 }
                 // 房客同步：让各客户端也建立放置光标
                 try {
-                    System.Reflection.MethodInfo su = SR.RefMethod(typeof(VersusControl), "SetupPlacementCursors", "关卡派对盒：同步放置光标");
+                    System.Reflection.MethodInfo su = SRApi.Ref.Method(typeof(VersusControl), "SetupPlacementCursors", "关卡派对盒：同步放置光标");
                     if (su != null) su.Invoke(vc, null);
                     vc.CallRpcSetupPlacementCursors(false);
                 } catch (System.Exception __s) { SRApi.LogWarn("同步放置光标失败: " + __s.Message); }
@@ -413,10 +413,10 @@ public class LevelPartyBox : ITweak {
                 if (vc == null) { SRApi.Notify(SR.T("请先进入派对模式对局", "Not in a party match")); return; }
                 // 相位推进是服务器权限（原生 RPC 也只在房主侧发）。
                 if (!SR.CanDoHost()) return;
-                // placementTimer / showingPlacementWarning 是 VersusControl 的 protected 字段，必须走 SR.RefField 并登记。
-                System.Reflection.FieldInfo pt = SR.RefField(typeof(VersusControl), "placementTimer",
+                // placementTimer / showingPlacementWarning 是 VersusControl 的 protected 字段，必须走 SRApi.Ref.Field 并登记。
+                System.Reflection.FieldInfo pt = SRApi.Ref.Field(typeof(VersusControl), "placementTimer",
                     "关卡派对盒：关闭（把原生放置计时推到结束）");
-                System.Reflection.FieldInfo pw = SR.RefField(typeof(VersusControl), "showingPlacementWarning",
+                System.Reflection.FieldInfo pw = SRApi.Ref.Field(typeof(VersusControl), "showingPlacementWarning",
                     "关卡派对盒：关闭（进入原生的放置结束提示窗口）");
                 if (pt == null || pw == null) {
                     SRApi.Notify(SR.T("关闭派对盒失败（游戏成员不可用）", "Failed to close the party box (member unavailable)"));
@@ -435,7 +435,7 @@ public class LevelPartyBox : ITweak {
         private static int DestroyPartyBoxPieces(PartyBox pb) {
             int count = 0;
             try {
-                System.Reflection.FieldInfo f = SR.RefField(typeof(PartyBox), "pieces", "关卡派对盒道具（清场/重抽）");
+                System.Reflection.FieldInfo f = SRApi.Ref.Field(typeof(PartyBox), "pieces", "关卡派对盒道具（清场/重抽）");
                 System.Collections.IList list = f != null ? f.GetValue(pb) as System.Collections.IList : null;
                 if (list == null) return 0;
                 List<UnityEngine.GameObject> dead = new List<UnityEngine.GameObject>();
@@ -470,7 +470,7 @@ public class LevelPartyBox : ITweak {
                 bool extra = false;
                 try {
                     VersusControl vc = UnityEngine.Object.FindObjectOfType<VersusControl>();
-                    System.Reflection.FieldInfo f = vc != null ? SR.RefField(typeof(VersusControl), "IsSecondBox", "关卡派对盒流程") : null;
+                    System.Reflection.FieldInfo f = vc != null ? SRApi.Ref.Field(typeof(VersusControl), "IsSecondBox", "关卡派对盒流程") : null;
                     if (f != null) extra = (bool)f.GetValue(vc);
                 } catch { }
                 try { pb.ShowBox(extra); } catch (Exception __ex) { SRApi.LogWarn("重新开箱(本地)失败: " + __ex.Message); }

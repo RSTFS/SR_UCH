@@ -75,6 +75,12 @@ namespace SR_UCH {
                     delegate (string __m) { SR.LogWarn(__m); },
                     delegate (string __m) { SR.LogError(__m); });
                 SRApi.SetNotifySink(delegate (string __t) { SR.Notify(__t); });
+                SRApi.Ref.SetSinks(
+                    delegate (Type __o, string __n, string __f) { return SR.RefField(__o, __n, __f); },
+                    delegate (Type __o, string __n, string __f) { return SR.RefMethod(__o, __n, __f); },
+                    delegate (Type __o, string __n, Type[] __p, string __f) { return SR.RefMethod(__o, __n, __p, __f); },
+                    delegate (string __m, string __f) { SR.RefOverride(__m, __f); },
+                    null);   // SR.RefType 是核心私有，功能层用不到（唯一一处出现在注释里）
             } catch { }
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。

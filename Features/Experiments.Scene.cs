@@ -124,7 +124,7 @@ public partial class Experiments : ITweak
             try {
                 if (!_fiSkipTried) {
                     _fiSkipTried = true;
-                    _fiSkip = SR.RefField(typeof(UISplashScreen), "SkipBool", "场景：关闭跳过加载动画需清此标志");
+                    _fiSkip = SRApi.Ref.Field(typeof(UISplashScreen), "SkipBool", "场景：关闭跳过加载动画需清此标志");
                 }
                 if (_fiSkip == null) return;
                 object v = _fiSkip.GetValue(sp);

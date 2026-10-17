@@ -30,8 +30,8 @@ public class QuickAdjust : ITweak {
 
     private static void SelfReg() {
         // 本文件反射的游戏私有成员，改名时启动自检会在日志里告警。
-        SR.RefOverride("VersusControl.graphScoreBoardInstance", "评分折扣（取计分板实例）");
-        SR.RefOverride("GraphScoreBoard.scorelineRelation", "评分折扣（分数条位置）");
+        SRApi.Ref.Override("VersusControl.graphScoreBoardInstance", "评分折扣（取计分板实例）");
+        SRApi.Ref.Override("GraphScoreBoard.scorelineRelation", "评分折扣（分数条位置）");
         SR.LocSec("Quick Adjust", "快速调整", null);
         SR.Nav("Quick Adjust", 30); // 侧栏栏目顺序 30
         SR.RegisterPage("Quick Adjust", Render);   // 本功能页自绘
@@ -308,7 +308,7 @@ public class QuickAdjust : ITweak {
 				try {
 					VersusControl vc = gc as VersusControl;
 					if (vc != null) {
-						if (_gsbField == null) _gsbField = SR.RefField(typeof(VersusControl), "graphScoreBoardInstance", "评分折扣（取计分板实例）");
+						if (_gsbField == null) _gsbField = SRApi.Ref.Field(typeof(VersusControl), "graphScoreBoardInstance", "评分折扣（取计分板实例）");
 						if (_gsbField != null) board = _gsbField.GetValue(vc) as GraphScoreBoard;
 					}
 				} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.RefreshScoreboardHandicapCore", __ex); }
@@ -316,7 +316,7 @@ public class QuickAdjust : ITweak {
 					board = UnityEngine.Object.FindObjectOfType<GraphScoreBoard>();
 				}
 				if (board == null) return false;
-				if (_relField == null) _relField = SR.RefField(typeof(GraphScoreBoard), "scorelineRelation", "评分折扣（分数条位置）");
+				if (_relField == null) _relField = SRApi.Ref.Field(typeof(GraphScoreBoard), "scorelineRelation", "评分折扣（分数条位置）");
 				if (_relField == null) return false;
 				object rel = _relField.GetValue(board);
 				if (rel == null) return false;

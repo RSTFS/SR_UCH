@@ -51,7 +51,7 @@ public partial class Chat : ITweak {
         private static bool _posHaveBase, _posApplied;
         private static float _posLastDx, _posLastDy;
 
-        // 仅 VisibilityTimer 是 protected，走 SR.RefField；ChatCanvasGroup / ChatHolder / ChatMode 均为 public 字段，直接访问。
+        // 仅 VisibilityTimer 是 protected，走 SRApi.Ref.Field；ChatCanvasGroup / ChatHolder / ChatMode 均为 public 字段，直接访问。
         private static FieldInfo _fVisTimer;   //ChatDisplay.VisibilityTimer（可见计时器，游戏自己的淡入淡出用它）
 
         // 滚轮被本功能吃掉的帧号，转发 SR 的通用滚轮仲裁（SR.Input 的 WheelFrame）。
@@ -65,7 +65,7 @@ public partial class Chat : ITweak {
 
         private static void SelfRegWindow(IFeatureHost plugin) {
             // ChatCanvasGroup / ChatHolder / ChatMode 为 public 字段，已改为直接访问，不登记；仅 VisibilityTimer 保留登记。
-            SR.RefOverride("ChatDisplay.VisibilityTimer", "聊天窗口（可见计时器：保持显示但不自己写 alpha，淡入淡出交给游戏）");
+            SRApi.Ref.Override("ChatDisplay.VisibilityTimer", "聊天窗口（可见计时器：保持显示但不自己写 alpha，淡入淡出交给游戏）");
 
             // 本页是会话栏目的第 1 个子页，配置段仍为 Chat Window。
             SR.NavHide(Sec); // 本页不单独成侧栏栏目
@@ -202,7 +202,7 @@ public partial class Chat : ITweak {
             return false;
         }
 
-        // 三个游戏成员均为 public 字段，直接访问，省去每帧的反射取值与装箱；VisibilityTimer 为 protected，仍走 SR.RefField。
+        // 三个游戏成员均为 public 字段，直接访问，省去每帧的反射取值与装箱；VisibilityTimer 为 protected，仍走 SRApi.Ref.Field。
         private static CanvasGroup GroupOf(ChatDisplay d) {
             try { return d != null ? d.ChatCanvasGroup : null; } catch { return null; }
         }
@@ -244,7 +244,7 @@ public partial class Chat : ITweak {
         // 可见计时器续期：游戏在 VisibilityTimer>0 时朝 alpha=1 淡入并每帧自减；这里只在"该显示"时把它抬到一个很小的正数，淡入淡出交给游戏动画。
         private static void BumpVisibility(ChatDisplay d) {
             try {
-                if (_fVisTimer == null) _fVisTimer = SR.RefField(typeof(ChatDisplay), "VisibilityTimer", "聊天窗口（可见计时器）");
+                if (_fVisTimer == null) _fVisTimer = SRApi.Ref.Field(typeof(ChatDisplay), "VisibilityTimer", "聊天窗口（可见计时器）");
                 if (_fVisTimer == null) return;
                 object o = _fVisTimer.GetValue(d);
                 float cur = o is float ? (float)o : 0f;
@@ -255,7 +255,7 @@ public partial class Chat : ITweak {
         // 清零：让游戏按自己的速度淡出，而不是直接写 alpha = 0。
         private static void ZeroVisibility(ChatDisplay d) {
             try {
-                if (_fVisTimer == null) _fVisTimer = SR.RefField(typeof(ChatDisplay), "VisibilityTimer", "聊天窗口（可见计时器）");
+                if (_fVisTimer == null) _fVisTimer = SRApi.Ref.Field(typeof(ChatDisplay), "VisibilityTimer", "聊天窗口（可见计时器）");
                 if (_fVisTimer == null) return;
                 _fVisTimer.SetValue(d, 0f);
             } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口可见计时器清零", __ex); }
