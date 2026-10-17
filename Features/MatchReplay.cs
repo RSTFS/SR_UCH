@@ -1457,10 +1457,10 @@ public class MatchReplay : ITweak {
 				return;
 			}
 			float width = Mathf.Max(SRApi.Ctl.Sc(260f), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40f));
-			RenderSessionRows(list, width, true);
+			RenderSessionRows(list, width, true, true);
 			GUILayout.Space(SRApi.Ctl.Sc(4));
-			GUILayout.Label(SRApi.T("点击一行选中对局记录；切换上方「查看器」页签查看时间线（Ctrl+滚轮可切页）。",
-				"Click a row to select it; switch to the Viewer tab above for the timeline (Ctrl+wheel cycles tabs)."), SRApi.Ctl.LabelWrap);
+			GUILayout.Label(SRApi.T("单击一行选中对局记录；双击一行直接打开「查看器」页签（Ctrl+滚轮也可切页）。",
+				"Click a row to select it; double-click a row to open the Viewer tab (Ctrl+wheel also cycles tabs)."), SRApi.Ctl.LabelWrap);
 		} catch (Exception __ex) { SRApi.Guard.Log("渲染对局记录页", __ex); }
 	}
 
@@ -1490,7 +1490,7 @@ public class MatchReplay : ITweak {
 				try {
 					GUILayout.Label(SRApi.T("对局记录", "Match records") + " (" + list.Count.ToString(CultureInfo.InvariantCulture) + ")",
 						SRApi.Ctl.Label);
-					RenderSessionRows(list, leftW, true);
+					RenderSessionRows(list, leftW, true, false);
 				} finally { GUILayout.EndVertical(); }
 				GUILayout.Space(SRApi.Ctl.Sc(8));
 				GUILayout.BeginVertical();
@@ -1546,7 +1546,8 @@ public class MatchReplay : ITweak {
 	}
 
 	// 会话行：两行排版（名称/时间；模式/关卡/条目/快照/大小）。行高按两行文本实测，不再用固定常数。
-	private static void RenderSessionRows(List<SessionInfo> list, float width, bool clickable) {
+	// openViewerOnDoubleClick = true 时（第一页）双击行会选中该会话并切到「查看器」页。
+	private static void RenderSessionRows(List<SessionInfo> list, float width, bool clickable, bool openViewerOnDoubleClick) {
 		Event e = Event.current;
 		Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
 		float innerW = Mathf.Max(SRApi.Ctl.Sc(60f), width - SRApi.Ctl.Sc(14f));
@@ -1580,6 +1581,8 @@ public class MatchReplay : ITweak {
 			if (clickable && e != null && e.type == EventType.MouseDown && e.button == 0 && r.Contains(mp)) {
 				if (si.path != _viewPath) SelectSession(si.path);
 				GUIUtility.keyboardControl = 0;
+				// 第一页：双击会话行直接切到「查看器」页（选中会话保持不变）。
+				if (openViewerOnDoubleClick && e.clickCount >= 2) SRApi.SelectPage(Sec, "viewer");
 				e.Use();
 			}
 		}
