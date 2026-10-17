@@ -65,13 +65,9 @@ public partial class Experiments : ITweak
             // Scene 段条目全部渲染在场景页，必须 NavHide，否则兜底分支会再加一个独立侧栏栏目。
             SRApi.NavHide("Scene");
             SRApi.LocKey("Scene", "Splash Skip Load", "跳过加载动画", "Skip load animation");
-            SRApi.LocDesc("Scene", "Splash Skip Load",
-                "加载画面一出现就跳掉, 不用干等.",
-                "Skip the loading splash immediately.");
+            SRApi.LocDesc("Scene", "Splash Skip Load", "是什么：跳过加载动画开关\n干什么：加载画面出现后立即跳过\n注意事项：无副作用，仅省去等待\n默认值：关", "What: skip loading animation switch\nDoes: skips the loading splash as soon as it appears\nNotes: no side effects; only removes the wait\nDefault: OFF");
             SRApi.LocKey("Scene", "Gentle Load", "温柔加载", "Gentle load");
-            SRApi.LocDesc("Scene", "Gentle Load",
-                "切场景时先卸载再回收垃圾, 长时间玩会顺很多. 切到主菜单时自动让路, 那边游戏自己要走另一套.",
-                "Use the game's own DoGentleSceneLoad for scene switches (unload + GC before loading).");
+            SRApi.LocDesc("Scene", "Gentle Load", "是什么：温和加载开关\n干什么：切换场景时走游戏的卸载加 GC 流程，减轻卡顿\n注意事项：切换到主菜单时交由游戏自身流程\n默认值：关", "What: gentle loading switch\nDoes: uses the game unload plus GC routine when switching scenes to reduce stutter\nNotes: main-menu transitions use the game own routine\nDefault: OFF");
         }
 
         public void Initialize(IFeatureHost plugin) {
@@ -232,9 +228,7 @@ public partial class Experiments : ITweak
 
         private static void SelfReg() {
             SRApi.LocKey("Scene", "Lobby Launch Key", "立即开始键", "Launch now key");
-            SRApi.LocDesc("Scene", "Lobby Launch Key",
-                "按这个键跳过等待直接开始关卡, 自动选票最多的那扇门. 要房主才能用.",
-                "Press to start the level immediately (host only).");
+            SRApi.LocDesc("Scene", "Lobby Launch Key", "是什么：立即开始关卡快捷键\n干什么：按该键跳过等待直接开始，自动选票数最高的门\n注意事项：需要房主权限；不绑键则不生效\n默认值：未绑定", "What: launch-now key\nDoes: starts the level immediately, picking the door with the most votes\nNotes: host only; inactive while unbound\nDefault: unbound");
 
         }
 

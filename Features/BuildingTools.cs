@@ -33,13 +33,13 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec("build", "建造", "Build");
             SRApi.Nav("build", 50); // 侧栏栏目顺序 50
             SRApi.LocKey("build", "Collision Override", "无视碰撞", null);
-            SRApi.LocDesc("build", "Collision Override", "关掉放置规则, 方块可以互相重叠, 也可以悬空放着, 想放哪放哪.", "Ignore collision: pieces ignore placement rules and can go anywhere (overlap/air/crossing)");
+            SRApi.LocDesc("build", "Collision Override", "是什么：无视碰撞放置开关\n干什么：放开放置规则，方块可重叠、悬空或相互穿插\n注意事项：仅影响放置判定，不改变物理与玩法\n默认值：关", "What: ignore-collision placement switch\nDoes: pieces may overlap, float or intersect anything\nNotes: placement rules only; physics and gameplay are unchanged\nDefault: OFF");
             SRApi.LocKey("build", "Collision Toggle Key", "无视碰撞开关", null);
-            SRApi.LocDesc("build", "Collision Toggle Key", "游戏里按这个键临时开关无视碰撞, 默认 F1.", "Toggle ignore-collision in-game (default F1)");
+            SRApi.LocDesc("build", "Collision Toggle Key", "是什么：无视碰撞快捷键\n干什么：游戏中临时开关无视碰撞放置\n注意事项：可改绑，支持组合键\n默认值：F1", "What: ignore-collision key\nDoes: temporarily toggles ignore-collision placement in-game\nNotes: rebindable, combos supported\nDefault: F1");
             SRApi.LocKey("build", "Grid Override", "自由放置", null);
-            SRApi.LocDesc("build", "Grid Override", "把吸附精度从 1 格调到 0.01 格, 放歪一点也能摆. 只改放置取整, 不改玩法和物理, 只在建造阶段生效. 关掉立刻回到整格.", "Free placement: pieces no longer snap to the 1-unit grid - they snap to 0.01 units, so you can fine-tune placement.\nOnly changes placement rounding precision, not gameplay/physics; build phase only.\nNo key needed while on; turning it off restores the standard grid snap.");
+            SRApi.LocDesc("build", "Grid Override", "是什么：自由放置开关\n干什么：吸附精度由 1 格改为 0.01 格，可微调位置\n注意事项：仅影响放置取整，只在建造阶段生效；关闭立即回到整格吸附\n默认值：关", "What: free placement switch\nDoes: changes grid snapping from 1 unit to 0.01 units for fine-tuning\nNotes: placement rounding only, build phase only; turning it off restores 1-unit snapping immediately\nDefault: OFF");
             SRApi.LocKey("build", "Grid Toggle Key", "自由放置开关", null);
-            SRApi.LocDesc("build", "Grid Toggle Key", "游戏里按这个键临时开关自由放置, 默认 F2.", "Toggle free placement in-game (default F2)");
+            SRApi.LocDesc("build", "Grid Toggle Key", "是什么：自由放置快捷键\n干什么：游戏中临时开关自由放置\n注意事项：可改绑，支持组合键\n默认值：F2", "What: free placement key\nDoes: temporarily toggles free placement in-game\nNotes: rebindable, combos supported\nDefault: F2");
         }
 
         // 当前生效的满度上限（只读框显示用）：直接读游戏字段，不借其它功能的接口以避免横向依赖。
@@ -264,9 +264,9 @@ namespace SR_UCH.Tweaks {
 
         private static void SelfReg() {
             SRApi.LocKey("build", "Lift Build Cap", "解除建造上限", null);
-            SRApi.LocDesc("build", "Lift Build Cap", "把关卡满度上限从原版 500 提到下面那个数, 默认 1000000. 装太满的关卡也能发出去. 不用按键, 关掉就回到 500.", "Lift the level fullness cap: the treehouse save/publish cap rises from 500 to the Limit value (default 1000000), so over-full levels can be published.\nWorks from anywhere; turning it off restores 500.");
+            SRApi.LocDesc("build", "Lift Build Cap", "是什么：满度上限解除开关\n干什么：把关卡满度上限从原版 500 提升到设定值\n注意事项：用于树屋保存/发布；关闭后恢复 500\n默认值：关", "What: build cap unlock switch\nDoes: raises the level fullness cap from the vanilla 500 to the configured value\nNotes: applies to treehouse save/publish; turning it off restores 500\nDefault: OFF");
             SRApi.LocKey("build", "Build Cap Value", "上限数值", "Limit Value");
-            SRApi.LocDesc("build", "Build Cap Value", "满度上限具体填多少, 500 到 10000000, 原版是 500. 改完立刻生效, 越大能放的方块越多.", "Fullness cap value (500 - 10000000; vanilla is 500).\nTakes effect immediately; higher allows more blocks before publish is blocked.");
+            SRApi.LocDesc("build", "Build Cap Value", "是什么：满度上限数值\n干什么：设置解除后的满度上限\n注意事项：范围 500 到 10000000，改完立即生效\n默认值：1000000", "What: build cap value\nDoes: sets the fullness cap used when the unlock is on\nNotes: range 500-10000000, applies immediately\nDefault: 1000000");
         }
 
         public void Initialize(IFeatureHost plugin) {

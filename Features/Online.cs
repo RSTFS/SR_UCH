@@ -140,9 +140,9 @@ namespace SR_UCH.Tweaks {
                 if (_sortCol < 0 || _sortCol >= ColCount || _sortCol == JoinCol) _sortCol = -1;
             } catch { _sortCol = -1; _sortDesc = false; }
             SRApi.LocKey(SecOnline, "Show Quality Coeff", "显示技能匹配质量", null);
-            SRApi.LocDesc(SecOnline, "Show Quality Coeff", "打开后, 游戏质量那一列的勾后面会多出一个 0 到 1 的匹配系数. 按住 Shift 点一下这一列的表头就能开关.", null);
+            SRApi.LocDesc(SecOnline, "Show Quality Coeff", "是什么：技能匹配质量系数显示开关\n干什么：在房间列表质量列后附带 0 到 1 的匹配系数\n注意事项：也可按住 Shift 点击该列列头切换\n默认值：关", "What: skill-match quality coefficient toggle\nDoes: appends a 0-1 match coefficient to the quality column\nNotes: can also be toggled with Shift + click on the column header\nDefault: OFF");
             SRApi.LocKey(SecOnline, "Skill Mode", "技能系数取值", null);
-            SRApi.LocDesc(SecOnline, "Skill Mode", "技能系数那一列显示最大值, 平均值还是最小值. 按住 Shift 点这一列的表头就能换.", null);
+            SRApi.LocDesc(SecOnline, "Skill Mode", "是什么：技能系数取值方式\n干什么：决定技能系数列取最大值、平均值还是最小值\n注意事项：也可按住 Shift 点击该列列头切换\n默认值：平均值", "What: skill coefficient mode\nDoes: selects max, average or min for the skill column\nNotes: can also be toggled with Shift + click on the column header\nDefault: average");
         }
 
         // 清空房间列表与表格几何缓存（返回主界面 / 房主解散时调用）；不动列宽 / 列序 / 隐藏列偏好。

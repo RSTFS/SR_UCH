@@ -217,9 +217,7 @@ public partial class Level {
         public void Initialize(IFeatureHost plugin) {
             try {
                 SRApi.LocKey("Level", "Drop Held Piece", "放弃道具", "Drop held piece");
-                SRApi.LocDesc("Level", "Drop Held Piece",
-                    "排队模式里手上拿着道具又不想放了, 按这个键丢掉. 走游戏自己的通道, 全员都能看到, 之后正常进下一阶段.",
-                    "In the queue phase, press this to discard the piece you are holding. Goes through the game's own channel; everyone sees it.");
+                SRApi.LocDesc("Level", "Drop Held Piece", "是什么：放弃道具快捷键\n干什么：排队阶段丢弃手上的道具，走游戏原生通道，全员可见\n注意事项：不绑键则不生效\n默认值：未绑定", "What: drop held piece key\nDoes: discards the held piece during the queue phase through the game own channel; visible to everyone\nNotes: inactive while unbound\nDefault: unbound");
                 _key = plugin.Config.Bind("Level", "Drop Held Piece", KeyCode.None,
                     "按这个键就把手上拿着的那块丢掉（走游戏原生通道, 全员可见）, 填 None 就是不绑键.");
                 SRApi.RegisterKey("关卡-放弃道具", _key, "press");
