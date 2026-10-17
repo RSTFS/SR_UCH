@@ -311,11 +311,12 @@ public partial class Chat : ITweak {
                 }
 
                 // 2) 滚轮：字号键调字号 / 缩放键调缩放（按住调节键即生效，不要求窗口当时可见）。
-                // 滚轮量取 SRApi.TakeWheelEvent()：Input.GetAxis("Mouse ScrollWheel") 在本环境恒为 0。
-                float wheel = SRApi.TakeWheelEvent();
+                // 只有按住调节键时才取滚轮：TakeWheelEvent 是"取用即清"的全局通道，
+                // 无条件取会吞掉其它功能的滚轮（方块破坏的滚轮选块因此失效）。
+                bool scaleKey = _boxScaleKey != null && _boxScaleKey.Value != KeyCode.None && SRApi.ComboKeyHeld(_boxScaleKey);
+                bool fontKey = _fontKey != null && _fontKey.Value != KeyCode.None && SRApi.ComboKeyHeld(_fontKey);
+                float wheel = (scaleKey || fontKey) ? SRApi.TakeWheelEvent() : 0f;
                 if (Mathf.Abs(wheel) > 0.0001f) {
-                    bool scaleKey = _boxScaleKey != null && _boxScaleKey.Value != KeyCode.None && SRApi.ComboKeyHeld(_boxScaleKey);
-                    bool fontKey = _fontKey != null && _fontKey.Value != KeyCode.None && SRApi.ComboKeyHeld(_fontKey);
                     if (fontKey) {
                         int step = wheel > 0f ? 1 : -1;
                         int nv = Mathf.Clamp((_fontSize != null ? _fontSize.Value : 18) + step, 1, 50);
