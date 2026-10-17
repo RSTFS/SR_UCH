@@ -20,6 +20,8 @@ namespace SR_UCH.Tweaks {
 	public class BuildingPresets : ITweak {
 		// 配置段名：导航栏目名 / LocSec / Config.Bind 三处必须完全一致。
 		private const string Section = "Building Presets";
+		// 对外槽位：Func<string xml, string displayName, bool ok>，供对局回放把阶段快照存成预设。
+		private const string SlotSaveXml = "presets.saveXml";
 		private const string IndexFileName = "index.json";
 		private const int IndexVersion = 1;
 		// 从剪贴板导入的上限：方块数 / XML 字符数。超出直接拒绝，避免一次性重建拖垮帧率或整段解析爆内存。
@@ -82,6 +84,9 @@ namespace SR_UCH.Tweaks {
 					"显示时间列：在预设列表显示每条的保存时间；关闭后列表更紧凑。");
 				_showTimestampsOn = _showTimestamps.Value;
 				_showTimestamps.SettingChanged += delegate { _showTimestampsOn = _showTimestamps.Value; };
+				// 对外槽位：其它功能（对局回放）把阶段快照 XML 存成预设。只新增跨功能入口，不改变本页现有行为。
+				try { Slots.Provide(SlotSaveXml, (Func<string, string, bool>)SaveXmlFromOther); }
+				catch (Exception __sx) { SRApi.Guard.Log("布局预设/提供槽位", __sx); }
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设 初始化", __ex);
 			}
@@ -382,6 +387,91 @@ namespace SR_UCH.Tweaks {
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/写文件", __ex);
 				SRApi.Notify(SRApi.T("保存预设失败", "Failed to save the preset"));
+			}
+		}
+
+		// 槽位实现：把外部 XML（对局回放的阶段快照）存成布局预设。
+		// 校验：XML 非空 / 根节点必须是 scene / 方块数 1..MaxImportBlocks；重名自动加 "-2"、"-3"…，不弹二次确认。
+		// 返回值：true = 已写文件并刷新索引；false = 被拒绝或失败（失败原因已 Notify）。
+		private static bool SaveXmlFromOther(string xml, string displayName) {
+			try {
+				if (string.IsNullOrEmpty(xml)) return false;
+				if (xml.Length > MaxImportChars) {
+					SRApi.Notify(SRApi.T("快照 XML 过大，已拒绝保存为预设", "Snapshot XML is too large; preset save rejected"));
+					return false;
+				}
+				XmlDocument doc = null;
+				try {
+					doc = new XmlDocument();
+					doc.LoadXml(xml);
+				} catch (Exception __px) {
+					SRApi.Guard.Log("布局预设/槽位解析XML", __px);
+				}
+				if (doc == null || doc.DocumentElement == null || doc.DocumentElement.Name != "scene") {
+					SRApi.Notify(SRApi.T("快照 XML 根节点不是 scene，已拒绝", "Snapshot XML root is not scene; rejected"));
+					return false;
+				}
+				int blocks = CountBlocks(doc);
+				if (blocks <= 0) {
+					SRApi.Notify(SRApi.T("快照里没有方块，已拒绝", "The snapshot contains no blocks; rejected"));
+					return false;
+				}
+				if (blocks > MaxImportBlocks) {
+					SRApi.Notify(SRApi.T("快照方块数超过上限 ", "Snapshot block count exceeds the limit ") + MaxImportBlocks + SRApi.T("，已拒绝", "; rejected"));
+					return false;
+				}
+				StripDestroyed(doc);
+				EnsureLoaded();
+				if (_presets.Count >= MaxPresets) {
+					SRApi.Notify(SRApi.T("预设数量已达上限 ", "Preset limit reached: ") + MaxPresets + SRApi.T("，请先删除旧预设", "; delete an old preset first"));
+					return false;
+				}
+				string mode = "REPLAY";
+				try {
+					GameSettings st = GameSettings.GetInstance();
+					if (st != null) mode = st.GameMode.ToString();
+				} catch (Exception __mx) { SRApi.Guard.Log("布局预设/槽位读取模式", __mx); }
+				string dirName = SafeDirName(mode);
+				string dir = Path.Combine(PresetsRoot(), dirName);
+				string baseName = (displayName ?? "").Trim();
+				if (baseName.Length == 0) baseName = SRApi.T("回放快照 ", "Replay snapshot ") + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+				if (baseName.Length > 40) baseName = baseName.Substring(0, 40);
+				string finalName = baseName;
+				string fileName = SafeFileName(finalName) + ".xml";
+				string key = dirName + "/" + fileName;
+				int n = 2;
+				while (File.Exists(Path.Combine(dir, fileName)) || FindPreset(key) != null) {
+					string candidate = baseName + "-" + n.ToString(CultureInfo.InvariantCulture);
+					if (candidate.Length > 60) candidate = candidate.Substring(0, 60);
+					finalName = candidate;
+					fileName = SafeFileName(finalName) + ".xml";
+					key = dirName + "/" + fileName;
+					n++;
+					if (n > 999) {
+						SRApi.Notify(SRApi.T("同名预设过多，保存失败", "Too many presets with the same name; save failed"));
+						return false;
+					}
+				}
+				Directory.CreateDirectory(dir);
+				File.WriteAllText(Path.Combine(dir, fileName), doc.OuterXml, new UTF8Encoding(false));
+				PresetInfo p = FindPreset(key);
+				if (p == null) {
+					p = new PresetInfo();
+					p.Mode = dirName;
+					p.File = fileName;
+					_presets.Add(p);
+				}
+				p.Name = finalName;
+				p.Blocks = blocks;
+				p.TimeUtc = DateTime.UtcNow;
+				p.FilePath = Path.Combine(dir, fileName);
+				SortPresets();
+				SaveIndex();
+				SRApi.LogInfo("[布局预设] 槽位保存 " + key + "（" + blocks + " 块）");
+				return true;
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/槽位保存", __ex);
+				return false;
 			}
 		}
 
