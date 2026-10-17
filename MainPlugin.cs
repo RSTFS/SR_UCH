@@ -1,6 +1,8 @@
 ﻿// 入口（BepInEx 插件）：配置外置到 SR_UCH_data.cfg；反射发现并初始化全部 ITweak；扫描外部
 // 功能 / 语言包 DLL；注册 SR_UCH 程序集解析。本文件定义统一契约 ITweak。
 using System;
+using UnityEngine;
+using BepInEx.Configuration;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -116,6 +118,41 @@ namespace SR_UCH {
                     delegate { return SR.CurrentLanguageId; },
                     delegate { return SR.LangVer; },
                     delegate (string __z, string __e, object[] __a) { SR.NotifyT(__z, __e, __a); });
+                SRApi.Ctl.SetSinks(
+                    delegate (float __v) { return SR.Ctl.Sc(__v); },
+                    delegate (GUIContent __c, ConfigEntryBase __e, float __w, float __h, ConfigEntry<KeyCode> __k) { SR.Ctl.RestoreLabel(__c, __e, __w, __h, __k); },
+                    delegate (ConfigEntryBase __e) { SR.Ctl.RenderControl(__e); },
+                    delegate (ConfigEntryBase __e, bool __i, float __c2) { SR.Ctl.RenderEntryRow(__e, __i, __c2); },
+                    delegate (string __s, string __k) { return SR.Ctl.FindEntry(__s, __k); },
+                    delegate (string __s) { return SR.Ctl.SectionEntries(__s); },
+                    delegate (ConfigEntryBase __e, float __w) { SR.Ctl.DrawEntryRow(__e, __w); },
+                    delegate (string __t2, float __w) { return SR.Ctl.TextHeight(__t2, __w); },
+                    delegate (Rect __r, float __v, float __mn, float __mx, bool __i) { return SR.Ctl.DrawSlider(__r, __v, __mn, __mx, __i); },
+                    delegate (ConfigEntryBase __e, string __cur, Array __vals, string[] __opts, ref bool __open, float __w) { return SR.Ctl.ComboBox(__e, __cur, __vals, __opts, ref __open, __w); },
+                    delegate { return SR.Ctl.SidebarWidth(); },
+                    delegate { return SR.Ctl.WinWidth; },
+                    delegate (ConfigEntryBase __e, object __v) { SR.Ctl.SetValue(__e, __v); },
+                    delegate (string __l, string __t2, ConfigEntry<KeyCode> __k, float __w, bool __b) { return SR.Ctl.HotkeyActionButton(__l, __t2, __k, __w, __b); },
+                    delegate (string __id, string __l, string __t2, Action __a, float __w, float __h) { return SR.Ctl.HotkeyButton(__id, __l, __t2, __a, __w, __h); },
+                    delegate (string __n) {
+                        switch (__n) {
+                            case "Label": return SR.Ctl.Label;
+                            case "LabelWrap": return SR.Ctl.LabelWrap;
+                            case "ChatLabel": return SR.Ctl.ChatLabel;
+                            case "ChatArea": return SR.Ctl.ChatArea;
+                            case "SecHeader": return SR.Ctl.SecHeader;
+                            case "Btn": return SR.Ctl.Btn;
+                            case "BtnClip": return SR.Ctl.BtnClip;
+                            case "SearchBox": return SR.Ctl.SearchBox;
+                            case "Footer": return SR.Ctl.Footer;
+                        }
+                        return null;
+                    },
+                    delegate { SR.Ctl.ScrollToBottom(); },
+                    delegate { SR.Ctl.NoteEntryBound(); },
+                    delegate (ConfigFile __c) { SR.Ctl.MarkConfigDirty(__c); },
+                    delegate { return SR.Ctl.LangEn; },
+                    delegate { return SR.Ctl.EditOpen; });
             } catch { }
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。

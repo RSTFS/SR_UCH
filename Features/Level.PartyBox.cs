@@ -19,40 +19,40 @@ public partial class Level {
         });
 
         // 派对盒炸弹：对局内所有成员都发过炸弹！快捷短语才生成
-        GUILayout.Label(SRApi.T("- 派对盒子炸弹 -", "- Party-box bomb -"), SR.Ctl.SecHeader);
+        GUILayout.Label(SRApi.T("- 派对盒子炸弹 -", "- Party-box bomb -"), SRApi.Ctl.SecHeader);
         GUILayout.BeginHorizontal();
-        ConfigEntryBase pbe = SR.Ctl.FindEntry("Level", "Party Bomb"); // Bind 在 Level 段，查 [EX] 段取不到
-        SR.Ctl.RestoreLabel(new GUIContent(SRApi.T("派对盒子炸弹", "Party-box bomb"), SRApi.T("房主开启后，对局内所有成员都发过炸弹！快捷短语时，往当前派对盒子塞入炸弹。", "Host on: when every member sends the Bomb quick-phrase, spawn a bomb in the current party box.")), pbe, SR.Ctl.Sc(140), SR.Ctl.Sc(40));
-        if (pbe != null) SR.Ctl.RenderControl(pbe);
-        GUILayout.Space(SR.Ctl.Sc(10));
-        GUILayout.Label(SRApi.T("炸弹种类", "Bomb type"), SR.Ctl.Label, GUILayout.Height(SR.Ctl.Sc(26)));
-        ConfigEntryBase pbtype = SR.Ctl.FindEntry("Level", "Party Bomb Type");
+        ConfigEntryBase pbe = SRApi.Ctl.FindEntry("Level", "Party Bomb"); // Bind 在 Level 段，查 [EX] 段取不到
+        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("派对盒子炸弹", "Party-box bomb"), SRApi.T("房主开启后，对局内所有成员都发过炸弹！快捷短语时，往当前派对盒子塞入炸弹。", "Host on: when every member sends the Bomb quick-phrase, spawn a bomb in the current party box.")), pbe, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(40));
+        if (pbe != null) SRApi.Ctl.RenderControl(pbe);
+        GUILayout.Space(SRApi.Ctl.Sc(10));
+        GUILayout.Label(SRApi.T("炸弹种类", "Bomb type"), SRApi.Ctl.Label, GUILayout.Height(SRApi.Ctl.Sc(26)));
+        ConfigEntryBase pbtype = SRApi.Ctl.FindEntry("Level", "Party Bomb Type");
         if (pbtype != null) {
             // 三档：0 小 / 1 大 / 2 超级（对应游戏内 99abombmini / 99bomb / 99bbombmega）
             string[] opts = new[] { SRApi.T("小炸弹", "Small"), SRApi.T("大炸弹", "Big"), SRApi.T("超级炸弹", "Mega") };
             int curIdx = Mathf.Clamp((int)pbtype.BoxedValue, 0, 2);
-            bool open; if (!SR.Ctl.EditOpen.TryGetValue(pbtype, out open)) open = false;
-            int pbSel = SR.Ctl.ComboBox(pbtype, opts[curIdx], BombTypeVals, opts, ref open, SR.Ctl.Sc(150));
-            if (pbSel >= 0) { SR.Ctl.SetValue(pbtype, BombTypeVals[pbSel]); SR.Ctl.EditOpen[pbtype] = false; }
-            else SR.Ctl.EditOpen[pbtype] = open;
+            bool open; if (!SRApi.Ctl.EditOpen.TryGetValue(pbtype, out open)) open = false;
+            int pbSel = SRApi.Ctl.ComboBox(pbtype, opts[curIdx], BombTypeVals, opts, ref open, SRApi.Ctl.Sc(150));
+            if (pbSel >= 0) { SRApi.Ctl.SetValue(pbtype, BombTypeVals[pbSel]); SRApi.Ctl.EditOpen[pbtype] = false; }
+            else SRApi.Ctl.EditOpen[pbtype] = open;
         }
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
-        GUILayout.Space(SR.Ctl.Sc(2));
+        GUILayout.Space(SRApi.Ctl.Sc(2));
 
-        GUILayout.Label(SRApi.T("- 派对盒（重抽 / 开箱 / 关闭）-", "- Party box -"), SR.Ctl.SecHeader);
+        GUILayout.Label(SRApi.T("- 派对盒（重抽 / 开箱 / 关闭）-", "- Party box -"), SRApi.Ctl.SecHeader);
         GUILayout.BeginHorizontal();
-        if (SR.Ctl.HotkeyActionButton(SRApi.T("刷新派对盒", "Reroll + reopen box"), SRApi.T("完整重走一遍游戏自己的派对盒流程：按本轮权重重抽道具 + 重新开箱（全员可再选一次）", "Run the game own party-box flow again: reroll with this round weights and reopen the box so everyone can pick again"), LevelPartyBox.RefreshPartyBoxKeyEntry, SR.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBox();
-        GUILayout.Space(SR.Ctl.Sc(8));
-        if (SR.Ctl.HotkeyActionButton(SRApi.T("刷新道具", "Reroll items"), SRApi.T("只重抽派对盒里的道具，不重新开箱、不切换相位", "Only reroll the items; no reopen and no phase change"), LevelPartyBox.RefreshPiecesKeyEntry, SR.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBoxPieces();
+        if (SRApi.Ctl.HotkeyActionButton(SRApi.T("刷新派对盒", "Reroll + reopen box"), SRApi.T("完整重走一遍游戏自己的派对盒流程：按本轮权重重抽道具 + 重新开箱（全员可再选一次）", "Run the game own party-box flow again: reroll with this round weights and reopen the box so everyone can pick again"), LevelPartyBox.RefreshPartyBoxKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBox();
+        GUILayout.Space(SRApi.Ctl.Sc(8));
+        if (SRApi.Ctl.HotkeyActionButton(SRApi.T("刷新道具", "Reroll items"), SRApi.T("只重抽派对盒里的道具，不重新开箱、不切换相位", "Only reroll the items; no reopen and no phase change"), LevelPartyBox.RefreshPiecesKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBoxPieces();
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
-        GUILayout.Space(SR.Ctl.Sc(6));
+        GUILayout.Space(SRApi.Ctl.Sc(6));
         GUILayout.BeginHorizontal();
-        if (SR.Ctl.HotkeyActionButton(SRApi.T("关闭派对盒", "Close party box"), SRApi.T("结束派对盒选择，进入游玩阶段（走游戏原生相位切换，全员同步）", "End the party-box selection and enter the play phase (native phase change, synced)"), LevelPartyBox.ClosePartyBoxKeyEntry, SR.Ctl.Sc(150), true)) LevelPartyBox.ClosePartyBox();
+        if (SRApi.Ctl.HotkeyActionButton(SRApi.T("关闭派对盒", "Close party box"), SRApi.T("结束派对盒选择，进入游玩阶段（走游戏原生相位切换，全员同步）", "End the party-box selection and enter the play phase (native phase change, synced)"), LevelPartyBox.ClosePartyBoxKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.ClosePartyBox();
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
-        GUILayout.Space(SR.Ctl.Sc(4));
+        GUILayout.Space(SRApi.Ctl.Sc(4));
         }
 }
 

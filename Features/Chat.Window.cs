@@ -152,15 +152,15 @@ public partial class Chat : ITweak {
 
         // 自绘页：在"启用位置调整"行前插入分区标题；锚点行必须在可见行上，否则标题永不显示。
         private static void RenderPage() {
-            float col = Mathf.Max(SR.Ctl.Sc(180), SR.Ctl.WinWidth - SR.Ctl.SidebarWidth() - SR.Ctl.Sc(240));
-            List<ConfigEntryBase> entries = SR.Ctl.SectionEntries(Sec);
+            float col = Mathf.Max(SRApi.Ctl.Sc(180), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(240));
+            List<ConfigEntryBase> entries = SRApi.Ctl.SectionEntries(Sec);
             for (int i = 0; i < entries.Count; i++) {
                 ConfigEntryBase e = entries[i];
                 if (e.Definition.Key == "Pos Enabled") {
-                    GUILayout.Space(SR.Ctl.Sc(6));
-                    GUILayout.Label(SRApi.T("- 聊天框位置 -", "- Chat box position -"), SR.Ctl.SecHeader);
+                    GUILayout.Space(SRApi.Ctl.Sc(6));
+                    GUILayout.Label(SRApi.T("- 聊天框位置 -", "- Chat box position -"), SRApi.Ctl.SecHeader);
                 }
-                SR.Ctl.RenderEntryRow(e, true, col);
+                SRApi.Ctl.RenderEntryRow(e, true, col);
             }
         }
 

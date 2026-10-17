@@ -297,7 +297,7 @@ namespace SR_UCH.Tweaks {
                 ListMode.Normal,
                 "列表模式：普通 = 只列出玩家确切放置过的方块（关卡初始布局/系统方块不出现）；进阶 = 所有方块单独列出，不在乎有没有玩家号。");
             // 该行可见性取决于列表模式（见 TrackPlayerRowVisible），而条目缓存只按绑定版本失效，故切换时需主动失效。
-            _listMode.SettingChanged += (s, e) => SR.Ctl.NoteEntryBound();
+            _listMode.SettingChanged += (s, e) => SRApi.Ctl.NoteEntryBound();
             _trackMode = _mp.Config.Bind(
                 "Destroy Blocks",
                 "Track Player",

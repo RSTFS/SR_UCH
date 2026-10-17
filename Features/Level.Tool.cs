@@ -17,30 +17,30 @@ public partial class Level {
 
 
     public static void RenderTools() {
-        GUILayout.Label(SRApi.T("- 关卡工具 -", "- Level tools -"), SR.Ctl.SecHeader);
+        GUILayout.Label(SRApi.T("- 关卡工具 -", "- Level tools -"), SRApi.Ctl.SecHeader);
         GUILayout.BeginHorizontal();
-        if (SR.Ctl.HotkeyButton("level.reload", SRApi.T("重载关卡", "Reload level"),
+        if (SRApi.Ctl.HotkeyButton("level.reload", SRApi.T("重载关卡", "Reload level"),
             SRApi.T("房主把当前看到的方块都写进关卡快照, 然后真的重载一次当前关卡, 全员一起重新加载.\n重载完按快照把方块重建出来并广播, 玩家放的方块和能动的道具都不会丢.\n要不要顺手把分数补回来, 看下面那个重载模式.\n 只在派对和创意模式的对局里生效, 而且只有房主能用.", "Host writes the current blocks into the snapshot and really reloads the level scene, so everyone reloads.\nBlocks are rebuilt from the snapshot and nothing is lost.\nWhether the score is filled back depends on the Reload mode below.\n Party/Creative matches only, host only."),
-            () => Level.ReloadLevel(), SR.Ctl.Sc(170), SR.Ctl.Sc(30))) {
+            () => Level.ReloadLevel(), SRApi.Ctl.Sc(170), SRApi.Ctl.Sc(30))) {
             Level.ReloadLevel();
         }
-        ConfigEntryBase rlm = SR.Ctl.FindEntry("Level", "Reload Mode");
-        SR.Ctl.RestoreLabel(new GUIContent(SRApi.T("重载模式", "Reload mode"),
+        ConfigEntryBase rlm = SRApi.Ctl.FindEntry("Level", "Reload Mode");
+        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("重载模式", "Reload mode"),
             SRApi.T("重载关卡模式：\n保留方块和分数（允许补分）= 重载后当前方块保留；房主按原类型分块给全员广播补分，下一回合结算时全员得分板显示与重载前一致的分数和类型。\n仅保留方块（跳过补分）= 重载后当前方块保留，分数重置。", "Reload level mode:\nKeep blocks & score (allow fill) = blocks kept; the host fills scores so everyone sees the same score/types next tally.\nKeep blocks only (skip fill) = blocks kept, score resets.")),
-            rlm, SR.Ctl.Sc(140), SR.Ctl.Sc(52));
-        if (rlm != null) SR.Ctl.RenderControl(rlm);
+            rlm, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
+        if (rlm != null) SRApi.Ctl.RenderControl(rlm);
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
-        GUILayout.Space(SR.Ctl.Sc(2));
+        GUILayout.Space(SRApi.Ctl.Sc(2));
         GUILayout.BeginHorizontal();
-        if (SR.Ctl.HotkeyButton("level.broadcast", SRApi.T("广播方块快照", "Broadcast snapshot"),
+        if (SRApi.Ctl.HotkeyButton("level.broadcast", SRApi.T("广播方块快照", "Broadcast snapshot"),
             SRApi.T("房主把当前看到的方块连位置, 旋转和属性一起打包广播出去, 全员按房主那边的样子重建方块.\n局内偶尔出现的方块自己这边看不见或者不同步, 就用这个修.\n不会重载场景: 对局进度和分数都留着, 全员会卡一下, 然后方块就回来了.\n 只在派对和创意模式的对局里生效, 而且只有房主能用.", "Host packages the blocks they see and broadcasts them, so everyone rebuilds from the host snapshot.\nUse this when blocks occasionally disappear or desync on your side mid-match.\nNo scene reload: progress and scores stay.\n Party/Creative matches only, host only."),
-            () => Level.BroadcastSnapshot(), SR.Ctl.Sc(170), SR.Ctl.Sc(30))) {
+            () => Level.BroadcastSnapshot(), SRApi.Ctl.Sc(170), SRApi.Ctl.Sc(30))) {
             Level.BroadcastSnapshot();
         }
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
-        GUILayout.Space(SR.Ctl.Sc(4));
+        GUILayout.Space(SRApi.Ctl.Sc(4));
     }
 
 		// 重载关卡模式：保留方块与分数 / 仅保留方块（分数重置）。

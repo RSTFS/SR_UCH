@@ -582,8 +582,8 @@ namespace SR_UCH.Tweaks {
             return fallback;
         }
 
-        // 界面语言为英文系时不使用游戏术语，改用自己的英文；判据必须走 SR.Ctl.LangEn（兼容外部语言包）。
-        private static bool En { get { return SR.Ctl.LangEn; } }
+        // 界面语言为英文系时不使用游戏术语，改用自己的英文；判据必须走 SRApi.Ctl.LangEn（兼容外部语言包）。
+        private static bool En { get { return SRApi.Ctl.LangEn; } }
 
         // 语言包优先：SRApi.T 命中外部语言包即为译文，未收录时按英文系 / 中文回落。
         private static string G(string i2Key, string zh, string en) {
@@ -920,32 +920,32 @@ namespace SR_UCH.Tweaks {
 
             // 按钮顺序：刷新列表 / 退出联机 / 房间码。
             GUILayout.BeginHorizontal();
-            if (SR.Ctl.HotkeyButton("online.lobbies", SRApi.T("刷新列表", "Refresh"),
+            if (SRApi.Ctl.HotkeyButton("online.lobbies", SRApi.T("刷新列表", "Refresh"),
                 SRApi.T("向匹配服务查一次公开房间, 能加入的排在表格最上面, 点里面的加入就行.\n如果你正待在某个房间里, 点加入会先退出当前房间, 退完立刻自动进新的.",
                      "Query the public lobby list, joinable lobbies on top. Click Join in the table.\nIf you are already in a lobby, clicking Join leaves it first and joins the new one right away."),
-                RefreshLobbies, SR.Ctl.Sc(140), SR.Ctl.Sc(30))) RefreshLobbies();
+                RefreshLobbies, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(30))) RefreshLobbies();
             // 返回倒计时中按钮文字改为"强制返回"，再点一次即立刻返回。
             bool returning = _abortDeadline > 0f || _forceDeadline > 0f || _forceRawDeadline > 0f;
-            if (SR.Ctl.HotkeyButton("online.disband",
+            if (SRApi.Ctl.HotkeyButton("online.disband",
                 returning ? SRApi.T("强制返回", "Force return") : SRApi.T("返回主界面", "Back to main menu"),
                 SRApi.T("回主界面, 走的就是游戏自己的离开房间流程. 房主会先广播 HostEndedGame, 全员一起回去; 房客只退自己.\n点下去当帧就放出加载遮罩并清掉本页房间列表; 1.5 秒还没回去就自己收尾, 4 秒硬切主界面.\n再点一次这个按钮 = 立刻强制返回, 完全不等游戏自己的加载流程.",
                      "Back to the main menu, using the game's own leave-lobby flow. Host: broadcasts HostEndedGame and everyone returns; guest: only you leave.\nThe moment you click it releases the loading splash and clears this page's lobby list; self-recovery at 1.5s / 4s.\nClick it again to force an immediate return, skipping the game's own loading flow."),
-                DisbandOrLeave, SR.Ctl.Sc(140), SR.Ctl.Sc(30))) DisbandOrLeave();
+                DisbandOrLeave, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(30))) DisbandOrLeave();
             // 房间码加入，走游戏自己的 Matchmaker.JoinLobby(code, useCode:true)。
-            GUILayout.Space(SR.Ctl.Sc(14));
+            GUILayout.Space(SRApi.Ctl.Sc(14));
             GUILayout.Label(new GUIContent(SRApi.T("房间码", "Lobby code"),
                 SRApi.T("输入 4 个大写字母的房间码直接加入（和游戏里按码加入一样；在对局内会先退出当前房间）。",
                      "Enter the 4-letter lobby code to join directly (same as the game's join-by-code; while in a session it leaves the current one first).")),
-                SR.Ctl.Label, GUILayout.Width(SR.Ctl.Sc(CodeLabelW)), GUILayout.Height(SR.Ctl.Sc(30)));
-            string typed = SR.ClearableTextField(_joinCode ?? "", 4, SR.Ctl.SearchBox,
-                GUILayout.Width(SR.Ctl.Sc(62)), GUILayout.Height(SR.Ctl.Sc(24)));
+                SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(CodeLabelW)), GUILayout.Height(SRApi.Ctl.Sc(30)));
+            string typed = SR.ClearableTextField(_joinCode ?? "", 4, SRApi.Ctl.SearchBox,
+                GUILayout.Width(SRApi.Ctl.Sc(62)), GUILayout.Height(SRApi.Ctl.Sc(24)));
             _joinCode = CodeOnly(typed);   // 只收大写英文字母，最多 4 个
             bool enter = Event.current != null && Event.current.type == EventType.KeyDown
                          && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter)
                          && _joinCode.Length == 4;
             bool oldEnabled = GUI.enabled;
             GUI.enabled = _joinCode.Length == 4;   // 不足 4 位不可点
-            bool clickJoin = GUILayout.Button(SRApi.T("加入", "Join"), SR.Ctl.Btn, GUILayout.Width(SR.Ctl.Sc(46)), GUILayout.Height(SR.Ctl.Sc(24)));
+            bool clickJoin = GUILayout.Button(SRApi.T("加入", "Join"), SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(46)), GUILayout.Height(SRApi.Ctl.Sc(24)));
             GUI.enabled = oldEnabled;
             if (_joinCode.Length == 4 && (clickJoin || enter)) JoinByCode(_joinCode);
             GUILayout.FlexibleSpace();
@@ -973,15 +973,15 @@ namespace SR_UCH.Tweaks {
             }
             string hint = SRApi.T("（点刷新列表查询）表头：左键点=按该列排序（升->降->默认），拖分隔线=调列宽（<->），拖表头=换列位置（+），Shift+点游戏质量=显示/隐藏匹配质量系数，Shift+点技能系数=最大/平均/最小，右键=隐藏该列，Shift+右键=还原；右键某行=隐藏该房间；滚轮=上下，Ctrl+滚轮=左右；表格底边可拖高度",
                                "(click 'Refresh' to query) Header: left-click = sort by that column (asc/desc/default), drag a separator = resize (<->), drag a header = reorder (+), Shift+click 'Quality' = show/hide the skill-match coefficient, Shift+click 'Skill' = max/avg/min, right-click = hide that column, Shift+right-click = reset; right-click a row = hide that lobby; wheel = up/down, Ctrl+wheel = left/right; drag the table's bottom edge to resize height");
-            GUILayout.Label(string.IsNullOrEmpty(_lobbyMsg) ? hint : _lobbyMsg, SR.Ctl.Label);
+            GUILayout.Label(string.IsNullOrEmpty(_lobbyMsg) ? hint : _lobbyMsg, SRApi.Ctl.Label);
             int hiddenNow = CountHidden();   // 只数当前列表里还存在的
             if (hiddenNow > 0) {
-                GUILayout.Label(string.Format(SRApi.T("已隐藏 {0} 个房间（Shift+右键表格可恢复）", "{0} lobbies hidden (Shift+right-click the table to restore)"), hiddenNow), SR.Ctl.Label);
+                GUILayout.Label(string.Format(SRApi.T("已隐藏 {0} 个房间（Shift+右键表格可恢复）", "{0} lobbies hidden (Shift+right-click the table to restore)"), hiddenNow), SRApi.Ctl.Label);
             }
 
             // 筛选：第一行 区域 / 模式 / 标签，第二行 人数 / AFK / 状态；下拉框固定宽度，同时只开一个。
-            float cellW = Mathf.Max(SR.Ctl.Sc(120), (SR.Ctl.WinWidth - SR.Ctl.SidebarWidth() - SR.Ctl.Sc(40)) / 3f - SR.Ctl.Sc(10));
-            GUILayout.Space(SR.Ctl.Sc(2));
+            float cellW = Mathf.Max(SRApi.Ctl.Sc(120), (SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40)) / 3f - SRApi.Ctl.Sc(10));
+            GUILayout.Space(SRApi.Ctl.Sc(2));
             GUILayout.BeginHorizontal();
             DropFilter("区域", "Region", "按服务器区域筛选（亚太/欧盟/美国）。", "Filter by server region (AP / EU / US).", "Filter Region", RegionVals(), cellW);
             DropFilter("模式", "Mode", "按游戏模式筛选。", "Filter by game mode.", "Filter Mode", ModeVals, cellW);
@@ -998,19 +998,19 @@ namespace SR_UCH.Tweaks {
             GUILayout.EndHorizontal();
 
             // 表格自绘：表头固定，只有房间行滚动；滚动条自绘以跟随界面缩放并在拖到列表外时不断。
-            GUILayout.Space(SR.Ctl.Sc(3));
+            GUILayout.Space(SRApi.Ctl.Sc(3));
             Rect last = GUILayoutUtility.GetLastRect();
-            float footerH = SR.FooterHeight > 0f ? SR.FooterHeight : SR.Ctl.Sc(30);
+            float footerH = SR.FooterHeight > 0f ? SR.FooterHeight : SRApi.Ctl.Sc(30);
             // 宽度用纯尺寸计算：布局矩形与屏幕矩形（ContentArea）不同坐标系，混算会导致表格框超宽、操作列被推出屏幕。
-            float availW = Mathf.Max(SR.Ctl.Sc(220), SR.Ctl.WinWidth - SR.Ctl.SidebarWidth() - SR.Ctl.Sc(12));
+            float availW = Mathf.Max(SRApi.Ctl.Sc(220), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(12));
             // 高度同理：页面可视高度（屏幕量）减去表格上方已用高度（布局量之差）。
-            float pageH = SR.ContentArea.height - SR.Ctl.Sc(26) - SR.Ctl.Sc(2) - footerH;
+            float pageH = SR.ContentArea.height - SRApi.Ctl.Sc(26) - SRApi.Ctl.Sc(2) - footerH;
             float usedAbove = _pageTopY > 0f ? Mathf.Max(0f, last.yMax - _pageTopY) : 0f;
-            float availH = Mathf.Max(SR.Ctl.Sc(140), pageH - usedAbove - SR.Ctl.Sc(8));
+            float availH = Mathf.Max(SRApi.Ctl.Sc(140), pageH - usedAbove - SRApi.Ctl.Sc(8));
             // 拖动中必须读临时值 _dragHTmp（配置值此时还是旧的），否则高度不跟手。
             float hPx = _dragH ? _dragHTmp : (_tableH != null ? _tableH.Value : 0);
             float boxH = hPx > 0f
-                ? Mathf.Clamp(SR.Ctl.Sc(hPx), SR.Ctl.Sc(120), availH)
+                ? Mathf.Clamp(SRApi.Ctl.Sc(hPx), SRApi.Ctl.Sc(120), availH)
                 : availH;
             List<int> vis = VisibleCols();
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
@@ -1024,21 +1024,21 @@ namespace SR_UCH.Tweaks {
         private static void HeightGrip() {
             Event e = Event.current;
             Rect r = GUILayoutUtility.GetLastRect();
-            GUILayout.Space(SR.Ctl.Sc(2));
-            GUILayout.Box(GUIContent.none, SR.Ctl.Footer, GUILayout.Height(SR.Ctl.Sc(4)), GUILayout.ExpandWidth(true));
+            GUILayout.Space(SRApi.Ctl.Sc(2));
+            GUILayout.Box(GUIContent.none, SRApi.Ctl.Footer, GUILayout.Height(SRApi.Ctl.Sc(4)), GUILayout.ExpandWidth(true));
             Rect grip = GUILayoutUtility.GetLastRect();
             if (e == null) return;
             if (e.type == EventType.MouseDown && e.button == 0 && grip.Contains(e.mousePosition)) {
                 _dragH = true;
                 _dragHY0 = e.mousePosition.y;
-                _dragH0 = _tableH != null && _tableH.Value > 0 ? _tableH.Value : (r.height / Mathf.Max(0.0001f, SR.Ctl.Sc(1f)));
+                _dragH0 = _tableH != null && _tableH.Value > 0 ? _tableH.Value : (r.height / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)));
                 // 临时值为 0 表示本次按下后尚无真正的 MouseDrag；只点击不拖动时不会把自动高度误写成固定高度。
                 _dragHTmp = _tableH != null && _tableH.Value > 0 ? _tableH.Value : 0f;
                 SRApi.BlockWindowDrag = true;
                 e.Use();
             } else if (e.type == EventType.MouseDrag && _dragH) {
-                // _dragH0 是设计单位，鼠标位移是屏幕像素，必须再除一次 SR.Ctl.Sc(1)。
-                int v = Mathf.Clamp(Mathf.RoundToInt(_dragH0 + (e.mousePosition.y - _dragHY0) / Mathf.Max(0.0001f, SR.Ctl.Sc(1f))), 120, 1000);
+                // _dragH0 是设计单位，鼠标位移是屏幕像素，必须再除一次 SRApi.Ctl.Sc(1)。
+                int v = Mathf.Clamp(Mathf.RoundToInt(_dragH0 + (e.mousePosition.y - _dragHY0) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f))), 120, 1000);
                 // 拖动期间只累加到 _dragHTmp，松手时由 SaveTableH 一次性写入配置（每帧写会触发 setter 与范围校验）。
                 _dragHTmp = v;
                 SRApi.BlockWindowDrag = true;
@@ -1046,7 +1046,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 落盘统一交给 SR.Ctl.MarkConfigDirty（节流写盘，失败有 Warning）。
+        // 落盘统一交给 SRApi.Ctl.MarkConfigDirty（节流写盘，失败有 Warning）。
         // 拖动期间高度只写 _dragHTmp，到这里才同步进配置；核心的拖拽看门狗也会调本方法。
         private static void SaveTableH() {
             if (_tableH != null) {
@@ -1054,11 +1054,11 @@ namespace SR_UCH.Tweaks {
                     int h = Mathf.RoundToInt(_dragHTmp);
                     if (h != _tableH.Value) _tableH.Value = h;
                 }
-                SR.Ctl.MarkConfigDirty(_tableH.ConfigFile);
+                SRApi.Ctl.MarkConfigDirty(_tableH.ConfigFile);
             }
         }
 
-        private static void SaveEntry(ConfigEntryBase e) { if (e != null) SR.Ctl.MarkConfigDirty(e.ConfigFile); }
+        private static void SaveEntry(ConfigEntryBase e) { if (e != null) SRApi.Ctl.MarkConfigDirty(e.ConfigFile); }
 
         // 表格：固定表头 + 房间行 + 自绘竖向滚动条，几何全部用绝对矩形手动偏移。
         private const int HostCol = 7;                 // 房主列靠左显示，其余列居中
@@ -1197,18 +1197,18 @@ namespace SR_UCH.Tweaks {
             Event e = Event.current;
             Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
             CollectShown();
-            float rowH = SR.Ctl.Sc(26), headerH = SR.Ctl.Sc(24);
-            float rowsH = Mathf.Max(SR.Ctl.Sc(20), box.height - headerH);
+            float rowH = SRApi.Ctl.Sc(26), headerH = SRApi.Ctl.Sc(24);
+            float rowsH = Mathf.Max(SRApi.Ctl.Sc(20), box.height - headerH);
             float contentH = _shownLobbies.Count * rowH;
             bool overflow = contentH > rowsH + 0.5f;                    //只有真的超出才画滚动条
-            float sbW = overflow ? SR.Ctl.Sc(13) : 0f;
-            float viewW = Mathf.Max(SR.Ctl.Sc(60), box.width - sbW);
+            float sbW = overflow ? SRApi.Ctl.Sc(13) : 0f;
+            float viewW = Mathf.Max(SRApi.Ctl.Sc(60), box.width - sbW);
             // 操作列钉在表格右边缘，不参与横向滚动，加入按钮始终可见可点。
             float joinW = 0f;
-            for (int i = 0; i < vis.Count; i++) if (vis[i] == JoinCol) joinW = SR.Ctl.Sc(_cw[JoinCol]);
-            float stripW = Mathf.Max(SR.Ctl.Sc(40), viewW - joinW);     //可横向滚动的列区
+            for (int i = 0; i < vis.Count; i++) if (vis[i] == JoinCol) joinW = SRApi.Ctl.Sc(_cw[JoinCol]);
+            float stripW = Mathf.Max(SRApi.Ctl.Sc(40), viewW - joinW);     //可横向滚动的列区
             float totalW = 0f;
-            for (int i = 0; i < vis.Count; i++) if (vis[i] != JoinCol) totalW += SR.Ctl.Sc(_cw[vis[i]]);
+            for (int i = 0; i < vis.Count; i++) if (vis[i] != JoinCol) totalW += SRApi.Ctl.Sc(_cw[vis[i]]);
             _joinW = joinW;
             _joinXPage = box.x + viewW - joinW;
             _rowsClipPage = new Rect(box.x, box.y + headerH, stripW, rowsH);
@@ -1217,7 +1217,7 @@ namespace SR_UCH.Tweaks {
             _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _tableMaxX);
             _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _tableMaxY);
             if (e == null) return;
-            if (e.type == EventType.Repaint) GUI.Box(box, GUIContent.none, SR.Ctl.Footer);
+            if (e.type == EventType.Repaint) GUI.Box(box, GUIContent.none, SRApi.Ctl.Footer);
                 DrawTableRows(vis, box, headerH, rowH, stripW, rowsH, viewW, mp);
         }
 
@@ -1272,7 +1272,7 @@ namespace SR_UCH.Tweaks {
                     Color pc = GUI.color;
                     if (!can) GUI.color = new Color(1f, 1f, 1f, 0.5f);
                     // 窄格子按钮：用内边距小的样式，避免文字被裁掉。
-                    SR.Ctl.BtnClip.Draw(new Rect(SR.Ctl.Sc(2), y + SR.Ctl.Sc(1), _joinW - SR.Ctl.Sc(4), rowH - SR.Ctl.Sc(2)),
+                    SRApi.Ctl.BtnClip.Draw(new Rect(SRApi.Ctl.Sc(2), y + SRApi.Ctl.Sc(1), _joinW - SRApi.Ctl.Sc(4), rowH - SRApi.Ctl.Sc(2)),
                         new GUIContent(JoinText(li)), hov, hov && _joinDownRow == i, false, false);
                     GUI.color = pc;
                 }
@@ -1282,9 +1282,9 @@ namespace SR_UCH.Tweaks {
             // 竖向滚动条：几何字段必须在这里赋值，否则核心 TableScrollbarInput 的 track.width > 0 判据不成立。
             // 颜色对齐 ImGui 的 ScrollbarBg / Grab / GrabHovered / GrabActive。
             if (_shownLobbies.Count * rowH > rowsH + 0.5f) {
-                Rect __track = new Rect(box.x + viewW + SR.Ctl.Sc(1), box.y + headerH, SR.Ctl.Sc(13) - SR.Ctl.Sc(2), rowsH);
+                Rect __track = new Rect(box.x + viewW + SRApi.Ctl.Sc(1), box.y + headerH, SRApi.Ctl.Sc(13) - SRApi.Ctl.Sc(2), rowsH);
                 float __contentH = _shownLobbies.Count * rowH;
-                float __thumbH = Mathf.Clamp(rowsH * rowsH / Mathf.Max(1f, __contentH), SR.Ctl.Sc(18), rowsH);
+                float __thumbH = Mathf.Clamp(rowsH * rowsH / Mathf.Max(1f, __contentH), SRApi.Ctl.Sc(18), rowsH);
                 float __ty = __track.y + (_tableMaxY > 0f ? Mathf.Clamp01(_scrollRows.y / _tableMaxY) : 0f) * (rowsH - __thumbH);
                 Rect __thumb = new Rect(__track.x, __ty, __track.width, __thumbH);
                 _sbTrackPage = __track; _sbThumbPage = __thumb;
@@ -1315,7 +1315,7 @@ namespace SR_UCH.Tweaks {
             for (int k = 0; k < _headerCellsPage.Count; k++) {
                 int ci = _headerCols[k];
                 Rect cell = _headerCellsPage[k];
-                Rect sep = new Rect(cell.xMax - SR.Ctl.Sc(3), cell.y, SR.Ctl.Sc(7), cell.height);
+                Rect sep = new Rect(cell.xMax - SRApi.Ctl.Sc(3), cell.y, SRApi.Ctl.Sc(7), cell.height);
                 bool onSep = inBox && sep.Contains(mp);
                 if (onSep) hoverSep = true;
                 else if (inBox && cell.Contains(mp)) hoverCell = true;
@@ -1534,8 +1534,8 @@ namespace SR_UCH.Tweaks {
             if (_filterLabelW >= 0f && _filterLabelLKey == lk) return _filterLabelW;
             float w = 0f;
             string[] ls = { SRApi.T("区域", "Region"), SRApi.T("模式", "Mode"), SRApi.T("标签", "Tag"), SRApi.T("人数", "Players"), SRApi.T("AFK", "AFK") };
-            for (int i = 0; i < ls.Length; i++) w = Mathf.Max(w, SR.Ctl.Label.CalcSize(new GUIContent(ls[i])).x);
-            _filterLabelW = Mathf.Max(SR.Ctl.Sc(FilterLabelW), w + SR.Ctl.Sc(8));
+            for (int i = 0; i < ls.Length; i++) w = Mathf.Max(w, SRApi.Ctl.Label.CalcSize(new GUIContent(ls[i])).x);
+            _filterLabelW = Mathf.Max(SRApi.Ctl.Sc(FilterLabelW), w + SRApi.Ctl.Sc(8));
             _filterLabelLKey = lk;
             return _filterLabelW;
         }
@@ -1543,18 +1543,18 @@ namespace SR_UCH.Tweaks {
         private static void DropFilter(string labelZh, string labelEn, string tipZh, string tipEn, string key, string[] values, float cellW) {
             try {
                 // 本帧只查一次 entry，当前值与写回都复用它（见 FindStr / SetStr）。
-                ConfigEntryBase e = SR.Ctl.FindEntry(SecOnline, key);
+                ConfigEntryBase e = SRApi.Ctl.FindEntry(SecOnline, key);
                 float labelW = FilterLabelWidth();
-                float comboW = SR.Ctl.Sc(FilterComboW);
-                GUILayout.BeginHorizontal(GUILayout.Width(labelW + comboW + SR.Ctl.Sc(14)));
-                GUILayout.Label(new GUIContent(SRApi.T(labelZh, labelEn), SRApi.T(tipZh, tipEn)), SR.Ctl.Label,
-                    GUILayout.Width(labelW), GUILayout.Height(SR.Ctl.Sc(26)));
+                float comboW = SRApi.Ctl.Sc(FilterComboW);
+                GUILayout.BeginHorizontal(GUILayout.Width(labelW + comboW + SRApi.Ctl.Sc(14)));
+                GUILayout.Label(new GUIContent(SRApi.T(labelZh, labelEn), SRApi.T(tipZh, tipEn)), SRApi.Ctl.Label,
+                    GUILayout.Width(labelW), GUILayout.Height(SRApi.Ctl.Sc(26)));
                 // 选项走缓存（见 FilterOptions），不每帧新建 List；改值不带动页面滚动条。
                 string[] opts = FilterOptions(key, values);
                 string[] vals = FilterVals(key, values);   // 与 opts 一一对应，选中后按下标写回
                 //同时只允许一个下拉框展开
                 bool open = _openCombo == key;
-                int dsel = SR.Ctl.ComboBox(e, DispName(key, FindStr(e)), vals, opts, ref open, comboW);
+                int dsel = SRApi.Ctl.ComboBox(e, DispName(key, FindStr(e)), vals, opts, ref open, comboW);
                 if (dsel >= 0) {
                     SetStr(e, dsel == 0 ? "" : (values != null && dsel - 1 < values.Length ? values[dsel - 1] : ""));
                     _openCombo = "";
@@ -1571,7 +1571,7 @@ namespace SR_UCH.Tweaks {
 
         // 按 key 查值的入口，内部转给按 entry 的重载。
         private static string FindStr(string key) {
-            try { return FindStr(SR.Ctl.FindEntry(SecOnline, key)); }
+            try { return FindStr(SRApi.Ctl.FindEntry(SecOnline, key)); }
             catch { return ""; }
         }
 
@@ -1585,7 +1585,7 @@ namespace SR_UCH.Tweaks {
         private static void SetStr(ConfigEntryBase e, string value) {
             try {
                 if (e != null) {
-                    SR.Ctl.SetValue(e, value);
+                    SRApi.Ctl.SetValue(e, value);
                     // 筛选条件变化需立即标脏，否则"筛选后 N 个"要等 1 秒兜底才更新。
                     _lobbiesDirty = true;
                 }
@@ -1663,7 +1663,7 @@ namespace SR_UCH.Tweaks {
                     foreach (int k in _hiddenCols) l.Add(k.ToString(CultureInfo.InvariantCulture));
                     _hiddenColsEntry.Value = string.Join(",", l.ToArray());
                 }
-                if (_colWidths != null) SR.Ctl.MarkConfigDirty(_colWidths.ConfigFile); //落盘走节流器（失败有 Warning）
+                if (_colWidths != null) SRApi.Ctl.MarkConfigDirty(_colWidths.ConfigFile); //落盘走节流器（失败有 Warning）
             } catch (Exception __ex) { SRApi.Guard.Log("保存列设置", __ex); }
         }
 

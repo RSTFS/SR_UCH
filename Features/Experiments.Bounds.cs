@@ -14,12 +14,12 @@ public partial class Experiments : ITweak
 		//进阶条目行：标签在左、控件紧贴其右（全项目复选框统一排版，见 SR.Settings.RenderEntryRow）。
 		private static void AdvRow(string key, string zh, string en, string zhTip, string enTip) {
 			try {
-				ConfigEntryBase e = SR.Ctl.FindEntry("Experiments", key);
+				ConfigEntryBase e = SRApi.Ctl.FindEntry("Experiments", key);
 				if (e == null) return;
 				GUILayout.BeginHorizontal();
-				SR.Ctl.RestoreLabel(new GUIContent(SRApi.T(zh, en), SRApi.T(zhTip, enTip)), e, SR.Ctl.Sc(200), SR.Ctl.Sc(26));
-				GUILayout.Space(SR.Ctl.Sc(6));
-				SR.Ctl.RenderControl(e);
+				SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T(zh, en), SRApi.T(zhTip, enTip)), e, SRApi.Ctl.Sc(200), SRApi.Ctl.Sc(26));
+				GUILayout.Space(SRApi.Ctl.Sc(6));
+				SRApi.Ctl.RenderControl(e);
 				GUILayout.FlexibleSpace();
 				GUILayout.EndHorizontal();
 			} catch (Exception __ex) { SRApi.Guard.Log("渲染进阶条目", __ex); }
@@ -28,12 +28,12 @@ public partial class Experiments : ITweak
 		// 条目行统一排版（全项目约定）：标签在左、控件紧贴其右，其余空间留白。
 		private static void Row(string zh, string en, string zhTip, string enTip, string key) {
 			try {
-				ConfigEntryBase e = SR.Ctl.FindEntry("Experiments", key);
+				ConfigEntryBase e = SRApi.Ctl.FindEntry("Experiments", key);
 				if (e == null) return;
 				GUILayout.BeginHorizontal();
-				SR.Ctl.RestoreLabel(new GUIContent(SRApi.T(zh, en), SRApi.T(zhTip, enTip)), e, SR.Ctl.Sc(200), SR.Ctl.Sc(26));
-				GUILayout.Space(SR.Ctl.Sc(6));
-				SR.Ctl.RenderControl(e);
+				SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T(zh, en), SRApi.T(zhTip, enTip)), e, SRApi.Ctl.Sc(200), SRApi.Ctl.Sc(26));
+				GUILayout.Space(SRApi.Ctl.Sc(6));
+				SRApi.Ctl.RenderControl(e);
 				GUILayout.FlexibleSpace();
 				GUILayout.EndHorizontal();
 			} catch (Exception __ex) { SRApi.Guard.Log("渲染关卡边界条目", __ex); }
@@ -41,7 +41,7 @@ public partial class Experiments : ITweak
 
 		public static void Render() {
         try {
-            GUILayout.Label(SRApi.T("- 解除关卡边界 -", "- Unlock level bounds -"), SR.Ctl.SecHeader);
+            GUILayout.Label(SRApi.T("- 解除关卡边界 -", "- Unlock level bounds -"), SRApi.Ctl.SecHeader);
             // 五个子项已全部并入主开关；条目仍在 cfg 里，由代码统一驱动。
             Row("解除关卡边界", "Unlock level bounds",
                 "一次解开关卡的空间边界, 共五项一起生效: 三面实体墙 / 放置光标边界 / 相机取景边界 / 界外黑幕(UI3 覆盖) / 方块越界放置.\n"
@@ -50,13 +50,13 @@ public partial class Experiments : ITweak
                 "Unlocks the level's spatial boundary: solid walls / placement-cursor bounds / camera framing bounds / the out-of-bounds black overlay (UI3) / piece placement outside bounds — all five at once.\n"
                 + "'Hard unlock' decides how far it reaches; 'Extra margin' expands the level edges and measurement boxes. Turning it off restores every one of them.",
                 "Level Bounds");
-            GUILayout.Space(SR.Ctl.Sc(6));
-            GUILayout.Label(SRApi.T("- 进阶（一般不用改）-", "- Advanced (rarely needed) -"), SR.Ctl.SecHeader);
+            GUILayout.Space(SRApi.Ctl.Sc(6));
+            GUILayout.Label(SRApi.T("- 进阶（一般不用改）-", "- Advanced (rarely needed) -"), SRApi.Ctl.SecHeader);
             // 提示只写默认值，不写范围（AcceptableValueRange 已删除）。
             AdvRow("Level Bounds Radius", "越界范围", "Unlock radius",
                 "能走到关卡外面多远, 不限范围. 相机取景/放置光标的边界都按这个值换掉.",
                 "How far outside the level you can go; the camera framing and placement-cursor bounds are both replaced by this.");
-            GUILayout.Space(SR.Ctl.Sc(6));
+            GUILayout.Space(SRApi.Ctl.Sc(6));
         } catch (Exception __ex) { SRApi.Guard.Log("实验区一 渲染", __ex); }
 		}
 }

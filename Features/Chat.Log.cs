@@ -130,23 +130,23 @@ public partial class Chat : ITweak {
                 _chatHeightW = -1f; //文本变了，高度作废
             }
             if (entries.Count == 0) {
-                GUILayout.Label(SRApi.T("（暂无消息）", "(no messages)"), SR.Ctl.Label);
+                GUILayout.Label(SRApi.T("（暂无消息）", "(no messages)"), SRApi.Ctl.Label);
             } else if (string.IsNullOrEmpty(_chatTextCache)) {
-                GUILayout.Label(SRApi.T("（已过滤全部消息）", "(all messages filtered)"), SR.Ctl.Label);
+                GUILayout.Label(SRApi.T("（已过滤全部消息）", "(all messages filtered)"), SRApi.Ctl.Label);
             } else {
-                float w = Mathf.Max(SR.Ctl.Sc(140), SR.Ctl.WinWidth - SR.Ctl.SidebarWidth() - SR.Ctl.Sc(36));
-                float innerW = w - SR.Ctl.Sc(20);
+                float w = Mathf.Max(SRApi.Ctl.Sc(140), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(36));
+                float innerW = w - SRApi.Ctl.Sc(20);
                 // 文本直接放外层滚动区，避免文本框与外层内容区双滚动条。
                 // 高度按文本 + 宽度缓存，其余帧复用。
                 if (_chatHeightW != innerW || _chatHeightCache <= 0f) {
                     _chatHeightW = innerW;
-                    _chatHeightCache = SR.Ctl.ChatLabel.CalcHeight(new GUIContent(_chatTextCache), innerW) + SR.Ctl.Sc(8);
+                    _chatHeightCache = SRApi.Ctl.ChatLabel.CalcHeight(new GUIContent(_chatTextCache), innerW) + SRApi.Ctl.Sc(8);
                 }
-                float th = Mathf.Max(SR.Ctl.Sc(200), _chatHeightCache);
+                float th = Mathf.Max(SRApi.Ctl.Sc(200), _chatHeightCache);
                 // 只读编辑框：借助 TextArea 获得文本选中与 Ctrl+A / Ctrl+C 复制（游戏本身没有文本选择功能）。
                 // 忽略 TextArea 返回的编辑结果，不回写。
-                GUILayout.TextArea(_chatTextCache, SR.Ctl.ChatArea, GUILayout.Width(innerW), GUILayout.Height(th));
-                if (entries.Count > _lastChatCount) { SR.Ctl.ScrollToBottom(); } //新消息滚到底
+                GUILayout.TextArea(_chatTextCache, SRApi.Ctl.ChatArea, GUILayout.Width(innerW), GUILayout.Height(th));
+                if (entries.Count > _lastChatCount) { SRApi.Ctl.ScrollToBottom(); } //新消息滚到底
                 _lastChatCount = entries.Count;
             }
         }
@@ -155,39 +155,39 @@ public partial class Chat : ITweak {
             if (SRApi.SelectedPageId("Chat") != "ChatLog") return; //顶栏只属于对话内容页
             GUILayout.BeginHorizontal();
             //清空（可右键绑定快捷键）
-            if (SR.Ctl.HotkeyButton("chat.clear", SRApi.T("清空", "Clear"), SRApi.T("清空聊天记录", "Clear the chat log"),
+            if (SRApi.Ctl.HotkeyButton("chat.clear", SRApi.T("清空", "Clear"), SRApi.T("清空聊天记录", "Clear the chat log"),
                 () => { Clear(); _chatTextCache = null; _chatBuilt = false; },
-                SR.Ctl.Sc(56), SR.Ctl.Sc(26))) {
+                SRApi.Ctl.Sc(56), SRApi.Ctl.Sc(26))) {
                 Clear();
                 _chatTextCache = null;
                 _chatBuilt = false; //强制重建，不等下一个计时点
             }
-            GUILayout.Space(SR.Ctl.Sc(4));
+            GUILayout.Space(SRApi.Ctl.Sc(4));
             // 复制当前显示的聊天记录（已应用过滤）到剪贴板。
-            if (SR.Ctl.HotkeyButton("chat.copy", SRApi.T("复制", "Copy"),
+            if (SRApi.Ctl.HotkeyButton("chat.copy", SRApi.T("复制", "Copy"),
                 SRApi.T("把当前显示的聊天记录复制到剪贴板（游戏里没有文本选择功能，用这个代替）", "Copy the currently shown chat log to the clipboard"),
                 () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); } },
-                SR.Ctl.Sc(56), SR.Ctl.Sc(26))) {
+                SRApi.Ctl.Sc(56), SRApi.Ctl.Sc(26))) {
                 try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); }
             }
-            GUILayout.Space(SR.Ctl.Sc(8));
+            GUILayout.Space(SRApi.Ctl.Sc(8));
             // 两个开关：标签（左键恢复默认 / 右键绑快捷键）+ 复选框。
-            SR.Ctl.RestoreLabel(new GUIContent(SRApi.T("过滤快捷消息", "Hide quick msgs"), SRApi.T("过滤快捷消息（表情/预设消息不显示）", "Hide quick msgs (emotes/presets)")),
-                _chatFilterQuickEntry, SR.Ctl.Sc(120), SR.Ctl.Sc(26));
-            if (_chatFilterQuickEntry != null) SR.Ctl.RenderControl(_chatFilterQuickEntry);
-            GUILayout.Space(SR.Ctl.Sc(16));
-            SR.Ctl.RestoreLabel(new GUIContent(SRApi.T("显示具体时间", "Show time"), SRApi.T("每条消息前显示具体时间", "Show a timestamp before each message")),
-                _chatShowTimeEntry, SR.Ctl.Sc(110), SR.Ctl.Sc(26));
-            if (_chatShowTimeEntry != null) SR.Ctl.RenderControl(_chatShowTimeEntry);
+            SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("过滤快捷消息", "Hide quick msgs"), SRApi.T("过滤快捷消息（表情/预设消息不显示）", "Hide quick msgs (emotes/presets)")),
+                _chatFilterQuickEntry, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(26));
+            if (_chatFilterQuickEntry != null) SRApi.Ctl.RenderControl(_chatFilterQuickEntry);
+            GUILayout.Space(SRApi.Ctl.Sc(16));
+            SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("显示具体时间", "Show time"), SRApi.T("每条消息前显示具体时间", "Show a timestamp before each message")),
+                _chatShowTimeEntry, SRApi.Ctl.Sc(110), SRApi.Ctl.Sc(26));
+            if (_chatShowTimeEntry != null) SRApi.Ctl.RenderControl(_chatShowTimeEntry);
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-            GUILayout.Space(SR.Ctl.Sc(4));
+            GUILayout.Space(SRApi.Ctl.Sc(4));
         }
 
         //底部发送行（固定在滚动区外）：Enter 发送。
         public static void RenderInputRow() {
             if (SRApi.SelectedPageId("Chat") != "ChatLog") return; //输入行只属于对话内容页
-            GUILayout.Space(SR.Ctl.Sc(10));
+            GUILayout.Space(SRApi.Ctl.Sc(10));
             GUILayout.BeginHorizontal();
             // Enter / 小键盘 Enter 必须在 TextField 绘制前拦截并 Use()：IMGUI 单行 TextField 会消费
             // KeyDown Return 导致提交并失焦；空文本不发送。
@@ -199,15 +199,15 @@ public partial class Chat : ITweak {
                 Event.current.Use();
             }
             GUI.SetNextControlName("SRUCH_ChatInput");
-            _chatInputText = SR.ClearableTextField(_chatInputText, SR.Ctl.SearchBox, GUILayout.Height(SR.Ctl.Sc(26)));
-            if (SR.Ctl.HotkeyButton("chat.send", SRApi.T("发送", "Send"), SRApi.T("把输入内容作为聊天消息发到游戏聊天里", "Send the text as a chat message"),
+            _chatInputText = SR.ClearableTextField(_chatInputText, SRApi.Ctl.SearchBox, GUILayout.Height(SRApi.Ctl.Sc(26)));
+            if (SRApi.Ctl.HotkeyButton("chat.send", SRApi.T("发送", "Send"), SRApi.T("把输入内容作为聊天消息发到游戏聊天里", "Send the text as a chat message"),
                 () => { SendChatText(_chatInputText); _chatInputText = ""; },
-                SR.Ctl.Sc(56), SR.Ctl.Sc(26))) {
+                SRApi.Ctl.Sc(56), SRApi.Ctl.Sc(26))) {
                 SendChatText(_chatInputText);
                 _chatInputText = "";
             }
             GUILayout.EndHorizontal();
-            GUILayout.Space(SR.Ctl.Sc(4));
+            GUILayout.Space(SRApi.Ctl.Sc(4));
         }
 
         internal static void InitLog(IFeatureHost plugin) {

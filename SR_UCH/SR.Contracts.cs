@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using BepInEx.Configuration;
+using UnityEngine;
 using BepInEx.Logging;
 
 namespace SR_UCH {
@@ -200,6 +201,90 @@ namespace SR_UCH {
         public static void Notify(string text, params object[] args) {
             if (args == null || args.Length == 0) { Notify(text); return; }
             try { Notify(string.Format(text, args)); } catch { Notify(text); }
+        }
+
+        // UI 工具箱门面（IMGUI 控件/样式/布局）：实现在核心，契约层只转发。
+        public static class Ctl {
+            public delegate int ComboBoxFn(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width);
+            private static Func<float, float> _sc;
+            private static Action<GUIContent, ConfigEntryBase, float, float, ConfigEntry<KeyCode>> _restoreLabel;
+            private static Action<ConfigEntryBase> _renderControl;
+            private static Action<ConfigEntryBase, bool, float> _renderEntryRow;
+            private static Func<string, string, ConfigEntryBase> _findEntry;
+            private static Func<string, List<ConfigEntryBase>> _sectionEntries;
+            private static Action<ConfigEntryBase, float> _drawEntryRow;
+            private static Func<string, float, float> _textHeight;
+            private static Func<Rect, float, float, float, bool, float> _drawSlider;
+            private static ComboBoxFn _comboBox;
+            private static Func<float> _sidebarWidth, _winWidth;
+            private static Action<ConfigEntryBase, object> _setValue;
+            private static Func<string, string, ConfigEntry<KeyCode>, float, bool, bool> _hotkeyActionButton;
+            private static Func<string, string, string, Action, float, float, bool> _hotkeyButton;
+            private static Func<string, GUIStyle> _style;
+            private static Action _scrollToBottom, _noteEntryBound, _markConfigDirtyDummy;
+            private static Action<ConfigFile> _markConfigDirty;
+            private static Func<bool> _langEn;
+            private static Func<Dictionary<ConfigEntryBase, bool>> _editOpen;
+            public static void SetSinks(
+                Func<float, float> sc,
+                Action<GUIContent, ConfigEntryBase, float, float, ConfigEntry<KeyCode>> restoreLabel,
+                Action<ConfigEntryBase> renderControl,
+                Action<ConfigEntryBase, bool, float> renderEntryRow,
+                Func<string, string, ConfigEntryBase> findEntry,
+                Func<string, List<ConfigEntryBase>> sectionEntries,
+                Action<ConfigEntryBase, float> drawEntryRow,
+                Func<string, float, float> textHeight,
+                Func<Rect, float, float, float, bool, float> drawSlider,
+                ComboBoxFn comboBox,
+                Func<float> sidebarWidth, Func<float> winWidth,
+                Action<ConfigEntryBase, object> setValue,
+                Func<string, string, ConfigEntry<KeyCode>, float, bool, bool> hotkeyActionButton,
+                Func<string, string, string, Action, float, float, bool> hotkeyButton,
+                Func<string, GUIStyle> style,
+                Action scrollToBottom, Action noteEntryBound, Action<ConfigFile> markConfigDirty,
+                Func<bool> langEn, Func<Dictionary<ConfigEntryBase, bool>> editOpen) {
+                _sc = sc; _restoreLabel = restoreLabel; _renderControl = renderControl; _renderEntryRow = renderEntryRow;
+                _findEntry = findEntry; _sectionEntries = sectionEntries; _drawEntryRow = drawEntryRow; _textHeight = textHeight;
+                _drawSlider = drawSlider; _comboBox = comboBox; _sidebarWidth = sidebarWidth; _winWidth = winWidth;
+                _setValue = setValue; _hotkeyActionButton = hotkeyActionButton; _hotkeyButton = hotkeyButton; _style = style;
+                _scrollToBottom = scrollToBottom; _noteEntryBound = noteEntryBound; _markConfigDirty = markConfigDirty;
+                _langEn = langEn; _editOpen = editOpen;
+            }
+            public static float Sc(float v) { Func<float, float> f = _sc; return f != null ? f(v) : v; }
+            public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey) { Action<GUIContent, ConfigEntryBase, float, float, ConfigEntry<KeyCode>> f = _restoreLabel; if (f != null) f(content, entry, w, h, hotkey); }
+            public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h) { RestoreLabel(content, entry, w, h, null); }
+            public static void RenderControl(ConfigEntryBase entry) { Action<ConfigEntryBase> f = _renderControl; if (f != null) f(entry); }
+            public static void RenderEntryRow(ConfigEntryBase entry, bool isInternal, float colWidth) { Action<ConfigEntryBase, bool, float> f = _renderEntryRow; if (f != null) f(entry, isInternal, colWidth); }
+            public static ConfigEntryBase FindEntry(string section, string key) { Func<string, string, ConfigEntryBase> f = _findEntry; return f != null ? f(section, key) : null; }
+            public static List<ConfigEntryBase> SectionEntries(string section) { Func<string, List<ConfigEntryBase>> f = _sectionEntries; return f != null ? f(section) : null; }
+            public static void DrawEntryRow(ConfigEntryBase entry, float colWidth) { Action<ConfigEntryBase, float> f = _drawEntryRow; if (f != null) f(entry, colWidth); }
+            public static float TextHeight(string text, float width) { Func<string, float, float> f = _textHeight; return f != null ? f(text, width) : 0f; }
+            public static float DrawSlider(Rect rect, float value, float min, float max, bool intStep) { Func<Rect, float, float, float, bool, float> f = _drawSlider; return f != null ? f(rect, value, min, max, intStep) : value; }
+            public static float DrawSlider(Rect rect, float value, float min, float max) { return DrawSlider(rect, value, min, max, false); }
+            public static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width) { ComboBoxFn f = _comboBox; return f != null ? f(entry, current, vals, options, ref open, width) : 0; }
+            public static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open) { return ComboBox(entry, current, vals, options, ref open, -1f); }
+            public static float SidebarWidth() { Func<float> f = _sidebarWidth; return f != null ? f() : 0f; }
+            public static float WinWidth { get { Func<float> f = _winWidth; return f != null ? f() : 0f; } }
+            public static void SetValue(ConfigEntryBase entry, object value) { Action<ConfigEntryBase, object> f = _setValue; if (f != null) f(entry, value); }
+            public static bool HotkeyActionButton(string label, string tooltip, ConfigEntry<KeyCode> keyEntry, float width, bool bindable) { Func<string, string, ConfigEntry<KeyCode>, float, bool, bool> f = _hotkeyActionButton; return f != null && f(label, tooltip, keyEntry, width, bindable); }
+            public static bool HotkeyActionButton(string label, string tooltip, ConfigEntry<KeyCode> keyEntry) { return HotkeyActionButton(label, tooltip, keyEntry, 0f, false); }
+            public static bool HotkeyButton(string id, string label, string tooltip, Action action, float width, float height) { Func<string, string, string, Action, float, float, bool> f = _hotkeyButton; return f != null && f(id, label, tooltip, action, width, height); }
+            public static bool HotkeyButton(string id, string label, string tooltip, Action action) { return HotkeyButton(id, label, tooltip, action, 0f, 0f); }
+            private static GUIStyle Style(string name) { Func<string, GUIStyle> f = _style; return f != null ? f(name) : null; }
+            public static GUIStyle Label { get { return Style("Label"); } }
+            public static GUIStyle LabelWrap { get { return Style("LabelWrap"); } }
+            public static GUIStyle ChatLabel { get { return Style("ChatLabel"); } }
+            public static GUIStyle ChatArea { get { return Style("ChatArea"); } }
+            public static GUIStyle SecHeader { get { return Style("SecHeader"); } }
+            public static GUIStyle Btn { get { return Style("Btn"); } }
+            public static GUIStyle BtnClip { get { return Style("BtnClip"); } }
+            public static GUIStyle SearchBox { get { return Style("SearchBox"); } }
+            public static GUIStyle Footer { get { return Style("Footer"); } }
+            public static bool LangEn { get { Func<bool> f = _langEn; return f != null && f(); } }
+            public static Dictionary<ConfigEntryBase, bool> EditOpen { get { Func<Dictionary<ConfigEntryBase, bool>> f = _editOpen; return f != null ? f() : null; } }
+            public static void ScrollToBottom() { Action a = _scrollToBottom; if (a != null) a(); }
+            public static void NoteEntryBound() { Action a = _noteEntryBound; if (a != null) a(); }
+            public static void MarkConfigDirty(ConfigFile cfg) { Action<ConfigFile> f = _markConfigDirty; if (f != null) f(cfg); }
         }
 
         // 本地化门面：语言引擎（语言包 / 词条表 / 缓存）留在核心，契约层只转发，行为不变。

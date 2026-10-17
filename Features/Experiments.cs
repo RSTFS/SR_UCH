@@ -18,13 +18,13 @@ public partial class Experiments : ITweak
 		}
 
 		// 状态行：只读、可复制。
-		// 高度必须取 SR.Ctl.TextHeight(text, w)：中文有字形下沉，固定高度会裁字；该函数内部已含下沉余量并带缓存。
+		// 高度必须取 SRApi.Ctl.TextHeight(text, w)：中文有字形下沉，固定高度会裁字；该函数内部已含下沉余量并带缓存。
 		private static void DrawStatus(string text) {
 			try {
 				if (string.IsNullOrEmpty(text)) return;
-				float w = Mathf.Max(SR.Ctl.Sc(160), SR.Ctl.WinWidth - SR.Ctl.SidebarWidth() - SR.Ctl.Sc(40));
-				float h = SR.Ctl.TextHeight(text, w);
-				GUILayout.Label(text, SR.Ctl.LabelWrap, GUILayout.Width(w), GUILayout.Height(h));
+				float w = Mathf.Max(SRApi.Ctl.Sc(160), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40));
+				float h = SRApi.Ctl.TextHeight(text, w);
+				GUILayout.Label(text, SRApi.Ctl.LabelWrap, GUILayout.Width(w), GUILayout.Height(h));
 			} catch (Exception __ex) { SRApi.Guard.Log("状态行", __ex); }
 		}
 

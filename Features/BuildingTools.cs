@@ -66,8 +66,8 @@ namespace SR_UCH.Tweaks {
         private static bool IsEnhanceKey(string k) { return k == "Collision Override" || k == "Grid Override"; }
         private static bool IsLimitKey(string k) { return k == "Lift Build Cap" || k == "Build Cap Value"; }
         private static void RenderPage() {
-            float col = Mathf.Max(SR.Ctl.Sc(180), SR.Ctl.WinWidth - SR.Ctl.SidebarWidth() - SR.Ctl.Sc(240));
-            List<ConfigEntryBase> entries = SR.Ctl.SectionEntries("build");
+            float col = Mathf.Max(SRApi.Ctl.Sc(180), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(240));
+            List<ConfigEntryBase> entries = SRApi.Ctl.SectionEntries("build");
             bool any = false;
 
             // 分区按条目键显式划分，不依赖遍历顺序（SectionEntries 按键名排序，顺序与分区无关）。
@@ -76,45 +76,45 @@ namespace SR_UCH.Tweaks {
             GUILayout.Label(new GUIContent("- " + SRApi.T("建造", "Build") + " -",
                 SRApi.T("建造增强：让方块无视放置规则、按更细的网格自由微调摆放。",
                      "Build: place pieces ignoring the placement rules and snap on a finer grid.")),
-                SR.Ctl.SecHeader);
-            GUILayout.Space(SR.Ctl.Sc(2));
+                SRApi.Ctl.SecHeader);
+            GUILayout.Space(SRApi.Ctl.Sc(2));
             for (int i = 0; i < entries.Count; i++) {
                 ConfigEntryBase e = entries[i];
                 if (!IsEnhanceKey(e.Definition.Key)) continue;
                 any = true;
-                SR.Ctl.DrawEntryRow(e, col);
+                SRApi.Ctl.DrawEntryRow(e, col);
             }
 
             // 分区二：建造上限
-            GUILayout.Space(SR.Ctl.Sc(6));
+            GUILayout.Space(SRApi.Ctl.Sc(6));
             GUILayout.Label(new GUIContent("- " + SRApi.T("建造上限", "Build Limit") + " -",
                 SRApi.T("建造上限（BuildUnlimiter）：解除树屋保存/发布界面的关卡满度限制，超满的关卡也能正常发布/上传。",
                      "Build Limit (BuildUnlimiter): lifts the treehouse save/publish fullness cap so over-full levels can be published.")),
-                SR.Ctl.SecHeader);
-            GUILayout.Space(SR.Ctl.Sc(2));
+                SRApi.Ctl.SecHeader);
+            GUILayout.Space(SRApi.Ctl.Sc(2));
             // 该行为手工排版：标签占名称列宽度 + 间隔 6 + 主控件列，与下方两行的编辑框左边缘对齐。
             GUILayout.BeginHorizontal();
             // GUILayout.Label 不会像 RestoreLabel 那样收缩到文字宽度，宽度需按文字实测。
-            float lw = SR.Ctl.Label.CalcSize(new GUIContent(SRApi.T("当前上限", "Current limit"))).x + SR.Ctl.Sc(12);
+            float lw = SRApi.Ctl.Label.CalcSize(new GUIContent(SRApi.T("当前上限", "Current limit"))).x + SRApi.Ctl.Sc(12);
             GUILayout.Label(new GUIContent(SRApi.T("当前上限", "Current limit"),
                 SRApi.T("当前生效的满度上限；游戏原版为 500", "The current effective fullness cap; vanilla is 500")),
-                SR.Ctl.Label, GUILayout.Width(Mathf.Max(SR.Ctl.Sc(60), lw)), GUILayout.Height(SR.Ctl.Sc(26)));
-            GUILayout.Space(SR.Ctl.Sc(6));
+                SRApi.Ctl.Label, GUILayout.Width(Mathf.Max(SRApi.Ctl.Sc(60), lw)), GUILayout.Height(SRApi.Ctl.Sc(26)));
+            GUILayout.Space(SRApi.Ctl.Sc(6));
             bool oldEn = GUI.enabled;
             try {
             GUI.enabled = false;
             // SRApi.T(zh, en) 的两个参数都会被求值：前缀为常量、只有末尾数字在变，故字符串只拼一次。
             int curLimit = CurrentCapShown();
             GUILayout.TextField(SRApi.T("当前上限：", "Current: ") + curLimit,
-                SR.Ctl.SearchBox, GUILayout.Width(SR.Ctl.Sc(170)), GUILayout.Height(SR.Ctl.Sc(26)));
+                SRApi.Ctl.SearchBox, GUILayout.Width(SRApi.Ctl.Sc(170)), GUILayout.Height(SRApi.Ctl.Sc(26)));
             } finally { GUI.enabled = oldEn; }
             GUILayout.EndHorizontal();
-            GUILayout.Space(SR.Ctl.Sc(2));
+            GUILayout.Space(SRApi.Ctl.Sc(2));
             for (int i = 0; i < entries.Count; i++) {
                 ConfigEntryBase e = entries[i];
                 if (!IsLimitKey(e.Definition.Key)) continue;
                 any = true;
-                SR.Ctl.DrawEntryRow(e, col);
+                SRApi.Ctl.DrawEntryRow(e, col);
             }
 
             // 其余条目：避免出现未渲染的条目
@@ -122,9 +122,9 @@ namespace SR_UCH.Tweaks {
                 ConfigEntryBase e = entries[i];
                 if (IsEnhanceKey(e.Definition.Key) || IsLimitKey(e.Definition.Key)) continue;
                 any = true;
-                SR.Ctl.DrawEntryRow(e, col);
+                SRApi.Ctl.DrawEntryRow(e, col);
             }
-            if (!any) GUILayout.Label(SRApi.T("（无匹配条目）", "(no matching entries)"), SR.Ctl.Label);
+            if (!any) GUILayout.Label(SRApi.T("（无匹配条目）", "(no matching entries)"), SRApi.Ctl.Label);
         }
 
         public void Initialize(IFeatureHost plugin) {

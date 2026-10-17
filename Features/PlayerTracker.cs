@@ -149,7 +149,7 @@ namespace SR_UCH.Tweaks {
         private static void Render() {
             try {
                 List<ConfigEntryBase> list = SR.SectionEntries("Player Tracker");
-                if (list == null || list.Count == 0) { GUILayout.Label(SRApi.T("（无匹配条目）", "(no matching entries)"), SR.Ctl.Label); return; }
+                if (list == null || list.Count == 0) { GUILayout.Label(SRApi.T("（无匹配条目）", "(no matching entries)"), SRApi.Ctl.Label); return; }
                 SR.RenderSectionEntries("Player Tracker");
             } catch (Exception __ex) { SRApi.Guard.Log("渲染移动轨迹页", __ex); }
         }

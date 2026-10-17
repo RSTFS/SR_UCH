@@ -17,27 +17,27 @@ public partial class Experiments : ITweak
 				GUILayout.Label(new GUIContent("- " + SRApi.T("自由相机", "Free camera") + " -",
 					SRApi.T("开启后可以用滚轮自由缩放视野. 关闭后完全恢复游戏默认相机. 只在自由模式有效.",
 					 "While on, the wheel zooms the view freely. Off = fully restores the default camera. Freeplay only.")),
-					SR.Ctl.SecHeader);
+					SRApi.Ctl.SecHeader);
 				SR.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
 					// 相机移动速度归入自由相机分区（只对自由相机生效）。
 					return e.Definition.Key == "Free Camera" || e.Definition.Key == "Free Camera FOV"
 						|| e.Definition.Key == "Free Camera Speed";
 				});
 				if (FreeCam.SpeedNote != null && FreeCam.SpeedNote.Length > 0) {
-					GUILayout.Space(SR.Ctl.Sc(2));
+					GUILayout.Space(SRApi.Ctl.Sc(2));
 					DrawStatus(FreeCam.SpeedNote);
 				}
 
 				// 加载后清理
-				GUILayout.Space(SR.Ctl.Sc(6));
+				GUILayout.Space(SRApi.Ctl.Sc(6));
 				GUILayout.Label(new GUIContent("- " + SRApi.T("加载后清理", "Cleanup after load") + " -",
 					SRApi.T("进关卡时执行一次垃圾回收和资源卸载. 减少对局内卡顿. 不影响结算速度.",
 					 "Runs GC and asset unload once on level load, reducing in-match stutter. Does not affect scoring.")),
-					SR.Ctl.SecHeader);
+					SRApi.Ctl.SecHeader);
 				SR.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
 					return e.Definition.Key == "GC After Load";
 				});
-				GUILayout.Space(SR.Ctl.Sc(6));
+				GUILayout.Space(SRApi.Ctl.Sc(6));
 			} catch (Exception __ex) { SRApi.Guard.Log("其它页 渲染", __ex); }
 		}
 		// 加载后清理的初始化：配置 + 每帧钩子 + 补丁注册（UI 在上面的加载后清理分区）。
