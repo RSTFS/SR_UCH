@@ -412,7 +412,7 @@ namespace SR_UCH {
             private static Func<string, string, ConfigEntry<KeyCode>, float, bool, bool> _hotkeyActionButton;
             private static Func<string, string, string, Action, float, float, bool> _hotkeyButton;
             private static Func<string, GUIStyle> _style;
-            private static Action _scrollToBottom, _noteEntryBound, _markConfigDirtyDummy;
+            private static Action _scrollToBottom, _noteEntryBound;
             private static Action<ConfigFile> _markConfigDirty;
             private static Func<bool> _langEn;
             private static Func<Dictionary<ConfigEntryBase, bool>> _editOpen;
@@ -595,6 +595,41 @@ namespace SR_UCH {
             public static MethodInfo Method(Type owner, string name, Type[] parameters, string feature) { Func<Type, string, Type[], string, MethodInfo> f = MethodArgsFn; return f != null ? f(owner, name, parameters, feature) : null; }
             public static void Override(string member, string feature) { Action<string, string> f = OverrideFn; if (f != null) f(member, feature); }
             public static Type Type(string name) { Func<string, Type> f = TypeFn; return f != null ? f(name) : null; }
+        }
+
+        // 自检：反射遍历全部注入点，返回尚未注入的 API 通道名（漏注入会让对应功能静默失效）。
+        // 运行时由 MainPlugin 在注入完成后调用；Ref.TypeFn 恒为 null（核心私有，功能层用不到），列入白名单。
+        private static readonly string[] _optionalSinks = new string[] { "Ref.TypeFn" };
+        public static string[] MissingSinks() {
+            List<string> miss = new List<string>();
+            try {
+                Type[] owners = new Type[] { typeof(SRApi), typeof(SRApi.Ref), typeof(SRApi.Ctl), typeof(SRApi.Migration) };
+                for (int i = 0; i < owners.Length; i++) {
+                    FieldInfo[] fs = owners[i].GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+                    for (int j = 0; j < fs.Length; j++) {
+                        FieldInfo f = fs[j];
+                        if (!typeof(Delegate).IsAssignableFrom(f.FieldType)) continue;
+                        if (f.GetValue(null) != null) continue;
+                        string name = owners[i].Name + "." + f.Name;
+                        bool optional = false;
+                        for (int k = 0; k < _optionalSinks.Length; k++) if (_optionalSinks[k] == name) { optional = true; break; }
+                        if (!optional) miss.Add(name);
+                    }
+                }
+            } catch { }
+            return miss.ToArray();
+        }
+        // 已注入的 API 通道总数（自检用）
+        public static int SinkCount() {
+            int n = 0;
+            try {
+                Type[] owners = new Type[] { typeof(SRApi), typeof(SRApi.Ref), typeof(SRApi.Ctl), typeof(SRApi.Migration) };
+                for (int i = 0; i < owners.Length; i++) {
+                    FieldInfo[] fs = owners[i].GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+                    for (int j = 0; j < fs.Length; j++) if (typeof(Delegate).IsAssignableFrom(fs[j].FieldType) && fs[j].GetValue(null) != null) n++;
+                }
+            } catch { }
+            return n;
         }
 
         // 统一带日志的 try / catch 包装：同一条 what 5 秒内只记一次，每帧路径上也安全。

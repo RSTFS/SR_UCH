@@ -191,6 +191,10 @@ namespace SR_UCH {
                 SRApi.Migration.SetSinks(
                     delegate (string __s, string[] __k) { ConfigMigration.Remove(__s, __k); },
                     delegate (string __f, string __t3, string __k) { ConfigMigration.Move(__f, __t3, __k); });
+                // P0-1：API 通道自检 —— 漏注入的 sink 会让对应功能静默失效，这里必须报错。
+                string[] __miss = SRApi.MissingSinks();
+                if (__miss.Length > 0) ModLogger.LogError("[SR.Api] 未注入的 API 通道 (" + __miss.Length + "): " + string.Join(", ", __miss));
+                else ModLogger.LogInfo("[SR.Api] API 通道注入完整（" + SRApi.SinkCount() + " 个）");
             } catch { }
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。
