@@ -438,13 +438,13 @@ public partial class SR {
         }
 
         // 设置页的栏目顺序块：按住列头拖动调整顺序（用左键，IMGUI 对左键的拖动 / 松开事件可靠）。
-        // 排序状态由 SR.TableArgs 持有（见 EnsureOrdArgs / RenderSidebarOrder）。
+        // 排序状态由 SRApi.TableArgs 持有（见 EnsureOrdArgs / RenderSidebarOrder）。
 
         // 自定义栏目 = 无数据行的 SR 列表，只用其表头：列头即侧栏栏目名，拖动改顺序，右键隐藏，Shift+右键还原。
         private static readonly List<int> _ordVis = new List<int>();
         private static readonly HashSet<int> _ordHidden = new HashSet<int>();
         // 拖拽与列宽状态是 TableArgs 的实例字段，须跨帧持有。
-        private static SR.TableArgs _ordArgs;
+        private static SRApi.TableArgs _ordArgs;
         private static int _ordN = -1;
         private static float[] _ordColW;
         private static float[] _ordDefaultColW() { int n = Mathf.Max(1, _ordN); float[] d = new float[n]; for (int i = 0; i < n; i++) d[i] = 64f; return d; }
@@ -453,7 +453,7 @@ public partial class SR {
         private static void EnsureOrdArgs(int n) {
             if (_ordArgs != null && _ordN == n) return;
             _ordN = n;
-            _ordArgs = new SR.TableArgs();
+            _ordArgs = new SRApi.TableArgs();
             _ordColW = new float[n];
             for (int i = 0; i < n; i++) _ordColW[i] = 64f;   //表头默认宽度 64px（可拖分隔线拉宽）
             _ordArgs.colW = _ordColW;
@@ -503,7 +503,7 @@ public partial class SR {
                 EnsureOrdArgs(n);
                 //高度贴合内容：横向列头仅 Sc(24) 高，横向溢出由内部滚动兜住。
                 GUILayout.BeginVertical(GUILayout.Height(Sc(30)));
-                SR.TableArgs a = _ordArgs;
+                SRApi.TableArgs a = _ordArgs;
                 _ordHidden.Clear(); _ordVis.Clear();
                 for (int i = 0; i < n; i++) {
                     if (SR._userHiddenSections.Contains(SR._allSections[i])) _ordHidden.Add(i); else _ordVis.Add(i);

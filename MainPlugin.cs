@@ -183,6 +183,11 @@ namespace SR_UCH {
                     },
                     delegate (string __s, Action __a) { SR.RegisterPage(__s, __a.Invoke); },
                     delegate (string __s, string __p, string __zh, string __en, int __o, Action __a) { SR.RegisterPage(__s, __p, __zh, __en, __o, __a.Invoke); });
+                SRApi.SetTableSinks(
+                    delegate (SRApi.TableArgs __a) { SR.TableDraw(__a); },
+                    delegate (Event __e, ref float __w, ref bool __sb, ref int __mc, ref float __md, ref int __dc, ref bool __dh, Action __sw, Action __sh, Action __rj) { SR.TableDragWatchdog(__e, ref __w, ref __sb, ref __mc, ref __md, ref __dc, ref __dh, __sw, __sh, __rj); },
+                    delegate (Event __e, Rect __box, Vector2 __mp, float __mx, float __my, ref Vector2 __sc, ref Vector2 __sr) { return SR.TableWheelInput(__e, __box, __mp, __mx, __my, ref __sc, ref __sr); },
+                    delegate (Event __e, Vector2 __mp, Rect __tr, Rect __th, float __sm, ref bool __dr, ref float __gy, ref float __sy) { return SR.TableScrollbarInput(__e, __mp, __tr, __th, __sm, ref __dr, ref __gy, ref __sy); });
             } catch { }
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。

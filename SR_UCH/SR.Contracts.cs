@@ -226,6 +226,86 @@ namespace SR_UCH {
         public static void RegisterPage(string section, Action render) { Action<string, Action> f = _registerPageSimple; if (f != null) f(section, render); }
         public static void RegisterPage(string section, string pageId, string nameZh, string nameEn, int order, Action render) { Action<string, string, string, string, int, Action> f = _registerPageFull; if (f != null) f(section, pageId, nameZh, nameEn, order, render); }
 
+        // 表格控件门面：TableArgs 是纯数据参数对象（与核心同字段），4 个交互函数委托注入。
+        public delegate void TableDragWatchdogFn(Event e, ref float watchdog, ref bool sbDragging, ref int moveCol,
+            ref float moveDx, ref int dragCol, ref bool dragH, Action saveWidths, Action saveTableH, Action resetJoinDown);
+        public delegate bool TableWheelInputFn(Event e, Rect box, Vector2 mp, float maxX, float maxY,
+            ref Vector2 scrollCols, ref Vector2 scrollRows);
+        public delegate bool TableScrollbarInputFn(Event e, Vector2 mp, Rect track, Rect thumb, float scrollMax,
+            ref bool dragging, ref float grabY, ref float scrollY);
+        private static Action<TableArgs> _tableDraw;
+        private static TableDragWatchdogFn _tableDragWatchdog;
+        private static TableWheelInputFn _tableWheelInput;
+        private static TableScrollbarInputFn _tableScrollbarInput;
+        public static void SetTableSinks(Action<TableArgs> tableDraw, TableDragWatchdogFn tableDragWatchdog,
+                                         TableWheelInputFn tableWheelInput, TableScrollbarInputFn tableScrollbarInput) {
+            _tableDraw = tableDraw; _tableDragWatchdog = tableDragWatchdog;
+            _tableWheelInput = tableWheelInput; _tableScrollbarInput = tableScrollbarInput;
+        }
+                    public sealed class TableArgs {
+            public Rect box;                 //表格外框（屏幕坐标）
+            public Rect rowsClip;            //行区裁剪矩形（命中和绘制共用）
+            public float headerH, rowH, rowsH, stripW;
+            public float[] colW;
+            public List<int> vis;            //可见列顺序
+            public int rowCount, pinCol = -1, alignLeftCol = -1, moveCol = -1;
+            public float scrollX, scrollY;
+            public Vector2 mp;
+            public float pinW, pinX;
+            public string pinTitle;
+            public System.Func<int, string> title;          //列标题(列下标)
+            public System.Func<int, string> tip;            //列头悬停提示(可选)
+            public System.Func<int, string[]> rowCells;     //整行文本（行号 -> 各列文本）
+            public System.Func<int, float> rowAlpha;       //行透明度（可选；不可用的行压暗）
+            public bool drawHeader = true;                 //是否画表头（表头另外画时置 false）
+            // 竖向排列：格子沿 Y 叠放（每项一行），默认 false。
+            public bool vertical;
+            public float[] defaultColW; // 默认列宽（Shift+右键还原时核心会还原成它）
+            public System.Func<int, bool> rowSelected; // 某行是否“选中”（核心据此画整行高亮）
+            public bool headerLeft; // 表头文字靠左（默认居中）
+            public bool resizable;                         //表头分隔线可拖动改列宽（与房间列表同款）
+            public int dragCol = -1;                       //列宽拖动状态（由参数对象自己持有，跨帧保持）
+            public float dragX0, dragW0;
+            public Vector2 scrollColsTmp, scrollColsAtDragTmp;
+            public bool reorderable;                       //表头可拖动换列位
+            public int[] order;                            //显示顺序（数据列下标）
+            public System.Action<int[]> applyOrder;        //换位回调（调用方保存新顺序）
+            public System.Action saveOrder;                //换位后落盘（可选）
+            public System.Action saveWidths;               //列宽拖动松开时落盘（可选；核心自己处理 MouseUp 清状态）
+            public System.Action<int> click;               //单击列头（可选）
+            public System.Action resetAll;                 //Shift+右键=还原全部（可选）
+            // 钉住列按钮与空列表提示也由本控件负责绘制：三处列表只提供内容。
+            public System.Action<int, Rect, int> pinDraw;  //(数据行下标, 钉住列绝对矩形, 可见序号)
+            public System.Func<string> emptyHint;          //无行时的居中提示（返回 null/空 = 不画）
+            public float moveX0, moveDx;
+            public List<int> allCols = new List<int>();
+            public System.Collections.Generic.HashSet<int> hidden; //被隐藏的列（右键表头隐藏，Shift+右键恢复）
+            public bool hideable;                                  //是否允许右键隐藏列 / 显示+N恢复按钮
+            public int sortCol = -1;                               //当前排序列（仅用于给列头画标记）
+            public bool sortAsc = true;
+            public List<Rect> headerCells = new List<Rect>();
+            public List<int> headerCols = new List<int>();
+            public List<Rect> rowRects = new List<Rect>();
+            public List<int> rowRows = new List<int>();
+            public List<Rect> pinRects = new List<Rect>();
+            public List<int> pinRows = new List<int>();
+            public Rect pinHeader;
+            }
+        public static void TableDraw(TableArgs a) { Action<TableArgs> f = _tableDraw; if (f != null) f(a); }
+        public static void TableDragWatchdog(Event e, ref float watchdog, ref bool sbDragging, ref int moveCol,
+            ref float moveDx, ref int dragCol, ref bool dragH, Action saveWidths, Action saveTableH, Action resetJoinDown) {
+            TableDragWatchdogFn f = _tableDragWatchdog;
+            if (f != null) f(e, ref watchdog, ref sbDragging, ref moveCol, ref moveDx, ref dragCol, ref dragH, saveWidths, saveTableH, resetJoinDown);
+        }
+        public static bool TableWheelInput(Event e, Rect box, Vector2 mp, float maxX, float maxY, ref Vector2 scrollCols, ref Vector2 scrollRows) {
+            TableWheelInputFn f = _tableWheelInput;
+            return f != null && f(e, box, mp, maxX, maxY, ref scrollCols, ref scrollRows);
+        }
+        public static bool TableScrollbarInput(Event e, Vector2 mp, Rect track, Rect thumb, float scrollMax, ref bool dragging, ref float grabY, ref float scrollY) {
+            TableScrollbarInputFn f = _tableScrollbarInput;
+            return f != null && f(e, mp, track, thumb, scrollMax, ref dragging, ref grabY, ref scrollY);
+        }
+
         // 行扩展点（与核心同名同签名）：功能向设置页条目行注册过滤/附加控件/滑块范围。
         public delegate bool RowFilterFn(ConfigEntryBase entry);
         public delegate string RowCompanionFn(ConfigEntryBase entry);

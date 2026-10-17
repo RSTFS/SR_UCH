@@ -1145,7 +1145,7 @@ namespace SR_UCH.Tweaks {
         private static ulong _pendingSteamId; // Steam 平台要加入的房间号（LobbyListInfo.UnityMatchID）
         private static float _dragWatchdog;             // 拖拽兜底：太久没有鼠标事件就复位（不用 Input.GetMouseButton）
         private static int _clickFrame = -1;            //表头单击一帧只处理一次
-        private static readonly SR.TableArgs _tableArgs = new SR.TableArgs(); //统一入口参数（复用，避免每帧分配）
+        private static readonly SRApi.TableArgs _tableArgs = new SRApi.TableArgs(); //统一入口参数（复用，避免每帧分配）
 
         // 当前会显示的房间（筛选 + 未隐藏），顺序已由 SortLobbies 排好。
         private static void CollectShown() {
@@ -1252,7 +1252,7 @@ namespace SR_UCH.Tweaks {
             _tableArgs.rowRects = _rowRectsPage; _tableArgs.rowRows = _rowRows;
             _tableArgs.pinRects = _joinRectsPage; _tableArgs.pinRows = _joinRows;
             _tableArgs.emptyHint = delegate { return SRApi.T("（没有符合筛选的房间）", "(no lobbies match the filters)"); };
-            SR.TableDraw(_tableArgs);
+            SRApi.TableDraw(_tableArgs);
             // 收回核心算出的钉住列表头矩形，供下方命中判定显示"操作"列 tooltip。
             _joinHeaderPage = _tableArgs.pinHeader;
             // 空提示由核心的 emptyHint 在行区裁剪内绘制。
@@ -1302,13 +1302,13 @@ namespace SR_UCH.Tweaks {
             Vector2 mp = e.mousePosition;
             // 拖拽兜底复位：不能用 Input.GetMouseButton(0) 判断（与 IMGUI 事件流不同步），改为超时无鼠标事件才复位。
             try {
-                SR.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _tableArgs.moveCol, ref _tableArgs.moveDx, ref _tableArgs.dragCol, ref _dragH,
+                SRApi.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _tableArgs.moveCol, ref _tableArgs.moveDx, ref _tableArgs.dragCol, ref _dragH,
                     SaveWidths, SaveTableH, delegate { _joinDownRow = -1; });
             } catch (Exception __ex) { SRApi.Guard.Log("联机表格输入处理", __ex); } // 兜底：表头拖拽 / 列宽 / 加入点击都在这里
             //竖向滚动条拖拽 / 点轨道 -> 核心实现
-            if (SR.TableScrollbarInput(e, mp, _sbTrackPage, _sbThumbPage, _tableMaxY, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y)) return;
+            if (SRApi.TableScrollbarInput(e, mp, _sbTrackPage, _sbThumbPage, _tableMaxY, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y)) return;
             //滚轮（纵向 / Ctrl 横向 / 无纵向余量转横向）-> 核心实现
-            SR.TableWheelInput(e, box, mp, _tableMaxX, _tableMaxY, ref _scrollCols, ref _scrollRows);
+            SRApi.TableWheelInput(e, box, mp, _tableMaxX, _tableMaxY, ref _scrollCols, ref _scrollRows);
             // 表头：分隔线调宽（<->）/ 表头换位（+）/ 单击切换 / 右键隐藏 / Shift+右键还原
             bool hoverSep = false, hoverCell = false;
             bool inBox = box.Contains(mp);   // 横向滚出的列会落到框外，故把判定收回框内
