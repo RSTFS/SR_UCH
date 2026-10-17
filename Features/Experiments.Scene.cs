@@ -106,7 +106,7 @@ public partial class Experiments : ITweak
         private static void ApplySkip() {
             try {
                 // 总开关参与判定；为 false 时走 ClearSkip 把游戏标志清回去。
-                bool want = SR.GateMaster && _skipLoad != null && _skipLoad.Value;
+                bool want = SRApi.GateMaster && _skipLoad != null && _skipLoad.Value;
                 LoadingInterstitialSplash sp = FindSplash();
                 if (sp == null) return;
                 if (want) {
@@ -141,7 +141,7 @@ public partial class Experiments : ITweak
             try { return UnityEngine.Object.FindObjectOfType<LoadingInterstitialSplash>(); } catch { return null; }
         }
 
-        internal static bool GentleOn() { return _gentleLoad != null && _gentleLoad.Value && SR.GateMaster; }
+        internal static bool GentleOn() { return _gentleLoad != null && _gentleLoad.Value && SRApi.GateMaster; }
     }
 
     // 温柔加载：前置 SceneManagerWrapper 的两个入口，改走游戏自己的 DoGentleSceneLoad。
@@ -255,7 +255,7 @@ public partial class Experiments : ITweak
 
         private static void Tick() {
             try {
-                if (!SR.GateMaster) return;
+                if (!SRApi.GateMaster) return;
                 if (!SR.Env.InTreehouse) return;
                 LevelSelectController lsc = Lsc();
                 if (lsc == null) return;
@@ -266,8 +266,8 @@ public partial class Experiments : ITweak
         }
 
         private static void DoLaunch(LevelSelectController lsc) {
-            // 判 SR.CanControlLocally（离线时为真）；LaunchLevel 是纯本地调用，与广播能力无关。
-            if (!SR.CanControlLocally) { SRApi.Notify(SR.T("仅房主可开始关卡", "Host only")); return; }
+            // 判 SRApi.CanControlLocally（离线时为真）；LaunchLevel 是纯本地调用，与广播能力无关。
+            if (!SRApi.CanControlLocally) { SRApi.Notify(SR.T("仅房主可开始关卡", "Host only")); return; }
             LevelPortal[] portals = lsc.portals;
             if (portals == null || portals.Length == 0) { SRApi.Notify(SR.T("未找到可用关卡门", "No level portal available")); return; }
             int best = -1, bestV = -1;

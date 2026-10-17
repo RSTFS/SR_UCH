@@ -90,11 +90,11 @@ public partial class Level {
         [HarmonyPatch(typeof(ChatDisplay), "DisplayNewMessage", new Type[] { typeof(ChatMessageDetails) })]
         [HarmonyPrefix]
         static void OnBombEmote(ChatMessageDetails chatMessageDetails) {
-            if (!SR.GateMaster || !Enabled) return;
+            if (!SRApi.GateMaster || !Enabled) return;
             try {
                 if (chatMessageDetails.EmoteType != EmoteMeanings.EMOTE_Bomb) return;
-                // 仅服务器端统计/生成：炸弹需 NetworkServer.Spawn 广播全员（SR.HasServer = NetworkServer.active）。
-                if (!SR.HasServer) return;
+                // 仅服务器端统计/生成：炸弹需 NetworkServer.Spawn 广播全员（SRApi.HasServer = NetworkServer.active）。
+                if (!SRApi.HasServer) return;
                 List<int> online = OnlinePlayerNumbers();
                 if (online.Count == 0) return;
                 _bombSent.Add(chatMessageDetails.NetworkNumber);
@@ -236,7 +236,7 @@ public partial class Level {
         // 执行放弃道具；门控集中在此处。
         public static void Perform() {
             try {
-                if (!SR.GateMaster) return;
+                if (!SRApi.GateMaster) return;
                 PiecePlacementCursor c = FindCursor();
                 if (c == null) { SRApi.Notify(SR.T("未找到放置光标", "Placement cursor not found")); return; }
                 if (c.Piece == null) { SRApi.Notify(SR.T("手上没有方块", "No piece in hand")); return; }
@@ -335,7 +335,7 @@ public class LevelPartyBox : ITweak {
         // 快捷键轮询：与页面按钮共用同一批动作
         private static void Tick() {
             try {
-                if (!SR.GateMaster) return;
+                if (!SRApi.GateMaster) return;
                 if (SR.ComboKeyDown(_refreshPartyBoxKey)) RefreshPartyBox();
                 if (SR.ComboKeyDown(_refreshPiecesKey)) RefreshPartyBoxPieces();
                 if (SR.ComboKeyDown(_closePartyBoxKey)) ClosePartyBox();
@@ -350,8 +350,8 @@ public class LevelPartyBox : ITweak {
                 if (vc == null) { SRApi.Notify(SR.T("请先进入派对模式对局", "Not in a party match")); return; }
                 PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
                 if (pb == null) { SRApi.Notify(SR.T("未找到派对盒", "Party box not found")); return; }
-                // 权限判定走 SR.CanDoHost()：道具由房主端生成并需服务器广播，提示文案由 SR 统一给出。
-                if (!SR.CanDoHost()) return;
+                // 权限判定走 SRApi.CanDoHost()：道具由房主端生成并需服务器广播，提示文案由 SR 统一给出。
+                if (!SRApi.CanDoHost()) return;
                 int oldPieces = DestroyPartyBoxPieces(pb); // 旧道具必须广播销毁：ChoosePieces 内部的 ClearPieces 只用 Object.Destroy
                 System.Reflection.MethodInfo show = SRApi.Ref.Method(typeof(VersusControl), "showPartyBox", "关卡派对盒流程");
                 if (show != null) {
@@ -396,7 +396,7 @@ public class LevelPartyBox : ITweak {
                 if (vc == null) { SRApi.Notify(SR.T("请先进入派对模式对局", "Not in a party match")); return; }
                 PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
                 if (pb == null) { SRApi.Notify(SR.T("未找到派对盒", "Party box not found")); return; }
-                if (!SR.CanDoHost()) return; // 重建道具同样需要服务器权限
+                if (!SRApi.CanDoHost()) return; // 重建道具同样需要服务器权限
                 int oldPieces = DestroyPartyBoxPieces(pb);
                 int amount = oldPieces > 0 ? oldPieces : 1;
                 pb.ChoosePieces(amount, null);
@@ -412,7 +412,7 @@ public class LevelPartyBox : ITweak {
                 VersusControl vc = UnityEngine.Object.FindObjectOfType<VersusControl>();
                 if (vc == null) { SRApi.Notify(SR.T("请先进入派对模式对局", "Not in a party match")); return; }
                 // 相位推进是服务器权限（原生 RPC 也只在房主侧发）。
-                if (!SR.CanDoHost()) return;
+                if (!SRApi.CanDoHost()) return;
                 // placementTimer / showingPlacementWarning 是 VersusControl 的 protected 字段，必须走 SRApi.Ref.Field 并登记。
                 System.Reflection.FieldInfo pt = SRApi.Ref.Field(typeof(VersusControl), "placementTimer",
                     "关卡派对盒：关闭（把原生放置计时推到结束）");

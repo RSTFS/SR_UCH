@@ -351,14 +351,14 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(GameControl), "Update")]
         [HarmonyPrefix]
         static void Controls(GameControl __instance) {
-            if (!SR.GateMaster) return;
+            if (!SRApi.GateMaster) return;
             if (!Enabled) return;
-            if (SR.UiOpen && SR.BlockInput) return; 
+            if (SRApi.UiOpen && SRApi.BlockInput) return; 
             // 仅派对 / 创意 / 自由建造模式；已接入 IgnoreModeLimit 豁免。
             if (!SR.GateModeAllows(SR.ModeMask.Party | SR.ModeMask.Creative | SR.ModeMask.Freeplay)) return;
             // 仅房主能删：SR 侧没有方块删除的网络同步通道，房客删除只有本机生效，会造成脱同步；房客需开 EX 的“允许客户端删除”。
-            // 有意不接 GateHost（豁免只解决权限、解决不了同步）；判据用 SR.CanControlLocally，勿用 is GamesparksMatchmakingLobby（离线/大厅为空时会短路放行）。
-            if (!AllowClientsOn && !SR.CanControlLocally) return;
+            // 有意不接 GateHost（豁免只解决权限、解决不了同步）；判据用 SRApi.CanControlLocally，勿用 is GamesparksMatchmakingLobby（离线/大厅为空时会短路放行）。
+            if (!AllowClientsOn && !SRApi.CanControlLocally) return;
             if (SR.ComboKeyDown(_toggleKey)) {
                 _altDown = true;
                 RebuildList();
@@ -404,12 +404,12 @@ namespace SR_UCH.Tweaks {
                     _tintedBlock = null; 
                     if (Blocks.Count <= 0) return;
                 }
-                // 滚轮量必须取 SR.TakeWheelEvent()：Input.GetAxis("Mouse ScrollWheel") 在本环境恒为 0，滚轮切换永不生效。
+                // 滚轮量必须取 SRApi.TakeWheelEvent()：Input.GetAxis("Mouse ScrollWheel") 在本环境恒为 0，滚轮切换永不生效。
                 // TakeWheelEvent 由每帧执行的 ManagerUI.OnGUI 从事件 delta 记录，面板关着也有效。
-                float wheel = SR.TakeWheelEvent();
+                float wheel = SRApi.TakeWheelEvent();
                 if (wheel != 0f) {
                     _index += wheel > 0f ? 1 : -1;
-                    SR.MarkWheelUsed(); // 滚轮已被选块器吃掉，地图/自由相机让路
+                    SRApi.MarkWheelUsed(); // 滚轮已被选块器吃掉，地图/自由相机让路
                 }
                 if (_index >= Blocks.Count) _index = 0;
                 if (_index < 0) _index = Blocks.Count - 1;

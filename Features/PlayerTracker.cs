@@ -81,7 +81,7 @@ namespace SR_UCH.Tweaks {
             private bool _lastEff;
             private void FixedUpdate() {
                 if (!_linesReady()) return;
-                bool eff = Enabled && SR.GateMaster;
+                bool eff = Enabled && SRApi.GateMaster;
                 // 只在显示状态变化时 SetActive。
                 if (eff != _lastEff) {
                     _lastEff = eff;

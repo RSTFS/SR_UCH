@@ -55,7 +55,7 @@ public partial class Chat : ITweak {
         private static FieldInfo _fVisTimer;   //ChatDisplay.VisibilityTimer（可见计时器，游戏自己的淡入淡出用它）
 
         // 滚轮被本功能吃掉的帧号，转发 SR 的通用滚轮仲裁（SR.Input 的 WheelFrame）。
-        public static int WheelFrame { get { return SR.WheelFrame; } set { SR.WheelFrame = value; } }
+        public static int WheelFrame { get { return SRApi.WheelFrame; } set { SRApi.WheelFrame = value; } }
 
         internal static void InitWindow(IFeatureHost plugin) {
             SelfRegWindow(plugin);
@@ -261,7 +261,7 @@ public partial class Chat : ITweak {
             } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口可见计时器清零", __ex); }
         }
 
-        private static bool EnabledOn { get { return SR.GateMaster && _enabled != null && _enabled.Value; } }
+        private static bool EnabledOn { get { return SRApi.GateMaster && _enabled != null && _enabled.Value; } }
 
         [HarmonyPatch(typeof(ChatDisplay), "Update")]
         [HarmonyPostfix]
@@ -311,8 +311,8 @@ public partial class Chat : ITweak {
                 }
 
                 // 2) 滚轮：字号键调字号 / 缩放键调缩放（按住调节键即生效，不要求窗口当时可见）。
-                // 滚轮量取 SR.TakeWheelEvent()：Input.GetAxis("Mouse ScrollWheel") 在本环境恒为 0。
-                float wheel = SR.TakeWheelEvent();
+                // 滚轮量取 SRApi.TakeWheelEvent()：Input.GetAxis("Mouse ScrollWheel") 在本环境恒为 0。
+                float wheel = SRApi.TakeWheelEvent();
                 if (Mathf.Abs(wheel) > 0.0001f) {
                     bool scaleKey = _boxScaleKey != null && _boxScaleKey.Value != KeyCode.None && SR.ComboKeyHeld(_boxScaleKey);
                     bool fontKey = _fontKey != null && _fontKey.Value != KeyCode.None && SR.ComboKeyHeld(_fontKey);

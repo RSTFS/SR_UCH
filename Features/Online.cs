@@ -196,7 +196,7 @@ namespace SR_UCH.Tweaks {
             // 动游戏状态机的收尾（Disconnect / 销毁 LobbyManager / 切场景）只交给看门狗。
             NudgeSplash();
             ClearLobbyList();
-            try { SR.ForceResetUiState(); } catch (Exception __ex) { SRApi.Guard.Log("返回主界面：重置界面状态", __ex); }
+            try { SRApi.ForceResetUiState(); } catch (Exception __ex) { SRApi.Guard.Log("返回主界面：重置界面状态", __ex); }
             ArmWatchdog();
         }
 
@@ -238,7 +238,7 @@ namespace SR_UCH.Tweaks {
                     try { UnityEngine.Object.Destroy(lm.gameObject); } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：销毁 LobbyManager", __ex); }
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：收尾联机状态", __ex); }
-            try { SR.ForceResetUiState(); } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：重置界面状态", __ex); }
+            try { SRApi.ForceResetUiState(); } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：重置界面状态", __ex); }
             try { SceneManagerWrapper.LoadScene("MainMenu"); }
             catch (Exception e) { SRApi.LogWarn("强制加载主界面失败: " + e.Message); }
             _forceRawDeadline = Time.unscaledTime + 2f;   //5) 二级兜底
@@ -325,7 +325,7 @@ namespace SR_UCH.Tweaks {
                 // 2) 解除回家看门狗，避免它的超时兜底强断连接 / 销毁 LobbyManager。
                 DisarmWatchdog();
                 ClearLobbyList();
-                try { SR.ForceResetUiState(); } catch (Exception __ex) { SRApi.Guard.Log("房主解散：重置界面状态", __ex); }
+                try { SRApi.ForceResetUiState(); } catch (Exception __ex) { SRApi.Guard.Log("房主解散：重置界面状态", __ex); }
                 NudgeSplash();
                 ArmWatchdog();
                 if (wasPending) Notes("房主已解散房间，已取消加入", "Host disbanded; join cancelled");
@@ -342,7 +342,7 @@ namespace SR_UCH.Tweaks {
         }
 
         public static void RefreshLobbies() {
-            if (!SR.GateMaster) return;   // 受 SR 总开关限制
+            if (!SRApi.GateMaster) return;   // 受 SR 总开关限制
             try {
                 Matchmaker mm = MatchmakerOrNull();
                 // 判空必须放最前：下面的 _pendingSteamId 分支会立刻调用 mm.GetType()。
@@ -910,8 +910,8 @@ namespace SR_UCH.Tweaks {
             SR.PageScroll = Vector2.zero;
             SR.NoPageScrollBars = true;   // 页面级横纵向滚动条都关闭
             if (Event.current != null && Event.current.type == EventType.MouseUp) {
-                if (_tableArgs.dragCol >= 0) { _tableArgs.dragCol = -1; SR.BlockWindowDrag = false; SaveWidths(); }
-                if (_dragH) { _dragH = false; SR.BlockWindowDrag = false; SaveTableH(); }
+                if (_tableArgs.dragCol >= 0) { _tableArgs.dragCol = -1; SRApi.BlockWindowDrag = false; SaveWidths(); }
+                if (_dragH) { _dragH = false; SRApi.BlockWindowDrag = false; SaveTableH(); }
             }
             EnsureWidths();
             // 页面内容在布局空间的起点 y（零高度探针），用于计算表格上方已用高度。
@@ -1034,14 +1034,14 @@ namespace SR_UCH.Tweaks {
                 _dragH0 = _tableH != null && _tableH.Value > 0 ? _tableH.Value : (r.height / Mathf.Max(0.0001f, SR.Ctl.Sc(1f)));
                 // 临时值为 0 表示本次按下后尚无真正的 MouseDrag；只点击不拖动时不会把自动高度误写成固定高度。
                 _dragHTmp = _tableH != null && _tableH.Value > 0 ? _tableH.Value : 0f;
-                SR.BlockWindowDrag = true;
+                SRApi.BlockWindowDrag = true;
                 e.Use();
             } else if (e.type == EventType.MouseDrag && _dragH) {
                 // _dragH0 是设计单位，鼠标位移是屏幕像素，必须再除一次 SR.Ctl.Sc(1)。
                 int v = Mathf.Clamp(Mathf.RoundToInt(_dragH0 + (e.mousePosition.y - _dragHY0) / Mathf.Max(0.0001f, SR.Ctl.Sc(1f))), 120, 1000);
                 // 拖动期间只累加到 _dragHTmp，松手时由 SaveTableH 一次性写入配置（每帧写会触发 setter 与范围校验）。
                 _dragHTmp = v;
-                SR.BlockWindowDrag = true;
+                SRApi.BlockWindowDrag = true;
                 e.Use();
             }
         }
@@ -1391,10 +1391,10 @@ namespace SR_UCH.Tweaks {
                 Matchmaker.LobbyListInfo li = si >= 0 && si < _shownLobbies.Count ? _shownLobbies[si] : null;
                 if (li == null || !IsJoinable(li)) break;
                 // 只在按下到松开之间阻止窗口拖动：无条件设 true 会让鼠标悬停即锁住窗口拖动。
-                if (e.type == EventType.MouseDown && e.button == 0) { _joinDownRow = si; _joinDownId = li.sLobbyID; SR.BlockWindowDrag = true; e.Use(); }
+                if (e.type == EventType.MouseDown && e.button == 0) { _joinDownRow = si; _joinDownId = li.sLobbyID; SRApi.BlockWindowDrag = true; e.Use(); }
                 else if (e.type == EventType.MouseUp && e.button == 0 && !string.IsNullOrEmpty(_joinDownId) && _joinDownId == li.sLobbyID) {
                     try { SRApi.LogInfo("[联机] 列表项 sLobbyID=" + li.sLobbyID + " UnityMatchID=" + li.UnityMatchID + " (UnityMatchID=0 表示该列表不是 Steam 大厅数据)"); } catch { }
-                    _joinDownRow = -1; _joinDownId = null; SR.BlockWindowDrag = false; JoinLobbySteam(li.UnityMatchID, li.sLobbyID); e.Use();
+                    _joinDownRow = -1; _joinDownId = null; SRApi.BlockWindowDrag = false; JoinLobbySteam(li.UnityMatchID, li.sLobbyID); e.Use();
                 }
                 break;
             }

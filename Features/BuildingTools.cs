@@ -165,9 +165,9 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(GameState), "Update")]
         [HarmonyPrefix]
         static void ToggleKeys() {
-            if (!SR.GateMaster) return;
+            if (!SRApi.GateMaster) return;
             if (!Enabled) return;
-            if (SR.UiOpen && SR.BlockInput) return; 
+            if (SRApi.UiOpen && SRApi.BlockInput) return; 
             if (SR.ComboKeyDown(_toggleCollisionKey)) { _collisionEntry.Value = !_collisionEntry.Value; Notify(SR.T("无视碰撞", "Collision Override"), _collisionEntry.Value); }
             if (SR.ComboKeyDown(_toggleGridKey)) { _gridEntry.Value = !_gridEntry.Value; Notify(SR.T("自由放置", "Free Placement"), _gridEntry.Value); }
         }
@@ -181,9 +181,9 @@ namespace SR_UCH.Tweaks {
         static void OnPieceInput(PiecePlacementCursor __instance) {
             // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SRApi.Guard.Log（按调用点去重）留痕。
             try {
-                        if (!SR.GateMaster) return;
+                        if (!SRApi.GateMaster) return;
                         if (!Enabled) return;
-                        if (SR.UiOpen && SR.BlockInput) return; 
+                        if (SRApi.UiOpen && SRApi.BlockInput) return; 
                         if (__instance.Piece == null) return;
                         __instance.Piece.IgnorePlacementRules = _collisionOverride;
             } catch (Exception __ex) { SRApi.Guard.Log("自由放置：忽略放置规则", __ex); }
@@ -202,7 +202,7 @@ namespace SR_UCH.Tweaks {
             }
             static void Postfix(PiecePlacementCursor __instance) {
                 try {
-                    if (!SR.GateMaster) return; // 总开关关闭时失效
+                    if (!SRApi.GateMaster) return; // 总开关关闭时失效
                     if (!GridOverride) return;
                     if (__instance == null || __instance.Piece == null) return;
                     // 复刻游戏 FixedUpdate 的守卫：这些状态下游戏刻意不动位置，照写会把方块拽到非法位置。
@@ -284,18 +284,18 @@ namespace SR_UCH.Tweaks {
             // 启动时 GameSettings 可能尚未加载（GetInstance() 返回 null），故挂场景切换重试；
             // 与 DestroyBlocks / Respawn / ExModule 等其它 tweak 的做法一致。
             SceneManager.activeSceneChanged += (a, b) => Apply();
-            // Apply() 的求值依赖 SR.GateMaster，总开关关闭时需要有人调用它。
+            // Apply() 的求值依赖 SRApi.GateMaster，总开关关闭时需要有人调用它。
             // DismissHook 负责关总开关，SceneHook 负责启动早期 GameSettings 未就绪时的重试。
-            SRApi.RegisterDismissHook(delegate { if (!SR.GateMaster) Apply(); });
-            SRApi.RegisterSceneHook(delegate { if (!SR.GateMaster) Apply(); });
+            SRApi.RegisterDismissHook(delegate { if (!SRApi.GateMaster) Apply(); });
+            SRApi.RegisterSceneHook(delegate { if (!SRApi.GateMaster) Apply(); });
         }
 
         private static void Apply() {
             try {
                 GameSettings gs = GameSettings.GetInstance();
                 if (gs == null) return; //场景还没加载完：交给下次场景切换重试（见 Initialize 里的订阅）
-                gs.LevelFullnessScoreLimit = (SR.GateMaster && Enabled) ? LimitValue : VanillaLimit;
-                // 只写游戏字段，不调 Config.Save（配置落盘统一由 SR.FlushConfig 节流）。
+                gs.LevelFullnessScoreLimit = (SRApi.GateMaster && Enabled) ? LimitValue : VanillaLimit;
+                // 只写游戏字段，不调 Config.Save（配置落盘统一由 SRApi.FlushConfig 节流）。
             } catch (Exception __ex) {
                 SRApi.Guard.Log("应用建造上限", __ex);
             }

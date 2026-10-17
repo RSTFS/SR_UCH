@@ -202,6 +202,42 @@ namespace SR_UCH {
             try { Notify(string.Format(text, args)); } catch { Notify(text); }
         }
 
+        // 门控/UI 状态门面：状态在核心，契约层只读（provider 注入）。
+        public const int ApiVersion = 3;   //与核心 SR.ApiVersion 同步
+        private static Func<bool> _hasServer, _gateMaster, _gateHost, _canControl, _canDoHost, _uiOpen, _blockInput, _blockWindowDrag;
+        private static Func<int> _wheelFrame;
+        private static Func<float> _takeWheel;
+        private static Action _markWheelUsed, _forceResetUiState, _flushConfig;
+        private static Func<string, string> _selectedPageId;
+        public static void SetStateSinks(
+            Func<bool> hasServer, Func<bool> gateMaster, Func<bool> gateHost, Func<bool> canControl,
+            Func<bool> canDoHost, Func<bool> uiOpen, Func<bool> blockInput, Func<bool> blockWindowDrag,
+            Func<int> wheelFrame, Func<float> takeWheel, Action markWheelUsed,
+            Action forceResetUiState, Action flushConfig, Func<string, string> selectedPageId,
+            Action<bool> setBlockWindowDrag, Action<int> setWheelFrame) {
+            _hasServer = hasServer; _gateMaster = gateMaster; _gateHost = gateHost; _canControl = canControl;
+            _canDoHost = canDoHost; _uiOpen = uiOpen; _blockInput = blockInput; _blockWindowDrag = blockWindowDrag;
+            _wheelFrame = wheelFrame; _takeWheel = takeWheel; _markWheelUsed = markWheelUsed;
+            _forceResetUiState = forceResetUiState; _flushConfig = flushConfig; _selectedPageId = selectedPageId;
+            _setBlockWindowDrag = setBlockWindowDrag; _setWheelFrame = setWheelFrame;
+        }
+        public static bool HasServer { get { return _hasServer != null && _hasServer(); } }
+        public static bool GateMaster { get { return _gateMaster != null && _gateMaster(); } }
+        public static bool GateHost { get { return _gateHost != null && _gateHost(); } }
+        public static bool CanControlLocally { get { return _canControl != null && _canControl(); } }
+        public static bool CanDoHost() { return _canDoHost != null && _canDoHost(); }
+        public static bool UiOpen { get { return _uiOpen != null && _uiOpen(); } }
+        public static bool BlockInput { get { return _blockInput != null && _blockInput(); } }
+        private static Action<bool> _setBlockWindowDrag;
+        public static bool BlockWindowDrag { get { return _blockWindowDrag != null && _blockWindowDrag(); } set { Action<bool> a = _setBlockWindowDrag; if (a != null) a(value); } }
+        private static Action<int> _setWheelFrame;
+        public static int WheelFrame { get { return _wheelFrame != null ? _wheelFrame() : -1; } set { Action<int> a = _setWheelFrame; if (a != null) a(value); } }
+        public static float TakeWheelEvent() { return _takeWheel != null ? _takeWheel() : 0f; }
+        public static void MarkWheelUsed() { Action a = _markWheelUsed; if (a != null) a(); }
+        public static void ForceResetUiState() { Action a = _forceResetUiState; if (a != null) a(); }
+        public static void FlushConfig() { Action a = _flushConfig; if (a != null) a(); }
+        public static string SelectedPageId(string section) { Func<string, string> f = _selectedPageId; return f != null ? f(section) : null; }
+
         // 扩展点注册门面：注册表在核心，契约层只转发（功能层不再依赖 SR.*）。
         private static Action<string, int> _nav;
         private static Action<string> _navHide;

@@ -152,7 +152,7 @@ public partial class Chat : ITweak {
         }
 
         public static void RenderToolbar() {
-            if (SR.SelectedPageId("Chat") != "ChatLog") return; //顶栏只属于对话内容页
+            if (SRApi.SelectedPageId("Chat") != "ChatLog") return; //顶栏只属于对话内容页
             GUILayout.BeginHorizontal();
             //清空（可右键绑定快捷键）
             if (SR.Ctl.HotkeyButton("chat.clear", SR.T("清空", "Clear"), SR.T("清空聊天记录", "Clear the chat log"),
@@ -186,7 +186,7 @@ public partial class Chat : ITweak {
 
         //底部发送行（固定在滚动区外）：Enter 发送。
         public static void RenderInputRow() {
-            if (SR.SelectedPageId("Chat") != "ChatLog") return; //输入行只属于对话内容页
+            if (SRApi.SelectedPageId("Chat") != "ChatLog") return; //输入行只属于对话内容页
             GUILayout.Space(SR.Ctl.Sc(10));
             GUILayout.BeginHorizontal();
             // Enter / 小键盘 Enter 必须在 TextField 绘制前拦截并 Use()：IMGUI 单行 TextField 会消费
@@ -230,7 +230,7 @@ public partial class Chat : ITweak {
         static void OnMessage(object[] __args) {
             // Harmony 补丁不在 SR 页面的 try/catch 覆盖范围内，异常会穿到游戏的网络消息接收路径，故整段兜住只记日志。
             try {
-                if (!SR.GateMaster) return;
+                if (!SRApi.GateMaster) return;
                 if (__args == null || __args.Length == 0) return;
                 if (!(__args[0] is ChatMessageDetails)) return;
                 ChatMessageDetails details = (ChatMessageDetails)__args[0];

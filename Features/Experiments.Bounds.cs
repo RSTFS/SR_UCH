@@ -78,8 +78,8 @@ public partial class Experiments : ITweak
             get { return _on != null && _on.Value; }
         }
 
-        // 供 RemoveUI3 判断主开关；判据含 SR.GateMaster，与 Reeval/Tick 一致。
-        internal static bool MasterOn { get { return _on != null && _on.Value && SR.GateMaster; } }
+        // 供 RemoveUI3 判断主开关；判据含 SRApi.GateMaster，与 Reeval/Tick 一致。
+        internal static bool MasterOn { get { return _on != null && _on.Value && SRApi.GateMaster; } }
 
         // 原值记录：关闭开关时逐项还原（换场景则整体作废，见 Reset）
         private static readonly Dictionary<Collider2D, Vector2> _colOrig = new Dictionary<Collider2D, Vector2>();
@@ -206,7 +206,7 @@ public partial class Experiments : ITweak
         private static void Reeval() {
             try {
                 if (_on == null) return;
-                bool on = _on.Value && SR.GateMaster;
+                bool on = _on.Value && SRApi.GateMaster;
                 if (on) {
                     _applied = true;
                     if (WallsOn) EnsureWalls();
@@ -226,7 +226,7 @@ public partial class Experiments : ITweak
         internal static void Tick() {
             try {
                 if (_on == null) return;
-                bool on = _on.Value && SR.GateMaster;
+                bool on = _on.Value && SRApi.GateMaster;
                 ApplyCursorPiece(on);
                 if (!on) { if (_applied) { Restore(); _applied = false; } return; }
                 _applied = true;
@@ -747,7 +747,7 @@ public partial class Experiments : ITweak
                 // 已并入「解除关卡边界」主开关。
                 bool want = LevelBoundsUnlock.MasterOn;
                 if (!want) { Restore(); return; }
-                if (!SR.GateMaster) { Restore(); return; }
+                if (!SRApi.GateMaster) { Restore(); return; }
                 Apply();
             } catch (Exception __ex) { SRApi.Guard.Log("解除UI3 Tick", __ex); }
         }

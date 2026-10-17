@@ -107,7 +107,7 @@ public partial class Level {
 			bool coroutineStarted = false;
 			try
 			{
-				if (!SR.GateMaster)
+				if (!SRApi.GateMaster)
 				{
 					SRApi.Notify(SR.Msg.MasterOff());
 					return;
@@ -118,7 +118,7 @@ public partial class Level {
 					return;
 				}
 				// 房主判定走统一门控 GateHost（= IsHost || OverrideHost）
-				if (!SR.GateHost)
+				if (!SRApi.GateHost)
 				{
 					SR.NotifyT("仅房主可执行：", "Host only: ", feature);
 					return;
@@ -289,7 +289,7 @@ public partial class Level {
 		{
 			try
 			{
-				if (!SR.GateMaster)
+				if (!SRApi.GateMaster)
 				{
 					SRApi.Notify(SR.Msg.MasterOff());
 					return;
@@ -300,7 +300,7 @@ public partial class Level {
 					return;
 				}
 				// 房主判定走统一门控 GateHost（= IsHost || OverrideHost）
-				if (!SR.GateHost)
+				if (!SRApi.GateHost)
 				{
 					SR.NotifyT("仅房主可执行：", "Host only: ", feature);
 					return;
@@ -424,7 +424,7 @@ public partial class Level {
 		{
 			gc = null;
 			qs = null;
-			if (!SR.GateMaster)
+			if (!SRApi.GateMaster)
 			{
 				SRApi.Notify(SR.Msg.MasterOff());
 				return false;
@@ -434,7 +434,7 @@ public partial class Level {
 				SRApi.Notify(feature + SR.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
 				return false;
 			}
-			if (!SR.GateHost)
+			if (!SRApi.GateHost)
 			{
 				SR.NotifyT("仅房主可执行：", "Host only: ", feature);
 				return false;
@@ -688,7 +688,7 @@ public partial class Level {
         Dictionary<int, int> backup = _handicapBackup;
         _handicapBackup = null;
         try {
-            if (!SR.HasServer) return; // 仅房主可写 SyncVar
+            if (!SRApi.HasServer) return; // 仅房主可写 SyncVar
             LobbyManager lm = LobbyManager.instance;
             if (lm == null || lm.PlayerTracker == null) return;
             foreach (KeyValuePair<int, int> kv in backup) {
@@ -847,8 +847,8 @@ public partial class Level {
     private const int FillTotalCap = 300;
     private static void FillScoresIfPending() {
         if (_scoreBackupBlocks == null || _scoreBackupBlocks.Count == 0) return;
-        // 只以服务器权威把关（SR.HasServer），不用 UI 总开关，否则关掉总开关会让分数补不回来。
-        if (!SR.HasServer) return;
+        // 只以服务器权威把关（SRApi.HasServer），不用 UI 总开关，否则关掉总开关会让分数补不回来。
+        if (!SRApi.HasServer) return;
         Dictionary<int, List<PointBlock>> backup = _scoreBackupBlocks;
         _scoreBackupBlocks = null;
         try {

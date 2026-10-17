@@ -341,7 +341,7 @@ public class QuickAdjust : ITweak {
 		[HarmonyPostfix]
 		private static void OverrideHoldTime(Character __instance)
 		{
-			if (!SR.GateMaster || (SR.UiOpen && SR.BlockInput) || !__instance.hasAuthority) return;
+			if (!SRApi.GateMaster || (SRApi.UiOpen && SRApi.BlockInput) || !__instance.hasAuthority) return;
 			try
 			{
 				// 模式门控统一走 GateModeAllows（已含 IgnoreModeLimit 豁免）。
@@ -374,7 +374,7 @@ public class QuickAdjust : ITweak {
 		[HarmonyPostfix]
 		private static void ForceSuicideState(Character __instance)
 		{
-			if (!SR.GateMaster || (SR.UiOpen && SR.BlockInput) || !__instance.hasAuthority)
+			if (!SRApi.GateMaster || (SRApi.UiOpen && SRApi.BlockInput) || !__instance.hasAuthority)
 			{
 				return;
 			}
@@ -439,7 +439,7 @@ public class QuickAdjust : ITweak {
 		{
 			try
 			{
-				if (!SR.GateMaster)
+				if (!SRApi.GateMaster)
 				{
 					SRApi.Notify(SR.Msg.MasterOff());
 					return;
@@ -495,7 +495,7 @@ public class QuickAdjust : ITweak {
 		{
 			try
 			{
-				if (!SR.GateMaster)
+				if (!SRApi.GateMaster)
 				{
 					SRApi.Notify(SR.Msg.MasterOff());
 					return;
@@ -560,9 +560,9 @@ public class TreehouseSuicide : ITweak {
     private static void CharacterPatch(Character __instance) {
         // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SRApi.Guard.Log（按调用点去重）留痕。
         try {
-                if (!SR.GateMaster) return;
+                if (!SRApi.GateMaster) return;
                 if (!Enabled) return;
-                if (SR.UiOpen && SR.BlockInput) return;
+                if (SRApi.UiOpen && SRApi.BlockInput) return;
                 if (!__instance.hasAuthority) return;
                 // 本帧已判过输入（无论是否触发），后续物理步不再判定
                 if (_suicideFrame == Time.frameCount) return;

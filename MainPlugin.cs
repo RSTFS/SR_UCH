@@ -89,6 +89,23 @@ namespace SR_UCH {
                     delegate (Action __a) { SR.RegisterDismissHook(__a); },
                     delegate (Func<float, bool> __w) { SR.RegisterWheelHook(__w); },
                     delegate (string __i, string __l, Action __a) { SR.HotkeyAction(__i, __l, __a); });
+                SRApi.SetStateSinks(
+                    delegate { return SR.HasServer; },
+                    delegate { return SR.GateMaster; },
+                    delegate { return SR.GateHost; },
+                    delegate { return SR.CanControlLocally; },
+                    delegate { return SR.CanDoHost(); },
+                    delegate { return SR.UiOpen; },
+                    delegate { return SR.BlockInput; },
+                    delegate { return SR.BlockWindowDrag; },
+                    delegate { return SR.WheelFrame; },
+                    delegate { return SR.TakeWheelEvent(); },
+                    delegate { SR.MarkWheelUsed(); },
+                    delegate { SR.ForceResetUiState(); },
+                    delegate { SR.FlushConfig(); },
+                    delegate (string __s) { return SR.SelectedPageId(__s); },
+                    delegate (bool __v) { SR.BlockWindowDrag = __v; },
+                    delegate (int __v) { SR.WheelFrame = __v; });
             } catch { }
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。

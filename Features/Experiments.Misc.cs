@@ -64,7 +64,7 @@ public partial class Experiments : ITweak
 		internal static void TickCleanup()
 		{
 			// 与记录处对称：总开关关闭时不执行。
-			if (!SR.GateMaster) return;
+			if (!SRApi.GateMaster) return;
 			if (_pendingCleanupAt < 0f || Time.unscaledTime < _pendingCleanupAt) return;
 			_pendingCleanupAt = -1f;
 			try
@@ -80,7 +80,7 @@ public partial class Experiments : ITweak
 		[HarmonyPostfix]
 		static void OnLoadEndRecordCleanup()
 		{
-			if (!SR.GateMaster) return;
+			if (!SRApi.GateMaster) return;
 			if (_gcAfterLoadEntry == null || !_gcAfterLoadEntry.Value) return;
 			try
 			{
@@ -180,7 +180,7 @@ public partial class Experiments : ITweak
                 _followAt = Time.frameCount;
                 // 每帧回调需自行判 GateMaster：不满足时还原原值并清快照，下次开启重新取。
                 // 只受模组总开关限制，不受「自由相机」开关限制。
-                if (!SR.GateMaster) {
+                if (!SRApi.GateMaster) {
                     if (_followOrig >= 0f) {
                         try { if (_followZc != null) _followZc.MaxFollowSpeed = _followOrig; } catch { }
                     }
@@ -215,7 +215,7 @@ public partial class Experiments : ITweak
         internal static void CheckKey() {
             try {
                 // 总开关必须在此判定，否则关闭模组后快捷键仍能改游戏相机。
-                if (!SR.GateMaster) return;
+                if (!SRApi.GateMaster) return;
                 if (!SR.ComboKeyDown(_key)) return;
                 // 自由相机全局有效，但仍只改游戏相机。
                 if (_on != null) _on.Value = !_on.Value;                   // 快捷键等于勾选框
@@ -244,7 +244,7 @@ public partial class Experiments : ITweak
         public static bool WheelZoom(float wheel) {
             try {
                 // 总开关关闭时不消费滚轮，避免与其它功能抢同一事件。
-                if (!SR.GateMaster) return false;
+                if (!SRApi.GateMaster) return false;
                 if (_on == null || !_on.Value || Mathf.Abs(wheel) < 0.001f) return false;
                 bool inGame = false;
                 try { inGame = (UnityEngine.Cursor.lockState != CursorLockMode.None) || !UnityEngine.Cursor.visible; } catch { inGame = true; }
@@ -266,7 +266,7 @@ public partial class Experiments : ITweak
                 if (g == null || cam != g) return;
                 // 未开启（含总开关关闭）：写回保存的原视野后返回。
                 // 核心的 ApplyCameraViews 分发不带门控，本回调需自行判定总开关。
-                if (!SR.GateMaster || _on == null || !_on.Value) {
+                if (!SRApi.GateMaster || _on == null || !_on.Value) {
                     RestoreFov(cam);
                     return;
                 }
