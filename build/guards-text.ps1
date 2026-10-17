@@ -72,13 +72,14 @@ function Check-FeatureLeak {
 function Check-RspCoverage {
     $rsp = Join-Path $Root 'build\rsp\sr_uch.rsp'
     if (-not (Test-Path $rsp)) { Bad '缺少 build\rsp\sr_uch.rsp'; return }
-    $listed = @(Get-Content $rsp | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('/') })
+    # 统一用 / 作为分隔符比较：rsp 模板里写的是 Windows 风格的 \，而 Linux/macOS 上 FullName 用 /。
+    $listed = @(Get-Content $rsp | ForEach-Object { ($_.Trim() -replace '\\', '/') } | Where-Object { $_ -and -not $_.StartsWith('/') })
     $disk = @()
     foreach ($d in @('SR_UCH', 'Features')) {
         $dir = Join-Path $Root $d
         if (Test-Path $dir) {
             $disk += Get-ChildItem -LiteralPath $dir -Recurse -Filter '*.cs' -File |
-                ForEach-Object { $_.FullName.Substring($Root.Length).TrimStart('\') }
+                ForEach-Object { ($_.FullName.Substring($Root.Length) -replace '\\', '/').TrimStart('/') }
         }
     }
     $disk += 'MainPlugin.cs'
@@ -94,11 +95,12 @@ function Check-Encoding {
     $bad = @()
     $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
     foreach ($f in Get-ChildItem -LiteralPath $Root -Recurse -File -Include *.cs, *.ps1, *.rsp, *.md, *.txt, *.json) {
-        if ($f.FullName -match '\\bin\\|\\obj\\|\\.cache\\|\\.git\\') { continue }
+        $full = ($f.FullName -replace '\\', '/')
+        if ($full -match '/bin/|/obj/|/\.cache/|/\.git/') { continue }
         try {
             $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
             [void]$utf8.GetString($bytes)
-        } catch { $bad += $f.FullName.Substring($Root.Length) }
+        } catch { $bad += ($f.FullName.Substring($Root.Length) -replace '\\', '/') }
     }
     if ($bad.Count -gt 0) { Bad ('非 UTF-8 文本文件: ' + (($bad | Select-Object -First 6) -join ', ')) }
     else { Ok '全部文本文件均为合法 UTF-8' }
