@@ -275,7 +275,7 @@ namespace SR_UCH.Tweaks {
                 } catch (Exception __fx) { SRApi.Guard.Log("快照方块收尾", __fx); }
                 // 归属登记必须在加载之后：方块是加载时创建的，加载前集合为空。
                 try {
-                    System.Collections.Generic.HashSet<Placeable> initPcs = InitialLevelPieces(__instance);
+                    System.Collections.Generic.HashSet<Placeable> initPcs = InitialLevelPieces(__instance);   // O2：与上方不属同一方法，保持独立调用
                     List<Placeable> built = new List<Placeable>();
                     foreach (Placeable bp in Placeable.AllPlaceables) {
                         // 必须过滤 MarkedForDestruction：上一轮残留的死方块（destroyMarkedPieces 未回收）会被误算进 built。

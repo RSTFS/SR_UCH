@@ -8,7 +8,6 @@ CanDoHost
 ClearableTextField
 ComboKeyDown
 ComboKeyHeld
-ComboMod
 ContentArea
 Ctl
 CurrentLanguageId
@@ -26,7 +25,6 @@ GateModeAllows
 Guard
 HasServer
 HotkeyAction
-KeyComboMod
 LangVer
 LocDesc
 LocEnum
@@ -63,7 +61,6 @@ RowFilters
 RowSliders
 SectionEntries
 SelectedPageId
-SetDefaultCombo
 T
 TableArgs
 TableDragWatchdog

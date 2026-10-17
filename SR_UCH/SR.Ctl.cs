@@ -197,20 +197,6 @@ public partial class SR {
                 } catch (Exception __ex) { Guard.Log("表格列偏好保存", __ex); }
             }
 
-            //还原全部：列序回默认、取消隐藏、列宽回默认（对应 Shift+右键）
-            public void ResetAll() {
-                try {
-                    for (int i = 0; i < Order.Length; i++) Order[i] = i;
-                    Hidden.Clear();
-                    _savedW = null;
-                    if (_widths != null && _defaults != null) {
-                        int n = Mathf.Min(_defaults.Length, _widths.Length);
-                        for (int i = 0; i < n; i++) _widths[i] = _defaults[i];
-                    }
-                    Save();
-                } catch (Exception __ex) { Guard.Log("表格列偏好还原", __ex); }
-            }
-
             // 每帧调用：顺序/隐藏列被改动时才落盘。
             public void SaveIfDirty() {
                 if (Sig() != _sig) Save();

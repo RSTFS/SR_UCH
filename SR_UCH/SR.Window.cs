@@ -1,4 +1,4 @@
-// 主窗口框架：Tick 主循环、标题栏、DrawGUI 页面派发、窗口拖动缩放、侧栏。
+﻿// 主窗口框架：Tick 主循环、标题栏、DrawGUI 页面派发、窗口拖动缩放、侧栏。
 // 每帧驱动入口是里面的 ManagerUI（MonoBehaviour，提供 Update / LateUpdate / OnGUI）。
 using System;
 using System.Collections.Generic;

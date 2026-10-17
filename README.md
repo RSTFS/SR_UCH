@@ -58,6 +58,12 @@ The panel has sections on the left and pages on the right. Listed by section bel
 
 - **Online Room List** -- filter by region, mode, progress, full / not-full and more; sort, refresh and join.
 
+### Player Tracker
+
+- **Movement trails** -- draws the recent movement path of other players on screen.
+- Trail length, sampling interval, start/end line width, teleport-clear distance and opacity are all configurable.
+- **OFF by default**; display only, it never affects gameplay.
+
 ### Destroy Blocks
 
 - Press `Alt` to enter delete mode, scroll to switch the target, `Backspace` to delete.

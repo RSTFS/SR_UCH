@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <!-- SR_UCH 主模块：入口 MainPlugin.cs + SR_UCH/ 下的核心（管理器）+ Features/ 下各功能源码。
        本工程只服务于 IDE / MSBuild（VS、Rider、dotnet build）里看代码、查游戏 API 与编译；

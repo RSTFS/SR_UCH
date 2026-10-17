@@ -702,6 +702,8 @@ public partial class Experiments : ITweak
         internal static string Note = "";
         private static int _frame = -9999;
         private static int _hitCount = -1;
+        private static int _ui3ScanTries;                     // 本场景已扫描次数（封顶后放弃）
+        private const int Ui3ScanMaxTries = 6;                 // 2.5s × 6 ≈ 15 秒
         private static float _nextScanAt;    // 下次全扫时间
         private static string _scanScene;    // 上次扫描的场景名（换场景立即重扫）
 
@@ -720,7 +722,7 @@ public partial class Experiments : ITweak
         }
 
         // 换场景必须清 _wasOn：其为强引用字典，旧 Renderer 已随场景销毁，原值无意义且会逐场累积。
-        private static void Reset() { _hitCount = -1; _scanScene = null; _nextScanAt = 0f; Note = ""; _wasOn.Clear(); }
+        private static void Reset() { _hitCount = -1; _scanScene = null; _nextScanAt = 0f; _ui3ScanTries = 0; Note = ""; _wasOn.Clear(); }
 
         private static void Tick() {
             try {
@@ -740,8 +742,11 @@ public partial class Experiments : ITweak
                 string sc = "";
                 try { sc = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name; } catch { }
                 float now = Time.unscaledTime;
-                if (_hitCount >= 0 && sc == _scanScene && now < _nextScanAt) return;
-                _scanScene = sc;
+                // 次数上限：换场景清零，本场景最多扫 Ui3ScanMaxTries 次（≈15 秒）后放弃，避免无限期全场景扫描。
+                if (sc != _scanScene) { _scanScene = sc; _ui3ScanTries = 0; }
+                if (_hitCount >= 0 && now < _nextScanAt) return;
+                if (_ui3ScanTries >= Ui3ScanMaxTries) return;
+                _ui3ScanTries++;
                 _nextScanAt = now + 2.5f;
                 Renderer[] all = UnityEngine.Object.FindObjectsOfType<Renderer>();
                 if (all == null) return;

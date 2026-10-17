@@ -238,7 +238,7 @@ public class QuickAdjust : ITweak {
 			return s;
 		}
 
-		public static int ScoreDiscount => (_scoreDiscount != null) ? _scoreDiscount.Value : 0;
+		public static int ScoreDiscount => (_scoreDiscount != null) ? Mathf.Clamp(_scoreDiscount.Value, 0, 90) : 0;
 
 		public static bool MoreDiscountOn => _moreDiscount != null && _moreDiscount.Value;
 

@@ -325,8 +325,7 @@ public partial class SR : ITweak {
             }
         }
         // 功能健康：自检结果登记，供界面（设置页自检块与首页提示）读取。
-        // 自检 / 诊断用安全日志：ModLogger 在极早期可能还没就绪。
-        private static void AuditLog(string msg) { try { if (MainPlugin.ModLogger != null) SR.LogInfo(msg); } catch (Exception __ex) { Guard.Log("AuditLog", __ex); } }
+        // 自检 / 诊断用安全日志：ModLogger 在极早期可能还没就绪。 catch (Exception __ex) { Guard.Log("AuditLog", __ex); } }
         private static void AuditWarn(string msg) { try { if (MainPlugin.ModLogger != null) SR.LogWarn(msg); } catch (Exception __ex) { Guard.Log("AuditWarn", __ex); } }
 
         public sealed class AuditIssue {
@@ -1154,8 +1153,6 @@ public partial class SR : ITweak {
             SR.LocDesc("Level", "Refresh Party Box Key", "刷新派对盒快捷键\n按下重走派对盒流程，按权重重新开箱\n不绑键则不生效\n默认：未绑定", "Reroll party box key\npress to reroll and reopen the box\ninactive while unbound\nDefault: unbound");
             SR.LocDesc("Level", "Refresh Pieces Key", "刷新道具快捷键\n按下只重抽道具，不重新开箱\n不绑键则不生效\n默认：未绑定", "Reroll items key\npress to reroll items only\ninactive while unbound\nDefault: unbound");
             SR.LocDesc("Level", "Close Party Box Key", "关闭派对盒快捷键\n按下结束选择，进入游玩阶段\n不绑键则不生效\n默认：未绑定", "Close party box key\npress to end picking and enter play\ninactive while unbound\nDefault: unbound");
-            SR.LocDesc("Quick Adjust", "Enabled", "快速调整总开关\n决定本页功能是否生效\n关闭后本页所有修改都不生效\n默认：关", "Quick adjust master switch\nenables or disables this page\nno change from this page applies when off\nDefault: OFF");
-            SR.LocDesc("Quick Adjust", "Keybind", "自杀快捷键\n按下在树屋或局内自杀\n可绑组合键（如 Shift+0）\n默认：Alpha0", "Suicide key\nkills your character in the treehouse or in a match\ncombos supported (e.g. Shift+0)\nDefault: Alpha0");
             SR.LocDesc("Online", "Filter Region", "区域筛选\n只显示指定区域的房间\n从下拉选择；留空表示不过滤\n空", "Region filter\nshows lobbies from the selected region only\npick from the dropdown; empty means no filter\nempty");
             SR.LocDesc("Online", "Filter Mode", "模式筛选\n只显示指定模式的房间\n留空表示不过滤\n默认：空", "Mode filter\nshows lobbies of the selected game mode only\nempty means no filter\nDefault: empty");
             SR.LocDesc("Online", "Filter Tag", "标签筛选\n只显示含指定标签的房间\n留空表示不过滤\n默认：空", "Tag filter\nshows lobbies with the selected tag only\nempty means no filter\nDefault: empty");

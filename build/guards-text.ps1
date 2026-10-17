@@ -126,6 +126,24 @@ function Check-DescFormat {
 }
 
 
+
+# ---------- 7) 源码编码规范：.cs 必须 UTF-8 BOM + CRLF（与 .editorconfig 一致）----------
+function Check-CsEncoding {
+    $bad = @()
+    foreach ($f in Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.cs' -File) {
+        $full = ($f.FullName -replace '\\', '/')
+        if ($full -match '/bin/|/obj/|/\.git/') { continue }
+        $b = [System.IO.File]::ReadAllBytes($f.FullName)
+        if (-not ($b.Length -ge 3 -and $b[0] -eq 0xEF)) { $bad += ($f.Name + ': 缺 BOM'); continue }
+        $txt = [System.Text.Encoding]::UTF8.GetString($b)
+        $crlf = ([regex]::Matches($txt, "`r`n")).Count
+        $lf = ([regex]::Matches($txt, "`n")).Count
+        if ($lf -eq 0 -or $crlf -ne $lf) { $bad += ($f.Name + ': 非 CRLF') }
+    }
+    if ($bad.Count -gt 0) { Bad ('源码编码不合规（BOM/CRLF）: ' + (($bad | Select-Object -First 5) -join '; ')) }
+    else { Ok '全部 .cs 均为 UTF-8 BOM + CRLF' }
+}
+
 Write-Host '== SR_UCH 文本类守卫（不需要游戏 / 不需要 csc）=='
 Check-ApiSurface
 Check-ContractBoundary
@@ -133,6 +151,7 @@ Check-FeatureLeak
 Check-RspCoverage
 Check-Encoding
 Check-DescFormat
+Check-CsEncoding
 if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); exit 1 }
 Write-Host '== 文本类守卫全部通过 ✅ =='
 exit 0

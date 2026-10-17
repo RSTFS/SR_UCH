@@ -1,7 +1,7 @@
 ﻿# ============================================================
 # SR_UCH 一键构建脚本
 # 用法：
-#   & '.\_tools\build_sr_uch.ps1'            合并模式（默认，部署用）：核心 + 全部功能 → 单个 SR_UCH.dll
+#   .\build\build.ps1                          合并模式（默认，部署用）：核心 + 全部功能 → 单个 SR_UCH.dll
 #   & '.\_tools\build_sr_uch.ps1 -Split'     拆分模式：核心 SR_Manager.dll + 每个功能一个 SR_UCH_<功能>.dll
 #   & '.\_tools\build_sr_uch.ps1 -All'       合并模式 + 再编译 EX 与 Others 下的独立插件
 #   （-Split 与 -All 可组合）
@@ -12,7 +12,7 @@
 #   两种模式的产物互斥：切换时会自动清掉另一种模式的残留 DLL，避免"功能被初始化两次"。
 #   ★拆分模式的核心**编译时仍叫 SR_UCH.dll**（功能与 EX 的 rsp 都引用它），
 #     全部编完之后才改名成 $splitCoreName.dll —— 只动文件名，程序集标识仍是 SR_UCH。
-# 注：新增功能源码后，在 _tools\roslyn_toolset\ 下建 feat_<功能>.rsp，
+# 注：新增功能源码后，在 build\rsp\ 下建 feat_<功能>.rsp，
 #     并把文件名加进下面的 $rspFeatures；合并模式的 sr_uch.rsp 也要补上该 .cs。
 # 注：本机无 dotnet SDK 时会自动回退到 tasks\net472\csc.exe。
 # ============================================================
@@ -56,7 +56,7 @@ Get-ChildItem -LiteralPath $tplDir -Filter '*.rsp' | ForEach-Object {
 # **Opt-24（审计 B1）**：这里原来把工程根写死成 'D:\RS_TFS\D\...'，而该目录在本机**根本不存在**
 #  （工程实际在 D:\RS_TFS\CC）-> README 承诺的"一键构建"直接失败，且没有任何提示指向路径问题。
 # 现在统一从脚本位置推导（$PSScriptRoot 的上一级 = 工程根），也可以用 -Root 显式指定：
-#   & '.\_tools\build_sr_uch.ps1' -Root 'E:\somewhere\CC'
+#   .\build\build.ps1 -GameDir 'E:\...\Ultimate Chicken Horse'
 # 工程整体挪目录 / 换机器都不用再改脚本。
 if (-not (Test-Path -LiteralPath $Root)) { Write-Host "工程根不存在: $Root（可用 -Root 指定）"; exit 1 }
 # csc 解析：优先用系统 dotnet SDK 自带的 Roslyn 编译器，其次工程内 vendored 工具链，最后 net472 csc.exe。

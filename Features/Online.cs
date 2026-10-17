@@ -86,7 +86,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec(SecOnline, "联机", "Online");
             SRApi.Nav(SecOnline, 90);   // 侧栏顺序 90：会话(80) 之后、实验(100) 之前
             SRApi.RegisterPage(SecOnline, RenderOnlinePage);
-            SRApi.RegisterTick("联机看门狗", CheckHotkeys); // 每帧：回家看门狗 + 延时加入
+            SRApi.RegisterTick("联机看门狗", TickOnline); // 每帧：回家看门狗 + 延时加入
             // 加入流程本身要用 EventSystem，禁用会卡在"正在进入"：登记门控挂起，让核心不禁用 EventSystem。
             // 屏蔽输入上限 3 秒，超过即不再屏蔽（pending 最长可挂 30 秒）。
         SRApi.RegisterInputGateHold(() => !string.IsNullOrEmpty(_pendingJoin)
@@ -311,7 +311,7 @@ namespace SR_UCH.Tweaks {
         }
 
 
-        public static void CheckHotkeys() {
+        public static void TickOnline() {
             TickWatchdog();
             TickPendingJoin();
         }
