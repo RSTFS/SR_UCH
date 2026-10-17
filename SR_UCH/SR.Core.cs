@@ -12,6 +12,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
+[SrFeature("sr.core", "SR 核心", "1.0", Rank = 0)]
 public partial class SR : ITweak {
 
 // 分区：Core（核心状态 / 初始化 / 插件扫描）

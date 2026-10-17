@@ -8,6 +8,7 @@ using GameEvent;
 using UnityEngine;
 
 namespace SR_UCH.Tweaks {
+[SrFeature("sr.experiments", "Experiments", "1.0")]
 public partial class Experiments : ITweak
 	{
 		//进阶条目行：标签在左、控件紧贴其右（全项目复选框统一排版，见 SR.Settings.RenderEntryRow）。
@@ -61,6 +62,7 @@ public partial class Experiments : ITweak
 }
     // 关卡边界（实验）：解除制作关卡时的空间边界限制，与满度上限无关。
     // 四条路：实体墙 size 归零 / 光标边界换 Huge / 相机取景边界 / 方块 IgnoreBounds；改动均记录原值，可逐项还原。
+    [SrFeature("sr.levelboundsunlock", "LevelBoundsUnlock", "1.0")]
     public class LevelBoundsUnlock : ITweak {
         private static ConfigEntry<bool> _on;   // 主开关
         private static ConfigEntry<int> _radius;
@@ -710,6 +712,7 @@ public partial class Experiments : ITweak
         }
     }
     // 解除 UI 3 覆盖：BlankLevel 里 4 个纯黑 whiteSquare 位于 UI 3 层并盖住界外，停画它们及该层所有 Renderer。
+    [SrFeature("sr.removeui3", "RemoveUI3", "1.0")]
     public class RemoveUI3 : ITweak {
         private static readonly Dictionary<Renderer, bool> _wasOn = new Dictionary<Renderer, bool>();
         internal static string Note = "";

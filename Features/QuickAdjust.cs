@@ -8,6 +8,7 @@ using UnityEngine;
 
 namespace SR_UCH.Tweaks {
 // 分数折扣、记分板 handicap 刷新、快速切换、快速重试（含两个 Character 补丁）；ITweak 由 MainPlugin 反射初始化。
+[SrFeature("sr.quickadjust", "QuickAdjust", "1.0")]
 public class QuickAdjust : ITweak {
 
     private static ConfigEntry<int> _scoreDiscount;
@@ -514,6 +515,8 @@ public class QuickAdjust : ITweak {
 			}
 		}
 }
+
+[SrFeature("sr.treehousesuicide", "TreehouseSuicide", "1.0")]
 
 public class TreehouseSuicide : ITweak {
     private static IFeatureHost _mp;   // 只用来读 Config（契约类型）

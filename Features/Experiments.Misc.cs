@@ -94,6 +94,7 @@ public partial class Experiments : ITweak
 }
     // 自由相机（实验）：经游戏自己的 ZoomCamera 生效，不直接写 Camera.fieldOfView（会被每帧覆盖）。
     // 默认键 F3，滚轮调 FOV（1-32，每格 0.5）；仅开启时消费滚轮，每次启用从相机当前 FOV 起算，关闭时还原。
+    [SrFeature("sr.freecam", "FreeCam", "1.0")]
     public class FreeCam : ITweak {
         internal const float MinFov = 1f, MaxFov = 32f;
         // 滚轮灵敏度：perspective 与 orthographic 两分支统一使用。

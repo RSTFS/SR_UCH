@@ -110,6 +110,7 @@ public partial class SR {
 
 // 输入门控（独立功能类，不属于管理器框架）：打开面板 / 地图时冻结游戏输入的 6 个补丁。
 // 置于本文件而非新建 .cs：csproj 为显式文件列表，新增文件不会被编译。
+[SrFeature("sr.srinputgate", "SRInputGate", "1.0")]
 public class SRInputGate : ITweak {
 
     public void Initialize(IFeatureHost plugin) {

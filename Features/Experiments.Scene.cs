@@ -52,6 +52,8 @@ public partial class Experiments : ITweak
     // 加载遮罩 + 温柔加载。SRHost 为协程挂载点（SR 核心不是 MonoBehaviour）。
     internal sealed class SRHost : MonoBehaviour { }
 
+    [SrFeature("sr.splashtools", "SplashTools", "1.0")]
+
     public class SplashTools : ITweak {
         private static ConfigEntry<bool> _skipLoad;
         private static ConfigEntry<bool> _gentleLoad;
@@ -222,6 +224,7 @@ public partial class Experiments : ITweak
         }
     }
     // 树屋：立即开始。
+    [SrFeature("sr.lobbytools", "LobbyTools", "1.0")]
     public class LobbyTools : ITweak {
         private static ConfigEntry<KeyCode> _launchKey;
 

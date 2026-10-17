@@ -14,6 +14,7 @@ using UnityEngine.SceneManagement;
 namespace SR_UCH.Tweaks {
     // 联机栏目（侧栏顺序 90）：回家、房间列表、房间码加入。
     // 表格文案优先取游戏自己的本地化（区域 / 模式 / 标签 / I2 术语），与游戏内列表用词一致。
+    [SrFeature("sr.online", "Online", "1.0")]
     public class Online : ITweak {
 
 

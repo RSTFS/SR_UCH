@@ -8,6 +8,7 @@ using UnityEngine;
 
 namespace SR_UCH.Tweaks {
     // 玩家移动轨迹线：在每位玩家身后绘制一条轨迹。
+    [SrFeature("sr.playertracker", "PlayerTracker", "1.0")]
     public class PlayerTracker : ITweak {
         private static IFeatureHost _mp;   // 只用来读 Config（契约类型）
         private static ConfigEntry<int> _trackingLength;

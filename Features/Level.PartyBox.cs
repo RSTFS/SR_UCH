@@ -58,6 +58,7 @@ public partial class Level {
 
     // 派对盒炸弹：房主端统计对局内所有在线成员的炸弹！快捷短语（EmoteMeanings.EMOTE_Bomb，按枚举码识别，与语言无关）。
     // 全员都发过才往当前派对盒塞入一个可选取的炸弹，型号可配置（PartyBox.BombPrefab 的下标）。
+    [SrFeature("sr.partybomb", "PartyBomb", "1.0")]
     public class PartyBomb : ITweak {
         private static ConfigEntry<bool> _enabled;
         private static ConfigEntry<int> _bombSize;
@@ -209,6 +210,7 @@ public partial class Level {
 
     // 放弃道具：必须在排队阶段手上有道具时使用，走游戏原生的 Command 上行链（CallCmdClearPiece -> CmdClearPiece ->
     // RpcClearPiece 全员执行），联机同步天然正确；自己拼 SetPiece(null)+Destroy 会导致别人手上仍留着方块。
+    [SrFeature("sr.dropheldpiece", "DropHeldPiece", "1.0")]
     public class DropHeldPiece : ITweak {
         private static ConfigEntry<KeyCode> _key;
 
@@ -298,6 +300,7 @@ public partial class Level {
     }
 
 // 派对盒三个动作（重抽 / 开箱 / 关闭）的实现，页面由 Level.RenderPartyBox 渲染。
+[SrFeature("sr.levelpartybox", "LevelPartyBox", "1.0")]
 public class LevelPartyBox : ITweak {
         private static ConfigEntry<KeyCode> _refreshPartyBoxKey;
         private static ConfigEntry<KeyCode> _refreshPiecesKey;

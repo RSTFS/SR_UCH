@@ -8,6 +8,7 @@ using HarmonyLib;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 namespace SR_UCH.Tweaks {
+    [SrFeature("sr.buildingtools", "BuildingTools", "1.0")]
     public class BuildingTools : ITweak {
         private static IFeatureHost _mp;   // 只用来读 Config（契约类型）
         private static bool _collisionOverride;
@@ -245,6 +246,7 @@ namespace SR_UCH.Tweaks {
 // 以下由 BuildUnlimiter.cs 并入（UI 在本文件，配置与实现同归一处）。
 namespace SR_UCH.Tweaks {
     // 建造上限：放宽 GameSettings.LevelFullnessScoreLimit。
+    [SrFeature("sr.buildunlimiter", "BuildUnlimiter", "1.0")]
     public class BuildUnlimiter : ITweak {
         public const int VanillaLimit = 500;
         private const int DefaultLimit = 1000000;

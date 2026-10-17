@@ -11,6 +11,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 
 namespace SR_UCH.Tweaks {
+[SrFeature("sr.chat", "Chat", "1.0")]
 public partial class Chat : ITweak {
         public class ChatEntry {
             public string time;
