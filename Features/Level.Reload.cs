@@ -1,4 +1,4 @@
-﻿// Level 的 partial 分片（只做代码组织，无逻辑改动）
+// Level 的 partial 分片（只做代码组织，无逻辑改动）
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -143,8 +143,8 @@ namespace SR_UCH.Tweaks {
 					SRApi.Notify(SRApi.T("快照写入失败", "Failed to write the snapshot"));
 					return;
 				}
-				// KeepScore 先置保分标志：重载后按原类型广播补分，下回合结算显示；KeepBlocksOnly 不置标志，分数重置。
-				if (ReloadKeepsScore) MarkPreserveScores();
+				// KeepScore 的补分标志在协程里、真正调用 ReloadScene 之前才置位：
+				// 提前置位时，后面的“游戏加载中/启动协程失败”等提前返回会让标志残留，下一次正常结算会错误补分。
 				// GameSettings 取不到必须中止重载并解锁：客户端收不到 PrepareToReloadScene 会与房主脱同步。
 				GameSettings gsForMode = GameSettings.GetInstance();
 				if (gsForMode == null)
@@ -193,6 +193,8 @@ namespace SR_UCH.Tweaks {
 				{
 					// 与游戏原生重载一致：先重置方块 ID 序列，否则重载后新 ID 会与快照里的 parentID/mainID 错位。
 					try { Placeable.SetInitialSequenceID(0); } catch (Exception __ex) { SRApi.Guard.Log("重载前重置方块 ID 序列", __ex); }
+					// 真正重载前才置补分标志：此后的失败只会让本次重载失败，不会把标志留给下一局。
+					if (ReloadKeepsScore) MarkPreserveScores();
 					lm.ReloadScene(toMode);
 					ok = true;
 				}
