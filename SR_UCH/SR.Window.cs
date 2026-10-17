@@ -129,6 +129,10 @@ public partial class SR {
 
         // 右栏底部那行（设置 / 模式）的高度：自绘页据此给表格留出底部空间，否则末行会被盖住。
         public static float FooterHeight;
+        // 底栏注册按钮的悬停过渡与命中矩形（按 id 缓存）
+        private static readonly Dictionary<string, float> _footerBtnHover = new Dictionary<string, float>();
+        private static readonly Dictionary<string, Rect> _footerBtnRects = new Dictionary<string, Rect>();
+        private static int _footerClickFrame = -1;
 
         // 页面滚动位置：自绘页用它抵消控件变化导致的滚动区跳动
         public static Vector2 PageScroll { get { return _scroll; } set { _scroll = value; } }
@@ -528,14 +532,31 @@ public partial class SR {
                 _editOpen.Clear();
                 _capturing = null;
             }
-            // 功能注册的底栏按钮（如配置工具）：排在「设置」右侧
-            foreach (SRApi.FooterButton fb in SRApi.FooterButtons) {
+            // 功能注册的底栏按钮（如配置工具）：排在「设置」右侧；带悬停过渡与单击去重
+            for (int fbi = 0; fbi < SRApi.FooterButtons.Count; fbi++) {
+                SRApi.FooterButton fb = SRApi.FooterButtons[fbi];
                 if (fb == null || string.IsNullOrEmpty(fb.Id)) continue;
                 string fbLabel = T(fb.LabelZh, fb.LabelEn);
                 if (string.IsNullOrEmpty(fbLabel)) continue;
                 float fbW = _btn.CalcSize(new GUIContent(fbLabel)).x + Sc(18);
                 bool fbSel = _mode == Mode.Internal && _selectedInternalSection == fb.Id;
-                if (GUILayout.Button(fbLabel, fbSel ? _selItem : _btn, GUILayout.Width(fbW))) {
+                Rect fbLast;
+                _footerBtnRects.TryGetValue(fb.Id, out fbLast);
+                bool fbHover = fbLast.width > 0f && fbLast.Contains(Event.current.mousePosition);
+                float fbWant = fbHover ? 1f : 0f;
+                float fbCur;
+                _footerBtnHover.TryGetValue(fb.Id, out fbCur);
+                float fbDt = Mathf.Clamp01(Time.unscaledDeltaTime * 10f);
+                fbCur = Mathf.Lerp(fbCur, fbWant, fbDt);
+                _footerBtnHover[fb.Id] = fbCur;
+                Color fbBg = GUI.backgroundColor;
+                GUI.backgroundColor = Color.Lerp(fbBg, new Color(0.72f, 0.88f, 1f, 1f), fbCur * (fbSel ? 0.35f : 0.75f));
+                GUIContent fbContent = new GUIContent(fbLabel, T("打开", "Open ") + fbLabel);
+                bool fbClicked = GUILayout.Button(fbContent, fbSel ? _selItem : _btn, GUILayout.Width(fbW));
+                GUI.backgroundColor = fbBg;
+                _footerBtnRects[fb.Id] = GUILayoutUtility.GetLastRect();
+                if (fbClicked && _footerClickFrame != Time.frameCount) {
+                    _footerClickFrame = Time.frameCount;
                     try { if (fb.OnClick != null) fb.OnClick(); } catch (Exception __ex) { Guard.Log("底栏按钮", __ex); }
                     _mode = Mode.Internal;
                     _selectedInternalSection = fb.Id;
