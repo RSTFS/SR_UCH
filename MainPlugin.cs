@@ -192,6 +192,7 @@ namespace SR_UCH {
                     delegate (string __s, string[] __k) { ConfigMigration.Remove(__s, __k); },
                     delegate (string __f, string __t3, string __k) { ConfigMigration.Move(__f, __t3, __k); });
                 // P0-1：API 通道自检 —— 漏注入的 sink 会让对应功能静默失效，这里必须报错。
+                try { ModLogger.LogInfo("[SR] 游戏版本=" + UnityEngine.Application.version + " | 契约=v" + SRContract.Version); } catch { }
                 string[] __miss = SRApi.MissingSinks();
                 if (__miss.Length > 0) ModLogger.LogError("[SR.Api] 未注入的 API 通道 (" + __miss.Length + "): " + string.Join(", ", __miss));
                 else ModLogger.LogInfo("[SR.Api] API 通道注入完整（" + SRApi.SinkCount() + " 个）");
@@ -227,6 +228,7 @@ namespace SR_UCH {
             try { SR.RunStartupAudit(); } catch (Exception __ex) { try { ModLogger.LogWarning("[SR] 启动自检失败: " + __ex.Message); } catch { } }
             // P1-1：运行时冒烟测试标记 —— 单行、固定格式、可被脚本 grep（build\smoke.ps1）。
             try {
+                try { ModLogger.LogInfo("[SR] 游戏版本=" + UnityEngine.Application.version + " | 契约=v" + SRContract.Version); } catch { }
                 string[] __miss = SRApi.MissingSinks();
                 string __gv = "?";
                 try { __gv = UnityEngine.Application.version; } catch { }
