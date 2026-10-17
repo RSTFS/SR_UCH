@@ -616,19 +616,16 @@ namespace SR_UCH {
             internal static Func<Type, string, string, MethodInfo> MethodFn;
             internal static Func<Type, string, Type[], string, MethodInfo> MethodArgsFn;
             internal static Action<string, string> OverrideFn;
-            internal static Func<string, Type> TypeFn;
             public static void SetSinks(Func<Type, string, string, FieldInfo> field,
                                         Func<Type, string, string, MethodInfo> method,
                                         Func<Type, string, Type[], string, MethodInfo> methodArgs,
-                                        Action<string, string> over,
-                                        Func<string, Type> type) {
-                FieldFn = field; MethodFn = method; MethodArgsFn = methodArgs; OverrideFn = over; TypeFn = type;
+                                        Action<string, string> over) {
+                FieldFn = field; MethodFn = method; MethodArgsFn = methodArgs; OverrideFn = over;
             }
             public static FieldInfo Field(Type owner, string name, string feature) { Func<Type, string, string, FieldInfo> f = FieldFn; return f != null ? f(owner, name, feature) : null; }
             public static MethodInfo Method(Type owner, string name, string feature) { Func<Type, string, string, MethodInfo> f = MethodFn; return f != null ? f(owner, name, feature) : null; }
             public static MethodInfo Method(Type owner, string name, Type[] parameters, string feature) { Func<Type, string, Type[], string, MethodInfo> f = MethodArgsFn; return f != null ? f(owner, name, parameters, feature) : null; }
             public static void Override(string member, string feature) { Action<string, string> f = OverrideFn; if (f != null) f(member, feature); }
-            public static Type Type(string name) { Func<string, Type> f = TypeFn; return f != null ? f(name) : null; }
         }
 
         // 自检用：SRApi 自身 + 全部嵌套类型（含以后新增的门面分组，避免硬编码列表漏统计）。
@@ -655,7 +652,6 @@ namespace SR_UCH {
 
         // 自检：反射遍历全部注入点，返回尚未注入的 API 通道名（漏注入会让对应功能静默失效）。
         // 运行时由 MainPlugin 在注入完成后调用；Ref.TypeFn 恒为 null（核心私有，功能层用不到），列入白名单。
-        private static readonly string[] _optionalSinks = new string[] { "Ref.TypeFn" };
         public static string[] MissingSinks() {
             List<string> miss = new List<string>();
             try {
@@ -668,7 +664,6 @@ namespace SR_UCH {
                         if (f.GetValue(null) != null) continue;
                         string name = owners[i].Name + "." + f.Name;
                         bool optional = false;
-                        for (int k = 0; k < _optionalSinks.Length; k++) if (_optionalSinks[k] == name) { optional = true; break; }
                         if (!optional) miss.Add(name);
                     }
                 }

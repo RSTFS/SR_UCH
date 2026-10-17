@@ -96,7 +96,6 @@ namespace SR_UCH.Tweaks {
             SRApi.HotkeyAction("online.disband", "返回主界面", DisbandOrLeave);
 
             // 反射成员登记：本文件的反射同样要登记，否则游戏改名后静默失效。
-            // SRApi.Ref.Type() 按简单名解析类型，只能登记全局命名空间下的类型；带命名空间的类型不登记（会误报失效）。
             try {
                 SRApi.Ref.Override("LevelSelectController.FadeOut", "联机：强制返回主界面（放出加载遮罩）");
                 // JoinSteamLobby 保留反射：源码里写 SteamMatchmaker 会引入 Steamworks 程序集依赖。

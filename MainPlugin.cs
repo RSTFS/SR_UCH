@@ -81,8 +81,7 @@ namespace SR_UCH {
                     delegate (Type __o, string __n, string __f) { return SR.RefField(__o, __n, __f); },
                     delegate (Type __o, string __n, string __f) { return SR.RefMethod(__o, __n, __f); },
                     delegate (Type __o, string __n, Type[] __p, string __f) { return SR.RefMethod(__o, __n, __p, __f); },
-                    delegate (string __m, string __f) { SR.RefOverride(__m, __f); },
-                    null);   // SR.RefType 是核心私有，功能层用不到（唯一一处出现在注释里）
+                    delegate (string __m, string __f) { SR.RefOverride(__m, __f); });
                 SRApi.SetExtSinks(
                     delegate (string __s, int __r) { SR.Nav(__s, __r); },
                     delegate (string __s) { SR.NavHide(__s); },
