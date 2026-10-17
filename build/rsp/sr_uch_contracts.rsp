@@ -1,0 +1,14 @@
+﻿/nologo
+/target:library
+/out:bin\Release\SR.Contracts.dll
+/r:"%GAME%\UltimateChickenHorse_Data\Managed\mscorlib.dll"
+/r:"%GAME%\UltimateChickenHorse_Data\Managed\netstandard.dll"
+/r:"%GAME%\UltimateChickenHorse_Data\Managed\System.dll"
+/r:"%GAME%\UltimateChickenHorse_Data\Managed\System.Core.dll"
+/r:"%GAME%\BepInEx\core\BepInEx.dll"
+/r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.dll"
+/r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.CoreModule.dll"
+/r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.IMGUIModule.dll"
+/r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.InputLegacyModule.dll"
+/r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.TextRenderingModule.dll"
+SR_UCH\SR.Contracts.cs
