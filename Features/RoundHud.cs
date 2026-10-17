@@ -70,8 +70,8 @@ namespace SR_UCH.Tweaks {
 			new ContentDef {
 				Key = "Show Player Panel", ColorKey = "Color Player Panel",
 				LabelZh = "玩家面板", LabelEn = "Player panel",
-				DescZh = "显示玩家面板\n每个玩家一行：玩家号、玩家名、角色、积分、评分折扣\n折扣为 100 时不显示；玩家号/名使用玩家颜色",
-				DescEn = "show player panel\none line per player: number, name, character, score, score discount\ndiscount 100 is hidden; number/name use the game player color"
+				DescZh = "显示玩家面板\n每个玩家一行，列内容可在本页下方分别开关\n玩家号/名使用玩家颜色；折扣为 100 时不显示",
+				DescEn = "show player panel\none line per player; enable individual columns below on this page\nnumber/name use the game player color; discount 100 is hidden"
 			},
 			new ContentDef {
 				Key = "Extra Line 1", ColorKey = "Color Extra 1",
@@ -106,6 +106,11 @@ namespace SR_UCH.Tweaks {
 		private static ConfigEntry<bool> _showLevel;
 		private static ConfigEntry<bool> _showWin;
 		private static ConfigEntry<bool> _showPanel;
+		private static ConfigEntry<bool> _colNumber;
+		private static ConfigEntry<bool> _colName;
+		private static ConfigEntry<bool> _colAnimal;
+		private static ConfigEntry<bool> _colScore;
+		private static ConfigEntry<bool> _colHandicap;
 		private static ConfigEntry<string> _extra1;
 		private static ConfigEntry<string> _extra2;
 		private static ConfigEntry<string> _colPhase;
@@ -185,6 +190,7 @@ namespace SR_UCH.Tweaks {
 		private static readonly HashSet<string> _keysConfig = new HashSet<string> { "Enabled", "Fade", "Show Key" };
 		private static readonly HashSet<string> _keysAppearance = new HashSet<string> { "Layout", "Font Size", "Opacity", "Background Opacity" };
 		private static readonly HashSet<string> _keysBehavior = new HashSet<string> { "Warning Seconds", "Blink", "Phase Notice", "Round Notice" };
+		private static readonly HashSet<string> _keysPanelCols = new HashSet<string> { "Show Number", "Show Name", "Show Animal", "Show Score", "Show Handicap" };
 		private static string _openColorKey;   // 当前展开调色板的内容颜色键
 		private static float _pickR = 1f, _pickG = 1f, _pickB = 1f;
 
@@ -288,6 +294,7 @@ namespace SR_UCH.Tweaks {
 			SRApi.Nav(Sec, 25); // 移动轨迹(20) 之后
 			SRApi.RegisterPage(Sec, "hud", "HUD", "HUD", 10, RenderPage1);
 			SRApi.RegisterPage(Sec, "content", "显示内容", "Content", 20, RenderPage2);
+			SRApi.RegisterPage(Sec, "players", "玩家面板", "Player panel", 30, RenderPage3);
 
 			Loc("Enabled", "显示HUD", "Show HUD",
 				"HUD 总开关\n关闭后完全不绘制 HUD\n纯本地只读，不发送任何网络消息",
@@ -326,7 +333,7 @@ namespace SR_UCH.Tweaks {
 				"回合提示\n回合数变化时短暂显示当前回合（约 2 秒）\n关闭则不显示",
 				"round notice\nbriefly shows the current round when the round number changes (about 2 seconds)\nwhen off it is hidden");
 
-			// 第二页内容：开关 + 颜色（颜色说明统一模板）。
+			// 第二页/第三页内容：开关 + 颜色（颜色说明统一模板）。
 			for (int i = 0; i < _content.Length; i++) {
 				ContentDef d = _content[i];
 				Loc(d.Key, d.LabelZh, d.LabelEn, d.DescZh, d.DescEn);
@@ -335,6 +342,22 @@ namespace SR_UCH.Tweaks {
 					d.LabelZh + "的文字颜色\n十六进制颜色值，例如 #FFFFFF\n点同内容行右侧色块可打开调色板并实时生效",
 					"text color for " + d.LabelEn.ToLowerInvariant() + "\nhex color value, for example #FFFFFF\nclick the swatch on the right of the same row to open the picker; applies immediately");
 			}
+			// 第三页玩家面板的列开关。
+			Loc("Show Number", "玩家号", "Player number",
+				"显示玩家号\n在玩家面板中显示玩家编号\n关闭则不显示该列",
+				"show player number\nshows the player number in the player panel\nwhen off this column is hidden");
+			Loc("Show Name", "玩家名", "Player name",
+				"显示玩家名\n在玩家面板中显示玩家名字\n关闭则不显示该列",
+				"show player name\nshows the player name in the player panel\nwhen off this column is hidden");
+			Loc("Show Animal", "角色", "Character",
+				"显示角色\n在玩家面板中显示玩家选择的角色\n关闭则不显示该列",
+				"show character\nshows the player's chosen character in the player panel\nwhen off this column is hidden");
+			Loc("Show Score", "玩家积分", "Player score",
+				"显示玩家积分\n在玩家面板中显示玩家当前积分\n关闭则不显示该列",
+				"show player score\nshows the player's current score in the player panel\nwhen off this column is hidden");
+			Loc("Show Handicap", "评分折扣", "Score discount",
+				"显示评分折扣\n在玩家面板中显示评分折扣，折扣为 100 时不显示\n关闭则不显示该列",
+				"show score discount\nshows the score discount in the player panel; discount 100 is hidden\nwhen off this column is hidden");
 		}
 
 		private static void Loc(string key, string zh, string en, string descZh, string descEn) {

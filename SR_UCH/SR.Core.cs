@@ -884,14 +884,11 @@ public partial class SR : ITweak {
                 NavHide("Internal");
                 ConfigEntry<int> __schema = plugin.Config.Bind("Internal", "Sidebar Order Schema", 0, "内部用: 侧栏顺序的存储版本, 用来一次性清掉历史遗留的脏值.");
                 // 第二个版本号：清掉栏目改名后残留的旧段名（ApplyCustomSidebarOrder 负责改名映射与剔除死条目）。
-                if (__schema.Value < 1) {
+                // v3: HUD / presets added and default order adjusted; drop stale custom sidebar order once.
+                if (__schema.Value < 3) {
                     _sidebarOrderEntry.Value = "";
-                    __schema.Value = 2;
-                    SR.LogInfo("[SR] 已清理历史遗留的 Sidebar Order（恢复默认栏目顺序）");
-                } else if (__schema.Value < 2) {
-                    _sidebarOrderEntry.Value = "";
-                    __schema.Value = 2;
-                    SR.LogInfo("[SR] 已清理栏目改名残留的 Sidebar Order（恢复默认栏目顺序）");
+                    __schema.Value = 3;
+                    SR.LogInfo("[SR] sidebar order schema v3: reset to Nav rank default order");
                 }
             } catch (Exception __ex) { Guard.Log("清理侧栏顺序历史值", __ex); }
             _sidebarW = _sidebarWEntry.Value;
