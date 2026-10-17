@@ -44,6 +44,8 @@ if ($DryRun) {
 
 if (-not (Test-Path -LiteralPath $exe)) { Write-Host ('找不到游戏 EXE: ' + $exe); exit 2 }
 
+# 清掉旧日志：否则会读到上一次运行的标记，把旧构建的结论当成新构建的（曾经的坑）
+if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue }   # 移除旧日志
 Write-Host '== 启动游戏 ...'
 $proc = Start-Process -FilePath $exe -WorkingDirectory $GameDir -PassThru
 $marker = $null

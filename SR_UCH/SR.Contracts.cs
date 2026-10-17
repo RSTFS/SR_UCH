@@ -631,13 +631,35 @@ namespace SR_UCH {
             public static Type Type(string name) { Func<string, Type> f = TypeFn; return f != null ? f(name) : null; }
         }
 
+        // 自检用：SRApi 自身 + 全部嵌套类型（含以后新增的门面分组，避免硬编码列表漏统计）。
+        internal static Type[] Owners() {
+            Type self = typeof(SRApi);
+            Type[] nested = self.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic);
+            Type[] all = new Type[nested.Length + 1];
+            all[0] = self;
+            Array.Copy(nested, 0, all, 1, nested.Length);
+            return all;
+        }
+        // 注入点总数（= 声明为委托类型的静态字段数）
+        public static int SinkTotal() {
+            int n = 0;
+            try {
+                Type[] owners = Owners();
+                for (int i = 0; i < owners.Length; i++) {
+                    FieldInfo[] fs = owners[i].GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+                    for (int j = 0; j < fs.Length; j++) if (typeof(Delegate).IsAssignableFrom(fs[j].FieldType)) n++;
+                }
+            } catch { }
+            return n;
+        }
+
         // 自检：反射遍历全部注入点，返回尚未注入的 API 通道名（漏注入会让对应功能静默失效）。
         // 运行时由 MainPlugin 在注入完成后调用；Ref.TypeFn 恒为 null（核心私有，功能层用不到），列入白名单。
         private static readonly string[] _optionalSinks = new string[] { "Ref.TypeFn" };
         public static string[] MissingSinks() {
             List<string> miss = new List<string>();
             try {
-                Type[] owners = new Type[] { typeof(SRApi), typeof(SRApi.Ref), typeof(SRApi.Ctl), typeof(SRApi.Migration) };
+                Type[] owners = Owners();
                 for (int i = 0; i < owners.Length; i++) {
                     FieldInfo[] fs = owners[i].GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
                     for (int j = 0; j < fs.Length; j++) {
@@ -657,7 +679,7 @@ namespace SR_UCH {
         public static int SinkCount() {
             int n = 0;
             try {
-                Type[] owners = new Type[] { typeof(SRApi), typeof(SRApi.Ref), typeof(SRApi.Ctl), typeof(SRApi.Migration) };
+                Type[] owners = Owners();
                 for (int i = 0; i < owners.Length; i++) {
                     FieldInfo[] fs = owners[i].GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
                     for (int j = 0; j < fs.Length; j++) if (typeof(Delegate).IsAssignableFrom(fs[j].FieldType) && fs[j].GetValue(null) != null) n++;
