@@ -225,6 +225,16 @@ namespace SR_UCH {
             try { Features.Rebuild(); ModLogger.LogInfo(Features.Describe()); } catch (Exception __ft) { try { ModLogger.LogWarning("[SR.Feat] 功能清单登记失败: " + __ft.Message); } catch { } }
             // 启动自检（补丁目标 / 反射成员）：必须在全部功能与 EX 都挂完之后，结论进日志。
             try { SR.RunStartupAudit(); } catch (Exception __ex) { try { ModLogger.LogWarning("[SR] 启动自检失败: " + __ex.Message); } catch { } }
+            // P1-1：运行时冒烟测试标记 —— 单行、固定格式、可被脚本 grep（build\smoke.ps1）。
+            try {
+                string[] __miss = SRApi.MissingSinks();
+                string __gv = "?";
+                try { __gv = UnityEngine.Application.version; } catch { }
+                if (__miss.Length == 0 && Features.ProblemCount == 0)
+                    ModLogger.LogInfo("[SR.SelfTest] OK 游戏版本=" + __gv + " 契约=v" + SRContract.Version + " 功能=" + Features.Count + " API通道缺失=0 功能表问题=0");
+                else
+                    ModLogger.LogError("[SR.SelfTest] FAIL 游戏版本=" + __gv + " API通道缺失=" + __miss.Length + " 功能表问题=" + Features.ProblemCount + " 缺失=" + string.Join(",", __miss));
+            } catch (Exception __st) { try { ModLogger.LogError("[SR.SelfTest] FAIL 自检异常: " + __st.Message); } catch { } }
         }
 
         // 只认 SR_UCH 这几个程序集名：外部 DLL 编译时引用的就是它。
