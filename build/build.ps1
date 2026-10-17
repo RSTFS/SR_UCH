@@ -502,7 +502,7 @@ if ($ExportAudit) {
     [void]$sb.AppendLine('## 审计行')
     [void]$sb.AppendLine('')
     [void]$sb.AppendLine('```')
-    foreach ($l in $lines) { if ($l -match '\[SR\.(Patch|Ref|Feat|Api|SelfTest|GateAudit|Cfg)\]') { [void]$sb.AppendLine($l.Trim()) } }
+    foreach ($l in $lines) { if ($l -match '\[SR\.(SelfTest|Gate|Cfg|Audit|Patch|Ref)\]') { [void]$sb.AppendLine($l.Trim()) } }
     [void]$sb.AppendLine('```')
     [IO.File]::WriteAllText($out, $sb.ToString(), (New-Object System.Text.UTF8Encoding($true)))
     Write-Host ('已导出: ' + $out)

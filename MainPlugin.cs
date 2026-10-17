@@ -206,10 +206,8 @@ namespace SR_UCH {
                     delegate (Func<bool> __f) { SR.RegisterPauseProvider(__f); },
                     delegate (string __s, Action __d) { SR.RegisterTabPrefix(__s, __d); });
                 // P0-1：API 通道自检 —— 漏注入的 sink 会让对应功能静默失效，这里必须报错。
-                try { ModLogger.LogInfo("[SR] 游戏版本=" + UnityEngine.Application.version + " | 契约=v" + SRContract.Version); } catch { }
                 string[] __miss = SRApi.MissingSinks();
                 if (__miss.Length > 0) ModLogger.LogError("[SR.Api] 未注入的 API 通道 (" + __miss.Length + "): " + string.Join(", ", __miss));
-                else ModLogger.LogInfo("[SR.Api] API 通道注入完整（已注入 " + SRApi.SinkCount() + " / 共 " + SRApi.SinkTotal() + " 个）");
             } catch { }
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。
@@ -237,7 +235,7 @@ namespace SR_UCH {
             // 放在本程序集扫描与 EX 之后（EX 的硬编码路径不受影响）。
             LoadExternal();
             // 功能清单（SMAPI 的 manifest 等价物）：内置 / 外部 / EX 的 ITweak 全部就位后统一登记，校验依赖与契约版本。
-            try { Features.Rebuild(); ModLogger.LogInfo(Features.Describe()); } catch (Exception __ft) { try { ModLogger.LogWarning("[SR.Feat] 功能清单登记失败: " + __ft.Message); } catch { } }
+            try { Features.Rebuild(); if (Features.ProblemCount > 0) ModLogger.LogInfo(Features.Describe()); } catch (Exception __ft) { try { ModLogger.LogWarning("[SR.Feat] 功能清单登记失败: " + __ft.Message); } catch { } }
             // 启动自检（补丁目标 / 反射成员）：必须在全部功能与 EX 都挂完之后，结论进日志。
             try { SR.RunStartupAudit(); } catch (Exception __ex) { try { ModLogger.LogWarning("[SR] 启动自检失败: " + __ex.Message); } catch { } }
             // P1-1：运行时冒烟测试标记 —— 单行、固定格式、可被脚本 grep（build\smoke.ps1）。
@@ -247,7 +245,7 @@ namespace SR_UCH {
                 string __gv = "?";
                 try { __gv = UnityEngine.Application.version; } catch { }
                 if (__miss.Length == 0 && Features.ProblemCount == 0)
-                    ModLogger.LogInfo("[SR.SelfTest] OK 游戏版本=" + __gv + " 契约=v" + SRContract.Version + " 功能=" + Features.Count + " API通道缺失=0 功能表问题=0");
+                    ModLogger.LogInfo("[SR.SelfTest] OK 游戏版本=" + __gv + " 契约=v" + SRContract.Version + " 补丁=" + SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " 反射=" + SR.AuditRefOk + "/" + SR.AuditRefTotal + " 功能=" + Features.Count + " API=" + SRApi.SinkCount() + "/" + SRApi.SinkTotal());
                 else
                     ModLogger.LogError("[SR.SelfTest] FAIL 游戏版本=" + __gv + " API通道缺失=" + __miss.Length + " 功能表问题=" + Features.ProblemCount + " 缺失=" + string.Join(",", __miss));
             } catch (Exception __st) { try { ModLogger.LogError("[SR.SelfTest] FAIL 自检异常: " + __st.Message); } catch { } }
@@ -384,7 +382,7 @@ namespace SR_UCH {
                 MethodInfo init = loader.GetMethod("Init", BindingFlags.Public | BindingFlags.Static);
                 if (init == null) { ModLogger.LogError("附加模块缺少 Init 入口"); return; }
                 bool ok = (bool)init.Invoke(null, new object[] { this });
-                ModLogger.LogInfo("附加模块加载完成: " + (ok ? "成功" : "失败"));
+                if (!ok) ModLogger.LogWarning("附加模块加载失败");
             } catch (Exception e) {
                 ModLogger.LogError("附加模块加载失败: " + e);
             }

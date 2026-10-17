@@ -224,7 +224,7 @@ public partial class SR : ITweak {
                            _auditIssues.Add(new AuditIssue { Kind = "反射", Target = kv.Key, Scope = kv.Value }); }
                 }
                 AuditRefTotal = _refFeature.Count; AuditRefOk = ok;
-                AuditLog("[SR.Ref] 反射成员 " + _refFeature.Count + " 个：可用 " + ok + "，失效 " + failed.Count);
+
                 for (int i = 0; i < failed.Count; i++) {
                     AuditWarn("[SR.Ref]   ✗ " + failed[i]
                         + " -> 该功能已禁用。游戏更新导致改名时，请等新版模组适配（旧的在 cfg [Reflection] 段填新成员名能力已删除，照着做是无效的）。");
@@ -317,7 +317,7 @@ public partial class SR : ITweak {
             } catch (Exception __ex) { Guard.Log("SR.Patch 启动自检", __ex); }
             AuditPatchTotal = total; AuditPatchOk = ok;
             PatchAuditBad = failed.Count;
-            AuditLog("[SR.Patch] 按名绑定的补丁目标 " + total + " 个：可用 " + ok + "，失效 " + failed.Count);
+
             for (int i = 0; i < failed.Count; i++) AuditWarn("[SR.Patch]   ✗ " + failed[i]);
             if (failed.Count > 0) {
                 AuditWarn("[SR.Patch] 以上补丁目标已不存在 -> 对应功能不会生效"
@@ -339,6 +339,10 @@ public partial class SR : ITweak {
         // 孤儿键数：BepInEx 把"文件里有但没有任何代码 Bind"的键留在 OrphanedEntries，Save 时原样写回。
         // 启动扫描后显示在设置页（可一键清理）。
         public static int OrphanKeyCount;
+        // 供启动自检汇总行使用的审计计数
+        public static int AuditOrphan;
+        public static int AuditGateTotal;
+        public static int AuditPerFrame;
         // 按需生成、尚未 Bind 的条目数（快捷键/组合键）：仅统计不告警。
         public static int OrphanPendingCount;
         // 没有登记归属、也没被 NavHide 的配置段数：它们会以兜底页出现在侧栏（含漏登记退役的已删功能段）。
@@ -406,6 +410,7 @@ public partial class SR : ITweak {
                 ClearEntryCache();
                 OrphanKeyCount = 0;
             OrphanPendingCount = 0;
+            AuditOrphan = 0;
                 LogInfo("[SR.Cfg] 已清理 " + pairs.Count + " 个孤儿键（原文件已留成 .bak）");
                 return pairs.Count;
             } catch (Exception __ex) { Guard.Log("清理孤儿键", __ex); return 0; }
@@ -428,14 +433,14 @@ public partial class SR : ITweak {
                         continue;
                     }
                     OrphanKeyCount++;
+                    AuditOrphan = OrphanKeyCount;
                     if (real.Length > 0) real.Append(" | ");
                     real.Append("[").Append(def.Section).Append("] ").Append(def.Key);
                 }
                 // 只打一行：真实孤儿键逐条列出（通常极少），按需生成的快捷键条目只报数量。
                 if (OrphanKeyCount > 0)
                     AuditWarn("[SR.Cfg] 配置孤儿键 " + OrphanKeyCount + " 个（配置里有、但没有代码再读；设置页可一键清理）: " + real.ToString());
-                else if (OrphanPendingCount > 0)
-                    LogInfo("[SR.Cfg] 孤儿键 0 个（" + OrphanPendingCount + " 个快捷键条目待按需生成，属正常）");
+
 
             } catch (Exception __ex) { Guard.Log("孤儿键扫描", __ex); }
         }
@@ -1030,7 +1035,7 @@ public partial class SR : ITweak {
             if (!_scanned) return;   // 启动期注册：等 EnsureScanned 一次算完
             RebuildSections(false);
             try { ApplyCmOrder(); } catch (Exception __ex) { Guard.Log("晚注册后重排 Configuration Manager", __ex); }
-            if (!string.IsNullOrEmpty(sec)) AuditLog("[SR] 侧栏栏目在首次扫描后注册：" + sec + "（已即时生效）");
+
         }
 
         public static void Nav(string sec, int rank) {

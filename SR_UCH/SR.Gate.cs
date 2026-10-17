@@ -281,10 +281,10 @@ public partial class SR {
                         }
                     }
 
-                    SR.LogInfo("[GateAudit] SR_UCH 补丁目标方法 " + total + " 个；其中挂在每帧方法上的 " + perFrame.Count + " 个：");
-                    for (int i = 0; i < perFrame.Count; i++) {
-                        SR.LogInfo("[GateAudit]   " + perFrame[i]);
-                    }
+                    // 只留一行汇总：逐个列出每帧补丁属于排查噪音（详情可看设置页自检块）。
+                    SR.AuditGateTotal = total;
+                    SR.AuditPerFrame = perFrame.Count;
+                    SR.LogInfo("[SR.Gate] 补丁目标方法 " + total + " 个（其中每帧方法 " + perFrame.Count + " 个）");
                 } catch (Exception ex) {
                     try { SR.LogWarn("[GateAudit] 扫描失败: " + ex.Message); } catch (Exception __ex) { Guard.Log("Run", __ex); }
                 }
