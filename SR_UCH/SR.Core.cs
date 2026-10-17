@@ -869,6 +869,11 @@ public partial class SR : ITweak {
             // 切语言 / 装语言包都走 ApplyLanguage：解析 id 并让显示名缓存失效
             _langEntry.SettingChanged += (s, e) => ApplyLanguage();
             ApplyLanguage();
+            // 语言包外置：扫描 config/SR_UCH/lang/*.json 并注册（第三方语言包不再需要编译 DLL）。
+            // 位置要求：必须在语言条目 Bind + ApplyLanguage 之后（RegisterLanguage 内部会按 cfg 里保存的语言 id
+            // 重新解析，否则本次启动选不中 JSON 语言包），并在各功能的 Initialize 与第一次渲染之前。
+            // 加载器自身逐文件兜底，这里再包一层 try，保证任何异常都不影响核心启动。
+            try { LoadJsonLanguagePacks(); } catch (Exception __ex) { Guard.Log("加载 JSON 语言包", __ex); }
             // 地图总开关：默认关闭；开启后 M 键开地图，关闭时已打开的地图立即关闭（地图网格等独立功能不受影响）。
             // 设置页栏目宽度：0 = 自动按文字宽度；也可拖动窗口侧栏右缘调整，结果写回本项。
             _sidebarWEntry = plugin.Config.Bind(Keys.Settings, Keys.SidebarWidth, 0, "左边那一栏有多宽, 单位像素, 填 0 让它自己算. 也可以直接在窗口里拖侧栏右边缘.");

@@ -1,6 +1,9 @@
 // 本地化：T() 查表入口、注册表、内置中英文词条、外部语言包，以及键名 / 关卡名 / 枚举名翻译。
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Text;
 using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Configuration;
@@ -378,6 +381,308 @@ public partial class SR {
             if (ov != null) return ov;
             if (UseEn) return n; //英文系直接显示原名
             return zh ?? n;
+        }
+
+        // ---------- 外置 JSON 语言包（config/SR_UCH/lang/*.json） ----------
+        // 第三方语言包不再必须编译 DLL：把 {"id","displayName","fallback","map"} 写进 JSON 即可。
+        // 加载点在 SR.Initialize 早期（语言条目 Bind + ApplyLanguage 之后、各功能 Initialize 之前），
+        // 失败只写日志并跳过对应文件，绝不抛出（语言包缺失不能影响核心启动）。
+
+        private const long MaxLangPackFileBytes = 2L * 1024L * 1024L; // 单文件 2MB 上限
+        private const int MaxLangPackEntries = 20000;                // map 最多 2 万条
+
+        // JSON 语言包实现：Map 直接返回解析出的字典；ApplyLanguage / LanguageOptions 走现有逻辑，
+        // 因此设置页语言下拉会自动多出这一项，无需改 UI。
+        private sealed class JsonLanguagePack : ILanguagePack {
+            private readonly string _id;
+            private readonly string _displayName;
+            private readonly string _fallbackId;
+            private readonly Dictionary<string, string> _map;
+
+            public JsonLanguagePack(string id, string displayName, string fallbackId, Dictionary<string, string> map) {
+                _id = id;
+                _displayName = displayName;
+                _fallbackId = fallbackId;
+                _map = map;
+            }
+
+            public string Id { get { return _id; } }
+            public string DisplayName { get { return _displayName; } }
+            public string FallbackId { get { return _fallbackId; } }
+            public IDictionary<string, string> Map { get { return _map; } }
+        }
+
+        // 扫描并注册 config/SR_UCH/lang/*.json。目录不存在 = 正常情况（未安装任何 JSON 语言包）。
+        internal static void LoadJsonLanguagePacks() {
+            try {
+                string dir;
+                try { dir = Path.Combine(Paths.ConfigPath, "SR_UCH", "lang"); }
+                catch (Exception __ex) { Guard.Log("语言包/定位目录", __ex); return; }
+                try { if (!Directory.Exists(dir)) return; }
+                catch (Exception __ex) { Guard.Log("语言包/检查目录", __ex); return; }
+                string[] files;
+                try { files = Directory.GetFiles(dir, "*.json"); }
+                catch (Exception __ex) { Guard.Log("语言包/枚举文件", __ex); return; }
+                // 按文件名排序后加载：同 id 时后加载覆盖（与 RegisterLanguage 的覆盖语义一致），顺序可预期。
+                try { Array.Sort(files, StringComparer.OrdinalIgnoreCase); }
+                catch (Exception __ex) { Guard.Log("语言包/排序文件", __ex); }
+                int loaded = 0;
+                int skipped = 0;
+                // 已加载的 id -> 来源文件名：同名 id 后加载覆盖，并记一条日志方便排查。
+                Dictionary<string, string> seenIds = new Dictionary<string, string>(StringComparer.Ordinal);
+                for (int i = 0; i < files.Length; i++) {
+                    if (LoadOneJsonLanguagePack(files[i], seenIds)) loaded++;
+                    else skipped++;
+                }
+                if (loaded > 0) {
+                    SR.LogInfo("[SR] 已从 " + dir + " 加载 " + loaded + " 个 JSON 语言包"
+                        + (skipped > 0 ? "（跳过 " + skipped + " 个无效文件）" : ""));
+                } else if (skipped > 0) {
+                    SR.LogWarn("[SR] " + dir + " 下的 " + skipped + " 个 JSON 语言包全部无效，已跳过");
+                }
+            } catch (Exception __ex) {
+                Guard.Log("语言包/批量加载", __ex);
+            }
+        }
+
+        // 加载单个 JSON 语言包；返回 false 表示已记录日志并跳过（每个文件最多一条告警）。
+        private static bool LoadOneJsonLanguagePack(string path, Dictionary<string, string> seenIds) {
+            string fileName = "<unknown>";
+            try {
+                fileName = Path.GetFileName(path);
+                long length;
+                try { length = new FileInfo(path).Length; }
+                catch (Exception __ex) { Guard.Log("语言包/读取文件大小 " + fileName, __ex); return false; }
+                if (length <= 0) {
+                    SR.LogWarn("[SR] 语言包文件为空，已跳过: " + fileName);
+                    return false;
+                }
+                if (length > MaxLangPackFileBytes) {
+                    SR.LogWarn("[SR] 语言包文件超过 2MB 上限，已跳过: " + fileName + "（" + length + " 字节）");
+                    return false;
+                }
+                string text;
+                try { text = File.ReadAllText(path, Encoding.UTF8); } // 兼容 BOM（StreamReader 自动识别）
+                catch (Exception __ex) { Guard.Log("语言包/读取文件 " + fileName, __ex); return false; }
+                string id;
+                string displayName;
+                string fallbackId;
+                string err;
+                Dictionary<string, string> map;
+                if (!JsonLanguagePackParser.TryParse(text, out id, out displayName, out fallbackId, out map, out err)) {
+                    SR.LogWarn("[SR] JSON 语言包无效，已跳过: " + fileName + "（" + err + "）");
+                    return false;
+                }
+                // 与内置语言 id 冲突：RegisterLanguage 也会忽略，这里提前跳过并给出更明确的一条日志。
+                if (id == LangZh || id == LangEn) {
+                    SR.LogWarn("[SR] JSON 语言包 id 与内置语言冲突，已跳过: " + fileName + "（id=" + id + "）");
+                    return false;
+                }
+                if (seenIds != null) {
+                    string prev;
+                    if (seenIds.TryGetValue(id, out prev)) {
+                        SR.LogWarn("[SR] JSON 语言包 id 重复，后加载覆盖: " + id + "（" + fileName + " 覆盖 " + prev + "）");
+                    }
+                    seenIds[id] = fileName;
+                }
+                if (string.IsNullOrEmpty(displayName)) displayName = id;
+                if (string.IsNullOrEmpty(fallbackId)) fallbackId = LangEn;
+                RegisterLanguage(new JsonLanguagePack(id, displayName, fallbackId, map));
+                SR.LogInfo("[SR] 已加载 JSON 语言包: " + displayName + " (" + id + "，" + map.Count + " 条) <- " + fileName);
+                return true;
+            } catch (Exception __ex) {
+                Guard.Log("语言包/加载 " + fileName, __ex);
+                return false;
+            }
+        }
+
+        // 最小 JSON 解析器：只取顶层对象里的 id / displayName / fallback（字符串）与 map（对象 string->string）。
+        // 其余字段、map 中的非字符串值、以及数组/数字/布尔/null 一律只做语法跳过，不构造对象。
+        private sealed class JsonLanguagePackParser {
+            private string _s;
+            private int _i;
+
+            public static bool TryParse(string text, out string id, out string displayName, out string fallbackId,
+                out Dictionary<string, string> map, out string err) {
+                id = null;
+                displayName = null;
+                fallbackId = null;
+                map = null;
+                err = null;
+                JsonLanguagePackParser p = new JsonLanguagePackParser();
+                p._s = text ?? "";
+                p._i = 0;
+                try {
+                    p.SkipWs();
+                    if (!p.TryConsume('{')) return p.Fail("根节点必须是对象", out err);
+                    Dictionary<string, string> m = new Dictionary<string, string>(StringComparer.Ordinal);
+                    bool hasMap = false;
+                    p.SkipWs();
+                    if (!p.TryConsume('}')) {
+                        while (true) {
+                            p.SkipWs();
+                            string key;
+                            if (!p.TryReadString(out key)) return p.Fail("对象键必须是字符串", out err);
+                            p.SkipWs();
+                            if (!p.TryConsume(':')) return p.Fail("字段 " + key + " 后缺少冒号", out err);
+                            p.SkipWs();
+                            if (key == "id" || key == "displayName" || key == "fallback") {
+                                string v;
+                                if (!p.TryReadString(out v)) {
+                                    if (!p.SkipValue()) return p.Fail("字段 " + key + " 的值语法错误", out err);
+                                    return p.Fail("字段 " + key + " 必须是字符串", out err);
+                                }
+                                if (key == "id") id = v;
+                                else if (key == "displayName") displayName = v;
+                                else fallbackId = v;
+                            } else if (key == "map") {
+                                if (!p.TryReadStringMap(out m, out err)) return false;
+                                hasMap = true;
+                            } else {
+                                if (!p.SkipValue()) return p.Fail("字段 " + key + " 的值语法错误", out err);
+                            }
+                            p.SkipWs();
+                            if (p.TryConsume(',')) continue;
+                            if (p.TryConsume('}')) break;
+                            return p.Fail("对象成员之间缺少逗号", out err);
+                        }
+                    }
+                    p.SkipWs();
+                    if (p._i != p._s.Length) return p.Fail("根对象之后有多余内容", out err);
+                    if (string.IsNullOrEmpty(id)) return p.Fail("缺少 id 字段或 id 为空", out err);
+                    if (!hasMap || m.Count == 0) return p.Fail("缺少 map 字段或 map 为空", out err);
+                    map = m;
+                    return true;
+                } catch (Exception __ex) {
+                    err = __ex.GetType().Name;
+                    return false;
+                }
+            }
+
+            private bool Fail(string msg, out string err) { err = msg; return false; }
+
+            private void SkipWs() {
+                while (_i < _s.Length) {
+                    char c = _s[_i];
+                    if (c == ' ' || c == '\t' || c == '\r' || c == '\n') { _i++; continue; }
+                    break;
+                }
+            }
+
+            private bool TryConsume(char c) {
+                if (_i < _s.Length && _s[_i] == c) { _i++; return true; }
+                return false;
+            }
+
+            // JSON 字符串：支持 \" \\ \/ \b \f \n \r \t \uXXXX 转义；\u 逐码元追加（代理对由两个转义自然拼成）。
+            private bool TryReadString(out string value) {
+                value = null;
+                SkipWs();
+                if (!TryConsume('"')) return false;
+                StringBuilder sb = new StringBuilder();
+                while (_i < _s.Length) {
+                    char c = _s[_i++];
+                    if (c == '"') { value = sb.ToString(); return true; }
+                    if (c != '\\') { sb.Append(c); continue; }
+                    if (_i >= _s.Length) return false;
+                    char e = _s[_i++];
+                    switch (e) {
+                        case '"': sb.Append('"'); break;
+                        case '\\': sb.Append('\\'); break;
+                        case '/': sb.Append('/'); break;
+                        case 'b': sb.Append('\b'); break;
+                        case 'f': sb.Append('\f'); break;
+                        case 'n': sb.Append('\n'); break;
+                        case 'r': sb.Append('\r'); break;
+                        case 't': sb.Append('\t'); break;
+                        case 'u':
+                            if (_i + 4 > _s.Length) return false;
+                            int cp;
+                            if (!int.TryParse(_s.Substring(_i, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out cp)) return false;
+                            sb.Append((char)cp);
+                            _i += 4;
+                            break;
+                        default: return false;
+                    }
+                }
+                return false;
+            }
+
+            // map：必须是对象；键必须是字符串，值只收字符串，其他类型按规格跳过（不整文件作废）。
+            private bool TryReadStringMap(out Dictionary<string, string> map, out string err) {
+                map = new Dictionary<string, string>(StringComparer.Ordinal);
+                err = null;
+                SkipWs();
+                if (!TryConsume('{')) { err = "map 必须是对象"; return false; }
+                SkipWs();
+                if (TryConsume('}')) return true;
+                while (true) {
+                    SkipWs();
+                    string key;
+                    if (!TryReadString(out key)) { err = "map 的键必须是字符串"; return false; }
+                    SkipWs();
+                    if (!TryConsume(':')) { err = "map 成员 " + key + " 后缺少冒号"; return false; }
+                    SkipWs();
+                    string val;
+                    if (TryReadString(out val)) {
+                        if (map.Count >= MaxLangPackEntries) { err = "map 超过 " + MaxLangPackEntries + " 条上限"; return false; }
+                        map[key] = val; // 同键重复：后者覆盖
+                    } else {
+                        if (!SkipValue()) { err = "map 成员 " + key + " 的值语法错误"; return false; }
+                    }
+                    SkipWs();
+                    if (TryConsume(',')) continue;
+                    if (TryConsume('}')) return true;
+                    err = "map 成员之间缺少逗号";
+                    return false;
+                }
+            }
+
+            // 语法级跳过任意 JSON 值（字符串 / 对象 / 数组 / 数字 / true / false / null）。
+            private bool SkipValue() {
+                SkipWs();
+                if (_i >= _s.Length) return false;
+                char c = _s[_i];
+                if (c == '"') {
+                    string tmp;
+                    return TryReadString(out tmp);
+                }
+                if (c == '{') {
+                    _i++;
+                    SkipWs();
+                    if (TryConsume('}')) return true;
+                    while (true) {
+                        SkipWs();
+                        string k;
+                        if (!TryReadString(out k)) return false;
+                        SkipWs();
+                        if (!TryConsume(':')) return false;
+                        if (!SkipValue()) return false;
+                        SkipWs();
+                        if (TryConsume(',')) continue;
+                        return TryConsume('}');
+                    }
+                }
+                if (c == '[') {
+                    _i++;
+                    SkipWs();
+                    if (TryConsume(']')) return true;
+                    while (true) {
+                        if (!SkipValue()) return false;
+                        SkipWs();
+                        if (TryConsume(',')) continue;
+                        return TryConsume(']');
+                    }
+                }
+                // 数字 / true / false / null：吃到分隔符为止；不做数值校验（跳过即可）。
+                int start = _i;
+                while (_i < _s.Length) {
+                    char d = _s[_i];
+                    if (d == ',' || d == '}' || d == ']' || d == ' ' || d == '\t' || d == '\r' || d == '\n') break;
+                    _i++;
+                }
+                return _i > start;
+            }
         }
 
 	}
