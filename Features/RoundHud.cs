@@ -22,6 +22,10 @@ namespace SR_UCH.Tweaks {
 		private static ConfigEntry<int> _warnSeconds;
 		private static ConfigEntry<bool> _blink;
 		private static ConfigEntry<bool> _phaseNotice;
+		private static ConfigEntry<bool> _showScores;
+		private static ConfigEntry<bool> _showRound;
+		private static ConfigEntry<bool> _beep;
+		private static ConfigEntry<float> _beepVolume;
 
 		// 阶段状态：Harmony 补丁写，RegisterTick 读。
 		private static GameControl _gc;
@@ -42,6 +46,23 @@ namespace SR_UCH.Tweaks {
 		private static FieldInfo _fPlacementTimer;
 		private static FieldInfo _fLevelTimer;
 		private static FieldInfo _fCountdownTimer;
+
+		// 得分列表：Tick 里排序并缓存成最多 4 行文本，OnGUI 直接画。
+		private struct ScoreRow {
+			public string name;
+			public int score;
+			public bool outFlag;
+		}
+		private static readonly ScoreRow[] _scoreRows = new ScoreRow[8];
+		private static readonly string[] _scoreLines = new string[4];
+		private static int _scoreLineCount;
+		private static int _scoreSig;
+		private static int _scoreRowCount;
+
+		// 最后 5 秒提示音：AudioSource + 运行时生成的正弦波，不依赖游戏音频资源。
+		private static AudioSource _audio;
+		private static AudioClip _beepClip;
+		private static bool _beepedPhase;       // 每个阶段只响一次
 
 		// HUD 绘制缓存（首次 OnGUI 时创建）。
 		private static GUIStyle _phaseStyle;
@@ -90,6 +111,22 @@ namespace SR_UCH.Tweaks {
 			try { return _phaseNotice != null && _phaseNotice.Value; } catch { return true; }
 		}
 
+		private static bool ShowScoresOn() {
+			try { return _showScores != null && _showScores.Value; } catch { return false; }
+		}
+
+		private static bool ShowRoundOn() {
+			try { return _showRound != null && _showRound.Value; } catch { return true; }
+		}
+
+		private static bool BeepOn() {
+			try { return _beep != null && _beep.Value; } catch { return true; }
+		}
+
+		private static float BeepVolume() {
+			try { return _beepVolume != null ? Mathf.Clamp(_beepVolume.Value, 0f, 1f) : 0.5f; } catch { return 0.5f; }
+		}
+
 		private static void SelfReg() {
 			// 本文件反射的游戏私有成员，改名时启动自检会在日志里告警。
 			SRApi.Ref.Override("VersusControl.placementTimer", "回合计时（建造阶段剩余时间）");
@@ -114,6 +151,14 @@ namespace SR_UCH.Tweaks {
 			SRApi.LocDesc("Round HUD", "Blink", "最后 5 秒闪烁\n倒计时进入最后 5 秒时文字闪烁提醒\n关闭则只在最后 5 秒显示红色", "blink in the last 5 seconds\nmakes the countdown blink during the final 5 seconds\nOFF shows a steady red countdown instead");
 			SRApi.LocKey("Round HUD", "Phase Notice", "阶段提示", null);
 			SRApi.LocDesc("Round HUD", "Phase Notice", "阶段切换提示\n阶段切换时在 HUD 里短暂显示新阶段名称\n显示约 2 秒后自动消失", "phase change notice\nbriefly shows the new phase name in the HUD when the phase changes\nfades out automatically after about 2 seconds");
+			SRApi.LocKey("Round HUD", "Show Scores", "显示得分", null);
+			SRApi.LocDesc("Round HUD", "Show Scores", "显示玩家得分\nHUD 内增加最多 4 行的玩家得分列表，按分数从高到低排序\n只读取本局得分与淘汰状态，取不到时整段隐藏", "show player scores\nadds a list of up to 4 players to the HUD, sorted from highest to lowest score\nreads this match's scores and eliminated state only; hidden when unavailable");
+			SRApi.LocKey("Round HUD", "Show Round", "显示回合进度", null);
+			SRApi.LocDesc("Round HUD", "Show Round", "显示回合进度\n在 HUD 中显示第 N 回合与目标回合/胜场数\n取不到回合信息时自动隐藏该行", "show round progress\nshows the current round and the target round/win count in the HUD\nhidden automatically when round info is unavailable");
+			SRApi.LocKey("Round HUD", "Beep", "最后 5 秒提示音", null);
+			SRApi.LocDesc("Round HUD", "Beep", "最后 5 秒提示音\n倒计时进入最后 5 秒时响一声，每个阶段只响一次\n使用运行时生成的简单提示音，不依赖游戏音频资源", "last-5-seconds beep\nplays one beep when the countdown enters its final 5 seconds, once per phase\nuses a beep generated at runtime; no game audio assets are used");
+			SRApi.LocKey("Round HUD", "Beep Volume", "提示音音量", null);
+			SRApi.LocDesc("Round HUD", "Beep Volume", "提示音音量\n最后 5 秒提示音的音量\n范围 0 到 1，0 为静音", "beep volume\nvolume of the last-5-seconds beep\nrange 0-1, 0 = silent");
 		}
 
 		// 本页内容 = 该段的条目列表（与移动轨迹页同款）。
@@ -144,14 +189,24 @@ namespace SR_UCH.Tweaks {
 					new ConfigDescription("倒计时警告秒数（5-60）：剩余时间低于该值时文字变黄；最后 5 秒固定变红。", new AcceptableValueRange<int>(5, 60)));
 				_blink = cfg.Bind("Round HUD", "Blink", false, "最后 5 秒闪烁：倒计时进入最后 5 秒时文字闪烁提醒。");
 				_phaseNotice = cfg.Bind("Round HUD", "Phase Notice", true, "阶段切换提示：阶段切换时在 HUD 里短暂显示新阶段名称（约 2 秒）。");
+				_showScores = cfg.Bind("Round HUD", "Show Scores", false, "显示玩家得分：在 HUD 内增加最多 4 行玩家得分/淘汰列表（只读本局数据，取不到时隐藏）。");
+				_showRound = cfg.Bind("Round HUD", "Show Round", true, "显示回合进度：在 HUD 中显示第 N 回合与目标回合/胜场数（取不到时隐藏）。");
+				_beep = cfg.Bind("Round HUD", "Beep", true, "最后 5 秒提示音：倒计时进入最后 5 秒时响一声，每个阶段只响一次。");
+				_beepVolume = cfg.Bind("Round HUD", "Beep Volume", 0.5f,
+					new ConfigDescription("提示音音量（0-1）：最后 5 秒提示音的音量，0 为静音。", new AcceptableValueRange<float>(0f, 1f)));
 
 				SRApi.RegisterTick("sr.roundhud", Tick);
 				SRApi.RegisterSceneHook(ResetStateSafe);
 
-				// 常驻对象：只承载 OnGUI 绘制。
+				// 常驻对象：承载 OnGUI 绘制与提示音播放。
 				GameObject go = new GameObject("SR_UCHRoundHud");
 				UnityEngine.Object.DontDestroyOnLoad(go);
 				go.AddComponent<HudComponent>();
+				// 2D 音源；AudioClip 懒生成（只在第一次需要响提示音时创建）。
+				_audio = go.AddComponent<AudioSource>();
+				_audio.playOnAwake = false;
+				_audio.spatialBlend = 0f;
+				_audio.volume = 1f;
 
 				// 本类自带 [HarmonyPatch] 但 ITweak 为反射发现，须手动 CreateAndPatchAll；失败只丢本类功能。
 				try { Harmony.CreateAndPatchAll(typeof(RoundHud), (string)null); }
@@ -180,6 +235,7 @@ namespace SR_UCH.Tweaks {
 			_phase = phase;
 			_phaseStart = Time.unscaledTime;
 			_vsPlaceSeen = false;
+			_beepedPhase = false;   // 新阶段重新允许最后 5 秒提示音
 			_noticeText = SRApi.T("阶段：", "Phase: ") + PhaseName(phase);
 			_noticeUntil = _phaseStart + 2f;
 		}
@@ -229,7 +285,8 @@ namespace SR_UCH.Tweaks {
 				_hasGame = true;
 				GameSettings gs = ReadSettings();
 				UpdateTimer(gc, gs);
-				UpdateRound(gc, gs);
+				if (ShowRoundOn()) UpdateRound(gc, gs); else _roundText = null;
+				UpdateScores(gc);
 			} catch (Exception __ex) { SRApi.Guard.Log("回合计时 状态更新", __ex); }
 		}
 
@@ -296,27 +353,141 @@ namespace SR_UCH.Tweaks {
 				float warn = WarnSeconds();
 				float red = Mathf.Min(5f, warn);
 				_warnLevel = remaining <= red ? 2 : (remaining <= warn ? 1 : 0);
+				// 进入最后 5 秒的那一帧响一次（每个阶段一次，_beepedPhase 在 StartPhaseEvent 重置）。
+				if (_warnLevel >= 2) MaybeBeep();
 			} else {
 				_timerText = FormatClock(Mathf.FloorToInt(elapsed));
 				_warnLevel = 0;
 			}
 		}
 
-		// 回合计时：只读 GameControl.RoundNumber；目标胜场按游戏规则取 MaxRounds 或 MaxScore。
+		// 回合进度：只读 GameControl.RoundNumber；目标按游戏规则取 MaxRounds 或 MaxScore。
 		private static void UpdateRound(GameControl gc, GameSettings gs) {
 			try {
 				int round = gc.RoundNumber;
 				if (round <= 0) { _roundText = null; return; }
-				string head = SRApi.T("回合 ", "Round ") + round;
+				string head = SRApi.T("第 ", "Round ") + round + SRApi.T(" 回合", " round");
 				if (gs == null) { _roundText = head; return; }
 				if (gs.GameLimitType == GameLimitType.ROUNDS) {
 					int rounds = gs.MaxRounds;
-					_roundText = rounds > 0 ? head + " / " + rounds : head;
+					_roundText = rounds > 0 ? head + SRApi.T(" / 目标 ", " / target ") + rounds : head;
 				} else {
 					int wins = gs.MaxScore;
-					_roundText = wins > 0 ? head + SRApi.T(" · 目标 ", " · Target ") + wins + SRApi.T(" 胜", " wins") : head;
+					_roundText = wins > 0 ? head + SRApi.T(" / 目标 ", " / target ") + wins + SRApi.T(" 胜", " wins") : head;
 				}
 			} catch { _roundText = null; }
+		}
+
+		// 得分/淘汰列表：只读 ScoreKeeper（玩家总分）与 GamePlayer（名字、角色死亡状态），最多 4 行。
+		private static void UpdateScores(GameControl gc) {
+			try {
+				if (!ShowScoresOn()) { ClearScores(); return; }
+				// ScoreKeeper 只在 Versus 系模式（派对/创造）里 Setup；其他模式整段隐藏。
+				if (!(gc is VersusControl)) { ClearScores(); return; }
+				ScoreKeeper sk;
+				try { sk = ScoreKeeper.Instance; } catch { sk = null; }
+				if (sk == null) { ClearScores(); return; }
+				int n = 0;
+				Queue<GamePlayer> queue = gc.CurrentPlayerQueue;
+				if (queue != null) {
+					foreach (GamePlayer gp in queue) {
+						if (gp == null) continue;
+						if (n >= _scoreRows.Length) break;
+						int total;
+						try { total = sk.GetPlayerTotal(gp); } catch { total = 0; }
+						bool outFlag = false;
+						try {
+							Character c = gp.CharacterInstance;
+							if (c != null && (c.Dead || c.Dying)) outFlag = true;
+						} catch { outFlag = false; }
+						_scoreRows[n].name = DisplayName(gp);
+						_scoreRows[n].score = total;
+						_scoreRows[n].outFlag = outFlag;
+						n++;
+					}
+				}
+				_scoreRowCount = n;
+				if (n == 0) { ClearScores(); return; }
+				// 插入排序：按分数从高到低；同分保持队列顺序，避免每帧互换导致抖动。
+				for (int i = 1; i < n; i++) {
+					ScoreRow key = _scoreRows[i];
+					int j = i - 1;
+					while (j >= 0 && _scoreRows[j].score < key.score) { _scoreRows[j + 1] = _scoreRows[j]; j--; }
+					_scoreRows[j + 1] = key;
+				}
+				int shown = Mathf.Min(n, _scoreLines.Length);
+				int sig = SRApi.LangVer;
+				sig = sig * 31 + shown;
+				for (int i = 0; i < shown; i++) {
+					sig = sig * 31 + _scoreRows[i].score;
+					sig = sig * 31 + (_scoreRows[i].outFlag ? 1 : 0);
+					sig = sig * 31 + (_scoreRows[i].name != null ? _scoreRows[i].name.GetHashCode() : 0);
+				}
+				if (sig != _scoreSig) {
+					_scoreSig = sig;
+					for (int i = 0; i < shown; i++) {
+						string line = _scoreRows[i].name + "  " + _scoreRows[i].score + SRApi.T(" 分", " pts");
+						if (_scoreRows[i].outFlag) line += SRApi.T(" · 淘汰", " · out");
+						_scoreLines[i] = line;
+					}
+					for (int i = shown; i < _scoreLines.Length; i++) _scoreLines[i] = null;
+				}
+				_scoreLineCount = shown;
+			} catch (Exception __ex) {
+				ClearScores();
+				SRApi.Guard.Log("回合计时 得分列表", __ex);
+			}
+		}
+
+		private static void ClearScores() {
+			_scoreLineCount = 0;
+			_scoreRowCount = 0;
+			_scoreSig = 0;
+			for (int i = 0; i < _scoreLines.Length; i++) _scoreLines[i] = null;
+		}
+
+		private static string DisplayName(GamePlayer gp) {
+			string name = null;
+			try { name = gp.playerName; } catch { }
+			if (string.IsNullOrEmpty(name)) {
+				try { name = gp.ValidatedDisplayName; } catch { }
+			}
+			if (!string.IsNullOrEmpty(name)) name = name.Trim();
+			if (string.IsNullOrEmpty(name)) name = "P" + gp.networkNumber;
+			if (name.Length > 12) name = name.Substring(0, 11) + "..";
+			return name;
+		}
+
+		// 最后 5 秒提示音：每次阶段只响一次；AudioClip 懒生成（纯正弦，0.18 秒，淡入淡出防爆音）。
+		private static void MaybeBeep() {
+			if (!BeepOn() || _beepedPhase || !SRApi.GateMaster) return;
+			// 只在有实际倒计时的阶段响：准备/结算阶段的最后 5 秒没有必要提示。
+			if (_phase != GameControl.GamePhase.PLACE && _phase != GameControl.GamePhase.PLAY && _phase != GameControl.GamePhase.SUDDENDEATH) return;
+			_beepedPhase = true;
+			try {
+				float vol = BeepVolume();
+				if (vol <= 0f) return;
+				EnsureBeepClip();
+				if (_audio == null || _beepClip == null) return;
+				_audio.PlayOneShot(_beepClip, vol);
+			} catch (Exception __ex) { SRApi.Guard.Log("回合计时 提示音", __ex); }
+		}
+
+		private static void EnsureBeepClip() {
+			if (_beepClip != null) return;
+			const int rate = 44100;
+			int samples = Mathf.Max(1, Mathf.RoundToInt((float)rate * 0.18f));
+			float[] data = new float[samples];
+			for (int i = 0; i < samples; i++) {
+				float t = (float)i / (float)rate;
+				float env = 1f;
+				if (t < 0.012f) env = t / 0.012f;                 // 起音淡入
+				float tail = (float)(samples - i) / (float)samples;
+				if (tail < 0.3f) env *= tail / 0.3f;              // 收尾淡出
+				data[i] = Mathf.Sin(2f * Mathf.PI * 880f * t) * 0.6f * env;
+			}
+			_beepClip = AudioClip.Create("SR_RoundHudBeep", samples, 1, rate, false);
+			_beepClip.SetData(data, 0);
 		}
 
 		private static float ReadFloat(ref FieldInfo f, object owner, string name, string feature) {
@@ -362,6 +533,8 @@ namespace SR_UCH.Tweaks {
 			_noticeText = null;
 			_noticeUntil = 0f;
 			_vsPlaceSeen = false;
+			_beepedPhase = false;
+			ClearScores();
 			_dragging = false;
 		}
 
@@ -418,7 +591,8 @@ namespace SR_UCH.Tweaks {
 			float op = Opacity();
 			string phaseName = PhaseName(_phase);
 			string timer = _timerText;
-			string round = _roundText;
+			string round = ShowRoundOn() ? _roundText : null;
+			int scoreCount = ShowScoresOn() ? _scoreLineCount : 0;
 			string notice = (PhaseNoticeOn() && Time.unscaledTime < _noticeUntil) ? _noticeText : null;
 
 			float pad = SRApi.Ctl.Sc(9f);
@@ -430,10 +604,12 @@ namespace SR_UCH.Tweaks {
 			float w = Measure(phaseName, _phaseStyle);
 			w = Mathf.Max(w, Measure(timer, _timerStyle));
 			if (round != null) w = Mathf.Max(w, Measure(round, _smallStyle));
+			for (int i = 0; i < scoreCount; i++) w = Mathf.Max(w, Measure(_scoreLines[i], _smallStyle));
 			if (notice != null) w = Mathf.Max(w, Measure(notice, _noticeStyle));
 			float panelW = Mathf.Max(w + pad * 2f + SRApi.Ctl.Sc(4f), SRApi.Ctl.Sc(120f));
 			float panelH = hPhase + hTimer + pad * 2f;
 			if (round != null) panelH += hSmall;
+			if (scoreCount > 0) panelH += hSmall * scoreCount;
 			if (notice != null) panelH += hSmall;
 
 			float x, y;
@@ -485,6 +661,15 @@ namespace SR_UCH.Tweaks {
 			if (round != null) {
 				_smallStyle.normal.textColor = smallCol;
 				GUI.Label(new Rect(panel.x + pad, ty, tw, hSmall), round, _smallStyle);
+				ty += hSmall;
+			}
+			// 得分/淘汰行：淘汰的玩家整行压暗，仍然显示分数。
+			for (int i = 0; i < scoreCount; i++) {
+				string line = _scoreLines[i];
+				if (line == null) continue;
+				bool outFlag = i < _scoreRowCount && _scoreRows[i].outFlag;
+				_smallStyle.normal.textColor = outFlag ? new Color(1f, 0.62f, 0.62f, 0.45f * op) : smallCol;
+				GUI.Label(new Rect(panel.x + pad, ty, tw, hSmall), line, _smallStyle);
 				ty += hSmall;
 			}
 			if (notice != null) {
