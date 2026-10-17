@@ -22,7 +22,7 @@ public partial class Experiments : ITweak
 				SR.Ctl.RenderControl(e);
 				GUILayout.FlexibleSpace();
 				GUILayout.EndHorizontal();
-			} catch (Exception __ex) { SR.Guard.Log("渲染进阶条目", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("渲染进阶条目", __ex); }
 		}
 
 		// 条目行统一排版（全项目约定）：标签在左、控件紧贴其右，其余空间留白。
@@ -36,7 +36,7 @@ public partial class Experiments : ITweak
 				SR.Ctl.RenderControl(e);
 				GUILayout.FlexibleSpace();
 				GUILayout.EndHorizontal();
-			} catch (Exception __ex) { SR.Guard.Log("渲染关卡边界条目", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("渲染关卡边界条目", __ex); }
 		}
 
 		public static void Render() {
@@ -57,7 +57,7 @@ public partial class Experiments : ITweak
                 "能走到关卡外面多远, 不限范围. 相机取景/放置光标的边界都按这个值换掉.",
                 "How far outside the level you can go; the camera framing and placement-cursor bounds are both replaced by this.");
             GUILayout.Space(SR.Ctl.Sc(6));
-        } catch (Exception __ex) { SR.Guard.Log("实验区一 渲染", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("实验区一 渲染", __ex); }
 		}
 }
     // 关卡边界（实验）：解除制作关卡时的空间边界限制，与满度上限无关。
@@ -177,13 +177,13 @@ public partial class Experiments : ITweak
                     try {
                         if (_radius.Value == 100000 || _radius.Value == 320 || _radius.Value == 10) _radius.Value = DefaultHardRadiusInt;
                         lbDefaults.Value = true;
-                    } catch (Exception __ex) { SR.Guard.Log("边界默认值迁移", __ex); }
+                    } catch (Exception __ex) { SRApi.Guard.Log("边界默认值迁移", __ex); }
                 }
 
                 // 事件驱动即时重评估，Tick 仅作兜底（面板关闭/页面切走时 Tick 可能不跑）。
                 if (_on != null) _on.SettingChanged += (s, e) => Reeval();
                 // 半径变更走轻量刷新（只重跑 ApplyHardBounds，幂等），不触发 Reeval 的全流程重扫。
-                if (_radius != null) _radius.SettingChanged += (s, e) => { if (_on != null && _on.Value) { try { ApplyHardBounds(); } catch (Exception __ex) { SR.Guard.Log("边界半径刷新", __ex); } } };
+                if (_radius != null) _radius.SettingChanged += (s, e) => { if (_on != null && _on.Value) { try { ApplyHardBounds(); } catch (Exception __ex) { SRApi.Guard.Log("边界半径刷新", __ex); } } };
                 // 半径与外扩用编辑框渲染：两者可用跨度都是大 int，滑块不可用。
                 // 半径不挂 SettingChanged，Tick 每帧会调 ApplyHardBounds，改完下一帧自然生效。
                 // 以下键已无任何代码 Bind，由迁移规则从旧 cfg 清除；只能列真正不再 Bind 的键，否则运行时自检报错。
@@ -199,7 +199,7 @@ public partial class Experiments : ITweak
                 SR.RegisterSceneHook(Reset);
                 SR.RegisterDismissHook(Dismiss);
                 // 总开关关闭时核心触发 RegisterDismissHook -> Dismiss() -> Restore()。
-            } catch (Exception __ex) { SR.Guard.Log("关卡边界 初始化", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("关卡边界 初始化", __ex); }
         }
 
         // 事件驱动的重新评估：开则应用、关则还原；幂等，不依赖 Tick。
@@ -219,7 +219,7 @@ public partial class Experiments : ITweak
                     ApplyCursorPiece(false);
                     if (_applied) { Restore(); _applied = false; }
                 }
-            } catch (Exception __ex) { SR.Guard.Log("关卡边界 重评估", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("关卡边界 重评估", __ex); }
         }
 
         // 每帧总入口：所有分支双向幂等（开写目标值、关写回原值），可任意次切换。
@@ -243,7 +243,7 @@ public partial class Experiments : ITweak
                 if (_tick % 30 != 0) return;
                 ApplyAllPiecesIgnore();
                 BuildStatus();
-            } catch (Exception __ex) { SR.Guard.Log("关卡边界 Tick", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("关卡边界 Tick", __ex); }
         }
 
         // 三面实体墙：只在引用缺失时扫场景；两道闸限制扫描次数 —— 换场景清零、单场景累计上限 WallScanMaxTries 后放弃。
@@ -309,7 +309,7 @@ public partial class Experiments : ITweak
                     }
                 }
                 if (changed) SyncPhysics();   // 与其它改 collider 几何的路径一致
-            } catch (Exception __ex) { SR.Guard.Log("解除实体墙", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("解除实体墙", __ex); }
         }
 
         // 相机取景集合不干预：界外的黑来自无背景时的相机清除色，属背景问题。
@@ -340,7 +340,7 @@ public partial class Experiments : ITweak
                     // ③ 曾打开的 ZoomCamera 按原值还回
                     if (_zcTouched) {
                         try { ZoomCamera z0 = Zc(); if (z0 != null && z0.enabled != _zcWasEnabled) z0.enabled = _zcWasEnabled; }
-                        catch (Exception __ze) { SR.Guard.Log("还原 ZoomCamera.enabled", __ze); }
+                        catch (Exception __ze) { SRApi.Guard.Log("还原 ZoomCamera.enabled", __ze); }
                         _zcTouched = false;
                     }
                     if (nb > 0) SR.LogInfo("[关卡边界] 相机项关闭，已把相机交回游戏（" + nb + " 个相机控制器重新接管）");
@@ -359,7 +359,7 @@ public partial class Experiments : ITweak
                     if (!_zcTouched) { _zcWasEnabled = zc.enabled; _zcTouched = true; }   // 只在首次记录原值
                     if (!zc.enabled) zc.enabled = true;
                 }
-            } catch (Exception __ex) { SR.Guard.Log("压制 FixCamera", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("压制 FixCamera", __ex); }
         }
 
         private static void ApplyCursorPiece(bool on) {
@@ -373,7 +373,7 @@ public partial class Experiments : ITweak
                     if (p == null) continue;
                     if (p.IgnoreBounds != want) p.IgnoreBounds = want;
                 }
-            } catch (Exception __ex) { SR.Guard.Log("关卡边界-手上方块", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("关卡边界-手上方块", __ex); }
         }
 
         private static void ApplyAllPiecesIgnore() {
@@ -399,7 +399,7 @@ public partial class Experiments : ITweak
                     }
                     if (dead != null) for (int i = 0; i < dead.Count; i++) _igWas.Remove(dead[i]);
                 }
-            } catch (Exception __ex) { SR.Guard.Log("全场方块 IgnoreBounds", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("全场方块 IgnoreBounds", __ex); }
         }
 
 
@@ -407,7 +407,7 @@ public partial class Experiments : ITweak
         // 不改 enabled：那是 Level.EnablePlacementBounds 的职责。
         private static void SyncPhysics() {
             try { Physics2D.SyncTransforms(); }
-            catch (Exception __ex) { SR.Guard.Log("同步物理宽相", __ex); }
+            catch (Exception __ex) { SRApi.Guard.Log("同步物理宽相", __ex); }
         }
 
         // 硬解除半径的默认值与兜底值，取值不限范围。
@@ -521,7 +521,7 @@ public partial class Experiments : ITweak
                 _hardNoteKey = hardKey;
                 _hardNote = "硬解除 r=" + (int)r + " 光标×" + n + " " + cam;
             }
-            } catch (Exception __ex) { _hardNote = "硬解除失败:" + __ex.Message; SR.Guard.Log("关卡边界-硬解除", __ex); }
+            } catch (Exception __ex) { _hardNote = "硬解除失败:" + __ex.Message; SRApi.Guard.Log("关卡边界-硬解除", __ex); }
         }
 
         // 缓存
@@ -602,7 +602,7 @@ public partial class Experiments : ITweak
                 bits.Add(CamNote());
                 Status = (_hardNote != null ? _hardNote + " | " : "")
                        + string.Join("  ", bits.ToArray());
-            } catch (Exception __ex) { Status = "状态生成失败：" + __ex.Message; SR.Guard.Log("关卡边界 状态", __ex); }
+            } catch (Exception __ex) { Status = "状态生成失败：" + __ex.Message; SRApi.Guard.Log("关卡边界 状态", __ex); }
         }
 
         // 相机取景诊断：输出取景框尺寸、相机位置、光标坐标与边界快照尺寸。
@@ -633,7 +633,7 @@ public partial class Experiments : ITweak
                         + "） -  取景框被撑到这么大时，画面里所有东西都会小到看不见。");
                 }
                 return s;
-            } catch (Exception __ex) { SR.Guard.Log("相机诊断", __ex); return "相机诊断失败"; }
+            } catch (Exception __ex) { SRApi.Guard.Log("相机诊断", __ex); return "相机诊断失败"; }
         }
 
         // 还原：把改过的每一项按原值写回。
@@ -679,7 +679,7 @@ public partial class Experiments : ITweak
                 if (_zcTouched) { try { ZoomCamera zr = Zc(); if (zr != null && !_zcWasEnabled && zr.enabled) zr.enabled = false; } catch { } }
                 _zcTouched = false;
                 Status = "（已还原为游戏原值）" + string.Join(" ", rb.ToArray());
-            } catch (Exception __ex) { Status = "（还原异常：" + __ex.Message + "）已还原：" + string.Join(" ", rb.ToArray()); SR.Guard.Log("关卡边界 还原", __ex); }
+            } catch (Exception __ex) { Status = "（还原异常：" + __ex.Message + "）已还原：" + string.Join(" ", rb.ToArray()); SRApi.Guard.Log("关卡边界 还原", __ex); }
             _hardNote = null;
             // 与 Reset 对齐：清除"只告警一次"的标志，关闭后再开启仍能看到诊断。
             _camDiagDone = false;
@@ -708,7 +708,7 @@ public partial class Experiments : ITweak
 
         private static void Dismiss() {
             try { if (_applied) { Restore(); _applied = false; } }
-            catch (Exception __ex) { SR.Guard.Log("关卡边界 收起", __ex); }
+            catch (Exception __ex) { SRApi.Guard.Log("关卡边界 收起", __ex); }
         }
     }
     // 解除 UI 3 覆盖：BlankLevel 里 4 个纯黑 whiteSquare 位于 UI 3 层并盖住界外，停画它们及该层所有 Renderer。
@@ -734,7 +734,7 @@ public partial class Experiments : ITweak
                 SR.RegisterTick("解除UI3", Tick);
                 SR.RegisterSceneHook(Reset);
                 SR.RegisterDismissHook(Restore);
-            } catch (Exception __ex) { SR.Guard.Log("解除UI3 初始化", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("解除UI3 初始化", __ex); }
         }
 
         // 换场景必须清 _wasOn：其为强引用字典，旧 Renderer 已随场景销毁，原值无意义且会逐场累积。
@@ -749,7 +749,7 @@ public partial class Experiments : ITweak
                 if (!want) { Restore(); return; }
                 if (!SR.GateMaster) { Restore(); return; }
                 Apply();
-            } catch (Exception __ex) { SR.Guard.Log("解除UI3 Tick", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("解除UI3 Tick", __ex); }
         }
 
         private static void Apply() {
@@ -777,7 +777,7 @@ public partial class Experiments : ITweak
                 _hitCount = n;
                 Note = n > 0 ? ("已解除 UI3 覆盖：停画 " + n + " 个 Renderer")
                              : "未找到 UI3 层上的 Renderer（本关卡可能没有）";
-            } catch (Exception __ex) { SR.Guard.Log("应用UI3解除", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("应用UI3解除", __ex); }
         }
 
         // UI 3 的显示名可能带空格，sortingLayerName 为配置中的原样字符串。

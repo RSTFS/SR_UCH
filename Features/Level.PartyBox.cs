@@ -125,7 +125,7 @@ public partial class Level {
                         list.Add(info.NetworkNumber);
                     }
                 }
-            } catch (Exception __ex) { SR.Guard.Log("统计在线玩家(PlayerTracker)", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("统计在线玩家(PlayerTracker)", __ex); }
             if (list.Count == 0) {
                 try {
                     foreach (Player p in PlayerManager.GetInstance()) {
@@ -133,7 +133,7 @@ public partial class Level {
                         int n = p.PlayerCharacter.networkNumber;
                         if (!list.Contains(n)) list.Add(n);
                     }
-                } catch (Exception __ex) { SR.Guard.Log("统计在线玩家(PlayerManager)", __ex); }
+                } catch (Exception __ex) { SRApi.Guard.Log("统计在线玩家(PlayerManager)", __ex); }
             }
             return list;
         }
@@ -159,7 +159,7 @@ public partial class Level {
                 pieces.Add(piece);
 
                 piece.transform.SetParent(pb.transform, false);
-                try { piece.ChangeArtLayer("Background 2"); } catch (Exception __ex) { SR.Guard.Log("设置炸弹美术层", __ex); }
+                try { piece.ChangeArtLayer("Background 2"); } catch (Exception __ex) { SRApi.Guard.Log("设置炸弹美术层", __ex); }
                 foreach (Transform t in piece.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = 5;
                 float ang = UnityEngine.Random.Range(0f, 360f) * Mathf.Deg2Rad;
                 float rad = Mathf.Max(0.1f, pb.PlacementRadius * 0.8f);
@@ -167,7 +167,7 @@ public partial class Level {
                 piece.NetworkUseStartPosition = true;
                 piece.NetworkStartPosition = piece.transform.localPosition; // Start() 会用 StartPosition 覆盖 localPosition
                 piece.FindPartyBox = true; // 让 piece 找到并跟随派对盒（同游戏自身 spawn）
-                try { piece.setInitialScale(GameSettings.GetInstance().partyBoxItemScale); } catch (Exception __ex) { SR.Guard.Log("设置炸弹初始缩放", __ex); }
+                try { piece.setInitialScale(GameSettings.GetInstance().partyBoxItemScale); } catch (Exception __ex) { SRApi.Guard.Log("设置炸弹初始缩放", __ex); }
                 piece.InPartybox = true;
                 piece.Enable();
                 NetworkServer.Spawn(piece.gameObject);
@@ -224,7 +224,7 @@ public partial class Level {
                     "按这个键就把手上拿着的那块丢掉（走游戏原生通道, 全员可见）, 填 None 就是不绑键.");
                 SR.RegisterKey("关卡-放弃道具", _key, "press");
                 SR.RegisterTick("放弃道具", Tick);
-            } catch (Exception __ex) { SR.Guard.Log("放弃道具 初始化", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("放弃道具 初始化", __ex); }
         }
 
         private static void Tick() {
@@ -246,7 +246,7 @@ public partial class Level {
                     return;
                 }
                 SR.Notify(SR.T("已放弃当前方块", "Piece dropped"));
-            } catch (Exception __ex) { SR.Guard.Log("放弃道具", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("放弃道具", __ex); }
         }
 
         // 本机的放置光标：CursorInstance 挂在 LobbyPlayer 上（Player 上只有 AssociatedLobbyPlayer），
@@ -266,7 +266,7 @@ public partial class Level {
                 // 退路：单机或 lobbySlots 尚未生成时取场上任一 PiecePlacementCursor
                 PiecePlacementCursor[] all = UnityEngine.Object.FindObjectsOfType<PiecePlacementCursor>();
                 if (all != null && all.Length > 0) return all[0];
-            } catch (Exception __ex) { SR.Guard.Log("找放置光标", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("找放置光标", __ex); }
             return null;
         }
 
@@ -283,7 +283,7 @@ public partial class Level {
                 // PlacementSkippedEvent -> Cursor.Hide()，否则光标残留、放置阶段永不结束（整局卡住）。
                 bool sent = false;
                 try { c.CallCmdClearPiece(); sent = true; }
-                catch (Exception __ce) { SR.Guard.Log("放弃道具(Command 上行)", __ce); return false; }
+                catch (Exception __ce) { SRApi.Guard.Log("放弃道具(Command 上行)", __ce); return false; }
 
                 try {
                     MsgPiecePlaced skip = new MsgPiecePlaced();
@@ -293,9 +293,9 @@ public partial class Level {
                     skip.PieceRotation = Quaternion.identity;
                     skip.PieceID = 0; // <=0：客户端据此发 PlacementSkippedEvent，服务端忽略放置
                     LobbyManager.instance.client.Send(NetMsgTypes.PiecePlaced, skip);
-                } catch (Exception __se) { SR.Guard.Log("放弃道具(上报跳过)", __se); return sent; }
+                } catch (Exception __se) { SRApi.Guard.Log("放弃道具(上报跳过)", __se); return sent; }
                 return true;
-            } catch (Exception __ex) { SR.Guard.Log("放弃道具（原生通道）", __ex); return false; }
+            } catch (Exception __ex) { SRApi.Guard.Log("放弃道具（原生通道）", __ex); return false; }
         }
     }
 
@@ -329,7 +329,7 @@ public class LevelPartyBox : ITweak {
                 SR.RefOverride("VersusControl.ToPlaceMode", "关卡派对盒：房客一起进建造状态");
                 SR.RefOverride("VersusControl.SetupPlacementCursors", "关卡派对盒：同步放置光标");
                 SR.RefOverride("GameControl.nextPhase", "关卡派对盒：结束放置阶段");
-            } catch (Exception __ex) { SR.Guard.Log("关卡派对盒 初始化", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("关卡派对盒 初始化", __ex); }
         }
 
         // 快捷键轮询：与页面按钮共用同一批动作
@@ -339,7 +339,7 @@ public class LevelPartyBox : ITweak {
                 if (SR.ComboKeyDown(_refreshPartyBoxKey)) RefreshPartyBox();
                 if (SR.ComboKeyDown(_refreshPiecesKey)) RefreshPartyBoxPieces();
                 if (SR.ComboKeyDown(_closePartyBoxKey)) ClosePartyBox();
-            } catch (Exception __ex) { SR.Guard.Log("派对盒快捷键", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("派对盒快捷键", __ex); }
         }
 
         // 刷新派对盒：完整重走游戏自己的流程（showPartyBox = SetupPartyBoxForRound(true) + ShowBox(IsSecondBox)）。

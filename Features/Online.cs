@@ -102,11 +102,11 @@ namespace SR_UCH.Tweaks {
                 // JoinSteamLobby 保留反射：源码里写 SteamMatchmaker 会引入 Steamworks 程序集依赖。
                 SR.RefOverride("SteamMatchmaker.JoinSteamLobby", "联机：按 Steam 房间号加入");
                 SR.RefOverride("UnityMatchmaker.inPlatformLobbyNoRelay", "联机：判断是否在平台房间里");
-            } catch (Exception __ro) { SR.Guard.Log("联机反射登记", __ro); }
+            } catch (Exception __ro) { SRApi.Guard.Log("联机反射登记", __ro); }
 
             // 房主解散感知：订阅游戏的网络消息事件总线；房主返回主界面会 SendToAll(HostEndedGame)。
             try { GameEventManager.ChangeListener<NetworkMessageReceivedEvent>(new HostEndedListener(), true); }
-            catch (Exception __he) { SR.Guard.Log("联机.房主解散监听", __he); }
+            catch (Exception __he) { SRApi.Guard.Log("联机.房主解散监听", __he); }
 
 
             _fRegion = plugin.Config.Bind(SecOnline, "Filter Region", "", "按区域挑房间, 从下拉里选一个.");
@@ -155,7 +155,7 @@ namespace SR_UCH.Tweaks {
                 _joinRectsPage.Clear(); _joinRows.Clear();
                 _joinDownRow = -1; _joinDownId = null;
                 _lobbiesDirty = true;
-            } catch (Exception __ex) { SR.Guard.Log("清空房间列表", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("清空房间列表", __ex); }
         }
 
         // 回家（解散 / 退出 / 返回主界面）
@@ -196,7 +196,7 @@ namespace SR_UCH.Tweaks {
             // 动游戏状态机的收尾（Disconnect / 销毁 LobbyManager / 切场景）只交给看门狗。
             NudgeSplash();
             ClearLobbyList();
-            try { SR.ForceResetUiState(); } catch (Exception __ex) { SR.Guard.Log("返回主界面：重置界面状态", __ex); }
+            try { SR.ForceResetUiState(); } catch (Exception __ex) { SRApi.Guard.Log("返回主界面：重置界面状态", __ex); }
             ArmWatchdog();
         }
 
@@ -207,9 +207,9 @@ namespace SR_UCH.Tweaks {
                 LobbyManager lm = LobbyManager.instance;
                 bool host = false;
                 // 房主判定失败会退回房客分支（只退自己、不广播 HostEndedGame），故须留痕。
-                try { host = lm != null && lm.IsHost; } catch (Exception __ex) { SR.Guard.Log("判定是否房主", __ex); }
+                try { host = lm != null && lm.IsHost; } catch (Exception __ex) { SRApi.Guard.Log("判定是否房主", __ex); }
                 Notes(host ? "正在解散房间" : "正在退出房间", host ? "Disbanding the session" : "Leaving the session");
-            } catch (Exception __ex) { SR.Guard.Log("退出联机提示", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("退出联机提示", __ex); }
             // 房主：ReturnToMainMenu 先广播 HostEndedGame，全员一起回主界面；房客：同一条路只退自己。
             GoMainMenu();
         }
@@ -234,11 +234,11 @@ namespace SR_UCH.Tweaks {
                 LobbyManager lm = LobbyManager.instance;
                 if (lm != null) {
                     // 每一步独立 try、失败继续往下，但异常必须记录（Guard.Log 内部去重）。
-                    try { lm.Disconnect("SR_UCH force"); } catch (Exception __ex) { SR.Guard.Log("强制返回主界面：断开连接", __ex); }
-                    try { UnityEngine.Object.Destroy(lm.gameObject); } catch (Exception __ex) { SR.Guard.Log("强制返回主界面：销毁 LobbyManager", __ex); }
+                    try { lm.Disconnect("SR_UCH force"); } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：断开连接", __ex); }
+                    try { UnityEngine.Object.Destroy(lm.gameObject); } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：销毁 LobbyManager", __ex); }
                 }
-            } catch (Exception __ex) { SR.Guard.Log("强制返回主界面：收尾联机状态", __ex); }
-            try { SR.ForceResetUiState(); } catch (Exception __ex) { SR.Guard.Log("强制返回主界面：重置界面状态", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：收尾联机状态", __ex); }
+            try { SR.ForceResetUiState(); } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：重置界面状态", __ex); }
             try { SceneManagerWrapper.LoadScene("MainMenu"); }
             catch (Exception e) { SR.LogWarn("强制加载主界面失败: " + e.Message); }
             _forceRawDeadline = Time.unscaledTime + 2f;   //5) 二级兜底
@@ -248,18 +248,18 @@ namespace SR_UCH.Tweaks {
             try {
                 if (ReferenceEquals(s, null)) return;             //已销毁的场景内遮罩也要改（协程读的是托管字段）
                 if (s.State != UISplashScreen.STATE.SHOW) s.State = UISplashScreen.STATE.SHOW;
-            } catch (Exception __ex) { SR.Guard.Log("放出加载遮罩", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("放出加载遮罩", __ex); }
         }
 
         // 把被 FadeToLevel 等待的遮罩推到 SHOW，让卡住的协程继续往下走。
         private static void NudgeSplash() {
-            try { SetShow(LoadingInterstitialSplash.Instance); } catch (Exception __ex) { SR.Guard.Log("放出加载遮罩(Instance)", __ex); }
+            try { SetShow(LoadingInterstitialSplash.Instance); } catch (Exception __ex) { SRApi.Guard.Log("放出加载遮罩(Instance)", __ex); }
             try {
                 LobbyManager lm = LobbyManager.instance;
                 if (lm != null && lm.CurrentLevelSelectController != null && _fLsFadeOut != null) {
                     SetShow(_fLsFadeOut.GetValue(lm.CurrentLevelSelectController) as UISplashScreen);
                 }
-            } catch (Exception __ex) { SR.Guard.Log("放出加载遮罩(关卡选择)", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("放出加载遮罩(关卡选择)", __ex); }
         }
 
         // 回家看门狗（只在玩家点了退出联机 / 返回主界面之后启动）。
@@ -287,10 +287,10 @@ namespace SR_UCH.Tweaks {
                     LobbyManager lm = LobbyManager.instance;
                     if (lm != null) {
                         // 同 ForceMainMenu：每步独立 try，失败必须留痕。
-                        try { lm.Disconnect("SR_UCH watchdog"); } catch (Exception __ex) { SR.Guard.Log("超时兜底：断开连接", __ex); }
-                        try { UnityEngine.Object.Destroy(lm.gameObject); } catch (Exception __ex) { SR.Guard.Log("超时兜底：销毁 LobbyManager", __ex); }
+                        try { lm.Disconnect("SR_UCH watchdog"); } catch (Exception __ex) { SRApi.Guard.Log("超时兜底：断开连接", __ex); }
+                        try { UnityEngine.Object.Destroy(lm.gameObject); } catch (Exception __ex) { SRApi.Guard.Log("超时兜底：销毁 LobbyManager", __ex); }
                     }
-                } catch (Exception __ex) { SR.Guard.Log("超时兜底：收尾联机状态", __ex); }
+                } catch (Exception __ex) { SRApi.Guard.Log("超时兜底：收尾联机状态", __ex); }
                 try { SceneManagerWrapper.LoadScene("MainMenu"); }
                 catch (Exception e) { SR.LogWarn("强制加载主界面失败: " + e.Message); }
                 _forceRawDeadline = now + 2f;
@@ -313,7 +313,7 @@ namespace SR_UCH.Tweaks {
                     if (nm == null || nm.Message == null) return;
                     if (nm.Message.msgType != NetMsgTypes.HostEndedGame) return;
                     OnHostEnded();
-                } catch (Exception __ex) { SR.Guard.Log("房主解散感知", __ex); }
+                } catch (Exception __ex) { SRApi.Guard.Log("房主解散感知", __ex); }
             }
         }
 
@@ -325,13 +325,13 @@ namespace SR_UCH.Tweaks {
                 // 2) 解除回家看门狗，避免它的超时兜底强断连接 / 销毁 LobbyManager。
                 DisarmWatchdog();
                 ClearLobbyList();
-                try { SR.ForceResetUiState(); } catch (Exception __ex) { SR.Guard.Log("房主解散：重置界面状态", __ex); }
+                try { SR.ForceResetUiState(); } catch (Exception __ex) { SRApi.Guard.Log("房主解散：重置界面状态", __ex); }
                 NudgeSplash();
                 ArmWatchdog();
                 if (wasPending) Notes("房主已解散房间，已取消加入", "Host disbanded; join cancelled");
                 else Notes("房主已解散房间", "Host disbanded");
                 SR.LogInfo("[联机] 收到 HostEndedGame：已清待加入队列并解除看门狗");
-            } catch (Exception __ex) { SR.Guard.Log("处理房主解散", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("处理房主解散", __ex); }
         }
 
         // 房间列表：取匹配器必须先用 IsInstantiated 询问是否已实例化。
@@ -379,7 +379,7 @@ namespace SR_UCH.Tweaks {
                 RegionCode(info);
                 // 只标记"变了"：排序与统计延迟到渲染时各做一次。
                 _lobbiesDirty = true;
-            } catch (Exception __ex) { SR.Guard.Log("房间列表回调", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("房间列表回调", __ex); }
         }
 
         // 点加入：不在房间里直接加；在房间里则先退出当前房间，退出后立刻加入，不等回主界面。
@@ -415,8 +415,8 @@ namespace SR_UCH.Tweaks {
                 try {
                     // LeaveLobby 声明在基类 Matchmaker 上，直接调用交由虚方法分发。
                     try { mm.LeaveLobby(null, UserMessageManager.UserMsgPriority.lo); }
-                    catch (Exception __lv2) { SR.Guard.Log("联机.离开房间", __lv2); }
-                } catch (Exception __lv) { SR.Guard.Log("联机.离开房间", __lv); }
+                    catch (Exception __lv2) { SRApi.Guard.Log("联机.离开房间", __lv2); }
+                } catch (Exception __lv) { SRApi.Guard.Log("联机.离开房间", __lv); }
                 // 等待离开最多 2.5 秒：仍在平台房间里时通用 JoinLobby 必定失败；超时后补发一次 LeaveLobby 再继续。
                 float t = 0f;
                 while (InLobby() && t < 2.5f) { t += Time.unscaledDeltaTime; yield return null; }
@@ -424,7 +424,7 @@ namespace SR_UCH.Tweaks {
                     try {
                         mm.LeaveLobby(null, UserMessageManager.UserMsgPriority.hi);
                         SR.LogWarn("[联机] 等待离开超时，已补发一次 LeaveLobby");
-                    } catch (Exception __lv3) { SR.Guard.Log("联机.补发离开房间", __lv3); }
+                    } catch (Exception __lv3) { SRApi.Guard.Log("联机.补发离开房间", __lv3); }
                 }
                 try { SR.LogInfo("[联机] 离开完成(inLobby=" + InLobby() + ")，开始加入"); } catch { }
             }
@@ -442,9 +442,9 @@ namespace SR_UCH.Tweaks {
                         yield break;   // 已按 Steam 通道发出加入请求，不再走通用 JoinLobby
                     }
                     SR.LogWarn("[联机] 无 JoinSteamLobby(ulong)，退回通用流程");
-                } catch (Exception __jsl) { SR.Guard.Log("联机.JoinSteamLobby", __jsl); }
+                } catch (Exception __jsl) { SRApi.Guard.Log("联机.JoinSteamLobby", __jsl); }
             }
-            try { mm.JoinLobby(id, useCode, null); } catch (Exception __jl) { SR.Guard.Log("联机.加入", __jl); }
+            try { mm.JoinLobby(id, useCode, null); } catch (Exception __jl) { SRApi.Guard.Log("联机.加入", __jl); }
         }
 
 
@@ -500,7 +500,7 @@ namespace SR_UCH.Tweaks {
                 try { connected = lm != null && lm.client != null && lm.client.isConnected; } catch { }
                 if (lm != null && (lm.IsHost || (connected && lm.IsInOnlineGame))) return true;
                 if (Matchmaker.CurrentMatchmakingLobby != null) return true;
-            } catch (Exception __ex) { SR.Guard.Log("判定是否在联机中", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("判定是否在联机中", __ex); }
             return false;
         }
 
@@ -519,17 +519,17 @@ namespace SR_UCH.Tweaks {
                 try {
                     GameSettings.GetInstance().StartAsHost = false;
                     SR.LogInfo("[联机] StartAsHost=false（加入而非创建）");
-                } catch (Exception __sa) { SR.Guard.Log("联机.StartAsHost", __sa); }
+                } catch (Exception __sa) { SRApi.Guard.Log("联机.StartAsHost", __sa); }
                 try { SR.LogInfo("[联机] 加入请求 id=" + id + " mm=" + mm.GetType().FullName + " useCode=" + useCode); } catch { }
                 // 必须在这里清掉待加入队列：它是每帧轮询的，不清会重复发起同一次加入。
                 _pendingJoin = "";
-                try { mm.StartCoroutine(JoinFlow(id, useCode, mm)); return; } catch (Exception __jf) { SR.Guard.Log("联机.加入流程", __jf); }
+                try { mm.StartCoroutine(JoinFlow(id, useCode, mm)); return; } catch (Exception __jf) { SRApi.Guard.Log("联机.加入流程", __jf); }
                 try { SR.LogInfo("[联机] 协程启动失败，退回直接 JoinLobby"); } catch { }
                 mm.JoinLobby(id, useCode, new UnityEngine.Events.UnityAction<bool>(ok => {
                     try {
                         _pendingJoin = "";
                         Notes(ok ? "已发送加入请求" : "加入失败", ok ? "Join request sent" : "Join failed");
-                    } catch (Exception __ex) { SR.Guard.Log("加入房间回调", __ex); }
+                    } catch (Exception __ex) { SRApi.Guard.Log("加入房间回调", __ex); }
                 }));
                 // 发出即算完成：这里立刻清空，避免回调未触发时 TickPendingJoin 反复重发。
                 _pendingJoin = "";
@@ -565,7 +565,7 @@ namespace SR_UCH.Tweaks {
                 DoJoin(id, useCode);
                 // 已退出旧房间并发出加入请求：解除看门狗（未退出干净时不会走到这里，仍受其兜底）。
                 DisarmWatchdog();
-            } catch (Exception __ex) { SR.Guard.Log("延时加入房间", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("延时加入房间", __ex); }
         }
 
         public static void CheckHotkeys() {
@@ -854,7 +854,7 @@ namespace SR_UCH.Tweaks {
                     if (c != 0) return c;
                     return string.Compare(a.sLobbyID, b.sLobbyID, StringComparison.Ordinal);
                 });
-            } catch (Exception __ex) { SR.Guard.Log("房间排序", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("房间排序", __ex); }
         }
 
         // 按某一列比较两个房间：数值列用真实数值（文本比较下 "10" < "2"），其余列用显示文本。
@@ -897,7 +897,7 @@ namespace SR_UCH.Tweaks {
                     if (li != null && !string.IsNullOrEmpty(li.sLobbyID)) alive.Add(li.sLobbyID);
                 }
                 _hidden.IntersectWith(alive);
-            } catch (Exception __ex) { SR.Guard.Log("裁剪已隐藏房间集合", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("裁剪已隐藏房间集合", __ex); }
         }
 
         private static void UpdateLobbyMsg() {
@@ -1096,7 +1096,7 @@ namespace SR_UCH.Tweaks {
                     }
                 }
                 CycleSort(ci);
-            } catch (Exception __ex) { SR.Guard.Log("表头点击", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("表头点击", __ex); }
         }
 
         // 列排序三态循环：升序 -> 降序 -> 默认（回到游戏自己的顺序）。
@@ -1115,7 +1115,7 @@ namespace SR_UCH.Tweaks {
                              : (_sortDesc ? SR.T("降序", "descending") : SR.T("升序", "ascending"));
                 string msg = nm + " · " + state;
                 Notes(msg, msg);
-            } catch (Exception __ex) { SR.Guard.Log("列排序切换", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("列排序切换", __ex); }
         }
 
         private static string SkillModeCfg() {
@@ -1304,7 +1304,7 @@ namespace SR_UCH.Tweaks {
             try {
                 SR.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _tableArgs.moveCol, ref _tableArgs.moveDx, ref _tableArgs.dragCol, ref _dragH,
                     SaveWidths, SaveTableH, delegate { _joinDownRow = -1; });
-            } catch (Exception __ex) { SR.Guard.Log("联机表格输入处理", __ex); } // 兜底：表头拖拽 / 列宽 / 加入点击都在这里
+            } catch (Exception __ex) { SRApi.Guard.Log("联机表格输入处理", __ex); } // 兜底：表头拖拽 / 列宽 / 加入点击都在这里
             //竖向滚动条拖拽 / 点轨道 -> 核心实现
             if (SR.TableScrollbarInput(e, mp, _sbTrackPage, _sbThumbPage, _tableMaxY, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y)) return;
             //滚轮（纵向 / Ctrl 横向 / 无纵向余量转横向）-> 核心实现
@@ -1416,7 +1416,7 @@ namespace SR_UCH.Tweaks {
                 _lobbiesDirty = true;
                 SaveCols();
                 Notes("已还原列宽、顺序与高度，并显示全部房间与列", "Widths, order and height reset; all sessions and columns restored");
-            } catch (Exception __ex) { SR.Guard.Log("还原联机表格列设置", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("还原联机表格列设置", __ex); }
         }
 
         // 模式选项顺序：全部(空) -> 派对 -> 创意 -> 挑战 -> 自由 -> 其它（"全部"由下拉框首项提供）。
@@ -1566,7 +1566,7 @@ namespace SR_UCH.Tweaks {
                     _openCombo = "";
                 }
                 GUILayout.EndHorizontal();
-            } catch (Exception __ex) { SR.Guard.Log("房间筛选下拉", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("房间筛选下拉", __ex); }
         }
 
         // 按 key 查值的入口，内部转给按 entry 的重载。
@@ -1589,7 +1589,7 @@ namespace SR_UCH.Tweaks {
                     // 筛选条件变化需立即标脏，否则"筛选后 N 个"要等 1 秒兜底才更新。
                     _lobbiesDirty = true;
                 }
-            } catch (Exception __ex) { SR.Guard.Log("设置房间筛选", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("设置房间筛选", __ex); }
         }
 
         // 列宽 / 列顺序 / 隐藏列（可拖动 + 持久化）
@@ -1611,7 +1611,7 @@ namespace SR_UCH.Tweaks {
                         }
                     }
                 }
-            } catch (Exception __ex) { SR.Guard.Log("读取联机表格列宽", __ex); } // 一次性：读不到就用默认列宽，留痕
+            } catch (Exception __ex) { SRApi.Guard.Log("读取联机表格列宽", __ex); } // 一次性：读不到就用默认列宽，留痕
             EnsureColOrder();
             EnsureHiddenCols();
         }
@@ -1632,7 +1632,7 @@ namespace SR_UCH.Tweaks {
                     o[i] = k;
                 }
                 _order = o;
-            } catch (Exception __ex) { SR.Guard.Log("读取联机列顺序", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("读取联机列顺序", __ex); }
         }
 
         private static void EnsureHiddenCols() {
@@ -1643,7 +1643,7 @@ namespace SR_UCH.Tweaks {
                     int k;
                     if (int.TryParse(s, out k) && k >= 0 && k < ColCount && k != JoinCol) _hiddenCols.Add(k);
                 }
-            } catch (Exception __ex) { SR.Guard.Log("读取联机隐藏列", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("读取联机隐藏列", __ex); }
         }
 
         private static void SaveCols() {
@@ -1664,7 +1664,7 @@ namespace SR_UCH.Tweaks {
                     _hiddenColsEntry.Value = string.Join(",", l.ToArray());
                 }
                 if (_colWidths != null) SR.Ctl.MarkConfigDirty(_colWidths.ConfigFile); //落盘走节流器（失败有 Warning）
-            } catch (Exception __ex) { SR.Guard.Log("保存列设置", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("保存列设置", __ex); }
         }
 
         private static void SaveWidths() { SaveCols(); }

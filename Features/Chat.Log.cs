@@ -77,7 +77,7 @@ public partial class Chat : ITweak {
                     LobbyPlayer lp = slots[i] as LobbyPlayer;
                     if (lp != null && lp.LocalPlayer != null) return lp.networkNumber;
                 }
-            } catch (Exception __ex) { SR.Guard.Log("查找本地玩家 networkNumber", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("查找本地玩家 networkNumber", __ex); }
             return -1;
         }
 
@@ -92,7 +92,7 @@ public partial class Chat : ITweak {
             SR.LocDesc("Chat", "Show Time", "在每条聊天记录前面显示一下时间.", "Show the timestamp before each message");
             // 预登记本页自动快捷键：不预登记则重启后在首次打开本页前按键无效。
             SR.HotkeyAction("chat.clear", "清空", () => { Clear(); _chatTextCache = null; _chatBuilt = false; });
-            SR.HotkeyAction("chat.copy", "复制", () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (System.Exception __ex) { SR.Guard.Log("复制聊天记录", __ex); } });
+            SR.HotkeyAction("chat.copy", "复制", () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (System.Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); } });
             SR.HotkeyAction("chat.send", "发送", () => { SendChatText(_chatInputText); _chatInputText = ""; });
         }
 
@@ -166,9 +166,9 @@ public partial class Chat : ITweak {
             // 复制当前显示的聊天记录（已应用过滤）到剪贴板。
             if (SR.Ctl.HotkeyButton("chat.copy", SR.T("复制", "Copy"),
                 SR.T("把当前显示的聊天记录复制到剪贴板（游戏里没有文本选择功能，用这个代替）", "Copy the currently shown chat log to the clipboard"),
-                () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (Exception __ex) { SR.Guard.Log("复制聊天记录", __ex); } },
+                () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); } },
                 SR.Ctl.Sc(56), SR.Ctl.Sc(26))) {
-                try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (Exception __ex) { SR.Guard.Log("复制聊天记录", __ex); }
+                try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); }
             }
             GUILayout.Space(SR.Ctl.Sc(8));
             // 两个开关：标签（左键恢复默认 / 右键绑快捷键）+ 复选框。
@@ -254,7 +254,7 @@ public partial class Chat : ITweak {
                     isQuick = isQuick
                 });
                 if (_log.Count > LogLimit()) _log.RemoveAt(0); //保留最近 N 条（条数可配，滚动淘汰）
-            } catch (Exception __ex) { SR.Guard.Log("聊天记录回调", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天记录回调", __ex); }
         }
 }
 }

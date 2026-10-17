@@ -72,7 +72,7 @@ namespace SR_UCH.Tweaks {
                 // 事件回调抛异常会冒到 GameEventManager 并影响同链其它监听器，故只记日志。
                 try {
                     ClearLines();
-                } catch (Exception __ex) { SR.Guard.Log("移动轨迹：关卡重置清理", __ex); }
+                } catch (Exception __ex) { SRApi.Guard.Log("移动轨迹：关卡重置清理", __ex); }
             }
         }
 
@@ -93,7 +93,7 @@ namespace SR_UCH.Tweaks {
                 if (!eff) return;
                 if (framesLeft > 0) { framesLeft--; return; }
                 framesLeft = SkipFrames();
-                // 每个玩家各自一个 try：出错只跳过该玩家（下帧重试），并经 SR.Guard.Log 去重记录。
+                // 每个玩家各自一个 try：出错只跳过该玩家（下帧重试），并经 SRApi.Guard.Log 去重记录。
                 foreach (PlayerLine pl in GetPlayers()) {
                   try {
                         Vector3 pos = pl.character.transform.position;
@@ -117,7 +117,7 @@ namespace SR_UCH.Tweaks {
                         ApplyPositions(pl.line);
                   } catch (Exception e) {
                         // PlayerLine 是结构体，不能与 null 比较，只判 character
-                        SR.Guard.Log("轨迹更新 " + (pl.character != null ? pl.character.name : "?"), e);
+                        SRApi.Guard.Log("轨迹更新 " + (pl.character != null ? pl.character.name : "?"), e);
                         try { ClearLine(pl.line); } catch { }   // 出错的玩家本帧不画，下帧重试
                   }
                 }
@@ -151,7 +151,7 @@ namespace SR_UCH.Tweaks {
                 List<ConfigEntryBase> list = SR.SectionEntries("Player Tracker");
                 if (list == null || list.Count == 0) { GUILayout.Label(SR.T("（无匹配条目）", "(no matching entries)"), SR.Ctl.Label); return; }
                 SR.RenderSectionEntries("Player Tracker");
-            } catch (Exception __ex) { SR.Guard.Log("渲染移动轨迹页", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("渲染移动轨迹页", __ex); }
         }
 
         // 初始化需整段 try：中途抛异常会留下 DontDestroyOnLoad 的常驻对象，且功能静默消失。
@@ -215,7 +215,7 @@ namespace SR_UCH.Tweaks {
             EnsureCapacity(8);
 
             GameEventManager.ChangeListener<GameEvent.LevelResetEvent>(new LevelResetListener(), true);
-          } catch (Exception __ex) { SR.Guard.Log("移动轨迹 初始化", __ex); }
+          } catch (Exception __ex) { SRApi.Guard.Log("移动轨迹 初始化", __ex); }
         }
 
         private static void ClearLines() {

@@ -68,6 +68,8 @@ namespace SR_UCH {
             } catch (Exception __mig) { try { ModLogger.LogWarning("配置迁移失败: " + __mig.Message); } catch { } }
             // 程序集解析：外部功能 / 语言包 DLL 只引用 SR_UCH.dll（不引用 BepInEx），全局注册一次。
             AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
+            // 契约层 API 门面的日志出口：接到本插件的日志系统。
+            try { SRApi.SetLogSink(delegate (string __m) { SR.LogWarn(__m); }); } catch { }
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。
             List<Type> __tweaks = new List<Type>();

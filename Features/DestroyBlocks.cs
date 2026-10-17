@@ -101,7 +101,7 @@ namespace SR_UCH.Tweaks {
                     _placements[p] = info;
                 }
                 _listDirty = true;
-            } catch (Exception __ex) { SR.Guard.Log("构建对象归属房主", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("构建对象归属房主", __ex); }
         }
 
         private static GameObject _infoTag;
@@ -148,7 +148,7 @@ namespace SR_UCH.Tweaks {
                 // 必须走虚方法调用（Bomb / ActiveBlock 均 override），且 OnDestroy 幂等，之后 Unity 真销毁再调也无副作用。
                 target.OnDestroy();
                 _placements.Remove(target); // 本路径不发 DestroyPieceEvent，必须自己清记录，避免强引用已销毁对象
-            } catch (Exception __ex) { SR.Guard.Log("方块破坏.原生销毁", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.原生销毁", __ex); }
         }
 
 
@@ -165,7 +165,7 @@ namespace SR_UCH.Tweaks {
                     if (_placements.TryGetValue(up, out info)) return info;
                     cur = up;
                 }
-            } catch (Exception __ex) { SR.Guard.Log("解析子元件归属", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("解析子元件归属", __ex); }
             return null;
         }
 
@@ -195,7 +195,7 @@ namespace SR_UCH.Tweaks {
                         _placements.Remove(dpe.Piece);
                         _listDirty = true; // 方块没了，候选表要跟着变
                     }
-                } catch (Exception __ex) { SR.Guard.Log("记录方块放置者(本地)", __ex); }
+                } catch (Exception __ex) { SRApi.Guard.Log("记录方块放置者(本地)", __ex); }
             }
         }
 
@@ -224,7 +224,7 @@ namespace SR_UCH.Tweaks {
                     if (string.IsNullOrEmpty(info.playerName)) info.playerName = "Player " + info.playerNumber;
                     _placements[p] = info;
                     _listDirty = true; // 别人放的方块：实时列表要立刻看到
-                } catch (Exception __ex) { SR.Guard.Log("记录方块放置者", __ex); }
+                } catch (Exception __ex) { SRApi.Guard.Log("记录方块放置者", __ex); }
             }
 
         private static Placeable FindPlaceableByID(int id) {
@@ -416,20 +416,20 @@ namespace SR_UCH.Tweaks {
                 _selected = Blocks[_index];
                 if (_selected != _tintedBlock) {
                     if (_tintedBlock != null) {
-                        try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.GetAxis", __ex); }
+                        try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.GetAxis", __ex); }
                     }
                     // Color 的分量是 0..1 浮点而非 0..255 整数，此处按真实意图写不透明白色。
-                    try { _selected.AddBombTint(new Color(1f, 1f, 1f, 1f)); } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.RemoveBombTint", __ex); }
+                    try { _selected.AddBombTint(new Color(1f, 1f, 1f, 1f)); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.RemoveBombTint", __ex); }
                     _tintedBlock = _selected;
                 }
-                try { _selected.Tint(); } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.AddBombTint", __ex); } // 每帧应用高亮色（bombTints > 0 -> 白色）
-                try { UpdateInfoTag(_selected); } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.UpdateInfoTag", __ex); }
+                try { _selected.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.AddBombTint", __ex); } // 每帧应用高亮色（bombTints > 0 -> 白色）
+                try { UpdateInfoTag(_selected); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.UpdateInfoTag", __ex); }
             } 
             else if(_altDown)
             {
                 _altDown = false;
                 if (_tintedBlock != null) {
-                    try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.UpdateInfoTag", __ex); }
+                    try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.UpdateInfoTag", __ex); }
                 }
                 _tintedBlock = null;
                 _selected = null;
@@ -437,7 +437,7 @@ namespace SR_UCH.Tweaks {
                 RebuildList();
                 if (Blocks.Count <= 0) return;
                 if (_index < 0 || _index >= Blocks.Count) _index = Blocks.Count - 1;
-                try { Blocks[_index].Tint(); } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.松开重选高亮", __ex); }
+                try { Blocks[_index].Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.松开重选高亮", __ex); }
             }
         }
 
@@ -449,7 +449,7 @@ namespace SR_UCH.Tweaks {
                     float db = (b.transform.position - me).sqrMagnitude;
                     return da.CompareTo(db);
                 });
-            } catch (Exception __ex) { SR.Guard.Log("按距离排序方块", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("按距离排序方块", __ex); }
         }
 
         // 本地角色位置按帧缓存：距离模式每次重建都要排序，FindObjectsOfType<Character> 不宜反复全场景遍历。
@@ -464,7 +464,7 @@ namespace SR_UCH.Tweaks {
                 foreach (Character c in UnityEngine.Object.FindObjectsOfType<Character>()) {
                     if (c != null && c.hasAuthority) { _localPosCache = c.transform.position; break; }
                 }
-            } catch (Exception __ex) { SR.Guard.Log("获取本地角色位置", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("获取本地角色位置", __ex); }
             return _localPosCache;
         }
 
@@ -495,7 +495,7 @@ namespace SR_UCH.Tweaks {
                 }
                 Blocks.Add(p);
             }
-          } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.RebuildList", __ex); }
+          } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.RebuildList", __ex); }
         }
 
         // 实时列表：按住切换键期间的节流重建，最快 RealtimeMinInterval 一次；不按切换键或暂存模式下不会被调用。
@@ -510,7 +510,7 @@ namespace SR_UCH.Tweaks {
             _lastListRebuildAt = now;
             _listDirty = false;
             RefreshListKeepSelection();
-          } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.TickRealtimeList", __ex); }
+          } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.TickRealtimeList", __ex); }
         }
 
         // 重建候选表并按引用找回当前选中项：实时模式下列表反复重建，不保选中项会导致高亮乱跳。
@@ -526,7 +526,7 @@ namespace SR_UCH.Tweaks {
                 _index = 0;
                 _selected = null;
                 if (_tintedBlock != null) {
-                    try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.清空高亮", __ex); }
+                    try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.清空高亮", __ex); }
                     _tintedBlock = null;
                 }
                 DestroyInfoTag();
@@ -541,7 +541,7 @@ namespace SR_UCH.Tweaks {
             if (_index >= Blocks.Count) _index = Blocks.Count - 1;
             if (_index < 0) _index = 0;
             _selected = Blocks[_index];
-          } catch (Exception __ex) { SR.Guard.Log("DestroyBlocks.RefreshListKeepSelection", __ex); }
+          } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.RefreshListKeepSelection", __ex); }
         }
 
         // 在选中方块上方显示浮动名牌，按玩家颜色着色。
@@ -606,7 +606,7 @@ namespace SR_UCH.Tweaks {
                     if (ResolveInfo(p) == null) continue; // 关卡自带布局没有归属，不算玩家放置
                     list.Add(p);
                 }
-            } catch (Exception __ex) { SR.Guard.Log("收集玩家放置方块", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("收集玩家放置方块", __ex); }
             return list;
         }
 

@@ -193,7 +193,7 @@ public class QuickAdjust : ITweak {
         GUILayout.EndHorizontal();
         GUILayout.Space(SR.Ctl.Sc(4));
         GUILayout.Space(SR.Ctl.Sc(6));
-        } catch (Exception __ex) { SR.Guard.Log("快速调整页 渲染", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("快速调整页 渲染", __ex); }
     }
 
     public void Initialize(IFeatureHost plugin) {
@@ -250,7 +250,7 @@ public class QuickAdjust : ITweak {
 					}
 					break;
 				}
-			} catch (Exception __ex) { SR.Guard.Log("读取 SwitchTime 默认值", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("读取 SwitchTime 默认值", __ex); }
 			return s;
 		}
 
@@ -265,21 +265,21 @@ public class QuickAdjust : ITweak {
 		[HarmonyPatch(typeof(GamePlayer), "set_NetworkHandicap")]
 		[HarmonyPostfix]
 		private static void RefreshScoreboardHandicap(GamePlayer __instance) {
-			// Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SR.Guard.Log（按调用点去重）留痕。
+			// Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SRApi.Guard.Log（按调用点去重）留痕。
 			try {
 						// 服务端/显式设置走 set_NetworkHandicap，房客端由 OnDeserialize 兜底。
 						RefreshScoreboardHandicapIfChanged(__instance);
-			} catch (Exception __ex) { SR.Guard.Log("分数折扣刷新(服务端)", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("分数折扣刷新(服务端)", __ex); }
 		}
 
 		// 房客端 SyncVar 反序列化直接写 Handicap 字段，不走 set_NetworkHandicap，须在此补刷。
 		[HarmonyPatch(typeof(GamePlayer), "OnDeserialize")]
 		[HarmonyPostfix]
 		private static void RefreshScoreboardHandicapClient(GamePlayer __instance) {
-			// Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SR.Guard.Log（按调用点去重）留痕。
+			// Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SRApi.Guard.Log（按调用点去重）留痕。
 			try {
 						RefreshScoreboardHandicapIfChanged(__instance);
-			} catch (Exception __ex) { SR.Guard.Log("分数折扣刷新(房客)", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("分数折扣刷新(房客)", __ex); }
 		}
 
 		// 统一入口：handicap 与上次记录不同才刷新。
@@ -294,7 +294,7 @@ public class QuickAdjust : ITweak {
 				_lastHandicapShown[__instance] = h;
 				// 超限整体清空（场景切换后 GamePlayer 重建，旧引用残留）。
 				if (_lastHandicapShown.Count > 64) _lastHandicapShown.Clear();
-			} catch (Exception __ex) { SR.Guard.Log("QuickAdjust.RefreshScoreboardHandicapCore", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.RefreshScoreboardHandicapCore", __ex); }
 		}
 
 		private static bool RefreshScoreboardHandicapCore(GamePlayer __instance) {
@@ -311,7 +311,7 @@ public class QuickAdjust : ITweak {
 						if (_gsbField == null) _gsbField = SR.RefField(typeof(VersusControl), "graphScoreBoardInstance", "评分折扣（取计分板实例）");
 						if (_gsbField != null) board = _gsbField.GetValue(vc) as GraphScoreBoard;
 					}
-				} catch (Exception __ex) { SR.Guard.Log("QuickAdjust.RefreshScoreboardHandicapCore", __ex); }
+				} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.RefreshScoreboardHandicapCore", __ex); }
 				if (board == null) {
 					board = UnityEngine.Object.FindObjectOfType<GraphScoreBoard>();
 				}
@@ -328,12 +328,12 @@ public class QuickAdjust : ITweak {
 				if (!relDict.TryGetValue(num, out line)) {
 					try {
 						line = relDict[__instance.localNumber];
-					} catch (Exception __ex) { SR.Guard.Log("QuickAdjust.GetValue", __ex); }
+					} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.GetValue", __ex); }
 				}
 				if (line == null) return false;
 				line.SetHandicap(__instance.Handicap);
 				return true;
-			} catch (Exception __ex) { SR.Guard.Log("QuickAdjust.SetHandicap", __ex); return false; }
+			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.SetHandicap", __ex); return false; }
 		}
 
 		// UpdateHoldBIndicator 是设置 SuicideTime 的地方，Postfix 覆盖为配置值，并同步建造态 SwitchTime。
@@ -364,7 +364,7 @@ public class QuickAdjust : ITweak {
 					__instance.SuicideTime = QuickRetryHold;
 				}
 			}
-			catch (Exception __ex) { SR.Guard.Log("QuickAdjust.OverrideHoldTime", __ex); }
+			catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.OverrideHoldTime", __ex); }
 		}
 
 		// 快速重试已发标记（闩锁）：按 networkNumber 记，见 ForceSuicidalState。
@@ -402,7 +402,7 @@ public class QuickAdjust : ITweak {
 					MsgPlayerWantsToRetry msg = new MsgPlayerWantsToRetry { networkNumber = num };
 					UnityEngine.Networking.NetworkManager.singleton.client.Send(NetMsgTypes.PlayerWantsToRetry, msg);
 				}
-				catch (Exception __ex) { SR.Guard.Log("QuickAdjust.Send", __ex); }
+				catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.Send", __ex); }
 				return;
 			}
 			if (!SR.GateModeAllows(SR.ModeMask.Freeplay))
@@ -420,7 +420,7 @@ public class QuickAdjust : ITweak {
 			{
 				return;
 			}
-			try { __instance.SuicideTime = QuickSwitchHold; } catch (Exception __ex) { SR.Guard.Log("QuickAdjust.Send", __ex); }
+			try { __instance.SuicideTime = QuickSwitchHold; } catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.Send", __ex); }
 			// 建造态 SwitchTime 同样设为配置值。
 			try {
 				// 按帧只做一次：一帧内多个 Character 回调都会进这里。
@@ -432,7 +432,7 @@ public class QuickAdjust : ITweak {
 						if (pc != null) pc.SwitchTime = QuickSwitchHold;
 					}
 				}
-			} catch (Exception __ex) { SR.Guard.Log("QuickAdjust.Send", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.Send", __ex); }
 		}
 
 		public static void ApplyScoreDiscount()
@@ -482,12 +482,12 @@ public class QuickAdjust : ITweak {
 						{
 							p.AssociatedGamePlayer.CallCmdSetPlayerHandicap(value);
 						}
-						catch (Exception __ex) { SR.Guard.Log("QuickAdjust.CallCmdSetPlayerHandicap", __ex); }
+						catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.CallCmdSetPlayerHandicap", __ex); }
 					}
 					return true;
 				}
 			}
-			catch (Exception __ex) { SR.Guard.Log("QuickAdjust.CallCmdSetPlayerHandicap", __ex); }
+			catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.CallCmdSetPlayerHandicap", __ex); }
 			return false;
 		}
 
@@ -558,7 +558,7 @@ public class TreehouseSuicide : ITweak {
     [HarmonyPatch(typeof(Character), "FixedUpdate")]
     [HarmonyPostfix]
     private static void CharacterPatch(Character __instance) {
-        // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SR.Guard.Log（按调用点去重）留痕。
+        // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SRApi.Guard.Log（按调用点去重）留痕。
         try {
                 if (!SR.GateMaster) return;
                 if (!Enabled) return;
@@ -571,7 +571,7 @@ public class TreehouseSuicide : ITweak {
                 if (SR.ComboKeyDown(_keybind) && !__instance.Frozen) {
                     __instance.KillCharacter("Suicide", false, __instance.networkNumber);
                 }
-        } catch (Exception __ex) { SR.Guard.Log("自杀键", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("自杀键", __ex); }
     }
 }
 }

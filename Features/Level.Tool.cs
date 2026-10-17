@@ -199,7 +199,7 @@ public partial class Level {
 					};
 					NetworkServer.SendToAll(NetMsgTypes.PrepareToReloadScene, msg);
 				}
-				catch (Exception __ex) { SR.Guard.Log("Level.SendToAll", __ex); }
+				catch (Exception __ex) { SRApi.Guard.Log("Level.SendToAll", __ex); }
 				if (LoadingInterstitialSplash.Instance != null)
 				{
 					LoadingInterstitialSplash.Instance.showLevelInfoNextLoad = true;
@@ -228,7 +228,7 @@ public partial class Level {
 				if ((UnityEngine.Object)(object)lm != (UnityEngine.Object)null)
 				{
 					// 与游戏原生重载一致：先重置方块 ID 序列，否则重载后新 ID 会与快照里的 parentID/mainID 错位。
-					try { Placeable.SetInitialSequenceID(0); } catch (Exception __ex) { SR.Guard.Log("重载前重置方块 ID 序列", __ex); }
+					try { Placeable.SetInitialSequenceID(0); } catch (Exception __ex) { SRApi.Guard.Log("重载前重置方块 ID 序列", __ex); }
 					lm.ReloadScene(toMode);
 					ok = true;
 				}
@@ -275,7 +275,7 @@ public partial class Level {
 			{
 				QuickSaver.levelPortalXml = null;
 			}
-			catch (Exception __ex) { SR.Guard.Log("Level.Field", __ex); }
+			catch (Exception __ex) { SRApi.Guard.Log("Level.Field", __ex); }
 		}
 
 		// 广播方块快照：房主重发当前关卡快照，全员按房主视角重建方块。
@@ -408,7 +408,7 @@ public partial class Level {
 					System.Xml.XmlDocument selfDoc = new System.Xml.XmlDocument();
 					selfDoc.LoadXml(xml);
 					// 按原生流程先 QuickClear(true)：原生清场并恢复关卡自带件，缺这一步可移动/可变化道具要等下次建造阶段才会动。
-					try { selfQs.QuickClear(true); } catch (Exception __qcx) { SR.Guard.Log("清场.QuickClear", __qcx); }
+					try { selfQs.QuickClear(true); } catch (Exception __qcx) { SRApi.Guard.Log("清场.QuickClear", __qcx); }
 					// 门闩必须用 try/finally 复位，否则泄漏后游戏自己的开局也会被补发阶段事件。
 					_srSnapshotLoad = true;
 					try {
@@ -416,7 +416,7 @@ public partial class Level {
 							SR.Notify(SR.T("本地应用快照失败", "Failed to apply the snapshot locally"));
 					} finally { _srSnapshotLoad = false; }
 				}
-			} catch (Exception __ex) { SR.Guard.Log("本地应用快照", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("本地应用快照", __ex); }
 		}
 
 		// 广播快照的前置检查（总开关 -> 模式 -> 房主 -> 对局 -> 控制器 -> 快照组件 -> 重载锁）；返回 false 时已提示原因。
@@ -487,7 +487,7 @@ public partial class Level {
 					QuickSaver.SaveablePiece sp = o as QuickSaver.SaveablePiece;
 					if (sp != null && sp.placeable != null) set.Add(sp.placeable);
 				}
-			} catch (Exception __ex) { SR.Guard.Log("收集关卡初始件", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("收集关卡初始件", __ex); }
 			return set;
 		}
 		// 清除玩家放置的方块（全员可见，房客也能用）：逐块网络销毁，不走 <destroyed> 快照路径。
@@ -497,7 +497,7 @@ public partial class Level {
 				GameControl gc; QuickSaver qs;
 				if (!TryGetSnapshotContext(feature, out gc, out qs)) return;
 				FallbackClearPlacedBlocks(targets); // 直接逐块网络销毁（不用快照）
-			} catch (Exception __ex) { SR.Guard.Log("清场.逐块销毁", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("清场.逐块销毁", __ex); }
 		}
 
 		// 对外槽位：调用方经 SR.Require 按名取用，不引用 Level 类型，取不到即降级。
@@ -535,10 +535,10 @@ public partial class Level {
                             if (gsFix != null) gsFix.IncrementPieceCount(fp.Name);
                             fp.Tint();
                             nFix++;
-                        } catch (Exception __pe) { SR.Guard.Log("快照方块收尾", __pe); }
+                        } catch (Exception __pe) { SRApi.Guard.Log("快照方块收尾", __pe); }
                     }
                     if (nFix > 0) SR.LogInfo("[快照] 已为 " + nFix + " 个方块补放置计数并着色");
-                } catch (Exception __fx) { SR.Guard.Log("快照方块收尾", __fx); }
+                } catch (Exception __fx) { SRApi.Guard.Log("快照方块收尾", __fx); }
                 // 归属登记必须在加载之后：方块是加载时创建的，加载前集合为空。
                 try {
                     System.Collections.Generic.HashSet<Placeable> initPcs = InitialLevelPieces(__instance);
@@ -556,8 +556,8 @@ public partial class Level {
                     } else {
                         SR.LogWarn("[快照] 方块破坏功能未加载，跳过 " + built.Count + " 个方块的归属登记");
                     }
-                } catch (Exception __ahx) { SR.Guard.Log("构建归属房主", __ahx); }
-            } catch (Exception __ex) { SR.Guard.Log("快照后补发阶段事件", __ex); }
+                } catch (Exception __ahx) { SRApi.Guard.Log("构建归属房主", __ahx); }
+            } catch (Exception __ex) { SRApi.Guard.Log("快照后补发阶段事件", __ex); }
         }
 
 		private static string StripDestroyedNodes(string xml) {
@@ -575,7 +575,7 @@ public partial class Level {
 		        for (int i = 0; i < n2; i++) root.RemoveChild(bad[i]);
 		        if (n2 > 0) SR.LogInfo("[快照] 已剥掉快照内 <destroyed> 节点: " + n2 + " 个");
 		        return doc.OuterXml;
-		    } catch (Exception __ex) { SR.Guard.Log("剥离 destroyed", __ex); return xml; }
+		    } catch (Exception __ex) { SRApi.Guard.Log("剥离 destroyed", __ex); return xml; }
 		}
 
 		// 兜底清场：快照 <destroyed> 路径不可用时退回逐块 DestroySelf（仍走游戏原生网络销毁信号）。
@@ -585,7 +585,7 @@ public partial class Level {
 			for (int i = 0; i < targets.Count; i++) {
 				Placeable p = targets[i];
 				if (p == null || p.MarkedForDestruction) continue;
-				try { p.DestroySelf(destroyChildren: false, useSmoke: false); n++; } catch (Exception __ex) { SR.Guard.Log("清场.兜底单项", __ex); }
+				try { p.DestroySelf(destroyChildren: false, useSmoke: false); n++; } catch (Exception __ex) { SRApi.Guard.Log("清场.兜底单项", __ex); }
 			}
 			SR.LogInfo("[清场] 快照路径不可用，已退回逐块网络销毁: " + n + " 个");
 		}
@@ -595,7 +595,7 @@ public partial class Level {
     [HarmonyPatch(typeof(LoadingInterstitialSplash), "FadeOut")]
     [HarmonyPostfix]
     static void OnLoadEnd() {
-        // 补丁内异常会被 Harmony 吞掉并每次记一条日志，统一兜住并经 SR.Guard.Log（按调用点去重）记录。
+        // 补丁内异常会被 Harmony 吞掉并每次记一条日志，统一兜住并经 SRApi.Guard.Log（按调用点去重）记录。
         try {
                 // 重载后广播补分：按原类型分块补分，下一回合结算显示。
                 FillScoresIfPending();
@@ -603,7 +603,7 @@ public partial class Level {
                 RestoreHandicapsIfAny();
                 // 通知 Experiments 记录场景加载完成时刻，用于决定何时清 levelPortalXml。
                 Level.OnReloadSceneLoaded();
-        } catch (Exception __ex) { SR.Guard.Log("重载完成收尾", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("重载完成收尾", __ex); }
     }
 
     // 场景重载期间暂停“坏客户端踢出”检测。
@@ -614,14 +614,14 @@ public partial class Level {
     static void OnReloadSceneStart() {
         try {
                 _reloadGraceUntil = Time.unscaledTime + 20f;
-        } catch (Exception __ex) { SR.Guard.Log("重载宽限起点", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("重载宽限起点", __ex); }
     }
     [HarmonyPatch(typeof(LobbyManager), "DisconnectBrokenClients")]
     [HarmonyPrefix]
     static bool SkipDisconnectDuringReload() {
         try {
                 return Time.unscaledTime >= _reloadGraceUntil;
-        } catch (Exception __ex) { SR.Guard.Log("重载期跳过断连检查", __ex); return true; }
+        } catch (Exception __ex) { SRApi.Guard.Log("重载期跳过断连检查", __ex); return true; }
     }
 
     // 重载后保留分数：重载前备份各玩家的分块列表，重载后房主按原类型逐个重放 PointAwarded，全员下回合 tally 恢复。
@@ -659,7 +659,7 @@ public partial class Level {
                 // 折扣备份与补分模式无关；恢复仅房主执行，房客端备份无副作用。
                 BackupHandicaps();
             }
-        } catch (Exception __ex) { SR.Guard.Log("处理 PrepareToReloadScene", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("处理 PrepareToReloadScene", __ex); }
     }
 
     // 备份所有在线玩家的 handicap（从 LobbyPlayer 读服务器权威值）。
@@ -674,12 +674,12 @@ public partial class Level {
                     LobbyPlayer lp = lm.PlayerTracker.GetLobbyPlayer(info.NetworkNumber);
                     if (lp == null) continue;
                     _handicapBackup[info.NetworkNumber] = lp.Networkhandicap;
-                } catch (Exception __ex) { SR.Guard.Log("读取玩家 handicap", __ex); }
+                } catch (Exception __ex) { SRApi.Guard.Log("读取玩家 handicap", __ex); }
             }
             if (_handicapBackup.Count > 0) {
                 SR.LogInfo("[折扣] 重载前备份 " + _handicapBackup.Count + " 名玩家 handicap");
             }
-        } catch (Exception __ex) { SR.Guard.Log("备份 handicap", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("备份 handicap", __ex); }
     }
 
     // 重载完成后房主写回备份的 handicap（LobbyPlayer + GamePlayer 的 SyncVar，服务器赋值自动广播全员）。
@@ -695,14 +695,14 @@ public partial class Level {
                 try {
                     LobbyPlayer lp = lm.PlayerTracker.GetLobbyPlayer(kv.Key);
                     if (lp != null) lp.Networkhandicap = kv.Value;
-                } catch (Exception __ex) { SR.Guard.Log("恢复 LobbyPlayer handicap", __ex); }
+                } catch (Exception __ex) { SRApi.Guard.Log("恢复 LobbyPlayer handicap", __ex); }
                 try {
                     GamePlayer gp = lm.PlayerTracker.GetGamePlayer(kv.Key);
                     if (gp != null) gp.NetworkHandicap = kv.Value;
-                } catch (Exception __ex) { SR.Guard.Log("恢复 GamePlayer handicap", __ex); }
+                } catch (Exception __ex) { SRApi.Guard.Log("恢复 GamePlayer handicap", __ex); }
             }
             SR.LogInfo("[折扣] 重载后恢复 " + backup.Count + " 名玩家 handicap");
-        } catch (Exception __ex) { SR.Guard.Log("恢复 handicap", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("恢复 handicap", __ex); }
     }
 
     // ClearNewPointBlocks 会删掉非 AlwaysAward 分块：补分重放后（_refillPending）跳过清除；正常结算只缓存外部加分分块，原生未 tally 的不缓存以免多计分。
@@ -726,7 +726,7 @@ public partial class Level {
                             if (!dup) _clearedExternBlocks.Add(pb);
                         }
                     }
-                } catch (Exception __cex) { SR.Guard.Log("缓存补分分块", __cex); }
+                } catch (Exception __cex) { SRApi.Guard.Log("缓存补分分块", __cex); }
                 // 补分重放后的第一次结算跳过清除，保留全部分块
                 return false;
             }
@@ -742,7 +742,7 @@ public partial class Level {
             if (_clearedExternBlocks.Count > 500) {
                 _clearedExternBlocks.RemoveRange(0, _clearedExternBlocks.Count - 500);
             }
-        } catch (Exception __ex) { SR.Guard.Log("缓存被清除的外部加分分块", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("缓存被清除的外部加分分块", __ex); }
         return true;
     }
 
@@ -763,7 +763,7 @@ public partial class Level {
             if (msg != null && msg.AlwaysAward) {
                 _externAwardedKeys.Add(Key(msg.PlayerNumber, msg.PointType));
             }
-        } catch (Exception __ex) { SR.Guard.Log("标记外部加分分块", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("标记外部加分分块", __ex); }
     }
 
     // 分块 tally 后清除 _refillPending 与外部加分标记，恢复正常清除。
@@ -774,7 +774,7 @@ public partial class Level {
                 _refillPending = false;
                 _externAwardedKeys.Clear();
                 _clearedExternBlocks.Clear();
-        } catch (Exception __ex) { SR.Guard.Log("结算收尾", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("结算收尾", __ex); }
     }
 
     [HarmonyPatch(typeof(ScoreKeeper), "Setup")]
@@ -838,7 +838,7 @@ public partial class Level {
                 // 只清标志，不恢复分块（分块图标由 FillScoresIfPending 的补分广播恢复）
                 _preserveScoresOnReload = false;
                 _preserveMarkedAt = -1f;
-        } catch (Exception __ex) { SR.Guard.Log("保分标志复位", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("保分标志复位", __ex); }
     }
 
     // 重载后广播补分：房主按备份的原类型逐个发 PointAwarded（AlwaysAward=true），下回合 tally 进 playerTotal。

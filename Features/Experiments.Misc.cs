@@ -38,7 +38,7 @@ public partial class Experiments : ITweak
 					return e.Definition.Key == "GC After Load";
 				});
 				GUILayout.Space(SR.Ctl.Sc(6));
-			} catch (Exception __ex) { SR.Guard.Log("其它页 渲染", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("其它页 渲染", __ex); }
 		}
 		// 加载后清理的初始化：配置 + 每帧钩子 + 补丁注册（UI 在上面的加载后清理分区）。
 		internal static void InitCleanup(IFeatureHost plugin) {
@@ -73,7 +73,7 @@ public partial class Experiments : ITweak
 				System.GC.Collect();
 				Resources.UnloadUnusedAssets();
 			}
-			catch (Exception __ex) { SR.Guard.Log("加载后清理(GC)", __ex); }
+			catch (Exception __ex) { SRApi.Guard.Log("加载后清理(GC)", __ex); }
 		}
 		// 加载过渡结束（FadeOut 后缀）：记录待清理场景与 1 秒后的执行时刻。
 		[HarmonyPatch(typeof(LoadingInterstitialSplash), "FadeOut")]
@@ -89,7 +89,7 @@ public partial class Experiments : ITweak
 				_pendingCleanupScene = sc;
 				_pendingCleanupAt = Time.unscaledTime + 1f;
 			}
-			catch (Exception __ex) { SR.Guard.Log("记录加载后清理场景", __ex); }
+			catch (Exception __ex) { SRApi.Guard.Log("记录加载后清理场景", __ex); }
 		}
 }
     // 自由相机（实验）：经游戏自己的 ZoomCamera 生效，不直接写 Camera.fieldOfView（会被每帧覆盖）。
@@ -161,7 +161,7 @@ public partial class Experiments : ITweak
                 _on.SettingChanged += OnLockChanged;
                 // 不挂 SettingChanged：ApplyFollowSpeed 已作为 30 帧节流的 Tick，下一拍自然生效。
                 _followSpeed.SettingChanged += (s, e) => { _followAt = -9999; _followLastMul = -1f; };
-            } catch (Exception __ex) { SR.Guard.Log("自由相机 初始化", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("自由相机 初始化", __ex); }
         }
     
         // 直接改 ZoomCamera.MaxFollowSpeed（FixedUpdate 里相机跟随的每帧最大位移），越大越跟得上。
@@ -201,7 +201,7 @@ public partial class Experiments : ITweak
                     _followLastMul = mul;
                     SpeedNote = "相机移动速度 " + mul.ToString("0.0") + "×（原值 " + ((int)_followOrig) + " -> " + ((int)want) + "）";
                 }
-            } catch (Exception __ex) { SR.Guard.Log("相机移动速度", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("相机移动速度", __ex); }
         }
 
         // 启用时把滑条与 _savedFov 同步为相机当前视野。
@@ -210,7 +210,7 @@ public partial class Experiments : ITweak
                 if (_on != null && _on.Value) { float v = CurrentFov(); _fov.Value = Mathf.Clamp(v, MinFov, MaxFov); _savedFov = v; Camera g = GameCamera(); if (g != null) { try { if (g.orthographic) g.orthographicSize = _fov.Value; else g.fieldOfView = _fov.Value; } catch { } } }
                 SR.Notify((_on != null && _on.Value) ? SR.T("自由相机：开", "Free camera: ON")
                                                  : SR.T("自由相机：关（已还原）", "Free camera: OFF (restored)"));
-            } catch (Exception __ex) { SR.Guard.Log("自由相机 开关变化", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("自由相机 开关变化", __ex); }
         }
         internal static void CheckKey() {
             try {
@@ -219,7 +219,7 @@ public partial class Experiments : ITweak
                 if (!SR.ComboKeyDown(_key)) return;
                 // 自由相机全局有效，但仍只改游戏相机。
                 if (_on != null) _on.Value = !_on.Value;                   // 快捷键等于勾选框
-            } catch (Exception __ex) { SR.Guard.Log("自由相机 快捷键", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("自由相机 快捷键", __ex); }
         }
     
         // 游戏实际的渲染相机：ZoomCamera.useCamera -> 其 Camera 组件 -> 静态 CurrentZoomCamera -> Camera.main
@@ -234,7 +234,7 @@ public partial class Experiments : ITweak
                     }
                 }
                 if (ZoomCamera.CurrentZoomCamera != null) return ZoomCamera.CurrentZoomCamera;
-            } catch (Exception __ex) { SR.Guard.Log("获取当前 ZoomCamera", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("获取当前 ZoomCamera", __ex); }
             return Camera.main;
         }
         public static float CurrentFov() {
@@ -253,7 +253,7 @@ public partial class Experiments : ITweak
                 if (cam.orthographic) _fov.Value = Mathf.Clamp(cam.orthographicSize - wheel * ZoomSensitivity, MinFov, MaxFov);
                 else _fov.Value = Mathf.Clamp(cam.fieldOfView - wheel * ZoomSensitivity, MinFov, MaxFov);
                 return true;
-            } catch (Exception __ex) { SR.Guard.Log("自由相机 滚轮", __ex); return false; }
+            } catch (Exception __ex) { SRApi.Guard.Log("自由相机 滚轮", __ex); return false; }
         }
         // 每帧幂等：满足条件时相机 FOV 跟随滑条值。
         private static float _savedFov = -1f;   // 开启时的原视野，关闭/菜单场景还原用

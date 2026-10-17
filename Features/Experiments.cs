@@ -25,7 +25,7 @@ public partial class Experiments : ITweak
 				float w = Mathf.Max(SR.Ctl.Sc(160), SR.Ctl.WinWidth - SR.Ctl.SidebarWidth() - SR.Ctl.Sc(40));
 				float h = SR.Ctl.TextHeight(text, w);
 				GUILayout.Label(text, SR.Ctl.LabelWrap, GUILayout.Width(w), GUILayout.Height(h));
-			} catch (Exception __ex) { SR.Guard.Log("状态行", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("状态行", __ex); }
 		}
 
 		public void Initialize(IFeatureHost plugin)

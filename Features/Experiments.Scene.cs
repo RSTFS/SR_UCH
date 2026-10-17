@@ -42,7 +42,7 @@ public partial class Experiments : ITweak
 					DrawStatus(SplashTools.Note);
 				}
 				GUILayout.Space(SR.Ctl.Sc(6));
-			} catch (Exception __ex) { SR.Guard.Log("场景页 渲染", __ex); }
+			} catch (Exception __ex) { SRApi.Guard.Log("场景页 渲染", __ex); }
 		}
 
 		
@@ -84,7 +84,7 @@ public partial class Experiments : ITweak
                 SR.RegisterSceneHook(Reset);
                 try { Harmony.CreateAndPatchAll(typeof(SplashPatch)); }
                 catch (Exception __ex) { SR.LogWarn("加载遮罩 补丁注册失败: " + __ex.Message); }
-            } catch (Exception __ex) { SR.Guard.Log("加载遮罩 初始化", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("加载遮罩 初始化", __ex); }
         }
 
         private static void Reset() {
@@ -96,7 +96,7 @@ public partial class Experiments : ITweak
                 SplashPatch.Tick();
                 // 门控不得挡住 ApplySkip：总开关关闭时也须走到 ClearSkip 分支清掉游戏标志位。
                 ApplySkip();
-            } catch (Exception __ex) { SR.Guard.Log("加载遮罩 Tick", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("加载遮罩 Tick", __ex); }
         }
 
         // 游戏 Skip() 只把 SkipBool 置真且无取消路径，一旦开过就永远跳。
@@ -116,7 +116,7 @@ public partial class Experiments : ITweak
                 } else {
                     ClearSkip(sp);
                 }
-            } catch (Exception __ex) { SR.Guard.Log("跳过加载动画", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("跳过加载动画", __ex); }
         }
 
         // 清掉 SkipBool（protected 字段，无公开的关闭接口）。
@@ -129,7 +129,7 @@ public partial class Experiments : ITweak
                 if (_fiSkip == null) return;
                 object v = _fiSkip.GetValue(sp);
                 if (v is bool && (bool)v) _fiSkip.SetValue(sp, false);
-            } catch (Exception __ex) { SR.Guard.Log("清 SkipBool", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("清 SkipBool", __ex); }
         }
 
         // Instance 为空时才回退全场景扫描，回退路径 15 帧节流。
@@ -163,21 +163,21 @@ public partial class Experiments : ITweak
         [HarmonyPatch(typeof(SceneManagerWrapper), "LoadScene")]
         [HarmonyPrefix]
         static bool PreLoadScene(string sceneName) {
-            // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SR.Guard.Log（按调用点去重）留痕。
+            // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SRApi.Guard.Log（按调用点去重）留痕。
             try {
                         if (!Should(sceneName)) return true;
                         return !Start(sceneName);
-            } catch (Exception __ex) { SR.Guard.Log("温和加载(同步)", __ex); return true; }
+            } catch (Exception __ex) { SRApi.Guard.Log("温和加载(同步)", __ex); return true; }
         }
 
         [HarmonyPatch(typeof(SceneManagerWrapper), "LoadSceneAsync")]
         [HarmonyPrefix]
         static bool PreLoadSceneAsync(string sceneName) {
-            // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SR.Guard.Log（按调用点去重）留痕。
+            // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SRApi.Guard.Log（按调用点去重）留痕。
             try {
                         if (!Should(sceneName)) return true;
                         return !Start(sceneName);
-            } catch (Exception __ex) { SR.Guard.Log("温和加载(异步)", __ex); return true; }
+            } catch (Exception __ex) { SRApi.Guard.Log("温和加载(异步)", __ex); return true; }
         }
 
         private static bool Should(string sceneName) {
@@ -209,7 +209,7 @@ public partial class Experiments : ITweak
                 SR.LogInfo("[场景] 温柔加载：" + sceneName);
                 return true;
             } catch (Exception __ex) {
-                SR.Guard.Log("温柔加载", __ex);
+                SRApi.Guard.Log("温柔加载", __ex);
                 return false;   // 异常也回落，不吞掉场景请求
             }
         }
@@ -244,7 +244,7 @@ public partial class Experiments : ITweak
                 _launchKey = plugin.Config.Bind("Scene", "Lobby Launch Key", KeyCode.None, "按此键立即开始（None=不绑，需房主）。");
                 SR.RegisterTick("树屋工具", Tick);
                 SR.RegisterSceneHook(Reset);
-            } catch (Exception __ex) { SR.Guard.Log("树屋工具 初始化", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("树屋工具 初始化", __ex); }
         }
 
         private static void Reset() { Note = ""; }
@@ -260,9 +260,9 @@ public partial class Experiments : ITweak
                 LevelSelectController lsc = Lsc();
                 if (lsc == null) return;
                 if (_launchKey != null && _launchKey.Value != KeyCode.None && SR.ComboKeyDown(_launchKey)) {
-                    try { DoLaunch(lsc); } catch (Exception __ex) { SR.Guard.Log("立即开始", __ex); }
+                    try { DoLaunch(lsc); } catch (Exception __ex) { SRApi.Guard.Log("立即开始", __ex); }
                 }
-            } catch (Exception __ex) { SR.Guard.Log("树屋工具 Tick", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("树屋工具 Tick", __ex); }
         }
 
         private static void DoLaunch(LevelSelectController lsc) {

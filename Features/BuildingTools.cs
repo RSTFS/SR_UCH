@@ -179,14 +179,14 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(PiecePlacementCursor), "ReceiveEvent")]
         [HarmonyPostfix]
         static void OnPieceInput(PiecePlacementCursor __instance) {
-            // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SR.Guard.Log（按调用点去重）留痕。
+            // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SRApi.Guard.Log（按调用点去重）留痕。
             try {
                         if (!SR.GateMaster) return;
                         if (!Enabled) return;
                         if (SR.UiOpen && SR.BlockInput) return; 
                         if (__instance.Piece == null) return;
                         __instance.Piece.IgnorePlacementRules = _collisionOverride;
-            } catch (Exception __ex) { SR.Guard.Log("自由放置：忽略放置规则", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("自由放置：忽略放置规则", __ex); }
         }
 
         // 自由放置：SetPiece/FixedUpdate 后用 Postfix 把方块位置改为未取整的光标位置。
@@ -219,7 +219,7 @@ namespace SR_UCH.Tweaks {
                         _heldOffsetField = SR.RefField(typeof(PiecePlacementCursor), "heldPositionOffset", "自由放置（关闭网格吸附）");
                     Vector3 held = Vector3.zero;
                     if (_heldOffsetField != null) {
-                        try { held = (Vector3)_heldOffsetField.GetValue(__instance); } catch (Exception __ex) { SR.Guard.Log("BuildingTools.Field", __ex); }
+                        try { held = (Vector3)_heldOffsetField.GetValue(__instance); } catch (Exception __ex) { SRApi.Guard.Log("BuildingTools.Field", __ex); }
                     }
                     Vector2 freePos = new Vector2(cp.x + held.x + offset.x, cp.y + held.y + offset.y);
                     Vector3 cur = __instance.Piece.transform.position;
@@ -227,7 +227,7 @@ namespace SR_UCH.Tweaks {
                     if (__instance.Piece.ConstrainX) freePos = new Vector2(cur.x, freePos.y);
                     else if (__instance.Piece.ConstrainY) freePos = new Vector2(freePos.x, cur.y);
                     __instance.Piece.transform.position = new Vector3(freePos.x, freePos.y, cur.z);
-                } catch (Exception __ex) { SR.Guard.Log("BuildingTools.Vector3", __ex); }
+                } catch (Exception __ex) { SRApi.Guard.Log("BuildingTools.Vector3", __ex); }
             }
 
             // 读取 private/protected bool 字段，取不到按 false（字段改名只是少一条守卫）。
@@ -297,7 +297,7 @@ namespace SR_UCH.Tweaks {
                 gs.LevelFullnessScoreLimit = (SR.GateMaster && Enabled) ? LimitValue : VanillaLimit;
                 // 只写游戏字段，不调 Config.Save（配置落盘统一由 SR.FlushConfig 节流）。
             } catch (Exception __ex) {
-                SR.Guard.Log("应用建造上限", __ex);
+                SRApi.Guard.Log("应用建造上限", __ex);
             }
         }
     }

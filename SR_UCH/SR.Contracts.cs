@@ -179,4 +179,43 @@ namespace SR_UCH {
             return head + detail;
         }
     }
+    // API 门面（SMAPI 的 SMAPI.Mod* 助手对应物）：功能层只允许用这里的成员。
+    // 契约层不引用实现层，日志出口由核心在启动时注入（SRApi.SetLogSink）。
+    public static class SRApi {
+        private static Action<string> _warn;
+        // 核心启动时注入：把契约层的告警接到实现的日志系统（无注入时静默丢弃，不影响功能）。
+        public static void SetLogSink(Action<string> warn) { _warn = warn; }
+        internal static void Warn(string msg) { try { Action<string> w = _warn; if (w != null) w(msg); } catch { } }
+
+        // 统一带日志的 try / catch 包装：同一条 what 5 秒内只记一次，每帧路径上也安全。
+        public static class Guard {
+            private static readonly Dictionary<string, int> _lastWarn = new Dictionary<string, int>();
+            public static string LastWhat, LastError;
+            public static int WarnCount;
+
+            public static void Try(string what, Action action) {
+                try { action(); } catch (Exception ex) { Warn(what, ex); }
+            }
+            public static T Try<T>(string what, Func<T> action, T fallback) {
+                try { return action(); } catch (Exception ex) { Warn(what, ex); return fallback; }
+            }
+            public static void Log(string what, Exception ex) { Warn(what, ex); }
+
+            private static void Warn(string what, Exception ex) {
+                try {
+                    int now = Environment.TickCount;
+                    int last;
+                    if (what != null && _lastWarn.TryGetValue(what, out last) && unchecked((uint)(now - last)) < 5000u) return;
+                    if (what != null) _lastWarn[what] = now;
+                    LastWhat = what;
+                    LastError = ex != null ? (ex.GetType().Name + ": " + ex.Message) : "未知错误";
+                    WarnCount++;
+                    SRApi.Warn("[Guard] " + what + " 失败: " + (ex != null ? ex.Message : "未知错误"));
+                } catch (Exception __ex) {
+                    try { LastWhat = what; LastError = "Warn 自身失败: " + __ex.GetType().Name; } catch { }
+                }
+            }
+        }
+    }
+
 }

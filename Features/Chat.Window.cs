@@ -134,7 +134,7 @@ public partial class Chat : ITweak {
                     if (_key.Value == KeyCode.LeftAlt || _key.Value == KeyCode.RightAlt) _key.Value = KeyCode.Z;
                     if (_boxScaleKey.Value == KeyCode.LeftControl || _boxScaleKey.Value == KeyCode.RightControl) _boxScaleKey.Value = KeyCode.X;
                     _keyDefaultsV2.Value = true;
-                } catch (Exception __ex) { SR.Guard.Log("聊天窗口快捷键默认值迁移", __ex); }
+                } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口快捷键默认值迁移", __ex); }
             }
             // 一次性默认值迁移：字号范围改为 1 - 50 后，老配置的 0 会被夹成 1，需改成 18。
             _defaultsV3 = plugin.Config.Bind(Sec, "Defaults v3", false, "内部：字号默认值已迁移到 18");
@@ -142,7 +142,7 @@ public partial class Chat : ITweak {
                 try {
                     if (_fontSize.Value < 1) _fontSize.Value = 18;
                     _defaultsV3.Value = true;
-                } catch (Exception __ex) { SR.Guard.Log("聊天窗口字号默认值迁移", __ex); }
+                } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口字号默认值迁移", __ex); }
             }
 
             SR.RegisterKey("聊天窗口-显示键", _key, "hold");
@@ -220,7 +220,7 @@ public partial class Chat : ITweak {
             try {
                 GameSettings gs = GameSettings.GetInstance();
                 if (gs != null && gs.ChatMessagingFadeSpeed > 0.001f) return gs.ChatMessagingFadeSpeed;
-            } catch (Exception __ex) { SR.Guard.Log("聊天窗口淡出速度", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口淡出速度", __ex); }
             return 0.8f;
         }
 
@@ -249,7 +249,7 @@ public partial class Chat : ITweak {
                 object o = _fVisTimer.GetValue(d);
                 float cur = o is float ? (float)o : 0f;
                 if (cur < 0.15f) _fVisTimer.SetValue(d, 0.15f);
-            } catch (Exception __ex) { SR.Guard.Log("聊天窗口可见计时器续期", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口可见计时器续期", __ex); }
         }
 
         // 清零：让游戏按自己的速度淡出，而不是直接写 alpha = 0。
@@ -258,7 +258,7 @@ public partial class Chat : ITweak {
                 if (_fVisTimer == null) _fVisTimer = SR.RefField(typeof(ChatDisplay), "VisibilityTimer", "聊天窗口（可见计时器）");
                 if (_fVisTimer == null) return;
                 _fVisTimer.SetValue(d, 0f);
-            } catch (Exception __ex) { SR.Guard.Log("聊天窗口可见计时器清零", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口可见计时器清零", __ex); }
         }
 
         private static bool EnabledOn { get { return SR.GateMaster && _enabled != null && _enabled.Value; } }
@@ -338,7 +338,7 @@ public partial class Chat : ITweak {
                 ApplyPosition(cg);
 
                 DiagOnce(__instance, holder, cg);
-            } catch (Exception __ex) { SR.Guard.Log("聊天窗口增强", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口增强", __ex); }
         }
 
         // 字号：写入游戏自己的 GameSettings.ChatMessageFontSize（游戏新建消息时按它算头像尺寸）。
@@ -359,7 +359,7 @@ public partial class Chat : ITweak {
                 List<ChatUnit> msgs = inst.currentMessages;
                 if (msgs == null) return;
                 for (int i = 0; i < msgs.Count; i++) ApplyUnitFont(msgs[i], want);
-            } catch (Exception __ex) { SR.Guard.Log("聊天窗口字号", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口字号", __ex); }
         }
 
         // 对一条消息应用字号（want = 0 表示还原游戏原字号），头像尺寸一并跟随。
@@ -376,7 +376,7 @@ public partial class Chat : ITweak {
                     if ((u.chatPortrait.rectTransform.sizeDelta - sz).sqrMagnitude > 0.01f)
                         u.chatPortrait.rectTransform.sizeDelta = sz;
                 }
-            } catch (Exception __ex) { SR.Guard.Log("聊天窗口头像尺寸", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口头像尺寸", __ex); }
         }
 
         // 单段消息文字：want > 0 用配置字号并关闭 best-fit，want = 0 还原游戏原字号与 best-fit。
@@ -393,7 +393,7 @@ public partial class Chat : ITweak {
                     int restore = _origGameFontSize > 0 ? _origGameFontSize : _origFontSize;
                     if (t.fontSize != restore) t.fontSize = restore;
                 }
-            } catch (Exception __ex) { SR.Guard.Log("聊天窗口文字尺寸", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口文字尺寸", __ex); }
         }
 
         // 清晰度：写 canvas.pixelPerfect；系数变化时让全部文字 SetAllDirty 重建字库。
@@ -422,7 +422,7 @@ public partial class Chat : ITweak {
                     Text[] texts = holder.GetComponentsInChildren<Text>(true);
                     for (int i = 0; i < texts.Length; i++) { if (texts[i] != null) texts[i].SetAllDirty(); }
                 }
-            } catch (Exception __ex) { SR.Guard.Log("聊天窗口清晰度", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口清晰度", __ex); }
         }
 
         // 总开关关闭时的一次性还原：游戏字号 / 每段文字的字号与 bestFit / 缩放 / pixelPerfect / 位置偏移全部交回游戏原值。
@@ -445,7 +445,7 @@ public partial class Chat : ITweak {
                 if (node != null && _posApplied)
                     node.anchoredPosition = node.anchoredPosition - new Vector2(_posLastDx, _posLastDy);
                 _lastClarity = -1f; // 下次打开时重建字库
-            } catch (Exception __ex) { SR.Guard.Log("聊天窗口还原原版", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口还原原版", __ex); }
             _posApplied = false; _posHaveBase = false;
             _touched = false;
         }
@@ -474,7 +474,7 @@ public partial class Chat : ITweak {
                 _posLast = node.anchoredPosition;
                 _posLastDx = dx; _posLastDy = dy;
                 _posApplied = true;
-            } catch (Exception __ex) { SR.Guard.Log("聊天窗口位置", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口位置", __ex); }
         }
 
         // 诊断：打印当前消息（currentMessages[0]）上受管的文字与头像尺寸及配置值/游戏值；"首次有消息"与"每次字号变化"各记一条，最多 6 条。
@@ -505,7 +505,7 @@ public partial class Chat : ITweak {
                     + " 像素对齐=" + (canvas != null ? canvas.pixelPerfect.ToString() : "?")
                     + " alpha=" + (cg != null ? cg.alpha.ToString() : "?")
                     + " || 首条消息 " + first);
-            } catch (Exception __ex) { SR.Guard.Log("聊天窗口诊断", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口诊断", __ex); }
         }
 }
 }
