@@ -23,7 +23,11 @@ namespace SR_UCH.Tweaks {
 		// 对外槽位：Func<string xml, string displayName, bool ok>，供对局回放把阶段快照存成预设。
 		private const string SlotSaveXml = "presets.saveXml";
 		private const string IndexFileName = "index.json";
-		private const int IndexVersion = 1;
+		// 索引格式版本：v2 起新增 level / favorite / ok 字段（v1 老索引缺字段按默认值处理并在扫描时自愈）。
+		private const int IndexVersion = 2;
+		// 排序方式取值范围（与 Config.Bind 的 AcceptableValueRange 一致）：0=时间 1=名称 2=方块数 3=收藏优先。
+		private const int SortModeMin = 0;
+		private const int SortModeMax = 3;
 		// 从剪贴板导入的上限：方块数 / XML 字符数。超出直接拒绝，避免一次性重建拖垮帧率或整段解析爆内存。
 		private const int MaxImportBlocks = 3000;
 		private const int MaxImportChars = 2000000;
@@ -37,9 +41,11 @@ namespace SR_UCH.Tweaks {
 		private static ConfigEntry<bool> _enabled;
 		private static ConfigEntry<int> _maxPresets;
 		private static ConfigEntry<bool> _showTimestamps;
+		private static ConfigEntry<int> _sortModeEntry;
 		// 运行期快照：配置变化回调里即时更新，供每帧渲染读取（避免每帧访问 ConfigEntry）。
 		private static bool _featureOn;
 		private static bool _showTimestampsOn;
+		private static int _sortMode;
 		// 存储根目录缓存（BepInEx.Paths 的调用只做一次）。
 		private static string _rootDir;
 
@@ -53,19 +59,27 @@ namespace SR_UCH.Tweaks {
 		private static float _pendingAt = -1f;
 		private static string _renameKey;
 		private static string _renameText;
+		// 视图状态：搜索词 / 从路径导入的输入框 / 批量选择（key 集合）/ 下次加载是否强制重校验文件元数据。
+		private static string _search = "";
+		private static string _importPath = "";
+		private static readonly HashSet<string> _selectedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		private static bool _forceRevalidate;
 
 		// 加载预设时的重载锁（本功能自己的，和 Level 的锁互相不可见）。
 		private static bool _reloadBusy;
 		private static float _reloadBusyAt = -1f;
 
-		// 一条预设的展示元数据。磁盘上的 XML 文件是权威数据；index.json 只是名称/方块数/时间的缓存。
+		// 一条预设的展示元数据。磁盘上的 XML 文件是权威数据；index.json 只是名称/关卡/方块数/时间/收藏/有效性缓存。
 		private sealed class PresetInfo {
 			public string Name;
 			public string Mode;      // 模式目录名（GameState.GameMode 的 ToString）
 			public string File;      // 安全文件名（含 .xml）
 			public string FilePath;  // 扫描时补全的绝对路径
+			public string Level = ""; // XML 根节点 levelSceneName（读不到留空）
 			public int Blocks = -1;  // -1 = 索引里没有，需要从 XML 现算
 			public DateTime TimeUtc = DateTime.MinValue;
+			public bool Favorite;    // 收藏（存 index.json，列表里始终置顶）
+			public bool Ok;          // XML 可解析且方块数 > 0（存 index.json；缺字段按 false，扫描时自愈）
 
 			public string Key { get { return Mode + "/" + File; } }
 		}
@@ -84,6 +98,11 @@ namespace SR_UCH.Tweaks {
 					"显示时间列：在预设列表显示每条的保存时间；关闭后列表更紧凑。");
 				_showTimestampsOn = _showTimestamps.Value;
 				_showTimestamps.SettingChanged += delegate { _showTimestampsOn = _showTimestamps.Value; };
+				_sortModeEntry = plugin.Config.Bind(Section, "Sort Mode", 0,
+					new ConfigDescription("列表排序方式：0=时间（新→旧），1=名称，2=方块数（多→少），3=收藏优先（收藏始终置顶）。",
+						new AcceptableValueRange<int>(SortModeMin, SortModeMax)));
+				_sortMode = _sortModeEntry.Value;
+				_sortModeEntry.SettingChanged += delegate { _sortMode = _sortModeEntry.Value; };
 				// 对外槽位：其它功能（对局回放）把阶段快照 XML 存成预设。只新增跨功能入口，不改变本页现有行为。
 				try { Slots.Provide(SlotSaveXml, (Func<string, string, bool>)SaveXmlFromOther); }
 				catch (Exception __sx) { SRApi.Guard.Log("布局预设/提供槽位", __sx); }
@@ -109,6 +128,10 @@ namespace SR_UCH.Tweaks {
 			SRApi.LocDesc(Section, "Show Timestamps",
 				"显示时间列\n在预设列表里显示每条的保存时间\n关闭后列表只显示名称、方块数和模式，更紧凑；时间取自预设文件的最后修改时间。",
 				"show timestamps\nshows when each preset was saved in the list\nwhen off, the list only shows name, block count and mode to save space; uses the preset file last write time");
+			SRApi.LocKey(Section, "Sort Mode", "列表排序", "Sort mode");
+			SRApi.LocDesc(Section, "Sort Mode",
+				"列表排序方式\n0=时间（新→旧），1=名称，2=方块数（多→少），3=收藏优先\n收藏的预设始终置顶，所以 3 与 0 分组相同、组内同样按时间排序",
+				"preset list sort mode\n0 = time (newest first), 1 = name, 2 = block count (most first), 3 = favorites first\nfavorited presets are always pinned on top, so mode 3 groups the same way as mode 0 and sorts each group by time");
 		}
 
 		// ---------- 配置读取 ----------
@@ -125,6 +148,12 @@ namespace SR_UCH.Tweaks {
 
 		private static bool ShowTimestamps {
 			get { return _showTimestampsOn; }
+		}
+
+		private static int SortMode {
+			get {
+				try { return Mathf.Clamp(_sortMode, SortModeMin, SortModeMax); } catch { return 0; }
+			}
 		}
 
 		// 所有动作共用的门控：模组总开关 + 本功能总开关；返回 false 时已给出用户提示。
@@ -144,6 +173,52 @@ namespace SR_UCH.Tweaks {
 			return SRApi.Ctl.Sc(v);
 		}
 
+		// 排序：收藏始终置顶，再按配置的排序方式；同组内按名称稳定排序。
+		private static int ComparePreset(PresetInfo a, PresetInfo b) {
+			try {
+				if (a == null && b == null) return 0;
+				if (a == null) return 1;
+				if (b == null) return -1;
+				int fa = a.Favorite ? 1 : 0;
+				int fb = b.Favorite ? 1 : 0;
+				int c = fb.CompareTo(fa);
+				if (c != 0) return c;
+				int mode = SortMode;
+				if (mode == 1) c = string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+				else if (mode == 2) c = Mathf.Max(0, b.Blocks).CompareTo(Mathf.Max(0, a.Blocks));
+				else c = b.TimeUtc.CompareTo(a.TimeUtc);
+				if (c != 0) return c;
+				return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+			} catch { return 0; }
+		}
+
+		// 当前搜索过滤 + 排序后的可见列表（批量选择和"全选可见"都以它为准）。
+		private static List<PresetInfo> VisiblePresets() {
+			List<PresetInfo> list = new List<PresetInfo>();
+			try {
+				string q = (_search ?? "").Trim();
+				for (int i = 0; i < _presets.Count; i++) {
+					PresetInfo p = _presets[i];
+					if (p == null) continue;
+					if (q.Length > 0) {
+						// 名称 / 关卡名是规格要求的过滤维度；模式文本也顺手匹配，便于按模式搜索。
+						bool hit = ContainsText(p.Name, q) || ContainsText(p.Level, q) || ContainsText(ModeText(p.Mode), q);
+						if (!hit) continue;
+					}
+					list.Add(p);
+				}
+				list.Sort(ComparePreset);
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/过滤排序", __ex);
+			}
+			return list;
+		}
+
+		private static bool ContainsText(string text, string query) {
+			try { return text != null && query != null && text.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0; }
+			catch { return false; }
+		}
+
 		// ---------- 页面渲染 ----------
 
 		private static void Render() {
@@ -155,67 +230,167 @@ namespace SR_UCH.Tweaks {
 				GUILayout.Space(W(6));
 				RenderSaveBar();
 				GUILayout.Space(W(6));
+				RenderToolbar();
+				GUILayout.Space(W(6));
 				RenderList();
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("渲染布局预设页", __ex);
 			}
 		}
 
-		// 保存 / 导入 / 刷新 三个入口 + 状态行。
+		// 保存 / 导入（剪贴板 / 文件路径）+ 状态行。分两行，避免搜索/排序/批量操作把按钮挤出窗口。
 		private static void RenderSaveBar() {
 			SRApi.Ctl.SectionTitle(SRApi.T("- 保存当前布局 -", "- Save current layout -"));
 			GUILayout.BeginHorizontal();
 			try {
 				GUILayout.Label(new GUIContent(SRApi.T("预设名称", "Preset name"),
-					SRApi.T("保存时使用的名称\n同名预设会要求再点一次按钮确认覆盖\nWindows 不允许的文件名字符会被替换成下划线",
-						"name used when saving\nan existing preset with the same name requires a second click to overwrite\ncharacters not allowed by Windows are replaced with underscores")),
+					SRApi.T("保存时使用的名称，留空则自动用「关卡名 + 时间」命名\n同名预设会要求再点一次按钮确认覆盖\nWindows 不允许的文件名字符会被替换成下划线",
+						"name used when saving; when empty, the level name plus a timestamp is used\na preset with the same name requires a second click to overwrite\ncharacters not allowed by Windows are replaced with underscores")),
 					SRApi.Ctl.Label, GUILayout.Width(W(96)), GUILayout.Height(W(26)));
 				string typed = SRApi.ClearableTextField(_newName ?? "", 40, SRApi.Ctl.SearchBox,
-					GUILayout.Width(W(200)), GUILayout.Height(W(26)));
+					GUILayout.Width(W(260)), GUILayout.Height(W(26)));
 				if (typed != null && typed != _newName) _newName = typed;
 				if (GUILayout.Button(SaveButtonText(), SRApi.Ctl.Btn, GUILayout.Width(W(130)), GUILayout.Height(W(26)))) SaveCurrent();
-				GUILayout.Space(W(6));
-				if (GUILayout.Button(SRApi.T("从剪贴板导入", "Import clipboard"), SRApi.Ctl.Btn,
-					GUILayout.Width(W(140)), GUILayout.Height(W(26)))) ImportFromClipboard();
 				GUILayout.FlexibleSpace();
-				if (GUILayout.Button(SRApi.T("刷新列表", "Refresh"), SRApi.Ctl.Btn,
-					GUILayout.Width(W(90)), GUILayout.Height(W(26)))) {
-					ClearPending();
-					_loaded = false;
-					EnsureLoaded();
-					_status = "";
-				}
+			} finally {
+				GUILayout.EndHorizontal();
+			}
+			GUILayout.BeginHorizontal();
+			try {
+				GUILayout.Label(new GUIContent(SRApi.T("XML 路径", "XML path"),
+					SRApi.T("从磁盘上的 XML 文件导入布局预设（例如别人发来的 .xml）\n路径可以是绝对路径，也可以是相对 BepInEx 目录的路径",
+						"import a layout preset from an XML file on disk (for example a .xml received from someone)\nthe path may be absolute or relative to the BepInEx folder")),
+					SRApi.Ctl.Label, GUILayout.Width(W(96)), GUILayout.Height(W(26)));
+				string path = SRApi.ClearableTextField(_importPath ?? "", 260, SRApi.Ctl.SearchBox,
+					GUILayout.Width(W(220)), GUILayout.Height(W(26)));
+				if (path != null && path != _importPath) _importPath = path;
+				if (GUILayout.Button(SRApi.T("从路径导入", "Import path"), SRApi.Ctl.Btn,
+					GUILayout.Width(W(120)), GUILayout.Height(W(26)))) ImportFromPath();
+				if (GUILayout.Button(SRApi.T("从剪贴板导入", "Import clipboard"), SRApi.Ctl.Btn,
+					GUILayout.Width(W(130)), GUILayout.Height(W(26)))) ImportFromClipboard();
+				GUILayout.FlexibleSpace();
 			} finally {
 				GUILayout.EndHorizontal();
 			}
 			if (!string.IsNullOrEmpty(_status)) GUILayout.Label(_status, SRApi.Ctl.LabelWrap);
 		}
 
-		// 列表：表头 + 每行 [加载][重命名][导出][删除]。
-		private static void RenderList() {
-			int max = MaxPresets;
-			SRApi.Ctl.SectionTitle(SRApi.T("- 预设列表", "- Preset list") + " (" + _presets.Count + "/" + max + ")");
+		// 搜索 / 排序 / 批量选择与批量删除 / 全部导出 / 刷新。
+		private static void RenderToolbar() {
+			SRApi.Ctl.SectionTitle(SRApi.T("- 搜索 / 排序 / 批量 -", "- Search / sort / batch -"));
 			GUILayout.BeginHorizontal();
 			try {
-				HeaderLabel(SRApi.T("名称", "Name"), 190);
-				HeaderLabel(SRApi.T("方块数", "Blocks"), 56);
-				HeaderLabel(SRApi.T("模式", "Mode"), 72);
-				if (ShowTimestamps) HeaderLabel(SRApi.T("时间", "Time"), 120);
+				GUILayout.Label(SRApi.T("搜索", "Search"), SRApi.Ctl.Label, GUILayout.Width(W(32)), GUILayout.Height(W(24)));
+				string q = SRApi.ClearableTextField(_search ?? "", 40, SRApi.Ctl.SearchBox,
+					GUILayout.Width(W(120)), GUILayout.Height(W(24)));
+				if (q != null && q != _search) _search = q;
+				GUILayout.Space(W(6));
+				GUILayout.Label(SRApi.T("排序", "Sort"), SRApi.Ctl.Label, GUILayout.Width(W(32)), GUILayout.Height(W(24)));
+				RenderSortCombo();
+				GUILayout.Space(W(6));
+				List<PresetInfo> visible = VisiblePresets();
+				if (GUILayout.Button(new GUIContent(SRApi.T("全选", "Select"), SRApi.T("全选当前可见的预设", "select every currently shown preset")), SRApi.Ctl.Btn, GUILayout.Width(W(44)), GUILayout.Height(W(24)))) SelectVisible(visible, true);
+				if (GUILayout.Button(new GUIContent(SRApi.T("清空", "Clear"), SRApi.T("清空所有勾选（含被搜索过滤掉的行）", "clear every check, including rows hidden by the search filter")), SRApi.Ctl.Btn, GUILayout.Width(W(44)), GUILayout.Height(W(24)))) _selectedKeys.Clear();
+				string batchLabel = IsPending("batchdel:")
+					? SRApi.T("确认批量删除", "Confirm delete")
+					: SRApi.T("批量删除 (", "Delete selected (") + _selectedKeys.Count + ")";
+				GUIContent batchContent = new GUIContent(batchLabel,
+					SRApi.T("删除当前选中的预设文件；需要点两次：第一次变成「确认批量删除」，5 秒内再点一次才真正删除\n只删除已勾选的行，与搜索过滤无关",
+						"deletes the selected preset files; needs two clicks: the first turns the button into Confirm, a second click within 5 seconds deletes them\nonly checked rows are deleted, regardless of the search filter"));
+				if (GUILayout.Button(batchContent, SRApi.Ctl.Btn, GUILayout.Width(W(100)), GUILayout.Height(W(24)))) {
+					if (ConfirmOrArm("batchdel:")) BatchDeleteSelected();
+				}
 				GUILayout.FlexibleSpace();
-				HeaderLabel(SRApi.T("操作", "Actions"), 180);
+			} finally {
+				GUILayout.EndHorizontal();
+			}
+			GUILayout.BeginHorizontal();
+			try {
+				if (GUILayout.Button(new GUIContent(SRApi.T("全部导出", "Export all"),
+					SRApi.T("把所有预设 XML 复制到 预设目录/exports/<时间>/ 下（按模式分子目录），并复制一份 index.json\n用于整库备份或迁移到另一台机器",
+						"copies every preset XML into presets/exports/<time>/ (grouped by mode) and copies index.json as well\nuseful for a full backup or moving the library to another machine")),
+					SRApi.Ctl.Btn, GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ExportAllToDirectory();
+				if (GUILayout.Button(new GUIContent(SRApi.T("复制清单", "Copy list"),
+					SRApi.T("把全部预设的名称/模式/关卡/方块数/时间/路径作为文本清单复制到剪贴板",
+						"copies a text list of every preset (name/mode/level/blocks/time/path) to the clipboard")),
+					SRApi.Ctl.Btn, GUILayout.Width(W(110)), GUILayout.Height(W(24)))) CopyAllList();
+				GUILayout.Space(W(6));
+				if (GUILayout.Button(SRApi.T("刷新列表", "Refresh"), SRApi.Ctl.Btn,
+					GUILayout.Width(W(80)), GUILayout.Height(W(24)))) {
+					ClearPending();
+					_forceRevalidate = true;
+					_loaded = false;
+					EnsureLoaded();
+					_status = "";
+				}
+				GUILayout.FlexibleSpace();
+				GUILayout.Label(SRApi.T("共 ", "Total ") + _presets.Count + SRApi.T(" 条，显示 ", " presets, showing ") + VisiblePresets().Count, SRApi.Ctl.Label);
+			} finally {
+				GUILayout.EndHorizontal();
+			}
+		}
+
+		// 排序下拉：配置项驱动，选项数量与 SortModeMin..Max 保持一致。
+		private static void RenderSortCombo() {
+			try {
+				ConfigEntryBase e = SRApi.Ctl.FindEntry(Section, "Sort Mode");
+				string[] opts = new[] {
+					SRApi.T("时间（新→旧）", "Time (new first)"),
+					SRApi.T("名称", "Name"),
+					SRApi.T("方块数（多→少）", "Blocks (most first)"),
+					SRApi.T("收藏优先", "Favorites first")
+				};
+				int[] vals = new int[] { 0, 1, 2, 3 };
+				int cur = Mathf.Clamp(SortMode, 0, opts.Length - 1);
+				bool open;
+				if (e == null || !SRApi.Ctl.EditOpen.TryGetValue(e, out open)) open = false;
+				int sel = SRApi.Ctl.ComboBox(e, opts[cur], vals, opts, ref open, W(130));
+				if (sel >= 0) {
+					if (e != null) SRApi.Ctl.SetValue(e, vals[sel]);
+					if (e != null) SRApi.Ctl.EditOpen[e] = false;
+				} else if (e != null) {
+					SRApi.Ctl.EditOpen[e] = open;
+				}
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/渲染排序下拉", __ex);
+			}
+		}
+
+		// 列表：表头 + 每行（选择框、收藏、名称、关卡、方块数、模式、时间、操作）。
+		private static void RenderList() {
+			List<PresetInfo> visible = VisiblePresets();
+			int max = MaxPresets;
+			string title = SRApi.T("- 预设列表", "- Preset list") + " (" + visible.Count + "/" + _presets.Count
+				+ SRApi.T("，上限 ", ", limit ") + max + ")";
+			SRApi.Ctl.SectionTitle(title);
+			GUILayout.BeginHorizontal();
+			try {
+				HeaderLabel("", 22);
+				HeaderLabel("", 24);
+				HeaderLabel(SRApi.T("名称", "Name"), 120);
+				HeaderLabel(SRApi.T("关卡", "Level"), 70);
+				HeaderLabel(SRApi.T("方块数", "Blocks"), 40);
+				HeaderLabel(SRApi.T("模式", "Mode"), 48);
+				if (ShowTimestamps) HeaderLabel(SRApi.T("时间", "Time"), 84);
+				GUILayout.FlexibleSpace();
+				HeaderLabel(SRApi.T("操作", "Actions"), 188);
 			} finally {
 				GUILayout.EndHorizontal();
 			}
 			if (_presets.Count == 0) {
 				GUILayout.Label(SRApi.T(
-					"还没有预设：在任意对局里输入名称后点「保存当前布局」，或者点「从剪贴板导入」。",
-					"No presets yet: enter a name and click Save layout in a match, or click Import clipboard."),
+					"还没有预设：在任意对局里输入名称后点「保存当前布局」，或者点「从剪贴板导入」/「从路径导入」。",
+					"No presets yet: enter a name and click Save layout in a match, or use Import clipboard / Import path."),
 					SRApi.Ctl.LabelWrap);
 				return;
 			}
-			for (int i = 0; i < _presets.Count; i++) {
+			if (visible.Count == 0) {
+				GUILayout.Label(SRApi.T("没有匹配当前搜索的预设。", "No presets match the current search."), SRApi.Ctl.LabelWrap);
+				return;
+			}
+			for (int i = 0; i < visible.Count; i++) {
 				try {
-					RenderRow(_presets[i]);
+					RenderRow(visible[i]);
 				} catch (Exception __ex) {
 					SRApi.Guard.Log("渲染预设行", __ex);
 				}
@@ -226,6 +401,19 @@ namespace SR_UCH.Tweaks {
 			GUILayout.Label(text, SRApi.Ctl.Label, GUILayout.Width(W(width)), GUILayout.Height(W(24)));
 		}
 
+		private static void SelectVisible(List<PresetInfo> list, bool selected) {
+			try {
+				if (list == null) return;
+				for (int i = 0; i < list.Count; i++) {
+					if (list[i] == null) continue;
+					if (selected) _selectedKeys.Add(list[i].Key);
+					else _selectedKeys.Remove(list[i].Key);
+				}
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/选择可见行", __ex);
+			}
+		}
+
 		private static void RenderRow(PresetInfo p) {
 			if (p == null) return;
 			GUILayout.BeginHorizontal();
@@ -233,7 +421,7 @@ namespace SR_UCH.Tweaks {
 				// 重命名编辑态：名称列换成输入框，只留确定 / 取消。
 				if (_renameKey == p.Key) {
 					string typed = SRApi.ClearableTextField(_renameText ?? p.Name, 40, SRApi.Ctl.SearchBox,
-						GUILayout.Width(W(190)), GUILayout.Height(W(24)));
+						GUILayout.Width(W(120)), GUILayout.Height(W(24)));
 					if (typed != null && typed != _renameText) _renameText = typed;
 					if (GUILayout.Button(SRApi.T("确定", "OK"), SRApi.Ctl.Btn, GUILayout.Width(W(60)), GUILayout.Height(W(24)))) CommitRename(p);
 					if (GUILayout.Button(SRApi.T("取消", "Cancel"), SRApi.Ctl.Btn, GUILayout.Width(W(60)), GUILayout.Height(W(24)))) {
@@ -243,34 +431,51 @@ namespace SR_UCH.Tweaks {
 					GUILayout.FlexibleSpace();
 					return;
 				}
+				// 多选：批量删除用；勾选状态按 Key 保存，刷新/过滤不会丢。
+				bool sel = _selectedKeys.Contains(p.Key);
+				bool nsel = GUILayout.Toggle(sel, "", GUILayout.Width(W(22)), GUILayout.Height(W(24)));
+				if (nsel != sel) {
+					if (nsel) _selectedKeys.Add(p.Key);
+					else _selectedKeys.Remove(p.Key);
+				}
+				// 收藏星标：存 index.json，收藏的预设始终置顶。
+				GUIContent starContent = new GUIContent(p.Favorite ? "★" : "☆",
+					p.Favorite ? SRApi.T("取消收藏", "Unfavorite") : SRApi.T("收藏（置顶显示）", "Favorite (pin on top)"));
+				if (GUILayout.Button(starContent, SRApi.Ctl.Btn, GUILayout.Width(W(24)), GUILayout.Height(W(24)))) ToggleFavorite(p);
 				string tip = SRApi.T("预设文件：", "Preset file: ") + p.Mode + "/" + p.File
+					+ "\n" + SRApi.T("关卡：", "Level: ") + LevelText(p)
 					+ "\n" + SRApi.T("方块数：", "Blocks: ") + Mathf.Max(0, p.Blocks)
-					+ "\n" + SRApi.T("保存时间：", "Saved: ") + TimeText(p);
-				GUILayout.Label(new GUIContent(p.Name, tip), SRApi.Ctl.Label, GUILayout.Width(W(190)), GUILayout.Height(W(24)));
-				GUILayout.Label(Mathf.Max(0, p.Blocks).ToString(), SRApi.Ctl.Label, GUILayout.Width(W(56)), GUILayout.Height(W(24)));
-				GUILayout.Label(ModeText(p.Mode), SRApi.Ctl.Label, GUILayout.Width(W(72)), GUILayout.Height(W(24)));
-				if (ShowTimestamps) GUILayout.Label(TimeText(p), SRApi.Ctl.Label, GUILayout.Width(W(120)), GUILayout.Height(W(24)));
+					+ "\n" + SRApi.T("保存时间：", "Saved: ") + TimeText(p)
+					+ (p.Ok ? "" : "\n" + SRApi.T("⚠ 预设文件无法解析或没有方块，建议删除或重新导入", "warning: the preset file cannot be parsed or has no blocks; consider deleting or re-importing it"));
+				string rowName = (p.Ok ? "" : "⚠ ") + (p.Name ?? "");
+				GUILayout.Label(new GUIContent(rowName, tip), SRApi.Ctl.Label, GUILayout.Width(W(120)), GUILayout.Height(W(24)));
+				GUILayout.Label(LevelText(p), SRApi.Ctl.Label, GUILayout.Width(W(70)), GUILayout.Height(W(24)));
+				GUILayout.Label(Mathf.Max(0, p.Blocks).ToString(), SRApi.Ctl.Label, GUILayout.Width(W(40)), GUILayout.Height(W(24)));
+				GUILayout.Label(ModeText(p.Mode), SRApi.Ctl.Label, GUILayout.Width(W(48)), GUILayout.Height(W(24)));
+				if (ShowTimestamps) GUILayout.Label(TimeText(p), SRApi.Ctl.Label, GUILayout.Width(W(84)), GUILayout.Height(W(24)));
 				GUILayout.FlexibleSpace();
-				GUIContent loadContent = new GUIContent(SRApi.T("加载", "Load"),
-					SRApi.T("仅房主可用：把这份预设写进 QuickSaver.levelPortalXml 后按房主视角重载当前关卡\n会重载场景并重置本局分数，全员一起重新加载",
-						"host only: writes this preset into QuickSaver.levelPortalXml and reloads the current level from the host view\nthis reloads the scene, resets the score of the current match and reloads everyone"));
-				if (GUILayout.Button(loadContent, SRApi.Ctl.Btn, GUILayout.Width(W(52)), GUILayout.Height(W(24)))) LoadPreset(p);
+				string loadKey = "load:" + p.Key;
+				string loadLabel = IsPending(loadKey) ? SRApi.T("确认加载", "Confirm") : SRApi.T("加载", "Load");
+				GUIContent loadContent = new GUIContent(loadLabel,
+					SRApi.T("仅房主可用：把这份预设写进 QuickSaver.levelPortalXml 后按房主视角重载当前关卡\n会重载场景并重置本局分数，全员一起重新加载；模式或关卡不匹配时需要再点一次确认",
+						"host only: writes this preset into QuickSaver.levelPortalXml and reloads the current level from the host view\nthis reloads the scene, resets the score of the current match and reloads everyone; if the mode or level differs, a second click is required"));
+				if (GUILayout.Button(loadContent, SRApi.Ctl.Btn, GUILayout.Width(W(48)), GUILayout.Height(W(24)))) LoadPreset(p);
 				GUIContent renameContent = new GUIContent(SRApi.T("重命名", "Rename"),
 					SRApi.T("只改列表里显示的名称，磁盘上的文件名保持不变", "only changes the name shown in the list; the file name on disk stays the same"));
-				if (GUILayout.Button(renameContent, SRApi.Ctl.Btn, GUILayout.Width(W(68)), GUILayout.Height(W(24)))) {
+				if (GUILayout.Button(renameContent, SRApi.Ctl.Btn, GUILayout.Width(W(52)), GUILayout.Height(W(24)))) {
 					ClearPending();
 					_renameKey = p.Key;
 					_renameText = p.Name;
 				}
 				GUIContent exportContent = new GUIContent(SRApi.T("导出", "Export"),
 					SRApi.T("把预设 XML 复制到剪贴板，便于分享或手动备份", "copies the preset XML to the clipboard for sharing or manual backup"));
-				if (GUILayout.Button(exportContent, SRApi.Ctl.Btn, GUILayout.Width(W(52)), GUILayout.Height(W(24)))) ExportPreset(p);
+				if (GUILayout.Button(exportContent, SRApi.Ctl.Btn, GUILayout.Width(W(40)), GUILayout.Height(W(24)))) ExportPreset(p);
 				string delKey = "del:" + p.Key;
 				string delLabel = IsPending(delKey) ? SRApi.T("确认删除", "Confirm") : SRApi.T("删除", "Delete");
 				GUIContent delContent = new GUIContent(delLabel,
 					SRApi.T("删除预设文件；需要点两次：第一次变成「确认删除」，5 秒内再点一次才真正删除",
 						"deletes the preset file; needs two clicks: the first turns the button into Confirm, a second click within 5 seconds deletes it"));
-				if (GUILayout.Button(delContent, SRApi.Ctl.Btn, GUILayout.Width(W(72)), GUILayout.Height(W(24)))) {
+				if (GUILayout.Button(delContent, SRApi.Ctl.Btn, GUILayout.Width(W(48)), GUILayout.Height(W(24)))) {
 					if (ConfirmOrArm(delKey)) DeletePreset(p);
 				}
 			} finally {
@@ -319,12 +524,6 @@ namespace SR_UCH.Tweaks {
 		private static void SaveCurrent() {
 			try {
 				if (!ActionAllowed()) return;
-				string name = (_newName ?? "").Trim();
-				if (name.Length == 0) {
-					SRApi.Notify(SRApi.T("请先输入预设名称", "Enter a preset name first"));
-					return;
-				}
-				if (name.Length > 40) name = name.Substring(0, 40);
 				XmlDocument doc;
 				string mode;
 				if (!TryGetCurrentSnapshot(out doc, out mode)) return;
@@ -335,14 +534,23 @@ namespace SR_UCH.Tweaks {
 					SRApi.Notify(SRApi.T("当前场景没有可保存的方块", "No blocks to save in the current scene"));
 					return;
 				}
-				SaveXml(doc.OuterXml, name, mode, blocks);
+				string level = LevelFromDoc(doc);
+				string name = (_newName ?? "").Trim();
+				// 名称留空：默认用「关卡名 + 时间」，避免每次手工起名。
+				if (name.Length == 0) {
+					string baseName = string.IsNullOrEmpty(level) ? SRApi.T("布局", "Layout") : level;
+					name = baseName + " " + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+				}
+				if (name.Length > 40) name = name.Substring(0, 40);
+				SaveXml(doc.OuterXml, name, mode, blocks, level);
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/保存", __ex);
 			}
 		}
 
 		// 保存 / 导入共用的落盘逻辑：同名覆盖需二次确认，数量上限只拦新预设。
-		private static void SaveXml(string xml, string name, string mode, int blocks) {
+		// level 来自 XML 根节点 levelSceneName（读不到传空串），写进预设元数据用于列表/加载前校验。
+		private static void SaveXml(string xml, string name, string mode, int blocks, string level) {
 			try {
 				string root = PresetsRoot();
 				string dirName = SafeDirName(mode);
@@ -379,6 +587,8 @@ namespace SR_UCH.Tweaks {
 				p.Blocks = blocks;
 				p.TimeUtc = DateTime.UtcNow;
 				p.FilePath = path;
+				p.Level = level ?? "";
+				p.Ok = true;
 				SortPresets();
 				SaveIndex();
 				_status = SRApi.T("已保存预设：", "Saved preset: ") + name;
@@ -465,6 +675,8 @@ namespace SR_UCH.Tweaks {
 				p.Blocks = blocks;
 				p.TimeUtc = DateTime.UtcNow;
 				p.FilePath = Path.Combine(dir, fileName);
+				p.Level = LevelFromDoc(doc);
+				p.Ok = true;
 				SortPresets();
 				SaveIndex();
 				SRApi.LogInfo("[布局预设] 槽位保存 " + key + "（" + blocks + " 块）");
@@ -484,9 +696,59 @@ namespace SR_UCH.Tweaks {
 					SRApi.Notify(SRApi.T("剪贴板是空的", "The clipboard is empty"));
 					return;
 				}
+				ImportXmlText(xml, null, SRApi.T("剪贴板", "clipboard"));
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/导入(剪贴板)", __ex);
+			}
+		}
+
+		// 从磁盘 XML 文件导入：支持绝对路径，也支持相对 BepInEx 根目录 / 配置目录 / 预设目录的路径。
+		private static void ImportFromPath() {
+			try {
+				if (!ActionAllowed()) return;
+				string input = (_importPath ?? "").Trim();
+				if (input.Length >= 2 && input[0] == '"' && input[input.Length - 1] == '"') input = input.Substring(1, input.Length - 2).Trim();
+				if (input.Length == 0) {
+					SRApi.Notify(SRApi.T("请先填写 XML 文件路径", "Enter the XML file path first"));
+					return;
+				}
+				string path = ResolveImportPath(input);
+				if (string.IsNullOrEmpty(path)) {
+					SRApi.Notify(SRApi.T("找不到 XML 文件：", "XML file not found: ") + input);
+					return;
+				}
+				long length = 0;
+				try { length = new FileInfo(path).Length; }
+				catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取文件大小", __ex); }
+				if (length > MaxImportChars) {
+					SRApi.Notify(SRApi.T("XML 文件过大，已拒绝导入", "The XML file is too large; import rejected"));
+					return;
+				}
+				string xml = null;
+				try { xml = File.ReadAllText(path, Encoding.UTF8); }
+				catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取路径文件", __ex); }
+				if (string.IsNullOrEmpty(xml)) {
+					SRApi.Notify(SRApi.T("读取 XML 文件失败", "Failed to read the XML file"));
+					return;
+				}
+				string defaultName = null;
+				try { defaultName = Path.GetFileNameWithoutExtension(path); } catch { }
+				ImportXmlText(xml, defaultName, SRApi.T("文件", "file"));
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/导入(路径)", __ex);
+			}
+		}
+
+		// 剪贴板 / 文件路径共用的 XML 导入：校验根节点/方块数/关卡名后落盘（同名覆盖仍走 SaveXml 的二次确认）。
+		private static void ImportXmlText(string xml, string defaultBaseName, string sourceLabel) {
+			try {
+				if (string.IsNullOrEmpty(xml) || xml.Trim().Length == 0) {
+					SRApi.Notify(SRApi.T("导入内容为空", "The import content is empty"));
+					return;
+				}
 				xml = xml.Trim();
 				if (xml.Length > MaxImportChars) {
-					SRApi.Notify(SRApi.T("剪贴板内容过大，已拒绝导入（上限 ", "Clipboard content is too large; import rejected (limit ")
+					SRApi.Notify(SRApi.T("导入内容过大，已拒绝（上限 ", "Import content is too large; rejected (limit ")
 						+ (MaxImportChars / 1000) + SRApi.T(" 千字符）", "k characters)"));
 					return;
 				}
@@ -496,15 +758,15 @@ namespace SR_UCH.Tweaks {
 					doc.LoadXml(xml);
 				} catch (Exception __ex) {
 					// 解析失败是非常常见的用户错误（粘错东西），只记一次 Guard 日志并提示，不抛到页面。
-					SRApi.Guard.Log("布局预设/解析剪贴板 XML", __ex);
+					SRApi.Guard.Log("布局预设/解析导入 XML", __ex);
 				}
 				if (doc == null || doc.DocumentElement == null || doc.DocumentElement.Name != "scene") {
-					SRApi.Notify(SRApi.T("剪贴板里不是关卡布局 XML（根节点必须是 scene）", "Clipboard content is not level layout XML (root node must be scene)"));
+					SRApi.Notify(SRApi.T("导入内容不是关卡布局 XML（根节点必须是 scene）", "The import content is not level layout XML (root node must be scene)"));
 					return;
 				}
 				int blocks = CountBlocks(doc);
 				if (blocks <= 0) {
-					SRApi.Notify(SRApi.T("剪贴板 XML 里没有方块", "The clipboard XML contains no blocks"));
+					SRApi.Notify(SRApi.T("导入 XML 里没有方块", "The imported XML contains no blocks"));
 					return;
 				}
 				if (blocks > MaxImportBlocks) {
@@ -512,14 +774,14 @@ namespace SR_UCH.Tweaks {
 						+ SRApi.T("，已拒绝导入", "; import rejected"));
 					return;
 				}
-				string level = "";
-				try { level = doc.DocumentElement.GetAttribute("levelSceneName"); } catch { }
+				string level = LevelFromDoc(doc);
 				if (string.IsNullOrEmpty(level)) {
 					SRApi.Notify(SRApi.T("XML 缺少 levelSceneName，无法确定属于哪个关卡", "The XML has no levelSceneName, so its level cannot be determined"));
 					return;
 				}
 				StripDestroyed(doc);
 				string name = (_newName ?? "").Trim();
+				if (name.Length == 0 && !string.IsNullOrEmpty(defaultBaseName)) name = defaultBaseName.Trim();
 				if (name.Length == 0) name = SRApi.T("导入 ", "Imported ") + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
 				if (name.Length > 40) name = name.Substring(0, 40);
 				string mode = "IMPORTED";
@@ -527,10 +789,26 @@ namespace SR_UCH.Tweaks {
 					GameSettings st = GameSettings.GetInstance();
 					if (st != null) mode = st.GameMode.ToString();
 				} catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取模式(导入)", __ex); }
-				SaveXml(doc.OuterXml, name, mode, blocks);
+				SRApi.LogInfo("[布局预设] 从" + sourceLabel + "导入：" + name + "（" + blocks + " 块，关卡 " + level + "）");
+				SaveXml(doc.OuterXml, name, mode, blocks, level);
 			} catch (Exception __ex) {
-				SRApi.Guard.Log("布局预设/导入", __ex);
+				SRApi.Guard.Log("布局预设/导入XML", __ex);
 			}
+		}
+
+		// 路径解析：绝对路径直接使用；相对路径依次尝试 当前目录 / BepInEx 根目录 / 配置目录 / 预设目录。
+		private static string ResolveImportPath(string input) {
+			try {
+				if (string.IsNullOrEmpty(input)) return null;
+				try { if (File.Exists(input)) return Path.GetFullPath(input); } catch { }
+				string p = null;
+				try { p = Path.Combine(Paths.BepInExRootPath, input); if (File.Exists(p)) return p; } catch { }
+				try { p = Path.Combine(Paths.ConfigPath, input); if (File.Exists(p)) return p; } catch { }
+				try { p = Path.Combine(PresetsRoot(), input); if (File.Exists(p)) return p; } catch { }
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/解析导入路径", __ex);
+			}
+			return null;
 		}
 
 		private static void ExportPreset(PresetInfo p) {
@@ -556,6 +834,144 @@ namespace SR_UCH.Tweaks {
 			}
 		}
 
+		// 全部导出到目录：预设目录/exports/<时间>/<模式>/<文件>，并附带一份 index.json。
+		private static void ExportAllToDirectory() {
+			try {
+				if (!ActionAllowed()) return;
+				if (_presets.Count == 0) {
+					SRApi.Notify(SRApi.T("当前没有可导出的预设", "There are no presets to export"));
+					return;
+				}
+				string baseDir = Path.Combine(PresetsRoot(), "exports", DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture));
+				int copied = 0;
+				int failed = 0;
+				for (int i = 0; i < _presets.Count; i++) {
+					PresetInfo p = _presets[i];
+					if (p == null) continue;
+					try {
+						string xml = ReadAllText(p.FilePath);
+						if (string.IsNullOrEmpty(xml)) { failed++; continue; }
+						string dir = Path.Combine(baseDir, SafeDirName(p.Mode));
+						Directory.CreateDirectory(dir);
+						File.WriteAllText(Path.Combine(dir, p.File), xml, new UTF8Encoding(false));
+						copied++;
+					} catch (Exception __ex) {
+						SRApi.Guard.Log("布局预设/导出全部单项", __ex);
+						failed++;
+					}
+				}
+				try {
+					string index = Path.Combine(PresetsRoot(), IndexFileName);
+					if (File.Exists(index)) {
+						Directory.CreateDirectory(baseDir);
+						File.Copy(index, Path.Combine(baseDir, IndexFileName), true);
+					}
+				} catch (Exception __ex) {
+					SRApi.Guard.Log("布局预设/导出全部索引", __ex);
+				}
+				if (copied == 0) {
+					SRApi.Notify(SRApi.T("全部导出失败（详见日志）", "Exporting all presets failed (see the log)"));
+					return;
+				}
+				_status = SRApi.T("已导出 ", "Exported ") + copied + SRApi.T(" 个预设到：", " presets to: ") + baseDir
+					+ (failed > 0 ? SRApi.T("（失败 ", " (failed ") + failed + SRApi.T(" 个）", ")") : "");
+				SRApi.Notify(_status);
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/全部导出", __ex);
+			}
+		}
+
+		// 复制全部清单（文本）到剪贴板：名称 / 模式 / 关卡 / 方块数 / 时间 / 路径。
+		private static void CopyAllList() {
+			try {
+				if (!ActionAllowed()) return;
+				// 清单始终导出全部预设（不受搜索过滤影响），按当前排序输出。
+				List<PresetInfo> list = new List<PresetInfo>(_presets);
+				list.Sort(ComparePreset);
+				if (list.Count == 0) {
+					SRApi.Notify(SRApi.T("当前没有可复制的预设", "There are no presets to copy"));
+					return;
+				}
+				StringBuilder sb = new StringBuilder();
+				sb.AppendLine("SR_UCH layout presets (" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + ")");
+				for (int i = 0; i < list.Count; i++) {
+					PresetInfo p = list[i];
+					if (p == null) continue;
+					sb.Append(i + 1).Append(". ").Append(p.Name ?? "")
+						.Append("\tmode=").Append(p.Mode ?? "")
+						.Append("\tlevel=").Append(LevelText(p))
+						.Append("\tblocks=").Append(Mathf.Max(0, p.Blocks))
+						.Append("\ttime=").Append(p.TimeUtc == DateTime.MinValue ? "-" : p.TimeUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))
+						.Append("\t").Append(p.FilePath ?? "")
+						.AppendLine();
+				}
+				try {
+					GUIUtility.systemCopyBuffer = sb.ToString();
+				} catch (Exception __ex) {
+					SRApi.Guard.Log("布局预设/复制清单写剪贴板", __ex);
+					SRApi.Notify(SRApi.T("写入剪贴板失败", "Failed to write to the clipboard"));
+					return;
+				}
+				_status = SRApi.T("已复制全部清单（", "Copied the full list (") + list.Count + SRApi.T(" 条）到剪贴板", " presets) to the clipboard");
+				SRApi.Notify(_status);
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/复制清单", __ex);
+			}
+		}
+
+		private static void ToggleFavorite(PresetInfo p) {
+			try {
+				if (p == null) return;
+				if (!ActionAllowed()) return;
+				p.Favorite = !p.Favorite;
+				SortPresets();
+				SaveIndex();
+				_status = p.Favorite
+					? SRApi.T("已收藏：", "Favorited: ") + p.Name
+					: SRApi.T("已取消收藏：", "Unfavorited: ") + p.Name;
+				SRApi.Notify(_status);
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/切换收藏", __ex);
+			}
+		}
+
+		// 批量删除当前勾选的预设（二次确认在工具栏按钮上完成）。
+		private static void BatchDeleteSelected() {
+			try {
+				if (!ActionAllowed()) return;
+				List<PresetInfo> targets = new List<PresetInfo>();
+				for (int i = 0; i < _presets.Count; i++) {
+					PresetInfo p = _presets[i];
+					if (p != null && _selectedKeys.Contains(p.Key)) targets.Add(p);
+				}
+				if (targets.Count == 0) {
+					SRApi.Notify(SRApi.T("没有勾选任何预设", "No presets are selected"));
+					return;
+				}
+				int removed = 0;
+				int failed = 0;
+				for (int i = 0; i < targets.Count; i++) {
+					PresetInfo p = targets[i];
+					try {
+						if (File.Exists(p.FilePath)) File.Delete(p.FilePath);
+						_presets.Remove(p);
+						_selectedKeys.Remove(p.Key);
+						removed++;
+					} catch (Exception __ex) {
+						SRApi.Guard.Log("布局预设/批量删除单项", __ex);
+						failed++;
+					}
+				}
+				SortPresets();
+				SaveIndex();
+				_status = SRApi.T("已批量删除 ", "Deleted ") + removed + SRApi.T(" 个预设", " presets")
+					+ (failed > 0 ? SRApi.T("（失败 ", " (failed ") + failed + SRApi.T(" 个）", ")") : "");
+				SRApi.Notify(_status);
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/批量删除", __ex);
+			}
+		}
+
 		private static void DeletePreset(PresetInfo p) {
 			try {
 				if (p == null) return;
@@ -567,6 +983,7 @@ namespace SR_UCH.Tweaks {
 					SRApi.Notify(SRApi.T("删除预设文件失败", "Failed to delete the preset file"));
 					return;
 				}
+				_selectedKeys.Remove(p.Key);
 				_presets.Remove(p);
 				SaveIndex();
 				_status = SRApi.T("已删除预设：", "Deleted preset: ") + p.Name;
@@ -662,12 +1079,26 @@ namespace SR_UCH.Tweaks {
 				string presetScene = "";
 				string activeScene = "";
 				try { presetScene = doc.DocumentElement.GetAttribute("levelSceneName"); } catch { }
+				if (string.IsNullOrEmpty(presetScene)) presetScene = p.Level ?? "";
 				try { activeScene = SceneManager.GetActiveScene().name; } catch { }
-				if (!string.IsNullOrEmpty(presetScene) && !string.IsNullOrEmpty(activeScene) && presetScene != activeScene) {
-					SRApi.Notify(SRApi.T("该预设属于关卡「", "This preset belongs to level \"") + presetScene
-						+ SRApi.T("」，当前关卡是「", "\", but the current level is \"") + activeScene + SRApi.T("」", "\""));
-					return;
+				string currentMode = "";
+				try { currentMode = st.GameMode.ToString(); } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取当前模式(加载)", __ex); }
+				bool levelMismatch = !string.IsNullOrEmpty(presetScene) && !string.IsNullOrEmpty(activeScene)
+					&& !string.Equals(presetScene, activeScene, StringComparison.Ordinal);
+				bool modeMismatch = IsConcreteMode(p.Mode) && IsConcreteMode(currentMode)
+					&& !string.Equals(p.Mode, currentMode, StringComparison.OrdinalIgnoreCase);
+				if (levelMismatch || modeMismatch) {
+					// 两段确认：第一次只提示差异并让行内按钮变成「确认加载」，5 秒内再点一次才真正重载。
+					string diff = SRApi.T("模式/关卡不匹配：预设 ", "Mode/level mismatch: preset ") + p.Name;
+					if (modeMismatch) diff += SRApi.T("（模式 ", " (mode ") + ModeText(p.Mode) + SRApi.T("，当前 ", ", current ") + ModeText(currentMode) + "）";
+					if (levelMismatch) diff += SRApi.T("（关卡 ", " (level ") + presetScene + SRApi.T("，当前 ", ", current ") + activeScene + "）";
+					if (!ConfirmOrArm("load:" + p.Key)) {
+						_status = diff + SRApi.T("；再点一次「加载」确认", "; click Load again to confirm");
+						SRApi.Notify(_status);
+						return;
+					}
 				}
+				ClearPending();
 				SetReloadBusy(true);
 				try {
 					// 一次性静态字段：游戏在 OnSetupStartLevel 里读取后立即置 null 并原生广播给全员。
@@ -827,18 +1258,23 @@ namespace SR_UCH.Tweaks {
 
 		private static void EnsureLoaded() {
 			if (_loaded) return;
-			LoadFromDisk();
+			bool revalidate = _forceRevalidate;
+			_forceRevalidate = false;
+			LoadFromDisk(revalidate);
 		}
 
 		// 扫描磁盘重建列表：index.json 只提供展示元数据，XML 文件才是权威数据。
-		// 索引损坏 / 被手改坏时，仍按模式目录下的 XML 文件重建，绝不因为索引坏了就丢预设。
-		private static void LoadFromDisk() {
+		// 索引损坏 / 被手改坏 / 旧版索引缺字段（level / favorite / ok）时按 XML 重新读取元数据，扫完回写自愈。
+		// revalidate=true（刷新按钮）时强制重新解析每个 XML，用于发现后来损坏的文件。
+		private static void LoadFromDisk(bool revalidate) {
 			_loaded = true;
 			_presets.Clear();
+			bool upgraded = false; // 旧索引缺字段 / 出现新文件 / 强制重校验结果变化：扫完回写一次
 			try {
 				string root = PresetsRoot();
 				if (!Directory.Exists(root)) return;
 				Dictionary<string, PresetInfo> byKey = new Dictionary<string, PresetInfo>(StringComparer.OrdinalIgnoreCase);
+				Dictionary<string, bool> completeIdx = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 				string index = Path.Combine(root, IndexFileName);
 				if (File.Exists(index)) {
 					try {
@@ -856,6 +1292,16 @@ namespace SR_UCH.Tweaks {
 							if (string.IsNullOrEmpty(pi.Name)) pi.Name = Path.GetFileNameWithoutExtension(file);
 							pi.Blocks = JsonInt(line, "blocks");
 							pi.TimeUtc = ParseTime(JsonStr(line, "time"));
+							pi.Level = JsonStr(line, "level");
+							if (pi.Level == null) pi.Level = "";
+							pi.Favorite = JsonBool(line, "favorite");
+							pi.Ok = JsonBool(line, "ok");
+							// 字段缺失判定：老索引（v1）没有 level / favorite / ok -> 默认 false/0，扫描时自愈。
+							bool complete = line.IndexOf("\"level\":", StringComparison.Ordinal) >= 0
+								&& line.IndexOf("\"favorite\":", StringComparison.Ordinal) >= 0
+								&& line.IndexOf("\"ok\":", StringComparison.Ordinal) >= 0;
+							completeIdx[mode + "/" + file] = complete;
+							if (!complete) upgraded = true;
 							byKey[mode + "/" + file] = pi;
 						}
 					} catch (Exception __ex) {
@@ -872,17 +1318,33 @@ namespace SR_UCH.Tweaks {
 						string file = Path.GetFileName(fp);
 						string key = mode + "/" + file;
 						PresetInfo pi;
+						bool complete = false;
 						if (!byKey.TryGetValue(key, out pi)) {
 							pi = new PresetInfo();
 							pi.Mode = mode;
 							pi.File = file;
 							pi.Name = Path.GetFileNameWithoutExtension(file);
+							upgraded = true; // 索引里没有这个文件：扫完回写登记
+						} else {
+							complete = completeIdx.ContainsKey(key) && completeIdx[key];
 						}
 						pi.Mode = mode;
 						pi.File = file;
 						pi.FilePath = fp;
-						// 索引没记方块数时现算一次；有缓存就信缓存（避免每次打开页面都解析一批大 XML）。
-						if (pi.Blocks < 0) pi.Blocks = CountBlocksInFile(fp);
+						// 索引缺元数据（老索引 / 无索引 / 刷新强制重校验）：流式读一次 XML 根节点与方块数。
+						if (revalidate || !complete || string.IsNullOrEmpty(pi.Level) || !pi.Ok || pi.Blocks < 0) {
+							bool oldOk = pi.Ok;
+							string oldLevel = pi.Level ?? "";
+							int oldBlocks = pi.Blocks;
+							string lv;
+							int blocks;
+							bool xmlOk = TryReadPresetMeta(fp, out lv, out blocks);
+							pi.Level = lv ?? "";
+							pi.Blocks = xmlOk ? blocks : Mathf.Max(0, pi.Blocks);
+							pi.Ok = xmlOk && blocks > 0;
+							if (!complete) upgraded = true;
+							if (revalidate && (oldOk != pi.Ok || !string.Equals(oldLevel, pi.Level, StringComparison.Ordinal) || oldBlocks != pi.Blocks)) upgraded = true;
+						}
 						if (pi.TimeUtc == DateTime.MinValue) {
 							try { pi.TimeUtc = File.GetLastWriteTimeUtc(fp); } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读文件时间", __ex); }
 						}
@@ -895,7 +1357,17 @@ namespace SR_UCH.Tweaks {
 					try { if (!File.Exists(pi.FilePath)) continue; } catch { continue; }
 					_presets.Add(pi);
 				}
+				// 批量选择里的 key 可能对应已删除的预设，重建后清掉。
+				if (_selectedKeys.Count > 0) {
+					List<string> keep = new List<string>();
+					foreach (string k in _selectedKeys) {
+						if (FindPreset(k) != null) keep.Add(k);
+					}
+					_selectedKeys.Clear();
+					for (int i = 0; i < keep.Count; i++) _selectedKeys.Add(keep[i]);
+				}
 				SortPresets();
+				if (upgraded) SaveIndex(); // 自愈结果立刻落盘（旧索引升级 / 新文件补登记）
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/扫描目录", __ex);
 			}
@@ -912,8 +1384,11 @@ namespace SR_UCH.Tweaks {
 					sb.Append("    {\"file\":\"").Append(JsonEsc(p.File))
 						.Append("\",\"name\":\"").Append(JsonEsc(p.Name))
 						.Append("\",\"mode\":\"").Append(JsonEsc(p.Mode))
+						.Append("\",\"level\":\"").Append(JsonEsc(p.Level))
 						.Append("\",\"blocks\":").Append(Mathf.Max(0, p.Blocks))
-						.Append(",\"time\":\"").Append(JsonEsc(TimeIso(p.TimeUtc))).Append("\"}");
+						.Append(",\"time\":\"").Append(JsonEsc(TimeIso(p.TimeUtc)))
+						.Append("\",\"favorite\":").Append(p.Favorite ? "true" : "false")
+						.Append(",\"ok\":").Append(p.Ok ? "true" : "false").Append("}");
 					if (i < _presets.Count - 1) sb.Append(',');
 					sb.Append('\n');
 				}
@@ -936,11 +1411,7 @@ namespace SR_UCH.Tweaks {
 
 		private static void SortPresets() {
 			try {
-				_presets.Sort(delegate(PresetInfo a, PresetInfo b) {
-					int c = b.TimeUtc.CompareTo(a.TimeUtc);
-					if (c != 0) return c;
-					return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
-				});
+				_presets.Sort(ComparePreset);
 			} catch { }
 		}
 
@@ -996,14 +1467,41 @@ namespace SR_UCH.Tweaks {
 			} catch { return 0; }
 		}
 
-		private static int CountBlocksInFile(string path) {
+		// 流式读取预设 XML 的元数据：根节点必须是 scene，取 levelSceneName 并统计顶层 block 数量。
+		// 用 XmlReader 而不是 XmlDocument：扫描列表时只关心根属性与方块数，避免把整份 XML 建成 DOM。
+		private static bool TryReadPresetMeta(string path, out string level, out int blocks) {
+			level = "";
+			blocks = 0;
 			try {
-				XmlDocument doc = new XmlDocument();
-				doc.Load(path);
-				return CountBlocks(doc);
+				if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
+				XmlReaderSettings settings = new XmlReaderSettings();
+				settings.IgnoreComments = true;
+				settings.IgnoreWhitespace = true;
+				settings.DtdProcessing = DtdProcessing.Prohibit;
+				settings.XmlResolver = null;
+				using (XmlReader reader = XmlReader.Create(path, settings)) {
+					if (!reader.Read()) return false;
+					// 跳过 XML 声明 / 注释，定位根元素。
+					while (reader.NodeType != XmlNodeType.Element) {
+						if (!reader.Read()) return false;
+					}
+					if (reader.Name != "scene") return false;
+					string lv = reader.GetAttribute("levelSceneName");
+					level = lv ?? "";
+					if (reader.IsEmptyElement) return false;
+					int rootDepth = reader.Depth;
+					while (reader.Read()) {
+						if (reader.NodeType == XmlNodeType.Element && reader.Depth == rootDepth + 1 && reader.Name == "block") {
+							blocks++;
+						} else if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == rootDepth) {
+							break;
+						}
+					}
+					return true;
+				}
 			} catch (Exception __ex) {
-				SRApi.Guard.Log("布局预设/统计方块数", __ex);
-				return 0;
+				SRApi.Guard.Log("布局预设/读取预设元数据", __ex);
+				return false;
 			}
 		}
 
@@ -1059,6 +1557,34 @@ namespace SR_UCH.Tweaks {
 			} catch { return mode; }
 		}
 
+		// 列表里的关卡显示：XML 里读不到 levelSceneName 时留空显示 "-"。
+		private static string LevelText(PresetInfo p) {
+			try {
+				if (p == null || string.IsNullOrEmpty(p.Level)) return "-";
+				return p.Level;
+			} catch { return "-"; }
+		}
+
+		private static string LevelFromDoc(XmlDocument doc) {
+			try {
+				if (doc == null || doc.DocumentElement == null) return "";
+				string lv = doc.DocumentElement.GetAttribute("levelSceneName");
+				return lv ?? "";
+			} catch { return ""; }
+		}
+
+		// 只有真实对局模式才参与"模式不匹配"校验：REPLAY / IMPORTED / UNKNOWN 等目录名无法比较。
+		private static bool IsConcreteMode(string mode) {
+			try {
+				if (string.IsNullOrEmpty(mode)) return false;
+				string m = mode.Trim();
+				if (string.Equals(m, "REPLAY", StringComparison.OrdinalIgnoreCase)) return false;
+				if (string.Equals(m, "IMPORTED", StringComparison.OrdinalIgnoreCase)) return false;
+				if (string.Equals(m, "UNKNOWN", StringComparison.OrdinalIgnoreCase)) return false;
+				return true;
+			} catch { return false; }
+		}
+
 		// index.json 由本功能按固定格式每行一条写出；这里按行做轻量解析。
 		// 解析不到（用户手改坏）时该条元数据退回文件扫描结果，不会丢预设。
 		private static string JsonStr(string line, string key) {
@@ -1112,6 +1638,18 @@ namespace SR_UCH.Tweaks {
 				}
 				return any ? sign * v : -1;
 			} catch { return -1; }
+		}
+
+		// 读布尔字段（index.json 的 favorite / ok）：缺字段或格式不同一律按 false（向后兼容 v1 索引）。
+		private static bool JsonBool(string line, string key) {
+			try {
+				string pat = "\"" + key + "\":";
+				int i = line.IndexOf(pat, StringComparison.Ordinal);
+				if (i < 0) return false;
+				int p = i + pat.Length;
+				while (p < line.Length && (line[p] == ' ' || line[p] == '\t')) p++;
+				return string.Compare(line, p, "true", 0, 4, StringComparison.OrdinalIgnoreCase) == 0;
+			} catch { return false; }
 		}
 
 		private static string JsonEsc(string s) {
