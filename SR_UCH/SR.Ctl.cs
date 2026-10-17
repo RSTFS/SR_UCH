@@ -42,6 +42,8 @@ public partial class SR {
         // 原始皮肤字体（由 SR.Styles 在首次改皮肤前记录），供窗口恢复用。
         public static Font OrigSkinFont() { return SR.OrigSkinFontValue; }
         public static string KeySuffix(ConfigEntry<KeyCode> e) { return SR.KeySuffix(e); }
+        // 快捷键框文本：只显示按键本身
+        public static string KeyText(ConfigEntry<KeyCode> e) { return SR.KeyText(e); }
         public static void RegisterRowHotkey(ConfigEntry<KeyCode> entry) { SR.RegisterRowHotkey(entry); }
         public static void TryBindByRightClick(ConfigEntry<KeyCode> entry, Rect rect) { SR.TryBindByRightClick(entry, rect); }
         public static bool SelfToggleButton(string label, string tooltip, bool on, ConfigEntry<KeyCode> keyEntry, float width = 0f, bool bindable = false) {
@@ -298,7 +300,12 @@ public partial class SR {
         //操作按钮：左键触发操作。bindable=true 时该按钮支持右键绑定快捷键（其余按钮右键无反应）。
         private static bool HotkeyActionButton(string label, string tooltip, ConfigEntry<KeyCode> keyEntry, float width = 0f, bool bindable = false) {
             bool capturing = keyEntry != null && _capturing == keyEntry;
-            string text = label + SR.KeySuffix(keyEntry);
+            // 快捷键框只显示按键本身；动作名放进悬浮提示。
+            string text = keyEntry != null ? SR.KeyText(keyEntry) : label;
+            if (keyEntry != null) {
+                string actTip = string.IsNullOrEmpty(tooltip) ? label : label + "\n" + tooltip;
+                tooltip = bindable ? actTip + "\n" + T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey") : actTip;
+            }
             float w = width > 0f ? width : Sc(150);
             Event e = Event.current;
             int evBtn = e != null ? e.button : 0;
@@ -334,13 +341,15 @@ public partial class SR {
             SR.HotkeyAction(id, label, action);
             ConfigEntry<KeyCode> key = SR.Hotkey(id);
             bool capturing = key != null && _capturing == key;
-            string tip = string.IsNullOrEmpty(tooltip) ? "" : tooltip + "\n";
-            tip += T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey");
+            // 快捷键框只显示按键本身；动作名放进悬浮提示。
+            string tip = label;
+            if (!string.IsNullOrEmpty(tooltip)) tip += "\n" + tooltip;
+            tip += "\n" + T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey");
             Event e = Event.current;
             int evBtn = e != null ? e.button : 0;
             float bw = width > 0f ? width : Sc(150);
             float bh = height > 0f ? height : Sc(30);
-            bool clicked = GUILayout.Button(new GUIContent(label + SR.KeySuffix(key), tip),
+            bool clicked = GUILayout.Button(new GUIContent(key != null ? SR.KeyText(key) : label, tip),
                 capturing ? _capture : _btn, GUILayout.Width(bw), GUILayout.Height(bh));
             if (clicked && evBtn != 0) clicked = false; //右键绝不触发左键动作
             if (key != null && e != null) TryBindByRightClick(key, GUILayoutUtility.GetLastRect());

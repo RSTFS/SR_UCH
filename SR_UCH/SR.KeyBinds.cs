@@ -490,6 +490,16 @@ public partial class SR {
             return KeySuffix(k);
         }
 
+        // 键位框文本：只显示按键本身（未绑定 / 录制中各自有对应文案），供快捷键框使用。
+        public static string KeyText(ConfigEntry<KeyCode> k) {
+            if (k == null) return T("未绑定", "Unbound");
+            if (_capturing == k) return _recSeq.Count == 0 ? "..." : RecText();
+            KeyCode v = KeyCode.None;
+            try { v = k.Value; } catch (Exception __ex) { Guard.Log("KeyText", __ex); }
+            if (v == KeyCode.None) return T("未绑定", "Unbound");
+            return ComboKeyDisplay(k, v);
+        }
+
         // 键位后缀（"" = 未绑定）：统一给标签 / 按钮拼文本，录制中显示紧凑的 [...] / [正在录的键]
         public static string KeySuffix(ConfigEntry<KeyCode> k) {
             if (k == null) return "";
