@@ -60,7 +60,7 @@ public partial class Experiments : ITweak
 		private static string _lastCleanedScene = "";
 		private static float _pendingCleanupAt = -1f;
 		private static string _pendingCleanupScene = "";
-		// 加载后清理的实际执行（SR.Tick 每帧钩子）：FadeOut 后延迟 1 秒再 GC。
+		// 加载后清理的实际执行（SR 每帧钩子 每帧钩子）：FadeOut 后延迟 1 秒再 GC。
 		internal static void TickCleanup()
 		{
 			// 与记录处对称：总开关关闭时不执行。

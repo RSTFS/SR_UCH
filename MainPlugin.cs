@@ -171,6 +171,10 @@ namespace SR_UCH {
                     delegate (string __s) { return SR.SectionEntries(__s); },
                     delegate { return SR.TableLineStrong; },
                     delegate (Rect __r, Color __c) { SR.DrawFill(__r, __c); });
+                SRApi.SetGateSinks(
+                    delegate (int __m) { return SR.GateModeAllows((SR.ModeMask)__m); },
+                    delegate { return SR.Env.SceneName; },
+                    delegate { return SR.Env.InTreehouse; });
             } catch { }
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。

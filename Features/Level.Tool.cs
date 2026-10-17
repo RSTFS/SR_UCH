@@ -86,11 +86,11 @@ public partial class Level {
 
 		public static bool ReloadKeepsScore => _reloadMode == null || _reloadMode.Value == ReloadMode.KeepScore;
 
-		// 仅派对 / 创意 / 自由建造关卡内生效（统一走 SR.GateModeAllows）。
+		// 仅派对 / 创意 / 自由建造关卡内生效（统一走 SRApi.GateModeAllows）。
 		private static bool IsPartyCreativeOrFreeplay()
 		{
 			// 统一模式门控，IgnoreModeLimit 豁免已内置
-			return SR.GateModeAllows(SR.ModeMask.Party | SR.ModeMask.Creative | SR.ModeMask.Freeplay);
+			return SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay);
 		}
 
 		// 真正重载当前关卡场景：重载前把房主快照写入 QuickSaver.levelPortalXml（static），重载后由房主 OnSetupStartLevel 读取并原生广播，全员重建方块。
@@ -262,7 +262,7 @@ public partial class Level {
 			SetReloadBusy(false);
 		}
 
-		// 重载场景加载完成（FadeOut，由 SR.Reload.OnLoadEnd 调用）：记录时刻供 ReloadSceneRoutine 决定何时清 levelPortalXml。
+		// 重载场景加载完成（FadeOut，由 SR 重载钩子.OnLoadEnd 调用）：记录时刻供 ReloadSceneRoutine 决定何时清 levelPortalXml。
 		public static void OnReloadSceneLoaded()
 		{
 			_reloadLoadedAt = Time.unscaledTime;

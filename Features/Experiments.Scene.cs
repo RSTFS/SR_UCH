@@ -218,7 +218,7 @@ public partial class Experiments : ITweak
             try {
                 if (_runningUntil > 0f) {
                     if (Time.realtimeSinceStartup >= _runningUntil) _runningUntil = -1f;
-                    else if (SR.Env.SceneName == _target) _runningUntil = -1f;
+                    else if (SRApi.Env.SceneName == _target) _runningUntil = -1f;
                 }
             } catch { }
         }
@@ -256,7 +256,7 @@ public partial class Experiments : ITweak
         private static void Tick() {
             try {
                 if (!SRApi.GateMaster) return;
-                if (!SR.Env.InTreehouse) return;
+                if (!SRApi.Env.InTreehouse) return;
                 LevelSelectController lsc = Lsc();
                 if (lsc == null) return;
                 if (_launchKey != null && _launchKey.Value != KeyCode.None && SRApi.ComboKeyDown(_launchKey)) {

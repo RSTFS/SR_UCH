@@ -54,7 +54,7 @@ public partial class Chat : ITweak {
         // 仅 VisibilityTimer 是 protected，走 SRApi.Ref.Field；ChatCanvasGroup / ChatHolder / ChatMode 均为 public 字段，直接访问。
         private static FieldInfo _fVisTimer;   //ChatDisplay.VisibilityTimer（可见计时器，游戏自己的淡入淡出用它）
 
-        // 滚轮被本功能吃掉的帧号，转发 SR 的通用滚轮仲裁（SR.Input 的 WheelFrame）。
+        // 滚轮被本功能吃掉的帧号，转发 SR 的通用滚轮仲裁（SR 输入层 的 WheelFrame）。
         public static int WheelFrame { get { return SRApi.WheelFrame; } set { SRApi.WheelFrame = value; } }
 
         internal static void InitWindow(IFeatureHost plugin) {

@@ -1728,7 +1728,7 @@ namespace SR_UCH.Tweaks {
 
         // 绘制原语已抽到核心 SR，本页只保留房间列表的数据与布局。
 
-        // 悬停在表头分隔线 / 单元格时声明特殊光标；由 SR.Window 每帧统一绘制并复位。
+        // 悬停在表头分隔线 / 单元格时声明特殊光标；由 SR 主窗口 每帧统一绘制并复位。
         private static void SetMouseCursor(bool resize, bool move) {
             SRApi.CursorResize = resize;
             SRApi.CursorMove = move;

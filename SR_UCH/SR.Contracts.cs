@@ -203,6 +203,22 @@ namespace SR_UCH {
             try { Notify(string.Format(text, args)); } catch { Notify(text); }
         }
 
+        // 对局模式门控（与核心 SR.ModeMask 按位一致）与场景环境查询
+        [Flags] public enum ModeMask { None = 0, Freeplay = 1, Party = 2, Creative = 4, Challenge = 8 }
+        private static Func<int, bool> _gateModeAllows;
+        private static Func<string> _envSceneName;
+        private static Func<bool> _envInTreehouse;
+        public static void SetGateSinks(Func<int, bool> gateModeAllows, Func<string> envSceneName, Func<bool> envInTreehouse) {
+            _gateModeAllows = gateModeAllows; _envSceneName = envSceneName; _envInTreehouse = envInTreehouse;
+        }
+        // 当前对局模式是否落在 allowed 位集合内
+        public static bool GateModeAllows(ModeMask allowed) { Func<int, bool> f = _gateModeAllows; return f != null && f((int)allowed); }
+        // 场景环境（只读）
+        public static class Env {
+            public static string SceneName { get { Func<string> f = _envSceneName; return f != null ? f() : ""; } }
+            public static bool InTreehouse { get { Func<bool> f = _envInTreehouse; return f != null && f(); } }
+        }
+
         // UI 状态/注册门面（窗口尺寸、光标样式、页面注册、按键注册）
         private static Func<Rect> _contentArea; private static Action<Rect> _setContentArea;
         private static Func<float> _footerHeight; private static Action<float> _setFooterHeight;

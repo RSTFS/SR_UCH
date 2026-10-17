@@ -11,7 +11,7 @@ namespace SR_UCH.Tweaks {
 [SrFeature("sr.experiments", "Experiments", "1.0")]
 public partial class Experiments : ITweak
 	{
-		//进阶条目行：标签在左、控件紧贴其右（全项目复选框统一排版，见 SR.Settings.RenderEntryRow）。
+		//进阶条目行：标签在左、控件紧贴其右（全项目复选框统一排版，见 SR 设置页.RenderEntryRow）。
 		private static void AdvRow(string key, string zh, string en, string zhTip, string enTip) {
 			try {
 				ConfigEntryBase e = SRApi.Ctl.FindEntry("Experiments", key);

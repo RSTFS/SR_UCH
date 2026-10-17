@@ -355,7 +355,7 @@ namespace SR_UCH.Tweaks {
             if (!Enabled) return;
             if (SRApi.UiOpen && SRApi.BlockInput) return; 
             // 仅派对 / 创意 / 自由建造模式；已接入 IgnoreModeLimit 豁免。
-            if (!SR.GateModeAllows(SR.ModeMask.Party | SR.ModeMask.Creative | SR.ModeMask.Freeplay)) return;
+            if (!SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay)) return;
             // 仅房主能删：SR 侧没有方块删除的网络同步通道，房客删除只有本机生效，会造成脱同步；房客需开 EX 的“允许客户端删除”。
             // 有意不接 GateHost（豁免只解决权限、解决不了同步）；判据用 SRApi.CanControlLocally，勿用 is GamesparksMatchmakingLobby（离线/大厅为空时会短路放行）。
             if (!AllowClientsOn && !SRApi.CanControlLocally) return;

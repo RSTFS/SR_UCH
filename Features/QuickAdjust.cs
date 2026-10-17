@@ -345,7 +345,7 @@ public class QuickAdjust : ITweak {
 			try
 			{
 				// 模式门控统一走 GateModeAllows（已含 IgnoreModeLimit 豁免）。
-				if (QuickSwitchOn && SR.GateModeAllows(SR.ModeMask.Freeplay))
+				if (QuickSwitchOn && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay))
 				{
 					__instance.SuicideTime = QuickSwitchHold; // 自由模式长按 B 的切换等待
 					// 建造态切回行动用 PiecePlacementCursor.SwitchTime，须每帧同步。
@@ -359,7 +359,7 @@ public class QuickAdjust : ITweak {
 						}
 					}
 				}
-				else if (QuickRetryFastOn && SR.GateModeAllows(SR.ModeMask.Challenge))
+				else if (QuickRetryFastOn && SRApi.GateModeAllows(SRApi.ModeMask.Challenge))
 				{
 					__instance.SuicideTime = QuickRetryHold;
 				}
@@ -379,7 +379,7 @@ public class QuickAdjust : ITweak {
 				return;
 			}
 			// 模式门控统一走 GateModeAllows（已含 IgnoreModeLimit 豁免，模式取不到时一律不放行）。
-			if (SR.GateModeAllows(SR.ModeMask.Challenge))
+			if (SRApi.GateModeAllows(SRApi.ModeMask.Challenge))
 			{
 				bool dead = !__instance.Success && (__instance.Dead || __instance.Dying || __instance.LocallyDead);
 				int num;
@@ -405,7 +405,7 @@ public class QuickAdjust : ITweak {
 				catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.Send", __ex); }
 				return;
 			}
-			if (!SR.GateModeAllows(SR.ModeMask.Freeplay))
+			if (!SRApi.GateModeAllows(SRApi.ModeMask.Freeplay))
 			{
 				return;
 			}
