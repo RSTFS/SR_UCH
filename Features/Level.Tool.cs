@@ -500,7 +500,7 @@ public partial class Level {
 			} catch (Exception __ex) { SRApi.Guard.Log("清场.逐块销毁", __ex); }
 		}
 
-		// 对外槽位：调用方经 SR.Require 按名取用，不引用 Level 类型，取不到即降级。
+		// 对外槽位：调用方经 Slots.Require 按名取用，不引用 Level 类型，取不到即降级。
 		private const string SlotClearPlacedBlocks = "Level.ClearPlacedBlocks"; // Action<List<Placeable>,string>
 		// 槽位名与 DestroyBlocks 逐字一致，双方各写各的常量，互不引用以免编译期依赖。
 		private const string SlotAttributeToHost = "DestroyBlocks.AttributeToHost"; // Action<List<Placeable>>
@@ -549,7 +549,7 @@ public partial class Level {
                         built.Add(bp);
                     }
                     // 经槽位取用以避免跨功能编译期依赖；取不到只丢名牌与归属，不影响重建。
-                    Action<List<Placeable>> attributeToHost = SR.Require<Action<List<Placeable>>>(SlotAttributeToHost);
+                    Action<List<Placeable>> attributeToHost = Slots.Require<Action<List<Placeable>>>(SlotAttributeToHost);
                     if (attributeToHost != null) {
                         attributeToHost(built);
                         SRApi.LogInfo("[快照] 已把 " + built.Count + " 个快照方块归属房主(#1)");

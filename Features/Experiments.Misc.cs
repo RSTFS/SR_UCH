@@ -18,7 +18,7 @@ public partial class Experiments : ITweak
 					SRApi.T("开启后可以用滚轮自由缩放视野. 关闭后完全恢复游戏默认相机. 只在自由模式有效.",
 					 "While on, the wheel zooms the view freely. Off = fully restores the default camera. Freeplay only.")),
 					SRApi.Ctl.SecHeader);
-				SR.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
+				SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
 					// 相机移动速度归入自由相机分区（只对自由相机生效）。
 					return e.Definition.Key == "Free Camera" || e.Definition.Key == "Free Camera FOV"
 						|| e.Definition.Key == "Free Camera Speed";
@@ -34,7 +34,7 @@ public partial class Experiments : ITweak
 					SRApi.T("进关卡时执行一次垃圾回收和资源卸载. 减少对局内卡顿. 不影响结算速度.",
 					 "Runs GC and asset unload once on level load, reducing in-match stutter. Does not affect scoring.")),
 					SRApi.Ctl.SecHeader);
-				SR.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
+				SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
 					return e.Definition.Key == "GC After Load";
 				});
 				GUILayout.Space(SRApi.Ctl.Sc(6));
@@ -150,13 +150,13 @@ public partial class Experiments : ITweak
                 _followSpeed = plugin.Config.Bind("Experiments", "Free Camera Speed", 1f,
                     new ConfigDescription("相机跟随角色的速度倍数（0-10，每次 0.5，1 = 游戏原值；与自由相机开关无关）",
                         new AcceptableValueRange<float>(0f, 10f)));
-                SR.RegisterKey("实验-自由相机", _key, "press");
+                SRApi.RegisterKey("实验-自由相机", _key, "press");
                 SRApi.RegisterTick("自由相机-开关", CheckKey);
                 SRApi.RegisterWheelHook(WheelZoom);
                 // 启动时强制重置为默认状态：关闭自由相机、FOV 回 10（赋值会写盘，属 BepInEx 行为）。
                 _on.Value = false;
                 _fov.Value = 10f;
-                SR.RegisterCameraView(ApplyToCamera);
+                SRApi.RegisterCameraView(ApplyToCamera);
                 SRApi.RegisterTick("自由相机-移动速度", ApplyFollowSpeed);
                 _on.SettingChanged += OnLockChanged;
                 // 不挂 SettingChanged：ApplyFollowSpeed 已作为 30 帧节流的 Tick，下一拍自然生效。
@@ -216,7 +216,7 @@ public partial class Experiments : ITweak
             try {
                 // 总开关必须在此判定，否则关闭模组后快捷键仍能改游戏相机。
                 if (!SRApi.GateMaster) return;
-                if (!SR.ComboKeyDown(_key)) return;
+                if (!SRApi.ComboKeyDown(_key)) return;
                 // 自由相机全局有效，但仍只改游戏相机。
                 if (_on != null) _on.Value = !_on.Value;                   // 快捷键等于勾选框
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 快捷键", __ex); }

@@ -60,7 +60,7 @@ public partial class Chat : ITweak {
         internal static void InitWindow(IFeatureHost plugin) {
             SelfRegWindow(plugin);
             // 向核心注册"是否正在打字"接点：SR 的键位轮询据此避让。
-            SR.RegisterTypingProvider(() => ChatTyping);
+            SRApi.RegisterTypingProvider(() => ChatTyping);
         }
 
         private static void SelfRegWindow(IFeatureHost plugin) {
@@ -145,9 +145,9 @@ public partial class Chat : ITweak {
                 } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口字号默认值迁移", __ex); }
             }
 
-            SR.RegisterKey("聊天窗口-显示键", _key, "hold");
-            SR.RegisterKey("聊天窗口-缩放键", _boxScaleKey, "hold");
-            SR.RegisterKey("聊天窗口-字号键", _fontKey, "hold");
+            SRApi.RegisterKey("聊天窗口-显示键", _key, "hold");
+            SRApi.RegisterKey("聊天窗口-缩放键", _boxScaleKey, "hold");
+            SRApi.RegisterKey("聊天窗口-字号键", _fontKey, "hold");
         }
 
         // 自绘页：在"启用位置调整"行前插入分区标题；锚点行必须在可见行上，否则标题永不显示。
@@ -282,9 +282,9 @@ public partial class Chat : ITweak {
                 bool force = false;
                 WinMode mode = _mode != null ? _mode.Value : WinMode.Hold;
                 if (mode == WinMode.Hold) {
-                    force = SR.ComboKeyHeld(_key);
+                    force = SRApi.ComboKeyHeld(_key);
                 } else {
-                    if (SR.ComboKeyDown(_key)) _toggleOn = !_toggleOn;
+                    if (SRApi.ComboKeyDown(_key)) _toggleOn = !_toggleOn;
                     force = _toggleOn;
                 }
                 bool typing = ChatInputActive(__instance);
@@ -314,8 +314,8 @@ public partial class Chat : ITweak {
                 // 滚轮量取 SRApi.TakeWheelEvent()：Input.GetAxis("Mouse ScrollWheel") 在本环境恒为 0。
                 float wheel = SRApi.TakeWheelEvent();
                 if (Mathf.Abs(wheel) > 0.0001f) {
-                    bool scaleKey = _boxScaleKey != null && _boxScaleKey.Value != KeyCode.None && SR.ComboKeyHeld(_boxScaleKey);
-                    bool fontKey = _fontKey != null && _fontKey.Value != KeyCode.None && SR.ComboKeyHeld(_fontKey);
+                    bool scaleKey = _boxScaleKey != null && _boxScaleKey.Value != KeyCode.None && SRApi.ComboKeyHeld(_boxScaleKey);
+                    bool fontKey = _fontKey != null && _fontKey.Value != KeyCode.None && SRApi.ComboKeyHeld(_fontKey);
                     if (fontKey) {
                         int step = wheel > 0f ? 1 : -1;
                         int nv = Mathf.Clamp((_fontSize != null ? _fontSize.Value : 18) + step, 1, 50);

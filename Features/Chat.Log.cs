@@ -84,7 +84,7 @@ public partial class Chat : ITweak {
         internal static void SelfRegLog() {
                         SR.RegisterPage("Chat", "ChatLog", "对话内容", "ChatLog", 20, Render); //会话栏目第 2 页
             // 顶部工具行与底部输入行必须画在滚动区之外（不随内容滚动），故注册为页面外框部件。
-            SR.RegisterPageChrome("Chat", RenderToolbar, RenderInputRow);
+            SRApi.RegisterPageChrome("Chat", RenderToolbar, RenderInputRow);
             // 两个开关的本地化文案（配置在本文件 Bind 到 Chat 段）。
             SRApi.LocKey("Chat", "Filter Quick Msgs", "过滤快捷消息", null);
             SRApi.LocDesc("Chat", "Filter Quick Msgs", "把表情和预设消息从聊天记录里藏起来, 只留玩家真正打的字.", "Hide quick messages (emotes/presets) from the log");

@@ -20,7 +20,7 @@ public partial class Experiments : ITweak
 				SRApi.T("在树屋大厅里直接开始关卡.",
 					   "Start the level immediately from the treehouse.")),
 				SRApi.Ctl.SecHeader);
-			SR.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
+			SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
 				return e.Definition.Key.StartsWith("Lobby ");
 			});
 				if (LobbyTools.Note != null && LobbyTools.Note.Length > 0) {
@@ -34,7 +34,7 @@ public partial class Experiments : ITweak
 					SRApi.T("跳过加载动画. 温柔加载在切换场景时先卸载再回收.",
 						 "Skip the loading animation. Gentle load unloads and collects before switching.")),
 					SRApi.Ctl.SecHeader);
-				SR.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
+				SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
 					return e.Definition.Key.StartsWith("Splash ") || e.Definition.Key == "Gentle Load";
 				});
 				if (SplashTools.Note != null && SplashTools.Note.Length > 0) {
@@ -259,7 +259,7 @@ public partial class Experiments : ITweak
                 if (!SR.Env.InTreehouse) return;
                 LevelSelectController lsc = Lsc();
                 if (lsc == null) return;
-                if (_launchKey != null && _launchKey.Value != KeyCode.None && SR.ComboKeyDown(_launchKey)) {
+                if (_launchKey != null && _launchKey.Value != KeyCode.None && SRApi.ComboKeyDown(_launchKey)) {
                     try { DoLaunch(lsc); } catch (Exception __ex) { SRApi.Guard.Log("立即开始", __ex); }
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("树屋工具 Tick", __ex); }

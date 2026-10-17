@@ -89,7 +89,7 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterTick("联机看门狗", CheckHotkeys); // 每帧：回家看门狗 + 延时加入
             // 加入流程本身要用 EventSystem，禁用会卡在"正在进入"：登记门控挂起，让核心不禁用 EventSystem。
             // 屏蔽输入上限 3 秒，超过即不再屏蔽（pending 最长可挂 30 秒）。
-        SR.RegisterInputGateHold(() => !string.IsNullOrEmpty(_pendingJoin)
+        SRApi.RegisterInputGateHold(() => !string.IsNullOrEmpty(_pendingJoin)
             && Time.unscaledTime - _pendingWaitFrom < 3f);
             // 预登记本页自动快捷键：本页自绘，不打开就渲染不到 HotkeyButton，而这两个键需在房间内随时可用。
             SRApi.HotkeyAction("online.lobbies", "刷新列表", RefreshLobbies);
@@ -907,8 +907,8 @@ namespace SR_UCH.Tweaks {
         // 页面：联机
         private static void RenderOnlinePage() {
             // 本页无页面级滚动：表头 / 筛选必须始终可见，房间只在下方框内滚动。
-            SR.PageScroll = Vector2.zero;
-            SR.NoPageScrollBars = true;   // 页面级横纵向滚动条都关闭
+            SRApi.PageScroll = Vector2.zero;
+            SRApi.NoPageScrollBars = true;   // 页面级横纵向滚动条都关闭
             if (Event.current != null && Event.current.type == EventType.MouseUp) {
                 if (_tableArgs.dragCol >= 0) { _tableArgs.dragCol = -1; SRApi.BlockWindowDrag = false; SaveWidths(); }
                 if (_dragH) { _dragH = false; SRApi.BlockWindowDrag = false; SaveTableH(); }
@@ -1000,11 +1000,11 @@ namespace SR_UCH.Tweaks {
             // 表格自绘：表头固定，只有房间行滚动；滚动条自绘以跟随界面缩放并在拖到列表外时不断。
             GUILayout.Space(SRApi.Ctl.Sc(3));
             Rect last = GUILayoutUtility.GetLastRect();
-            float footerH = SR.FooterHeight > 0f ? SR.FooterHeight : SRApi.Ctl.Sc(30);
+            float footerH = SRApi.FooterHeight > 0f ? SRApi.FooterHeight : SRApi.Ctl.Sc(30);
             // 宽度用纯尺寸计算：布局矩形与屏幕矩形（ContentArea）不同坐标系，混算会导致表格框超宽、操作列被推出屏幕。
             float availW = Mathf.Max(SRApi.Ctl.Sc(220), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(12));
             // 高度同理：页面可视高度（屏幕量）减去表格上方已用高度（布局量之差）。
-            float pageH = SR.ContentArea.height - SRApi.Ctl.Sc(26) - SRApi.Ctl.Sc(2) - footerH;
+            float pageH = SRApi.ContentArea.height - SRApi.Ctl.Sc(26) - SRApi.Ctl.Sc(2) - footerH;
             float usedAbove = _pageTopY > 0f ? Mathf.Max(0f, last.yMax - _pageTopY) : 0f;
             float availH = Mathf.Max(SRApi.Ctl.Sc(140), pageH - usedAbove - SRApi.Ctl.Sc(8));
             // 拖动中必须读临时值 _dragHTmp（配置值此时还是旧的），否则高度不跟手。
@@ -1277,7 +1277,7 @@ namespace SR_UCH.Tweaks {
                     GUI.color = pc;
                 }
                 } finally { GUI.EndClip(); }
-                SR.DrawLine(new Rect(_joinXPage - 1f, box.y + headerH, 1f, rowsH), SR.TableLineStrong);   // 钉住列分隔线
+                SRApi.DrawLine(new Rect(_joinXPage - 1f, box.y + headerH, 1f, rowsH), SRApi.TableLineStrong);   // 钉住列分隔线
             }
             // 竖向滚动条：几何字段必须在这里赋值，否则核心 TableScrollbarInput 的 track.width > 0 判据不成立。
             // 颜色对齐 ImGui 的 ScrollbarBg / Grab / GrabHovered / GrabActive。
@@ -1288,8 +1288,8 @@ namespace SR_UCH.Tweaks {
                 float __ty = __track.y + (_tableMaxY > 0f ? Mathf.Clamp01(_scrollRows.y / _tableMaxY) : 0f) * (rowsH - __thumbH);
                 Rect __thumb = new Rect(__track.x, __ty, __track.width, __thumbH);
                 _sbTrackPage = __track; _sbThumbPage = __thumb;
-                SR.DrawFill(__track, new Color(0.06f, 0.06f, 0.07f, 0.94f));                    //ImGui ScrollbarBg
-                SR.DrawFill(__thumb, _sbDragging ? new Color(0.51f, 0.51f, 0.53f, 1f)           //ImGui GrabActive
+                SRApi.DrawFill(__track, new Color(0.06f, 0.06f, 0.07f, 0.94f));                    //ImGui ScrollbarBg
+                SRApi.DrawFill(__thumb, _sbDragging ? new Color(0.51f, 0.51f, 0.53f, 1f)           //ImGui GrabActive
                                     : __thumb.Contains(mp) ? new Color(0.41f, 0.41f, 0.44f, 1f) //ImGui GrabHovered
                                     : new Color(0.31f, 0.31f, 0.34f, 1f));                      //ImGui Grab
             } else {
@@ -1730,8 +1730,8 @@ namespace SR_UCH.Tweaks {
 
         // 悬停在表头分隔线 / 单元格时声明特殊光标；由 SR.Window 每帧统一绘制并复位。
         private static void SetMouseCursor(bool resize, bool move) {
-            SR.CursorResize = resize;
-            SR.CursorMove = move;
+            SRApi.CursorResize = resize;
+            SRApi.CursorMove = move;
         }
 
         // 单击一帧只处理一次，避免多条命中路径同时命中导致来回切换。

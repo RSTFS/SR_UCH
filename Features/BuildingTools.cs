@@ -142,7 +142,7 @@ namespace SR_UCH.Tweaks {
                 "Collision Toggle Key",
                 KeyCode.F1,
                 "Key to toggle the collision override in-game");
-            SR.RegisterKey("建造增强-碰撞开关", _toggleCollisionKey, "toggle");
+            SRApi.RegisterKey("建造增强-碰撞开关", _toggleCollisionKey, "toggle");
             _gridEntry = _mp.Config.Bind(
                 "build",
                 "Grid Override",
@@ -155,7 +155,7 @@ namespace SR_UCH.Tweaks {
                 "Grid Toggle Key",
                 KeyCode.F2,
                 "Key to toggle free placement (grid override) in-game");
-            SR.RegisterKey("建造增强-自由放置开关", _toggleGridKey, "toggle");
+            SRApi.RegisterKey("建造增强-自由放置开关", _toggleGridKey, "toggle");
 
             // 嵌套类的 CreateAndPatchAll 不递归，需显式注册；单个失败不影响其他。
             try { Harmony.CreateAndPatchAll(typeof(BuildingTools)); } catch (Exception e) { SRApi.LogWarn("BuildingTools 补丁失败: " + e.Message); }
@@ -168,8 +168,8 @@ namespace SR_UCH.Tweaks {
             if (!SRApi.GateMaster) return;
             if (!Enabled) return;
             if (SRApi.UiOpen && SRApi.BlockInput) return; 
-            if (SR.ComboKeyDown(_toggleCollisionKey)) { _collisionEntry.Value = !_collisionEntry.Value; Notify(SRApi.T("无视碰撞", "Collision Override"), _collisionEntry.Value); }
-            if (SR.ComboKeyDown(_toggleGridKey)) { _gridEntry.Value = !_gridEntry.Value; Notify(SRApi.T("自由放置", "Free Placement"), _gridEntry.Value); }
+            if (SRApi.ComboKeyDown(_toggleCollisionKey)) { _collisionEntry.Value = !_collisionEntry.Value; Notify(SRApi.T("无视碰撞", "Collision Override"), _collisionEntry.Value); }
+            if (SRApi.ComboKeyDown(_toggleGridKey)) { _gridEntry.Value = !_gridEntry.Value; Notify(SRApi.T("自由放置", "Free Placement"), _gridEntry.Value); }
         }
 
         private static void Notify(string name, bool state) {

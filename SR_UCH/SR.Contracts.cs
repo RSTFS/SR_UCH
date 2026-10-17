@@ -203,6 +203,59 @@ namespace SR_UCH {
             try { Notify(string.Format(text, args)); } catch { Notify(text); }
         }
 
+        // UI 状态/注册门面（窗口尺寸、光标样式、页面注册、按键注册）
+        private static Func<Rect> _contentArea; private static Action<Rect> _setContentArea;
+        private static Func<float> _footerHeight; private static Action<float> _setFooterHeight;
+        private static Func<Vector2> _pageScroll; private static Action<Vector2> _setPageScroll;
+        private static Func<bool> _noPageScrollBars, _cursorResize, _cursorMove;
+        private static Action<bool> _setNoPageScrollBars, _setCursorResize, _setCursorMove;
+        private static Action<Func<bool>> _typingProvider, _inputGateHold;
+        private static Action<Action<Camera>> _cameraView;
+        private static Action<string, Action, Action> _pageChrome;
+        private static Action<string, ConfigEntry<KeyCode>, string> _registerKey;
+        private static Func<ConfigEntry<KeyCode>, bool> _comboKeyDown, _comboKeyHeld;
+        private static Action<string, Func<ConfigEntryBase, bool>> _renderSectionEntries;
+        private static Func<string, List<ConfigEntryBase>> _sectionEntries2;
+        private static Func<Color> _tableLineStrong;
+        private static Action<Rect, Color> _drawFill;
+        public static void SetUiSinks(
+            Func<Rect> contentArea, Action<Rect> setContentArea, Func<float> footerHeight, Action<float> setFooterHeight,
+            Func<Vector2> pageScroll, Action<Vector2> setPageScroll, Func<bool> noPageScrollBars, Action<bool> setNoPageScrollBars,
+            Func<bool> cursorResize, Action<bool> setCursorResize, Func<bool> cursorMove, Action<bool> setCursorMove,
+            Action<Func<bool>> typingProvider, Action<Func<bool>> inputGateHold, Action<Action<Camera>> cameraView,
+            Action<string, Action, Action> pageChrome, Action<string, ConfigEntry<KeyCode>, string> registerKey,
+            Func<ConfigEntry<KeyCode>, bool> comboKeyDown, Func<ConfigEntry<KeyCode>, bool> comboKeyHeld,
+            Action<string, Func<ConfigEntryBase, bool>> renderSectionEntries, Func<string, List<ConfigEntryBase>> sectionEntries,
+            Func<Color> tableLineStrong, Action<Rect, Color> drawFill) {
+            _contentArea = contentArea; _setContentArea = setContentArea; _footerHeight = footerHeight; _setFooterHeight = setFooterHeight;
+            _pageScroll = pageScroll; _setPageScroll = setPageScroll; _noPageScrollBars = noPageScrollBars; _setNoPageScrollBars = setNoPageScrollBars;
+            _cursorResize = cursorResize; _setCursorResize = setCursorResize; _cursorMove = cursorMove; _setCursorMove = setCursorMove;
+            _typingProvider = typingProvider; _inputGateHold = inputGateHold; _cameraView = cameraView; _pageChrome = pageChrome;
+            _registerKey = registerKey; _comboKeyDown = comboKeyDown; _comboKeyHeld = comboKeyHeld;
+            _renderSectionEntries = renderSectionEntries; _sectionEntries2 = sectionEntries;
+            _tableLineStrong = tableLineStrong; _drawFill = drawFill;
+        }
+        public static Rect ContentArea { get { Func<Rect> f = _contentArea; return f != null ? f() : default(Rect); } set { Action<Rect> a = _setContentArea; if (a != null) a(value); } }
+        public static float FooterHeight { get { Func<float> f = _footerHeight; return f != null ? f() : 0f; } set { Action<float> a = _setFooterHeight; if (a != null) a(value); } }
+        public static Vector2 PageScroll { get { Func<Vector2> f = _pageScroll; return f != null ? f() : default(Vector2); } set { Action<Vector2> a = _setPageScroll; if (a != null) a(value); } }
+        public static bool NoPageScrollBars { get { Func<bool> f = _noPageScrollBars; return f != null && f(); } set { Action<bool> a = _setNoPageScrollBars; if (a != null) a(value); } }
+        public static bool CursorResize { get { Func<bool> f = _cursorResize; return f != null && f(); } set { Action<bool> a = _setCursorResize; if (a != null) a(value); } }
+        public static bool CursorMove { get { Func<bool> f = _cursorMove; return f != null && f(); } set { Action<bool> a = _setCursorMove; if (a != null) a(value); } }
+        public static void RegisterTypingProvider(Func<bool> provider) { Action<Func<bool>> f = _typingProvider; if (f != null) f(provider); }
+        public static void RegisterInputGateHold(Func<bool> hold) { Action<Func<bool>> f = _inputGateHold; if (f != null) f(hold); }
+        public static void RegisterCameraView(Action<Camera> apply) { Action<Action<Camera>> f = _cameraView; if (f != null) f(apply); }
+        public static void RegisterPageChrome(string section, Action header, Action footer) { Action<string, Action, Action> f = _pageChrome; if (f != null) f(section, header, footer); }
+        public static void RegisterKey(string name, ConfigEntry<KeyCode> entry, string mode) { Action<string, ConfigEntry<KeyCode>, string> f = _registerKey; if (f != null) f(name, entry, mode); }
+        public static bool ComboKeyDown(ConfigEntry<KeyCode> entry) { Func<ConfigEntry<KeyCode>, bool> f = _comboKeyDown; return f != null && f(entry); }
+        public static bool ComboKeyHeld(ConfigEntry<KeyCode> entry) { Func<ConfigEntry<KeyCode>, bool> f = _comboKeyHeld; return f != null && f(entry); }
+        public static void RenderSectionEntries(string section, Func<ConfigEntryBase, bool> filter) { Action<string, Func<ConfigEntryBase, bool>> f = _renderSectionEntries; if (f != null) f(section, filter); }
+        public static void RenderSectionEntries(string section) { RenderSectionEntries(section, null); }
+        public static List<ConfigEntryBase> SectionEntries(string section) { Func<string, List<ConfigEntryBase>> f = _sectionEntries2; return f != null ? f(section) : null; }
+        public static Color TableLineStrong { get { Func<Color> f = _tableLineStrong; return f != null ? f() : default(Color); } }
+        public static void DrawFill(Rect r, Color c) { Action<Rect, Color> f = _drawFill; if (f != null) f(r, c); }
+        public static void DrawLine(Rect r, Color c) { DrawFill(r, c); }
+        public static void DrawLine(Rect r) { DrawFill(r, new Color(1f, 1f, 1f, 0.22f)); }
+
         // UI 工具箱门面（IMGUI 控件/样式/布局）：实现在核心，契约层只转发。
         public static class Ctl {
             public delegate int ComboBoxFn(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width);

@@ -14,7 +14,7 @@ public partial class Level {
 
         public static void RenderPartyBox() {
         // 放弃道具条目：排队阶段手上拿着道具时才有意义
-        SR.RenderSectionEntries("Level", delegate (ConfigEntryBase e) {
+        SRApi.RenderSectionEntries("Level", delegate (ConfigEntryBase e) {
             return e.Definition.Key == "Drop Held Piece";
         });
 
@@ -222,14 +222,14 @@ public partial class Level {
                     "In the queue phase, press this to discard the piece you are holding. Goes through the game's own channel; everyone sees it.");
                 _key = plugin.Config.Bind("Level", "Drop Held Piece", KeyCode.None,
                     "按这个键就把手上拿着的那块丢掉（走游戏原生通道, 全员可见）, 填 None 就是不绑键.");
-                SR.RegisterKey("关卡-放弃道具", _key, "press");
+                SRApi.RegisterKey("关卡-放弃道具", _key, "press");
                 SRApi.RegisterTick("放弃道具", Tick);
             } catch (Exception __ex) { SRApi.Guard.Log("放弃道具 初始化", __ex); }
         }
 
         private static void Tick() {
             if (_key == null || _key.Value == KeyCode.None) return;
-            if (!SR.ComboKeyDown(_key)) return;
+            if (!SRApi.ComboKeyDown(_key)) return;
             Perform();
         }
 
@@ -318,9 +318,9 @@ public class LevelPartyBox : ITweak {
                     "刷新派对盒道具（只重抽、不开箱、不切相位）快捷键（按下即触发）");
                 _closePartyBoxKey = plugin.Config.Bind("Level", "Close Party Box Key", KeyCode.None,
                     "关闭派对盒快捷键（结束派对盒选择、进入游玩阶段；按下即触发）");
-                SR.RegisterKey("关卡-刷新派对盒", _refreshPartyBoxKey, "press");
-                SR.RegisterKey("关卡-刷新道具", _refreshPiecesKey, "press");
-                SR.RegisterKey("关卡-关闭派对盒", _closePartyBoxKey, "press");
+                SRApi.RegisterKey("关卡-刷新派对盒", _refreshPartyBoxKey, "press");
+                SRApi.RegisterKey("关卡-刷新道具", _refreshPiecesKey, "press");
+                SRApi.RegisterKey("关卡-关闭派对盒", _closePartyBoxKey, "press");
                 SRApi.RegisterTick("派对盒快捷键", Tick);
                 // 反射成员登记：游戏改名时启动自检会告警。
                 SRApi.Ref.Override("PartyBox.pieces", "关卡派对盒道具（清场/重抽）");
@@ -336,9 +336,9 @@ public class LevelPartyBox : ITweak {
         private static void Tick() {
             try {
                 if (!SRApi.GateMaster) return;
-                if (SR.ComboKeyDown(_refreshPartyBoxKey)) RefreshPartyBox();
-                if (SR.ComboKeyDown(_refreshPiecesKey)) RefreshPartyBoxPieces();
-                if (SR.ComboKeyDown(_closePartyBoxKey)) ClosePartyBox();
+                if (SRApi.ComboKeyDown(_refreshPartyBoxKey)) RefreshPartyBox();
+                if (SRApi.ComboKeyDown(_refreshPiecesKey)) RefreshPartyBoxPieces();
+                if (SRApi.ComboKeyDown(_closePartyBoxKey)) ClosePartyBox();
             } catch (Exception __ex) { SRApi.Guard.Log("派对盒快捷键", __ex); }
         }
 

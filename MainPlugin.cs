@@ -153,6 +153,24 @@ namespace SR_UCH {
                     delegate (ConfigFile __c) { SR.Ctl.MarkConfigDirty(__c); },
                     delegate { return SR.Ctl.LangEn; },
                     delegate { return SR.Ctl.EditOpen; });
+                SRApi.SetUiSinks(
+                    delegate { return SR.ContentArea; }, delegate (Rect __v) { SR.ContentArea = __v; },
+                    delegate { return SR.FooterHeight; }, delegate (float __v) { SR.FooterHeight = __v; },
+                    delegate { return SR.PageScroll; }, delegate (Vector2 __v) { SR.PageScroll = __v; },
+                    delegate { return SR.NoPageScrollBars; }, delegate (bool __v) { SR.NoPageScrollBars = __v; },
+                    delegate { return SR.CursorResize; }, delegate (bool __v) { SR.CursorResize = __v; },
+                    delegate { return SR.CursorMove; }, delegate (bool __v) { SR.CursorMove = __v; },
+                    delegate (Func<bool> __p) { SR.RegisterTypingProvider(__p); },
+                    delegate (Func<bool> __h) { SR.RegisterInputGateHold(__h); },
+                    delegate (Action<Camera> __a) { SR.RegisterCameraView(__a); },
+                    delegate (string __s, Action __h, Action __f) { SR.RegisterPageChrome(__s, __h, __f); },
+                    delegate (string __n, ConfigEntry<KeyCode> __e, string __m) { SR.RegisterKey(__n, __e, __m); },
+                    delegate (ConfigEntry<KeyCode> __e) { return SR.ComboKeyDown(__e); },
+                    delegate (ConfigEntry<KeyCode> __e) { return SR.ComboKeyHeld(__e); },
+                    delegate (string __s, Func<ConfigEntryBase, bool> __f) { SR.RenderSectionEntries(__s, __f); },
+                    delegate (string __s) { return SR.SectionEntries(__s); },
+                    delegate { return SR.TableLineStrong; },
+                    delegate (Rect __r, Color __c) { SR.DrawFill(__r, __c); });
             } catch { }
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。

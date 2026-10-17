@@ -60,12 +60,12 @@ namespace SR_UCH.Tweaks {
         private static float _lastListRebuildAt = -999f; // 上次全量重建的时刻
 
         // 允许客户端删除由外部模块（EX）经槽位登记，此处用时拉取，避免初始化顺序问题；槽位名不带模块名，任何模块都能登记。
-        // SR.Provide 是覆盖语义（同一槽位重复登记以最后一次为准）；未登记时房客不能删。
+        // Slots.Provide 是覆盖语义（同一槽位重复登记以最后一次为准）；未登记时房客不能删。
         private const string SlotAllowClients = "Blocks.AllowClientsOn"; // Func<bool>
         private static Func<bool> _allowCached; // 取到后缓存委托
         public static bool AllowClientsOn {
             get {
-                if (_allowCached == null) _allowCached = SR.Require<Func<bool>>(SlotAllowClients);
+                if (_allowCached == null) _allowCached = Slots.Require<Func<bool>>(SlotAllowClients);
                 Func<bool> f = _allowCached;
                 return f != null && f();
             }
@@ -132,7 +132,7 @@ namespace SR_UCH.Tweaks {
 
         // 普通页（本栏目唯一页面）：直接渲染本栏目的通用设置条目。
         private static void RenderNormalPage() {
-            SR.RenderSectionEntries("Destroy Blocks");
+            SRApi.RenderSectionEntries("Destroy Blocks");
         }
 
 
@@ -282,8 +282,8 @@ namespace SR_UCH.Tweaks {
                 "Delete Key",
                 KeyCode.Backspace,
                 "Keybind for deleting the currently selected block");
-            SR.RegisterKey("方块破坏-切换", _toggleKey, "hold");
-            SR.RegisterKey("方块破坏-删除", _deleteKey, "press");
+            SRApi.RegisterKey("方块破坏-切换", _toggleKey, "hold");
+            SRApi.RegisterKey("方块破坏-删除", _deleteKey, "press");
             // 本功能只有一个页面（原高级页已整体删除）。
             SR.RegisterPage("Destroy Blocks", "Normal", "普通", "Normal", 10, RenderNormalPage);
             _selectMode = _mp.Config.Bind(
@@ -322,11 +322,11 @@ namespace SR_UCH.Tweaks {
             GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(netListener, true);
             SceneManager.activeSceneChanged += OnSceneChanged;
 
-            // 对外能力槽位：调用方经 SR.Require 按名取用，不引用本类，取不到即降级。
-            SR.Provide(SlotIsPlayerPlaced, (Func<Placeable, bool>)IsPlayerPlaced);
-            SR.Provide(SlotPlayerPlacedBlocks, (Func<List<Placeable>>)PlayerPlacedBlocks);
+            // 对外能力槽位：调用方经 Slots.Require 按名取用，不引用本类，取不到即降级。
+            Slots.Provide(SlotIsPlayerPlaced, (Func<Placeable, bool>)IsPlayerPlaced);
+            Slots.Provide(SlotPlayerPlacedBlocks, (Func<List<Placeable>>)PlayerPlacedBlocks);
             // 归属登记同样走槽位，避免与关卡功能产生编译期引用（拆分编译会 CS0103）。
-            SR.Provide(SlotAttributeToHost, (Action<List<Placeable>>)AttributeToHost);
+            Slots.Provide(SlotAttributeToHost, (Action<List<Placeable>>)AttributeToHost);
         }
 
         // 槽位名：与调用方的唯一约定是“名字 + 委托签名”，刻意用 private const，调用方另写自己的常量以免编译期依赖。
@@ -359,7 +359,7 @@ namespace SR_UCH.Tweaks {
             // 仅房主能删：SR 侧没有方块删除的网络同步通道，房客删除只有本机生效，会造成脱同步；房客需开 EX 的“允许客户端删除”。
             // 有意不接 GateHost（豁免只解决权限、解决不了同步）；判据用 SRApi.CanControlLocally，勿用 is GamesparksMatchmakingLobby（离线/大厅为空时会短路放行）。
             if (!AllowClientsOn && !SRApi.CanControlLocally) return;
-            if (SR.ComboKeyDown(_toggleKey)) {
+            if (SRApi.ComboKeyDown(_toggleKey)) {
                 _altDown = true;
                 RebuildList();
                 _lastListRebuildAt = Time.unscaledTime;
@@ -373,7 +373,7 @@ namespace SR_UCH.Tweaks {
                 }
                 _selected = Blocks[_index];
             }
-            if (SR.ComboKeyHeld(_toggleKey)) 
+            if (SRApi.ComboKeyHeld(_toggleKey)) 
             {
                 // 实时列表：按住期间保持候选表最新（事件置脏 + 节流重建）；暂存模式或不按住时完全不跑。
                 if (RealtimeListOn) TickRealtimeList();
@@ -386,7 +386,7 @@ namespace SR_UCH.Tweaks {
                     }
                 }
                 if (_index < 0 || _index >= Blocks.Count) _index = Blocks.Count - 1;
-                if (SR.ComboKeyDown(_deleteKey)) {
+                if (SRApi.ComboKeyDown(_deleteKey)) {
                     Placeable target = Blocks[_index];
                     if (target == null || target.MarkedForDestruction) {
                         Blocks.RemoveAt(_index);

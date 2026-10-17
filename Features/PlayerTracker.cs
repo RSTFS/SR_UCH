@@ -148,9 +148,9 @@ namespace SR_UCH.Tweaks {
         // 本页内容 = 该段的条目列表。
         private static void Render() {
             try {
-                List<ConfigEntryBase> list = SR.SectionEntries("Player Tracker");
+                List<ConfigEntryBase> list = SRApi.SectionEntries("Player Tracker");
                 if (list == null || list.Count == 0) { GUILayout.Label(SRApi.T("（无匹配条目）", "(no matching entries)"), SRApi.Ctl.Label); return; }
-                SR.RenderSectionEntries("Player Tracker");
+                SRApi.RenderSectionEntries("Player Tracker");
             } catch (Exception __ex) { SRApi.Guard.Log("渲染移动轨迹页", __ex); }
         }
 

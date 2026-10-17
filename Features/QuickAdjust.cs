@@ -541,7 +541,7 @@ public class TreehouseSuicide : ITweak {
             pMigrated.Value = true;
         }
         // 未设置过修饰键时默认 Shift。
-        SR.RegisterKey("快捷自杀", _keybind, "hold");
+        SRApi.RegisterKey("快捷自杀", _keybind, "hold");
         if (SR.KeyComboMod(_keybind) == SR.ComboMod.None)
         {
             SR.SetDefaultCombo(_keybind, SR.ComboMod.Shift);
@@ -568,7 +568,7 @@ public class TreehouseSuicide : ITweak {
                 if (_suicideFrame == Time.frameCount) return;
                 _suicideFrame = Time.frameCount;
                 // 组合键判定：修饰键在键位捕捉时设置（默认 Shift）。
-                if (SR.ComboKeyDown(_keybind) && !__instance.Frozen) {
+                if (SRApi.ComboKeyDown(_keybind) && !__instance.Frozen) {
                     __instance.KillCharacter("Suicide", false, __instance.networkNumber);
                 }
         } catch (Exception __ex) { SRApi.Guard.Log("自杀键", __ex); }
