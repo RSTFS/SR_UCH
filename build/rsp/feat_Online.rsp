@@ -25,6 +25,7 @@
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 /r:"bin\Release\SR_UCH.dll"
 Features\Online.cs
+Features\Online.Table.cs
 Features\Online.LobbyList.cs
 Features\Online.Join.cs
 Features\Online.Watchdog.cs

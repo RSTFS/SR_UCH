@@ -48,6 +48,7 @@ Features\Chat.cs
 Features\Chat.Log.cs
 Features\Chat.Window.cs
 Features\Online.cs
+Features\Online.Table.cs
 Features\Online.LobbyList.cs
 Features\Online.Join.cs
 Features\Online.Watchdog.cs
