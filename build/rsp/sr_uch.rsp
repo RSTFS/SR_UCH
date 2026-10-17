@@ -48,6 +48,7 @@ Features\Chat.cs
 Features\Chat.Log.cs
 Features\Chat.Window.cs
 Features\Online.cs
+Features\Online.Watchdog.cs
 Features\Experiments.cs
 Features\Experiments.Bounds.cs
 Features\Experiments.Misc.cs
