@@ -106,12 +106,33 @@ function Check-Encoding {
     else { Ok '全部文本文件均为合法 UTF-8' }
 }
 
+
+# ---------- 6) 悬浮条目统一格式：不得再有 是什么/干什么/注意事项 行首标签 ----------
+function Check-DescFormat {
+    $files = @(Get-ChildItem -LiteralPath (Join-Path $Root 'Features') -Filter '*.cs' -File)
+    $core = Join-Path $Root 'SR_UCH\SR.Core.cs'
+    if (Test-Path -LiteralPath $core) { $files += Get-Item -LiteralPath $core }
+    $bad = 0
+    $total = 0
+    foreach ($f in $files) {
+        $txt = Read-Text $f.FullName
+        foreach ($m in [regex]::Matches($txt, 'LocDesc\([^\r\n]*')) {
+            $total++
+            if ($m.Value -match '是什么：|干什么：|注意事项：|What: |Does: |Notes: ') { $bad++ }
+        }
+    }
+    if ($bad -gt 0) { Bad ('仍有 ' + $bad + ' 条悬浮条目带行首标签（应已统一移除）') }
+    else { Ok ('悬浮条目格式统一（' + $total + ' 条，无行首标签）') }
+}
+
+
 Write-Host '== SR_UCH 文本类守卫（不需要游戏 / 不需要 csc）=='
 Check-ApiSurface
 Check-ContractBoundary
 Check-FeatureLeak
 Check-RspCoverage
 Check-Encoding
+Check-DescFormat
 if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); exit 1 }
 Write-Host '== 文本类守卫全部通过 ✅ =='
 exit 0
