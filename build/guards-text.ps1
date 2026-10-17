@@ -127,21 +127,25 @@ function Check-DescFormat {
 
 
 
-# ---------- 7) 源码编码规范：.cs 必须 UTF-8 BOM + CRLF（与 .editorconfig 一致）----------
+# ---------- 7) 源码编码规范：.cs/.csproj = UTF-8 无 BOM + LF；.ps1 = UTF-8 BOM ----------
 function Check-CsEncoding {
     $bad = @()
-    foreach ($f in Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.cs' -File) {
+    foreach ($f in Get-ChildItem -LiteralPath $Root -Recurse -File | Where-Object { $_.Extension -in '.cs', '.csproj' }) {
         $full = ($f.FullName -replace '\\', '/')
         if ($full -match '/bin/|/obj/|/\.git/') { continue }
         $b = [System.IO.File]::ReadAllBytes($f.FullName)
-        if (-not ($b.Length -ge 3 -and $b[0] -eq 0xEF)) { $bad += ($f.Name + ': 缺 BOM'); continue }
+        if ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) { $bad += ($f.Name + ': 不应带 BOM'); continue }
         $txt = [System.Text.Encoding]::UTF8.GetString($b)
-        $crlf = ([regex]::Matches($txt, "`r`n")).Count
-        $lf = ([regex]::Matches($txt, "`n")).Count
-        if ($lf -eq 0 -or $crlf -ne $lf) { $bad += ($f.Name + ': 非 CRLF') }
+        if ($txt.Contains("`r`n")) { $bad += ($f.Name + ': 应为 LF') }
     }
-    if ($bad.Count -gt 0) { Bad ('源码编码不合规（BOM/CRLF）: ' + (($bad | Select-Object -First 5) -join '; ')) }
-    else { Ok '全部 .cs 均为 UTF-8 BOM + CRLF' }
+    foreach ($f in Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.ps1' -File) {
+        $full = ($f.FullName -replace '\\', '/')
+        if ($full -match '/bin/|/obj/|/\.git/') { continue }
+        $b = [System.IO.File]::ReadAllBytes($f.FullName)
+        if (-not ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF)) { $bad += ($f.Name + ': 缺 BOM') }
+    }
+    if ($bad.Count -gt 0) { Bad ('源码编码不合规: ' + (($bad | Select-Object -First 6) -join '; ')) }
+    else { Ok '编码规范通过（.cs/.csproj = UTF-8 无 BOM+LF；.ps1 = UTF-8 BOM）' }
 }
 
 Write-Host '== SR_UCH 文本类守卫（不需要游戏 / 不需要 csc）=='

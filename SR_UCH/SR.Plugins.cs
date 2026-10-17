@@ -1,4 +1,4 @@
-﻿// 外部插件管理页。扫描 plugins 目录下的插件和语言包 DLL，负责禁用 / 启用 / 记住状态。
+// 外部插件管理页。扫描 plugins 目录下的插件和语言包 DLL，负责禁用 / 启用 / 记住状态。
 using System;
 using System.Collections.Generic;
 using System.Reflection;

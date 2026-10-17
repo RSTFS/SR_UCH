@@ -1,4 +1,4 @@
-﻿// 门控：每帧场景上下文快照（SR.Gate）+ 统一房主判定 + 内置模式豁免 + 启动自检；Env 提供场景/身份/模式查询。
+// 门控：每帧场景上下文快照（SR.Gate）+ 统一房主判定 + 内置模式豁免 + 启动自检；Env 提供场景/身份/模式查询。
 using System;
 using UnityEngine;
 using UnityEngine.Networking;

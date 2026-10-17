@@ -1,4 +1,4 @@
-﻿// 实验栏目：注册侧栏栏目和三页、生命周期。
+// 实验栏目：注册侧栏栏目和三页、生命周期。
 // 页面拆分：p1 关卡边界 -> Experiments.Bounds.cs；p2 其它 -> Experiments.Misc.cs；p3 场景 -> Experiments.Scene.cs。
 
 using System;

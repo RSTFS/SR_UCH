@@ -1,4 +1,4 @@
-﻿// 方块破坏：列出现场方块、按玩家归属筛选、远程销毁。
+// 方块破坏：列出现场方块、按玩家归属筛选、远程销毁。
 // 槽位：对外 DestroyBlocks.IsPlayerPlaced / PlayerPlacedBlocks / AttributeToHost，向内取 Blocks.AllowClientsOn。
 using System;
 using System.Collections.Generic;

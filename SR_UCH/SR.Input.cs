@@ -1,4 +1,4 @@
-﻿// 输入：打开/关闭键、EventSystem 门控、按帧滚轮仲裁，以及独立功能类 SRInputGate。
+// 输入：打开/关闭键、EventSystem 门控、按帧滚轮仲裁，以及独立功能类 SRInputGate。
 // SRInputGate 自行注册 Harmony 补丁；管理器本身不 patch 游戏。
 using System;
 using BepInEx;

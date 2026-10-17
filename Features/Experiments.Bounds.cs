@@ -1,4 +1,4 @@
-﻿// 实验 · 关卡边界页：页面渲染 + 边界解除本体 + 解除 UI3 覆盖。
+// 实验 · 关卡边界页：页面渲染 + 边界解除本体 + 解除 UI3 覆盖。
 
 using System;
 using System.Collections.Generic;

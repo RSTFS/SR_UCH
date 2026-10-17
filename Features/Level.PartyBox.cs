@@ -1,4 +1,4 @@
-﻿// 关卡派对盒页（侧栏「关卡」第 1 页）：放弃道具 / 派对盒炸弹 / 派对盒（重抽·开箱·关闭）。
+// 关卡派对盒页（侧栏「关卡」第 1 页）：放弃道具 / 派对盒炸弹 / 派对盒（重抽·开箱·关闭）。
 // 独立插件 PartyBoxCtrl.dll 内有等价实现，不依赖 SR；命名空间内 Level 会遮蔽游戏自带的 global::Level。
 using System;
 using System.Collections;

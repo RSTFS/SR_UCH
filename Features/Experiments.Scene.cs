@@ -1,4 +1,4 @@
-﻿// 实验 · 场景页：加载遮罩、温柔加载、树屋立即开始。
+// 实验 · 场景页：加载遮罩、温柔加载、树屋立即开始。
 
 using System;
 using System.Collections.Generic;

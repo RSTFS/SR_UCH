@@ -1,4 +1,4 @@
-﻿// 样式：深色主题的 GUIStyle / 字体 / 纹理 / 滑块素材；Sc() 为统一缩放系数入口。
+// 样式：深色主题的 GUIStyle / 字体 / 纹理 / 滑块素材；Sc() 为统一缩放系数入口。
 using System;
 using BepInEx;
 using BepInEx.Bootstrap;

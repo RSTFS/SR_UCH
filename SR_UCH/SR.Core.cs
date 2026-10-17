@@ -1,4 +1,4 @@
-﻿// 框架本体：状态与初始化、各类 Register 扩展点、Provide/Require 槽位、每帧钩子派发、
+// 框架本体：状态与初始化、各类 Register 扩展点、Provide/Require 槽位、每帧钩子派发、
 // 对局开始时重置界面、日志包装 Guard。不认识任何具体功能（功能自己通过 SR.Register 挂上来）。
 using System;
 using System.Collections.Generic;

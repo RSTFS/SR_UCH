@@ -1,4 +1,4 @@
-﻿// 本地化：T() 查表入口、注册表、内置中英文词条、外部语言包，以及键名 / 关卡名 / 枚举名翻译。
+// 本地化：T() 查表入口、注册表、内置中英文词条、外部语言包，以及键名 / 关卡名 / 枚举名翻译。
 using System;
 using System.Collections.Generic;
 using BepInEx;

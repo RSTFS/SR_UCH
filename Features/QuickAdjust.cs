@@ -1,4 +1,4 @@
-﻿// 快速调整：分数折扣、记分板 handicap 刷新、快速切换、快速重试、树屋/局内自杀。
+// 快速调整：分数折扣、记分板 handicap 刷新、快速切换、快速重试、树屋/局内自杀。
 using System;
 using System.Collections.Generic;
 using System.Reflection;

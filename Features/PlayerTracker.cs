@@ -1,4 +1,4 @@
-﻿// 玩家移动轨迹：在玩家身后画一条轨迹线（移植自 UCHPlayerTrackerMod）。
+// 玩家移动轨迹：在玩家身后画一条轨迹线（移植自 UCHPlayerTrackerMod）。
 // 自行创建常驻 GameObject + TrackerComponent 驱动，不走核心的页面/Register 机制。
 using System;
 using System.Collections.Generic;

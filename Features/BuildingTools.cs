@@ -1,4 +1,4 @@
-﻿// 建造增强：自由放置（网格覆盖，吸附到 0.01 单位）+ 建造上限放宽（BuildUnlimiter）。
+// 建造增强：自由放置（网格覆盖，吸附到 0.01 单位）+ 建造上限放宽（BuildUnlimiter）。
 using System;
 using System.Collections.Generic;
 using System.Reflection;

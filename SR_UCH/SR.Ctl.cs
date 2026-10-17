@@ -1,4 +1,4 @@
-﻿// 控件与页面能力门面：管理器通用控件（按键录制/右键绑键/开关/滑块/下拉）、首页、Ctl 门面、行页扩展点 RowHooks、表格控件 TableArgs -> TableDraw。
+// 控件与页面能力门面：管理器通用控件（按键录制/右键绑键/开关/滑块/下拉）、首页、Ctl 门面、行页扩展点 RowHooks、表格控件 TableArgs -> TableDraw。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;

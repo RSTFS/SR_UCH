@@ -1,4 +1,4 @@
-﻿// 设置页：条目行 / 控件渲染、滑块、下拉框、侧栏自定义顺序，以及 Configuration Manager 的排序与隐藏。
+// 设置页：条目行 / 控件渲染、滑块、下拉框、侧栏自定义顺序，以及 Configuration Manager 的排序与隐藏。
 using System;
 using System.Collections.Generic;
 using System.Globalization;

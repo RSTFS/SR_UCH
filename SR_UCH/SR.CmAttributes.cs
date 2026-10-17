@@ -1,4 +1,4 @@
-﻿// BepInEx Configuration Manager（F1 呼出）使用的排序与隐藏标签容器。
+// BepInEx Configuration Manager（F1 呼出）使用的排序与隐藏标签容器。
 // 该管理器按类型名反射读取本类公开字段，类名与字段名不可更改。
 using System;
 

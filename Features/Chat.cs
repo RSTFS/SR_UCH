@@ -1,4 +1,4 @@
-﻿// 会话栏目：注册栏目与两个页面、生命周期、Harmony 补丁。
+// 会话栏目：注册栏目与两个页面、生命周期、Harmony 补丁。
 // 页面拆分：对话窗口 -> Chat.Window.cs；对话内容 -> Chat.Log.cs。
 
 using System;

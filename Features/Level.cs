@@ -1,4 +1,4 @@
-﻿// 关卡栏目：栏目注册、两页页签、生命周期。
+// 关卡栏目：栏目注册、两页页签、生命周期。
 // 第 1 页 派对盒 -> Level.PartyBox.cs；第 2 页 关卡工具 -> Level.Tool.cs。
 // 本命名空间自定义的 Level 会遮蔽游戏的 global::Level：引用游戏类型一律写 global::Level。
 using System;

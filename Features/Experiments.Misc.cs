@@ -1,4 +1,4 @@
-﻿// 实验 · 其它页：自由相机 + 加载后清理（GC）。
+// 实验 · 其它页：自由相机 + 加载后清理（GC）。
 
 using System;
 using BepInEx;

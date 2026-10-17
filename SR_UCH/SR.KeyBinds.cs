@@ -1,4 +1,4 @@
-﻿// 键位：组合键（按按下顺序显示）、录制式快捷键序列、右键绑键、序列匹配与统一轮询触发。
+// 键位：组合键（按按下顺序显示）、录制式快捷键序列、右键绑键、序列匹配与统一轮询触发。
 using System;
 using System.Collections.Generic;
 using BepInEx;
