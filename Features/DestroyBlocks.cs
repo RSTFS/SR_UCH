@@ -239,7 +239,7 @@ namespace SR_UCH.Tweaks {
         private static void SelfReg() {
             SR.RowFilters.Add(TrackPlayerRowVisible); // 通用条目行扩展点
             SR.LocSec("Destroy Blocks", "方块破坏", null);
-            SR.Nav("Destroy Blocks", 60); // 侧栏栏目顺序
+            SRApi.Nav("Destroy Blocks", 60); // 侧栏栏目顺序
             SR.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);
             SR.LocDesc("Destroy Blocks", "Toggle Key", "按住进入删除模式, 最近放的方块会高亮, 松手退出.", "Hold to enter delete mode and highlight the most recently placed block (release to exit)");
             SR.LocKey("Destroy Blocks", "Delete Key", "删除键", null);

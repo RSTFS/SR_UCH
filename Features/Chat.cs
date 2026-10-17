@@ -10,7 +10,7 @@ public partial class Chat : ITweak {
 
         public void Initialize(IFeatureHost plugin) {
             SR.LocSec("Chat", "会话", null);
-            SR.Nav("Chat", 80); //侧栏栏目顺序 80
+            SRApi.Nav("Chat", 80); //侧栏栏目顺序 80
             InitWindow(plugin);
             InitLog(plugin);
             // CreateAndPatchAll 按程序集扫描：一次调用即覆盖本类两个 partial 文件的全部补丁，不可分两处重复注册。

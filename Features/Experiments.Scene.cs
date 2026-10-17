@@ -63,7 +63,7 @@ public partial class Experiments : ITweak
 
         private static void SelfReg() {
             // Scene 段条目全部渲染在场景页，必须 NavHide，否则兜底分支会再加一个独立侧栏栏目。
-            SR.NavHide("Scene");
+            SRApi.NavHide("Scene");
             SR.LocKey("Scene", "Splash Skip Load", "跳过加载动画", "Skip load animation");
             SR.LocDesc("Scene", "Splash Skip Load",
                 "加载画面一出现就跳掉, 不用干等.",
@@ -80,8 +80,8 @@ public partial class Experiments : ITweak
                 _skipLoad = plugin.Config.Bind("Scene", "Splash Skip Load", false, "加载画面一出现就立刻跳过。");
                 _gentleLoad = plugin.Config.Bind("Scene", "Gentle Load", false,
                     "切场景时走游戏自己的 DoGentleSceneLoad（卸载+GC，能减轻卡顿）。");
-                SR.RegisterTick("加载遮罩", Tick);
-                SR.RegisterSceneHook(Reset);
+                SRApi.RegisterTick("加载遮罩", Tick);
+                SRApi.RegisterSceneHook(Reset);
                 try { Harmony.CreateAndPatchAll(typeof(SplashPatch)); }
                 catch (Exception __ex) { SRApi.LogWarn("加载遮罩 补丁注册失败: " + __ex.Message); }
             } catch (Exception __ex) { SRApi.Guard.Log("加载遮罩 初始化", __ex); }
@@ -242,8 +242,8 @@ public partial class Experiments : ITweak
             try {
                 SelfReg();
                 _launchKey = plugin.Config.Bind("Scene", "Lobby Launch Key", KeyCode.None, "按此键立即开始（None=不绑，需房主）。");
-                SR.RegisterTick("树屋工具", Tick);
-                SR.RegisterSceneHook(Reset);
+                SRApi.RegisterTick("树屋工具", Tick);
+                SRApi.RegisterSceneHook(Reset);
             } catch (Exception __ex) { SRApi.Guard.Log("树屋工具 初始化", __ex); }
         }
 

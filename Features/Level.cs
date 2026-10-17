@@ -18,15 +18,15 @@ public partial class Level : ITweak {
         // 快照加载后据此区分关卡自带方块与玩家放置方块。
         SRApi.Ref.Override("QuickSaver.initialLevelPlaceables", "快照加载后的初始方块集合（关卡自带件）");
         SR.LocSec("Level", "关卡", null);
-        SR.Nav("Level", 40); //侧栏栏目顺序 40
+        SRApi.Nav("Level", 40); //侧栏栏目顺序 40
         // 一个栏目两页，页签切换。
         SR.RegisterPage("Level", "partybox", "派对盒", "Party Box", 10, RenderPartyBox);
         SR.RegisterPage("Level", "tools", "关卡工具", "Level Tools", 20, RenderTools);
         SR.LocKey("Level", "Reload Mode", "重载模式", null);
         SR.LocDesc("Level", "Reload Mode", "保留方块和分数: 重载后方块留着, 房主按重载前的分数类型给全员补一次, 下一回合结算时分数和图标都和重载前一样, 没装这个的房客也算上. 只保留方块: 方块留着但分数清零, 相当于重新开一局.", "Reload level mode:\nKeep blocks & score (allow fill) = blocks are kept; the host broadcasts a fill using the pre-reload per-type blocks (win/coin/trap etc. as-is), so everyone (incl. clients without the mod) sees the same score and types as before at the next round's tally (fill does not trigger an immediate tally; icons appear with the normal round end).\nKeep blocks only (skip fill) = blocks are kept, score resets (fresh match, no fill).");
         // 预登记本页自动快捷键：不预登记则重启后在首次打开本页前按键无效；渲染时 HotkeyButton 会再登记一次（同 id 幂等）。
-        SR.HotkeyAction("level.reload", "重载关卡", () => Level.ReloadLevel());
-        SR.HotkeyAction("level.broadcast", "广播方块快照", () => Level.BroadcastSnapshot());
+        SRApi.HotkeyAction("level.reload", "重载关卡", () => Level.ReloadLevel());
+        SRApi.HotkeyAction("level.broadcast", "广播方块快照", () => Level.BroadcastSnapshot());
     }
 
     public void Initialize(IFeatureHost plugin) {

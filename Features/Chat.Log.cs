@@ -91,9 +91,9 @@ public partial class Chat : ITweak {
             SR.LocKey("Chat", "Show Time", "显示时间", null);
             SR.LocDesc("Chat", "Show Time", "在每条聊天记录前面显示一下时间.", "Show the timestamp before each message");
             // 预登记本页自动快捷键：不预登记则重启后在首次打开本页前按键无效。
-            SR.HotkeyAction("chat.clear", "清空", () => { Clear(); _chatTextCache = null; _chatBuilt = false; });
-            SR.HotkeyAction("chat.copy", "复制", () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (System.Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); } });
-            SR.HotkeyAction("chat.send", "发送", () => { SendChatText(_chatInputText); _chatInputText = ""; });
+            SRApi.HotkeyAction("chat.clear", "清空", () => { Clear(); _chatTextCache = null; _chatBuilt = false; });
+            SRApi.HotkeyAction("chat.copy", "复制", () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (System.Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); } });
+            SRApi.HotkeyAction("chat.send", "发送", () => { SendChatText(_chatInputText); _chatInputText = ""; });
         }
 
         private static string BuildChatText(List<ChatEntry> entries) {

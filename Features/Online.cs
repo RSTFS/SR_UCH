@@ -84,16 +84,16 @@ namespace SR_UCH.Tweaks {
 
         public void Initialize(IFeatureHost plugin) {
             SR.LocSec(SecOnline, "联机", "Online");
-            SR.Nav(SecOnline, 90);   // 侧栏顺序 90：会话(80) 之后、实验(100) 之前
+            SRApi.Nav(SecOnline, 90);   // 侧栏顺序 90：会话(80) 之后、实验(100) 之前
             SR.RegisterPage(SecOnline, RenderOnlinePage);
-            SR.RegisterTick("联机看门狗", CheckHotkeys); // 每帧：回家看门狗 + 延时加入
+            SRApi.RegisterTick("联机看门狗", CheckHotkeys); // 每帧：回家看门狗 + 延时加入
             // 加入流程本身要用 EventSystem，禁用会卡在"正在进入"：登记门控挂起，让核心不禁用 EventSystem。
             // 屏蔽输入上限 3 秒，超过即不再屏蔽（pending 最长可挂 30 秒）。
         SR.RegisterInputGateHold(() => !string.IsNullOrEmpty(_pendingJoin)
             && Time.unscaledTime - _pendingWaitFrom < 3f);
             // 预登记本页自动快捷键：本页自绘，不打开就渲染不到 HotkeyButton，而这两个键需在房间内随时可用。
-            SR.HotkeyAction("online.lobbies", "刷新列表", RefreshLobbies);
-            SR.HotkeyAction("online.disband", "返回主界面", DisbandOrLeave);
+            SRApi.HotkeyAction("online.lobbies", "刷新列表", RefreshLobbies);
+            SRApi.HotkeyAction("online.disband", "返回主界面", DisbandOrLeave);
 
             // 反射成员登记：本文件的反射同样要登记，否则游戏改名后静默失效。
             // SRApi.Ref.Type() 按简单名解析类型，只能登记全局命名空间下的类型；带命名空间的类型不登记（会误报失效）。

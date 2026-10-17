@@ -128,7 +128,7 @@ namespace SR_UCH.Tweaks {
 
         private static void SelfReg() {
             SR.LocSec("Player Tracker", "移动轨迹", null);
-            SR.Nav("Player Tracker", 20); // 侧栏顺序 20
+            SRApi.Nav("Player Tracker", 20); // 侧栏顺序 20
             // 每个栏目自己声明自己的页面：缺了它只会靠核心兜底分支成页，外部模块无法替换这一页。
             SR.RegisterPage("Player Tracker", Render);
             SR.LocKey("Player Tracker", "Tracking Length", "轨迹长度", null);

@@ -47,7 +47,7 @@ public partial class Experiments : ITweak
 				"进关卡的时候回收一次垃圾和没用的资源, 对局里会少卡一点. 只在第一次加载后做, 同关卡换回合不做.",
 				"Run GC and asset unload once on level load, reducing in-match stutter.");
 			_gcAfterLoadEntry = plugin.Config.Bind<bool>("Experiments", "GC After Load", false, "进关卡/换关卡时执行一次 GC 回收 + 资源卸载，减少对局内卡顿。同关卡回合切换不清理（场景名不变自动跳过），不影响结算速度。");
-			SR.RegisterTick("加载后清理", TickCleanup); // 每帧钩子（加载完成 1 秒后执行一次 GC）
+			SRApi.RegisterTick("加载后清理", TickCleanup); // 每帧钩子（加载完成 1 秒后执行一次 GC）
 			// CreateAndPatchAll 不会自动发现带 [HarmonyPatch] 的类型，必须显式注册一次。
 			try { Harmony.CreateAndPatchAll(typeof(Experiments), (string)null); }
 			catch (Exception e) { SRApi.LogError("实验页(加载后清理) 补丁注册失败: " + e.Message); }
@@ -151,13 +151,13 @@ public partial class Experiments : ITweak
                     new ConfigDescription("相机跟随角色的速度倍数（0-10，每次 0.5，1 = 游戏原值；与自由相机开关无关）",
                         new AcceptableValueRange<float>(0f, 10f)));
                 SR.RegisterKey("实验-自由相机", _key, "press");
-                SR.RegisterTick("自由相机-开关", CheckKey);
-                SR.RegisterWheelHook(WheelZoom);
+                SRApi.RegisterTick("自由相机-开关", CheckKey);
+                SRApi.RegisterWheelHook(WheelZoom);
                 // 启动时强制重置为默认状态：关闭自由相机、FOV 回 10（赋值会写盘，属 BepInEx 行为）。
                 _on.Value = false;
                 _fov.Value = 10f;
                 SR.RegisterCameraView(ApplyToCamera);
-                SR.RegisterTick("自由相机-移动速度", ApplyFollowSpeed);
+                SRApi.RegisterTick("自由相机-移动速度", ApplyFollowSpeed);
                 _on.SettingChanged += OnLockChanged;
                 // 不挂 SettingChanged：ApplyFollowSpeed 已作为 30 帧节流的 Tick，下一拍自然生效。
                 _followSpeed.SettingChanged += (s, e) => { _followAt = -9999; _followLastMul = -1f; };

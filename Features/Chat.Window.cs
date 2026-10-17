@@ -68,7 +68,7 @@ public partial class Chat : ITweak {
             SRApi.Ref.Override("ChatDisplay.VisibilityTimer", "聊天窗口（可见计时器：保持显示但不自己写 alpha，淡入淡出交给游戏）");
 
             // 本页是会话栏目的第 1 个子页，配置段仍为 Chat Window。
-            SR.NavHide(Sec); // 本页不单独成侧栏栏目
+            SRApi.NavHide(Sec); // 本页不单独成侧栏栏目
             SR.RegisterPage("Chat", "ChatWindow", "对话窗口", "ChatWindows", 10, RenderPage);
             SR.LocEnum("Hold", "按住显示");
             SR.LocEnum("Toggle", "切换常驻");

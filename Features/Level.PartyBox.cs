@@ -69,7 +69,7 @@ public partial class Level {
 
 
         public void Initialize(IFeatureHost plugin) {
-            SR.RegisterDismissHook(delegate { _bombSent.Clear(); });
+            SRApi.RegisterDismissHook(delegate { _bombSent.Clear(); });
             // 本文件反射的游戏私有成员：必须在此登记，游戏改名时启动自检会告警。
             SRApi.Ref.Override("PartyBox.pieces", "派对盒炸弹（生成/清理）");
             _enabled = plugin.Config.Bind("Level", "Party Bomb", false,
@@ -83,7 +83,7 @@ public partial class Level {
             catch (Exception e) { SRApi.LogError("派对盒炸弹 补丁注册失败: " + e.Message); }
             // networkNumber 会跨对局复用，必须在换场景（DismissHook）与对局开始（SceneHook）两处清理，
             // 否则新局同号玩家会被误判为已发过炸弹，提前生成且可叠加。
-            SR.RegisterSceneHook(delegate { _bombSent.Clear(); });
+            SRApi.RegisterSceneHook(delegate { _bombSent.Clear(); });
         }
 
         // 快捷短语都走 ChatDisplay.DisplayNewMessage，EmoteType 保留原枚举码；房主端收集每位成员的 EMOTE_Bomb。
@@ -223,7 +223,7 @@ public partial class Level {
                 _key = plugin.Config.Bind("Level", "Drop Held Piece", KeyCode.None,
                     "按这个键就把手上拿着的那块丢掉（走游戏原生通道, 全员可见）, 填 None 就是不绑键.");
                 SR.RegisterKey("关卡-放弃道具", _key, "press");
-                SR.RegisterTick("放弃道具", Tick);
+                SRApi.RegisterTick("放弃道具", Tick);
             } catch (Exception __ex) { SRApi.Guard.Log("放弃道具 初始化", __ex); }
         }
 
@@ -321,7 +321,7 @@ public class LevelPartyBox : ITweak {
                 SR.RegisterKey("关卡-刷新派对盒", _refreshPartyBoxKey, "press");
                 SR.RegisterKey("关卡-刷新道具", _refreshPiecesKey, "press");
                 SR.RegisterKey("关卡-关闭派对盒", _closePartyBoxKey, "press");
-                SR.RegisterTick("派对盒快捷键", Tick);
+                SRApi.RegisterTick("派对盒快捷键", Tick);
                 // 反射成员登记：游戏改名时启动自检会告警。
                 SRApi.Ref.Override("PartyBox.pieces", "关卡派对盒道具（清场/重抽）");
                 SRApi.Ref.Override("VersusControl.showPartyBox", "关卡派对盒：完整流程");

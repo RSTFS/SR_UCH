@@ -31,7 +31,7 @@ namespace SR_UCH.Tweaks {
             SR.RowFilters.Add(BuilderRowVisible);   // 两个开关键位不单独成行
             SR.RegisterPage("build", RenderPage); // 本功能页自绘（含建造上限分区）
             SR.LocSec("build", "建造", "Build");
-            SR.Nav("build", 50); // 侧栏栏目顺序 50
+            SRApi.Nav("build", 50); // 侧栏栏目顺序 50
             SR.LocKey("build", "Collision Override", "无视碰撞", null);
             SR.LocDesc("build", "Collision Override", "关掉放置规则, 方块可以互相重叠, 也可以悬空放着, 想放哪放哪.", "Ignore collision: pieces ignore placement rules and can go anywhere (overlap/air/crossing)");
             SR.LocKey("build", "Collision Toggle Key", "无视碰撞开关", null);
@@ -286,8 +286,8 @@ namespace SR_UCH.Tweaks {
             SceneManager.activeSceneChanged += (a, b) => Apply();
             // Apply() 的求值依赖 SR.GateMaster，总开关关闭时需要有人调用它。
             // DismissHook 负责关总开关，SceneHook 负责启动早期 GameSettings 未就绪时的重试。
-            SR.RegisterDismissHook(delegate { if (!SR.GateMaster) Apply(); });
-            SR.RegisterSceneHook(delegate { if (!SR.GateMaster) Apply(); });
+            SRApi.RegisterDismissHook(delegate { if (!SR.GateMaster) Apply(); });
+            SRApi.RegisterSceneHook(delegate { if (!SR.GateMaster) Apply(); });
         }
 
         private static void Apply() {

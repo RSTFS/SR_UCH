@@ -195,9 +195,9 @@ public partial class Experiments : ITweak
                     "Level Bounds Camera",
                     "Level Bounds Piece Ignore",
                     "Remove UI3");
-                SR.RegisterTick("关卡边界-应用", Tick);
-                SR.RegisterSceneHook(Reset);
-                SR.RegisterDismissHook(Dismiss);
+                SRApi.RegisterTick("关卡边界-应用", Tick);
+                SRApi.RegisterSceneHook(Reset);
+                SRApi.RegisterDismissHook(Dismiss);
                 // 总开关关闭时核心触发 RegisterDismissHook -> Dismiss() -> Restore()。
             } catch (Exception __ex) { SRApi.Guard.Log("关卡边界 初始化", __ex); }
         }
@@ -731,9 +731,9 @@ public partial class Experiments : ITweak
         public void Initialize(IFeatureHost plugin) {
             try {
                 SelfReg();
-                SR.RegisterTick("解除UI3", Tick);
-                SR.RegisterSceneHook(Reset);
-                SR.RegisterDismissHook(Restore);
+                SRApi.RegisterTick("解除UI3", Tick);
+                SRApi.RegisterSceneHook(Reset);
+                SRApi.RegisterDismissHook(Restore);
             } catch (Exception __ex) { SRApi.Guard.Log("解除UI3 初始化", __ex); }
         }
 

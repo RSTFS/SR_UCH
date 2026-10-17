@@ -33,7 +33,7 @@ public class QuickAdjust : ITweak {
         SRApi.Ref.Override("VersusControl.graphScoreBoardInstance", "评分折扣（取计分板实例）");
         SRApi.Ref.Override("GraphScoreBoard.scorelineRelation", "评分折扣（分数条位置）");
         SR.LocSec("Quick Adjust", "快速调整", null);
-        SR.Nav("Quick Adjust", 30); // 侧栏栏目顺序 30
+        SRApi.Nav("Quick Adjust", 30); // 侧栏栏目顺序 30
         SR.RegisterPage("Quick Adjust", Render);   // 本功能页自绘
         SR.LocKey("Quick Adjust", "Quick Switch", "快速切换", null);
         SR.LocDesc("Quick Adjust", "Quick Switch", "只在自由模式有用. 长按 B 到设定秒数, 在行动和建造之间切, 原版是半秒. 默认关, 局里开关立刻生效.", "Quick switch (freeplay only): hold B for the set seconds to swap Action<->Build (vanilla 0.5s).\nOFF by default; takes effect immediately.");
@@ -50,8 +50,8 @@ public class QuickAdjust : ITweak {
         SR.LocKey("Quick Adjust", "More Discount Values", "更多折扣数值", null);
         SR.LocDesc("Quick Adjust", "More Discount Values", "默认关. 打开后折扣从滑块变成输入框, 0 到 90 任意整数.", "More discount values (OFF by default): turns the slider into a free input box (0-90 any integer, 0 = off).");
         // 预登记本页自动快捷键。
-        SR.HotkeyAction("qa.apply_discount", "应用折扣", () => QuickAdjust.ApplyScoreDiscount());
-        SR.HotkeyAction("qa.restore_discount", "恢复原值", () => QuickAdjust.RestoreScoreDiscount());
+        SRApi.HotkeyAction("qa.apply_discount", "应用折扣", () => QuickAdjust.ApplyScoreDiscount());
+        SRApi.HotkeyAction("qa.restore_discount", "恢复原值", () => QuickAdjust.RestoreScoreDiscount());
     }
 
     public static void Render() {

@@ -202,6 +202,33 @@ namespace SR_UCH {
             try { Notify(string.Format(text, args)); } catch { Notify(text); }
         }
 
+        // 扩展点注册门面：注册表在核心，契约层只转发（功能层不再依赖 SR.*）。
+        private static Action<string, int> _nav;
+        private static Action<string> _navHide;
+        private static Action<string, Action> _tick;
+        private static Action<Action> _sceneHook, _dismissHook;
+        private static Action<Func<float, bool>> _wheelHook;
+        private static Action<string, string, Action> _hotkey;
+        public static void SetExtSinks(Action<string, int> nav, Action<string> navHide, Action<string, Action> tick,
+                                       Action<Action> sceneHook, Action<Action> dismissHook,
+                                       Action<Func<float, bool>> wheelHook, Action<string, string, Action> hotkey) {
+            _nav = nav; _navHide = navHide; _tick = tick; _sceneHook = sceneHook; _dismissHook = dismissHook; _wheelHook = wheelHook; _hotkey = hotkey;
+        }
+        //侧栏栏目与顺序（rank 越小越靠前）
+        public static void Nav(string sec, int rank) { Action<string, int> f = _nav; if (f != null) f(sec, rank); }
+        //隐藏某个配置段对应的栏目
+        public static void NavHide(string sec) { Action<string> f = _navHide; if (f != null) f(sec); }
+        //每帧回调（name 仅用于自检/日志）
+        public static void RegisterTick(string name, Action hook) { Action<string, Action> f = _tick; if (f != null) f(name, hook); }
+        //场景切换通知
+        public static void RegisterSceneHook(Action hook) { Action<Action> f = _sceneHook; if (f != null) f(hook); }
+        //收起功能 UI 的通知
+        public static void RegisterDismissHook(Action hook) { Action<Action> f = _dismissHook; if (f != null) f(hook); }
+        //滚轮钩子（返回 true = 已消费）
+        public static void RegisterWheelHook(Func<float, bool> hook) { Action<Func<float, bool>> f = _wheelHook; if (f != null) f(hook); }
+        //注册一个可绑定的快捷键动作
+        public static void HotkeyAction(string id, string label, Action action) { Action<string, string, Action> f = _hotkey; if (f != null) f(id, label, action); }
+
         // 反射门面：实际实现（缓存 / 登记 RefOverride / 启动自检）在核心，契约层只转发，行为不变。
         public static class Ref {
             internal static Func<Type, string, string, FieldInfo> FieldFn;
