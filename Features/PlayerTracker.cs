@@ -136,11 +136,11 @@ namespace SR_UCH.Tweaks {
             SRApi.LocKey("Player Tracker", "Skip Frames", "跳帧数", null);
             SRApi.LocDesc("Player Tracker", "Skip Frames", "采样间隔\n每跳过 N 帧记录一个位置点\n范围 0 到 60，数值越大轨迹越稀疏\n0", "sampling interval\nrecords one position point every N frames\nrange 0-60; higher values make the trail sparser\n0");
             SRApi.LocKey("Player Tracker", "Line Start Width", "起点宽度", null);
-            SRApi.LocDesc("Player Tracker", "Line Start Width", "轨迹起点线宽\n控制靠近当前位置一端的粗细\n范围 0.01 到 2\n0.1", "trail start width\nthickness at the end nearest the current position\nrange 0.01-2\n0.1");
+            SRApi.LocDesc("Player Tracker", "Line Start Width", "轨迹起点线宽\n控制靠近当前位置一端的粗细\n范围 0.01 到 2\n默认：0.1", "trail start width\nthickness at the end nearest the current position\nrange 0.01-2\nDefault: 0.1");
             SRApi.LocKey("Player Tracker", "Line End Width", "终点宽度", null);
-            SRApi.LocDesc("Player Tracker", "Line End Width", "轨迹终点线宽\n控制最旧位置一端的粗细\n范围 0.01 到 2\n0.1", "trail end width\nthickness at the oldest position\nrange 0.01-2\n0.1");
+            SRApi.LocDesc("Player Tracker", "Line End Width", "轨迹终点线宽\n控制最旧位置一端的粗细\n范围 0.01 到 2\n默认：0.1", "trail end width\nthickness at the oldest position\nrange 0.01-2\nDefault: 0.1");
             SRApi.LocKey("Player Tracker", "Teleport Threshold", "瞬移清除距离", null);
-            SRApi.LocDesc("Player Tracker", "Teleport Threshold", "瞬移判定距离\n单帧移动超过该距离即清空轨迹重画，避免拖出贯穿全图的长线\n范围 1 到 500\n10", "teleport threshold\nclears and restarts the trail when a character moves farther than this in one frame, avoiding a line across the map\nrange 1-500\n10");
+            SRApi.LocDesc("Player Tracker", "Teleport Threshold", "瞬移判定距离\n单帧移动超过该距离即清空轨迹重画，避免拖出贯穿全图的长线\n范围 1 到 500\n默认：10", "teleport threshold\nclears and restarts the trail when a character moves farther than this in one frame, avoiding a line across the map\nrange 1-500\nDefault: 10");
             SRApi.LocKey("Player Tracker", "Enabled", "移动轨迹总开关", null);
             SRApi.LocDesc("Player Tracker", "Enabled", "玩家轨迹总开关\n在画面上绘制其他玩家的移动轨迹\n仅显示，不影响游戏判定\n关", "master switch for player trails\ndraws other players movement trails on screen\ndisplay only; does not affect gameplay\nOFF");
         }

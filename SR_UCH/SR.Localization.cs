@@ -35,18 +35,6 @@ public partial class SR {
             if (changed) _nameCacheVer = -1; //名字缓存整体失效
         }
 
-        // 悬浮说明的默认值行前缀：4 行文案的最后一行统一加“默认：/Default: ”。
-        private static string PrefixDefaultLine(string s, bool en) {
-            if (string.IsNullOrEmpty(s)) return s;
-            int idx = s.LastIndexOf('\n');
-            if (idx < 0) return s;
-            string last = s.Substring(idx + 1).Trim();
-            if (last.Length == 0) return s;
-            string pre = en ? "Default: " : "默认：";
-            if (last.StartsWith(en ? "Default" : "默认", StringComparison.Ordinal)) return s;
-            return s.Substring(0, idx + 1) + pre + last;
-        }
-
         public static void LocDesc(string sec, string key, string zh, string en) {
             if (sec == null || key == null) return;
             string k = sec + "\t" + key;
