@@ -61,3 +61,4 @@ Features\Experiments.Scene.cs
 Features\BuildingPresets.cs
 Features\RoundHud.cs
 Features\MatchReplay.cs
+Features\ConfigTools.cs
