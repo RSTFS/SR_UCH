@@ -138,15 +138,12 @@ public partial class SR {
             return cached;
         }
 
-        //名称列悬浮说明 = 说明 + 默认值 + 恢复提示：三段在语言不变时都是常量 -> 整串按 entry 缓存。
+        //名称列悬浮说明 = 说明本身（4 行文案已含默认值；不再自动追加默认值/恢复提示）。
         internal static string RowTip(ConfigEntryBase entry, string desc) {
             NameCacheSync();
             string cached;
             if (_rowTipCache.TryGetValue(entry, out cached)) return cached;
-            string defText = FormatDefaultValue(entry);   //ConfigEntryBase 重载：bool 显示 开/关
             string tip = desc != null ? desc : "";
-            if (defText.Length > 0) tip += "\n" + T("默认: " + defText, "Default: " + defText);
-            tip += "\n" + T("点击恢复默认值", "Click to reset to default");
             _rowTipCache[entry] = tip;
             return tip;
         }

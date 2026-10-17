@@ -253,13 +253,7 @@ public partial class SR {
             ConfigEntry<KeyCode> hk = hotkey; //只认功能显式传入的键
             try {
                 string tip = content.tooltip != null ? content.tooltip : "";
-                if (entry != null && !(entry.BoxedValue is bool)) {
-                    string dft = FormatDefaultValue(entry.DefaultValue);
-                    if (!string.IsNullOrEmpty(dft) && tip.IndexOf("默认", StringComparison.Ordinal) < 0
-                                              && tip.IndexOf("Default", StringComparison.OrdinalIgnoreCase) < 0) {
-                        tip += (tip.Length > 0 ? "\n" : "") + DefaultSuffix(entry);
-                    }
-                }
+                  // 说明（4 行文案）里已含默认值，这里不再自动追加，避免两个默认值。
                 if (hk != null) {
                     //绑定的键（录制中为 [...]）跟在标签后，宽度按需放宽
                     string txt = content.text + KeySuffix(hk);
