@@ -187,7 +187,7 @@ public partial class Experiments : ITweak
                 // 半径与外扩用编辑框渲染：两者可用跨度都是大 int，滑块不可用。
                 // 半径不挂 SettingChanged，Tick 每帧会调 ApplyHardBounds，改完下一帧自然生效。
                 // 以下键已无任何代码 Bind，由迁移规则从旧 cfg 清除；只能列真正不再 Bind 的键，否则运行时自检报错。
-                ConfigMigration.Remove("Experiments",
+                SRApi.Migration.Remove("Experiments",
                     "Level Bounds Margin",
                     "Level Bounds Hard",
                     "Level Bounds Walls",
