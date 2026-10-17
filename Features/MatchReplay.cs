@@ -151,8 +151,6 @@ public class MatchReplay : ITweak {
 	private static int _selIndex;
 	private static bool _selScrollPending; // 选中项变化后下一次绘制把该行滚进可视区（滚轮自由滚动时不抢滚动）
 	private static Vector2 _tlScroll, _tlScrollX;
-	private static Vector2 _sessionScroll;
-	private static Vector2 _detailScroll;
 	private static SRApi.TableArgs _tlArgs;
 	private static readonly List<int> _tlVis = new List<int>();
 	private static readonly List<Rect> _tlRects = new List<Rect>();
@@ -193,7 +191,9 @@ public class MatchReplay : ITweak {
 	private static void SelfReg() {
 		SRApi.LocSec(Sec, "对局记录", "Match Records");
 		SRApi.Nav(Sec, 65); // 侧栏栏目顺序 65：关卡工具(60) 之后、会话(80) 之前
-		SRApi.RegisterPage(Sec, Render); // 本功能页自绘：配置行 + 双栏查看器
+		// 一个栏目两个子页：记录（配置 + 状态 + 会话列表）/ 查看器（完整时间线查看）。核心自动画页签。
+		SRApi.RegisterPage(Sec, "records", "对局记录", "Records", 10, RenderRecordsPage);
+		SRApi.RegisterPage(Sec, "viewer", "查看器", "Viewer", 20, RenderViewerPage);
 		SRApi.LocKey(Sec, "Enabled", "记录总开关", "Recording");
 		SRApi.LocDesc(Sec, "Enabled",
 			"记录总开关\n开启后对局开始与每次阶段切换都会自动记录一条时间线\n记录只写本地配置文件目录，不发送任何网络消息；关闭后不再开始新的记录。",
@@ -1383,18 +1383,48 @@ public class MatchReplay : ITweak {
 
 	// ---------------------------------------------------------------- UI
 
-	private static void Render() {
-		// 整段兜住：任一控件抛异常都会让 IMGUI 布局栈失衡，本页宁可少画也不能把异常带进核心渲染。
-		try {
-			SRApi.Ctl.SectionTitle(SRApi.T("- 对局记录 -", "- Match records -"),
-				SRApi.T("本地记录对局时间线：阶段切换、方块布局摘要、玩家得分、放置/删除事件。只记录，不改游戏、不发网络消息。",
-					"Records match timelines locally: phase changes, block layout summaries, player scores and place/destroy events. Recording only; nothing is injected or sent over the network."));
-			// 配置行（Enabled / Max Sessions / Record Scores / Record Blocks）由核心统一绘制。
-			SRApi.RenderSectionEntries(Sec);
-			GUILayout.Space(SRApi.Ctl.Sc(4));
+	// 行高统一按字体实测：SRApi.Ctl.TextHeight 内部用核心样式 CalcHeight，UI 缩放 / 字体 / 窗口宽度变化都自适应。
+	private static float UiTextH(string text, float width) {
+		float h = 0f;
+		try { h = SRApi.Ctl.TextHeight(text == null ? "" : text, Mathf.Max(SRApi.Ctl.Sc(20f), width)); } catch { h = 0f; }
+		if (h <= 0f) h = SRApi.Ctl.Sc(20f);
+		return h;
+	}
 
-			// 当前记录状态。
-			GUILayout.BeginHorizontal();
+	// 自绘行用：在 TextHeight 基础上再按实际绘制样式（LabelWrap）量一次，保证自动换行时行高也够。
+	private static float UiLineH(string text, float width) {
+		float w = Mathf.Max(SRApi.Ctl.Sc(20f), width);
+		float h = UiTextH(text, w);
+		try {
+			GUIStyle st = SRApi.Ctl.LabelWrap;
+			if (st != null) h = Mathf.Max(h, st.CalcHeight(new GUIContent(text == null ? "" : text), w));
+		} catch { }
+		return h;
+	}
+
+	// 标签宽度按文字实测（英文较长 / UI 缩放变化不截断）。
+	private static float LabelW(string zh, string en) {
+		float w = SRApi.Ctl.Sc(38f);
+		try {
+			GUIStyle st = SRApi.Ctl.Label;
+			if (st != null) w = Mathf.Max(w, st.CalcSize(new GUIContent(SRApi.T(zh, en))).x + SRApi.Ctl.Sc(8f));
+		} catch { }
+		return w;
+	}
+
+	// 按钮宽度按文字实测（中英文 / UI 缩放变化都不会把按钮文字截断）。
+	private static float BtnW(string zh, string en) {
+		float w = SRApi.Ctl.Sc(64f);
+		try {
+			GUIStyle st = SRApi.Ctl.Btn;
+			if (st != null) w = Mathf.Max(w, st.CalcSize(new GUIContent(SRApi.T(zh, en))).x + SRApi.Ctl.Sc(18f));
+		} catch { }
+		return w;
+	}
+
+	private static void RenderStatusLine() {
+		GUILayout.BeginHorizontal();
+		try {
 			if (_session != null) {
 				GUILayout.Label(SRApi.T("正在记录: ", "Recording: ") + _session.id
 					+ "  (" + _session.entries.Count.ToString(CultureInfo.InvariantCulture) + SRApi.T(" 条", " entries") + ")",
@@ -1403,12 +1433,45 @@ public class MatchReplay : ITweak {
 				GUILayout.Label(SRApi.T("（当前未在记录）", "(not recording)"), SRApi.Ctl.Label);
 			}
 			GUILayout.FlexibleSpace();
-			GUILayout.EndHorizontal();
+		} finally { GUILayout.EndHorizontal(); }
+	}
+
+	// 第一页「对局记录」：配置项 + 记录状态 + 会话列表（不自绘时间线）。
+	private static void RenderRecordsPage() {
+		try {
+			SRApi.Ctl.SectionTitle(SRApi.T("- 对局记录 -", "- Match records -"),
+				SRApi.T("本地记录对局时间线：阶段切换、方块布局摘要、玩家得分、放置/删除事件。只记录，不改游戏、不发网络消息。",
+					"Records match timelines locally: phase changes, block layout summaries, player scores and place/destroy events. Recording only; nothing is injected or sent over the network."));
+			// 配置行（Enabled / Max Sessions / Record Scores / Record Blocks）由核心统一绘制。
+			SRApi.RenderSectionEntries(Sec);
+			GUILayout.Space(SRApi.Ctl.Sc(4));
+			RenderStatusLine();
 			GUILayout.Space(SRApi.Ctl.Sc(4));
 
 			List<SessionInfo> list = GetSessions();
+			int n = list == null ? 0 : list.Count;
+			SRApi.Ctl.SectionTitle(SRApi.T("- 会话列表 -", "- Match records -") + " (" + n.ToString(CultureInfo.InvariantCulture) + ")");
+			if (n == 0) {
+				GUILayout.Label(SRApi.T("（暂无对局记录，进入对局后会自动记录）",
+					"(no match records yet; matches are recorded automatically)"), SRApi.Ctl.Label);
+				return;
+			}
+			float width = Mathf.Max(SRApi.Ctl.Sc(260f), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40f));
+			RenderSessionRows(list, width, true);
+			GUILayout.Space(SRApi.Ctl.Sc(4));
+			GUILayout.Label(SRApi.T("点击一行选中对局记录；切换上方「查看器」页签查看时间线（Ctrl+滚轮可切页）。",
+				"Click a row to select it; switch to the Viewer tab above for the timeline (Ctrl+wheel cycles tabs)."), SRApi.Ctl.LabelWrap);
+		} catch (Exception __ex) { SRApi.Guard.Log("渲染对局记录页", __ex); }
+	}
+
+	// 第二页「查看器」：左会话列表 + 右筛选 / 时间线 / 条目详情（无可见滚动条，页面级滚轮滚动）。
+	private static void RenderViewerPage() {
+		try {
+			SRApi.Ctl.SectionTitle(SRApi.T("- 查看器 -", "- Viewer -"),
+				SRApi.T("左侧选择对局记录，右侧查看时间线；↑↓ 切换条目，点击行可选中。",
+					"Pick a match record on the left and inspect its timeline on the right; use Up/Down to move and click a row to select."));
+			List<SessionInfo> list = GetSessions();
 			if (list == null || list.Count == 0) {
-				SRApi.Ctl.SectionTitle(SRApi.T("- 查看器 -", "- Viewer -"));
 				GUILayout.Label(SRApi.T("（暂无对局记录，进入对局后会自动记录）",
 					"(no match records yet; matches are recorded automatically)"), SRApi.Ctl.Label);
 				return;
@@ -1416,36 +1479,29 @@ public class MatchReplay : ITweak {
 			EnsureSelectedSession(list);
 			ViewSession vs = GetViewData();
 			BuildPhaseOptions(vs);
-			SRApi.Ctl.SectionTitle(SRApi.T("- 查看器 -", "- Viewer -"),
-				SRApi.T("左侧选择对局记录，右侧查看时间线；↑↓ 切换条目，点击行可选中。",
-					"Pick a match record on the left and inspect its timeline on the right; use Up/Down to move and click a row to select."));
 
-			float availW = Mathf.Max(SRApi.Ctl.Sc(560), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40));
-			float leftW = Mathf.Clamp(availW * 0.30f, SRApi.Ctl.Sc(230), SRApi.Ctl.Sc(340));
-			float paneH = SRApi.Ctl.Sc(500);
+			float availW = Mathf.Max(SRApi.Ctl.Sc(520f), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(36f));
+			float leftW = Mathf.Clamp(availW * 0.29f, SRApi.Ctl.Sc(220f), SRApi.Ctl.Sc(330f));
+			float rightW = Mathf.Max(SRApi.Ctl.Sc(280f), availW - leftW - SRApi.Ctl.Sc(10f));
 
 			GUILayout.BeginHorizontal();
 			try {
-				// 左栏：会话列表（自绘行 + 选中高亮）。
 				GUILayout.BeginVertical(GUILayout.Width(leftW));
 				try {
 					GUILayout.Label(SRApi.T("对局记录", "Match records") + " (" + list.Count.ToString(CultureInfo.InvariantCulture) + ")",
-						SRApi.Ctl.Label, GUILayout.Height(SRApi.Ctl.Sc(20)));
-					_sessionScroll = GUILayout.BeginScrollView(_sessionScroll, false, true,
-						GUILayout.Height(paneH - SRApi.Ctl.Sc(28)));
-					try { RenderSessionRows(list); } finally { GUILayout.EndScrollView(); }
+						SRApi.Ctl.Label);
+					RenderSessionRows(list, leftW, true);
 				} finally { GUILayout.EndVertical(); }
 				GUILayout.Space(SRApi.Ctl.Sc(8));
-				// 右栏：筛选条 + 时间线表格 + 条目详情。
 				GUILayout.BeginVertical();
 				try {
-					RenderFilterBar(vs);
+					RenderFilterBar(vs, rightW);
 					RefreshFiltered(vs);
 					RenderTimeline(vs);
-					RenderDetail(vs);
+					RenderDetail(vs, rightW);
 				} finally { GUILayout.EndVertical(); }
 			} finally { GUILayout.EndHorizontal(); }
-		} catch (Exception __ex) { SRApi.Guard.Log("渲染对局记录页", __ex); }
+		} catch (Exception __ex) { SRApi.Guard.Log("渲染对局记录查看器", __ex); }
 	}
 
 	private static void EnsureSelectedSession(List<SessionInfo> list) {
@@ -1489,34 +1545,39 @@ public class MatchReplay : ITweak {
 		return null;
 	}
 
-	// 左栏会话行：名称 / 时间 / 模式 / 关卡 / 条目数 / 快照数 / 大小，选中高亮；点击即切换会话。
-	private static void RenderSessionRows(List<SessionInfo> list) {
+	// 会话行：两行排版（名称/时间；模式/关卡/条目/快照/大小）。行高按两行文本实测，不再用固定常数。
+	private static void RenderSessionRows(List<SessionInfo> list, float width, bool clickable) {
 		Event e = Event.current;
 		Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
-		float rowH = SRApi.Ctl.Sc(58);
+		float innerW = Mathf.Max(SRApi.Ctl.Sc(60f), width - SRApi.Ctl.Sc(14f));
 		for (int i = 0; i < list.Count; i++) {
 			SessionInfo si = list[i];
+			string line1 = si.name + " · " + si.started.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+			string line2 = (string.IsNullOrEmpty(si.modeLabel) ? ModeTagText(si.mode) : si.modeLabel)
+				+ " · " + (string.IsNullOrEmpty(si.level) ? "-" : si.level)
+				+ " · " + si.entries.ToString(CultureInfo.InvariantCulture) + SRApi.T(" 条", " entries")
+				+ " · " + si.snapshots.ToString(CultureInfo.InvariantCulture) + SRApi.T(" 快照", " snaps")
+				+ " · " + SizeText(si.size);
+			float line1H = UiLineH(line1, innerW);
+			float line2H = UiLineH(line2, innerW);
+			float rowH = line1H + line2H + SRApi.Ctl.Sc(2f);
 			Rect r = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
 				GUILayout.ExpandWidth(true), GUILayout.Height(rowH));
 			bool sel = !string.IsNullOrEmpty(_viewPath) && si.path == _viewPath;
 			bool hov = e != null && r.Contains(mp);
 			if (e != null && e.type == EventType.Repaint) {
-				if (sel) SRApi.DrawFill(r, new Color(0.24f, 0.42f, 0.68f, 0.55f));
-				else if (hov) SRApi.DrawFill(r, new Color(1f, 1f, 1f, 0.06f));
+				if (sel) {
+					SRApi.DrawFill(r, new Color(0.20f, 0.38f, 0.62f, 0.72f));
+					// 左侧强调条：让选中态更明显。
+					SRApi.DrawFill(new Rect(r.x, r.y, SRApi.Ctl.Sc(3f), r.height), new Color(0.35f, 0.68f, 1f, 0.95f));
+				} else if (hov) {
+					SRApi.DrawFill(r, new Color(1f, 1f, 1f, 0.07f));
+				}
 				SRApi.DrawLine(new Rect(r.x, r.yMax - 1f, r.width, 1f), new Color(1f, 1f, 1f, 0.08f));
 			}
-			float x = r.x + SRApi.Ctl.Sc(6);
-			float w = Mathf.Max(SRApi.Ctl.Sc(20), r.width - SRApi.Ctl.Sc(12));
-			GUI.Label(new Rect(x, r.y + SRApi.Ctl.Sc(2), w, SRApi.Ctl.Sc(17)), si.name, SRApi.Ctl.Label);
-			string line2 = si.started.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
-				+ " · " + (string.IsNullOrEmpty(si.modeLabel) ? ModeTagText(si.mode) : si.modeLabel)
-				+ " · " + (string.IsNullOrEmpty(si.level) ? "-" : si.level);
-			GUI.Label(new Rect(x, r.y + SRApi.Ctl.Sc(19), w, SRApi.Ctl.Sc(17)), line2, SRApi.Ctl.Label);
-			string line3 = si.entries.ToString(CultureInfo.InvariantCulture) + SRApi.T(" 条", " entries")
-				+ " · " + si.snapshots.ToString(CultureInfo.InvariantCulture) + SRApi.T(" 快照", " snaps")
-				+ " · " + SizeText(si.size);
-			GUI.Label(new Rect(x, r.y + SRApi.Ctl.Sc(36), w, SRApi.Ctl.Sc(17)), line3, SRApi.Ctl.Label);
-			if (e != null && e.type == EventType.MouseDown && e.button == 0 && r.Contains(mp)) {
+			GUI.Label(new Rect(r.x + SRApi.Ctl.Sc(7f), r.y, innerW, line1H), line1, SRApi.Ctl.LabelWrap);
+			GUI.Label(new Rect(r.x + SRApi.Ctl.Sc(7f), r.y + line1H, innerW, line2H), line2, SRApi.Ctl.LabelWrap);
+			if (clickable && e != null && e.type == EventType.MouseDown && e.button == 0 && r.Contains(mp)) {
 				if (si.path != _viewPath) SelectSession(si.path);
 				GUIUtility.keyboardControl = 0;
 				e.Use();
@@ -1524,21 +1585,25 @@ public class MatchReplay : ITweak {
 		}
 	}
 
-	// 右栏顶部：搜索框 + 阶段下拉；第二行：导出 CSV / 导出 TXT / 删除（作用于选中会话）。
-	private static void RenderFilterBar(ViewSession vs) {
+	// 右栏顶部：搜索框 + 阶段下拉；第二行：导出 CSV / 导出 TXT / 删除（作用于选中会话）。控件尺寸按文字实测。
+	private static void RenderFilterBar(ViewSession vs, float rightW) {
+		float inputH = UiTextH("Ag", SRApi.Ctl.Sc(120f));
+		float labelW = LabelW("搜索", "Search");
+		float comboW = Mathf.Clamp(rightW * 0.24f, SRApi.Ctl.Sc(96f), SRApi.Ctl.Sc(150f));
+		float searchW = Mathf.Clamp(rightW * 0.34f, SRApi.Ctl.Sc(120f), SRApi.Ctl.Sc(260f));
 		GUILayout.BeginHorizontal();
 		try {
-			GUILayout.Label(SRApi.T("搜索", "Search"), SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(38)));
+			GUILayout.Label(SRApi.T("搜索", "Search"), SRApi.Ctl.Label, GUILayout.Width(labelW));
 			string typed = SRApi.ClearableTextField(_filterText == null ? "" : _filterText, SRApi.Ctl.SearchBox,
-				GUILayout.Width(SRApi.Ctl.Sc(180)), GUILayout.Height(SRApi.Ctl.Sc(24)));
+				GUILayout.Width(searchW), GUILayout.Height(inputH));
 			if (typed != null && typed != _filterText) { _filterText = typed; _filterSig = null; }
 			GUILayout.Space(SRApi.Ctl.Sc(6));
-			GUILayout.Label(SRApi.T("阶段", "Phase"), SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(38)));
+			GUILayout.Label(SRApi.T("阶段", "Phase"), SRApi.Ctl.Label, GUILayout.Width(labelW));
 			if (_phaseVals != null && _phaseOpts != null && _phaseVals.Length > 0) {
 				int cur = 0;
 				for (int i = 0; i < _phaseVals.Length; i++) if (_phaseVals[i] == (_filterPhase == null ? "" : _filterPhase)) { cur = i; break; }
 				bool open = _phaseComboOpen;
-				int dsel = SRApi.Ctl.ComboBox(null, _phaseOpts[cur], _phaseVals, _phaseOpts, ref open, SRApi.Ctl.Sc(120));
+				int dsel = SRApi.Ctl.ComboBox(null, _phaseOpts[cur], _phaseVals, _phaseOpts, ref open, comboW);
 				_phaseComboOpen = open;
 				if (dsel >= 0 && dsel < _phaseVals.Length && _phaseVals[dsel] != _filterPhase) {
 					_filterPhase = _phaseVals[dsel];
@@ -1554,12 +1619,12 @@ public class MatchReplay : ITweak {
 			GUILayout.FlexibleSpace();
 			if (si != null) {
 				if (GUILayout.Button(SRApi.T("导出 CSV", "Export CSV"), SRApi.Ctl.Btn,
-					GUILayout.Width(SRApi.Ctl.Sc(84)), GUILayout.Height(SRApi.Ctl.Sc(24)))) ExportSessionCsv(si);
+					GUILayout.Width(BtnW("导出 CSV", "Export CSV")), GUILayout.Height(inputH))) ExportSessionCsv(si);
 				if (GUILayout.Button(SRApi.T("导出 TXT", "Export TXT"), SRApi.Ctl.Btn,
-					GUILayout.Width(SRApi.Ctl.Sc(84)), GUILayout.Height(SRApi.Ctl.Sc(24)))) ExportSession(si);
+					GUILayout.Width(BtnW("导出 TXT", "Export TXT")), GUILayout.Height(inputH))) ExportSession(si);
 				bool pending = _pendingDelete == si.path;
 				if (GUILayout.Button(pending ? SRApi.T("确认删除", "Confirm") : SRApi.T("删除", "Delete"), SRApi.Ctl.Btn,
-					GUILayout.Width(SRApi.Ctl.Sc(76)), GUILayout.Height(SRApi.Ctl.Sc(24)))) {
+					GUILayout.Width(BtnW(pending ? "确认删除" : "删除", pending ? "Confirm" : "Delete")), GUILayout.Height(inputH))) {
 					if (pending) { DeleteSession(si); _pendingDelete = null; }
 					else _pendingDelete = si.path;
 				}
@@ -1571,19 +1636,28 @@ public class MatchReplay : ITweak {
 		int total = vs != null ? vs.entries.Count : 0;
 		SRApi.Ctl.SectionTitle(SRApi.T("- 时间线 -", "- Timeline -") + " ("
 			+ _filtered.Count.ToString(CultureInfo.InvariantCulture) + "/" + total.ToString(CultureInfo.InvariantCulture) + ")");
-		float rowH = SRApi.Ctl.Sc(23);
-		float headerH = SRApi.Ctl.Sc(23);
-		float tableH = SRApi.Ctl.Sc(280);
-		float rowsH = Mathf.Max(SRApi.Ctl.Sc(40), tableH - headerH);
+		// 行高按字体实测（SRApi.Ctl.TextHeight）：UI 缩放 / 字体 / 窗口宽度变化都不会裁字。
+		float rowH = UiTextH("Ag", SRApi.Ctl.Sc(120f));
+		float headerH = UiTextH("Ag", SRApi.Ctl.Sc(80f));
+		int visibleRows = Mathf.Clamp(_filtered.Count, 4, 9);
+		float rowsH = rowH * visibleRows;
+		float tableH = headerH + rowsH + SRApi.Ctl.Sc(2f);
 		Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
 			GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
-		float availW = Mathf.Max(SRApi.Ctl.Sc(320), box.width);
-		// 列宽按"设计单位"填（核心绘制时会再乘一次缩放系数），fit 在屏幕像素上算，保证窄窗口也放得下。
-		float[] designW = { 74f, 42f, 76f, 54f, 96f, 180f };
-		float sumScreen = 0f;
-		for (int i = 0; i < designW.Length; i++) sumScreen += SRApi.Ctl.Sc(designW[i]);
-		float fit = Mathf.Min(1f, (availW - SRApi.Ctl.Sc(8)) / Mathf.Max(1f, sumScreen));
-		for (int i = 0; i < designW.Length; i++) _tlColW[i] = Mathf.Max(20f, designW[i] * fit);
+		float availW = Mathf.Max(SRApi.Ctl.Sc(320f), box.width);
+		// 列宽随窗口自适应：按权重分配，窄窗口等比缩小（设计单位；核心绘制时会再乘一次 UI 缩放）。
+		float[] weights = { 2.0f, 1.15f, 1.9f, 1.25f, 2.2f, 4.2f };
+		float sumWeights = 0f;
+		for (int i = 0; i < weights.Length; i++) sumWeights += weights[i];
+		float scale = Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f));
+		float[] designW = new float[weights.Length];
+		float totalDesign = 0f;
+		for (int i = 0; i < weights.Length; i++) {
+			designW[i] = Mathf.Max(32f, (availW * weights[i] / Mathf.Max(0.0001f, sumWeights)) / scale);
+			totalDesign += designW[i];
+		}
+		float fit = Mathf.Min(1f, (availW - SRApi.Ctl.Sc(6f)) / Mathf.Max(1f, totalDesign * scale));
+		for (int i = 0; i < designW.Length; i++) _tlColW[i] = Mathf.Max(24f, designW[i] * fit);
 
 		if (_tlArgs == null) _tlArgs = new SRApi.TableArgs();
 		float maxY = Mathf.Max(0f, _filtered.Count * rowH - rowsH);
@@ -1743,8 +1817,8 @@ public class MatchReplay : ITweak {
 		}
 	}
 
-	// 条目详情：元数据 + 逐人得分 + 快照名 + ops 摘要 + [存为预设]。
-	private static void RenderDetail(ViewSession vs) {
+	// 条目详情：元数据 + 快照名 + ops 摘要 + 逐人得分（两列紧凑排版）+ [存为预设]。
+	private static void RenderDetail(ViewSession vs, float width) {
 		SRApi.Ctl.SectionTitle(SRApi.T("- 条目详情 -", "- Entry detail -"));
 		ViewEntry en = (_selIndex >= 0 && _selIndex < _filtered.Count) ? _filtered[_selIndex] : null;
 		if (en == null) {
@@ -1752,6 +1826,8 @@ public class MatchReplay : ITweak {
 				"(pick a match record on the left and select a timeline row)"), SRApi.Ctl.Label);
 			return;
 		}
+		float inputH = UiTextH("Ag", SRApi.Ctl.Sc(120f));
+		// 第一行：时间 / 事件 / 阶段 / 回合 / 耗时 + 存为预设。
 		GUILayout.BeginHorizontal();
 		try {
 			string head = (string.IsNullOrEmpty(en.time) ? "-" : en.time)
@@ -1762,38 +1838,37 @@ public class MatchReplay : ITweak {
 			GUILayout.Label(head, SRApi.Ctl.Label);
 			GUILayout.FlexibleSpace();
 			if (!string.IsNullOrEmpty(en.snapshot) && GUILayout.Button(SRApi.T("存为预设", "Save as preset"), SRApi.Ctl.Btn,
-				GUILayout.Width(SRApi.Ctl.Sc(96)), GUILayout.Height(SRApi.Ctl.Sc(24)))) {
+				GUILayout.Width(BtnW("存为预设", "Save as preset")), GUILayout.Height(inputH))) {
 				SaveSnapshotAsPreset(vs != null ? vs.id : null, en);
 			}
 		} finally { GUILayout.EndHorizontal(); }
-		GUILayout.BeginHorizontal();
-		try {
-			GUILayout.Label(SRApi.T("方块 ", "Blocks ") + (en.blocks >= 0 ? en.blocks.ToString(CultureInfo.InvariantCulture) : "-"), SRApi.Ctl.Label);
-			GUILayout.Space(SRApi.Ctl.Sc(12));
-			GUILayout.Label(SRApi.T("指纹 ", "Hash ") + (string.IsNullOrEmpty(en.layoutHash) ? "-" : en.layoutHash), SRApi.Ctl.Label);
-			GUILayout.Space(SRApi.Ctl.Sc(12));
-			GUILayout.Label(SRApi.T("快照 ", "Snapshot ") + (string.IsNullOrEmpty(en.snapshot) ? SRApi.T("（无）", "(none)") : Path.GetFileName(en.snapshot)), SRApi.Ctl.Label);
-			GUILayout.FlexibleSpace();
-		} finally { GUILayout.EndHorizontal(); }
-		GUILayout.BeginHorizontal();
-		try {
-			GUILayout.Label(SRApi.T("操作: 放置 ", "Ops: place ") + en.opsPlace.ToString(CultureInfo.InvariantCulture)
-				+ SRApi.T(" · 删除 ", " · destroy ") + en.opsDestroy.ToString(CultureInfo.InvariantCulture), SRApi.Ctl.Label);
-			GUILayout.FlexibleSpace();
-		} finally { GUILayout.EndHorizontal(); }
-		_detailScroll = GUILayout.BeginScrollView(_detailScroll, false, true, GUILayout.Height(SRApi.Ctl.Sc(90)));
-		try {
-			if (en.scores == null || en.scores.Count == 0) {
-				GUILayout.Label(SRApi.T("（本条目没有得分快照）", "(no score snapshot for this entry)"), SRApi.Ctl.Label);
-			} else {
-				for (int i = 0; i < en.scores.Count; i++) {
-					ScoreRow s = en.scores[i];
-					GUILayout.Label("P" + s.number.ToString(CultureInfo.InvariantCulture) + "  " + s.name + "  "
-						+ s.score.ToString(CultureInfo.InvariantCulture) + (s.eliminated ? SRApi.T("（已淘汰）", " (out)") : ""),
-						SRApi.Ctl.Label);
-				}
-			}
-		} finally { GUILayout.EndScrollView(); }
+		// 第二行：方块数 / 指纹 / 快照文件（紧凑一行）。
+		GUILayout.Label(SRApi.T("方块 ", "Blocks ") + (en.blocks >= 0 ? en.blocks.ToString(CultureInfo.InvariantCulture) : "-")
+			+ "    " + SRApi.T("指纹 ", "Hash ") + (string.IsNullOrEmpty(en.layoutHash) ? "-" : en.layoutHash)
+			+ "    " + SRApi.T("快照 ", "Snapshot ") + (string.IsNullOrEmpty(en.snapshot) ? SRApi.T("（无）", "(none)") : Path.GetFileName(en.snapshot))
+			+ "    " + SRApi.T("操作: 放置 ", "Ops: place ") + en.opsPlace.ToString(CultureInfo.InvariantCulture)
+			+ SRApi.T(" · 删除 ", " · destroy ") + en.opsDestroy.ToString(CultureInfo.InvariantCulture),
+			SRApi.Ctl.LabelWrap);
+		// 逐人得分：两列网格，行高由 GUILayout 按字体自动测量。
+		if (en.scores == null || en.scores.Count == 0) {
+			GUILayout.Label(SRApi.T("（本条目没有得分快照）", "(no score snapshot for this entry)"), SRApi.Ctl.Label);
+			return;
+		}
+		float colW = Mathf.Max(SRApi.Ctl.Sc(110f), width * 0.5f - SRApi.Ctl.Sc(12f));
+		for (int i = 0; i < en.scores.Count; i += 2) {
+			GUILayout.BeginHorizontal();
+			try {
+				GUILayout.Label(ScoreLine(en.scores[i]), SRApi.Ctl.Label, GUILayout.Width(colW));
+				if (i + 1 < en.scores.Count) GUILayout.Label(ScoreLine(en.scores[i + 1]), SRApi.Ctl.Label, GUILayout.Width(colW));
+				GUILayout.FlexibleSpace();
+			} finally { GUILayout.EndHorizontal(); }
+		}
+	}
+
+	private static string ScoreLine(ScoreRow s) {
+		if (s == null) return "-";
+		return "P" + s.number.ToString(CultureInfo.InvariantCulture) + "  " + (string.IsNullOrEmpty(s.name) ? "?" : s.name) + "  "
+			+ s.score.ToString(CultureInfo.InvariantCulture) + (s.eliminated ? SRApi.T("（已淘汰）", " (out)") : "");
 	}
 
 	// ---------------------------------------------------------------- 阶段快照存为预设
