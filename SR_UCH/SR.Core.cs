@@ -1,4 +1,4 @@
-// 框架本体：状态与初始化、各类 Register 扩展点、Provide/Require 槽位、每帧钩子派发、
+﻿// 框架本体：状态与初始化、各类 Register 扩展点、Provide/Require 槽位、每帧钩子派发、
 // 对局开始时重置界面、日志包装 Guard。不认识任何具体功能（功能自己通过 SR.Register 挂上来）。
 using System;
 using System.Collections.Generic;
@@ -339,6 +339,8 @@ public partial class SR : ITweak {
         // 孤儿键数：BepInEx 把"文件里有但没有任何代码 Bind"的键留在 OrphanedEntries，Save 时原样写回。
         // 启动扫描后显示在设置页（可一键清理）。
         public static int OrphanKeyCount;
+        // 按需生成、尚未 Bind 的条目数（快捷键/组合键）：仅统计不告警。
+        public static int OrphanPendingCount;
         // 没有登记归属、也没被 NavHide 的配置段数：它们会以兜底页出现在侧栏（含漏登记退役的已删功能段）。
         public static int FallbackSectionCount;
         public static int AuditIssueCount { get { return _auditIssues.Count; } }
@@ -403,6 +405,7 @@ public partial class SR : ITweak {
                 cfg.Reload();
                 ClearEntryCache();
                 OrphanKeyCount = 0;
+            OrphanPendingCount = 0;
                 LogInfo("[SR.Cfg] 已清理 " + pairs.Count + " 个孤儿键（原文件已留成 .bak）");
                 return pairs.Count;
             } catch (Exception __ex) { Guard.Log("清理孤儿键", __ex); return 0; }
@@ -410,24 +413,30 @@ public partial class SR : ITweak {
 
         private static void OrphanAudit() {
             OrphanKeyCount = 0;
+            OrphanPendingCount = 0;
             try {
                 if (_internalConfig == null) return;
                 System.Collections.IDictionary dict = ReadOrphanDict();
                 if (dict == null) return;
-                System.Text.StringBuilder all = new System.Text.StringBuilder();
+                System.Text.StringBuilder real = new System.Text.StringBuilder();
                 foreach (System.Collections.DictionaryEntry de in dict) {
-                    OrphanKeyCount++;
                     ConfigDefinition def = de.Key is ConfigDefinition ? (ConfigDefinition)de.Key : default(ConfigDefinition);
-                    if (all.Length > 0) all.Append(" | ");
-                    all.Append("[").Append(def.Section).Append("] ").Append(def.Key);
-                    if (OrphanKeyCount > 10) continue;
-                    AuditWarn("[SR.Cfg] 配置孤儿键（没有任何代码再读它）: [" + def.Section + "] " + def.Key);
+                    // 快捷键条目是按需生成的（新建快捷键时才 Bind），审计跑在生成之前 → 它们只是"尚未生成"，不是孤儿键。
+                    if (def.Section == "Hotkeys"
+                        || (def.Section == "Settings" && def.Key != null && def.Key.StartsWith("组合键", StringComparison.Ordinal))) {
+                        OrphanPendingCount++;
+                        continue;
+                    }
+                    OrphanKeyCount++;
+                    if (real.Length > 0) real.Append(" | ");
+                    real.Append("[").Append(def.Section).Append("] ").Append(def.Key);
                 }
-                if (OrphanKeyCount > 0) {
-                    AuditWarn("[SR.Cfg] 共 " + OrphanKeyCount + " 个孤儿键：不影响运行，但会让侧栏多出无意义的栏目；"
-                        + "新功能的清理规则请用 SR.Migration.Remove / Retire 自注册（见 SR.ConfigMigration 顶部说明）。");
-                    AuditWarn("[SR.Cfg] 孤儿键全量: " + all.ToString());
-                }
+                // 只打一行：真实孤儿键逐条列出（通常极少），按需生成的快捷键条目只报数量。
+                if (OrphanKeyCount > 0)
+                    AuditWarn("[SR.Cfg] 配置孤儿键 " + OrphanKeyCount + " 个（配置里有、但没有代码再读；设置页可一键清理）: " + real.ToString());
+                else if (OrphanPendingCount > 0)
+                    LogInfo("[SR.Cfg] 孤儿键 0 个（" + OrphanPendingCount + " 个快捷键条目待按需生成，属正常）");
+
             } catch (Exception __ex) { Guard.Log("孤儿键扫描", __ex); }
         }
 

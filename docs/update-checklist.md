@@ -38,7 +38,7 @@
 3. 提交信息里写明游戏版本号。
 ## 例行：配置瘦身（每次发布前）
 
-1. 跑一次游戏（或 `build\smoke.ps1`），日志会输出 `[SR.Cfg] 孤儿键全量: ...`；
+1. 跑一次游戏（或 `build\smoke.ps1`），日志里 `[SR.Cfg] 配置孤儿键 N 个 …` 一行就是当前真实孤儿键（快捷键/组合键这类按需生成的条目已排除，不再误报）；
 2. `build\build.ps1 -ExportAudit` → `docs\audit-<版本>.md` 归档完整清单；
 3. 对"已删除功能"的键：先静态校验 `"键名"` 在主模块源码中无引用，再在 `SR.ConfigMigration.cs` legacy 区加 `RemoveKeys(text, "段", new[]{ ... })`；
 4. 不要删 `[Hotkeys]` / `[Settings] 组合键*` 这类按需生成的条目（删了会丢用户键位），交给设置页的"清理孤儿键"按钮；
