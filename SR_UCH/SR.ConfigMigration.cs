@@ -634,6 +634,8 @@ namespace SR_UCH.Tweaks {
             // 快速自杀功能已删除：清理其遗留键。
             text = RemoveKeys(text, "Quick Adjust", new[] { "Enabled", "Keybind" });
             text = RemoveKeys(text, "Internal", new[] { "P Suicide Migrated" });
+            // 对局记录功能已删除（2026-10）：清理其配置段遗留键。
+            text = RemoveKeys(text, "Match Replay", new[] { "Enabled", "Max Sessions", "Record Scores", "Record Blocks" });
             // P2 配置瘦身：清理已删除功能的废弃键（静态校验过：主模块源码里已无任何引用）。
             text = RemoveKeys(text, "Experiments", new[] { "Mute Own", "Mute Others", "Level Background Scale", "Level Bounds Treehouse", "Level Bounds Death Line", "Level Bounds Death Drop", "Level Bounds Only In Place", "Level Bounds Direction", "Level Bounds Key" });
             text = RemoveKeys(text, "Scene", new[] { "Render Hide Skybox", "Render Bg Color", "Scene Bounds", "Scene Spawn", "Scene Death Line", "Scene Death Line Len" });
