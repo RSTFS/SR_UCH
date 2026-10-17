@@ -237,7 +237,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void SelfReg() {
-            SR.RowFilters.Add(TrackPlayerRowVisible); // 通用条目行扩展点
+            SRApi.RowFilters.Add(TrackPlayerRowVisible); // 通用条目行扩展点
             SRApi.LocSec("Destroy Blocks", "方块破坏", null);
             SRApi.Nav("Destroy Blocks", 60); // 侧栏栏目顺序
             SRApi.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);

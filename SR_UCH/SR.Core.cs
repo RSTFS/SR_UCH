@@ -906,9 +906,9 @@ public partial class SR : ITweak {
             // 外部插件默认启用；手动禁用的 GUID 记入本列表（deny-list），重启后保持禁用。
             _disabledPluginsEntry = plugin.Config.Bind(Keys.Settings, Keys.DisabledPlugins, "", "不想让它跟着管理器一起出现的外部插件, 把 GUID 填进来, 用分号隔开. 没写进来的默认启用.");
             // 设置页顶部有专门的插件清单，这个原始 GUID 字符串条目不再显示
-            SR.RowFilters.Add(SettingsHiddenDisabledPlugins);
+            SRApi.RowFilters.Add(SettingsHiddenDisabledPlugins);
             // 窗口宽高 / XY 不暴露为设置条目（右下角拖拽即可，见 SR.Window.ApplyScaleToWindow）
-            SR.RowFilters.Add(SettingsHiddenWindowGeometry);
+            SRApi.RowFilters.Add(SettingsHiddenWindowGeometry);
             BlockInput = _blockInputEntry.Value;
             _blockInputEntry.SettingChanged += (s, e) => {
                 BlockInput = _blockInputEntry.Value;
@@ -1138,7 +1138,7 @@ public partial class SR : ITweak {
 
         // 管理器自己的界面文案与侧栏注册
         private static void SelfRegCore() {
-            SR.RowFilters.Add(AllEnabledRowHidden); // 设置页不重复显示本 Mod 总开关
+            SRApi.RowFilters.Add(AllEnabledRowHidden); // 设置页不重复显示本 Mod 总开关
             SR.LocSec("Settings", "设置", null);
             SR.NavHide("Settings"); // 设置页是独立顶层页（不占内部侧栏栏目）
             // 已删除功能的段名不能让老 cfg 残留段出现在侧栏；名单在 ConfigMigration，核心不维护功能名单。
@@ -1150,7 +1150,7 @@ public partial class SR : ITweak {
             SR.LocKey(Keys.Settings, Keys.UiScale, "界面缩放", null);
             SR.LocDesc(Keys.Settings, Keys.UiScale, "整个界面放大多少. 1.0 是原始大小, 1.3 是默认值. 嫌字小就调大一点.", "UI zoom, default 1.3.");
             // 核心自己的设置项也走"行扩展点"：设置页因此只有一份滑块绘制代码，语言下拉不按 section/key 硬编码。
-            SR.RowSliders.Add(SettingsSliderRange);
+            SRApi.RowSliders.Add(SettingsSliderRange);
             SR.RowComboOptions.Add(SettingsComboOptions);
             SR.LocKey(Keys.Settings, Keys.DisabledPlugins, "禁用的外部插件", null);
             SR.LocDesc(Keys.Settings, Keys.DisabledPlugins, "不想让它跟着管理器一起出现的外部插件, 把它的 GUID 填进来, 用分号隔开. 没写进来的默认都启用.", "External plugins to disable, as a semicolon-separated GUID list. Plugins not listed stay enabled.");

@@ -233,7 +233,7 @@ public partial class SR {
             if (_internalConfig != null) {
                 foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
                     if (e.Definition.Section != "Settings") continue;
-                    //这些项在会话页 / 搜索栏已有开关，设置页不再渲染（可见性由功能经 SR.RowFilters 注册）
+                    //这些项在会话页 / 搜索栏已有开关，设置页不再渲染（可见性由功能经 SRApi.RowFilters 注册）
                     if (!SR.RowVisible(e)) continue;
                     //组合键修饰键的内部持久化条目（RegisterComboEntry 建立），不在设置页显示
                     if (e.Definition.Key.StartsWith(Keys.ComboPrefix)) continue;
@@ -993,7 +993,7 @@ public partial class SR {
                     try {
                         sr = GUILayoutUtility.GetRect(Sc(150), CtlH(), GUILayout.Width(SliderTrackWidth()));
                         nv = DrawSlider(sr, fv, hmin, hmax, val is int, hstep); //int 条目按整数步进，提交时由 SetValue 归一化类型
-                        //float 条目可选步进（范围由 RowSliders 给出，粒度由 RowSliderSteps 给出）
+                        //float 条目可选步进（范围由 SRApi.RowSliders 给出，粒度由 RowSliderSteps 给出）
                         float fstep;
                         if (RowSliderStep(entry, out fstep))
                             nv = Mathf.Clamp(hmin + Mathf.Round((nv - hmin) / fstep) * fstep, hmin, hmax);

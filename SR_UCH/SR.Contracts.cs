@@ -226,6 +226,15 @@ namespace SR_UCH {
         public static void RegisterPage(string section, Action render) { Action<string, Action> f = _registerPageSimple; if (f != null) f(section, render); }
         public static void RegisterPage(string section, string pageId, string nameZh, string nameEn, int order, Action render) { Action<string, string, string, string, int, Action> f = _registerPageFull; if (f != null) f(section, pageId, nameZh, nameEn, order, render); }
 
+        // 行扩展点（与核心同名同签名）：功能向设置页条目行注册过滤/附加控件/滑块范围。
+        public delegate bool RowFilterFn(ConfigEntryBase entry);
+        public delegate string RowCompanionFn(ConfigEntryBase entry);
+        public delegate bool RowSliderFn(ConfigEntryBase entry, out float min, out float max, out string fmt);
+        public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
+        public static readonly List<RowCompanionFn> RowCompanions = new List<RowCompanionFn>();
+        public static readonly List<RowCompanionFn> RowExtras = new List<RowCompanionFn>();
+        public static readonly List<RowSliderFn> RowSliders = new List<RowSliderFn>();
+
         // 对局模式门控（与核心 SR.ModeMask 按位一致）与场景环境查询
         [Flags] public enum ModeMask { None = 0, Freeplay = 1, Party = 2, Creative = 4, Challenge = 8 }
         private static Func<int, bool> _gateModeAllows;

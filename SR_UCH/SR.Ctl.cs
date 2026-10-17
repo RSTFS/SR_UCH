@@ -440,7 +440,7 @@ public partial class SR {
 // 分区：RowHooks（功能对通用条目行的扩展点）
 // SR.Settings 渲染条目行时不硬编码 section/key，功能在 Initialize/SelfReg 里注册以下扩展点。
 // 行可见性、同伴条目（同一行右侧再画一个控件）、行专用滑块范围、下拉框宽度、枚举选项过滤。
-// RowFilters 是布局过滤而非权限门禁：只决定条目是否单独成行 / 是否在设置页重复渲染。
+// SRApi.RowFilters 是布局过滤而非权限门禁：只决定条目是否单独成行 / 是否在设置页重复渲染。
 
     public delegate bool RowFilterFn(ConfigEntryBase entry);
     public delegate string RowCompanionFn(ConfigEntryBase entry);
@@ -452,34 +452,30 @@ public partial class SR {
     public delegate bool RowComboOptionsFn(ConfigEntryBase entry, out string[] values, out string[] displayNames);
     public delegate void PageRenderFn();
 
-    public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
-    public static readonly List<RowCompanionFn> RowCompanions = new List<RowCompanionFn>();
-    public static readonly List<RowCompanionFn> RowExtras = new List<RowCompanionFn>(); //本行右侧"再渲染一个控件"的条目（如 缩放+键位、文字大小+开关）
-    public static readonly List<RowSliderFn> RowSliders = new List<RowSliderFn>();
     public static readonly List<RowComboWidthFn> RowComboWidths = new List<RowComboWidthFn>();
     public static readonly List<RowEnumFilterFn> RowEnumFilters = new List<RowEnumFilterFn>();
     public static readonly List<RowComboOptionsFn> RowComboOptions = new List<RowComboOptionsFn>();
 
     // 该条目当前是否显示（任一过滤器返回 false 即不显示）
     public static bool RowVisible(ConfigEntryBase entry) {
-        for (int i = 0; i < RowFilters.Count; i++) {
-            try { if (!RowFilters[i](entry)) return false; } catch (Exception __ex) { Guard.Log("行可见性过滤", __ex); }
+        for (int i = 0; i < SRApi.RowFilters.Count; i++) {
+            try { if (!SRApi.RowFilters[i](entry)) return false; } catch (Exception __ex) { Guard.Log("行可见性过滤", __ex); }
         }
         return true;
     }
 
     // 同伴条目 key（同一行右侧再渲染一个控件），null = 无
     public static string RowCompanion(ConfigEntryBase entry) {
-        for (int i = 0; i < RowCompanions.Count; i++) {
-            try { string k = RowCompanions[i](entry); if (k != null) return k; } catch (Exception __ex) { Guard.Log("同伴条目", __ex); }
+        for (int i = 0; i < SRApi.RowCompanions.Count; i++) {
+            try { string k = SRApi.RowCompanions[i](entry); if (k != null) return k; } catch (Exception __ex) { Guard.Log("同伴条目", __ex); }
         }
         return null;
     }
 
     // 同伴条目 key（同一行右侧"再渲染一个控件"），null = 无
     public static string RowExtra(ConfigEntryBase entry) {
-        for (int i = 0; i < RowExtras.Count; i++) {
-            try { string k = RowExtras[i](entry); if (k != null) return k; } catch (Exception __ex) { Guard.Log("行附加控件", __ex); }
+        for (int i = 0; i < SRApi.RowExtras.Count; i++) {
+            try { string k = SRApi.RowExtras[i](entry); if (k != null) return k; } catch (Exception __ex) { Guard.Log("行附加控件", __ex); }
         }
         return null;
     }
@@ -487,8 +483,8 @@ public partial class SR {
     // 行专用滑块范围（命中即用滑块渲染这个数值条目；fmt = 数值显示格式）
     public static bool RowSliderRange(ConfigEntryBase entry, out float min, out float max, out string fmt) {
         min = 0f; max = 0f; fmt = "0.0";
-        for (int i = 0; i < RowSliders.Count; i++) {
-            try { if (RowSliders[i](entry, out min, out max, out fmt)) return true; } catch (Exception __ex) { Guard.Log("行滑块范围", __ex); }
+        for (int i = 0; i < SRApi.RowSliders.Count; i++) {
+            try { if (SRApi.RowSliders[i](entry, out min, out max, out fmt)) return true; } catch (Exception __ex) { Guard.Log("行滑块范围", __ex); }
         }
         return false;
     }

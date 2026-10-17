@@ -72,11 +72,11 @@ public partial class Chat : ITweak {
             SRApi.RegisterPage("Chat", "ChatWindow", "对话窗口", "ChatWindows", 10, RenderPage);
             SRApi.LocEnum("Hold", "按住显示");
             SRApi.LocEnum("Toggle", "切换常驻");
-            SR.RowFilters.Add(RowVisibleFilter);
-            SR.RowExtras.Add(RowExtraFor);
-            SR.RowSliders.Add(BoxScaleSlider);
-            SR.RowSliders.Add(FontSizeSlider);
-            SR.RowSliders.Add(PosSlider); //位置 X/Y：滑块范围按当前分辨率给
+            SRApi.RowFilters.Add(RowVisibleFilter);
+            SRApi.RowExtras.Add(RowExtraFor);
+            SRApi.RowSliders.Add(BoxScaleSlider);
+            SRApi.RowSliders.Add(FontSizeSlider);
+            SRApi.RowSliders.Add(PosSlider); //位置 X/Y：滑块范围按当前分辨率给
 
             SRApi.LocKey(Sec, "Enabled", "启用增强", "Enable tweaks");
             SRApi.LocDesc(Sec, "Enabled", "这一页的总开关. 关掉之后聊天窗口按原版跑, 字号缩放位置都不动.", "Master switch: when off, nothing on this page applies and the chat window runs exactly like vanilla (font size, scale and position are left untouched).");

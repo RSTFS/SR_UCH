@@ -117,10 +117,10 @@ public partial class Experiments : ITweak
                 "How fast the camera follows the character: 0.5 to 5 in steps of 0.5. 1 = the game default.");
             SRApi.LocKey("Experiments", "Free Camera Key", "视野快捷键", null);
             SRApi.LocDesc("Experiments", "Free Camera Key", "按这个键开关自由相机. 想用组合键就点按钮, 按住 Shift 或 Ctrl 再按主键.", "Key to toggle the free camera.");
-            SR.RowSliders.Add(FovSlider);                       // FOV 用滑块渲染
-            SR.RowSliders.Add(SpeedSlider);                     // 相机移动速度用滑块渲染
-            SR.RowCompanions.Add(CameraCompanion);              // 自由相机行右侧并排快捷键框
-            SR.RowFilters.Add(CameraRowFilter);                 // 快捷键不单独成行
+            SRApi.RowSliders.Add(FovSlider);                       // FOV 用滑块渲染
+            SRApi.RowSliders.Add(SpeedSlider);                     // 相机移动速度用滑块渲染
+            SRApi.RowCompanions.Add(CameraCompanion);              // 自由相机行右侧并排快捷键框
+            SRApi.RowFilters.Add(CameraRowFilter);                 // 快捷键不单独成行
         }
         private static bool FovSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
             min = MinFov; max = MaxFov; fmt = "0";
