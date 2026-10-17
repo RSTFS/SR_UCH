@@ -30,7 +30,6 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<string> _colWidths;
         private static ConfigEntry<int> _tableH;
         private static ConfigEntry<bool> _showQualityCoeff;    //游戏质量列是否附带技能匹配质量系数（Shift+表头点击切换）
-        private static ConfigEntry<string> _skillMode;         //技能系数列取 最大/平均/最小（Shift+表头点击切换）
         // 多列排序：-1 = 不按列排序，回到默认顺序（可加入优先 -> 健康分降序 -> 进度 -> id）。
         private static ConfigEntry<int> _sortColEntry;
         private static ConfigEntry<bool> _sortDescEntry;
@@ -48,9 +47,6 @@ namespace SR_UCH.Tweaks {
         // 仅当房间列表或可见性变化时才重排与重算统计。
         private static bool _lobbiesDirty;
         private static float _lobbySortAt = -999f;
-        // 自己的技能系数按帧缓存（悬浮技能系数表头时每帧都读）。
-        private static int _mySkillFrame = -1;
-        private static string _mySkillText;
         private static Vector2 _scrollRows, _scrollCols;
         private static string _openCombo = "";              //同时只允许一个下拉框展开
         private static float _abortDeadline, _forceDeadline, _forceRawDeadline;   //回家看门狗的三级时限
@@ -72,15 +68,20 @@ namespace SR_UCH.Tweaks {
             typeof(LevelSelectController).GetField("FadeOut", BindingFlags.Instance | BindingFlags.NonPublic);
 
         private const string SecOnline = "Online";
-        private const string ColWidthsKey = "Column Widths 4";   // v4：新增综合分列（加列即换键，旧值不再套用）
+        private const string ColWidthsKey = "Column Widths 5";   // v5：删除技能系数列（加/删列即换键，v4 旧值由配置迁移裁剪）
         private const string TableHKey = "Table Height";
         private const string ColOrderKey = "Column Order";
-        private const string HiddenColsKey = "Hidden Columns 4";   // v4：新增综合分列（默认隐藏）
+        private const string HiddenColsKey = "Hidden Columns 5";   // v5：删除技能系数列（v4 旧值由配置迁移裁剪）
         // 默认隐藏列的列索引字符串，取值必须与 CombinedCol 一致。
-        private const string DefaultHiddenCol = "10";
+        private const string DefaultHiddenCol = "9";
+        // v5 之前的列布局：12 列，索引 3 是已删除的「技能系数」列。
+        // Column Order 没有版本号（沿用旧键），所以加载时按老形状裁剪；Column Widths / Hidden Columns 已换键，
+        // 由 SR.ConfigMigration 把 v4 的旧值裁剪后写进 v5 键（否则旧索引会指到别的列 = 藏错列）。
+        private const int OldColCount = 12;
+        private const int OldSkillCol = 3;
 
-        // 默认列宽，顺序：区域 人数 游戏质量 平均技能 进度 游戏模式 标签 房主 限制 标记 综合分 操作。
-        private static readonly float[] DefWidths = { 62f, 44f, 76f, 62f, 66f, 80f, 50f, 86f, 78f, 50f, 54f, 70f };
+        // 默认列宽，顺序：区域 人数 游戏质量 进度 游戏模式 标签 房主 限制 标记 综合分 操作。
+        private static readonly float[] DefWidths = { 62f, 44f, 76f, 66f, 80f, 50f, 86f, 78f, 50f, 54f, 70f };
 
         public void Initialize(IFeatureHost plugin) {
             SRApi.LocSec(SecOnline, "联机", "Online");
@@ -124,14 +125,12 @@ namespace SR_UCH.Tweaks {
             _colOrder = plugin.Config.Bind(SecOnline, ColOrderKey, "", "列的先后顺序, 填列号, 用逗号隔开. 留空就是默认顺序.");
             _hiddenColsEntry = plugin.Config.Bind(SecOnline, HiddenColsKey, DefaultHiddenCol,
                 "藏起来的列, 填列号, 用逗号隔开. 右键表头可以藏一列, 按住 Shift 右键还原. 默认只藏了综合分那一列.");
-            // 表头切换（见 HeaderClick）：游戏质量列 = 是否附带技能匹配质量系数；技能系数列 = 最大 / 平均 / 最小。
+            // 表头切换（见 HeaderClick）：游戏质量列 = 是否附带技能匹配质量系数（Shift+点该列表头）。
             _showQualityCoeff = plugin.Config.Bind(SecOnline, "Show Quality Coeff", false,
-                "游戏质量那一列要不要多显示一个技能匹配质量系数. 点这一列的表头可以切换, 默认关.");
-            _skillMode = plugin.Config.Bind(SecOnline, "Skill Mode", "avg",
-                "技能系数那一列显示哪个值: max 是最大技能, avg 是平均技能, min 是最小技能. 按住 Shift 点这一列的表头可以切换, 默认 avg.");
-            // 多列排序：左键点表头按该列排序（升 -> 降 -> 默认），见 CycleSort。
+                "游戏质量那一列要不要多显示一个技能匹配质量系数. 按住 Shift 点这一列的表头可以切换, 默认关.");
+            // 多列排序：配置只保留读取，不再有表头点击写法（见 HeaderClick）。
             _sortColEntry = plugin.Config.Bind(SecOnline, "Sort Column", -1,
-                "房间列表按哪一列排序, 填列号, -1 表示默认排法: 能加入的排前面, 其余按综合分从高到低. 左键点表头就能换.");
+                "房间列表按哪一列排序, 填列号, -1 表示默认排法: 能加入的排前面, 其余按综合分从高到低.");
             _sortDescEntry = plugin.Config.Bind(SecOnline, "Sort Descending", false, "排序是从大到小还是从小到大.");
             try {
                 _sortCol = _sortColEntry.Value;
@@ -141,8 +140,6 @@ namespace SR_UCH.Tweaks {
             } catch { _sortCol = -1; _sortDesc = false; }
             SRApi.LocKey(SecOnline, "Show Quality Coeff", "显示技能匹配质量", null);
             SRApi.LocDesc(SecOnline, "Show Quality Coeff", "技能匹配质量系数显示开关\n在房间列表质量列后附带 0 到 1 的匹配系数\n也可按住 Shift 点击该列列头切换；关。", "skill-match quality coefficient toggle\nappends a 0-1 match coefficient to the quality column\ncan also be toggled with Shift + click on the column header; OFF");
-            SRApi.LocKey(SecOnline, "Skill Mode", "技能系数取值", null);
-            SRApi.LocDesc(SecOnline, "Skill Mode", "技能系数取值方式\n决定技能系数列取最大值、平均值还是最小值\n也可按住 Shift 点击该列列头切换；平均值。", "skill coefficient mode\nselects max, average or min for the skill column\ncan also be toggled with Shift + click on the column header; average");
         }
 
         // 清空房间列表与表格几何缓存（返回主界面 / 房主解散时调用）；不动列宽 / 列序 / 隐藏列偏好。
@@ -384,8 +381,8 @@ namespace SR_UCH.Tweaks {
                 SortLobbies();
                 if (refreshMsg) UpdateLobbyMsg();
             }
-            string hint = SRApi.T("（点刷新列表查询）表头：左键点=按该列排序（升->降->默认），拖分隔线=调列宽（<->），拖表头=换列位置（+），Shift+点游戏质量=显示/隐藏匹配质量系数，Shift+点技能系数=最大/平均/最小，右键=隐藏该列，Shift+右键=还原；右键某行=隐藏该房间；滚轮=上下，Ctrl+滚轮=左右；表格底边可拖高度",
-                               "(click 'Refresh' to query) Header: left-click = sort by that column (asc/desc/default), drag a separator = resize (<->), drag a header = reorder (+), Shift+click 'Quality' = show/hide the skill-match coefficient, Shift+click 'Skill' = max/avg/min, right-click = hide that column, Shift+right-click = reset; right-click a row = hide that lobby; wheel = up/down, Ctrl+wheel = left/right; drag the table's bottom edge to resize height");
+            string hint = SRApi.T("（点刷新列表查询）表头：左键点=按该列排序（升->降->默认），拖分隔线=调列宽（<->），拖表头=换列位置（+），Shift+点游戏质量=显示/隐藏匹配质量系数，右键=隐藏该列，Shift+右键=还原；右键某行=隐藏该房间；滚轮=上下，Ctrl+滚轮=左右；表格底边可拖高度",
+                               "(click 'Refresh' to query) Header: left-click = sort by that column (asc/desc/default), drag a separator = resize (<->), drag a header = reorder (+), Shift+click 'Quality' = show/hide the skill-match coefficient, right-click = hide that column, Shift+right-click = reset; right-click a row = hide that lobby; wheel = up/down, Ctrl+wheel = left/right; drag the table's bottom edge to resize height");
             GUILayout.Label(string.IsNullOrEmpty(_lobbyMsg) ? hint : _lobbyMsg, SRApi.Ctl.Label);
             int hiddenNow = CountHidden();   // 只数当前列表里还存在的
             if (hiddenNow > 0) {
@@ -427,8 +424,14 @@ namespace SR_UCH.Tweaks {
                 : availH;
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
+            // Shift+左键点「游戏质量」列头：必须在页面自己的 MouseDown 里先记下来（此时 Event.current.shift 可靠），
+            // 因为核心的 click 回调要等 MouseUp 才派发，IMGUI 的修饰键到 MouseUp 时可能已经丢了。
+            Event __hdrEv = Event.current;
+            bool __hdrShift = __hdrEv != null && __hdrEv.type == EventType.MouseDown && __hdrEv.button == 0 && ShiftHeldNow();
+            Vector2 __hdrMp = __hdrEv != null ? __hdrEv.mousePosition : Vector2.zero;
             TableDraw(box);
             TableInput(box, Event.current);
+            HandleQualityHeaderMouseDown(__hdrMp, __hdrShift);
             HeightGrip();   // 表格底边：拖动改高度
         }
 
@@ -613,6 +616,13 @@ namespace SR_UCH.Tweaks {
                 string v = _colWidths != null ? _colWidths.Value : null;
                 if (!string.IsNullOrEmpty(v)) {
                     string[] p = v.Split(',');
+                    // 兼容 v5 之前的 12 项老值（第 4 项是已删除的技能系数列）：先裁掉它再按列数套用，
+                    // 否则整串长度对不上会被丢弃（用户调好的列宽白丢）。
+                    if (p.Length == OldColCount) {
+                        List<string> q = new List<string>(ColCount);
+                        for (int i = 0; i < p.Length; i++) { if (i != OldSkillCol) q.Add(p[i]); }
+                        p = q.ToArray();
+                    }
                     if (p.Length == _cw.Length) {
                         for (int i = 0; i < p.Length; i++) {
                             float f;
@@ -626,17 +636,33 @@ namespace SR_UCH.Tweaks {
         }
 
         // 列顺序必须是 0..ColCount-1 的一个排列，否则忽略（防手改配置把表格搞崩）。
+        // "Column Order" 没有版本号：老值是 12 项（含已删除的技能系数列 3），先去掉 3 并把其后的索引统一 -1，
+        // 再按新列数校验；裁剪后仍不合法就整串忽略（回默认顺序，不崩也不藏错列）。
         private static void EnsureColOrder() {
             try {
                 string v = _colOrder != null ? _colOrder.Value : null;
                 if (string.IsNullOrEmpty(v)) return;
                 string[] p = v.Split(',');
-                if (p.Length != ColCount) return;
+                int[] src = new int[p.Length];
+                for (int i = 0; i < p.Length; i++) {
+                    if (!int.TryParse(p[i], out src[i])) return;
+                }
+                if (src.Length == OldColCount) {
+                    List<int> mapped = new List<int>(ColCount);
+                    for (int i = 0; i < src.Length; i++) {
+                        int k = src[i];
+                        if (k == OldSkillCol) continue;   // 已删除的技能系数列
+                        if (k > OldSkillCol) k -= 1;
+                        mapped.Add(k);
+                    }
+                    src = mapped.ToArray();
+                }
+                if (src.Length != ColCount) return;
                 bool[] seen = new bool[ColCount];
                 int[] o = new int[ColCount];
                 for (int i = 0; i < ColCount; i++) {
-                    int k;
-                    if (!int.TryParse(p[i], out k) || k < 0 || k >= ColCount || seen[k]) return;
+                    int k = src[i];
+                    if (k < 0 || k >= ColCount || seen[k]) return;
                     seen[k] = true;
                     o[i] = k;
                 }
@@ -644,6 +670,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("读取联机列顺序", __ex); }
         }
 
+        // v5 起配置键已换（值就是当前列索引），这里仍逐项做越界裁剪，防手改配置把不存在的列加进隐藏集合。
         private static void EnsureHiddenCols() {
             try {
                 string v = _hiddenColsEntry != null ? _hiddenColsEntry.Value : null;
@@ -679,16 +706,15 @@ namespace SR_UCH.Tweaks {
         private static void SaveWidths() { SaveCols(); }
 
         // 表格绘制（固定表头 + 细线分隔 + 列可拖动换位/隐藏/调宽）
-        private const int ColCount = 12;
-        private const int CombinedCol = 10;      // 综合分列 = LobbyHealthNum + LobbySkillNum（游戏排序用的房间质量分）
-        private const int JoinCol = 11;          //操作列：不可隐藏（否则没法加入）
-        private static readonly string[] Titles = { "区域", "人数", "游戏质量", "技能系数", "进度", "游戏模式", "标签", "房主", "限制", "标记", "综合分", "操作" };
-        private static readonly string[] TitlesEn = { "Region", "Players", "Quality", "Skill", "Progress", "Mode", "Tag", "Host", "Limit", "Flags", "Combined", "Operation" };
+        private const int ColCount = 11;         // v5：删除技能系数列后的列数
+        private const int CombinedCol = 9;       // 综合分列 = LobbyHealthNum + LobbySkillNum（游戏排序用的房间质量分）
+        private const int JoinCol = 10;          //操作列：不可隐藏（否则没法加入）
+        private static readonly string[] Titles = { "区域", "人数", "游戏质量", "进度", "游戏模式", "标签", "房主", "限制", "标记", "综合分", "操作" };
+        private static readonly string[] TitlesEn = { "Region", "Players", "Quality", "Progress", "Mode", "Tag", "Host", "Limit", "Flags", "Combined", "Operation" };
         private static readonly string[] TitleTips = {
             "服务器区域（游戏自己的本地化短名，显示为 亚太/欧盟/美国）",
             "当前人数 / 4（房间最多 4 人，人满不可加入）",
-            "✓ = 房主质量分达到 OkMatchScore，✓✓ = 达到 GoodMatchScore，再一个 ✓ = 匹配质量系数达到 SkillMatchQualityThreshold。\n系数 = CalculatedSkillMatchQuality（0~1）：游戏用大厅玩家技能串算出的技能匹配质量，越接近 1 = 房里玩家水平和本地玩家越接近（匹配越好）。\nShift+单击本列表头=显示/隐藏这个系数（默认不显示，只显示 ✓）。",
-            "这个房间里玩家技能值的 最大 / 平均 / 最小（游戏自己的 PlayerSkills 串，格式 数量,技能,权重,...）。数值越高 = 水平越高。\nShift+单击本列表头=在 最大技能 -> 平均技能 -> 最小技能 之间切换（默认平均技能）。",
+            "✓ = 房主质量分达到 OkMatchScore，✓✓ = 达到 GoodMatchScore，再一个 ✓ = 匹配质量系数达到 SkillMatchQualityThreshold。\n系数 = CalculatedSkillMatchQuality（0~1）：游戏用大厅玩家技能串算出的技能匹配质量，越接近 1 = 房里玩家水平和本地玩家越接近（匹配越好）。\nShift+单击本列表头=显示/隐藏这个系数（默认不显示，只显示 ✓；开启后本列在 ✓ 后追加 0~1 的系数）。",
             "游戏自己的对局进度：大厅中 / 房主AFK / 剩余百分比",
             "游戏模式（默认规则集）；自定义规则集显示规则集名",
             "房间标签（游戏本地化）",
@@ -701,8 +727,7 @@ namespace SR_UCH.Tweaks {
         private static readonly string[] TitleTipsEn = {
             "Server region (game-localized short name, shown as AP/EU/US)",
             "Players / 4 (a lobby holds at most 4; a full lobby cannot be joined)",
-            "✓ = host quality reaches OkMatchScore, ✓✓ = reaches GoodMatchScore, plus another ✓ when the skill-match coefficient reaches SkillMatchQualityThreshold.\nCoefficient = CalculatedSkillMatchQuality (0-1): the game's skill-match quality computed from the lobby's player skills; closer to 1 = the players' skill is closer to yours.\nShift+click this header to show/hide that coefficient (hidden by default, marks only).",
-            "Max / average / min skill value among this lobby's players (the game's own PlayerSkills string: count,skill,weight,...). Higher = a stronger lobby.\nShift+click this header to cycle max -> average -> min (default: average).",
+            "✓ = host quality reaches OkMatchScore, ✓✓ = reaches GoodMatchScore, plus another ✓ when the skill-match coefficient reaches SkillMatchQualityThreshold.\nCoefficient = CalculatedSkillMatchQuality (0-1): the game's skill-match quality computed from the lobby's player skills; closer to 1 = the players' skill is closer to yours.\nShift+click this header to show/hide that coefficient (hidden by default, marks only; when ON the column appends the 0-1 coefficient after the marks).",
             "The game's own match progress: in lobby / host AFK / remaining percent",
             "Game mode (default ruleset); a custom ruleset shows the ruleset name",
             "Lobby tag (game-localized)",
@@ -728,55 +753,6 @@ namespace SR_UCH.Tweaks {
             if (_clickFrame == Time.frameCount) return;
             _clickFrame = Time.frameCount;
             HeaderClick(ci);
-        }
-
-        // 技能系数：PlayerSkills 格式为 "数量,技能,权重,技能,权重,..."，按 _skillMode 取最大 / 平均 / 最小，取不到返回 NaN。
-        // 数值与文本分开：排序（CompareCol）必须用数值。
-        private static double SkillValue(Matchmaker.LobbyListInfo li) {
-            try {
-                string s = li != null ? li.PlayerSkills : null;
-                if (string.IsNullOrEmpty(s)) return double.NaN;
-                string[] p = s.Split(',');
-                int n;
-                if (p.Length < 3 || !int.TryParse(p[0], out n) || n <= 0) return double.NaN;
-                if (p.Length - 1 < 2 * n) n = (p.Length - 1) / 2;
-                if (n <= 0) return double.NaN;
-                string mode = SkillModeCfg();
-                double sum = 0, max = double.MinValue, min = double.MaxValue;
-                int ok = 0;
-                for (int i = 0; i < n; i++) {
-                    double v;
-                    if (double.TryParse(p[2 * i + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out v)) {
-                        sum += v; ok++;
-                        if (v > max) max = v;
-                        if (v < min) min = v;
-                    }
-                }
-                if (ok == 0) return double.NaN;
-                return mode == "max" ? max : mode == "min" ? min : sum / ok;
-            } catch { return double.NaN; }
-        }
-
-        private static string SkillText(Matchmaker.LobbyListInfo li) {
-            try {
-                double v = SkillValue(li);
-                return double.IsNaN(v) ? "-" : v.ToString("F0", CultureInfo.InvariantCulture);
-            } catch { return "-"; }
-        }
-
-        // 本地玩家自己的技能系数（游戏存档字段 SkillMean）。
-        private static string MySkillText() {
-            // 悬浮技能系数表头时每帧都调用；同一帧取一次即可。
-            int f = Time.frameCount;
-            if (_mySkillFrame == f) return _mySkillText;
-            _mySkillFrame = f;
-            _mySkillText = null;
-            try {
-                StatTracker st = StatTracker.Instance;
-                SaveFileData d = st != null ? st.GetSaveFileDataForMainUser() : null;
-                if (d != null) _mySkillText = d.SkillMean.ToString("F0", CultureInfo.InvariantCulture);
-            } catch { }
-            return _mySkillText;
         }
 
     }

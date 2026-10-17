@@ -165,7 +165,8 @@ namespace SR_UCH.Tweaks {
             } catch { return "?"; }
         }
 
-        // 游戏质量：按 LobbyHealthNum 对比 Good/OkMatchScore；技能匹配质量系数默认不显示，Shift+单击表头才带上。
+        // 游戏质量：按 LobbyHealthNum 对比 Good/OkMatchScore；技能匹配质量系数默认不显示，
+        // Shift+单击该列表头打开后，在标记（✓）后用「 · 0.87」形式追加 CalculatedSkillMatchQuality（0~1）。
         private static string QualityText(Matchmaker.LobbyListInfo li) {
             try {
                 GameSettings gs = GameSettings.GetInstance();
@@ -296,12 +297,12 @@ namespace SR_UCH.Tweaks {
         }
 
         // 按某一列比较两个房间：数值列用真实数值（文本比较下 "10" < "2"），其余列用显示文本。
+        // 列索引与 Online.cs 的 ColCount/Titles 对齐（v5：删除技能系数列后进度列前移一位）。
         private static int CompareCol(int ci, Matchmaker.LobbyListInfo a, Matchmaker.LobbyListInfo b) {
             switch (ci) {
                 case 1: return a.Players.CompareTo(b.Players);
                 case 2: return a.LobbyHealthNum.CompareTo(b.LobbyHealthNum);
-                case 3: return SkillValue(a).CompareTo(SkillValue(b));
-                case 4: return a.matchProgress.CompareTo(b.matchProgress);
+                case 3: return a.matchProgress.CompareTo(b.matchProgress);
                 case CombinedCol: return a.CombinedHealthSkill.CompareTo(b.CombinedHealthSkill);
                 default: {
                     string[] ca = CellTexts(a), cb = CellTexts(b);

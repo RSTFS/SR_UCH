@@ -52,54 +52,84 @@ namespace SR_UCH.Tweaks {
         private static void SaveEntry(ConfigEntryBase e) { if (e != null) SRApi.Ctl.MarkConfigDirty(e.ConfigFile); }
 
         // 表格：固定表头 + 房间行 + 自绘竖向滚动条，几何全部用绝对矩形手动偏移。
-        private const int HostCol = 7;                 // 房主列靠左显示，其余列居中
+        private const int HostCol = 6;                 // 房主列靠左显示，其余列居中
         private const int QualityCol = 2;              // 游戏质量列：Shift+单击表头切换技能匹配质量系数
-        private const int SkillCol = 3;                // 技能系数列：Shift+单击表头切换最大 / 平均 / 最小
         private const float CodeLabelW = 58f;          // 房间码标签宽度
 
         // 单击表头：Shift+左键触发列专属切换（排序不再通过点表头切换，避免误触）。
+        // 质量列实际由页面自己的 MouseDown 入口切换（见 HandleQualityHeaderMouseDown）；
+        // 这里保留核心 click 回调的备用路径：核心在 MouseUp 才派发，且 IMGUI 到那时可能已丢失 Shift，
+        // 故用 ShiftHeldNow() 同时看 Event.current.shift 与 Input.GetKey。
         private static void HeaderClick(int ci) {
             try {
-                bool shift = false;
-                try { shift = Event.current != null && Event.current.shift; } catch { }
-                if (shift) {
-                    if (ci == QualityCol) {
-                        bool v = _showQualityCoeff != null && !_showQualityCoeff.Value;
-                        if (_showQualityCoeff != null) {
-                            _showQualityCoeff.Value = v;
-                            SaveEntry(_showQualityCoeff);
-                        }
-                        Notes(v ? "游戏质量：显示技能匹配系数" : "游戏质量：仅显示 ✓",
-                              v ? "Quality: showing the skill-match coefficient" : "Quality: marks only");
-                        return;
-                    }
-                    if (ci == SkillCol) {
-                        string cur = SkillModeCfg();
-                        string next = cur == "max" ? "avg" : cur == "avg" ? "min" : "max";   //最大 -> 平均 -> 最小
-                        if (_skillMode != null) {
-                            _skillMode.Value = next;
-                            SaveEntry(_skillMode);
-                        }
-                        // Notes(zh, en) 两个实参都会求值：先取一次名字，避免重复计算。
-                        string skillName = SkillModeName(next);
-                        Notes(SRApi.T("技能系数：", "Skill coefficient: ") + skillName, "Skill coefficient: " + skillName);
-                        return;
-                    }
+                if (!ShiftHeldNow()) {
+                    // 点击表头不再切换升/降序（按需求移除）。
+                    return;
                 }
-                // 点击表头不再切换升/降序（按需求移除）。
+                if (ci == QualityCol) ToggleQualityCoeff("core click 回调");
             } catch (Exception __ex) { SRApi.Guard.Log("表头点击", __ex); }
         }
 
-
-        private static string SkillModeCfg() {
-            string v = _skillMode != null ? (_skillMode.Value ?? "avg") : "avg";
-            return v == "max" || v == "min" ? v : "avg";
+        // Shift 状态：MouseUp/Used 事件上的修饰键不可靠，补 Input.GetKey 兜底。
+        private static bool ShiftHeldNow() {
+            try { if (Event.current != null && Event.current.shift) return true; } catch { }
+            try { return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift); } catch { }
+            return false;
         }
 
-        private static string SkillModeName(string mode) {
-            if (mode == "max") return SRApi.T("最大技能", "max");
-            if (mode == "min") return SRApi.T("最小技能", "min");
-            return SRApi.T("平均技能", "average");
+        // 切换「游戏质量」列的技能匹配质量系数显示；页面 MouseDown 与核心 click 两条入口共用。
+        private static void ToggleQualityCoeff(string from) {
+            if (_showQualityCoeff == null) return;
+            bool v = !_showQualityCoeff.Value;
+            _showQualityCoeff.Value = v;
+            SaveEntry(_showQualityCoeff);
+            try {
+                SRApi.LogInfo("[联机] 游戏质量系数 -> " + (v ? "开（显示 0~1）" : "关（仅 ✓）") + "；入口=" + from);
+            } catch { }
+            Notes(v ? "游戏质量：显示技能匹配系数（0~1）" : "游戏质量：仅显示 ✓",
+                  v ? "Quality: showing the skill-match coefficient (0-1)" : "Quality: marks only");
+        }
+
+        // 页面自己的 Shift+左键质量列表头入口：本帧表头几何刚由 TableDraw 算好，直接复算命中，
+        // 完全不依赖核心 MouseUp 的 click 派发（根因见文件头对 TableColMove 的说明）。
+        private static void HandleQualityHeaderMouseDown(Vector2 mp, bool shift) {
+            try {
+                if (!shift) return;
+                int hit = HeaderColAt(mp);
+                // 实机排查用：确认 Shift+左键的按下事件确实进到页面、且命中的是不是质量列。
+                try {
+                    SRApi.LogInfo("[联机] Shift+左键按下：表头命中列=" + hit + "（质量列=" + QualityCol
+                        + "，Event.shift=" + (Event.current != null && Event.current.shift) + "）");
+                } catch { }
+                if (hit != QualityCol) return;
+                // 本次按下由页面处理：清掉核心刚记下的列头拖动状态，避免 MouseUp 再回调一次 click 把开关切回去。
+                _tableArgs.moveCol = -1;
+                _tableArgs.moveDx = 0f;
+                ToggleQualityCoeff("页面 MouseDown");
+            } catch (Exception __ex) { SRApi.Guard.Log("联机表头 Shift 点击", __ex); }
+        }
+
+        // 表头命中（独立复算，避免依赖 core headerCells 的时序）：返回命中的数据列索引，未命中 -1。
+        // 列序/隐藏/横向滚动与核心 DeriveVisibleCols 同一套规则；钉住的操作列不参与。
+        private static int HeaderColAt(Vector2 mp) {
+            try {
+                if (_order == null || _cw == null || _order.Length != ColCount || _cw.Length != ColCount) return -1;
+                Rect box = _tableArgs.box;
+                float headerH = SRApi.Ctl.Sc(24);
+                if (box.width <= 0f || box.height <= 0f) return -1;
+                if (mp.y < box.y || mp.y >= box.y + headerH) return -1;
+                float x = box.x - _scrollCols.x;
+                float stripEnd = box.x + _tableArgs.stripW;
+                float sepW = SRApi.Ctl.Sc(4f);   // 右边 4px 是核心的列宽分隔线（拖列宽用），不算点击表头
+                for (int i = 0; i < ColCount; i++) {
+                    int ci = _order[i];
+                    if (ci < 0 || ci >= ColCount || ci == JoinCol || _hiddenCols.Contains(ci)) continue;
+                    float w = SRApi.Ctl.Sc(_cw[ci]);
+                    if (mp.x >= x && mp.x < x + w - sepW && mp.x >= box.x && mp.x < stripEnd) return ci;
+                    x += w;
+                }
+            } catch { }
+            return -1;
         }
         private static readonly List<Matchmaker.LobbyListInfo> _shownLobbies = new List<Matchmaker.LobbyListInfo>();
         private static readonly List<Rect> _headerCellsPage = new List<Rect>();   //可滚动列的表头单元格（页面坐标）
@@ -153,13 +183,12 @@ namespace SR_UCH.Tweaks {
             buf[0] = RegionShort(li);
             buf[1] = li.Players + "/4";
             buf[2] = QualityText(li);
-            buf[3] = SkillText(li);
-            buf[4] = ProgressText(li);
-            buf[5] = ModeText(li);
-            buf[6] = TagText(li);
-            buf[7] = string.IsNullOrEmpty(li.LobbyOwner) ? "?" : li.LobbyOwner;
-            buf[8] = LimitText(li);
-            buf[9] = FlagsText(li);
+            buf[3] = ProgressText(li);
+            buf[4] = ModeText(li);
+            buf[5] = TagText(li);
+            buf[6] = string.IsNullOrEmpty(li.LobbyOwner) ? "?" : li.LobbyOwner;
+            buf[7] = LimitText(li);
+            buf[8] = FlagsText(li);
             buf[CombinedCol] = li.CombinedHealthSkill.ToString(CultureInfo.InvariantCulture);
             buf[JoinCol] = "";
             _cellCache[li] = buf;
@@ -289,15 +318,10 @@ namespace SR_UCH.Tweaks {
                 Vector2 mp = _tableArgs != null ? _tableArgs.mp : Vector2.zero;
                 if (_sbDragging || HoveringSeparatorNow(mp)) return null;
                 string tip = SRApi.T(TitleTips[ci], TitleTipsEn[ci]);
-                if (ci == SkillCol) {
-                    // 悬浮提示里带上自己的技能系数（存档中的 SkillMean）。
-                    string mine = MySkillText();
-                    tip += "\n" + SRApi.T("你自己的技能系数：", "your own skill: ") + (mine != null ? mine : "?");
-                    tip += "\n" + SRApi.T("当前显示：", "showing: ") + SkillModeName(SkillModeCfg());
-                } else if (ci == QualityCol) {
+                if (ci == QualityCol) {
                     bool on = _showQualityCoeff != null && _showQualityCoeff.Value;
-                    tip += "\n" + SRApi.T(on ? "当前：显示匹配质量系数" : "当前：不显示匹配质量系数（点一下打开）",
-                                         on ? "now: coefficient shown" : "now: coefficient hidden (click to show)");
+                    tip += "\n" + SRApi.T(on ? "当前：显示匹配质量系数（✓ 后追加 0~1）" : "当前：不显示匹配质量系数（Shift+点一下打开）",
+                                         on ? "now: coefficient shown (0-1 after the marks)" : "now: coefficient hidden (Shift+click to show)");
                 }
                 return tip;
             } catch { return null; }

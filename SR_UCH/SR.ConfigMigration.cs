@@ -205,6 +205,95 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SR.Guard.Log("cfg 键值合并", __ex); return text; }
         }
 
+        // 把 from 段 keyFrom 的值经 map 变换后写进 to 段 keyTo，并删掉源键（幂等：源键不存在或目标已有同键时原样返回）。
+        // 用于"列键换版本号"这类迁移：光改名不够，旧值里的列索引必须先裁剪，否则会指到别的列。
+        private static string MoveMappedKey(string text, string from, string keyFrom, string to, string keyTo,
+            Func<string, string> map) {
+            try {
+                _appliedMoves.Add(new[] { from, keyFrom }); // 登记规则，供启动后的冲突自检
+                string[] lines = text.Replace("\r\n", "\n").Split('\n');
+                string cur = "";
+                int src = -1, dst = -1, toHdr = -1;
+                for (int i = 0; i < lines.Length; i++) {
+                    string t = lines[i].Trim();
+                    if (t.StartsWith("[", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal)) {
+                        cur = t.Substring(1, t.Length - 2);
+                        if (cur == to) toHdr = i;
+                        continue;
+                    }
+                    int eq = t.IndexOf('=');
+                    if (eq <= 0) continue;
+                    string k = t.Substring(0, eq).TrimEnd();
+                    if (cur == from && k == keyFrom) src = i;
+                    if (cur == to && k == keyTo) dst = i;
+                }
+                if (src < 0 || dst >= 0) return text; // 源没有 / 目标已有（已有优先，源留给 RemoveKeys 清理）
+                int e0 = lines[src].IndexOf('=');
+                if (e0 <= 0) return text;
+                string val = lines[src].Substring(e0 + 1).Trim();
+                string mapped = map != null ? map(val) : val;
+                if (mapped == null) mapped = "";
+                string newLine = keyTo + " = " + mapped;
+                List<string> outp = new List<string>(lines.Length + 1);
+                for (int i = 0; i < lines.Length; i++) if (i != src) outp.Add(lines[i]);
+                if (toHdr < 0) {
+                    outp.Add("");
+                    outp.Add("[" + to + "]");
+                    outp.Add(newLine);
+                } else {
+                    // 源行删除后目标段表头可能前移，重新在 outp 里定位再插入。
+                    int insertAt = -1;
+                    for (int i = 0; i < outp.Count; i++) {
+                        if (outp[i].Trim() == "[" + to + "]") { insertAt = i + 1; break; }
+                    }
+                    if (insertAt < 0) {
+                        outp.Add("");
+                        outp.Add("[" + to + "]");
+                        outp.Add(newLine);
+                    } else {
+                        outp.Insert(insertAt, newLine);
+                    }
+                }
+                return string.Join("\n", outp.ToArray());
+            } catch (Exception __ex) { SR.Guard.Log("cfg 键值迁移", __ex); return text; }
+        }
+
+        // 联机表格 v5 删除了「技能系数」列（v4 的索引 3），其后各列索引统一 -1。
+        private const int OnlineV4ColCount = 12;
+        private const int OnlineV5ColCount = 11;
+        private const int OnlineV4SkillCol = 3;
+
+        // v4 列宽（12 项）-> v5（11 项）：裁掉已删除的技能系数列。
+        private static string MapOnlineV4ColWidths(string v) {
+            try {
+                if (string.IsNullOrEmpty(v)) return v;
+                string[] p = v.Split(',');
+                if (p.Length != OnlineV4ColCount) return v;   // 不是 v4 的 12 项形状：原样搬
+                List<string> keep = new List<string>(OnlineV5ColCount);
+                for (int i = 0; i < p.Length; i++) { if (i != OnlineV4SkillCol) keep.Add(p[i]); }
+                return string.Join(",", keep.ToArray());
+            } catch (Exception __ex) { SR.Guard.Log("cfg 联机列宽迁移", __ex); return v; }
+        }
+
+        // v4 隐藏列索引 -> v5：丢掉已删除的 3，大于 3 的索引 -1；再按新列数裁剪越界项与不可隐藏的操作列。
+        private static string MapOnlineV4HiddenCols(string v) {
+            try {
+                if (string.IsNullOrEmpty(v)) return v;
+                List<string> keep = new List<string>();
+                foreach (string s in v.Split(',')) {
+                    int k;
+                    if (!int.TryParse(s.Trim(), out k)) continue;
+                    if (k == OnlineV4SkillCol) continue;                 // 已删除的技能系数列
+                    if (k > OnlineV4SkillCol) k -= 1;
+                    if (k < 0 || k >= OnlineV5ColCount) continue;        // 越界项
+                    if (k == OnlineV5ColCount - 1) continue;             // v5 的操作列不可隐藏
+                    string t = k.ToString();
+                    if (!keep.Contains(t)) keep.Add(t);
+                }
+                return string.Join(",", keep.ToArray());
+            } catch (Exception __ex) { SR.Guard.Log("cfg 联机隐藏列迁移", __ex); return v; }
+        }
+
         // 键在段间搬家时，[Settings] 里的 "组合键 <旧段> <键>" 条目名要一起改，否则组合键失效。
         private static string MoveComboEntry(string text, string fromSec, string toSec, string key) {
             return MoveComboEntryTo(text, fromSec, key, toSec, key);
@@ -550,6 +639,12 @@ namespace SR_UCH.Tweaks {
             text = RemoveKeys(text, "Scene", new[] { "Render Hide Skybox", "Render Bg Color", "Scene Bounds", "Scene Spawn", "Scene Death Line", "Scene Death Line Len" });
             text = RemoveKeys(text, "Level", new[] { "Build Mode", "Build File", "Score Fill Per Frame", "Score Fill Total Cap", "Party Bomb Radius", "Party Bomb Trigger Ratio" });
             text = RemoveKeys(text, "Online", new[] { "Column Widths 3" });
+            // 联机表格 v5 删除「技能系数」列（v4 索引 3）：v4 的列宽 / 隐藏列先裁剪索引再写进 v5 键，
+            // 否则旧索引在新布局里会指到别的列（列宽错位 / 藏错列）。Column Order 没有版本号，改由 Online 加载时裁剪。
+            text = MoveMappedKey(text, "Online", "Hidden Columns 4", "Online", "Hidden Columns 5", MapOnlineV4HiddenCols);
+            text = MoveMappedKey(text, "Online", "Column Widths 4", "Online", "Column Widths 5", MapOnlineV4ColWidths);
+            // 源键残留 / 已删除的「技能系数」取值键一并清掉。
+            text = RemoveKeys(text, "Online", new[] { "Hidden Columns 4", "Column Widths 4", "Skill Mode" });
             text = RemoveKeys(text, "Player Tracker", new[] { "Show Own Trail" });
             text = RemoveKeys(text, "Destroy Blocks", new[] { "Realtime Interval" });
             text = RemoveKeys(text, "Settings", new[] { "Show Advanced" });
