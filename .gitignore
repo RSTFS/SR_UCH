@@ -6,3 +6,5 @@ build/.cache/
 # 独立插件只保存在 D:\RS_TFS\CC\Others（不在本仓库）
 Others/
 .vs/
+# 审计报告是本机/本游戏版本的产物，不入库
+docs/audit-*.md

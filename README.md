@@ -1,7 +1,5 @@
 ﻿# SR_UCH
 
-**English** | [简体中文](README.zh-CN.md)
-
 > A quality-of-life mod suite for **Ultimate Chicken Horse** (BepInEx 5 / Harmony)
 
 An in-game settings panel you can just install and use: levels, building, chat, online play and
