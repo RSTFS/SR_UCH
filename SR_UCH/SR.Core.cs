@@ -1,4 +1,4 @@
-﻿// 框架本体：状态与初始化、各类 Register 扩展点、Provide/Require 槽位、每帧钩子派发、
+// 框架本体：状态与初始化、各类 Register 扩展点、Provide/Require 槽位、每帧钩子派发、
 // 对局开始时重置界面、日志包装 Guard。不认识任何具体功能（功能自己通过 SR.Register 挂上来）。
 using System;
 using System.Collections.Generic;
@@ -414,15 +414,20 @@ public partial class SR : ITweak {
                 if (_internalConfig == null) return;
                 System.Collections.IDictionary dict = ReadOrphanDict();
                 if (dict == null) return;
+                System.Text.StringBuilder all = new System.Text.StringBuilder();
                 foreach (System.Collections.DictionaryEntry de in dict) {
                     OrphanKeyCount++;
-                    if (OrphanKeyCount > 10) continue;
                     ConfigDefinition def = de.Key is ConfigDefinition ? (ConfigDefinition)de.Key : default(ConfigDefinition);
+                    if (all.Length > 0) all.Append(" | ");
+                    all.Append("[").Append(def.Section).Append("] ").Append(def.Key);
+                    if (OrphanKeyCount > 10) continue;
                     AuditWarn("[SR.Cfg] 配置孤儿键（没有任何代码再读它）: [" + def.Section + "] " + def.Key);
                 }
-                if (OrphanKeyCount > 0)
+                if (OrphanKeyCount > 0) {
                     AuditWarn("[SR.Cfg] 共 " + OrphanKeyCount + " 个孤儿键：不影响运行，但会让侧栏多出无意义的栏目；"
                         + "新功能的清理规则请用 SR.Migration.Remove / Retire 自注册（见 SR.ConfigMigration 顶部说明）。");
+                    AuditWarn("[SR.Cfg] 孤儿键全量: " + all.ToString());
+                }
             } catch (Exception __ex) { Guard.Log("孤儿键扫描", __ex); }
         }
 
