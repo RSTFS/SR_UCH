@@ -241,21 +241,21 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec("Destroy Blocks", "方块破坏", null);
             SRApi.Nav("Destroy Blocks", 60); // 侧栏栏目顺序
             SRApi.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);
-            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "是什么：删除模式切换键\n干什么：按住进入删除模式并高亮最近放置的方块，松手退出\n注意事项：点键框后按新键改绑，支持组合键\n默认值：左 Alt", "What: delete-mode key\nDoes: hold to enter delete mode and highlight the most recently placed block; release to exit\nNotes: click the key box and press a new key to rebind (combos supported)\nDefault: Left Alt");
+            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "删除模式切换键\n按住进入删除模式并高亮最近放置的方块，松手退出\n点键框后按新键改绑，支持组合键\n左 Alt", "delete-mode key\nhold to enter delete mode and highlight the most recently placed block; release to exit\nclick the key box and press a new key to rebind (combos supported)\nLeft Alt");
             SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
-            SRApi.LocDesc("Destroy Blocks", "Delete Key", "是什么：删除键\n干什么：删除当前选中的方块\n注意事项：滚轮可在候选方块之间切换\n默认值：退格键", "What: delete key\nDoes: deletes the currently selected block\nNotes: the mouse wheel cycles through candidate blocks\nDefault: Backspace");
+            SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除键\n删除当前选中的方块\n滚轮可在候选方块之间切换\n退格键", "delete key\ndeletes the currently selected block\nthe mouse wheel cycles through candidate blocks\nBackspace");
             SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
-            SRApi.LocDesc("Destroy Blocks", "Enabled", "是什么：方块破坏总开关\n干什么：决定本页功能是否生效\n注意事项：仅房主能删除；房客删除需要 EX 扩展的允许客户端删除\n默认值：关", "What: master switch for block destruction\nDoes: enables or disables the feature on this page\nNotes: host only; client-side deletion needs the EX module permission\nDefault: OFF");
+            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n决定本页功能是否生效\n仅房主能删除；房客删除需要 EX 扩展的允许客户端删除\n关", "master switch for block destruction\nenables or disables the feature on this page\nhost only; client-side deletion needs the EX module permission\nOFF");
             SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
-            SRApi.LocDesc("Destroy Blocks", "Select Mode", "是什么：候选方块排序方式\n干什么：距离＝按离自己的距离由近到远；放置顺序＝最后放置的优先\n注意事项：只影响选择顺序，不影响列表内容\n默认值：距离", "What: candidate ordering\nDoes: Distance = nearest to you first; Placement = most recently placed first\nNotes: affects selection order only, not the list contents\nDefault: Distance");
+            SRApi.LocDesc("Destroy Blocks", "Select Mode", "候选方块排序方式\n距离＝按离自己的距离由近到远；放置顺序＝最后放置的优先\n只影响选择顺序，不影响列表内容\n距离", "candidate ordering\nDistance = nearest to you first; Placement = most recently placed first\naffects selection order only, not the list contents\nDistance");
             SRApi.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
-            SRApi.LocDesc("Destroy Blocks", "List Mode", "是什么：列表模式\n干什么：普通＝只列玩家亲手放置的方块；进阶＝场上所有方块单独列出\n注意事项：普通模式排除炸弹等临时物件\n默认值：普通", "What: list mode\nDoes: Normal = only blocks placed by players; Advanced = every block listed individually\nNotes: Normal excludes temporary items such as bombs\nDefault: Normal");
+            SRApi.LocDesc("Destroy Blocks", "List Mode", "列表模式\n普通＝只列玩家亲手放置的方块；进阶＝场上所有方块单独列出\n普通模式排除炸弹等临时物件\n普通", "list mode\nNormal = only blocks placed by players; Advanced = every block listed individually\nNormal excludes temporary items such as bombs\nNormal");
             SRApi.LocKey("Destroy Blocks", "Track Player", "追踪玩家", null);
-            SRApi.LocDesc("Destroy Blocks", "Track Player", "是什么：按玩家号过滤\n干什么：不追踪＝所有玩家的方块；1 到 4＝只看对应玩家号\n注意事项：仅影响列表，需配合列表模式\n默认值：不追踪", "What: player filter\nDoes: NoTrack = all players; 1-4 = only blocks placed by that player number\nNotes: affects the list only; used with list mode\nDefault: NoTrack");
+            SRApi.LocDesc("Destroy Blocks", "Track Player", "按玩家号过滤\n不追踪＝所有玩家的方块；1 到 4＝只看对应玩家号\n仅影响列表，需配合列表模式\n不追踪", "player filter\nNoTrack = all players; 1-4 = only blocks placed by that player number\naffects the list only; used with list mode\nNoTrack");
             SRApi.LocEnum("Realtime", "实时");
             SRApi.LocEnum("Snapshot", "暂存");
             SRApi.LocKey("Destroy Blocks", "Refresh Mode", "列表刷新", null);
-            SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "是什么：候选列表刷新方式\n干什么：实时＝按住切换键期间持续更新；暂存＝按下时重建一次\n注意事项：实时模式已节流，仅在按住时有开销\n默认值：实时", "What: refresh mode for the candidate list\nDoes: Realtime = keeps updating while the toggle key is held; Snapshot = rebuilt once on press\nNotes: Realtime is throttled and only costs while held\nDefault: Realtime");
+            SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "候选列表刷新方式\n实时＝按住切换键期间持续更新；暂存＝按下时重建一次\n实时模式已节流，仅在按住时有开销\n实时", "refresh mode for the candidate list\nRealtime = keeps updating while the toggle key is held; Snapshot = rebuilt once on press\nRealtime is throttled and only costs while held\nRealtime");
         }
 
         // 是否走实时列表（默认实时）

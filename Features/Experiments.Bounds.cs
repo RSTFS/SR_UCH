@@ -130,20 +130,20 @@ public partial class Experiments : ITweak
             SRApi.Ref.Override("Cursor.boundary", "解除关卡边界：放置光标边界快照");
             SRApi.Ref.Override("ZoomCamera.frame", "解除关卡边界：相机取景框");
             SRApi.LocKey("Experiments", "Level Bounds", "解除关卡边界", null);
-            SRApi.LocDesc("Experiments", "Level Bounds", "是什么：关卡空间边界总开关\n干什么：解除方块放置与角色移动的边界限制\n注意事项：实体墙、光标越界、相机三项需分别开启才生效\n默认值：关", "What: master switch for the level boundary\nDoes: removes the boundary limit on block placement and character movement\nNotes: the solid walls, cursor and camera entries below must be enabled separately\nDefault: OFF");
-            SRApi.LocDesc("Experiments", "Level Bounds Piece Ignore", "是什么：方块越界放置开关\n干什么：允许把方块放到原边界之外\n注意事项：只影响放置判定；关闭时逐个恢复原值\n默认值：关", "What: out-of-bounds placement switch\nDoes: allows blocks to be placed beyond the original boundary\nNotes: affects placement checks only; original values are restored one by one when disabled\nDefault: OFF");
+            SRApi.LocDesc("Experiments", "Level Bounds", "关卡空间边界总开关\n解除方块放置与角色移动的边界限制\n实体墙、光标越界、相机三项需分别开启才生效\n关", "master switch for the level boundary\nremoves the boundary limit on block placement and character movement\nthe solid walls, cursor and camera entries below must be enabled separately\nOFF");
+            SRApi.LocDesc("Experiments", "Level Bounds Piece Ignore", "方块越界放置开关\n允许把方块放到原边界之外\n只影响放置判定；关闭时逐个恢复原值\n关", "out-of-bounds placement switch\nallows blocks to be placed beyond the original boundary\naffects placement checks only; original values are restored one by one when disabled\nOFF");
             SRApi.LocKey("Experiments", "Level Bounds Margin", "边界外扩", "Extra margin");
-            SRApi.LocDesc("Experiments", "Level Bounds Margin", "是什么：边界外扩距离\n干什么：把每边边界按该像素值向外扩\n注意事项：不限范围\n默认值：500 像素", "What: boundary expansion distance\nDoes: expands each side of the boundary by this many pixels\nNotes: no upper limit\nDefault: 500 px");
+            SRApi.LocDesc("Experiments", "Level Bounds Margin", "边界外扩距离\n把每边边界按该像素值向外扩\n不限范围\n500 像素", "boundary expansion distance\nexpands each side of the boundary by this many pixels\nno upper limit\n500 px");
             SRApi.LocKey("Experiments", "Level Bounds Walls", "实体墙", "Solid walls");
-            SRApi.LocDesc("Experiments", "Level Bounds Walls", "是什么：实体墙解除开关\n干什么：去掉挡住角色的三面实体墙\n注意事项：不开启时角色仍无法走出边界\n默认值：关", "What: solid wall switch\nDoes: removes the three solid walls that block characters\nNotes: characters still cannot walk out unless this is on\nDefault: OFF");
+            SRApi.LocDesc("Experiments", "Level Bounds Walls", "实体墙解除开关\n去掉挡住角色的三面实体墙\n不开启时角色仍无法走出边界\n关", "solid wall switch\nremoves the three solid walls that block characters\ncharacters still cannot walk out unless this is on\nOFF");
             SRApi.LocKey("Experiments", "Level Bounds Cursor", "光标越界", "Cursor beyond bounds");
-            SRApi.LocDesc("Experiments", "Level Bounds Cursor", "是什么：光标越界开关\n干什么：把放置光标的边界换成硬解除半径，使光标可以到关卡外\n注意事项：需要先打开硬解除\n默认值：关", "What: cursor beyond bounds switch\nDoes: gives the placement cursor the hard radius so it can reach outside the level\nNotes: requires the hard unlock entry to be on\nDefault: OFF");
+            SRApi.LocDesc("Experiments", "Level Bounds Cursor", "光标越界开关\n把放置光标的边界换成硬解除半径，使光标可以到关卡外\n需要先打开硬解除\n关", "cursor beyond bounds switch\ngives the placement cursor the hard radius so it can reach outside the level\nrequires the hard unlock entry to be on\nOFF");
             SRApi.LocKey("Experiments", "Level Bounds Camera", "相机", "Camera");
-            SRApi.LocDesc("Experiments", "Level Bounds Camera", "是什么：相机取景放开开关\n干什么：把相机的取景边界一并放开\n注意事项：派对盒阶段相机可能被拉得很远\n默认值：关", "What: camera framing switch\nDoes: releases the camera framing bounds as well\nNotes: in the party-box phase the camera can be pulled far out\nDefault: OFF");
+            SRApi.LocDesc("Experiments", "Level Bounds Camera", "相机取景放开开关\n把相机的取景边界一并放开\n派对盒阶段相机可能被拉得很远\n关", "camera framing switch\nreleases the camera framing bounds as well\nin the party-box phase the camera can be pulled far out\nOFF");
             SRApi.LocKey("Experiments", "Level Bounds Hard", "硬解除", "Hard unlock");
-            SRApi.LocDesc("Experiments", "Level Bounds Hard", "是什么：硬解除总开关\n干什么：决定光标与原相机可到达的最大范围\n注意事项：是光标越界与相机两项的前置开关\n默认值：关", "What: hard unlock switch\nDoes: sets how far the cursor and camera can reach\nNotes: prerequisite for the cursor and camera entries\nDefault: OFF");
+            SRApi.LocDesc("Experiments", "Level Bounds Hard", "硬解除总开关\n决定光标与原相机可到达的最大范围\n是光标越界与相机两项的前置开关\n关", "hard unlock switch\nsets how far the cursor and camera can reach\nprerequisite for the cursor and camera entries\nOFF");
             SRApi.LocKey("Experiments", "Level Bounds Radius", "硬解除半径", "Hard radius");
-            SRApi.LocDesc("Experiments", "Level Bounds Radius", "是什么：硬解除半径\n干什么：设置硬解除允许到达的距离\n注意事项：不限范围，填 1 即贴着光标\n默认值：100000", "What: hard unlock radius\nDoes: sets the distance the hard unlock allows\nNotes: no upper limit; 1 keeps it right at the cursor\nDefault: 100000");
+            SRApi.LocDesc("Experiments", "Level Bounds Radius", "硬解除半径\n设置硬解除允许到达的距离\n不限范围，填 1 即贴着光标\n100000", "hard unlock radius\nsets the distance the hard unlock allows\nno upper limit; 1 keeps it right at the cursor\n100000");
         }
 
         public void Initialize(IFeatureHost plugin) {
@@ -707,7 +707,7 @@ public partial class Experiments : ITweak
 
         private static void SelfReg() {
             SRApi.LocKey("Experiments", "Remove UI3", "解除 UI3 覆盖", "Remove UI3 overlay");
-            SRApi.LocDesc("Experiments", "Remove UI3", "是什么：UI3 黑块绘制开关\n干什么：停止绘制 UI3 层上的黑方块，消除界外黑屏\n注意事项：已并入解除关卡边界，不再单独显示\n默认值：关", "What: UI3 black square switch\nDoes: stops drawing the black squares on the UI3 layer, removing the out-of-bounds darkness\nNotes: merged into the level bounds feature; no longer listed on its own\nDefault: OFF");
+            SRApi.LocDesc("Experiments", "Remove UI3", "UI3 黑块绘制开关\n停止绘制 UI3 层上的黑方块，消除界外黑屏\n已并入解除关卡边界，不再单独显示\n关", "UI3 black square switch\nstops drawing the black squares on the UI3 layer, removing the out-of-bounds darkness\nmerged into the level bounds feature; no longer listed on its own\nOFF");
         }
 
         public void Initialize(IFeatureHost plugin) {

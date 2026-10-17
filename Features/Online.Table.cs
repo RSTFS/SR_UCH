@@ -57,7 +57,7 @@ namespace SR_UCH.Tweaks {
         private const int SkillCol = 3;                // 技能系数列：Shift+单击表头切换最大 / 平均 / 最小
         private const float CodeLabelW = 58f;          // 房间码标签宽度
 
-        // 单击表头：左键按该列排序（升 -> 降 -> 默认，见 CycleSort）；Shift+左键触发列专属切换。
+        // 单击表头：Shift+左键触发列专属切换（排序不再通过点表头切换，避免误触）。
         private static void HeaderClick(int ci) {
             try {
                 bool shift = false;
@@ -86,28 +86,10 @@ namespace SR_UCH.Tweaks {
                         return;
                     }
                 }
-                CycleSort(ci);
+                // 点击表头不再切换升/降序（按需求移除）。
             } catch (Exception __ex) { SRApi.Guard.Log("表头点击", __ex); }
         }
 
-        // 列排序三态循环：升序 -> 降序 -> 默认（回到游戏自己的顺序）。
-        private static void CycleSort(int ci) {
-            try {
-                if (ci < 0 || ci >= ColCount || ci == JoinCol) return;   // 操作列无排序语义
-                if (_sortCol != ci) { _sortCol = ci; _sortDesc = false; }
-                else if (!_sortDesc) { _sortDesc = true; }
-                else { _sortCol = -1; _sortDesc = false; }
-                if (_sortColEntry != null) { _sortColEntry.Value = _sortCol; SaveEntry(_sortColEntry); }
-                if (_sortDescEntry != null) { _sortDescEntry.Value = _sortDesc; SaveEntry(_sortDescEntry); }
-                SortLobbies();
-                // Notes(zh, en) 两个实参都会求值：先拼一次再传。
-                string nm = SRApi.T(Titles[ci], TitlesEn[ci]);
-                string state = _sortCol < 0 ? SRApi.T("默认排序（可加入优先）", "default order (joinable first)")
-                             : (_sortDesc ? SRApi.T("降序", "descending") : SRApi.T("升序", "ascending"));
-                string msg = nm + " · " + state;
-                Notes(msg, msg);
-            } catch (Exception __ex) { SRApi.Guard.Log("列排序切换", __ex); }
-        }
 
         private static string SkillModeCfg() {
             string v = _skillMode != null ? (_skillMode.Value ?? "avg") : "avg";

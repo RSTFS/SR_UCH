@@ -255,7 +255,8 @@ public partial class SR {
                 string tip = content.tooltip != null ? content.tooltip : "";
                 if (entry != null && !(entry.BoxedValue is bool)) {
                     string dft = FormatDefaultValue(entry.DefaultValue);
-                    if (!string.IsNullOrEmpty(dft) && tip.IndexOf("默认", StringComparison.Ordinal) < 0) {
+                    if (!string.IsNullOrEmpty(dft) && tip.IndexOf("默认", StringComparison.Ordinal) < 0
+                                              && tip.IndexOf("Default", StringComparison.OrdinalIgnoreCase) < 0) {
                         tip += (tip.Length > 0 ? "\n" : "") + DefaultSuffix(entry);
                     }
                 }

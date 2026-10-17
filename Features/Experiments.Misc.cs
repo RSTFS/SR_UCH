@@ -43,7 +43,7 @@ public partial class Experiments : ITweak
 		// 加载后清理的初始化：配置 + 每帧钩子 + 补丁注册（UI 在上面的加载后清理分区）。
 		internal static void InitCleanup(IFeatureHost plugin) {
 			SRApi.LocKey("Experiments", "GC After Load", "加载后清理", "GC after load");
-			SRApi.LocDesc("Experiments", "GC After Load", "是什么：加载后清理开关\n干什么：首次进入关卡时执行一次 GC 与资源卸载，减少对局内卡顿\n注意事项：同一关卡的回合切换不重复执行，不影响结算速度\n默认值：关", "What: post-load cleanup switch\nDoes: runs GC and asset unload once on level load to reduce in-match stutter\nNotes: skipped on round changes within the same level; settlement speed unaffected\nDefault: OFF");
+			SRApi.LocDesc("Experiments", "GC After Load", "加载后清理开关\n首次进入关卡时执行一次 GC 与资源卸载，减少对局内卡顿\n同一关卡的回合切换不重复执行，不影响结算速度\n关", "post-load cleanup switch\nruns GC and asset unload once on level load to reduce in-match stutter\nskipped on round changes within the same level; settlement speed unaffected\nOFF");
 			_gcAfterLoadEntry = plugin.Config.Bind<bool>("Experiments", "GC After Load", false, "进关卡/换关卡时执行一次 GC 回收 + 资源卸载，减少对局内卡顿。同关卡回合切换不清理（场景名不变自动跳过），不影响结算速度。");
 			SRApi.RegisterTick("加载后清理", TickCleanup); // 每帧钩子（加载完成 1 秒后执行一次 GC）
 			// CreateAndPatchAll 不会自动发现带 [HarmonyPatch] 的类型，必须显式注册一次。
@@ -105,14 +105,14 @@ public partial class Experiments : ITweak
     
         private static void SelfReg2() {
             SRApi.LocKey("Experiments", "Free Camera", "自由相机", null);
-            SRApi.LocDesc("Experiments", "Free Camera", "是什么：自由相机开关\n干什么：开启后可用滚轮缩放视野\n注意事项：菜单与暂停界面不生效\n默认值：关", "What: free camera switch\nDoes: enables wheel zoom of the field of view\nNotes: does not apply in menus or the pause screen\nDefault: OFF");
+            SRApi.LocDesc("Experiments", "Free Camera", "自由相机开关\n开启后可用滚轮缩放视野\n菜单与暂停界面不生效\n关", "free camera switch\nenables wheel zoom of the field of view\ndoes not apply in menus or the pause screen\nOFF");
             SRApi.LocKey("Experiments", "Free Camera FOV", "视野大小", null);
-            SRApi.LocDesc("Experiments", "Free Camera FOV", "是什么：自由相机视野大小\n干什么：设置视野范围，越小越近，越大越远\n注意事项：范围 1 到 32；自由相机开启时滚轮也会同步修改\n默认值：10", "What: free camera FOV\nDoes: sets the field of view; smaller is closer, larger is farther\nNotes: range 1-32; the wheel also changes it while free camera is on\nDefault: 10");
+            SRApi.LocDesc("Experiments", "Free Camera FOV", "自由相机视野大小\n设置视野范围，越小越近，越大越远\n范围 1 到 32；自由相机开启时滚轮也会同步修改\n10", "free camera FOV\nsets the field of view; smaller is closer, larger is farther\nrange 1-32; the wheel also changes it while free camera is on\n10");
             // 必须登记 LocKey/LocDesc，否则界面回退显示英文键名。
             SRApi.LocKey("Experiments", "Free Camera Speed", "相机移动速度", null);
-            SRApi.LocDesc("Experiments", "Free Camera Speed", "是什么：相机跟随速度\n干什么：设置相机跟随角色的速度\n注意事项：范围 0.5 到 5，步长 0.5\n默认值：1（原版）", "What: camera follow speed\nDoes: sets how fast the camera follows the character\nNotes: range 0.5-5 in steps of 0.5\nDefault: 1 (vanilla)");
+            SRApi.LocDesc("Experiments", "Free Camera Speed", "相机跟随速度\n设置相机跟随角色的速度\n范围 0.5 到 5，步长 0.5\n1（原版）", "camera follow speed\nsets how fast the camera follows the character\nrange 0.5-5 in steps of 0.5\n1 (vanilla)");
             SRApi.LocKey("Experiments", "Free Camera Key", "视野快捷键", null);
-            SRApi.LocDesc("Experiments", "Free Camera Key", "是什么：自由相机快捷键\n干什么：按该键开关自由相机\n注意事项：可改绑，支持组合键\n默认值：F3", "What: free camera key\nDoes: toggles the free camera\nNotes: rebindable, combos supported\nDefault: F3");
+            SRApi.LocDesc("Experiments", "Free Camera Key", "自由相机快捷键\n按该键开关自由相机\n可改绑，支持组合键\nF3", "free camera key\ntoggles the free camera\nrebindable, combos supported\nF3");
             SRApi.RowSliders.Add(FovSlider);                       // FOV 用滑块渲染
             SRApi.RowSliders.Add(SpeedSlider);                     // 相机移动速度用滑块渲染
             SRApi.RowCompanions.Add(CameraCompanion);              // 自由相机行右侧并排快捷键框

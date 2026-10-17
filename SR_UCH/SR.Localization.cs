@@ -157,8 +157,8 @@ public partial class SR {
             string zh = KeyZh(k);
             string ov = Pack(zh, en);   //外部语言包覆盖
             if (ov != null) return ov;
-            //英文模式：显示 KeyCode 枚举名（本身就是英文）
-            return UseEn ? en : (zh ?? en);
+            //键位一律显示原始 KeyCode 名（本身就是英文）
+            return en;   // 一律显示原始 KeyCode 名（Delete / Backspace / LeftAlt），不做中文翻译
         }
 
         //键位中文名，无专门译名时返回 null。
