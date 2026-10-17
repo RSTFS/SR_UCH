@@ -156,20 +156,20 @@ public class MatchReplay : ITweak {
 		SRApi.RegisterPage(Sec, Render); // 本功能页自绘：设置行 + 会话列表 + 只读时间线
 		SRApi.LocKey(Sec, "Enabled", "记录总开关", "Recording");
 		SRApi.LocDesc(Sec, "Enabled",
-			"记录总开关\n开启后对局开始与每次阶段切换都会自动记录一条时间线\n记录只写本地配置文件目录，不发送任何网络消息\n关闭后不再开始新的记录",
-			"recording master switch\nwhen on, a timeline entry is recorded at match start and on every phase change\nrecords are written to the local config folder only; nothing is sent over the network\nturning it off stops new recordings");
+			"记录总开关\n开启后对局开始与每次阶段切换都会自动记录一条时间线\n记录只写本地配置文件目录，不发送任何网络消息；关闭后不再开始新的记录。",
+			"recording master switch\nwhen on, a timeline entry is recorded at match start and on every phase change\nrecords are written to the local config folder only; nothing is sent over the network; turning it off stops new recordings");
 		SRApi.LocKey(Sec, "Max Sessions", "保留会话数", "Max sessions");
 		SRApi.LocDesc(Sec, "Max Sessions",
-			"回放会话保留上限\n本地最多保留多少个 .json 回放会话\n超出后自动删除最旧的会话文件\n只清理记录，不动已导出的 .txt",
-			"replay session limit\nhow many .json replay sessions are kept locally\nolder sessions are deleted automatically when the limit is exceeded\nonly records are pruned; exported .txt files are left alone");
+			"回放会话保留上限\n本地最多保留多少个 .json 回放会话\n超出后自动删除最旧的会话文件；只清理记录，不动已导出的 .txt。",
+			"replay session limit\nhow many .json replay sessions are kept locally\nolder sessions are deleted automatically when the limit is exceeded; only records are pruned; exported .txt files are left alone");
 		SRApi.LocKey(Sec, "Record Scores", "记录玩家得分", "Record scores");
 		SRApi.LocDesc(Sec, "Record Scores",
-			"记录玩家得分\n每个条目保存一份在线玩家得分快照\n只读取计分板与玩家对象，不修改任何分数\n关闭后时间线不含玩家得分",
-			"record player scores\nsaves an online-player score snapshot with every entry\nonly reads the scoreboard and player objects; no score is modified\nwhen off, timelines carry no player scores");
+			"记录玩家得分\n每个条目保存一份在线玩家得分快照\n只读取计分板与玩家对象，不修改任何分数；关闭后时间线不含玩家得分。",
+			"record player scores\nsaves an online-player score snapshot with every entry\nonly reads the scoreboard and player objects; no score is modified; when off, timelines carry no player scores");
 		SRApi.LocKey(Sec, "Record Blocks", "记录方块布局", "Record blocks");
 		SRApi.LocDesc(Sec, "Record Blocks",
-			"记录方块布局\n每个条目保存方块数量与布局指纹\n指纹为当前快照 XML 的字符数加一个简单哈希，用于对比布局变化\n关闭后时间线不含方块信息",
-			"record block layout\nsaves the block count and a layout fingerprint with every entry\nthe fingerprint is the snapshot XML character count plus a simple hash, for comparing layouts\nwhen off, timelines carry no block information");
+			"记录方块布局\n每个条目保存方块数量与布局指纹\n指纹为当前快照 XML 的字符数加一个简单哈希，用于对比布局变化；关闭后时间线不含方块信息。",
+			"record block layout\nsaves the block count and a layout fingerprint with every entry\nthe fingerprint is the snapshot XML character count plus a simple hash, for comparing layouts; when off, timelines carry no block information");
 	}
 
 	public void Initialize(IFeatureHost plugin) {

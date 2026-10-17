@@ -39,7 +39,7 @@ public partial class Experiments : ITweak
 		// 加载后清理的初始化：配置 + 每帧钩子 + 补丁注册（UI 在上面的加载后清理分区）。
 		internal static void InitCleanup(IFeatureHost plugin) {
 			SRApi.LocKey("Experiments", "GC After Load", "加载后清理", "GC after load");
-			SRApi.LocDesc("Experiments", "GC After Load", "加载后清理开关\n首次进入关卡时执行一次 GC 与资源卸载，减少对局内卡顿\n同一关卡的回合切换不重复执行，不影响结算速度\n关", "post-load cleanup switch\nruns GC and asset unload once on level load to reduce in-match stutter\nskipped on round changes within the same level; settlement speed unaffected\nOFF");
+			SRApi.LocDesc("Experiments", "GC After Load", "加载后清理开关\n首次进入关卡时执行一次 GC 与资源卸载，减少对局内卡顿\n同一关卡的回合切换不重复执行，不影响结算速度；关。", "post-load cleanup switch\nruns GC and asset unload once on level load to reduce in-match stutter\nskipped on round changes within the same level; settlement speed unaffected; OFF");
 			_gcAfterLoadEntry = plugin.Config.Bind<bool>("Experiments", "GC After Load", false, "进关卡/换关卡时执行一次 GC 回收 + 资源卸载，减少对局内卡顿。同关卡回合切换不清理（场景名不变自动跳过），不影响结算速度。");
 			SRApi.RegisterTick("加载后清理", TickCleanup); // 每帧钩子（加载完成 1 秒后执行一次 GC）
 			// CreateAndPatchAll 不会自动发现带 [HarmonyPatch] 的类型，必须显式注册一次。
@@ -103,7 +103,7 @@ public partial class Experiments : ITweak
             SRApi.LocKey("Experiments", "Free Camera", "自由相机", null);
             SRApi.LocDesc("Experiments", "Free Camera", "自由相机开关\n开启后可用滚轮缩放视野\n菜单与暂停界面不生效", "free camera switch\nenables wheel zoom of the field of view\ndoes not apply in menus or the pause screen");
             SRApi.LocKey("Experiments", "Free Camera FOV", "视野大小", null);
-            SRApi.LocDesc("Experiments", "Free Camera FOV", "自由相机视野大小\n设置视野范围，越小越近，越大越远\n范围 1 到 32；自由相机开启时滚轮也会同步修改\n10", "free camera FOV\nsets the field of view; smaller is closer, larger is farther\nrange 1-32; the wheel also changes it while free camera is on\n10");
+            SRApi.LocDesc("Experiments", "Free Camera FOV", "自由相机视野大小\n设置视野范围，越小越近，越大越远\n范围 1 到 32；自由相机开启时滚轮也会同步修改；10。", "free camera FOV\nsets the field of view; smaller is closer, larger is farther\nrange 1-32; the wheel also changes it while free camera is on; 10");
             // 必须登记 LocKey/LocDesc，否则界面回退显示英文键名。
             SRApi.LocKey("Experiments", "Free Camera Speed", "相机移动速度", null);
             SRApi.LocDesc("Experiments", "Free Camera Speed", "相机跟随速度\n设置相机跟随角色的速度\n范围 0.5 到 5，步长 0.5", "camera follow speed\nsets how fast the camera follows the character\nrange 0.5-5 in steps of 0.5");

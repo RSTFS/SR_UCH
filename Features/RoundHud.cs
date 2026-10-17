@@ -146,7 +146,7 @@ namespace SR_UCH.Tweaks {
 			SRApi.LocKey("Round HUD", "Opacity", "不透明度", null);
 			SRApi.LocDesc("Round HUD", "Opacity", "HUD 不透明度\n同时控制背景和文字的透明程度\n范围 0.2 到 1，1 为完全不透明", "HUD opacity\ncontrols the transparency of both the background and the text\nrange 0.2-1, 1 = fully opaque");
 			SRApi.LocKey("Round HUD", "Warning Seconds", "警告秒数", null);
-			SRApi.LocDesc("Round HUD", "Warning Seconds", "倒计时警告秒数\n剩余时间低于该秒数时倒计时文字变黄\n最后 5 秒固定变红，可配合闪烁开关\n范围 5 到 60", "countdown warning seconds\nthe countdown turns yellow when less time than this remains\nit always turns red in the last 5 seconds; can blink\nrange 5-60");
+			SRApi.LocDesc("Round HUD", "Warning Seconds", "倒计时警告秒数\n剩余时间低于该秒数时倒计时文字变黄\n最后 5 秒固定变红，可配合闪烁开关；范围 5 到 60。", "countdown warning seconds\nthe countdown turns yellow when less time than this remains\nit always turns red in the last 5 seconds; can blink; range 5-60");
 			SRApi.LocKey("Round HUD", "Blink", "闪烁提醒", null);
 			SRApi.LocDesc("Round HUD", "Blink", "最后 5 秒闪烁\n倒计时进入最后 5 秒时文字闪烁提醒\n关闭则只在最后 5 秒显示红色", "blink in the last 5 seconds\nmakes the countdown blink during the final 5 seconds\nOFF shows a steady red countdown instead");
 			SRApi.LocKey("Round HUD", "Phase Notice", "阶段提示", null);

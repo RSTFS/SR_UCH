@@ -131,7 +131,7 @@ public partial class Experiments : ITweak
             SRApi.Ref.Override("ZoomCamera.frame", "解除关卡边界：相机取景框");
             SRApi.LocKey("Experiments", "Level Bounds", "解除关卡边界", null);
             SRApi.LocDesc("Experiments", "Level Bounds", "关卡空间边界总开关\n解除方块放置与角色移动的边界限制\n实体墙、光标越界、相机三项需分别开启才生效", "master switch for the level boundary\nremoves the boundary limit on block placement and character movement\nthe solid walls, cursor and camera entries below must be enabled separately");
-            SRApi.LocDesc("Experiments", "Level Bounds Piece Ignore", "方块越界放置开关\n允许把方块放到原边界之外\n只影响放置判定；关闭时逐个恢复原值\n关", "out-of-bounds placement switch\nallows blocks to be placed beyond the original boundary\naffects placement checks only; original values are restored one by one when disabled\nOFF");
+            SRApi.LocDesc("Experiments", "Level Bounds Piece Ignore", "方块越界放置开关\n允许把方块放到原边界之外\n只影响放置判定；关闭时逐个恢复原值；关。", "out-of-bounds placement switch\nallows blocks to be placed beyond the original boundary\naffects placement checks only; original values are restored one by one when disabled; OFF");
             SRApi.LocKey("Experiments", "Level Bounds Margin", "边界外扩", "Extra margin");
             SRApi.LocDesc("Experiments", "Level Bounds Margin", "边界外扩距离\n把每边边界按该像素值向外扩\n不限范围", "boundary expansion distance\nexpands each side of the boundary by this many pixels\nno upper limit");
             SRApi.LocKey("Experiments", "Level Bounds Walls", "实体墙", "Solid walls");
@@ -143,7 +143,7 @@ public partial class Experiments : ITweak
             SRApi.LocKey("Experiments", "Level Bounds Hard", "硬解除", "Hard unlock");
             SRApi.LocDesc("Experiments", "Level Bounds Hard", "硬解除总开关\n决定光标与原相机可到达的最大范围\n是光标越界与相机两项的前置开关", "hard unlock switch\nsets how far the cursor and camera can reach\nprerequisite for the cursor and camera entries");
             SRApi.LocKey("Experiments", "Level Bounds Radius", "硬解除半径", "Hard radius");
-            SRApi.LocDesc("Experiments", "Level Bounds Radius", "硬解除半径\n设置硬解除允许到达的距离\n不限范围，填 1 即贴着光标\n100000", "hard unlock radius\nsets the distance the hard unlock allows\nno upper limit; 1 keeps it right at the cursor\n100000");
+            SRApi.LocDesc("Experiments", "Level Bounds Radius", "硬解除半径\n设置硬解除允许到达的距离\n不限范围，填 1 即贴着光标；100000。", "hard unlock radius\nsets the distance the hard unlock allows\nno upper limit; 1 keeps it right at the cursor; 100000");
         }
 
         public void Initialize(IFeatureHost plugin) {
@@ -709,7 +709,7 @@ public partial class Experiments : ITweak
 
         private static void SelfReg() {
             SRApi.LocKey("Experiments", "Remove UI3", "解除 UI3 覆盖", "Remove UI3 overlay");
-            SRApi.LocDesc("Experiments", "Remove UI3", "UI3 黑块绘制开关\n停止绘制 UI3 层上的黑方块，消除界外黑屏\n已并入解除关卡边界，不再单独显示\n关", "UI3 black square switch\nstops drawing the black squares on the UI3 layer, removing the out-of-bounds darkness\nmerged into the level bounds feature; no longer listed on its own\nOFF");
+            SRApi.LocDesc("Experiments", "Remove UI3", "UI3 黑块绘制开关\n停止绘制 UI3 层上的黑方块，消除界外黑屏\n已并入解除关卡边界，不再单独显示；关。", "UI3 black square switch\nstops drawing the black squares on the UI3 layer, removing the out-of-bounds darkness\nmerged into the level bounds feature; no longer listed on its own; OFF");
         }
 
         public void Initialize(IFeatureHost plugin) {

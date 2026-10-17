@@ -107,7 +107,7 @@ function Check-Encoding {
 }
 
 
-# ---------- 6) 悬浮条目统一格式：不得再有 是什么/干什么/注意事项 行首标签 ----------
+# ---------- 6) 悬浮条目统一格式：每条说明恰好 3 行内容（无行首标签、不写默认值行）----------
 function Check-DescFormat {
     $files = @(Get-ChildItem -LiteralPath (Join-Path $Root 'Features') -Filter '*.cs' -File)
     $core = Join-Path $Root 'SR_UCH\SR.Core.cs'
@@ -116,13 +116,31 @@ function Check-DescFormat {
     $total = 0
     foreach ($f in $files) {
         $txt = Read-Text $f.FullName
-        foreach ($m in [regex]::Matches($txt, 'LocDesc\([^\r\n]*')) {
-            $total++
-            if ($m.Value -match '是什么：|干什么：|注意事项：|What: |Does: |Notes: ') { $bad++ }
+        $idx = 0
+        while ($true) {
+            $j = $txt.IndexOf('LocDesc(', $idx)
+            if ($j -lt 0) { break }
+            $k = $txt.IndexOf('(', $j); $depth = 0; $m = $k
+            while ($m -lt $txt.Length) {
+                $ch = $txt[$m]
+                if ($ch -eq '(') { $depth++ } elseif ($ch -eq ')') { $depth--; if ($depth -eq 0) { break } }
+                $m++
+            }
+            if ($m -ge $txt.Length -or $k -lt 0) { break }
+            $body = $txt.Substring($k, $m - $k + 1)
+            foreach ($lit in [regex]::Matches($body, '"((?:[^"\\]|\\.)*)"')) {
+                $s = $lit.Groups[1].Value
+                if (-not $s.Contains('\n')) { continue }   # 单行说明不参与（如占位/简短提示）
+                $total++
+                $lines = ([regex]::Matches($s, '\\n')).Count + 1
+                if ($lines -ne 3) { $bad++; continue }
+                if ($s -match '是什么：|干什么：|注意事项：|What: |Does: |Notes: ') { $bad++ }
+            }
+            $idx = $m + 1
         }
     }
-    if ($bad -gt 0) { Bad ('仍有 ' + $bad + ' 条悬浮条目带行首标签（应已统一移除）') }
-    else { Ok ('悬浮条目格式统一（' + $total + ' 条，无行首标签）') }
+    if ($bad -gt 0) { Bad ('悬浮条目格式不合规（应恰好 3 行且无行首标签）: ' + $bad + ' 条') }
+    else { Ok ('悬浮条目格式统一（' + $total + ' 条：3 行、无行首标签）') }
 }
 
 

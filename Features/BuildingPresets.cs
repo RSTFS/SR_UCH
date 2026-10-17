@@ -99,16 +99,16 @@ namespace SR_UCH.Tweaks {
 			SRApi.RegisterPage(Section, Render);
 			SRApi.LocKey(Section, "Enabled", "布局预设总开关", "Layout presets");
 			SRApi.LocDesc(Section, "Enabled",
-				"布局预设总开关\n开启后可在本页保存和加载方块布局预设\n关闭后本页仍可查看已有预设，但所有按钮都不生效\n与模组总开关相互独立",
-				"master switch for layout presets\nwhen on, block layout presets can be saved and loaded on this page\nwhen off, existing presets are still listed but every action button is inactive\nindependent from the mod-wide master switch");
+				"布局预设总开关\n开启后可在本页保存和加载方块布局预设\n关闭后本页仍可查看已有预设，但所有按钮都不生效；与模组总开关相互独立。",
+				"master switch for layout presets\nwhen on, block layout presets can be saved and loaded on this page\nwhen off, existing presets are still listed but every action button is inactive; independent from the mod-wide master switch");
 			SRApi.LocKey(Section, "Max Presets", "预设数量上限", "Max presets");
 			SRApi.LocDesc(Section, "Max Presets",
-				"预设数量上限\n列表最多保留多少个预设，达到上限后必须先删除旧预设才能保存新布局\n范围 1 到 500\n只限制新保存，不会删除磁盘上已有的预设文件",
-				"maximum number of presets\ncaps how many presets the list keeps; when reached, delete an old preset before saving a new layout\nrange 1-500\nonly limits new saves and never deletes existing preset files");
+				"预设数量上限\n列表最多保留多少个预设，达到上限后必须先删除旧预设才能保存新布局\n范围 1 到 500；只限制新保存，不会删除磁盘上已有的预设文件。",
+				"maximum number of presets\ncaps how many presets the list keeps; when reached, delete an old preset before saving a new layout\nrange 1-500; only limits new saves and never deletes existing preset files");
 			SRApi.LocKey(Section, "Show Timestamps", "显示时间", "Show timestamps");
 			SRApi.LocDesc(Section, "Show Timestamps",
-				"显示时间列\n在预设列表里显示每条的保存时间\n关闭后列表只显示名称、方块数和模式，更紧凑\n时间取自预设文件的最后修改时间",
-				"show timestamps\nshows when each preset was saved in the list\nwhen off, the list only shows name, block count and mode to save space\nuses the preset file last write time");
+				"显示时间列\n在预设列表里显示每条的保存时间\n关闭后列表只显示名称、方块数和模式，更紧凑；时间取自预设文件的最后修改时间。",
+				"show timestamps\nshows when each preset was saved in the list\nwhen off, the list only shows name, block count and mode to save space; uses the preset file last write time");
 		}
 
 		// ---------- 配置读取 ----------

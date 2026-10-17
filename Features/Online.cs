@@ -140,9 +140,9 @@ namespace SR_UCH.Tweaks {
                 if (_sortCol < 0 || _sortCol >= ColCount || _sortCol == JoinCol) _sortCol = -1;
             } catch { _sortCol = -1; _sortDesc = false; }
             SRApi.LocKey(SecOnline, "Show Quality Coeff", "显示技能匹配质量", null);
-            SRApi.LocDesc(SecOnline, "Show Quality Coeff", "技能匹配质量系数显示开关\n在房间列表质量列后附带 0 到 1 的匹配系数\n也可按住 Shift 点击该列列头切换\n关", "skill-match quality coefficient toggle\nappends a 0-1 match coefficient to the quality column\ncan also be toggled with Shift + click on the column header\nOFF");
+            SRApi.LocDesc(SecOnline, "Show Quality Coeff", "技能匹配质量系数显示开关\n在房间列表质量列后附带 0 到 1 的匹配系数\n也可按住 Shift 点击该列列头切换；关。", "skill-match quality coefficient toggle\nappends a 0-1 match coefficient to the quality column\ncan also be toggled with Shift + click on the column header; OFF");
             SRApi.LocKey(SecOnline, "Skill Mode", "技能系数取值", null);
-            SRApi.LocDesc(SecOnline, "Skill Mode", "技能系数取值方式\n决定技能系数列取最大值、平均值还是最小值\n也可按住 Shift 点击该列列头切换\n平均值", "skill coefficient mode\nselects max, average or min for the skill column\ncan also be toggled with Shift + click on the column header\naverage");
+            SRApi.LocDesc(SecOnline, "Skill Mode", "技能系数取值方式\n决定技能系数列取最大值、平均值还是最小值\n也可按住 Shift 点击该列列头切换；平均值。", "skill coefficient mode\nselects max, average or min for the skill column\ncan also be toggled with Shift + click on the column header; average");
         }
 
         // 清空房间列表与表格几何缓存（返回主界面 / 房主解散时调用）；不动列宽 / 列序 / 隐藏列偏好。
