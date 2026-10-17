@@ -96,7 +96,7 @@ $rspFeatures = @(
     'feat_Online.rsp',
     'feat_Experiments.rsp'
 )
-$outDir = Join-Path $Root 'SR_UCH\bin\Release'
+$outDir = Join-Path $Root 'bin\Release'
 
 # dotnet 不可用时的回退已在上面解析 csc 时处理（net472 csc.exe）
 
@@ -474,7 +474,7 @@ if ($Deploy) {
 if ($Separate -and $Deploy) {
     # 阶段B1：分离模式下契约程序集作为依赖放进 BepInEx\core（BepInEx 会先加载 core 里的程序集）
     $coreDir = Join-Path (Join-Path 'D:\EF\Steam\steamapps\common\Ultimate Chicken Horse' 'BepInEx') 'core'
-    $srcC = Join-Path $Root 'SR_UCH\bin\Release\SR.Contracts.dll'
+    $srcC = Join-Path $Root 'bin\Release\SR.Contracts.dll'
     if (Test-Path -LiteralPath $srcC) {
         if (-not (Test-Path -LiteralPath $coreDir)) { New-Item -ItemType Directory -Force -Path $coreDir | Out-Null }
         Copy-Item -LiteralPath $srcC -Destination (Join-Path $coreDir 'SR.Contracts.dll') -Force

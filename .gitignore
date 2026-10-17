@@ -5,3 +5,4 @@ obj/
 build/.cache/
 # 独立插件只保存在 D:\RS_TFS\CC\Others（不在本仓库）
 Others/
+.vs/
