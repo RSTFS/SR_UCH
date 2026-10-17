@@ -175,6 +175,14 @@ namespace SR_UCH {
                     delegate (int __m) { return SR.GateModeAllows((SR.ModeMask)__m); },
                     delegate { return SR.Env.SceneName; },
                     delegate { return SR.Env.InTreehouse; });
+                SRApi.SetMiscSinks(
+                    delegate (ConfigEntryBase __e) { return (int)SR.KeyComboMod(__e); },
+                    delegate (ConfigEntryBase __e, int __m) { SR.SetDefaultCombo(__e, (SR.ComboMod)__m); },
+                    delegate (string __t, int __mx, GUIStyle __st, GUILayoutOption[] __o) {
+                        return __mx < 0 ? SR.ClearableTextField(__t, __st, __o) : SR.ClearableTextField(__t, __mx, __st, __o);
+                    },
+                    delegate (string __s, Action __a) { SR.RegisterPage(__s, __a.Invoke); },
+                    delegate (string __s, string __p, string __zh, string __en, int __o, Action __a) { SR.RegisterPage(__s, __p, __zh, __en, __o, __a.Invoke); });
             } catch { }
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。

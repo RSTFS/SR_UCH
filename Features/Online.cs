@@ -85,7 +85,7 @@ namespace SR_UCH.Tweaks {
         public void Initialize(IFeatureHost plugin) {
             SRApi.LocSec(SecOnline, "联机", "Online");
             SRApi.Nav(SecOnline, 90);   // 侧栏顺序 90：会话(80) 之后、实验(100) 之前
-            SR.RegisterPage(SecOnline, RenderOnlinePage);
+            SRApi.RegisterPage(SecOnline, RenderOnlinePage);
             SRApi.RegisterTick("联机看门狗", CheckHotkeys); // 每帧：回家看门狗 + 延时加入
             // 加入流程本身要用 EventSystem，禁用会卡在"正在进入"：登记门控挂起，让核心不禁用 EventSystem。
             // 屏蔽输入上限 3 秒，超过即不再屏蔽（pending 最长可挂 30 秒）。
@@ -937,7 +937,7 @@ namespace SR_UCH.Tweaks {
                 SRApi.T("输入 4 个大写字母的房间码直接加入（和游戏里按码加入一样；在对局内会先退出当前房间）。",
                      "Enter the 4-letter lobby code to join directly (same as the game's join-by-code; while in a session it leaves the current one first).")),
                 SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(CodeLabelW)), GUILayout.Height(SRApi.Ctl.Sc(30)));
-            string typed = SR.ClearableTextField(_joinCode ?? "", 4, SRApi.Ctl.SearchBox,
+            string typed = SRApi.ClearableTextField(_joinCode ?? "", 4, SRApi.Ctl.SearchBox,
                 GUILayout.Width(SRApi.Ctl.Sc(62)), GUILayout.Height(SRApi.Ctl.Sc(24)));
             _joinCode = CodeOnly(typed);   // 只收大写英文字母，最多 4 个
             bool enter = Event.current != null && Event.current.type == EventType.KeyDown

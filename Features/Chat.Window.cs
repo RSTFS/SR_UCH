@@ -69,7 +69,7 @@ public partial class Chat : ITweak {
 
             // 本页是会话栏目的第 1 个子页，配置段仍为 Chat Window。
             SRApi.NavHide(Sec); // 本页不单独成侧栏栏目
-            SR.RegisterPage("Chat", "ChatWindow", "对话窗口", "ChatWindows", 10, RenderPage);
+            SRApi.RegisterPage("Chat", "ChatWindow", "对话窗口", "ChatWindows", 10, RenderPage);
             SRApi.LocEnum("Hold", "按住显示");
             SRApi.LocEnum("Toggle", "切换常驻");
             SR.RowFilters.Add(RowVisibleFilter);

@@ -130,7 +130,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec("Player Tracker", "移动轨迹", null);
             SRApi.Nav("Player Tracker", 20); // 侧栏顺序 20
             // 每个栏目自己声明自己的页面：缺了它只会靠核心兜底分支成页，外部模块无法替换这一页。
-            SR.RegisterPage("Player Tracker", Render);
+            SRApi.RegisterPage("Player Tracker", Render);
             SRApi.LocKey("Player Tracker", "Tracking Length", "轨迹长度", null);
             SRApi.LocDesc("Player Tracker", "Tracking Length", "记录多长时间的移动轨迹, 单位是格, 60 格大概一秒.", "How long of a movement trail to record (60 ticks ≈ 1 second)");
             SRApi.LocKey("Player Tracker", "Skip Frames", "跳帧数", null);

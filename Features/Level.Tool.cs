@@ -109,7 +109,7 @@ public partial class Level {
 			{
 				if (!SRApi.GateMaster)
 				{
-					SRApi.Notify(SR.Msg.MasterOff());
+					SRApi.Notify(SRApi.MsgMasterOff);
 					return;
 				}
 				if (!IsPartyCreativeOrFreeplay())
@@ -291,7 +291,7 @@ public partial class Level {
 			{
 				if (!SRApi.GateMaster)
 				{
-					SRApi.Notify(SR.Msg.MasterOff());
+					SRApi.Notify(SRApi.MsgMasterOff);
 					return;
 				}
 				if (!IsPartyCreativeOrFreeplay())
@@ -426,7 +426,7 @@ public partial class Level {
 			qs = null;
 			if (!SRApi.GateMaster)
 			{
-				SRApi.Notify(SR.Msg.MasterOff());
+				SRApi.Notify(SRApi.MsgMasterOff);
 				return false;
 			}
 			if (!IsPartyCreativeOrFreeplay())

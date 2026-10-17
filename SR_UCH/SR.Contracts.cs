@@ -203,6 +203,29 @@ namespace SR_UCH {
             try { Notify(string.Format(text, args)); } catch { Notify(text); }
         }
 
+        // 组合键修饰符（与核心 ComboMod 数值一致，下面枚举体直接从核心源码镜像）
+        [Flags] public enum ComboMod { None = 0, Shift = 1, Ctrl = 2, Alt = 4 }
+        private static Func<ConfigEntryBase, int> _keyComboMod;
+        private static Action<ConfigEntryBase, int> _setDefaultCombo;
+        private static Func<string, int, GUIStyle, GUILayoutOption[], string> _clearableTextField;
+        private static Action<string, Action> _registerPageSimple;
+        private static Action<string, string, string, string, int, Action> _registerPageFull;
+        public static string MsgMasterOff { get { return T("本 Mod 总开关已关闭", "The mod's master switch is off"); } }
+        public static string MsgNotLobby { get { return T("不在大厅或找不到本地玩家", "Not in a lobby or cannot find the local player"); } }
+        public static void SetMiscSinks(Func<ConfigEntryBase, int> keyComboMod, Action<ConfigEntryBase, int> setDefaultCombo,
+                                        Func<string, int, GUIStyle, GUILayoutOption[], string> clearableTextField,
+                                        Action<string, Action> registerPageSimple,
+                                        Action<string, string, string, string, int, Action> registerPageFull) {
+            _keyComboMod = keyComboMod; _setDefaultCombo = setDefaultCombo; _clearableTextField = clearableTextField;
+            _registerPageSimple = registerPageSimple; _registerPageFull = registerPageFull;
+        }
+        public static ComboMod KeyComboMod(ConfigEntryBase entry) { Func<ConfigEntryBase, int> f = _keyComboMod; return f != null ? (ComboMod)f(entry) : ComboMod.None; }
+        public static void SetDefaultCombo(ConfigEntryBase entry, ComboMod mod) { Action<ConfigEntryBase, int> f = _setDefaultCombo; if (f != null) f(entry, (int)mod); }
+        public static string ClearableTextField(string text, GUIStyle style, params GUILayoutOption[] options) { Func<string, int, GUIStyle, GUILayoutOption[], string> f = _clearableTextField; return f != null ? f(text, -1, style, options) : text; }
+        public static string ClearableTextField(string text, int maxLength, GUIStyle style, params GUILayoutOption[] options) { Func<string, int, GUIStyle, GUILayoutOption[], string> f = _clearableTextField; return f != null ? f(text, maxLength, style, options) : text; }
+        public static void RegisterPage(string section, Action render) { Action<string, Action> f = _registerPageSimple; if (f != null) f(section, render); }
+        public static void RegisterPage(string section, string pageId, string nameZh, string nameEn, int order, Action render) { Action<string, string, string, string, int, Action> f = _registerPageFull; if (f != null) f(section, pageId, nameZh, nameEn, order, render); }
+
         // 对局模式门控（与核心 SR.ModeMask 按位一致）与场景环境查询
         [Flags] public enum ModeMask { None = 0, Freeplay = 1, Party = 2, Creative = 4, Challenge = 8 }
         private static Func<int, bool> _gateModeAllows;

@@ -34,7 +34,7 @@ public class QuickAdjust : ITweak {
         SRApi.Ref.Override("GraphScoreBoard.scorelineRelation", "评分折扣（分数条位置）");
         SRApi.LocSec("Quick Adjust", "快速调整", null);
         SRApi.Nav("Quick Adjust", 30); // 侧栏栏目顺序 30
-        SR.RegisterPage("Quick Adjust", Render);   // 本功能页自绘
+        SRApi.RegisterPage("Quick Adjust", Render);   // 本功能页自绘
         SRApi.LocKey("Quick Adjust", "Quick Switch", "快速切换", null);
         SRApi.LocDesc("Quick Adjust", "Quick Switch", "只在自由模式有用. 长按 B 到设定秒数, 在行动和建造之间切, 原版是半秒. 默认关, 局里开关立刻生效.", "Quick switch (freeplay only): hold B for the set seconds to swap Action<->Build (vanilla 0.5s).\nOFF by default; takes effect immediately.");
         SRApi.LocKey("Quick Adjust", "Quick Switch Hold", "等待秒数", null);
@@ -70,7 +70,7 @@ public class QuickAdjust : ITweak {
         GUILayout.Label(__dct, SRApi.Ctl.LabelWrap, GUILayout.Width(__dcw), GUILayout.Height(SRApi.Ctl.Sc(52)));
         if (moreOn) {
             string cur = discVal.ToString();
-            string nv = SR.ClearableTextField(cur, SRApi.Ctl.SearchBox, GUILayout.Width(SRApi.Ctl.Sc(80)), GUILayout.Height(SRApi.Ctl.Sc(26)));
+            string nv = SRApi.ClearableTextField(cur, SRApi.Ctl.SearchBox, GUILayout.Width(SRApi.Ctl.Sc(80)), GUILayout.Height(SRApi.Ctl.Sc(26)));
             int parsed;
             if (nv != cur && int.TryParse(nv, out parsed)) {
                 parsed = Mathf.Clamp(parsed, 0, 90);
@@ -441,7 +441,7 @@ public class QuickAdjust : ITweak {
 			{
 				if (!SRApi.GateMaster)
 				{
-					SRApi.Notify(SR.Msg.MasterOff());
+					SRApi.Notify(SRApi.MsgMasterOff);
 					return;
 				}
 				int scoreDiscount = ScoreDiscount;
@@ -457,7 +457,7 @@ public class QuickAdjust : ITweak {
 				}
 				else
 				{
-					SRApi.Notify(SR.Msg.NotLobby());
+					SRApi.Notify(SRApi.MsgNotLobby);
 				}
 			}
 			catch (Exception ex)
@@ -497,7 +497,7 @@ public class QuickAdjust : ITweak {
 			{
 				if (!SRApi.GateMaster)
 				{
-					SRApi.Notify(SR.Msg.MasterOff());
+					SRApi.Notify(SRApi.MsgMasterOff);
 					return;
 				}
 				if (ApplyOwnHandicap(100))
@@ -506,7 +506,7 @@ public class QuickAdjust : ITweak {
 				}
 				else
 				{
-					SRApi.Notify(SR.Msg.NotLobby());
+					SRApi.Notify(SRApi.MsgNotLobby);
 				}
 			}
 			catch (Exception ex)
@@ -542,9 +542,9 @@ public class TreehouseSuicide : ITweak {
         }
         // 未设置过修饰键时默认 Shift。
         SRApi.RegisterKey("快捷自杀", _keybind, "hold");
-        if (SR.KeyComboMod(_keybind) == SR.ComboMod.None)
+        if (SRApi.KeyComboMod(_keybind) == SRApi.ComboMod.None)
         {
-            SR.SetDefaultCombo(_keybind, SR.ComboMod.Shift);
+            SRApi.SetDefaultCombo(_keybind, SRApi.ComboMod.Shift);
         }
         // 单个补丁目标失效只丢本类功能。
         try { Harmony.CreateAndPatchAll(typeof(TreehouseSuicide), (string)null); }

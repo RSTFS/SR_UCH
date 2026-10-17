@@ -29,7 +29,7 @@ namespace SR_UCH.Tweaks {
             SRApi.Ref.Override("PiecePlacementCursor.heldPositionOffset", "自由放置（关闭网格吸附）");
             SR.RowCompanions.Add(BuilderCompanion); // 通用条目行扩展点：覆盖项与快捷键同行显示
             SR.RowFilters.Add(BuilderRowVisible);   // 两个开关键位不单独成行
-            SR.RegisterPage("build", RenderPage); // 本功能页自绘（含建造上限分区）
+            SRApi.RegisterPage("build", RenderPage); // 本功能页自绘（含建造上限分区）
             SRApi.LocSec("build", "建造", "Build");
             SRApi.Nav("build", 50); // 侧栏栏目顺序 50
             SRApi.LocKey("build", "Collision Override", "无视碰撞", null);

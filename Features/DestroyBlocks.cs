@@ -285,7 +285,7 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterKey("方块破坏-切换", _toggleKey, "hold");
             SRApi.RegisterKey("方块破坏-删除", _deleteKey, "press");
             // 本功能只有一个页面（原高级页已整体删除）。
-            SR.RegisterPage("Destroy Blocks", "Normal", "普通", "Normal", 10, RenderNormalPage);
+            SRApi.RegisterPage("Destroy Blocks", "Normal", "普通", "Normal", 10, RenderNormalPage);
             _selectMode = _mp.Config.Bind(
                 "Destroy Blocks",
                 "Select Mode",

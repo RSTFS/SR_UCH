@@ -12,9 +12,9 @@ public partial class Experiments : ITweak
 			SRApi.LocSec("Experiments", "实验", null);
             SRApi.Nav("Experiments", 100); //侧栏栏目顺序 100
             // 本栏目自绘，共三页。页签顺序由 Order 决定：p3 场景(10) / p1 关卡边界(20) / p2 其它(30)，id 与文件对应关系固定。
-			SR.RegisterPage("Experiments", "p1", "关卡边界", "Bounds", 20, Render);
-			SR.RegisterPage("Experiments", "p2", "其它", "Misc", 30, RenderPage2);
-			SR.RegisterPage("Experiments", "p3", "场景", "Scene", 10, RenderPage3);
+			SRApi.RegisterPage("Experiments", "p1", "关卡边界", "Bounds", 20, Render);
+			SRApi.RegisterPage("Experiments", "p2", "其它", "Misc", 30, RenderPage2);
+			SRApi.RegisterPage("Experiments", "p3", "场景", "Scene", 10, RenderPage3);
 		}
 
 		// 状态行：只读、可复制。

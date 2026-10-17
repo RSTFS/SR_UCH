@@ -82,7 +82,7 @@ public partial class Chat : ITweak {
         }
 
         internal static void SelfRegLog() {
-                        SR.RegisterPage("Chat", "ChatLog", "对话内容", "ChatLog", 20, Render); //会话栏目第 2 页
+                        SRApi.RegisterPage("Chat", "ChatLog", "对话内容", "ChatLog", 20, Render); //会话栏目第 2 页
             // 顶部工具行与底部输入行必须画在滚动区之外（不随内容滚动），故注册为页面外框部件。
             SRApi.RegisterPageChrome("Chat", RenderToolbar, RenderInputRow);
             // 两个开关的本地化文案（配置在本文件 Bind 到 Chat 段）。
@@ -199,7 +199,7 @@ public partial class Chat : ITweak {
                 Event.current.Use();
             }
             GUI.SetNextControlName("SRUCH_ChatInput");
-            _chatInputText = SR.ClearableTextField(_chatInputText, SRApi.Ctl.SearchBox, GUILayout.Height(SRApi.Ctl.Sc(26)));
+            _chatInputText = SRApi.ClearableTextField(_chatInputText, SRApi.Ctl.SearchBox, GUILayout.Height(SRApi.Ctl.Sc(26)));
             if (SRApi.Ctl.HotkeyButton("chat.send", SRApi.T("发送", "Send"), SRApi.T("把输入内容作为聊天消息发到游戏聊天里", "Send the text as a chat message"),
                 () => { SendChatText(_chatInputText); _chatInputText = ""; },
                 SRApi.Ctl.Sc(56), SRApi.Ctl.Sc(26))) {
