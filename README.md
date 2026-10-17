@@ -109,6 +109,14 @@ The panel has sections on the left and pages on the right. Listed by section bel
 - Browse sessions in the mod UI, view the timeline, then export it to a text file or the clipboard.
 - Recording only in v1: nothing is ever injected back into the running game.
 
+- External translations: drop JSON language packs into BepInEx/config/SR_UCH/lang/ (format: {"id","displayName","fallback","map"}).
+
+### Config Tools
+
+- Export the mod configuration to a single JSON backup under config/SR_UCH/config-backup/, or import one back.
+- Import always creates a pre-import-*.json rollback point first; type mismatches are skipped and unknown keys are reported as orphans.
+- Only this mod's own config file is covered; other plugins' configs are untouched.
+
 ### Experiments
 
 **Level Bounds** page

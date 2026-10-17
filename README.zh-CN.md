@@ -106,6 +106,14 @@
 - 在模组界面浏览会话、查看时间线，并导出为文本文件或复制到剪贴板。
 - v1 只记录：不会向运行中的游戏注入任何东西。
 
+- 外置翻译：把 JSON 语言包放进 BepInEx/config/SR_UCH/lang/（格式：{"id","displayName","fallback","map"}）。
+
+### 配置工具 Config Tools
+
+- 把模组配置导出为 config/SR_UCH/config-backup/ 下的单个 JSON 备份，或从备份导入。
+- 导入前自动生成 pre-import-*.json 回滚点；类型不匹配的键跳过，未知键作为孤儿键报告。
+- 只覆盖本模组自己的配置文件，不影响其它插件。
+
 ### 实验 Experiments
 
 **关卡边界**页
