@@ -25,9 +25,7 @@ public partial class SR {
             CursorMove = false;
             // EventSystem 门控必须每帧跟随：只在打开面板时判定一次，之后 InputLocked 变 false 就不再恢复。
             ApplyEventSystemGate();
-            if (_wasVisible && !_visible) _closeFade = 1f;   // 刚关闭：启动背景淡出动画
-            _wasVisible = _visible;
-            _uiAlpha = Mathf.Clamp01(_uiAlpha + (_visible ? 10f : -40f) * Time.unscaledDeltaTime);   // 打开 0.1s 淡入；内容关闭立即消失
+            _uiAlpha = Mathf.Clamp01(_uiAlpha + (_visible ? 8f : -8f) * Time.unscaledDeltaTime);   // 打开/关闭约 0.12s 淡入淡出
             // 总开关关闭时请各功能收起自己的 UI；各功能自己判断各自的子开关。
             if (!GateMaster && AnyUiBlocked()) {
                 try { FireDismissUi(); } catch (Exception __ex) { Guard.Log("总开关关闭时收起功能 UI", __ex); }
@@ -131,8 +129,6 @@ public partial class SR {
 
         // 右栏底部那行（设置 / 模式）的高度：自绘页据此给表格留出底部空间，否则末行会被盖住。
         public static float FooterHeight;
-        private static bool _wasVisible;   // 上一帧是否可见（关闭动画触发用）
-        private static float _closeFade;   // 关闭背景淡出进度
         // 底栏注册按钮的悬停过渡与命中矩形（按 id 缓存）
         private static readonly Dictionary<string, float> _footerBtnHover = new Dictionary<string, float>();
         private static readonly Dictionary<string, Rect> _footerBtnRects = new Dictionary<string, Rect>();
@@ -205,20 +201,10 @@ public partial class SR {
         }
 
         private static void DrawGUI() {
-            if (!_visible) {
-                // 关闭动画：内容立即消失（避免表头/提示残留），只让窗口背景淡出约 0.12s。
+            if (!_visible) { try { ClearTip(); } catch { } }
+            if (!_visible && _uiAlpha <= 0.01f && !AnyUiBlocked()) {
+                // 面板已关：把自绘页声明的系统光标形状收掉，否则 <->/+ 光标会留在屏幕上
                 try { ClearTip(); } catch { }
-                try {
-                    if (_closeFade > 0f) {
-                        _closeFade = Mathf.Max(0f, _closeFade - Time.unscaledDeltaTime * 8f);
-                        if (_closeFade > 0f) {
-                            Color __oldC = GUI.color;
-                            GUI.color = new Color(1f, 1f, 1f, _closeFade * 0.55f);
-                            GUI.Box(new Rect(_winX, _winY, _winWidth, _winHeight), GUIContent.none, _win);
-                            GUI.color = __oldC;
-                        }
-                    }
-                } catch { }
                 RunFrameEndHooks();
                 return;
             }

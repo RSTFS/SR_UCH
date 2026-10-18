@@ -9,7 +9,6 @@ using BepInEx.Bootstrap;
 using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
@@ -963,8 +962,6 @@ public partial class SR : ITweak {
             try { Harmony.CreateAndPatchAll(typeof(SR)); } catch (Exception ex) { SR.LogError("SR 补丁注册失败: " + ex.Message); }
             // 录键屏蔽表情系统的嵌套类不被 CreateAndPatchAll 递归发现，需单独注册；失败不影响其它补丁
             try { Harmony.CreateAndPatchAll(typeof(EmoteBlockPatch)); } catch (Exception ex) { SR.LogWarn("录键屏蔽表情系统 补丁注册失败: " + ex.Message); }
-            // 原生提示优化：原版 MessageComponent 只写 mainText.text，长文本会被单行截断；补丁打开换行并允许纵向溢出。
-            try { Harmony.CreateAndPatchAll(typeof(MsgWrapPatch)); } catch (Exception ex) { SR.LogWarn("原生提示换行 补丁注册失败: " + ex.Message); }
         }
 
         // 侧栏栏目自注册（SR.Nav(段, 顺序值) 越小越靠前；SR.NavHide(段) 有 cfg 段但不单独成栏目）。
@@ -1276,21 +1273,5 @@ public partial class SR : ITweak {
         }
 
 	}
-
-    // 原生屏幕提示换行优化：MessageComponent.mainText 是固定 Rect 的 UGUI Text，默认单行；
-    // 显示后打开横向换行 + 纵向溢出，让长文本能显示多行（不改游戏布局/预制体）。
-    [HarmonyPatch(typeof(MessageComponent), "DisplayMessage")]
-    internal static class MsgWrapPatch {
-        [HarmonyPostfix]
-        private static void Postfix(MessageComponent __instance) {
-            try {
-                if (__instance == null || __instance.mainText == null) return;
-                Text mt = __instance.mainText;
-                mt.horizontalOverflow = HorizontalWrapMode.Wrap;
-                mt.verticalOverflow = VerticalWrapMode.Overflow;
-                mt.supportRichText = true;
-            } catch { }
-        }
-    }
 
 }
