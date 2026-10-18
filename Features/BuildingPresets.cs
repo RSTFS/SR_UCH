@@ -138,7 +138,7 @@ namespace SR_UCH.Tweaks {
 		public void Initialize(IFeatureHost plugin) {
 			try {
 				SelfReg();
-				_enabled = plugin.Config.Bind(Section, "Enabled", true,
+				_enabled = plugin.Config.Bind(Section, "Enabled", false,
 					"布局预设总开关：开启后可保存 / 加载 / 导入导出方块布局预设。");
 				_featureOn = _enabled.Value;
 				_enabled.SettingChanged += delegate { _featureOn = _enabled.Value; };
@@ -2219,12 +2219,38 @@ namespace SR_UCH.Tweaks {
 			} catch { return "UNKNOWN"; }
 		}
 
+		// 读取预设 XML：加载路径与导入路径用同一套上限（超大/畸形文件直接拒绝，避免主线程长时间卡顿或 OOM）。
 		private static string ReadAllText(string path) {
 			try {
 				if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
-				return File.ReadAllText(path, Encoding.UTF8);
+				long len = new FileInfo(path).Length;
+				if (len > MaxImportChars) {
+					SRApi.Notify(SRApi.T("预设文件过大，已拒绝加载（上限约 2MB）", "Preset file is too large and was not loaded (limit about 2MB)"));
+					SRApi.LogWarn("[布局预设] 预设文件过大，已拒绝加载: " + path + " (" + len + " bytes)");
+					return null;
+				}
+				string xml = File.ReadAllText(path, Encoding.UTF8);
+				if (!string.IsNullOrEmpty(xml) && xml.Length > MaxImportChars) {
+					SRApi.Notify(SRApi.T("预设文件过大，已拒绝加载（上限约 2MB）", "Preset file is too large and was not loaded (limit about 2MB)"));
+					return null;
+				}
+				// 方块数上限：与导入路径的 MaxImportBlocks 保持一致（超限的畸形文件不进入重建流程）。
+				int blocks = 0;
+				int at = 0;
+				while (true) {
+					at = xml.IndexOf("<block", at, StringComparison.Ordinal);
+					if (at < 0) break;
+					blocks++;
+					if (blocks > MaxImportBlocks) {
+						SRApi.Notify(SRApi.T("预设方块数量超限，已拒绝加载", "The preset has too many blocks and was not loaded"));
+						SRApi.LogWarn("[布局预设] 预设方块数超限，已拒绝加载: " + path);
+						return null;
+					}
+					at += 6;
+				}
+				return xml;
 			} catch (Exception __ex) {
-				SRApi.Guard.Log("布局预设/读文件", __ex);
+				SRApi.Guard.Log("布局预设/读取预设文件", __ex);
 				return null;
 			}
 		}

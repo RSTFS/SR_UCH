@@ -66,7 +66,7 @@ namespace SR_UCH.Tweaks {
 				SelfReg();
 				// 契约提供宿主 Config（BepInEx ConfigFile）：功能层用它枚举/写回全部本模组条目。
 				_config = plugin.Config;
-				_enabled = plugin.Config.Bind(Section, "Enabled", true,
+				_enabled = plugin.Config.Bind(Section, "Enabled", false,
 					"配置导出/导入总开关：开启后可在本页导出、导入和删除配置备份。");
 				_featureOn = _enabled.Value;
 				_enabled.SettingChanged += delegate { _featureOn = _enabled.Value; };
@@ -517,6 +517,14 @@ namespace SR_UCH.Tweaks {
 			}
 		}
 
+		// 自动备份（导入前生成）文件名前缀：清理时优先删除它们，保护用户手动导出的备份。
+		private static bool IsAutoBackup(string path) {
+			try {
+				string name = Path.GetFileName(path) ?? "";
+				return name.StartsWith("pre-import", StringComparison.OrdinalIgnoreCase);
+			} catch { return false; }
+		}
+
 		private static void PruneBackups() {
 			try {
 				string dir = BackupRoot();
@@ -524,20 +532,27 @@ namespace SR_UCH.Tweaks {
 				string[] files = Directory.GetFiles(dir, "*.json");
 				int keep = MaxBackups;
 				if (files.Length <= keep) { RefreshList(); return; }
+				// 排序：手动导出排前面（保住），自动备份 pre-import-* 排后面（优先被清理）；同类别按时间新→旧。
 				Array.Sort(files, delegate(string a, string c) {
+					bool autoA = IsAutoBackup(a);
+					bool autoC = IsAutoBackup(c);
+					if (autoA != autoC) return autoA ? 1 : -1;
 					try { return File.GetLastWriteTimeUtc(c).CompareTo(File.GetLastWriteTimeUtc(a)); }
 					catch { return string.CompareOrdinal(c, a); }
 				});
 				int removed = 0;
+				int removedAuto = 0;
 				for (int i = keep; i < files.Length; i++) {
 					try {
+						bool auto = IsAutoBackup(files[i]);
 						File.Delete(files[i]);
 						removed++;
+						if (auto) removedAuto++;
 					} catch (Exception __ex) {
 						SRApi.Guard.Log("配置工具/清理旧备份", __ex);
 					}
 				}
-				if (removed > 0) SRApi.LogInfo("[配置工具] 备份数量超过上限 " + keep + "，已清理最旧的 " + removed + " 份");
+				if (removed > 0) SRApi.LogInfo("[配置工具] 备份数量超过上限 " + keep + "，已清理 " + removed + " 份（其中自动备份 " + removedAuto + " 份，手动导出不会被优先删除）");
 				RefreshList();
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("配置工具/清理备份", __ex);

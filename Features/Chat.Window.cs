@@ -106,7 +106,7 @@ public partial class Chat : ITweak {
             SRApi.LocDesc(Sec, "Pos Y", "垂直偏移量，像素\n负值把聊天框向下移\n仅在位置调整开启时生效；范围负屏高到 0；0（原版位置）。", "vertical offset in pixels\nnegative values move the chat box down\nonly applies while position tweaks are on; range -screen height to 0; 0 (vanilla position)");
 
             //绑定顺序 = 页面显示顺序
-            _enabled = plugin.Config.Bind(Sec, "Enabled", true, "总开关：关闭后本页所有改动都不生效。");
+            _enabled = plugin.Config.Bind(Sec, "Enabled", false, "总开关：关闭后本页所有改动都不生效。");
             _noAutoShow = plugin.Config.Bind(Sec, "No Auto Show", false, "关闭自动弹出：新消息不再自动显示聊天窗口。");
             _noFade = plugin.Config.Bind(Sec, "No Fade", false, "关闭淡入淡出动画：出现/消失都瞬切。");
             _key = plugin.Config.Bind(Sec, "Window Key", KeyCode.Z, "显示聊天窗口的按键（默认 Z）");
