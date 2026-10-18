@@ -58,6 +58,7 @@ namespace SR_UCH.Tweaks {
 
 		private static ConfigEntry<bool> _enabled;
 		private static ConfigEntry<int> _maxPresets;
+		private static ConfigEntry<bool> _skipTreehouse;   // 跳过树屋流程（联机直接替换关卡，风险自负）
 		private static ConfigEntry<int> _sortModeEntry;
 		private static ConfigEntry<string> _colWidthsEntry;
 		private static ConfigEntry<string> _colOrderEntry;
@@ -154,6 +155,8 @@ namespace SR_UCH.Tweaks {
 						new AcceptableValueRange<int>(SortModeMin, SortModeMax)));
 				_sortMode = _sortModeEntry.Value;
 				_sortModeEntry.SettingChanged += delegate { _sortMode = _sortModeEntry.Value; };
+				_skipTreehouse = plugin.Config.Bind(Section, "Skip Treehouse", false,
+					"跳过树屋流程：勾选后联机替换关卡不再先回树屋，而是直接替换场景（房客的 SelectedLevel 可能不同步，风险自负）。");
 				// 旧配置可能残留已弃用的 2/3：夹回 0（时间）。
 				try { if (_sortModeEntry.Value < SortModeMin || _sortModeEntry.Value > SortModeMax) _sortModeEntry.Value = SortModeMin; }
 				catch (Exception __cx) { SRApi.Guard.Log("布局预设/裁剪排序值", __cx); }
@@ -190,6 +193,10 @@ namespace SR_UCH.Tweaks {
 			SRApi.LocDesc(Section, "Sort Mode",
 				"列表排序方式\n0=时间（新→旧），1=名称（A→Z）\n由列表页的排序下拉维护，不在配置区重复显示",
 				"preset list sort mode\n0 = time (newest first), 1 = name (A-Z)\nmaintained by the sort dropdown on the list page and not repeated in the settings area");
+			SRApi.LocKey(Section, "Skip Treehouse", "跳过树屋流程", "Skip treehouse");
+			SRApi.LocDesc(Section, "Skip Treehouse",
+				"跳过树屋流程\n勾选后联机替换关卡时不再先回树屋，而是直接替换场景进入目标关卡\n房客的关卡选择状态可能不同步（按关卡读取的岩浆/统计等次要设置可能不一致），默认关闭",
+				"skip the treehouse flow\nwhen on, online level replacement switches the scene directly instead of returning to the treehouse first\nclients' selected-level state may be out of sync (minor per-level settings like lava/stats may differ); off by default");
 			SRApi.LocKey(Section, ColWidthsKey, "列表列宽（内部）", "Preset widths (internal)");
 			SRApi.LocDesc(Section, ColWidthsKey,
 				"预设列表列宽\n由列表表头拖动自动写入，逗号分隔的设计单位\n一般无需手动修改；非法值会回退默认列宽",
@@ -377,6 +384,19 @@ namespace SR_UCH.Tweaks {
 					GUILayout.Space(W(8));
 					SRApi.Ctl.LabelAuto(SRApi.T("关卡", "Level"));
 					RenderLevelFilterCombo();
+					GUILayout.FlexibleSpace();
+				} finally {
+					GUILayout.EndHorizontal();
+				}
+				// 跳过树屋流程（默认关）：联机替换关卡时直接替换场景，不先回树屋
+				GUILayout.BeginHorizontal();
+				try {
+					bool __skip = _skipTreehouse != null && _skipTreehouse.Value;
+					bool __skip2 = GUILayout.Toggle(__skip, SRApi.T(" 跳过树屋流程（联机时直接替换关卡，风险自负）", " Skip treehouse (replace directly online; at your own risk)"), SRApi.Ctl.Label);
+					if (__skip2 != __skip && _skipTreehouse != null) {
+						_skipTreehouse.Value = __skip2;
+						try { SRApi.FlushConfig(); } catch { }
+					}
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
@@ -1392,10 +1412,12 @@ namespace SR_UCH.Tweaks {
 						// 单人/无远程客户端：直接在当前对局内切场景（设置 SelectedLevel/mode/snapshot + ReloadScene）；
 						// 有远程客户端时退回树屋方案，因为游戏没有在“对局内”更新房客 SelectedLevel 的 RPC/消息。
 						// 自定义关卡：场景与快照信息都能同步，多/单人都走直接替换（房客 SelectedLevel 仍是旧值，仅影响按关卡读取的次要设置）。
-						if ((!HasRemoteClients() || customPreset) && StartDirectReplace(p, xml, targetLevel, targetMode)) {
+						bool skipTreehouse = _skipTreehouse != null && _skipTreehouse.Value;
+						if ((!HasRemoteClients() || customPreset || skipTreehouse) && StartDirectReplace(p, xml, targetLevel, targetMode)) {
 							coroutineStarted = true;
 							SRApi.Notify(SRApi.T("直接替换关卡并加载预设：", "Replacing level directly and loading preset: ") + p.Name
-								+ SRApi.T(" → ", " → ") + (customPreset ? (string.IsNullOrEmpty(p.LevelName) ? SRApi.T("自定义关卡", "Custom level") : p.LevelName) : LevelDisplayNameForScene(presetScene)));
+								+ SRApi.T(" → ", " → ") + (customPreset ? (string.IsNullOrEmpty(p.LevelName) ? SRApi.T("自定义关卡", "Custom level") : p.LevelName) : LevelDisplayNameForScene(presetScene))
+								+ (skipTreehouse && HasRemoteClients() ? SRApi.T("（已跳过树屋流程，房客关卡状态可能不同步）", " (treehouse flow skipped; clients' level state may be out of sync)") : ""));
 						} else {
 							lm.StartCoroutine(ReplaceLevelRoutine(p.Name, xml, presetScene, targetLevel, targetMode));
 							coroutineStarted = true;
