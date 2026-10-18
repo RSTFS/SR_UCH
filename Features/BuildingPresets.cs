@@ -1000,6 +1000,13 @@ namespace SR_UCH.Tweaks {
 		// level 来自 XML 根节点 levelSceneName（读不到传空串），写进预设元数据用于列表/加载前校验。
 		private static void SaveXml(string xml, string name, string mode, int blocks, string level, string levelName, string levelCode) {
 			try {
+				// 保存侧与读取/导入同一上限：避免产生"能存不能取"的文件（读不出来只能手动删）。
+				if (string.IsNullOrEmpty(xml)) return;
+				if (xml.Length > MaxImportChars || blocks > MaxImportBlocks) {
+					SRApi.Notify(SRApi.T("布局太大，无法保存为预设（超出读取上限）", "The layout is too large to save as a preset (exceeds the load limit)"));
+					SRApi.LogWarn("[布局预设] 保存被拒：xml 长度=" + xml.Length + " 方块数=" + blocks);
+					return;
+				}
 				string root = PresetsRoot();
 				string dirName = SafeDirName(mode);
 				string dir = Path.Combine(root, dirName);
@@ -2240,13 +2247,18 @@ namespace SR_UCH.Tweaks {
 				while (true) {
 					at = xml.IndexOf("<block", at, StringComparison.Ordinal);
 					if (at < 0) break;
-					blocks++;
+					int after = at + 6;
+					// 只认 <block ... / <block> / <block/>：避免把 <blocked> 之类的节点误计成方块。
+					if (after < xml.Length) {
+						char ch = xml[after];
+						if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == '>' || ch == '/') blocks++;
+					}
 					if (blocks > MaxImportBlocks) {
 						SRApi.Notify(SRApi.T("预设方块数量超限，已拒绝加载", "The preset has too many blocks and was not loaded"));
 						SRApi.LogWarn("[布局预设] 预设方块数超限，已拒绝加载: " + path);
 						return null;
 					}
-					at += 6;
+					at = after;
 				}
 				return xml;
 			} catch (Exception __ex) {

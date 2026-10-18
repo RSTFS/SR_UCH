@@ -428,7 +428,6 @@ namespace SR_UCH.Tweaks {
         private static readonly Dictionary<string, string> _xSections = new Dictionary<string, string>();
         private static readonly Dictionary<string, string> _xKeys = new Dictionary<string, string>();
         private static readonly List<string[]> _xMoves = new List<string[]>();       // [from,to,key]
-        private static readonly List<string[]> _xComboMoves = new List<string[]>();  // [fromSec,fromKey,toSec,toKey]
         private static readonly List<string[]> _xRemovals = new List<string[]>();    // [sec, key...]
         private static bool _xPending;
 
@@ -446,15 +445,6 @@ namespace SR_UCH.Tweaks {
         public static void Move(string fromSec, string toSec, string key) {
             if (string.IsNullOrEmpty(fromSec) || string.IsNullOrEmpty(toSec) || string.IsNullOrEmpty(key)) return;
             _xMoves.Add(new[] { fromSec, toSec, key }); _xPending = true;
-        }
-        public static void Combo(string fromSec, string toSec, string key) {
-            if (string.IsNullOrEmpty(fromSec) || string.IsNullOrEmpty(toSec) || string.IsNullOrEmpty(key)) return;
-            _xComboMoves.Add(new[] { fromSec, key, toSec, key }); _xPending = true;
-        }
-        public static void ComboTo(string fromSec, string fromKey, string toSec, string toKey) {
-            if (string.IsNullOrEmpty(fromSec) || string.IsNullOrEmpty(fromKey) ||
-                string.IsNullOrEmpty(toSec) || string.IsNullOrEmpty(toKey)) return;
-            _xComboMoves.Add(new[] { fromSec, fromKey, toSec, toKey }); _xPending = true;
         }
         public static void Remove(string section, params string[] keys) {
             if (string.IsNullOrEmpty(section) || keys == null || keys.Length == 0) return;
@@ -544,8 +534,6 @@ namespace SR_UCH.Tweaks {
                 }
                 for (int i = 0; i < _xMoves.Count; i++)
                     text = MoveKeyBetweenSections(text, _xMoves[i][0], _xMoves[i][1], _xMoves[i][2]);
-                for (int i = 0; i < _xComboMoves.Count; i++)
-                    text = MoveComboEntryTo(text, _xComboMoves[i][0], _xComboMoves[i][1], _xComboMoves[i][2], _xComboMoves[i][3]);
                 for (int i = 0; i < _xRemovals.Count; i++) {
                     string sec = _xRemovals[i][0];
                     string[] keys = new string[_xRemovals[i].Length - 1];

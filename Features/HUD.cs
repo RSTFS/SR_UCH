@@ -1493,10 +1493,6 @@ namespace SR_UCH.Tweaks {
 			}
 		}
 
-		private static void AddLine(ref int n, string plain, string rich, int kind, Color col) {
-			AddLineFade(ref n, plain, rich, kind, col, 1f);
-		}
-
 		private static void AddLineFade(ref int n, string plain, string rich, int kind, Color col, float fade) {
 			if (string.IsNullOrEmpty(plain)) return;
 			if (n < _hudPlain.Length) {
