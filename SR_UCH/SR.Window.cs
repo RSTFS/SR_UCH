@@ -203,7 +203,7 @@ public partial class SR {
         private static void DrawGUI() {
             if (!_visible && _uiAlpha <= 0.01f && !AnyUiBlocked()) {
                 // 面板已关：把自绘页声明的系统光标形状收掉，否则 <->/+ 光标会留在屏幕上
-                try { SR.Ctl.ClearTip(); } catch { }
+                try { ClearTip(); } catch { }
                 RunFrameEndHooks();
                 return;
             }

@@ -69,9 +69,9 @@ namespace SR_UCH.Tweaks {
 			},
 			new ContentDef {
 				Key = "Show Win Score", ColorKey = "Color Win Score",
-				LabelZh = "获胜积分", LabelEn = "Win score",
-				DescZh = "显示获胜积分\n读取游戏设置的目标分，读不到时显示 250\n关闭后不显示该行",
-				DescEn = "show win score\nreads the target score from game settings, falls back to 250\nwhen off this line is hidden"
+				LabelZh = "获胜", LabelEn = "Win",
+				DescZh = "显示获胜目标\n读取游戏设置的获胜目标分，读不到时显示 250\n关闭后不显示该行",
+				DescEn = "show win target\nreads the winning target score from game settings, falls back to 250\nwhen off this line is hidden"
 			},
 			new ContentDef {
 				Key = "Extra Line 1", ColorKey = "Color Extra 1",
@@ -194,7 +194,23 @@ namespace SR_UCH.Tweaks {
 		// ---- 玩家面板 ----
 		private static readonly string[] _playerPlain = new string[8];
 		private static readonly string[] _playerRich = new string[8];
+		private static readonly int[] _playerNums = new int[8];
 		private static int _playerRowCount;
+
+		// ---- 平铺模式：独立小段（各自背景/颜色），一行放不下自动换行 ----
+		private static readonly string[] _segText = new string[16];
+		private static readonly Color[] _segColor = new Color[16];
+		private static readonly float[] _segW = new float[16];
+		private static readonly int[] _segRow = new int[16];
+		private static readonly float[] _segX = new float[16];
+		private static int _segCount;
+		private static int _segRowCount;
+		private static float _segRowsW;
+
+		// ---- 丝滑动画：整体滑入 + 行 stagger ----
+		private static float _hudAppear;        // 0..1 出现进度
+		private static float _hudShownAt;       // 本轮开始出现的时间（stagger 基准）
+		private static bool _wasVisible;
 
 		// ---- 额外信息行 ----
 		private static string _extra1Text;
@@ -511,9 +527,13 @@ namespace SR_UCH.Tweaks {
 			try {
 				ConfigEntryBase show = SRApi.Ctl.FindEntry(Sec, d.Key);
 				ConfigEntryBase color = SRApi.Ctl.FindEntry(Sec, d.ColorKey);
-				GUIContent label = new GUIContent(SRApi.T(d.LabelZh, d.LabelEn), SRApi.T(d.DescZh, d.DescEn));
+				string tip = SRApi.T(d.DescZh, d.DescEn) + "\n" + SRApi.T("点击名称还原默认白色", "Click the name to reset to default white");
+				GUIContent label = new GUIContent(SRApi.T(d.LabelZh, d.LabelEn), tip);
 				GUILayout.BeginHorizontal();
-				SRApi.Ctl.RestoreLabel(label, show, SRApi.Ctl.Sc(150f), SRApi.Ctl.Sc(28f));
+				// 名称文本可点击：把该内容颜色还原为默认白色。
+				if (GUILayout.Button(label, SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(150f)), GUILayout.Height(SRApi.Ctl.Sc(24f)))) {
+					ResetColor(d.ColorKey, color);
+				}
 				if (show != null) SRApi.Ctl.RenderControl(show);
 				GUILayout.Space(SRApi.Ctl.Sc(6f));
 				DrawColorSwatch(d.ColorKey, color);
@@ -521,6 +541,14 @@ namespace SR_UCH.Tweaks {
 				GUILayout.EndHorizontal();
 				if (color != null && _openColorKey == d.ColorKey) DrawColorPicker(d.LabelZh, d.LabelEn, d.ColorKey, color);
 			} catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 内容行", __ex); }
+		}
+
+		// 点击名称：该内容颜色还原为默认白色并刷新调色板。
+		private static void ResetColor(string colorKey, ConfigEntryBase color) {
+			try {
+				SRApi.Ctl.SetValue(color, "#FFFFFF");
+				if (_openColorKey == colorKey) LoadPicker(Color.white);
+			} catch (Exception __ex) { SRApi.Guard.Log("HUD 颜色还原", __ex); }
 		}
 
 		private static void DrawColorSwatch(string colorKey, ConfigEntryBase color) {
@@ -684,8 +712,8 @@ namespace SR_UCH.Tweaks {
 				_colRound = cfg.Bind(Sec, "Color Round", "#FFFFFF", "回合进度文字颜色（#RRGGBB）。");
 				_showLevel = cfg.Bind(Sec, "Show Level", false, "显示关卡/模式（默认关闭）。");
 				_colLevel = cfg.Bind(Sec, "Color Level", "#FFFFFF", "关卡/模式文字颜色（#RRGGBB）。");
-				_showWin = cfg.Bind(Sec, "Show Win Score", false, "显示获胜积分（默认关闭）。");
-				_colWin = cfg.Bind(Sec, "Color Win Score", "#FFFFFF", "获胜积分文字颜色（#RRGGBB）。");
+				_showWin = cfg.Bind(Sec, "Show Win Score", false, "显示获胜目标（默认关闭）。");
+				_colWin = cfg.Bind(Sec, "Color Win Score", "#FFFFFF", "获胜文字颜色（#RRGGBB）。");
 				_showPanel = cfg.Bind(Sec, "Show Player Panel", false, "显示玩家面板（默认关闭）。");
 				_colNumber = cfg.Bind(Sec, "Show Number", false, "玩家面板：显示玩家号（默认关闭）。");
 				_colNumColor = cfg.Bind(Sec, "Color Panel Number", "#FFFFFF", "玩家号列文字颜色（#RRGGBB）。");
@@ -847,8 +875,29 @@ namespace SR_UCH.Tweaks {
 
 		private static void StepAlpha(bool target) {
 			float want = target ? 1f : 0f;
-			if (FadeOn()) _hudAlpha = Mathf.MoveTowards(_hudAlpha, want, 6f * Time.unscaledDeltaTime);
-			else _hudAlpha = want;
+			bool fade = FadeOn();
+			if (target && !_wasVisible) _hudShownAt = Time.unscaledTime;
+			_wasVisible = target;
+			if (fade) {
+				_hudAlpha = Mathf.MoveTowards(_hudAlpha, want, 6f * Time.unscaledDeltaTime);
+				_hudAppear = Mathf.MoveTowards(_hudAppear, want, 4f * Time.unscaledDeltaTime);
+			} else {
+				_hudAlpha = want;
+				_hudAppear = want;
+			}
+		}
+
+		// ease-out（t = 1-(1-x)^3）。
+		private static float EaseOut(float x) {
+			float inv = 1f - Mathf.Clamp01(x);
+			return 1f - inv * inv * inv;
+		}
+
+		// 内容行依次淡入：每行延迟 30ms，0.2s 完成。
+		private static float StaggerAlpha(int index) {
+			if (_hudShownAt <= 0f) return 1f;
+			float x = (Time.unscaledTime - _hudShownAt - index * 0.03f) / 0.2f;
+			return EaseOut(x);
 		}
 
 		private static GameSettings ReadSettings() {
@@ -945,7 +994,7 @@ namespace SR_UCH.Tweaks {
 			} catch { _levelText = null; }
 		}
 
-		// 获胜积分：取游戏设置的目标分，读不到时用 250。
+		// 获胜：取游戏设置的获胜目标分，读不到时用 250。
 		private static void UpdateWin(GameSettings gs) {
 			int target = WinScoreFallback;
 			try {
@@ -954,7 +1003,7 @@ namespace SR_UCH.Tweaks {
 					if (ms > 0) target = ms;
 				}
 			} catch { target = WinScoreFallback; }
-			_winText = SRApi.T("获胜积分：", "Win score: ") + target;
+			_winText = SRApi.T("获胜：", "Win: ") + target;
 		}
 
 		private static void UpdateRoundNotice(GameControl gc) {
@@ -1003,6 +1052,25 @@ namespace SR_UCH.Tweaks {
 			return "<color=" + ToHex(c) + ">" + text + "</color>";
 		}
 
+		// 玩家面板按玩家号（networkNumber）升序排列。
+		private static void SortPlayerRows(int n) {
+			for (int i = 1; i < n; i++) {
+				int keyNum = _playerNums[i];
+				string keyPlain = _playerPlain[i];
+				string keyRich = _playerRich[i];
+				int j = i - 1;
+				while (j >= 0 && _playerNums[j] > keyNum) {
+					_playerNums[j + 1] = _playerNums[j];
+					_playerPlain[j + 1] = _playerPlain[j];
+					_playerRich[j + 1] = _playerRich[j];
+					j--;
+				}
+				_playerNums[j + 1] = keyNum;
+				_playerPlain[j + 1] = keyPlain;
+				_playerRich[j + 1] = keyRich;
+			}
+		}
+
 		// 对局内玩家面板：分数/折扣从 GamePlayer 读取。
 		private static void UpdatePanel(GameControl gc) {
 			try {
@@ -1037,10 +1105,12 @@ namespace SR_UCH.Tweaks {
 					try { handicap = gp.Handicap; } catch { handicap = 100; }
 					string plain, rich;
 					if (!BuildPlayerRow(name, num, animal, score, hasScore, handicap, false, out plain, out rich)) continue;
+					_playerNums[n] = num;
 					_playerPlain[n] = plain;
 					_playerRich[n] = rich;
 					n++;
 				}
+				SortPlayerRows(n);
 				_playerRowCount = n;
 			} catch (Exception __ex) {
 				_playerRowCount = 0;
@@ -1075,10 +1145,12 @@ namespace SR_UCH.Tweaks {
 					try { host = lp.IsHost; } catch { host = false; }
 					string plain, rich;
 					if (!BuildPlayerRow(name, num, animal, 0, false, handicap, host, out plain, out rich)) continue;
+					_playerNums[n] = num;
 					_playerPlain[n] = plain;
 					_playerRich[n] = rich;
 					n++;
 				}
+				SortPlayerRows(n);
 				_playerRowCount = n;
 				_lobbyVote = FindLeadingVote(lm);
 			} catch (Exception __ex) {
