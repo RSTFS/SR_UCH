@@ -11,8 +11,8 @@ using UnityEngine;
 
 namespace SR_UCH.Tweaks {
 	// 本类自带 [HarmonyPatch]，由 ITweak 反射发现后手动 CreateAndPatchAll。
-	[SrFeature("sr.roundhud", "RoundHUD", "1.0")]
-	public class RoundHud : ITweak {
+	[SrFeature("sr.roundhud", "HUD", "1.0")]
+	public class HUD : ITweak {
 		private const string Sec = "Round HUD";
 		private const int WinScoreFallback = 250;
 
@@ -786,12 +786,12 @@ namespace SR_UCH.Tweaks {
 				SRApi.RegisterSceneHook(ResetStateSafe);
 
 				// 常驻对象：只承载 OnGUI 绘制。
-				GameObject go = new GameObject("SR_UCHRoundHud");
+				GameObject go = new GameObject("SR_UCH_HUD");
 				UnityEngine.Object.DontDestroyOnLoad(go);
 				go.AddComponent<HudComponent>();
 
 				// 本类自带 [HarmonyPatch] 但 ITweak 为反射发现，须手动 CreateAndPatchAll；失败只丢本类功能。
-				try { Harmony.CreateAndPatchAll(typeof(RoundHud), (string)null); }
+				try { Harmony.CreateAndPatchAll(typeof(HUD), (string)null); }
 				catch (Exception e) { SRApi.LogError("HUD 补丁注册失败: " + e.Message); }
 			} catch (Exception __ex) { SRApi.Guard.Log("HUD 初始化", __ex); }
 		}

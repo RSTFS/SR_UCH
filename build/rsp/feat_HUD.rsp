@@ -1,6 +1,6 @@
 /nologo
 /target:library
-/out:bin\Release\SR_UCH_RoundHud.dll
+/out:bin\Release\SR_UCH_HUD.dll
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\mscorlib.dll"
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\netstandard.dll"
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\System.dll"
@@ -24,4 +24,4 @@
 /r:"%GAME%\BepInEx\core\0Harmony.dll"
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 /r:"bin\Release\SR_UCH.dll"
-Features\RoundHud.cs
+Features\HUD.cs
