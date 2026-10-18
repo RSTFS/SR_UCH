@@ -1348,17 +1348,18 @@ namespace SR_UCH.Tweaks {
 				try { currentMode = st.GameMode.ToString(); } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取当前模式(加载)", __ex); }
 				bool levelMismatch = !string.IsNullOrEmpty(presetScene) && !string.IsNullOrEmpty(activeScene)
 					&& !string.Equals(presetScene, activeScene, StringComparison.Ordinal);
+				// 自定义关卡：场景名都是 BlankLevel，要靠快照名/代码区分是不是同一个自定义关卡。
+				bool customPreset = string.Equals(presetScene, "BlankLevel", StringComparison.OrdinalIgnoreCase);
+				bool customIdentityDiff = customPreset && !SameCustomLevel(p, gs);
+				if (customIdentityDiff) levelMismatch = true;
 				bool modeMismatch = IsConcreteMode(p.Mode) && IsConcreteMode(currentMode)
 					&& !string.Equals(p.Mode, currentMode, StringComparison.OrdinalIgnoreCase);
 				if (levelMismatch) {
-					// 跨关卡加载 = 替换关卡：自动拒绝自定义关卡（XML 里只有 BlankLevel，无法定位具体关卡），
-					// 内置关卡则走「先结束当前对局回树屋 → 原生 LaunchLevel 进预设关卡」的流程。
-					if (string.Equals(presetScene, "BlankLevel", StringComparison.OrdinalIgnoreCase)) {
-						SRApi.Notify(SRApi.T("该预设属于自定义关卡，无法从当前对局自动替换进去；请先进入该自定义关卡再加载", "This preset belongs to a custom level and cannot be entered by replacing the level here; enter that custom level first and load it there"));
-						return;
-					}
+					// 跨关卡加载 = 替换关卡：内置关卡走树屋 LaunchLevel；自定义关卡（BlankLevel）直接替换进 BlankLevel 场景并带上快照信息。
 					GameState.LevelName targetLevel;
-					if (!TrySceneToLevel(presetScene, out targetLevel) || targetLevel == GameState.LevelName.BLANKLEVEL) {
+					if (customPreset) {
+						targetLevel = GameState.LevelName.BLANKLEVEL;
+					} else if (!TrySceneToLevel(presetScene, out targetLevel) || targetLevel == GameState.LevelName.BLANKLEVEL) {
 						SRApi.Notify(SRApi.T("无法识别预设所属关卡，暂不支持自动替换关卡", "The preset's level could not be recognized; automatic level replacement is not supported"));
 						return;
 					}
@@ -1378,10 +1379,11 @@ namespace SR_UCH.Tweaks {
 					try {
 						// 单人/无远程客户端：直接在当前对局内切场景（设置 SelectedLevel/mode/snapshot + ReloadScene）；
 						// 有远程客户端时退回树屋方案，因为游戏没有在“对局内”更新房客 SelectedLevel 的 RPC/消息。
-						if (!HasRemoteClients() && StartDirectReplace(p, xml, targetLevel, targetMode)) {
+						// 自定义关卡：场景与快照信息都能同步，多/单人都走直接替换（房客 SelectedLevel 仍是旧值，仅影响按关卡读取的次要设置）。
+						if ((!HasRemoteClients() || customPreset) && StartDirectReplace(p, xml, targetLevel, targetMode)) {
 							coroutineStarted = true;
 							SRApi.Notify(SRApi.T("直接替换关卡并加载预设：", "Replacing level directly and loading preset: ") + p.Name
-								+ SRApi.T(" → ", " -> ") + LevelDisplayNameForScene(presetScene));
+								+ SRApi.T(" → ", " → ") + (customPreset ? (string.IsNullOrEmpty(p.LevelName) ? SRApi.T("自定义关卡", "Custom level") : p.LevelName) : LevelDisplayNameForScene(presetScene)));
 						} else {
 							lm.StartCoroutine(ReplaceLevelRoutine(p.Name, xml, presetScene, targetLevel, targetMode));
 							coroutineStarted = true;
@@ -2324,6 +2326,22 @@ namespace SR_UCH.Tweaks {
 		}
 
 		// 场景名 -> 游戏关卡枚举：遍历 GameState.GetLevelSceneName 反查（覆盖 Farm/Rooftops/.../PrototypeN）。
+		// 当前对局是否就是该预设的自定义关卡（比较快照名/代码；任一为空时视为不同）。
+		private static bool SameCustomLevel(PresetInfo p, GameState gs) {
+			try {
+				if (p == null || gs == null) return false;
+				LevelSelectController.PlayedSnapshotInfo cur = gs.currentSnapshotInfo;
+				// PlayedSnapshotInfo 是结构体，无需判空
+				string pn = p.LevelName ?? "";
+				string pc = p.LevelCode ?? "";
+				string cn = cur.snapshotName ?? "";
+				string cc = cur.snapshotCode ?? "";
+				bool nameSame = !string.IsNullOrEmpty(pn) && !string.IsNullOrEmpty(cn) && string.Equals(pn, cn, StringComparison.OrdinalIgnoreCase);
+				bool codeSame = !string.IsNullOrEmpty(pc) && !string.IsNullOrEmpty(cc) && string.Equals(pc, cc, StringComparison.OrdinalIgnoreCase);
+				return nameSame || codeSame;
+			} catch { return false; }
+		}
+
 		private static bool TrySceneToLevel(string scene, out GameState.LevelName level) {
 			level = GameState.LevelName.FARM;
 			try {
