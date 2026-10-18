@@ -511,6 +511,20 @@ namespace SR_UCH {
             private static GUIStyle Style(string name) { Func<string, GUIStyle> f = _style; return f != null ? f(name) : null; }
             public static GUIStyle Label { get { return Style("Label"); } }
             public static GUIStyle LabelWrap { get { return Style("LabelWrap"); } }
+        // 自适应标签：按文本实测宽高绘制（宽度=文本宽+2，高度=CalcHeight），避免固定高度把文字下半截裁掉。
+        // 功能页统一用它替代 GUILayout.Label(..., GUILayout.Height(固定值))。
+        public static void LabelAuto(string text) { LabelAuto(text, 0f); }
+        public static void LabelAuto(string text, float minWidth) {
+            try {
+                GUIStyle st = Style("Label");
+                GUIContent c = new GUIContent(text ?? "");
+                float w = Mathf.Max(minWidth, st.CalcSize(c).x + 2f);
+                float h = Mathf.Max(st.CalcSize(c).y, st.CalcHeight(c, w));
+                GUILayout.Label(c, st, GUILayout.Width(w), GUILayout.Height(h));
+            } catch {
+                try { GUILayout.Label(text ?? ""); } catch { }
+            }
+        }
             public static GUIStyle ChatLabel { get { return Style("ChatLabel"); } }
             public static GUIStyle ChatArea { get { return Style("ChatArea"); } }
             public static GUIStyle SecHeader { get { return Style("SecHeader"); } }

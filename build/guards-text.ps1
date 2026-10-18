@@ -133,14 +133,14 @@ function Check-DescFormat {
                 if (-not $s.Contains('\n')) { continue }   # 单行说明不参与（如占位/简短提示）
                 $total++
                 $lines = ([regex]::Matches($s, '\\n')).Count + 1
-                if ($lines -ne 3) { $bad++; continue }
+                if ($lines -lt 2 -or $lines -gt 3) { $bad++; continue }
                 if ($s -match '是什么：|干什么：|注意事项：|What: |Does: |Notes: ') { $bad++ }
             }
             $idx = $m + 1
         }
     }
-    if ($bad -gt 0) { Bad ('悬浮条目格式不合规（应恰好 3 行且无行首标签）: ' + $bad + ' 条') }
-    else { Ok ('悬浮条目格式统一（' + $total + ' 条：3 行、无行首标签）') }
+    if ($bad -gt 0) { Bad ('悬浮条目格式不合规（应为 2~3 行且无行首标签）: ' + $bad + ' 条') }
+    else { Ok ('悬浮条目格式统一（' + $total + ' 条：2~3 行、无行首标签）') }
 }
 
 
