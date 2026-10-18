@@ -317,6 +317,19 @@ namespace SR_UCH.Tweaks {
 			try { return e != null ? e.Value : null; } catch { return null; }
 		}
 
+		// 唯一的 Color→Color32 归一化入口：预览、色板、HUD 文字颜色都走这里，避免三套取整逻辑。
+		private static Color32 ToColor32(Color c) {
+			int r = Mathf.Clamp(Mathf.RoundToInt(c.r * 255f), 0, 255);
+			int g = Mathf.Clamp(Mathf.RoundToInt(c.g * 255f), 0, 255);
+			int b = Mathf.Clamp(Mathf.RoundToInt(c.b * 255f), 0, 255);
+			return new Color32((byte)r, (byte)g, (byte)b, 255);
+		}
+
+		private static Color FromColor32(Color32 c) {
+			return new Color(c.r / 255f, c.g / 255f, c.b / 255f, 1f);
+		}
+
+		// hex 固定 #RRGGBB（R 在高位）。解析后经 Color32 归一化，保证 hex→Color→hex 往返不变。
 		private static Color ParseHex(string hex, Color fallback) {
 			try {
 				if (!string.IsNullOrEmpty(hex)) {
@@ -325,7 +338,8 @@ namespace SR_UCH.Tweaks {
 					if (t.Length == 6) {
 						int v;
 						if (int.TryParse(t, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out v)) {
-							return new Color(((v >> 16) & 0xFF) / 255f, ((v >> 8) & 0xFF) / 255f, (v & 0xFF) / 255f, 1f);
+							Color32 c32 = new Color32((byte)((v >> 16) & 0xFF), (byte)((v >> 8) & 0xFF), (byte)(v & 0xFF), 255);
+							return FromColor32(c32);
 						}
 					}
 				}
@@ -335,10 +349,8 @@ namespace SR_UCH.Tweaks {
 
 		private static string ToHex(Color c) {
 			try {
-				int r = Mathf.Clamp(Mathf.RoundToInt(c.r * 255f), 0, 255);
-				int g = Mathf.Clamp(Mathf.RoundToInt(c.g * 255f), 0, 255);
-				int b = Mathf.Clamp(Mathf.RoundToInt(c.b * 255f), 0, 255);
-				return "#" + r.ToString("X2") + g.ToString("X2") + b.ToString("X2");
+				Color32 c32 = ToColor32(c);
+				return "#" + c32.r.ToString("X2") + c32.g.ToString("X2") + c32.b.ToString("X2");
 			} catch { return "#FFFFFF"; }
 		}
 
@@ -367,6 +379,7 @@ namespace SR_UCH.Tweaks {
 			SRApi.RegisterPage(Sec, "hud", "HUD", "HUD", 10, RenderPage1);
 			SRApi.RegisterPage(Sec, "content", "显示内容", "Content", 20, RenderPage2);
 			SRApi.RegisterPage(Sec, "players", "玩家面板", "Player panel", 30, RenderPage3);
+			SRApi.RegisterPage(Sec, "treehouse", "树屋面板", "Treehouse", 40, RenderPage4);
 
 			Loc("Enabled", "显示HUD", "Show HUD",
 				"HUD 总开关\n关闭后完全不绘制 HUD\n纯本地只读，不发送任何网络消息",
@@ -509,6 +522,127 @@ namespace SR_UCH.Tweaks {
 			} catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 玩家面板页", __ex); }
 		}
 
+		// 只读信息行（自动换行，避免长关卡名/代码超出面板宽度）。
+		private static void InfoLine(string text) {
+			try {
+				if (string.IsNullOrEmpty(text)) return;
+				GUILayout.Label(text, SRApi.Ctl.LabelWrap);
+			} catch {
+				try { GUILayout.Label(text); } catch { }
+			}
+		}
+
+		// 第四页：树屋面板（只读）。
+		private static void RenderPage4() {
+			try {
+				SRApi.Ctl.SectionTitle(SRApi.T("- 树屋面板 -", "- Treehouse -"));
+				bool inTree = false;
+				try { inTree = SRApi.Env.InTreehouse; } catch { inTree = false; }
+				if (!inTree) {
+					InfoLine(SRApi.T("当前不在树屋/大厅。", "Not in the treehouse/lobby."));
+					return;
+				}
+				GameSettings gs = ReadSettings();
+				LobbyManager lm = LobbyManager.instance;
+				LevelSelectController lsc = (lm != null) ? lm.CurrentLevelSelectController : null;
+
+				// 模式
+				string mode = (gs != null) ? ModeName(gs.GameMode) : null;
+				InfoLine(SRApi.T("模式：", "Mode: ") + (string.IsNullOrEmpty(mode) ? "?" : mode));
+
+				// 大厅玩家
+				SRApi.Ctl.SectionTitle(SRApi.T("- 大厅玩家 -", "- Lobby players -"));
+				int count = 0;
+				if (lm != null) {
+					foreach (LobbyPlayer lp in lm.GetLobbyPlayers()) {
+						if (lp == null) continue;
+						count++;
+						string name = LobbyPlayerName(lp);
+						string animal = null;
+						try { animal = AnimalName(lp.PickedAnimal, lp.IsWearingSkin); } catch { animal = null; }
+						string host = "";
+						try { if (lp.IsHost) host = SRApi.T(" [房主]", " [HOST]"); } catch { host = ""; }
+						int num = 0;
+						try { num = lp.networkNumber; } catch { num = 0; }
+						InfoLine("#" + num + " " + name + (string.IsNullOrEmpty(animal) ? "" : " · " + animal) + host);
+					}
+				}
+				if (count == 0) InfoLine(SRApi.T("暂无玩家", "No players"));
+
+				// 已投票关卡（得票数）
+				SRApi.Ctl.SectionTitle(SRApi.T("- 投票关卡 -", "- Voted levels -"));
+				int voteLines = 0;
+				if (lsc != null) {
+					if (lsc.portals != null) {
+						for (int i = 0; i < lsc.portals.Length; i++) {
+							LevelPortal p = lsc.portals[i];
+							if (p == null || p.Votes == null || p.Votes.Count <= 0) continue;
+							InfoLine(PortalName(p) + " ×" + p.Votes.Count);
+							voteLines++;
+						}
+					}
+					if (lsc.snapshotPortals != null) {
+						for (int i = 0; i < lsc.snapshotPortals.Length; i++) {
+							LevelPortal p = lsc.snapshotPortals[i];
+							if (p == null || p.Votes == null || p.Votes.Count <= 0) continue;
+							InfoLine(PortalName(p) + " ×" + p.Votes.Count);
+							voteLines++;
+						}
+					}
+				}
+				if (voteLines == 0) InfoLine(SRApi.T("暂无投票", "No votes yet"));
+
+				// 当前选中关卡（含自定义关卡名/代码）
+				SRApi.Ctl.SectionTitle(SRApi.T("- 当前选中关卡 -", "- Selected level -"));
+				int leadVotes;
+				LevelPortal lead = FindLeadingPortal(lm, out leadVotes);
+				string level = null;
+				string code = null;
+				if (lead != null) { level = PortalName(lead); code = PortalCode(lead); }
+				else { level = CurrentLevelName(out code); }
+				if (!string.IsNullOrEmpty(level)) {
+					string line = SRApi.T("关卡：", "Level: ") + level;
+					if (!string.IsNullOrEmpty(code)) line += SRApi.T("（代码 ", " (code ") + code + ")";
+					InfoLine(line);
+				} else {
+					InfoLine(SRApi.T("未知", "Unknown"));
+				}
+
+				// 开局提示
+				SRApi.Ctl.SectionTitle(SRApi.T("- 开局提示 -", "- Can start -"));
+				int minPlayers = 1;
+				try { if (lsc != null && lsc.MinPlayers > 0) minPlayers = lsc.MinPlayers; } catch { minPlayers = 1; }
+				bool canStart = count > 0 && count >= minPlayers;
+				if (canStart) {
+					InfoLine(SRApi.T("可开局：当前 ", "Can start: ") + count + SRApi.T(" 人（至少 ", " players (min ") + minPlayers + SRApi.T(" 人）", " players)"));
+				} else {
+					InfoLine(SRApi.T("暂不可开局：至少需要 ", "Cannot start yet: need at least ") + minPlayers
+						+ SRApi.T(" 人，当前 ", " players, currently ") + count + SRApi.T(" 人", " players"));
+				}
+			} catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 树屋面板页", __ex); }
+		}
+
+		private static string LobbyPlayerName(LobbyPlayer lp) {
+			string name = null;
+			try { name = lp.playerName; } catch { }
+			if (string.IsNullOrEmpty(name)) { try { name = lp.ValidatedDisplayName; } catch { } }
+			if (!string.IsNullOrEmpty(name)) name = name.Trim();
+			int num = 0;
+			try { num = lp.networkNumber; } catch { num = 0; }
+			if (string.IsNullOrEmpty(name)) name = "P" + num;
+			return SafeText(Truncate(name, 16));
+		}
+
+		private static string PortalCode(LevelPortal p) {
+			try {
+				CustomLevelPortal cp = p as CustomLevelPortal;
+				if (cp != null && cp.snapshotInfo != null && !string.IsNullOrEmpty(cp.snapshotInfo.code)) {
+					return Truncate(cp.snapshotInfo.code, 24);
+				}
+			} catch { }
+			return null;
+		}
+
 		// 仅开关的行（无颜色）。
 		private static void RenderToggleRow(string key, string labelZh, string labelEn, string descZh, string descEn) {
 			try {
@@ -551,15 +685,28 @@ namespace SR_UCH.Tweaks {
 			} catch (Exception __ex) { SRApi.Guard.Log("HUD 颜色还原", __ex); }
 		}
 
+		// 纯色块 + 细边框（白贴图着色；不再用 GUI.backgroundColor 乘深色按钮底）。
+		private static void DrawColorBoxWithBorder(Rect r, Color c, float alpha) {
+			DrawColorBox(r, c, alpha);
+			try {
+				EnsureWhite();
+				Color old = GUI.color;
+				GUI.color = new Color(1f, 1f, 1f, 0.35f * Mathf.Clamp01(alpha));
+				GUI.DrawTexture(new Rect(r.x, r.y, r.width, 1f), _white);
+				GUI.DrawTexture(new Rect(r.x, r.yMax - 1f, r.width, 1f), _white);
+				GUI.DrawTexture(new Rect(r.x, r.y, 1f, r.height), _white);
+				GUI.DrawTexture(new Rect(r.xMax - 1f, r.y, 1f, r.height), _white);
+				GUI.color = old;
+			} catch { }
+		}
+
 		private static void DrawColorSwatch(string colorKey, ConfigEntryBase color) {
 			try {
 				Color cur = ReadEntryColor(color);
-				Color oldBg = GUI.backgroundColor;
-				GUI.backgroundColor = new Color(cur.r, cur.g, cur.b, 1f);
+				Rect r = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(64f), SRApi.Ctl.Sc(26f));
+				DrawColorBoxWithBorder(r, cur, 1f);
 				string tip = SRApi.T("点击打开调色板", "Click to open the color picker");
-				bool clicked = GUILayout.Button(new GUIContent("", tip), SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(64f)), GUILayout.Height(SRApi.Ctl.Sc(26f)));
-				GUI.backgroundColor = oldBg;
-				if (!clicked) return;
+				if (!GUI.Button(r, new GUIContent("", tip), GUIStyle.none)) return;
 				if (_openColorKey == colorKey) { _openColorKey = null; return; }
 				_openColorKey = colorKey;
 				LoadPicker(ReadEntryColor(color));
@@ -593,14 +740,13 @@ namespace SR_UCH.Tweaks {
 					for (int col = 0; col < 6; col++) {
 						string hex = _presets[row * 6 + col];
 						Color pc = ParseHex(hex, Color.white);
-						Color oldBg = GUI.backgroundColor;
-						GUI.backgroundColor = pc;
-						if (GUILayout.Button(new GUIContent("", hex), SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(34f)), GUILayout.Height(SRApi.Ctl.Sc(22f)))) {
+						Rect pr = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(34f), SRApi.Ctl.Sc(22f));
+						DrawColorBoxWithBorder(pr, pc, 1f);
+						if (GUI.Button(pr, new GUIContent("", hex), GUIStyle.none)) {
 							Color.RGBToHSV(pc, out _pickH, out _pickS, out _pickV);
 							_hexEdit = ToHex(pc);
 							SRApi.Ctl.SetValue(color, _hexEdit);
 						}
-						GUI.backgroundColor = oldBg;
 					}
 					GUILayout.EndHorizontal();
 				}
@@ -636,11 +782,11 @@ namespace SR_UCH.Tweaks {
 				GUILayout.EndHorizontal();
 				// 预览 + 关闭。
 				GUILayout.BeginHorizontal();
-				Color oldBg2 = GUI.backgroundColor;
-				GUI.backgroundColor = PickerColor();
-				GUILayout.Box(GUIContent.none, SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(90f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
-				GUI.backgroundColor = oldBg2;
-				GUILayout.Label(ToHex(PickerColor()), SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(80f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+				Rect pv = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(90f), SRApi.Ctl.Sc(24f));
+				// 预览色先量化到 Color32，保证与 hex 标签、HUD 实际文字颜色完全一致。
+				Color preview = FromColor32(ToColor32(PickerColor()));
+				DrawColorBoxWithBorder(pv, preview, 1f);
+				GUILayout.Label(ToHex(preview), SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(80f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
 				if (GUILayout.Button(SRApi.T("关闭", "Close"), SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(64f)), GUILayout.Height(SRApi.Ctl.Sc(24f)))) _openColorKey = null;
 				GUILayout.EndHorizontal();
 				GUILayout.EndVertical();
@@ -977,15 +1123,32 @@ namespace SR_UCH.Tweaks {
 			} catch { _roundText = null; }
 		}
 
-		// 关卡/模式行：「关卡名 · 模式」，不带前缀。
+		// 当前关卡显示名：自定义快照优先用 snapshotName；只有代码时显示「自定义关卡」；否则用本地化关卡名。
+		private static string CurrentLevelName(out string code) {
+			code = null;
+			string level = null;
+			try {
+				GameState st = GameState.GetInstance();
+				if (st != null) {
+					try {
+						level = st.currentSnapshotInfo.snapshotName;
+						code = st.currentSnapshotInfo.snapshotCode;
+					} catch { level = null; code = null; }
+					if (string.IsNullOrEmpty(level)) {
+						string lv = GameState.GetLevelLocalizedName(st.SelectedLevel);
+						if (!string.IsNullOrEmpty(lv) && lv.IndexOf("default Level name error", StringComparison.Ordinal) < 0) level = lv;
+					}
+				}
+			} catch { level = null; code = null; }
+			if (string.IsNullOrEmpty(level) && !string.IsNullOrEmpty(code)) level = SRApi.T("自定义关卡", "Custom level");
+			return level;
+		}
+
+		// 关卡/模式行：「关卡名 · 模式」，不带前缀；自定义关卡显示实际快照名。
 		private static void UpdateLevel(GameSettings gs) {
 			try {
-				string level = null;
-				try {
-					GameState st = GameState.GetInstance();
-					if (st != null) level = GameState.GetLevelLocalizedName(st.SelectedLevel);
-				} catch { level = null; }
-				if (!string.IsNullOrEmpty(level) && level.IndexOf("default Level name error", StringComparison.Ordinal) >= 0) level = null;
+				string code;
+				string level = CurrentLevelName(out code);
 				string mode = (gs != null) ? ModeName(gs.GameMode) : null;
 				if (!string.IsNullOrEmpty(level) && !string.IsNullOrEmpty(mode)) _levelText = level + " · " + mode;
 				else if (!string.IsNullOrEmpty(level)) _levelText = level;
@@ -1160,8 +1323,9 @@ namespace SR_UCH.Tweaks {
 			}
 		}
 
-		// 当前投票最多的关卡（没有票数就返回 null）。
-		private static string FindLeadingVote(LobbyManager lm) {
+		// 得票最多的关卡传送门（没有票就返回 null）。
+		private static LevelPortal FindLeadingPortal(LobbyManager lm, out int votes) {
+			votes = 0;
 			try {
 				if (lm == null) return null;
 				LevelSelectController lsc = lm.CurrentLevelSelectController;
@@ -1182,6 +1346,16 @@ namespace SR_UCH.Tweaks {
 						if (p.Votes.Count > bestVotes) { bestVotes = p.Votes.Count; best = p; }
 					}
 				}
+				votes = bestVotes;
+				return best;
+			} catch { return null; }
+		}
+
+		// 当前投票最多的关卡（没有票数就返回 null）。
+		private static string FindLeadingVote(LobbyManager lm) {
+			try {
+				int votes;
+				LevelPortal best = FindLeadingPortal(lm, out votes);
 				if (best == null) return null;
 				return SRApi.T("投票：", "Vote: ") + PortalName(best);
 			} catch { return null; }
@@ -1319,13 +1493,29 @@ namespace SR_UCH.Tweaks {
 			}
 		}
 
+		// 纯色绘制用白贴图（必须用 GUI.color 着色，不能用 GUI.backgroundColor 乘在深色按钮贴图上）。
+		private static void EnsureWhite() {
+			if (_white != null) return;
+			_white = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+			_white.SetPixel(0, 0, Color.white);
+			_white.Apply();
+			_white.hideFlags = HideFlags.HideAndDontSave;
+		}
+
+		// 在矩形内画纯色块（白贴图 × GUI.color，不经过任何深色按钮贴图）。
+		private static void DrawColorBox(Rect r, Color c, float alpha) {
+			try {
+				EnsureWhite();
+				Color old = GUI.color;
+				Color32 c32 = ToColor32(c);
+				GUI.color = new Color(c32.r / 255f, c32.g / 255f, c32.b / 255f, Mathf.Clamp01(alpha));
+				GUI.DrawTexture(r, _white);
+				GUI.color = old;
+			} catch { }
+		}
+
 		private static void EnsureStyles() {
-			if (_white == null) {
-				_white = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-				_white.SetPixel(0, 0, Color.white);
-				_white.Apply();
-				_white.hideFlags = HideFlags.HideAndDontSave;
-			}
+			EnsureWhite();
 			if (_phaseStyle == null) {
 				GUIStyle src = SRApi.Ctl.Label;
 				_phaseStyle = (src != null) ? new GUIStyle(src) : new GUIStyle(GUI.skin.label);
