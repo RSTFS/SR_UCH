@@ -437,6 +437,11 @@ public partial class SR {
         private static float _tipW, _tipH;
         private static bool _tipWrap;
         private static GUIContent TipLineContent(string s) { _tipLineContent.text = s; return _tipLineContent; }
+        // 关闭界面时清空提示缓存，避免 tooltip 文本跨帧残留（表头提示延迟消失）。
+        public static void ClearTip() {
+            try { _tipKey = null; _tipLines = new string[0]; _tipContent.text = ""; } catch { }
+        }
+
         private static void DrawTooltip(Vector2 mp) {
             string tip = GUI.tooltip;
             if (tip == null || tip.Length == 0) return;
