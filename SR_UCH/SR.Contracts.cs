@@ -615,13 +615,6 @@ namespace SR_UCH {
         public static void MarkWheelUsed() { Action a = _markWheelUsed; if (a != null) a(); }
         public static void ForceResetUiState() { Action a = _forceResetUiState; if (a != null) a(); }
         public static void FlushConfig() { Action a = _flushConfig; if (a != null) a(); }
-        // 程序化切换页签（核心在初始化时注入具体实现；未注入时为空操作）。
-        public static Action<string, string> SelectPageImpl;
-        public static void SelectPage(string section, string pageId) {
-            Action<string, string> f = SelectPageImpl;
-            if (f != null) f(section, pageId);
-        }
-
         public static string SelectedPageId(string section) { Func<string, string> f = _selectedPageId; return f != null ? f(section) : null; }
 
         // 扩展点注册门面：注册表在核心，契约层只转发（功能层不再依赖 SR.*）。

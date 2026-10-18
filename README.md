@@ -102,15 +102,6 @@ The panel has sections on the left and pages on the right. Listed by section bel
 - A small on-screen HUD shows the current phase, a phase countdown and round progress.
 - The countdown turns yellow in the last 10 seconds and red in the last 5; optional blinking and phase notices.
 - Local only: sends no network messages and never affects gameplay. Drag it to move; the position is saved.
-
-### Match Replay
-
-- Records a timeline of each match (phases, block count and layout fingerprint, player scores) into `BepInEx/config/SR_UCH/replays/`.
-- Browse sessions in the mod UI, view the timeline, then export it to a text file or the clipboard.
-- Recording only in v1: nothing is ever injected back into the running game.
-
-- External translations: drop JSON language packs into BepInEx/config/SR_UCH/lang/ (format: {"id","displayName","fallback","map"}).
-
 ### Config Tools
 
 - Export the mod configuration to a single JSON backup under config/SR_UCH/config-backup/, or import one back.

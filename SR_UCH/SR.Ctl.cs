@@ -629,18 +629,6 @@ public partial class SR {
         return !string.IsNullOrEmpty(section) && (PageRenderers.ContainsKey(section) || _pageLists.ContainsKey(section));
     }
 
-    // 程序化切页：sec 的页签里存在 pageId 时切换并返回 true（供 SRApi.SelectPage 注入使用）。
-    public static bool SelectPageCore(string sec, string pageId) {
-        try {
-            List<PageInfo> list;
-            if (string.IsNullOrEmpty(sec) || string.IsNullOrEmpty(pageId) || !_pageLists.TryGetValue(sec, out list)) return false;
-            for (int i = 0; i < list.Count; i++) {
-                if (list[i].Id == pageId) { _pageSel[sec] = pageId; return true; }
-            }
-        } catch { }
-        return false;
-    }
-
     //文本框（右键清空）：命中该框的右键会清空内容并吃掉事件。
     public static string ClearableTextField(string text, GUIStyle style, params GUILayoutOption[] options) {
         string r = GUILayout.TextField(text, style, options);

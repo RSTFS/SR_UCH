@@ -945,20 +945,6 @@ public partial class SR : ITweak {
                 try { ResetWheelState(); } catch (Exception __ex) { Guard.Log("SR.Core", __ex); }   // 清掉滑块 / 滚轮盾的跨帧残留
             };
             // EnsureScanned / ApplyDisabledPlugins 不在此调用：其它 tweak 可能在本插件之后初始化，扫描在首帧 Update 跑。
-            // 程序化切页：功能点击列表项可直接跳到同栏目另一页签
-            SRApi.SelectPageImpl = delegate(string sec, string pageId) {
-                try {
-                    if (string.IsNullOrEmpty(sec) || string.IsNullOrEmpty(pageId)) return;
-                    if (!HasPage(sec)) return;
-                    if (!SelectPageCore(sec, pageId)) return;
-                    _mode = Mode.Internal;
-                    _selectedInternalSection = sec;
-                    NoPageScrollBars = false;
-                    _editText.Clear();
-                    _editOpen.Clear();
-                    _capturing = null;
-                } catch (Exception __ex) { Guard.Log("程序化切页", __ex); }
-            };
             try { Harmony.CreateAndPatchAll(typeof(SR)); } catch (Exception ex) { SR.LogError("SR 补丁注册失败: " + ex.Message); }
             // 录键屏蔽表情系统的嵌套类不被 CreateAndPatchAll 递归发现，需单独注册；失败不影响其它补丁
             try { Harmony.CreateAndPatchAll(typeof(EmoteBlockPatch)); } catch (Exception ex) { SR.LogWarn("录键屏蔽表情系统 补丁注册失败: " + ex.Message); }

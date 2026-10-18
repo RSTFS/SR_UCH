@@ -99,15 +99,6 @@
 - 屏幕小窗显示当前阶段、阶段倒计时与回合进度。
 - 倒计时最后 10 秒变黄、最后 5 秒变红；可选闪烁与阶段切换提示。
 - 纯本地：不发送任何网络消息，不影响游戏判定。可拖动，位置会自动保存。
-
-### 对局回放 Match Replay
-
-- 把每局的时间线（阶段、方块数与布局指纹、玩家得分）记录到 `BepInEx/config/SR_UCH/replays/`。
-- 在模组界面浏览会话、查看时间线，并导出为文本文件或复制到剪贴板。
-- v1 只记录：不会向运行中的游戏注入任何东西。
-
-- 外置翻译：把 JSON 语言包放进 BepInEx/config/SR_UCH/lang/（格式：{"id","displayName","fallback","map"}）。
-
 ### 配置工具 Config Tools
 
 - 把模组配置导出为 config/SR_UCH/config-backup/ 下的单个 JSON 备份，或从备份导入。
