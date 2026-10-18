@@ -704,6 +704,12 @@ namespace SR_UCH.Tweaks {
                     "Wall Cursor Collider", "Wall Piece Bounds Check", "Wall Ignore Bounds",
                     "Wall Grid Snap", "Wall Placement Rules"
                 });
+                // 解除关卡边界整理：已废弃的子项键全部删除（现已无任何 Config.Bind；构建期守卫会交叉核对）。
+                text = RemoveKeys(text, "Experiments", new[] {
+                    "Level Bounds Margin", "Level Bounds Hard", "Level Bounds Walls",
+                    "Level Bounds Cursor", "Level Bounds Camera", "Level Bounds Piece Ignore",
+                    "Remove UI3"
+                });
                 // 多选系统与“相机只跟随角色 / 限制最远视野”已删除，键名一并清掉。
                 text = RemoveKeys(text, "build", new[] {
                     "Multi Select", "Multi Select Frame", "Multi Select Add Key",

@@ -39,6 +39,7 @@ namespace SR_UCH.Tweaks {
 		private const float ColWidthMax = 600f;
 		private const string ColWidthsKey = "Preset Widths";
 		private const string ColOrderKey = "Preset Order";
+		private const string ColHiddenKey = "Preset Hidden";
 		// 操作列按钮种类：0=加载 1=重命名 2=导出 3=删除。
 		private const int ActLoad = 0;
 		private const int ActRename = 1;
@@ -59,6 +60,7 @@ namespace SR_UCH.Tweaks {
 		private static ConfigEntry<int> _sortModeEntry;
 		private static ConfigEntry<string> _colWidthsEntry;
 		private static ConfigEntry<string> _colOrderEntry;
+		private static ConfigEntry<string> _colHiddenEntry;
 		// 运行期快照：配置变化回调里即时更新，供每帧渲染读取（避免每帧访问 ConfigEntry）。
 		private static bool _featureOn;
 		private static int _sortMode;
@@ -81,10 +83,12 @@ namespace SR_UCH.Tweaks {
 		private static string _levelFilter = "";
 		private static bool _levelFilterOpen;
 
-		// 标准表格（核心 TableDraw）状态：列宽 / 列序 / 可见列 / 命中矩形缓存 / 滚动 / 拖拽。
+		// 标准表格（核心 TableDraw）状态：列宽 / 列序 / 隐藏列 / 可见列 / 命中矩形缓存 / 滚动 / 拖拽。
 		private static readonly float[] _colW = new float[ColCount];
 		private static int[] _order = new int[] { 0, 1, 2, 3, 4 };
+		private static readonly HashSet<int> _hiddenCols = new HashSet<int>();
 		private static bool _colsLoaded;
+		private static int _hiddenBeforeTable;
 		private static readonly List<int> _vis = new List<int>(ColCount);
 		private static readonly List<Rect> _headerCells = new List<Rect>();
 		private static readonly List<int> _headerCols = new List<int>();
@@ -147,18 +151,18 @@ namespace SR_UCH.Tweaks {
 					"内部状态：预设列表列宽（逗号分隔的设计单位，由表头拖动自动写入）。");
 				_colOrderEntry = plugin.Config.Bind(Section, ColOrderKey, "",
 					"内部状态：预设列表列顺序（逗号分隔的列索引，由表头拖动自动写入）。");
+				_colHiddenEntry = plugin.Config.Bind(Section, ColHiddenKey, "",
+					"内部状态：预设列表隐藏列（逗号分隔的列索引，右键表头隐藏后自动写入）。");
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设 初始化", __ex);
 			}
 		}
 
-		// 栏目注册：两页（保存与导入 / 预设列表），与实验栏的多页写法一致。
+		// 栏目注册：单页（保存与导入 + 搜索/排序 + 预设列表同页，分区用 SectionTitle）。
 		private static void SelfReg() {
 			SRApi.LocSec(Section, "布局预设", "Layout Presets");
 			SRApi.Nav(Section, 45); // 关卡(40) 之后、构建工具(50) 之前
-			// 第 1 页保存与导入，第 2 页预设列表；页签顺序由 order 决定。
-			SRApi.RegisterPage(Section, "save", "保存与导入", "Save & Import", 10, RenderSavePage);
-			SRApi.RegisterPage(Section, "list", "预设列表", "Presets", 20, RenderListPage);
+			SRApi.RegisterPage(Section, Render);
 			// 已删除的配置键：Show Timestamps（时间列固定显示，不再提供开关）。
 			// 用功能自注册的迁移规则清理旧 cfg，避免遗留孤儿键（只列真正不再 Bind 的键）。
 			try { SRApi.Migration.Remove(Section, "Show Timestamps"); }
@@ -183,6 +187,10 @@ namespace SR_UCH.Tweaks {
 			SRApi.LocDesc(Section, ColOrderKey,
 				"预设列表列顺序\n由列表表头拖动换位自动写入，逗号分隔的列索引\n一般无需手动修改；非法值会回退默认列序",
 				"preset list column order\nwritten automatically when the list header is dragged; comma-separated column indices\nnormally no need to edit; invalid values fall back to the default order");
+			SRApi.LocKey(Section, ColHiddenKey, "隐藏列（内部）", "Preset hidden (internal)");
+			SRApi.LocDesc(Section, ColHiddenKey,
+				"预设列表隐藏列\n右键表头隐藏列后自动写入，逗号分隔的列索引\nShift+右键表头可恢复显示全部列；非法索引会被忽略",
+				"preset list hidden columns\nwritten automatically after hiding a column with a header right-click; comma-separated column indices\nShift+right-click the header to show all columns again; invalid indices are ignored");
 		}
 
 		// ---------- 配置读取 ----------
@@ -263,48 +271,46 @@ namespace SR_UCH.Tweaks {
 			catch { return false; }
 		}
 
-		// ---------- 页面渲染（两页：保存与导入 / 预设列表） ----------
+		// ---------- 页面渲染（单页：保存与导入 + 搜索/排序 + 预设列表） ----------
 
-		// 第 1 页「保存与导入」：保存当前预设 / 导入 / 导出 三个分区，各占一行。
-		private static void RenderSavePage() {
+		// 同一页按 SectionTitle 分三个区；页面本身不滚动（NoPageScrollBars + 表格高度按视口计算），
+		// 预设列表在固定高度区域内用自己的滚轮滚动。
+		private static void Render() {
 			try {
 				EnsureLoaded();
-				SRApi.Ctl.SectionTitle(SRApi.T("- 保存当前预设 -", "- Save current preset -"));
+				EnsureCols();
+				// 页面级滚动关闭：内容按视口高度布局，滚轮只在预设表格内部滚动。
+				try {
+					SRApi.NoPageScrollBars = true;
+					SRApi.PageScroll = Vector2.zero;
+				} catch (Exception __ex) { SRApi.Guard.Log("布局预设/关闭页面滚动", __ex); }
+
+				SRApi.Ctl.SectionTitle(SRApi.T("- 保存与导入 -", "- Save & Import -"));
 				GUILayout.BeginHorizontal();
 				try {
-					GUIContent nameLabel = new GUIContent(SRApi.T("预设名称", "Preset name"),
-						SRApi.T("保存时使用的名称，留空则自动用「关卡名 + 时间」命名\n同名预设会要求再点一次按钮确认覆盖\nWindows 不允许的文件名字符会被替换成下划线",
-							"name used when saving; when empty, the level name plus a timestamp is used\na preset with the same name requires a second click to overwrite\ncharacters not allowed by Windows are replaced with underscores"));
-					GUILayout.Label(nameLabel, SRApi.Ctl.Label, GUILayout.Width(LabelWidth(nameLabel)), GUILayout.Height(W(26)));
+					SRApi.Ctl.LabelAuto(SRApi.T("预设名称", "Preset name"));
 					string typed = SRApi.ClearableTextField(_newName ?? "", 40, SRApi.Ctl.SearchBox,
-						GUILayout.Width(W(260)), GUILayout.Height(W(26)));
+						GUILayout.Width(W(240)), GUILayout.Height(W(24)));
 					if (typed != null && typed != _newName) _newName = typed;
-					if (GUILayout.Button(SaveButtonText(), SRApi.Ctl.Btn, GUILayout.Width(W(130)), GUILayout.Height(W(26)))) SaveCurrent();
+					if (GUILayout.Button(SaveButtonText(), SRApi.Ctl.Btn, GUILayout.Width(W(120)), GUILayout.Height(W(24)))) SaveCurrent();
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
 				}
-				GUILayout.Space(W(6));
-				SRApi.Ctl.SectionTitle(SRApi.T("- 导入 -", "- Import -"));
 				GUILayout.BeginHorizontal();
 				try {
-					GUIContent pathLabel = new GUIContent(SRApi.T("XML 路径", "XML path"),
-						SRApi.T("从磁盘上的 XML 文件导入布局预设（例如别人发来的 .xml）\n路径可以是绝对路径，也可以是相对 BepInEx 目录的路径",
-							"import a layout preset from an XML file on disk (for example a .xml received from someone)\nthe path may be absolute or relative to the BepInEx folder"));
-					GUILayout.Label(pathLabel, SRApi.Ctl.Label, GUILayout.Width(LabelWidth(pathLabel)), GUILayout.Height(W(26)));
+					SRApi.Ctl.LabelAuto(SRApi.T("XML 路径", "XML path"));
 					string path = SRApi.ClearableTextField(_importPath ?? "", 260, SRApi.Ctl.SearchBox,
-						GUILayout.Width(W(240)), GUILayout.Height(W(26)));
+						GUILayout.Width(W(230)), GUILayout.Height(W(24)));
 					if (path != null && path != _importPath) _importPath = path;
 					if (GUILayout.Button(SRApi.T("从路径导入", "Import path"), SRApi.Ctl.Btn,
-						GUILayout.Width(W(110)), GUILayout.Height(W(26)))) ImportFromPath();
+						GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ImportFromPath();
 					if (GUILayout.Button(SRApi.T("从剪贴板导入", "Import clipboard"), SRApi.Ctl.Btn,
-						GUILayout.Width(W(120)), GUILayout.Height(W(26)))) ImportFromClipboard();
+						GUILayout.Width(W(120)), GUILayout.Height(W(24)))) ImportFromClipboard();
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
 				}
-				GUILayout.Space(W(6));
-				SRApi.Ctl.SectionTitle(SRApi.T("- 导出 -", "- Export -"));
 				GUILayout.BeginHorizontal();
 				try {
 					if (GUILayout.Button(new GUIContent(SRApi.T("全部导出到目录", "Export all to folder"),
@@ -319,56 +325,39 @@ namespace SR_UCH.Tweaks {
 				} finally {
 					GUILayout.EndHorizontal();
 				}
-			} catch (Exception __ex) {
-				SRApi.Guard.Log("渲染保存与导入页", __ex);
-			}
-		}
+				GUILayout.Space(W(4));
 
-		// 第 2 页「预设列表」：搜索 / 关卡筛选 / 排序 + 可拖列宽/换位的标准表格。
-		private static void RenderListPage() {
-			try {
-				EnsureLoaded();
-				EnsureCols();
-				SRApi.Ctl.SectionTitle(SRApi.T("- 搜索 / 筛选 / 排序 -", "- Search / filter / sort -"));
+				SRApi.Ctl.SectionTitle(SRApi.T("- 搜索 / 排序 / 批量 -", "- Search / sort / batch -"));
 				GUILayout.BeginHorizontal();
 				try {
-					// 搜索标签可点击：点一下清空搜索框。
-					GUIContent searchLabel = new GUIContent(SRApi.T("搜索", "Search"),
-						SRApi.T("点击清空搜索框", "click to clear the search box"));
-					if (GUILayout.Button(searchLabel, SRApi.Ctl.Label, GUILayout.Width(LabelWidth(searchLabel)), GUILayout.Height(W(24)))) _search = "";
+					// 搜索标签：LabelAuto 绘制 + 命中区域判定，点击清空搜索框。
+					SRApi.Ctl.LabelAuto(SRApi.T("搜索", "Search"));
+					Rect searchRect = GUILayoutUtility.GetLastRect();
+					Event evSearch = Event.current;
+					if (evSearch != null && evSearch.type == EventType.MouseDown && evSearch.button == 0
+						&& searchRect.Contains(evSearch.mousePosition)) {
+						_search = "";
+						evSearch.Use();
+					}
 					string q = SRApi.ClearableTextField(_search ?? "", 40, SRApi.Ctl.SearchBox,
 						GUILayout.Width(W(120)), GUILayout.Height(W(24)));
 					if (q != null && q != _search) _search = q;
 					GUILayout.Space(W(8));
-					GUIContent sortLabel = new GUIContent(SRApi.T("排序", "Sort"));
-					GUILayout.Label(sortLabel, SRApi.Ctl.Label, GUILayout.Width(LabelWidth(sortLabel)), GUILayout.Height(W(24)));
+					SRApi.Ctl.LabelAuto(SRApi.T("排序", "Sort"));
 					RenderSortCombo();
 					GUILayout.Space(W(8));
-					GUIContent levelLabel = new GUIContent(SRApi.T("关卡", "Level"));
-					GUILayout.Label(levelLabel, SRApi.Ctl.Label, GUILayout.Width(LabelWidth(levelLabel)), GUILayout.Height(W(24)));
+					SRApi.Ctl.LabelAuto(SRApi.T("关卡", "Level"));
 					RenderLevelFilterCombo();
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
 				}
 				if (!string.IsNullOrEmpty(_renameKey)) RenderRenameBar();
-				GUILayout.Space(W(4));
+				GUILayout.Space(W(2));
 				RenderPresetTable();
 			} catch (Exception __ex) {
-				SRApi.Guard.Log("渲染预设列表页", __ex);
+				SRApi.Guard.Log("渲染布局预设页", __ex);
 			}
-		}
-
-		// 标签宽度自适应：取当前语言实际文本宽度 + 左右内边距，避免固定宽度把文字裁掉。
-		private static float LabelWidth(GUIContent content) {
-			try {
-				float w = SRApi.Ctl.Label.CalcSize(content).x + W(10);
-				return Mathf.Max(W(24f), w);
-			} catch { return W(96f); }
-		}
-
-		private static float LabelWidth(string text) {
-			return LabelWidth(new GUIContent(text ?? ""));
 		}
 
 		// 关卡筛选下拉：全部 + 当前预设里出现过的关卡（显示为游戏本地化关卡名，值为 XML levelSceneName）。
@@ -439,7 +428,7 @@ namespace SR_UCH.Tweaks {
 				if (p == null) { _renameKey = null; _renameText = null; return; }
 				GUILayout.BeginHorizontal();
 				try {
-					GUILayout.Label(SRApi.T("重命名：", "Rename: "), SRApi.Ctl.Label, GUILayout.Width(W(64)), GUILayout.Height(W(24)));
+					SRApi.Ctl.LabelAuto(SRApi.T("重命名：", "Rename: "));
 					string typed = SRApi.ClearableTextField(_renameText ?? p.Name, 40, SRApi.Ctl.SearchBox,
 						GUILayout.Width(W(220)), GUILayout.Height(W(24)));
 					if (typed != null && typed != _renameText) _renameText = typed;
@@ -470,7 +459,7 @@ namespace SR_UCH.Tweaks {
 				SRApi.Ctl.SectionTitle(title);
 				float rowH = SRApi.Ctl.Sc(26);
 				float headerH = SRApi.Ctl.Sc(24);
-				float tableH = SRApi.Ctl.Sc(340);
+				float tableH = TableHeight();
 				float rowsH = Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH);
 				Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
 				if (box.width < SRApi.Ctl.Sc(220)) return;
@@ -521,8 +510,9 @@ namespace SR_UCH.Tweaks {
 				_args.applyOrder = delegate(int[] o) { _order = NormalizeOrder(o); SaveCols(); };
 				_args.saveOrder = delegate { SaveCols(); };
 				_args.saveWidths = delegate { SaveCols(); };
-				_args.hidden = null;
-				_args.hideable = false;
+				_args.hidden = _hiddenCols;
+				_args.hideable = true;
+				_args.resetAll = delegate { ResetTable(); };
 				_args.defaultColW = null;
 				_args.click = null;
 				_args.sortCol = -1;
@@ -535,10 +525,16 @@ namespace SR_UCH.Tweaks {
 				_args.pinDraw = delegate(int row, Rect r, int visibleIdx) { DrawActionButtons(visible, row, r); };
 				_args.emptyHint = delegate {
 					return _presets.Count == 0
-						? SRApi.T("还没有预设：到「保存与导入」页保存当前布局，或从剪贴板 / 文件导入。", "No presets yet: use Save & Import to save the current layout, or import from clipboard / file.")
+						? SRApi.T("还没有预设：在「保存与导入」区保存当前布局，或从剪贴板 / 文件导入。", "No presets yet: use the Save & Import section to save the current layout, or import from clipboard / file.")
 						: SRApi.T("没有匹配当前搜索的预设。", "No presets match the current search.");
 				};
+				_hiddenBeforeTable = _hiddenCols.Count;
 				SRApi.TableDraw(_args);
+				if (_hiddenCols.Count > _hiddenBeforeTable) {
+					// 核心在右键表头时把列加进 hidden 集合；这里落盘持久化（Shift+右键清空由 resetAll 回调处理）。
+					SaveCols();
+					SRApi.Notify(SRApi.T("已隐藏列（Shift+右键表头可恢复全部列）", "Column hidden (Shift+right-click the header to restore all columns)"));
+				}
 				if (e != null) {
 					// 拖拽兜底复位（拖列宽 / 换列位由核心处理，这里只接住状态与落盘回调）。
 					SRApi.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _args.moveCol, ref _args.moveDx,
@@ -549,6 +545,30 @@ namespace SR_UCH.Tweaks {
 				}
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/表格绘制", __ex);
+			}
+		}
+
+		// 表格高度：按页面视口高度扣掉上方固定行，尽量让整页不出现页面级滚动条；最小 140、最大 480 设计单位。
+		// 预设列表本身在固定高度区域内用 TableWheelInput 滚动，所以页面不需要滚动。
+		private static float TableHeight() {
+			float fallback = SRApi.Ctl.Sc(340);
+			try {
+				float areaH = SRApi.ContentArea.height;
+				if (areaH <= 0f) return fallback;
+				float reserve = SRApi.Ctl.Sc(300);
+				float avail = areaH - SRApi.FooterHeight - reserve;
+				return Mathf.Clamp(avail, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(480));
+			} catch { return fallback; }
+		}
+
+		// Shift+右键表头：核心清空隐藏列后回调这里，落盘并提示。
+		private static void ResetTable() {
+			try {
+				_hiddenCols.Clear();
+				SaveCols();
+				SRApi.Notify(SRApi.T("已恢复显示全部列", "All columns are shown again"));
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/恢复全部列", __ex);
 			}
 		}
 
@@ -689,6 +709,16 @@ namespace SR_UCH.Tweaks {
 					}
 					if (ok) _order = NormalizeOrder(src);
 				}
+				// 隐藏列：逐项做范围/合法性裁剪（操作列固定可见，不允许被隐藏）。
+				string h = _colHiddenEntry != null ? _colHiddenEntry.Value : null;
+				if (!string.IsNullOrEmpty(h)) {
+					string[] p = h.Split(',');
+					for (int i = 0; i < p.Length; i++) {
+						int k;
+						if (int.TryParse(p[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out k)
+							&& k >= 0 && k < ColCount && k != ColAction) _hiddenCols.Add(k);
+					}
+				}
 				// 操作列宽度固定为默认值（表头无法拖动它的宽度，避免手改配置把按钮挤没）。
 				_colW[ColAction] = DefColW[ColAction];
 			} catch (Exception __ex) {
@@ -731,7 +761,15 @@ namespace SR_UCH.Tweaks {
 					for (int i = 0; i < _order.Length; i++) p[i] = _order[i].ToString(CultureInfo.InvariantCulture);
 					_colOrderEntry.Value = string.Join(",", p);
 				}
+				if (_colHiddenEntry != null) {
+					List<string> l = new List<string>();
+					foreach (int k in _hiddenCols) l.Add(k.ToString(CultureInfo.InvariantCulture));
+					l.Sort();
+					_colHiddenEntry.Value = string.Join(",", l.ToArray());
+				}
+				// 配置落盘走核心节流器（MarkConfigDirty + FlushConfig）。
 				if (_colWidthsEntry != null) SRApi.Ctl.MarkConfigDirty(_colWidthsEntry.ConfigFile);
+				SRApi.FlushConfig();
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/保存列设置", __ex);
 			}
