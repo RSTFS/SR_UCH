@@ -211,21 +211,42 @@ public partial class SR {
             return null;
         }
 
-        //页脚状态：当前游戏模式 · 当前场景（如 自由·农场）。
+        //页脚状态：当前游戏模式 · 当前关卡（模式/关卡名都跟随游戏本地化语言）。
         private static string ModeLabel() {
             string mode = T("未知", "Unknown");
             try {
                 GameState.GameMode gm = GameSettings.GetInstance().GameMode;
-                if (gm == GameState.GameMode.FREEPLAY) mode = T("自由", "Freeplay");
-                else if (gm == GameState.GameMode.CHALLENGE) mode = T("挑战", "Challenge");
-                else if (gm == GameState.GameMode.PARTY) mode = T("派对", "Party");
-                else if (gm == GameState.GameMode.CREATIVE) mode = T("创意", "Creative");
-                else mode = gm.ToString();
+                string term = null;
+                if (gm == GameState.GameMode.FREEPLAY) term = "RuleBook/FreePlayText";
+                else if (gm == GameState.GameMode.CHALLENGE) term = "RuleBook/ChallengeModeText";
+                else if (gm == GameState.GameMode.PARTY) term = "RuleBook/PartyModeText";
+                else if (gm == GameState.GameMode.CREATIVE) term = "RuleBook/CreativeModeText";
+                bool got = false;
+                if (!string.IsNullOrEmpty(term)) {
+                    try {
+                        string loc = I2.Loc.LocalizationManager.GetTranslation(term);
+                        if (!string.IsNullOrEmpty(loc) && loc.IndexOf('/') < 0) { mode = loc; got = true; }
+                    } catch (Exception __gx) { Guard.Log("ModeLabel 模式本地化", __gx); }
+                }
+                if (!got) mode = gm.ToString();
             } catch (Exception __ex) { Guard.Log("ModeLabel", __ex); }
-            //场景名查询同样需 try：本文件约定所有 Unity 原生调用一律包裹。
             string scene = "";
             try { scene = SceneManager.GetActiveScene().name; } catch (Exception __ex) { Guard.Log("ModeLabel 场景名", __ex); }
-            return mode + "·" + MapNameZh(scene);
+            string level = null;
+            try {
+                if (scene == "Treehouse") level = T("树屋", "Treehouse");
+                else if (scene == "Lobby") level = T("大厅", "Lobby");
+                else if (scene == "BlankLevel") {
+                    LevelSelectController.PlayedSnapshotInfo info = GameState.GetInstance().currentSnapshotInfo;
+                    level = !string.IsNullOrEmpty(info.snapshotName) ? info.snapshotName : T("自定义关卡", "Custom level");
+                } else if (!string.IsNullOrEmpty(scene)) {
+                    foreach (GameState.LevelName lv in Enum.GetValues(typeof(GameState.LevelName))) {
+                        if (GameState.GetLevelSceneName(lv) == scene) { level = GameState.GetLevelLocalizedName(lv); break; }
+                    }
+                }
+            } catch (Exception __lx) { Guard.Log("ModeLabel 关卡本地化", __lx); }
+            if (string.IsNullOrEmpty(level)) level = MapNameZh(scene);
+            return mode + "·" + level;
         }
 
         //界面语言开关（设置页配置，运行时立即生效）；外部模块页渲染时 _forceZh=true 强制中文。

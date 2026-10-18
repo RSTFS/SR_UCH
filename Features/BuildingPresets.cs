@@ -193,6 +193,8 @@ namespace SR_UCH.Tweaks {
 			SRApi.LocDesc(Section, "Sort Mode",
 				"列表排序方式\n0=时间（新→旧），1=名称（A→Z）\n由列表页的排序下拉维护，不在配置区重复显示",
 				"preset list sort mode\n0 = time (newest first), 1 = name (A-Z)\nmaintained by the sort dropdown on the list page and not repeated in the settings area");
+			try { SRApi.HotkeyAction("presets.treehouse", "返回树屋", delegate { ReturnToTreehouse(); }); }
+			catch (Exception __hx) { SRApi.Guard.Log("布局预设/注册返回树屋快捷键", __hx); }
 			SRApi.LocKey(Section, "Skip Treehouse", "跳过树屋流程", "Skip treehouse");
 			SRApi.LocDesc(Section, "Skip Treehouse",
 				"跳过树屋流程\n勾选后联机替换关卡时不再先回树屋，而是直接替换场景进入目标关卡\n房客的关卡选择状态可能不同步（按关卡读取的岩浆/统计等次要设置可能不一致），默认关闭",
@@ -388,15 +390,24 @@ namespace SR_UCH.Tweaks {
 				} finally {
 					GUILayout.EndHorizontal();
 				}
-				// 跳过树屋流程（默认关）：联机替换关卡时直接替换场景，不先回树屋
+				// 跳过树屋流程（默认关）+ 返回树屋按钮
 				GUILayout.BeginHorizontal();
 				try {
 					bool __skip = _skipTreehouse != null && _skipTreehouse.Value;
-					bool __skip2 = GUILayout.Toggle(__skip, SRApi.T(" 跳过树屋流程（联机时直接替换关卡，风险自负）", " Skip treehouse (replace directly online; at your own risk)"), SRApi.Ctl.Label);
-					if (__skip2 != __skip && _skipTreehouse != null) {
-						_skipTreehouse.Value = __skip2;
-						try { SRApi.FlushConfig(); } catch { }
+					string __skipLabel = (__skip ? "☑ " : "☐ ") + SRApi.T("跳过树屋流程", "Skip treehouse");
+					if (GUILayout.Button(new GUIContent(__skipLabel,
+							SRApi.T("勾选后联机替换关卡时不再先回树屋，而是直接替换场景（房客关卡状态可能不同步，风险自负）",
+								"when on, online level replacement switches the scene directly instead of returning to the treehouse first (clients' level state may be out of sync)")),
+						SRApi.Ctl.Btn, GUILayout.Width(W(150)), GUILayout.Height(W(24)))) {
+						if (_skipTreehouse != null) {
+							_skipTreehouse.Value = !__skip;
+							try { SRApi.FlushConfig(); } catch { }
+						}
 					}
+					GUILayout.Space(W(8));
+					if (GUILayout.Button(new GUIContent(SRApi.T("返回树屋", "Back to treehouse"),
+							SRApi.T("走游戏原生的结束对局流程回到树屋（房主有效）", "ends the current match through the game's native flow and returns to the treehouse (host only)")),
+						SRApi.Ctl.Btn, GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ReturnToTreehouse();
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
@@ -735,7 +746,7 @@ namespace SR_UCH.Tweaks {
 				if (p == null) return;
 				bool delPending = IsPending("del:" + p.Key);
 				bool replacePending = IsPending("replace:" + p.Key);
-				float[] w = new float[] { replacePending ? 60f : 34f, 46f, 34f, 34f };
+				float[] w = new float[] { 34f, 46f, 34f, 34f };
 				float gap = SRApi.Ctl.Sc(2);
 				float x = r.x + SRApi.Ctl.Sc(2);
 				float y = r.y + SRApi.Ctl.Sc(1);
@@ -1413,11 +1424,15 @@ namespace SR_UCH.Tweaks {
 						// 有远程客户端时退回树屋方案，因为游戏没有在“对局内”更新房客 SelectedLevel 的 RPC/消息。
 						// 自定义关卡：场景与快照信息都能同步，多/单人都走直接替换（房客 SelectedLevel 仍是旧值，仅影响按关卡读取的次要设置）。
 						bool skipTreehouse = _skipTreehouse != null && _skipTreehouse.Value;
-						if ((!HasRemoteClients() || customPreset || skipTreehouse) && StartDirectReplace(p, xml, targetLevel, targetMode)) {
+						bool __directOk = (!HasRemoteClients() || customPreset || skipTreehouse) && StartDirectReplace(p, xml, targetLevel, targetMode);
+						if (__directOk) {
 							coroutineStarted = true;
 							SRApi.Notify(SRApi.T("直接替换关卡并加载预设：", "Replacing level directly and loading preset: ") + p.Name
 								+ SRApi.T(" → ", " → ") + (customPreset ? (string.IsNullOrEmpty(p.LevelName) ? SRApi.T("自定义关卡", "Custom level") : p.LevelName) : LevelDisplayNameForScene(presetScene))
 								+ (skipTreehouse && HasRemoteClients() ? SRApi.T("（已跳过树屋流程，房客关卡状态可能不同步）", " (treehouse flow skipped; clients' level state may be out of sync)") : ""));
+						} else if (customPreset) {
+							SRApi.Notify(SRApi.T("替换自定义关卡失败（详见日志）", "Failed to replace into the custom level (see the log)"));
+							coroutineStarted = true;   // 已在 StartDirectReplace 内部清理
 						} else {
 							lm.StartCoroutine(ReplaceLevelRoutine(p.Name, xml, presetScene, targetLevel, targetMode));
 							coroutineStarted = true;
@@ -1477,6 +1492,26 @@ namespace SR_UCH.Tweaks {
 			}
 		}
 
+		// 返回树屋：走游戏原生「结束对局」流程（与替换关卡的第一步相同），房主有效。
+		private static void ReturnToTreehouse() {
+			try {
+				if (!SRApi.GateHost || !NetworkServer.active) {
+					SRApi.NotifyT("仅房主可返回树屋：", "Host only: ", SRApi.T("返回树屋", "Back to treehouse"));
+					return;
+				}
+				LobbyManager lm = LobbyManager.instance;
+				GameControl gc = lm != null ? lm.CurrentGameController as GameControl : null;
+				if (gc == null) { SRApi.Notify(SRApi.T("当前不在对局中，无需返回树屋", "Not in a match; nothing to return from")); return; }
+				SetReloadBusy(true);
+				gc.EndGame();
+				SRApi.Notify(SRApi.T("正在返回树屋…", "Returning to the treehouse…"));
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/返回树屋", __ex);
+				SetReloadBusy(false);
+				SRApi.Notify(SRApi.T("返回树屋失败", "Failed to return to the treehouse"));
+			}
+		}
+
 		// 预设目录名（GameState.GameMode 的 ToString）-> 游戏模式枚举；IMPORTED/UNKNOWN 等非具体模式返回 false。
 		private static bool TryParseMode(string mode, out GameState.GameMode gm) {
 			gm = GameState.GameMode.FREEPLAY;
@@ -1515,6 +1550,19 @@ namespace SR_UCH.Tweaks {
 				if (p != null) {
 					info.snapshotName = p.LevelName;
 					info.snapshotCode = p.LevelCode;
+				}
+				// 旧索引可能没有名字/代码：从预设 XML 根属性补齐（自定义关卡必须带上，否则关卡显示空白）。
+				if (string.IsNullOrEmpty(info.snapshotName) || string.IsNullOrEmpty(info.snapshotCode)) {
+					try {
+						XmlDocument __xd = new XmlDocument();
+						__xd.LoadXml(xml);
+						XmlElement __root = __xd.DocumentElement;
+						if (__root != null) {
+							if (string.IsNullOrEmpty(info.snapshotName)) info.snapshotName = __root.GetAttribute("snapshotName");
+							if (string.IsNullOrEmpty(info.snapshotCode)) info.snapshotCode = __root.GetAttribute("snapshotCode");
+							if (string.IsNullOrEmpty(info.snapshotCode)) info.snapshotCode = __root.GetAttribute("levelCode");
+						}
+					} catch (Exception __xe) { SRApi.Guard.Log("布局预设/解析快照名", __xe); }
 				}
 				gs.currentSnapshotInfo = info;
 				st.GameMode = targetMode;
@@ -1687,7 +1735,17 @@ namespace SR_UCH.Tweaks {
 					return;
 				}
 				if (target == GameState.LevelName.BLANKLEVEL) {
-					SRApi.Notify(SRApi.T("该预设属于自定义关卡（BlankLevel），无法从树屋自动进入；请先在对应关卡内再加载", "This preset belongs to a custom level (BlankLevel) and cannot be entered from the treehouse; load it inside that level"));
+					// 自定义关卡：树屋里没有可用的关卡门，直接替换进 BlankLevel 并带上预设的快照名/代码。
+					GameState.GameMode __cm = GameSettings.GetInstance().GameMode;
+					GameState.GameMode __pm;
+					if (IsConcreteMode(p.Mode) && TryParseMode(p.Mode, out __pm)) __cm = __pm;
+					if (StartDirectReplace(p, xml, GameState.LevelName.BLANKLEVEL, __cm)) {
+						SetReloadBusy(true);
+						started = true;
+						SRApi.Notify(SRApi.T("正直接从树屋进入自定义关卡并加载预设：", "Entering the custom level directly from the treehouse and loading the preset: ") + p.Name);
+					} else {
+						SRApi.Notify(SRApi.T("进入自定义关卡失败（详见日志）", "Failed to enter the custom level (see the log)"));
+					}
 					return;
 				}
 				LevelPortal portal = FindTreehousePortal(lsc, target);
