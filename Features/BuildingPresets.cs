@@ -59,6 +59,7 @@ namespace SR_UCH.Tweaks {
 		private static ConfigEntry<bool> _enabled;
 		private static ConfigEntry<int> _maxPresets;
 		private static ConfigEntry<bool> _skipTreehouse;   // 跳过树屋流程（联机直接替换关卡，风险自负）
+		private static bool _actionHitThisFrame;   // 本帧是否命中操作按钮（空白处取消二次确认）
 		private static ConfigEntry<int> _sortModeEntry;
 		private static ConfigEntry<string> _colWidthsEntry;
 		private static ConfigEntry<string> _colOrderEntry;
@@ -303,18 +304,6 @@ namespace SR_UCH.Tweaks {
 			try {
 				EnsureLoaded();
 				EnsureCols();
-				// 二次确认的取消：点空白处（不在任何操作按钮上）即取消待确认动作。
-				try {
-					if (!string.IsNullOrEmpty(_pendingKey) && Event.current != null
-						&& Event.current.type == EventType.MouseDown && Event.current.button == 0) {
-						Vector2 __mp0 = Event.current.mousePosition;
-						bool __onAct = false;
-						for (int __ai = 0; __ai < _actRects.Count; __ai++) {
-							if (_actRects[__ai].Contains(__mp0)) { __onAct = true; break; }
-						}
-						if (!__onAct) ClearPending();
-					}
-				} catch (Exception __pe) { SRApi.Guard.Log("布局预设/空白处取消确认", __pe); }
 				// 页面级滚动关闭：内容按视口高度布局，滚轮只在预设表格内部滚动。
 				try {
 					SRApi.NoPageScrollBars = true;
@@ -390,24 +379,19 @@ namespace SR_UCH.Tweaks {
 				} finally {
 					GUILayout.EndHorizontal();
 				}
-				// 跳过树屋流程（默认关）+ 返回树屋按钮
+				// 跳过树屋流程（标准配置勾选框）+ 返回树屋（标准动作按钮，可绑定快捷键）
 				GUILayout.BeginHorizontal();
 				try {
-					bool __skip = _skipTreehouse != null && _skipTreehouse.Value;
-					string __skipLabel = (__skip ? "☑ " : "☐ ") + SRApi.T("跳过树屋流程", "Skip treehouse");
-					if (GUILayout.Button(new GUIContent(__skipLabel,
+					if (_skipTreehouse != null) {
+						SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("跳过树屋流程", "Skip treehouse"),
 							SRApi.T("勾选后联机替换关卡时不再先回树屋，而是直接替换场景（房客关卡状态可能不同步，风险自负）",
 								"when on, online level replacement switches the scene directly instead of returning to the treehouse first (clients' level state may be out of sync)")),
-						SRApi.Ctl.Btn, GUILayout.Width(W(150)), GUILayout.Height(W(24)))) {
-						if (_skipTreehouse != null) {
-							_skipTreehouse.Value = !__skip;
-							try { SRApi.FlushConfig(); } catch { }
-						}
+							_skipTreehouse, SRApi.Ctl.Sc(200), SRApi.Ctl.Sc(26));
 					}
-					GUILayout.Space(W(8));
-					if (GUILayout.Button(new GUIContent(SRApi.T("返回树屋", "Back to treehouse"),
-							SRApi.T("走游戏原生的结束对局流程回到树屋（房主有效）", "ends the current match through the game's native flow and returns to the treehouse (host only)")),
-						SRApi.Ctl.Btn, GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ReturnToTreehouse();
+					GUILayout.Space(SRApi.Ctl.Sc(8));
+					SRApi.Ctl.HotkeyButton("presets.treehouse", SRApi.T("返回树屋", "Back to treehouse"),
+						SRApi.T("走游戏原生的结束对局流程回到树屋（房主有效）；右键可绑定快捷键", "ends the current match through the game's native flow and returns to the treehouse (host only); right-click to bind a hotkey"),
+						delegate { ReturnToTreehouse(); }, SRApi.Ctl.Sc(150), SRApi.Ctl.Sc(26));
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
@@ -423,7 +407,15 @@ namespace SR_UCH.Tweaks {
 					? Mathf.Max(0f, last.yMax - _pageTopY)
 					: SRApi.Ctl.Sc(300);
 				float tableH = Mathf.Max(SRApi.Ctl.Sc(120), pageH - usedAbove - SRApi.Ctl.Sc(4));
+				_actionHitThisFrame = false;
 				RenderPresetTable(tableH);
+				// 二次确认取消：本帧 MouseDown 没有命中任何操作按钮 = 点了空白处
+				try {
+					if (!string.IsNullOrEmpty(_pendingKey) && !_actionHitThisFrame
+						&& Event.current != null && Event.current.type == EventType.MouseDown && Event.current.button == 0) {
+						ClearPending();
+					}
+				} catch (Exception __pe) { SRApi.Guard.Log("布局预设/空白处取消确认", __pe); }
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("渲染布局预设页", __ex);
 			}
@@ -794,6 +786,7 @@ namespace SR_UCH.Tweaks {
 						else if (kind == ActExport) ExportPreset(p);
 						else if (kind == ActDelete) { if (ConfirmOrArm("del:" + p.Key)) DeletePreset(p); }
 					}
+					_actionHitThisFrame = true;
 					SRApi.BlockWindowDrag = true;
 					e.Use();
 					break;
@@ -1431,8 +1424,9 @@ namespace SR_UCH.Tweaks {
 								+ SRApi.T(" → ", " → ") + (customPreset ? (string.IsNullOrEmpty(p.LevelName) ? SRApi.T("自定义关卡", "Custom level") : p.LevelName) : LevelDisplayNameForScene(presetScene))
 								+ (skipTreehouse && HasRemoteClients() ? SRApi.T("（已跳过树屋流程，房客关卡状态可能不同步）", " (treehouse flow skipped; clients' level state may be out of sync)") : ""));
 						} else if (customPreset) {
+							SetReloadBusy(false);   // 失败必须释放锁（否则后续所有加载都被拦）
 							SRApi.Notify(SRApi.T("替换自定义关卡失败（详见日志）", "Failed to replace into the custom level (see the log)"));
-							coroutineStarted = true;   // 已在 StartDirectReplace 内部清理
+							coroutineStarted = true;   // XML 已在 StartDirectReplace 内部清理
 						} else {
 							lm.StartCoroutine(ReplaceLevelRoutine(p.Name, xml, presetScene, targetLevel, targetMode));
 							coroutineStarted = true;
@@ -1736,6 +1730,10 @@ namespace SR_UCH.Tweaks {
 				}
 				if (target == GameState.LevelName.BLANKLEVEL) {
 					// 自定义关卡：树屋里没有可用的关卡门，直接替换进 BlankLevel 并带上预设的快照名/代码。
+					if (!AllLobbyPlayersPickedCharacter(lm)) {
+						SRApi.Notify(SRApi.T("有玩家还没选角色：请等所有人选好角色后再加载（否则可能开局异常）", "Some players have not picked a character yet; wait until everyone has one"));
+						return;
+					}
 					GameState.GameMode __cm = GameSettings.GetInstance().GameMode;
 					GameState.GameMode __pm;
 					if (IsConcreteMode(p.Mode) && TryParseMode(p.Mode, out __pm)) __cm = __pm;
