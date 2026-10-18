@@ -383,15 +383,17 @@ namespace SR_UCH.Tweaks {
 				GUILayout.BeginHorizontal();
 				try {
 					if (_skipTreehouse != null) {
+						// 标准配置行 = 可点击标签（点名称还原默认）+ 核心开关控件
 						SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("跳过树屋流程", "Skip treehouse"),
 							SRApi.T("勾选后联机替换关卡时不再先回树屋，而是直接替换场景（房客关卡状态可能不同步，风险自负）",
 								"when on, online level replacement switches the scene directly instead of returning to the treehouse first (clients' level state may be out of sync)")),
-							_skipTreehouse, SRApi.Ctl.Sc(200), SRApi.Ctl.Sc(26));
+							_skipTreehouse, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(26));
+						SRApi.Ctl.RenderControl(_skipTreehouse);
 					}
 					GUILayout.Space(SRApi.Ctl.Sc(8));
-					SRApi.Ctl.HotkeyButton("presets.treehouse", SRApi.T("返回树屋", "Back to treehouse"),
+					if (SRApi.Ctl.HotkeyButton("presets.treehouse", SRApi.T("返回树屋", "Back to treehouse"),
 						SRApi.T("走游戏原生的结束对局流程回到树屋（房主有效）；右键可绑定快捷键", "ends the current match through the game's native flow and returns to the treehouse (host only); right-click to bind a hotkey"),
-						delegate { ReturnToTreehouse(); }, SRApi.Ctl.Sc(150), SRApi.Ctl.Sc(26));
+						delegate { ReturnToTreehouse(); }, SRApi.Ctl.Sc(150), SRApi.Ctl.Sc(26))) ReturnToTreehouse();
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
@@ -1498,12 +1500,29 @@ namespace SR_UCH.Tweaks {
 				if (gc == null) { SRApi.Notify(SRApi.T("当前不在对局中，无需返回树屋", "Not in a match; nothing to return from")); return; }
 				SetReloadBusy(true);
 				gc.EndGame();
+				// EndGame 会切到树屋场景；锁必须由 watchdog 释放，否则后续所有加载都被"重载进行中"拦住。
+				try { lm.StartCoroutine(TreehouseReturnWatchdog()); }
+				catch (Exception __wx) { SRApi.Guard.Log("布局预设/返回树屋watchdog", __wx); SetReloadBusy(false); }
 				SRApi.Notify(SRApi.T("正在返回树屋…", "Returning to the treehouse…"));
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/返回树屋", __ex);
 				SetReloadBusy(false);
 				SRApi.Notify(SRApi.T("返回树屋失败", "Failed to return to the treehouse"));
 			}
+		}
+
+		// 返回树屋 watchdog：等树屋/大厅就绪或超时后释放重载锁。
+		private static IEnumerator TreehouseReturnWatchdog() {
+			float deadline = Time.unscaledTime + 25f;
+			while (Time.unscaledTime < deadline) {
+				try {
+					LobbyManager cur = LobbyManager.instance;
+					if (cur != null && cur.CurrentLevelSelectController != null
+						&& SceneManager.GetActiveScene().name == "TreeHouseLobby") break;
+				} catch (Exception __ex) { SRApi.Guard.Log("布局预设/返回树屋watchdog", __ex); }
+				yield return null;
+			}
+			SetReloadBusy(false);
 		}
 
 		// 预设目录名（GameState.GameMode 的 ToString）-> 游戏模式枚举；IMPORTED/UNKNOWN 等非具体模式返回 false。
