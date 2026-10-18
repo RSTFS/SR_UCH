@@ -1027,6 +1027,16 @@ public partial class SR : ITweak {
                 RebuildSections(false);   // 内部已有"选中项被移除 -> 回到第一个"的兜底
             } catch (Exception __ex) { Guard.Log("隐藏侧栏栏目", __ex); }
         }
+        // Shift+右键还原：清空 Sidebar Order（排序 + 隐藏存在同一份串里），恢复按 Nav rank 的默认栏目顺序。
+        public static void ResetSidebarOrder() {
+            try {
+                if (_sidebarOrderEntry != null) _sidebarOrderEntry.Value = "";
+                _userHiddenSections.Clear();
+                RebuildSections(false);
+                SR.LogInfo("[SR] 已还原侧栏栏目顺序与隐藏状态（回到默认顺序）");
+            } catch (Exception __ex) { Guard.Log("还原侧栏顺序", __ex); }
+        }
+
         public static void ClearHiddenSections() {
             try {
                 if (_userHiddenSections.Count == 0) return;

@@ -488,7 +488,7 @@ public partial class SR {
                     SR.RebuildSectionsPublic(false);
                 } catch (Exception __ex) { Guard.Log("保存栏目顺序", __ex); }
                 };
-            _ordArgs.resetAll = delegate { SR.ClearHiddenSections(); };   //Shift+右键 = 还原全部
+            _ordArgs.resetAll = delegate { SR.ResetSidebarOrder(); };   //Shift+右键 = 还原全部（排序 + 隐藏）
             _ordArgs.saveWidths = delegate { };   //列宽由静态 _ordColW 跨帧保留
         }
 
