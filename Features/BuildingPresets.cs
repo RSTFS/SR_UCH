@@ -294,6 +294,18 @@ namespace SR_UCH.Tweaks {
 			try {
 				EnsureLoaded();
 				EnsureCols();
+				// 二次确认的取消：点空白处（不在任何操作按钮上）即取消待确认动作。
+				try {
+					if (!string.IsNullOrEmpty(_pendingKey) && Event.current != null
+						&& Event.current.type == EventType.MouseDown && Event.current.button == 0) {
+						Vector2 __mp0 = Event.current.mousePosition;
+						bool __onAct = false;
+						for (int __ai = 0; __ai < _actRects.Count; __ai++) {
+							if (_actRects[__ai].Contains(__mp0)) { __onAct = true; break; }
+						}
+						if (!__onAct) ClearPending();
+					}
+				} catch (Exception __pe) { SRApi.Guard.Log("布局预设/空白处取消确认", __pe); }
 				// 页面级滚动关闭：内容按视口高度布局，滚轮只在预设表格内部滚动。
 				try {
 					SRApi.NoPageScrollBars = true;
@@ -715,7 +727,7 @@ namespace SR_UCH.Tweaks {
 					if (br.xMax > r.xMax) break;
 					string label;
 					if (k == ActLoad) {
-						if (replacePending) label = SRApi.T("确认替换", "Replace?");
+						if (replacePending) label = SRApi.T("确认", "Confirm");
 						else if (IsPending("load:" + p.Key)) label = SRApi.T("确认", "Confirm");
 						else label = SRApi.T("加载", "Load");
 					} else if (k == ActRename) label = SRApi.T("重命名", "Rename");
@@ -1369,8 +1381,8 @@ namespace SR_UCH.Tweaks {
 					if (!ConfirmOrArm("replace:" + p.Key)) {
 						_status = SRApi.T("将替换关卡：", "Level will be replaced: ") + LevelDisplayNameForScene(activeScene)
 							+ SRApi.T(" → ", " -> ") + LevelDisplayNameForScene(presetScene)
-							+ SRApi.T("；5 秒内再点一次「确认替换」执行（联机时会先结束当前对局回到树屋再进入该关卡）",
-								"; click Confirm replace again within 5 seconds (online: the current match ends and returns to the treehouse before entering that level)");
+							+ SRApi.T("；5 秒内再点一次「确认」执行（联机时会先结束当前对局回到树屋再进入该关卡）",
+								"; click Confirm again within 5 seconds (online: the current match ends and returns to the treehouse before entering that level)");
 						SRApi.Notify(_status);
 						return;
 					}
