@@ -40,10 +40,11 @@ namespace SR_UCH.Tweaks {
             RegionMember m;
             if (_regionMembers.TryGetValue(t, out m)) return m;
             m = new RegionMember();
+            // 属性没有 SRApi.Ref 的按名取法，保留 raw 反射；字段走 SRApi.Ref.Field（失效会进自检告警）。
             try { m.Loc = t.GetProperty("LocalizedShortName"); } catch { }
-            try { m.Short = t.GetField("shortName"); } catch { }
-            try { m.Name = t.GetField("name"); } catch { }
-            try { m.Id = t.GetField("id"); } catch { }
+            m.Short = SRApi.Ref.Field(t, "shortName", "联机列表");
+            m.Name = SRApi.Ref.Field(t, "name", "联机列表");
+            m.Id = SRApi.Ref.Field(t, "id", "联机列表");
             _regionMembers[t] = m;
             return m;
         }

@@ -197,6 +197,9 @@ namespace SR_UCH.Tweaks {
 			SRApi.LocDesc(Section, "Sort Mode",
 				"列表排序方式\n0=时间（新→旧），1=名称（A→Z）\n由列表页的排序下拉维护，不在配置区重复显示",
 				"preset list sort mode\n0 = time (newest first), 1 = name (A-Z)\nmaintained by the sort dropdown on the list page and not repeated in the settings area");
+			// 换场景后下次打开面板重新扫盘（手动放入/删除的 XML、其它存档的改动都能看到）。
+			try { SRApi.RegisterSceneHook(delegate { _loaded = false; }); }
+			catch (Exception __sh) { SRApi.Guard.Log("布局预设/注册场景钩子", __sh); }
 			try { SRApi.HotkeyAction("presets.treehouse", "返回树屋", delegate { ReturnToTreehouse(); }); }
 			catch (Exception __hx) { SRApi.Guard.Log("布局预设/注册返回树屋快捷键", __hx); }
 			SRApi.LocKey(Section, "Skip Treehouse", "跳过树屋流程", "Skip treehouse");
@@ -378,6 +381,13 @@ namespace SR_UCH.Tweaks {
 					GUILayout.Space(W(8));
 					SRApi.Ctl.LabelAuto(SRApi.T("关卡", "Level"));
 					RenderLevelFilterCombo();
+					GUILayout.Space(W(8));
+					if (GUILayout.Button(new GUIContent(SRApi.T("刷新", "Refresh"),
+							SRApi.T("重新扫描预设目录（手动放入/删除了 XML 时用），也用于重建索引",
+								"rescan the presets folder (after manually adding/removing XML files) and rebuild the index")),
+						SRApi.Ctl.Btn, GUILayout.Width(W(64)), GUILayout.Height(W(24)))) {
+						try { _loaded = false; LoadFromDisk(true); } catch (Exception __rx) { SRApi.Guard.Log("布局预设/刷新列表", __rx); }
+					}
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
@@ -576,12 +586,12 @@ namespace SR_UCH.Tweaks {
 				_args.applyOrder = delegate(int[] o) {
 					_order = o;
 					SaveCols();
-					try { SRApi.LogInfo("[布局预设] 列序更新: " + JoinInts(_order)); } catch (Exception __lx) { }
+					try { SRApi.LogInfo("[布局预设] 列序更新: " + JoinInts(_order)); } catch (Exception) { }
 				};
 				_args.saveOrder = delegate { SaveCols(); };
 				_args.saveWidths = delegate {
 					SaveCols();
-					try { SRApi.LogInfo("[布局预设] 列宽更新: " + JoinFloats(_colW)); } catch (Exception __lx) { }
+					try { SRApi.LogInfo("[布局预设] 列宽更新: " + JoinFloats(_colW)); } catch (Exception) { }
 				};
 				_args.hidden = _hiddenCols;
 				_args.hideable = true;
@@ -590,7 +600,7 @@ namespace SR_UCH.Tweaks {
 				_args.click = delegate(int ci) {
 					if (ci != ColLevel) return;
 					_levelShowCode = !_levelShowCode;
-					try { SRApi.LogInfo("[布局预设] 关卡列显示: " + (_levelShowCode ? "代码" : "名称")); } catch (Exception __lx) { }
+					try { SRApi.LogInfo("[布局预设] 关卡列显示: " + (_levelShowCode ? "代码" : "名称")); } catch (Exception) { }
 				};
 				_args.sortCol = -1;
 				_args.headerCells = _headerCells;
@@ -627,7 +637,7 @@ namespace SR_UCH.Tweaks {
 									+ " dragCol=" + _args.dragCol + " inBox=" + _args.box.Contains(mp));
 								break;
 							}
-						} catch (Exception __hx) { }
+						} catch (Exception) { }
 					}
 					// 点击「名称」单元格 = 加载该预设（沿用 LoadPreset 的两步确认逻辑）。
 					if (e.type == EventType.MouseDown && e.button == 0) {
@@ -1012,6 +1022,13 @@ namespace SR_UCH.Tweaks {
 						return;
 					}
 				}
+				// 把显示名写进 XML 根属性：索引丢失/重建时名字不会退回旧文件名。
+				try {
+					XmlDocument __md = ParseXmlSafe(xml);
+					if (__md.DocumentElement != null && !string.IsNullOrEmpty(name))
+						__md.DocumentElement.SetAttribute("srName", name);
+					xml = __md.OuterXml;
+				} catch (Exception __nx) { SRApi.Guard.Log("布局预设/写入显示名", __nx); }
 				Directory.CreateDirectory(dir);
 				File.WriteAllText(path, xml, new UTF8Encoding(false));
 				PresetInfo p = FindPreset(key);
@@ -1107,8 +1124,7 @@ namespace SR_UCH.Tweaks {
 				}
 				XmlDocument doc = null;
 				try {
-					doc = new XmlDocument();
-					doc.LoadXml(xml);
+					doc = ParseXmlSafe(xml);
 				} catch (Exception __ex) {
 					// 解析失败是非常常见的用户错误（粘错东西），只记一次 Guard 日志并提示，不抛到页面。
 					SRApi.Guard.Log("布局预设/解析导入 XML", __ex);
@@ -1372,8 +1388,7 @@ namespace SR_UCH.Tweaks {
 				}
 				XmlDocument doc = null;
 				try {
-					doc = new XmlDocument();
-					doc.LoadXml(xml);
+					doc = ParseXmlSafe(xml);
 				} catch (Exception __ex) {
 					SRApi.Guard.Log("布局预设/解析预设文件", __ex);
 				}
@@ -1576,8 +1591,7 @@ namespace SR_UCH.Tweaks {
 				// 旧索引可能没有名字/代码：从预设 XML 根属性补齐（自定义关卡必须带上，否则关卡显示空白）。
 				if (string.IsNullOrEmpty(info.snapshotName) || string.IsNullOrEmpty(info.snapshotCode)) {
 					try {
-						XmlDocument __xd = new XmlDocument();
-						__xd.LoadXml(xml);
+						XmlDocument __xd = ParseXmlSafe(xml);
 						XmlElement __root = __xd.DocumentElement;
 						if (__root != null) {
 							if (string.IsNullOrEmpty(info.snapshotName)) info.snapshotName = __root.GetAttribute("snapshotName");
@@ -1739,8 +1753,7 @@ namespace SR_UCH.Tweaks {
 				}
 				XmlDocument doc = null;
 				try {
-					doc = new XmlDocument();
-					doc.LoadXml(xml);
+					doc = ParseXmlSafe(xml);
 				} catch (Exception __ex) {
 					SRApi.Guard.Log("布局预设/树屋解析预设文件", __ex);
 				}
@@ -2099,8 +2112,11 @@ namespace SR_UCH.Tweaks {
 							int blocks;
 							string metaName;
 							string metaCode;
-							bool xmlOk = TryReadPresetMeta(fp, out lv, out blocks, out metaName, out metaCode);
+							string metaPreset = "";
+							bool xmlOk = TryReadPresetMeta(fp, out lv, out blocks, out metaName, out metaCode, out metaPreset);
 							pi.Level = lv ?? "";
+							if (!string.IsNullOrEmpty(metaPreset) && (string.IsNullOrEmpty(pi.Name) || pi.Name == Path.GetFileNameWithoutExtension(pi.File)))
+								pi.Name = metaPreset;   // 索引丢失时优先用 XML 里保存的显示名，避免重命名回退成旧文件名
 							if (string.IsNullOrEmpty(pi.LevelName) && !string.IsNullOrEmpty(metaName)) {
 								pi.LevelName = metaName;
 								upgraded = true;
@@ -2231,7 +2247,19 @@ namespace SR_UCH.Tweaks {
 		// 流式读取预设 XML 的元数据：根节点必须是 scene，取 levelSceneName 并统计顶层 block 数量；
 		// 如果 XML 里带 snapshotInfo/snapshotName（自定义关卡快照）也顺便取出展示名。
 		// 用 XmlReader 而不是 XmlDocument：扫描列表时只关心根属性与方块数，避免把整份 XML 建成 DOM。
-		private static bool TryReadPresetMeta(string path, out string level, out int blocks, out string levelName, out string levelCode) {
+		// 统一的安全 XML 解析入口：禁 DTD（即禁外部实体 / XXE）+ 不解析外部引用。
+		// 预设 XML 是玩家之间分享的不可信输入（剪贴板 / 论坛下载），所有解析必须走这里。
+		private static XmlDocument ParseXmlSafe(string xml) {
+			XmlDocument doc = new XmlDocument();
+			XmlReaderSettings s = new XmlReaderSettings();
+			s.DtdProcessing = DtdProcessing.Prohibit;
+			s.XmlResolver = null;
+			using (XmlReader r = XmlReader.Create(new StringReader(xml ?? ""), s)) doc.Load(r);
+			return doc;
+		}
+
+		private static bool TryReadPresetMeta(string path, out string level, out int blocks, out string levelName, out string levelCode, out string presetName) {
+			presetName = "";
 			level = "";
 			blocks = 0;
 			levelName = "";
@@ -2255,6 +2283,8 @@ namespace SR_UCH.Tweaks {
 					string nm = reader.GetAttribute("snapshotName");
 					if (string.IsNullOrEmpty(nm)) nm = reader.GetAttribute("levelName");
 					if (!string.IsNullOrEmpty(nm)) levelName = nm;
+					string pn = reader.GetAttribute("srName");
+					if (!string.IsNullOrEmpty(pn)) presetName = pn;
 					string cd = reader.GetAttribute("snapshotCode");
 					if (string.IsNullOrEmpty(cd)) cd = reader.GetAttribute("levelCode");
 					if (!string.IsNullOrEmpty(cd)) levelCode = cd;

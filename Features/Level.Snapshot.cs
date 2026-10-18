@@ -1,9 +1,12 @@
+
 // Level 的 partial 分片（只做代码组织，无逻辑改动）
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
+using System.IO;
+using System.Xml;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -13,6 +16,16 @@ using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
     public partial class Level {
+		// 安全 XML 解析：禁 DTD / 外部实体（快照 XML 可能来自其它玩家分享的关卡）。
+		private static XmlDocument ParseXmlSafe(string xml) {
+			XmlDocument doc = new XmlDocument();
+			XmlReaderSettings s = new XmlReaderSettings();
+			s.DtdProcessing = DtdProcessing.Prohibit;
+			s.XmlResolver = null;
+			using (XmlReader r = XmlReader.Create(new StringReader(xml ?? ""), s)) doc.Load(r);
+			return doc;
+		}
+
 		public static void BroadcastSnapshot()
 		{
 			RebuildBlocksFromHost(SRApi.T("广播方块快照", "Broadcast Snapshot"));
@@ -100,7 +113,7 @@ namespace SR_UCH.Tweaks {
 			try {
 				if (string.IsNullOrEmpty(xml)) return xml;
 				System.Xml.XmlDocument d = new System.Xml.XmlDocument();
-				d.LoadXml(xml);
+				d = ParseXmlSafe(xml);
 				if (d.DocumentElement == null) return xml;
 				if (d.DocumentElement.GetAttribute("srSnapshot") == "1") return xml;
 				d.DocumentElement.SetAttribute("srSnapshot", "1");
@@ -140,7 +153,7 @@ namespace SR_UCH.Tweaks {
 				QuickSaver selfQs = gc.GetComponent<QuickSaver>();
 				if (selfQs != null) {
 					System.Xml.XmlDocument selfDoc = new System.Xml.XmlDocument();
-					selfDoc.LoadXml(xml);
+					selfDoc = ParseXmlSafe(xml);
 					// 按原生流程先 QuickClear(true)：原生清场并恢复关卡自带件，缺这一步可移动/可变化道具要等下次建造阶段才会动。
 					try { selfQs.QuickClear(true); } catch (Exception __qcx) { SRApi.Guard.Log("清场.QuickClear", __qcx); }
 					// 门闩必须用 try/finally 复位，否则泄漏后游戏自己的开局也会被补发阶段事件。
@@ -298,7 +311,7 @@ namespace SR_UCH.Tweaks {
 		    try {
 		        if (string.IsNullOrEmpty(xml)) return xml;
 		        System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
-		        doc.LoadXml(xml);
+		        doc = ParseXmlSafe(xml);
 		        System.Xml.XmlElement root = doc.DocumentElement;
 		        if (root == null) return xml;
 		        List<System.Xml.XmlNode> bad = new List<System.Xml.XmlNode>();

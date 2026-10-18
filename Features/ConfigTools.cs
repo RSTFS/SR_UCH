@@ -83,6 +83,9 @@ namespace SR_UCH.Tweaks {
 			SRApi.LocSec(Section, "配置工具", "Config Tools");
 			SRApi.RegisterFooterButton(Section, "配置工具", "Config Tools", null); // 底栏入口，不再占侧栏
 			SRApi.RegisterPage(Section, Render);
+			// 换场景后备份列表下次打开重新扫描（外部手动增删备份文件也能看到）。
+			try { SRApi.RegisterSceneHook(delegate { _loaded = false; }); }
+			catch (Exception __sh) { SRApi.Guard.Log("配置工具/注册场景钩子", __sh); }
 			SRApi.LocKey(Section, "Enabled", "配置导出/导入总开关", "Config export/import");
 			SRApi.LocDesc(Section, "Enabled",
 				"配置导出/导入总开关\n开启后可在本页导出、导入和删除模组配置备份\n关闭后仍会显示历史备份列表，但所有操作按钮都不生效",
