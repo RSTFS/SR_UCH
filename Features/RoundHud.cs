@@ -1,4 +1,4 @@
-// HUD：阶段倒计时 / 回合进度 / 关卡 / 获胜积分 / 玩家面板 / 额外信息行。
+// HUD：阶段倒计时 / 回合进度 / 关卡 / 获胜目标 / 玩家面板 / 额外信息行。
 // 阶段切换来自 GameControl.handleEvent 的 Harmony Postfix；本地只读，不发送网络消息。
 using System;
 using System.Collections.Generic;
@@ -168,7 +168,7 @@ namespace SR_UCH.Tweaks {
 		private static bool _hasGame;
 		private static bool _wasEnabled;
 		private static bool _toggleOn;          // 切换显示模式的运行期状态
-		private static float _hudAlpha = 1f;    // 淡入淡出后的总透明度
+		private static float _hudAlpha;         // 淡入淡出后的总透明度（ease-out）
 		private static string _timerText = "00:00";
 		private static int _warnLevel;
 		private static string _roundText;
@@ -404,16 +404,16 @@ namespace SR_UCH.Tweaks {
 
 			// 显示方案下拉。
 			Loc("Display Mode", "显示方案", "Display mode",
-				"显示方案\n堆叠 = 每个内容单独一行；平铺 = 全部内容用 · 连成一行\n玩家面板与回合提示始终单独占行",
-				"display mode\nStack = one line per content item; Inline = all content joined by ·\nthe player panel and round notice always use their own lines");
+				"显示方案\n堆叠 = 每个内容单独一行；平铺 = 每个内容独立小段横向排列，放不下自动换行\n玩家面板与回合提示始终单独占行",
+				"display mode\nStack = one line per content item; Inline = each item is a small tile laid out horizontally and wraps when needed\nthe player panel and round notice always use their own lines");
 			// 第二页内容：开关 + 颜色（颜色说明统一模板）。
 			for (int i = 0; i < _content.Length; i++) {
 				ContentDef d = _content[i];
 				Loc(d.Key, d.LabelZh, d.LabelEn, d.DescZh, d.DescEn);
 				SRApi.LocKey(Sec, d.ColorKey, d.LabelZh + "颜色", d.LabelEn + " color");
 				SRApi.LocDesc(Sec, d.ColorKey,
-					d.LabelZh + "的文字颜色\n十六进制颜色值，例如 #FFFFFF\n点同内容行右侧色块可打开调色板并实时生效",
-					"text color for " + d.LabelEn.ToLowerInvariant() + "\nhex color value, for example #FFFFFF\nclick the swatch on the right of the same row to open the picker; applies immediately");
+					d.LabelZh + "的文字颜色\n十六进制颜色值，例如 #FFFFFF\n点色块开调色板；点名称还原默认白色",
+					"text color for " + d.LabelEn.ToLowerInvariant() + "\nhex color value, for example #FFFFFF\nclick the swatch to open the picker; click the name to reset to default white");
 			}
 			// 第三页玩家面板：总开关（无调色板）+ 各列开关与列颜色。
 			Loc("Show Player Panel", "玩家面板", "Player panel",
@@ -424,8 +424,8 @@ namespace SR_UCH.Tweaks {
 				Loc(d.Key, d.LabelZh, d.LabelEn, d.DescZh, d.DescEn);
 				SRApi.LocKey(Sec, d.ColorKey, d.LabelZh + "颜色", d.LabelEn + " color");
 				SRApi.LocDesc(Sec, d.ColorKey,
-					d.LabelZh + "列的文字颜色\n十六进制颜色值，例如 #FFFFFF\n点同内容行右侧色块可打开调色板并实时生效",
-					"text color for the " + d.LabelEn.ToLowerInvariant() + " column\nhex color value, for example #FFFFFF\nclick the swatch on the right of the same row to open the picker; applies immediately");
+					d.LabelZh + "列的文字颜色\n十六进制颜色值，例如 #FFFFFF\n点色块开调色板；点名称还原默认白色",
+					"text color for the " + d.LabelEn.ToLowerInvariant() + " column\nhex color value, for example #FFFFFF\nclick the swatch to open the picker; click the name to reset to default white");
 			}
 		}
 
@@ -703,7 +703,7 @@ namespace SR_UCH.Tweaks {
 				_blink = cfg.Bind(Sec, "Blink", false, "闪烁提醒：最后 5 秒倒计时文字闪烁。");
 				_roundNotice = cfg.Bind(Sec, "Round Notice", true, "回合提示：回合数变化时以放大闪烁动画显示当前回合。");
 				// 第二页：显示方案 + 显示内容 + 颜色。
-				_displayMode = cfg.Bind(Sec, "Display Mode", DisplayMode.Stack, "显示方案：堆叠（每项一行）/ 平铺（全部一行）。");
+				_displayMode = cfg.Bind(Sec, "Display Mode", DisplayMode.Stack, "显示方案：堆叠（每项一行）/ 平铺（小段横向排列，自动换行）。");
 				_showPhase = cfg.Bind(Sec, "Show Phase", false, "显示阶段名（默认关闭）。");
 				_colPhase = cfg.Bind(Sec, "Color Phase", "#FFFFFF", "阶段名文字颜色（#RRGGBB）。");
 				_showCountdown = cfg.Bind(Sec, "Show Countdown", false, "显示倒计时（默认关闭）。");
@@ -879,11 +879,11 @@ namespace SR_UCH.Tweaks {
 			if (target && !_wasVisible) _hudShownAt = Time.unscaledTime;
 			_wasVisible = target;
 			if (fade) {
-				_hudAlpha = Mathf.MoveTowards(_hudAlpha, want, 6f * Time.unscaledDeltaTime);
 				_hudAppear = Mathf.MoveTowards(_hudAppear, want, 4f * Time.unscaledDeltaTime);
+				_hudAlpha = EaseOut(_hudAppear);   // alpha 也用 ease-out
 			} else {
-				_hudAlpha = want;
 				_hudAppear = want;
+				_hudAlpha = want;
 			}
 		}
 
@@ -1420,11 +1420,12 @@ namespace SR_UCH.Tweaks {
 		}
 
 		// 平铺模式的分段连接符（「 · 」）。
-		private static void AppendSeg(ref string plain, ref string rich, Color c, string text) {
-			if (string.IsNullOrEmpty(text)) return;
-			plain = string.IsNullOrEmpty(plain) ? text : plain + " · " + text;
-			string seg = Tag(c, text);
-			rich = string.IsNullOrEmpty(rich) ? seg : rich + " · " + seg;
+		// 平铺小段：文字 + 颜色（宽度在绘制时按样式实测）。
+		private static void AddSeg(Color c, string text) {
+			if (string.IsNullOrEmpty(text) || _segCount >= _segText.Length) return;
+			_segText[_segCount] = text;
+			_segColor[_segCount] = c;
+			_segCount++;
 		}
 
 		// 回合提示：大号 + 1.0→1.15 缩放 + 颜色交替闪烁 + 末尾淡出，约 1.5 秒。
@@ -1432,7 +1433,7 @@ namespace SR_UCH.Tweaks {
 			if (!RoundNoticeOn() || string.IsNullOrEmpty(_roundNoticeText)) return;
 			float t = (Time.unscaledTime - _roundNoticeStart) / RoundNoticeDuration;
 			if (t < 0f || t >= 1f) return;
-			float scale = 1f + 0.15f * Mathf.Clamp01(t / 0.25f);
+			float scale = 1f + 0.15f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t));   // 1.0 → 1.15 → 1.0
 			bool bright = (Mathf.FloorToInt(Time.unscaledTime * 8f) & 1) == 0;
 			float fade = t < 0.7f ? 1f : Mathf.Clamp01(1f - (t - 0.7f) / 0.3f);
 			if (_roundNoticeStyle != null) {
@@ -1456,6 +1457,7 @@ namespace SR_UCH.Tweaks {
 
 			// 1) 拼行。
 			int n = 0;
+			_segCount = 0;
 			if (inLobby) {
 				// 树屋/大厅：只有标题「大厅」+ 大厅玩家面板 + 投票关卡，没有倒计时/回合。
 				if (ShowOn(_showPanel) && _playerRowCount > 0) {
@@ -1483,19 +1485,14 @@ namespace SR_UCH.Tweaks {
 				Color cExtra2 = Col(_colExtra2, Color.white);
 
 				if (DisplayModeValue() == DisplayMode.Inline) {
-					// 平铺：所有内容用「 · 」连成一行，每段保留自己的颜色。
-					string plain = null, rich = null;
-					if (ShowOn(_showPhase)) AppendSeg(ref plain, ref rich, cPhase, PhaseName(_phase));
-					if (ShowOn(_showCountdown)) AppendSeg(ref plain, ref rich, CountdownColor(cCountdown), _timerText);
-					if (ShowOn(_showRound) && !string.IsNullOrEmpty(_roundText)) AppendSeg(ref plain, ref rich, cRound, _roundText);
-					if (ShowOn(_showLevel) && !string.IsNullOrEmpty(_levelText)) AppendSeg(ref plain, ref rich, cLevel, _levelText);
-					if (ShowOn(_showWin) && !string.IsNullOrEmpty(_winText)) AppendSeg(ref plain, ref rich, cWin, _winText);
-					if (!string.IsNullOrEmpty(_extra1Text)) AppendSeg(ref plain, ref rich, cExtra1, _extra1Text);
-					if (!string.IsNullOrEmpty(_extra2Text)) AppendSeg(ref plain, ref rich, cExtra2, _extra2Text);
-					if (!string.IsNullOrEmpty(plain)) {
-						float f = SlotFadeAppear(22, plain);
-						AddLineFade(ref n, plain, rich, LineInline, Color.white, f);
-					}
+					// 平铺：每个显示项作为独立小段（各自背景/颜色），后面按可用宽度自动换行。
+					if (ShowOn(_showPhase)) AddSeg(cPhase, PhaseName(_phase));
+					if (ShowOn(_showCountdown)) AddSeg(CountdownColor(cCountdown), _timerText);
+					if (ShowOn(_showRound) && !string.IsNullOrEmpty(_roundText)) AddSeg(cRound, _roundText);
+					if (ShowOn(_showLevel) && !string.IsNullOrEmpty(_levelText)) AddSeg(cLevel, _levelText);
+					if (ShowOn(_showWin) && !string.IsNullOrEmpty(_winText)) AddSeg(cWin, _winText);
+					if (!string.IsNullOrEmpty(_extra1Text)) AddSeg(cExtra1, _extra1Text);
+					if (!string.IsNullOrEmpty(_extra2Text)) AddSeg(cExtra2, _extra2Text);
 				} else {
 					// 堆叠：每项一行。
 					if (ShowOn(_showPhase)) {
@@ -1543,14 +1540,40 @@ namespace SR_UCH.Tweaks {
 				AddRoundNoticeLine(ref n, textA);
 			}
 			if (n > _hudPlain.Length) n = _hudPlain.Length;
-			if (n == 0) return;
+			if (n == 0 && _segCount == 0) return;   // 无任何内容（含平铺小段）时完全隐藏
 
-			// 2) 量尺寸（紧凑：整体 padding 2px；行高 = 实测文本高 + 1px 内边距，无额外行距）。
+			// 2) 尺寸：紧凑（padding 2、行高=文本高、行间 0）；平铺模式先把小段排成网格。
 			float pad = SRApi.Ctl.Sc(2f);
-			float linePad = SRApi.Ctl.Sc(1f);
+			float segPad = SRApi.Ctl.Sc(3f);
+			float segGap = SRApi.Ctl.Sc(3f);
+			float rowGap = SRApi.Ctl.Sc(2f);
+			float segFont = (_smallStyle != null ? _smallStyle.fontSize : 14);
+			float segH = segFont + segPad * 2f;
+			float segBlockH = 0f;
+			if (_segCount > 0) {
+				float maxRowW = Mathf.Max(SRApi.Ctl.Sc(120f), (float)Screen.width - pad * 2f);
+				float rowW = 0f;
+				int row = 0;
+				_segRowsW = 0f;
+				for (int i = 0; i < _segCount; i++) {
+					float w = Measure(_segText[i], _smallStyle) + segPad * 2f;
+					_segW[i] = w;
+					if (rowW > 0f && rowW + segGap + w > maxRowW) { row++; rowW = 0f; }
+					if (rowW > 0f) rowW += segGap;
+					_segRow[i] = row;
+					_segX[i] = rowW;
+					rowW += w;
+					if (rowW > _segRowsW) _segRowsW = rowW;
+				}
+				_segRowCount = row + 1;
+				segBlockH = _segRowCount * segH + (_segRowCount - 1) * rowGap;
+			} else {
+				_segRowCount = 0;
+				_segRowsW = 0f;
+			}
 			float contentW = 0f;
 			for (int i = 0; i < n; i++) contentW = Mathf.Max(contentW, Measure(_hudPlain[i], LineStyle(_hudKinds[i])));
-			float panelW = Mathf.Max(contentW + pad * 2f + linePad, SRApi.Ctl.Sc(60f));
+			float panelW = Mathf.Max(Mathf.Max(contentW, _segRowsW) + pad * 2f, SRApi.Ctl.Sc(60f));
 			float textW = Mathf.Max(1f, panelW - pad * 2f);
 			float contentH = 0f;
 			for (int i = 0; i < n; i++) {
@@ -1563,19 +1586,28 @@ namespace SR_UCH.Tweaks {
 					try { th = SRApi.Ctl.TextHeight(_hudPlain[i], textW); } catch { th = 0f; }
 					if (th <= 0f) th = (st != null ? st.fontSize : 14);
 				}
-				_hudHeights[i] = th + linePad;
-				contentH += _hudHeights[i];
+				_hudHeights[i] = th;   // 行高 = 文本高 + 0
+				contentH += th;
 			}
-			float panelH = contentH + pad * 2f;
+			float panelH = contentH + pad * 2f + segBlockH + ((segBlockH > 0f && n > 0) ? rowGap : 0f);
 			_hudW = panelW;
 			_hudH = panelH;
 
-			// 3) 布局 + 拖动命中。
+			// 3) 布局（从所在边滑入 6px，ease-out）+ 拖动命中。
 			float x, y;
 			LayoutPosition(_hudW, _hudH, out x, out y);
 			x = Mathf.Clamp(x, 0f, Mathf.Max(0f, (float)Screen.width - panelW));
 			y = Mathf.Clamp(y, 0f, Mathf.Max(0f, (float)Screen.height - panelH));
-			Rect panel = new Rect(x, y, panelW, panelH);
+			float slide = SRApi.Ctl.Sc(6f) * (1f - EaseOut(_hudAppear));
+			float sx = 0f, sy = 0f;
+			switch (LayoutValue()) {
+			case HudLayout.TopLeft: sx = -slide; sy = -slide; break;
+			case HudLayout.TopRight: sx = slide; sy = -slide; break;
+			case HudLayout.BottomLeft: sx = -slide; sy = slide; break;
+			case HudLayout.BottomRight: sx = slide; sy = slide; break;
+			default: sx = -slide * 0.5f; break; // Custom：轻微从左侧滑入
+			}
+			Rect panel = new Rect(x + sx, y + sy, panelW, panelH);
 			HandleDrag(panel);
 
 			Event ev = Event.current;
@@ -1587,23 +1619,46 @@ namespace SR_UCH.Tweaks {
 			GUI.DrawTexture(panel, _white);
 			GUI.color = Color.white;
 
-			// 5) 逐行绘制（富文本行用 GUI.color 的 alpha 做淡入/总透明度）。
-			float tw = panel.width - pad * 2f;
+			// 5) 平铺小段网格：每段独立背景 + 内边距 + 颜色，按行依次淡入。
 			float ty = panel.y + pad;
+			if (_segCount > 0 && _segRowCount > 0) {
+				for (int r = 0; r < _segRowCount; r++) {
+					for (int i = 0; i < _segCount; i++) {
+						if (_segRow[i] != r) continue;
+						float easeSeg = StaggerAlpha(i);
+						if (easeSeg <= 0.001f) continue;
+						Rect sr = new Rect(panel.x + pad + _segX[i], ty + (1f - easeSeg) * SRApi.Ctl.Sc(3f), _segW[i], segH);
+						GUI.color = new Color(1f, 1f, 1f, 0.10f * easeSeg);   // 小段自身底色（比整块底稍亮）
+						GUI.DrawTexture(sr, _white);
+						GUI.color = Color.white;
+						_smallStyle.normal.textColor = WithA(_segColor[i], textA * easeSeg);
+						GUI.Label(new Rect(sr.x + segPad, sr.y, sr.width - segPad * 2f, sr.height), _segText[i], _smallStyle);
+					}
+					ty += segH + rowGap;
+				}
+				if (n > 0) ty += rowGap;
+			}
+
+			// 6) 普通行：逐行 stagger 淡入 + 轻微上移；富文本行用 GUI.color 的 alpha。
+			float tw = panel.width - pad * 2f;
 			for (int i = 0; i < n; i++) {
 				GUIStyle st = LineStyle(_hudKinds[i]);
-				if (st == null) continue;
+				if (st == null) { ty += _hudHeights[i]; continue; }
 				float lh = _hudHeights[i];
+				float easeLine = StaggerAlpha(i + _segCount);
+				float yOff = (1f - easeLine) * SRApi.Ctl.Sc(3f);
+				Rect lr = new Rect(panel.x + pad, ty + yOff, tw, lh);
 				int kind = _hudKinds[i];
-				if (kind == LinePanel || kind == LineInline) {
+				if (kind == LinePanel) {
 					st.normal.textColor = Color.white;
 					Color old = GUI.color;
-					GUI.color = new Color(1f, 1f, 1f, Mathf.Clamp01(textA * _hudFade[i]));
-					GUI.Label(new Rect(panel.x + pad, ty, tw, lh), _hudRich[i], st);
+					GUI.color = new Color(1f, 1f, 1f, Mathf.Clamp01(textA * _hudFade[i] * easeLine));
+					GUI.Label(lr, _hudRich[i], st);
 					GUI.color = old;
 				} else {
-					st.normal.textColor = _hudColors[i];
-					GUI.Label(new Rect(panel.x + pad, ty, tw, lh), _hudRich[i], st);
+					Color c = _hudColors[i];
+					st.normal.textColor = WithA(c, c.a * easeLine);
+					GUI.Label(lr, _hudRich[i], st);
 				}
 				ty += lh;
 			}

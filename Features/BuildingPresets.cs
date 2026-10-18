@@ -21,8 +21,9 @@ namespace SR_UCH.Tweaks {
 		// 配置段名：导航栏目名 / LocSec / Config.Bind 三处必须完全一致。
 		private const string Section = "Building Presets";
 		private const string IndexFileName = "index.json";
-		// 索引格式版本：v2 起新增 level / ok 字段（v1 老索引缺字段按默认值处理并在扫描时自愈）。
-		private const int IndexVersion = 2;
+		// 索引格式版本：v2 起新增 level / ok 字段；v3 起新增 levelName（展示用关卡名，自定义关卡用）。
+		// v1/v2 老索引缺字段按默认值处理并在扫描时自愈。
+		private const int IndexVersion = 3;
 		// 排序方式：0=时间（新→旧），1=名称（A→Z）。旧配置里的 2/3 已弃用，读取时夹到 0。
 		private const int SortModeMin = 0;
 		private const int SortModeMax = 1;
@@ -121,6 +122,7 @@ namespace SR_UCH.Tweaks {
 			public string File;      // 安全文件名（含 .xml）
 			public string FilePath;  // 扫描时补全的绝对路径
 			public string Level = ""; // XML 根节点 levelSceneName（读不到留空）
+			public string LevelName = ""; // 展示用关卡名（保存时按游戏本地化/自定义关卡名记下；旧索引为空则按 Level 现解析）
 			public int Blocks = -1;  // -1 = 索引里没有，需要从 XML 现算
 			public DateTime TimeUtc = DateTime.MinValue;
 			public bool Ok;          // XML 可解析且方块数 > 0（存 index.json；缺字段按 false，扫描时自愈）
@@ -136,8 +138,14 @@ namespace SR_UCH.Tweaks {
 				_featureOn = _enabled.Value;
 				_enabled.SettingChanged += delegate { _featureOn = _enabled.Value; };
 				_maxPresets = plugin.Config.Bind(Section, "Max Presets", 100,
-					new ConfigDescription("预设数量上限（1-500，默认 100）：列表最多保留多少条，达到上限后必须先删除旧预设才能保存新布局。",
-						new AcceptableValueRange<int>(1, 500)));
+					new ConfigDescription("预设数量上限（1-100，默认 100）：列表最多保留多少条，达到上限后必须先删除旧预设才能保存新布局。",
+						new AcceptableValueRange<int>(1, 100)));
+				// 旧版本默认值是 50，且历史范围到 500：启动时迁移/夹取到新范围（50 视作旧默认值改成 100）。
+				try {
+					if (_maxPresets.Value == 50) _maxPresets.Value = 100;
+					else if (_maxPresets.Value < 1) _maxPresets.Value = 1;
+					else if (_maxPresets.Value > 100) _maxPresets.Value = 100;
+				} catch (Exception __mxp) { SRApi.Guard.Log("布局预设/裁剪数量上限", __mxp); }
 				_sortModeEntry = plugin.Config.Bind(Section, "Sort Mode", 0,
 					new ConfigDescription("列表排序方式：0=时间（新→旧），1=名称（A→Z）。",
 						new AcceptableValueRange<int>(SortModeMin, SortModeMax)));
@@ -173,8 +181,8 @@ namespace SR_UCH.Tweaks {
 				"master switch for layout presets\nwhen on, block layout presets can be saved and loaded on this page\nwhen off, existing presets are still listed but every action is inactive; independent from the mod-wide master switch");
 			SRApi.LocKey(Section, "Max Presets", "预设数量上限", "Max presets");
 			SRApi.LocDesc(Section, "Max Presets",
-				"预设数量上限\n列表最多保留多少个预设，达到上限后必须先删除旧预设才能保存新布局\n范围 1 到 500，默认 100；只限制新保存，不会删除磁盘上已有的预设文件。",
-				"maximum number of presets\ncaps how many presets the list keeps; when reached, delete an old preset before saving a new layout\nrange 1-500, default 100; only limits new saves and never deletes existing preset files");
+				"预设数量上限\n列表最多保留多少个预设，达到上限后必须先删除旧预设才能保存新布局\n范围 1 到 100，默认 100；只限制新保存，不会删除磁盘上已有的预设文件。",
+				"maximum number of presets\ncaps how many presets the list keeps; when reached, delete an old preset before saving a new layout\nrange 1-100, default 100; only limits new saves and never deletes existing preset files");
 			SRApi.LocKey(Section, "Sort Mode", "列表排序", "Sort mode");
 			SRApi.LocDesc(Section, "Sort Mode",
 				"列表排序方式\n0=时间（新→旧），1=名称（A→Z）\n由列表页的排序下拉维护，不在配置区重复显示",
@@ -201,7 +209,7 @@ namespace SR_UCH.Tweaks {
 
 		private static int MaxPresets {
 			get {
-				try { return _maxPresets != null ? Mathf.Clamp(_maxPresets.Value, 1, 500) : 100; } catch { return 100; }
+				try { return _maxPresets != null ? Mathf.Clamp(_maxPresets.Value, 1, 100) : 100; } catch { return 100; }
 			}
 		}
 
@@ -275,6 +283,9 @@ namespace SR_UCH.Tweaks {
 
 		// 同一页按 SectionTitle 分三个区；页面本身不滚动（NoPageScrollBars + 表格高度按视口计算），
 		// 预设列表在固定高度区域内用自己的滚轮滚动。
+		// 页面内容在布局空间里的起点 y（零高度探针），用于计算表格上方已用高度（同联机列表）。
+		private static float _pageTopY;
+
 		private static void Render() {
 			try {
 				EnsureLoaded();
@@ -284,6 +295,8 @@ namespace SR_UCH.Tweaks {
 					SRApi.NoPageScrollBars = true;
 					SRApi.PageScroll = Vector2.zero;
 				} catch (Exception __ex) { SRApi.Guard.Log("布局预设/关闭页面滚动", __ex); }
+				Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
+				if (Event.current != null && Event.current.type == EventType.Layout) _pageTopY = topProbe.y;
 
 				SRApi.Ctl.SectionTitle(SRApi.T("- 保存与导入 -", "- Save & Import -"));
 				GUILayout.BeginHorizontal();
@@ -354,7 +367,13 @@ namespace SR_UCH.Tweaks {
 				}
 				if (!string.IsNullOrEmpty(_renameKey)) RenderRenameBar();
 				GUILayout.Space(W(2));
-				RenderPresetTable();
+				// 高度像联机列表一样按可用区域计算：页面可视高度 - 表格上方已用高度（窗口大小变化时每帧重算）。
+				Rect last = GUILayoutUtility.GetLastRect();
+				float footerH = SRApi.FooterHeight > 0f ? SRApi.FooterHeight : SRApi.Ctl.Sc(30);
+				float pageH = SRApi.ContentArea.height - SRApi.Ctl.Sc(26) - SRApi.Ctl.Sc(2) - footerH;
+				float usedAbove = _pageTopY > 0f ? Mathf.Max(0f, last.yMax - _pageTopY) : SRApi.Ctl.Sc(300);
+				float tableH = Mathf.Max(SRApi.Ctl.Sc(140), pageH - usedAbove - SRApi.Ctl.Sc(8));
+				RenderPresetTable(tableH);
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("渲染布局预设页", __ex);
 			}
@@ -370,7 +389,7 @@ namespace SR_UCH.Tweaks {
 					if (string.Equals(vals[i], _levelFilter, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
 				}
 				string[] labels = new string[vals.Count];
-				for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LocalizedLevelName(vals[i]);
+				for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
 				bool open = _levelFilterOpen;
 				int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open, W(120));
 				_levelFilterOpen = open;
@@ -391,7 +410,7 @@ namespace SR_UCH.Tweaks {
 					if (seen.Add(p.Level)) vals.Add(p.Level);
 				}
 				vals.Sort(delegate(string a, string c) {
-					return string.Compare(LocalizedLevelName(a), LocalizedLevelName(c), StringComparison.OrdinalIgnoreCase);
+					return string.Compare(LevelDisplayNameForScene(a), LevelDisplayNameForScene(c), StringComparison.OrdinalIgnoreCase);
 				});
 				vals.Insert(0, "");
 			} catch (Exception __ex) {
@@ -451,7 +470,7 @@ namespace SR_UCH.Tweaks {
 		}
 
 		// 标准表格：核心 TableDraw 负责表头/行/拖列宽/换列位/钉住操作列；本页只提供列定义、单元格文本与操作按钮。
-		private static void RenderPresetTable() {
+		private static void RenderPresetTable(float tableH) {
 			try {
 				List<PresetInfo> visible = VisiblePresets();
 				string title = SRApi.T("- 预设列表", "- Preset list") + " (" + visible.Count + "/" + _presets.Count
@@ -459,7 +478,7 @@ namespace SR_UCH.Tweaks {
 				SRApi.Ctl.SectionTitle(title);
 				float rowH = SRApi.Ctl.Sc(26);
 				float headerH = SRApi.Ctl.Sc(24);
-				float tableH = TableHeight();
+				if (tableH <= 0f) tableH = TableHeight();
 				float rowsH = Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH);
 				Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
 				if (box.width < SRApi.Ctl.Sc(220)) return;
@@ -507,9 +526,16 @@ namespace SR_UCH.Tweaks {
 				_args.resizable = true;
 				_args.reorderable = true;
 				_args.order = _order;
-				_args.applyOrder = delegate(int[] o) { _order = NormalizeOrder(o); SaveCols(); };
+				_args.applyOrder = delegate(int[] o) {
+					_order = o;
+					SaveCols();
+					try { SRApi.LogInfo("[布局预设] 列序更新: " + JoinInts(_order)); } catch (Exception __lx) { }
+				};
 				_args.saveOrder = delegate { SaveCols(); };
-				_args.saveWidths = delegate { SaveCols(); };
+				_args.saveWidths = delegate {
+					SaveCols();
+					try { SRApi.LogInfo("[布局预设] 列宽更新: " + JoinFloats(_colW)); } catch (Exception __lx) { }
+				};
 				_args.hidden = _hiddenCols;
 				_args.hideable = true;
 				_args.resetAll = delegate { ResetTable(); };
@@ -541,11 +567,53 @@ namespace SR_UCH.Tweaks {
 						ref _args.dragCol, ref _dragH, SaveCols, null, null);
 					SRApi.TableWheelInput(e, box, mp, _maxScrollX, _maxScrollY, ref _scrollCols, ref _scrollRows);
 					HandleActionClicks(visible, e, mp);
+					// 临时诊断日志：点表头时记录核心是否认到拖动/列宽拖动（构建后看 BepInEx 日志即可定位拖拽问题）。
+					if (e.type == EventType.MouseDown && e.button == 0) {
+						try {
+							for (int k = 0; k < _headerCells.Count; k++) {
+								if (!_headerCells[k].Contains(mp)) continue;
+								SRApi.LogInfo("[布局预设] 表头按下: 列=" + _headerCols[k] + " moveCol=" + _args.moveCol
+									+ " dragCol=" + _args.dragCol + " inBox=" + _args.box.Contains(mp));
+								break;
+							}
+						} catch (Exception __hx) { }
+					}
+					// 点击「名称」单元格 = 加载该预设（沿用 LoadPreset 的两步确认逻辑）。
+					if (e.type == EventType.MouseDown && e.button == 0) {
+						int nameRow = NameColumnRowAt(mp);
+						if (nameRow >= 0 && nameRow < visible.Count) {
+							SRApi.BlockWindowDrag = true;
+							LoadPreset(visible[nameRow]);
+							e.Use();
+						}
+					}
 					if (e.type == EventType.MouseUp) SRApi.BlockWindowDrag = false;
 				}
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/表格绘制", __ex);
 			}
+		}
+
+		// 名称列命中：按 order/hidden/scroll 与核心同一套规则复算名称列 x 范围，再在核心给的行矩形里找行。
+		private static int NameColumnRowAt(Vector2 mp) {
+			try {
+				if (_args == null) return -1;
+				float x = _args.box.x - _args.scrollX;
+				float nameX0 = -1f, nameX1 = -1f;
+				for (int i = 0; i < _order.Length; i++) {
+					int ci = _order[i];
+					if (ci == ColAction || ci < 0 || ci >= ColCount) continue;
+					if (_hiddenCols.Contains(ci)) continue;
+					float w = SRApi.Ctl.Sc(_colW[ci]);
+					if (ci == ColName) { nameX0 = x; nameX1 = x + w; break; }
+					x += w;
+				}
+				if (nameX0 < 0f || mp.x < nameX0 || mp.x >= nameX1) return -1;
+				for (int i = 0; i < _rowRects.Count && i < _rowRows.Count; i++) {
+					if (_rowRects[i].Contains(mp)) return _rowRows[i];
+				}
+			} catch (Exception __ex) { SRApi.Guard.Log("布局预设/名称列命中", __ex); }
+			return -1;
 		}
 
 		// 表格高度：按页面视口高度扣掉上方固定行，尽量让整页不出现页面级滚动条；最小 140、最大 480 设计单位。
@@ -726,6 +794,25 @@ namespace SR_UCH.Tweaks {
 			}
 		}
 
+		// 表格列设置落盘/日志用的小工具（逗号分隔，便于对照 cfg）。
+		private static string JoinInts(int[] a) {
+			try {
+				if (a == null) return "";
+				string[] p = new string[a.Length];
+				for (int i = 0; i < a.Length; i++) p[i] = a[i].ToString(CultureInfo.InvariantCulture);
+				return string.Join(",", p);
+			} catch { return ""; }
+		}
+
+		private static string JoinFloats(float[] a) {
+			try {
+				if (a == null) return "";
+				string[] p = new string[a.Length];
+				for (int i = 0; i < a.Length; i++) p[i] = Mathf.RoundToInt(a[i]).ToString(CultureInfo.InvariantCulture);
+				return string.Join(",", p);
+			} catch { return ""; }
+		}
+
 		// 列序归一化：只允许前 4 列换位，操作列强制固定在最后；非法/缺列时补回默认相对顺序。
 		private static int[] NormalizeOrder(int[] src) {
 			int[] def = new int[] { 0, 1, 2, 3, 4 };
@@ -827,6 +914,7 @@ namespace SR_UCH.Tweaks {
 					return;
 				}
 				string level = LevelFromDoc(doc);
+				string levelName = CurrentLevelDisplayName(level);
 				string name = (_newName ?? "").Trim();
 				// 名称留空：默认用「关卡名 + 时间」，避免每次手工起名。
 				if (name.Length == 0) {
@@ -834,7 +922,7 @@ namespace SR_UCH.Tweaks {
 					name = baseName + " " + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
 				}
 				if (name.Length > 40) name = name.Substring(0, 40);
-				SaveXml(doc.OuterXml, name, mode, blocks, level);
+				SaveXml(doc.OuterXml, name, mode, blocks, level, levelName);
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/保存", __ex);
 			}
@@ -842,7 +930,7 @@ namespace SR_UCH.Tweaks {
 
 		// 保存 / 导入共用的落盘逻辑：同名覆盖需二次确认，数量上限只拦新预设。
 		// level 来自 XML 根节点 levelSceneName（读不到传空串），写进预设元数据用于列表/加载前校验。
-		private static void SaveXml(string xml, string name, string mode, int blocks, string level) {
+		private static void SaveXml(string xml, string name, string mode, int blocks, string level, string levelName) {
 			try {
 				string root = PresetsRoot();
 				string dirName = SafeDirName(mode);
@@ -880,6 +968,7 @@ namespace SR_UCH.Tweaks {
 				p.TimeUtc = DateTime.UtcNow;
 				p.FilePath = path;
 				p.Level = level ?? "";
+				p.LevelName = levelName ?? "";
 				p.Ok = true;
 				SortPresets();
 				SaveIndex();
@@ -995,7 +1084,7 @@ namespace SR_UCH.Tweaks {
 					if (st != null) mode = st.GameMode.ToString();
 				} catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取模式(导入)", __ex); }
 				SRApi.LogInfo("[布局预设] 从" + sourceLabel + "导入：" + name + "（" + blocks + " 块，关卡 " + level + "）");
-				SaveXml(doc.OuterXml, name, mode, blocks, level);
+				SaveXml(doc.OuterXml, name, mode, blocks, level, LevelDisplayNameForScene(level));
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/导入XML", __ex);
 			}
@@ -1243,11 +1332,48 @@ namespace SR_UCH.Tweaks {
 					&& !string.Equals(presetScene, activeScene, StringComparison.Ordinal);
 				bool modeMismatch = IsConcreteMode(p.Mode) && IsConcreteMode(currentMode)
 					&& !string.Equals(p.Mode, currentMode, StringComparison.OrdinalIgnoreCase);
-				if (levelMismatch || modeMismatch) {
-					// 两段确认：第一次只提示差异并让操作列按钮变成「确认加载」，5 秒内再点一次才真正重载。
-					string diff = SRApi.T("模式/关卡不匹配：预设 ", "Mode/level mismatch: preset ") + p.Name;
-					if (modeMismatch) diff += SRApi.T("（模式 ", " (mode ") + ModeText(p.Mode) + SRApi.T("，当前 ", ", current ") + ModeText(currentMode) + "）";
-					if (levelMismatch) diff += SRApi.T("（关卡 ", " (level ") + LocalizedLevelName(presetScene) + SRApi.T("，当前 ", ", current ") + LocalizedLevelName(activeScene) + "）";
+				if (levelMismatch) {
+					// 跨关卡加载 = 替换关卡：自动拒绝自定义关卡（XML 里只有 BlankLevel，无法定位具体关卡），
+					// 内置关卡则走「先结束当前对局回树屋 → 原生 LaunchLevel 进预设关卡」的流程。
+					if (string.Equals(presetScene, "BlankLevel", StringComparison.OrdinalIgnoreCase)) {
+						SRApi.Notify(SRApi.T("该预设属于自定义关卡，无法从当前对局自动替换进去；请先进入该自定义关卡再加载", "This preset belongs to a custom level and cannot be entered by replacing the level here; enter that custom level first and load it there"));
+						return;
+					}
+					GameState.LevelName targetLevel;
+					if (!TrySceneToLevel(presetScene, out targetLevel) || targetLevel == GameState.LevelName.BLANKLEVEL) {
+						SRApi.Notify(SRApi.T("无法识别预设所属关卡，暂不支持自动替换关卡", "The preset's level could not be recognized; automatic level replacement is not supported"));
+						return;
+					}
+					GameState.GameMode targetMode = st.GameMode;
+					GameState.GameMode parsedMode;
+					if (IsConcreteMode(p.Mode) && TryParseMode(p.Mode, out parsedMode)) targetMode = parsedMode;
+					if (!ConfirmOrArm("replace:" + p.Key)) {
+						_status = SRApi.T("将替换关卡：", "Level will be replaced: ") + LevelDisplayNameForScene(activeScene)
+							+ SRApi.T(" → ", " -> ") + LevelDisplayNameForScene(presetScene)
+							+ SRApi.T("；再点一次「加载」确认（会先结束当前对局回到树屋，再进入该关卡并应用方块）",
+								"; click Load again to confirm (the current match ends, returns to the treehouse, then enters that level and applies the blocks)");
+						SRApi.Notify(_status);
+						return;
+					}
+					ClearPending();
+					SetReloadBusy(true);
+					try {
+						lm.StartCoroutine(ReplaceLevelRoutine(p.Name, xml, presetScene, targetLevel, targetMode));
+						coroutineStarted = true;
+						SRApi.Notify(SRApi.T("正在替换关卡并加载预设：", "Replacing level and loading preset: ") + p.Name
+							+ SRApi.T("（会先回树屋再进入 ", " (returns to the treehouse first, then enters ") + LevelDisplayNameForScene(presetScene) + "）");
+					} catch (Exception __rx) {
+						SRApi.Guard.Log("布局预设/开始替换关卡", __rx);
+						try { QuickSaver.levelPortalXml = null; } catch { }
+						SetReloadBusy(false);
+						SRApi.Notify(SRApi.T("加载预设失败：无法开始替换关卡", "Failed to load the preset: could not start the level replacement"));
+					}
+					return;
+				}
+				if (modeMismatch) {
+					// 同关卡仅模式不同：沿用原来的全员重载流程（ReloadScene 会同步切模式）。
+					string diff = SRApi.T("模式不匹配：预设 ", "Mode mismatch: preset ") + p.Name
+						+ SRApi.T("（模式 ", " (mode ") + ModeText(p.Mode) + SRApi.T("，当前 ", ", current ") + ModeText(currentMode) + "）";
 					if (!ConfirmOrArm("load:" + p.Key)) {
 						_status = diff + SRApi.T("；再点一次「加载」确认", "; click Load again to confirm");
 						SRApi.Notify(_status);
@@ -1272,7 +1398,9 @@ namespace SR_UCH.Tweaks {
 					// 成败提示在协程内真正执行完才发出；锁由协程末尾复位。
 					lm.StartCoroutine(LoadPresetRoutine(p.Name, xml, toMode));
 					coroutineStarted = true;
-					SRApi.Notify(SRApi.T("加载预设：", "Loading preset: ") + p.Name + SRApi.T("，全员重载中（分数会重置）", "; everyone is reloading (scores will reset)"));
+					SRApi.Notify(SRApi.T("加载预设：", "Loading preset: ") + p.Name
+						+ "（" + LevelText(p) + "）"
+						+ SRApi.T("，全员重载中（分数会重置）", "; everyone is reloading (scores will reset)"));
 				} catch (Exception __ex) {
 					SRApi.Guard.Log("布局预设/开始加载", __ex);
 					SRApi.Notify(SRApi.T("加载预设失败", "Failed to load the preset"));
@@ -1287,8 +1415,110 @@ namespace SR_UCH.Tweaks {
 			}
 		}
 
-		// ---------- 树屋 / 大厅加载（切到预设关卡并应用方块） ----------
+		// 预设目录名（GameState.GameMode 的 ToString）-> 游戏模式枚举；IMPORTED/UNKNOWN 等非具体模式返回 false。
+		private static bool TryParseMode(string mode, out GameState.GameMode gm) {
+			gm = GameState.GameMode.FREEPLAY;
+			try {
+				if (string.IsNullOrEmpty(mode)) return false;
+				if (!Enum.TryParse<GameState.GameMode>(mode.Trim(), true, out gm)) return false;
+				return Enum.IsDefined(typeof(GameState.GameMode), gm);
+			} catch { return false; }
+		}
 
+		// 替换关卡加载协程：先用 GameControl.EndGame() 走游戏原生「回树屋」流程（房主会向房客 RPC 一起回），
+		// 等 TreeHouseLobby + LevelSelectController 就绪后，用与树屋加载相同的原生 LaunchLevel(portal) 进入预设关卡，
+		// 再覆盖 QuickSaver.levelPortalXml 为预设 XML，让新场景 OnSetupStartLevel 应用方块。
+		private static IEnumerator ReplaceLevelRoutine(string name, string xml, string presetScene,
+			GameState.LevelName targetLevel, GameState.GameMode targetMode) {
+			yield return new WaitForEndOfFrame();
+			yield return new WaitForEndOfFrame();
+			bool ok = false;
+			if (StartReturnToTreehouse(targetMode)) {
+				float deadline = Time.unscaledTime + 20f;
+				LevelSelectController lsc = null;
+				while (Time.unscaledTime < deadline) {
+					LobbyManager cur = LobbyManager.instance;
+					lsc = cur != null ? cur.CurrentLevelSelectController : null;
+					if (lsc != null && SceneManager.GetActiveScene().name == "TreeHouseLobby") break;
+					yield return null;
+				}
+				if (lsc == null) {
+					SRApi.Notify(SRApi.T("替换关卡失败：等待回到树屋超时", "Level replacement failed: timed out waiting to return to the treehouse"));
+				} else {
+					// 等树屋门/大厅状态初始化（场景刚加载完的一两帧门可能还没激活）。
+					yield return new WaitForSeconds(0.8f);
+					ok = EnterPresetLevelFromTreehouse(lsc, name, xml, presetScene, targetLevel);
+				}
+			}
+			if (!ok) {
+				try { QuickSaver.levelPortalXml = null; } catch (Exception __cx) { SRApi.Guard.Log("布局预设/清理替换关卡XML", __cx); }
+				SetReloadBusy(false);
+			}
+		}
+
+		// 替换关卡第一步（无 yield，避免 C# 不允许在 try/catch 里 yield）：原生 EndGame 回树屋。
+		private static bool StartReturnToTreehouse(GameState.GameMode targetMode) {
+			try {
+				LobbyManager lm = LobbyManager.instance;
+				GameControl gc = lm != null ? lm.CurrentGameController as GameControl : null;
+				if (lm == null || gc == null || !NetworkServer.active) {
+					SRApi.Notify(SRApi.T("无法替换关卡：当前没有可结束的对局", "Cannot replace the level: there is no active match"));
+					return false;
+				}
+				// 目标模式先在本机设好：LaunchLevel 内部会 CallRpcSetGameMode 同步给房客。
+				try { GameSettings st = GameSettings.GetInstance(); if (st != null) st.GameMode = targetMode; } catch (Exception __mx) { SRApi.Guard.Log("布局预设/替换关卡设置模式", __mx); }
+				// 原生「回树屋」：RPC 全员淡出到 TreeHouseLobby，并清理当前对局玩家。
+				gc.EndGame();
+				return true;
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/结束对局回树屋", __ex);
+				SRApi.Notify(SRApi.T("替换关卡失败：无法结束当前对局", "Level replacement failed: could not end the current match"));
+				return false;
+			}
+		}
+
+		// 替换关卡第二步（无 yield）：树屋已就绪，找门并走原生 LaunchLevel 进预设关卡，再注入预设 XML。
+		private static bool EnterPresetLevelFromTreehouse(LevelSelectController lsc, string name, string xml,
+			string presetScene, GameState.LevelName targetLevel) {
+			try {
+				LevelPortal portal = FindTreehousePortal(lsc, targetLevel);
+				if (portal == null) {
+					SRApi.Notify(SRApi.T("替换关卡失败：树屋里找不到「", "Level replacement failed: no treehouse portal for \"")
+						+ LevelDisplayNameForScene(presetScene) + SRApi.T("」的入口（可能未解锁）", "\" (possibly locked)"));
+					return false;
+				}
+				if (!AllLobbyPlayersPickedCharacter(LobbyManager.instance)) {
+					SRApi.Notify(SRApi.T("已回到树屋：有玩家还没选角色，先选好角色后再点一次「加载」即可进入预设关卡",
+						"Returned to the treehouse: some players have not picked a character; pick one and click Load again to enter the preset level"));
+					return false;
+				}
+				try {
+					if (LoadingInterstitialSplash.Instance != null) {
+						LoadingInterstitialSplash.Instance.showLevelInfoNextLoad = true;
+						LoadingInterstitialSplash.Instance.FadeIn();
+					}
+				} catch (Exception __fx) { SRApi.Guard.Log("布局预设/替换关卡加载画面", __fx); }
+				lsc.LaunchLevel(portal);
+				try { QuickSaver.levelPortalXml = xml; } catch (Exception __qx) { SRApi.Guard.Log("布局预设/替换关卡写入预设XML", __qx); }
+				try {
+					GameState gs = GameState.GetInstance();
+					if (gs != null) {
+						gs.SelectedLevel = targetLevel;
+						LevelSelectController.PlayedSnapshotInfo info = new LevelSelectController.PlayedSnapshotInfo();
+						info.nextLevel = targetLevel;
+						gs.currentSnapshotInfo = info;
+					}
+				} catch (Exception __sx) { SRApi.Guard.Log("布局预设/替换关卡同步状态", __sx); }
+				LobbyManager.instance.StartCoroutine(TreehouseLoadWatchdog(name, xml));
+				SRApi.Notify(SRApi.T("正在替换关卡：进入 ", "Replacing level: entering ") + LevelDisplayNameForScene(presetScene)
+					+ SRApi.T(" 并应用预设 ", " and applying preset ") + name);
+				return true;
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/替换关卡进入", __ex);
+				SRApi.Notify(SRApi.T("替换关卡加载失败（详见日志）", "Level replacement failed (see the log)"));
+				return false;
+			}
+		}
 		// 树屋加载调用链（复用游戏原生流程，避免自己拼网络消息）：
 		//   1) 读预设 XML，取 levelSceneName → 反查 GameState.LevelName → 在树屋关卡门里找到对应 LevelPortal；
 		//   2) 先 LoadingInterstitialSplash.FadeIn()：原生 LevelSelectController.FadeToLevel 要等 FadeOut 进入 SHOW，
@@ -1615,9 +1845,12 @@ namespace SR_UCH.Tweaks {
 							pi.TimeUtc = ParseTime(JsonStr(line, "time"));
 							pi.Level = JsonStr(line, "level");
 							if (pi.Level == null) pi.Level = "";
+							pi.LevelName = JsonStr(line, "levelName");
+							if (pi.LevelName == null) pi.LevelName = "";
 							pi.Ok = JsonBool(line, "ok");
-							// 字段缺失判定：老索引（v1）没有 level / ok -> 默认 false/0，扫描时自愈。
+							// 字段缺失判定：老索引（v1/v2）没有 level / levelName / ok -> 默认 false/0，扫描时自愈。
 							bool complete = line.IndexOf("\"level\":", StringComparison.Ordinal) >= 0
+								&& line.IndexOf("\"levelName\":", StringComparison.Ordinal) >= 0
 								&& line.IndexOf("\"ok\":", StringComparison.Ordinal) >= 0;
 							completeIdx[mode + "/" + file] = complete;
 							if (!complete) upgraded = true;
@@ -1657,8 +1890,13 @@ namespace SR_UCH.Tweaks {
 							int oldBlocks = pi.Blocks;
 							string lv;
 							int blocks;
-							bool xmlOk = TryReadPresetMeta(fp, out lv, out blocks);
+							string metaName;
+							bool xmlOk = TryReadPresetMeta(fp, out lv, out blocks, out metaName);
 							pi.Level = lv ?? "";
+							if (string.IsNullOrEmpty(pi.LevelName) && !string.IsNullOrEmpty(metaName)) {
+								pi.LevelName = metaName;
+								upgraded = true;
+							}
 							pi.Blocks = xmlOk ? blocks : Mathf.Max(0, pi.Blocks);
 							pi.Ok = xmlOk && blocks > 0;
 							if (!complete) upgraded = true;
@@ -1695,6 +1933,7 @@ namespace SR_UCH.Tweaks {
 						.Append("\",\"name\":\"").Append(JsonEsc(p.Name))
 						.Append("\",\"mode\":\"").Append(JsonEsc(p.Mode))
 						.Append("\",\"level\":\"").Append(JsonEsc(p.Level))
+						.Append("\",\"levelName\":\"").Append(JsonEsc(p.LevelName))
 						.Append("\",\"blocks\":").Append(Mathf.Max(0, p.Blocks))
 						.Append(",\"time\":\"").Append(JsonEsc(TimeIso(p.TimeUtc)))
 						.Append("\",\"ok\":").Append(p.Ok ? "true" : "false").Append("}");
@@ -1776,11 +2015,13 @@ namespace SR_UCH.Tweaks {
 			} catch { return 0; }
 		}
 
-		// 流式读取预设 XML 的元数据：根节点必须是 scene，取 levelSceneName 并统计顶层 block 数量。
+		// 流式读取预设 XML 的元数据：根节点必须是 scene，取 levelSceneName 并统计顶层 block 数量；
+		// 如果 XML 里带 snapshotInfo/snapshotName（自定义关卡快照）也顺便取出展示名。
 		// 用 XmlReader 而不是 XmlDocument：扫描列表时只关心根属性与方块数，避免把整份 XML 建成 DOM。
-		private static bool TryReadPresetMeta(string path, out string level, out int blocks) {
+		private static bool TryReadPresetMeta(string path, out string level, out int blocks, out string levelName) {
 			level = "";
 			blocks = 0;
+			levelName = "";
 			try {
 				if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
 				XmlReaderSettings settings = new XmlReaderSettings();
@@ -1797,11 +2038,19 @@ namespace SR_UCH.Tweaks {
 					if (reader.Name != "scene") return false;
 					string lv = reader.GetAttribute("levelSceneName");
 					level = lv ?? "";
+					string nm = reader.GetAttribute("snapshotName");
+					if (string.IsNullOrEmpty(nm)) nm = reader.GetAttribute("levelName");
+					if (!string.IsNullOrEmpty(nm)) levelName = nm;
 					if (reader.IsEmptyElement) return false;
 					int rootDepth = reader.Depth;
 					while (reader.Read()) {
-						if (reader.NodeType == XmlNodeType.Element && reader.Depth == rootDepth + 1 && reader.Name == "block") {
-							blocks++;
+						if (reader.NodeType == XmlNodeType.Element && reader.Depth == rootDepth + 1) {
+							if (reader.Name == "block") {
+								blocks++;
+							} else if (string.IsNullOrEmpty(levelName) && reader.Name == "snapshotInfo") {
+								string sn = reader.GetAttribute("snapshotName");
+								if (!string.IsNullOrEmpty(sn)) levelName = sn;
+							}
 						} else if (reader.NodeType == XmlNodeType.EndElement && reader.Depth == rootDepth) {
 							break;
 						}
@@ -1853,25 +2102,89 @@ namespace SR_UCH.Tweaks {
 			return DateTime.MinValue;
 		}
 
+		// 模式名：优先用游戏自己的本地化术语（RuleBook/*ModeText，跟随游戏语言设置），
+		// 取不到再回退到界面文案；不再自造「创造」这类与游戏不一致的译名。
 		private static string ModeText(string mode) {
 			try {
 				if (string.IsNullOrEmpty(mode)) return "-";
-				switch (mode.ToUpperInvariant()) {
-					case "PARTY": return SRApi.T("派对", "Party");
-					case "CREATIVE": return SRApi.T("创意", "Creative");
-					case "FREEPLAY": return SRApi.T("自由", "Freeplay");
-					case "CHALLENGE": return SRApi.T("挑战", "Challenge");
-					default: return mode;
+				GameState.GameMode gm = GameState.GameMode.FREEPLAY;
+				bool parsed = false;
+				try { parsed = Enum.TryParse<GameState.GameMode>(mode.Trim(), true, out gm) && Enum.IsDefined(typeof(GameState.GameMode), gm); }
+				catch { parsed = false; }
+				if (parsed) {
+					string term = ModeLocalizationTerm(gm);
+					if (!string.IsNullOrEmpty(term)) {
+						string localized = null;
+						try { localized = I2.Loc.LocalizationManager.GetTranslation(term); } catch (Exception __lx) { SRApi.Guard.Log("布局预设/模式本地化", __lx); }
+						if (!string.IsNullOrEmpty(localized) && localized.IndexOf('/') < 0) return localized;
+					}
+					switch (gm) {
+						case GameState.GameMode.PARTY: return SRApi.T("派对", "Party");
+						case GameState.GameMode.CREATIVE: return SRApi.T("创意", "Creative");
+						case GameState.GameMode.FREEPLAY: return SRApi.T("自由", "Freeplay");
+						case GameState.GameMode.CHALLENGE: return SRApi.T("挑战", "Challenge");
+					}
 				}
+				return mode;
 			} catch { return mode; }
 		}
 
-		// 列表里的关卡显示：用游戏本地化关卡名（跟随游戏语言）；映射不到时回退 XML 里的 levelSceneName。
+		// 游戏本地化术语表里的模式名（与规则书 / 树屋界面一致）。
+		private static string ModeLocalizationTerm(GameState.GameMode mode) {
+			try {
+				switch (mode) {
+					case GameState.GameMode.FREEPLAY: return "RuleBook/FreePlayText";
+					case GameState.GameMode.CREATIVE: return "RuleBook/CreativeModeText";
+					case GameState.GameMode.PARTY: return "RuleBook/PartyModeText";
+					case GameState.GameMode.CHALLENGE: return "RuleBook/ChallengeModeText";
+					default: return null;
+				}
+			} catch { return null; }
+		}
+
+		// 列表里的关卡显示：优先用保存时记下的展示名（自定义关卡名），否则按场景名解析成游戏本地化名；
+		// 都取不到时给非空占位，避免列表出现空白单元格。
 		private static string LevelText(PresetInfo p) {
 			try {
-				if (p == null || string.IsNullOrEmpty(p.Level)) return "-";
-				return LocalizedLevelName(p.Level);
-			} catch { return p != null && !string.IsNullOrEmpty(p.Level) ? p.Level : "-"; }
+				if (p == null) return SRApi.T("未知关卡", "Unknown level");
+				if (!string.IsNullOrEmpty(p.LevelName)) return p.LevelName;
+				return LevelDisplayNameForScene(p.Level);
+			} catch { return SRApi.T("未知关卡", "Unknown level"); }
+		}
+
+		// 场景名 -> 展示名：自定义关卡（BlankLevel）用「自定义关卡」占位（保存时会记下具体关卡名），
+		// 普通关卡用游戏本地化名；空场景也给非空占位，避免列表空白。
+		private static string LevelDisplayNameForScene(string scene) {
+			try {
+				if (string.IsNullOrEmpty(scene)) return SRApi.T("未知关卡", "Unknown level");
+				if (string.Equals(scene, "BlankLevel", StringComparison.OrdinalIgnoreCase)) return SRApi.T("自定义关卡", "Custom level");
+				return LocalizedLevelName(scene);
+			} catch { return string.IsNullOrEmpty(scene) ? SRApi.T("未知关卡", "Unknown level") : scene; }
+		}
+
+		// 当前对局如果是自定义关卡，返回它的名字（GameState.currentSnapshotInfo.snapshotName）。
+		private static string CurrentCustomLevelName() {
+			try {
+				GameState gs = GameState.GetInstance();
+				if (gs == null) return null;
+				LevelSelectController.PlayedSnapshotInfo info = gs.currentSnapshotInfo;
+				string nm = info.snapshotName;
+				return string.IsNullOrEmpty(nm) ? null : nm;
+			} catch { return null; }
+		}
+
+		// 保存时记下的展示用关卡名：自定义关卡用当前关卡名（XML 里只有 BlankLevel，无法还原），普通关卡用本地化名。
+		private static string CurrentLevelDisplayName(string scene) {
+			try {
+				string active = "";
+				try { active = SceneManager.GetActiveScene().name; } catch { }
+				if (string.Equals(active, "BlankLevel", StringComparison.OrdinalIgnoreCase)) {
+					string custom = CurrentCustomLevelName();
+					if (!string.IsNullOrEmpty(custom)) return custom;
+					return SRApi.T("自定义关卡", "Custom level");
+				}
+				return LevelDisplayNameForScene(string.IsNullOrEmpty(active) ? scene : active);
+			} catch { return LevelDisplayNameForScene(scene); }
 		}
 
 		// 场景名 -> 游戏关卡枚举：遍历 GameState.GetLevelSceneName 反查（覆盖 Farm/Rooftops/.../PrototypeN）。
