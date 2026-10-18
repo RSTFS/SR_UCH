@@ -25,7 +25,7 @@ public partial class SR {
             CursorMove = false;
             // EventSystem 门控必须每帧跟随：只在打开面板时判定一次，之后 InputLocked 变 false 就不再恢复。
             ApplyEventSystemGate();
-            _uiAlpha = Mathf.Clamp01(_uiAlpha + (_visible ? 8f : -64f) * Time.unscaledDeltaTime);   // 关闭时快速消失，避免表头/提示残留延迟
+            _uiAlpha = Mathf.Clamp01(_uiAlpha + (_visible ? 10f : -10f) * Time.unscaledDeltaTime);   // 打开/关闭都用约 0.1s 的淡入淡出（关闭动画），tooltip 缓存在关闭时清空
             // 总开关关闭时请各功能收起自己的 UI；各功能自己判断各自的子开关。
             if (!GateMaster && AnyUiBlocked()) {
                 try { FireDismissUi(); } catch (Exception __ex) { Guard.Log("总开关关闭时收起功能 UI", __ex); }
