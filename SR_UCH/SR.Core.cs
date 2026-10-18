@@ -759,13 +759,8 @@ public partial class SR : ITweak {
                 }
                 _tipBatchUntil = now + 0.35f;
             } catch { show = text; }   // 拿不到时间就退回单条
-            try {
-                UserMessageManager.Instance.UserMessage(show, false);
-                if (_tipDown) { _tipDown = false; _tipDownScene = null; }   // 调通了说明已恢复
-            } catch (Exception __ex) {
-                _tipDown = true; _tipDownScene = scene;
-                Guard.Log("提示(UserMessage)", __ex);
-            }
+            // 改用模组自己的自适应 Toast（自动换行/宽度）；游戏原生提示只有单行，长文本会被截断。
+            try { AddToast(show); } catch (Exception __ex) { Guard.Log("提示(Toast)", __ex); }
         }
 
         // 共用提示文案（高频消息只生成一次），各功能直接用 SR.Msg。

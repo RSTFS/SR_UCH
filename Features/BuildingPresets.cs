@@ -607,7 +607,7 @@ namespace SR_UCH.Tweaks {
 				if (_hiddenCols.Count > _hiddenBeforeTable) {
 					// 核心在右键表头时把列加进 hidden 集合；这里落盘持久化（Shift+右键清空由 resetAll 回调处理）。
 					SaveCols();
-					SRApi.Notify(SRApi.T("已隐藏列（Shift+右键表头可恢复全部列）", "Column hidden (Shift+right-click the header to restore all columns)"));
+					SRApi.LogInfo("[布局预设] " + SRApi.T("已隐藏列（Shift+右键表头可恢复全部列）", "Column hidden (Shift+right-click the header to restore all columns)"));
 				}
 				if (e != null) {
 					// 拖拽兜底复位（拖列宽 / 换列位由核心处理，这里只接住状态与落盘回调）。
@@ -682,7 +682,7 @@ namespace SR_UCH.Tweaks {
 			try {
 				_hiddenCols.Clear();
 				SaveCols();
-				SRApi.Notify(SRApi.T("已恢复显示全部列", "All columns are shown again"));
+				SRApi.LogInfo("[布局预设] " + SRApi.T("已恢复显示全部列", "All columns are shown again"));
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/恢复全部列", __ex);
 			}
@@ -1029,7 +1029,7 @@ namespace SR_UCH.Tweaks {
 				SortPresets();
 				SaveIndex();
 				_status = SRApi.T("已保存预设：", "Saved preset: ") + name;
-				SRApi.Notify(_status);
+				SRApi.LogInfo("[布局预设] " + _status);
 				SRApi.LogInfo("[布局预设] 保存 " + key + "（" + blocks + " 块）");
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/写文件", __ex);
@@ -1178,7 +1178,7 @@ namespace SR_UCH.Tweaks {
 					return;
 				}
 				_status = SRApi.T("已导出到剪贴板：", "Exported to clipboard: ") + p.Name;
-				SRApi.Notify(_status);
+				SRApi.LogInfo("[布局预设] " + _status);
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/导出", __ex);
 			}
@@ -1189,7 +1189,7 @@ namespace SR_UCH.Tweaks {
 			try {
 				if (!ActionAllowed()) return;
 				if (_presets.Count == 0) {
-					SRApi.Notify(SRApi.T("当前没有可导出的预设", "There are no presets to export"));
+					SRApi.LogInfo("[布局预设] " + SRApi.T("当前没有可导出的预设", "There are no presets to export"));
 					return;
 				}
 				string baseDir = Path.Combine(PresetsRoot(), "exports", DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture));
@@ -1225,7 +1225,7 @@ namespace SR_UCH.Tweaks {
 				}
 				_status = SRApi.T("已导出 ", "Exported ") + copied + SRApi.T(" 个预设到：", " presets to: ") + baseDir
 					+ (failed > 0 ? SRApi.T("（失败 ", " (failed ") + failed + SRApi.T(" 个）", ")") : "");
-				SRApi.Notify(_status);
+				SRApi.LogInfo("[布局预设] " + _status);
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/全部导出", __ex);
 			}
@@ -1239,7 +1239,7 @@ namespace SR_UCH.Tweaks {
 				List<PresetInfo> list = new List<PresetInfo>(_presets);
 				list.Sort(ComparePreset);
 				if (list.Count == 0) {
-					SRApi.Notify(SRApi.T("当前没有可复制的预设", "There are no presets to copy"));
+					SRApi.LogInfo("[布局预设] " + SRApi.T("当前没有可复制的预设", "There are no presets to copy"));
 					return;
 				}
 				StringBuilder sb = new StringBuilder();
@@ -1263,7 +1263,7 @@ namespace SR_UCH.Tweaks {
 					return;
 				}
 				_status = SRApi.T("已复制全部清单（", "Copied the full list (") + list.Count + SRApi.T(" 条）到剪贴板", " presets) to the clipboard");
-				SRApi.Notify(_status);
+				SRApi.LogInfo("[布局预设] " + _status);
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/复制清单", __ex);
 			}
@@ -1283,7 +1283,7 @@ namespace SR_UCH.Tweaks {
 				_presets.Remove(p);
 				SaveIndex();
 				_status = SRApi.T("已删除预设：", "Deleted preset: ") + p.Name;
-				SRApi.Notify(_status);
+				SRApi.LogInfo("[布局预设] " + _status);
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/删除", __ex);
 			}
@@ -1304,7 +1304,7 @@ namespace SR_UCH.Tweaks {
 				_renameText = null;
 				SaveIndex();
 				_status = SRApi.T("已重命名预设：", "Renamed preset: ") + name;
-				SRApi.Notify(_status);
+				SRApi.LogInfo("[布局预设] " + _status);
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/重命名", __ex);
 			}
@@ -1404,6 +1404,13 @@ namespace SR_UCH.Tweaks {
 					GameState.GameMode targetMode = st.GameMode;
 					GameState.GameMode parsedMode;
 					if (IsConcreteMode(p.Mode) && TryParseMode(p.Mode, out parsedMode)) targetMode = parsedMode;
+					bool skipTreehouse = _skipTreehouse != null && _skipTreehouse.Value;
+					bool hasRemoteClients = HasRemoteClients();
+					// 自定义关卡在联机时只能走「跳过树屋流程」直接替换；未勾选时只提示，不执行。
+					if (customPreset && hasRemoteClients && !skipTreehouse) {
+						SRApi.Notify(SRApi.T("联机替换自定义关卡需要先勾选『跳过树屋流程』", "Replacing a custom level online requires enabling 'Skip treehouse' first"));
+						return;
+					}
 					if (!ConfirmOrArm("replace:" + p.Key)) {
 						_status = SRApi.T("将替换关卡：", "Level will be replaced: ") + LevelDisplayNameForScene(activeScene)
 							+ SRApi.T(" → ", " -> ") + LevelDisplayNameForScene(presetScene)
@@ -1415,16 +1422,14 @@ namespace SR_UCH.Tweaks {
 					ClearPending();
 					SetReloadBusy(true);
 					try {
-						// 单人/无远程客户端：直接在当前对局内切场景（设置 SelectedLevel/mode/snapshot + ReloadScene）；
-						// 有远程客户端时退回树屋方案，因为游戏没有在“对局内”更新房客 SelectedLevel 的 RPC/消息。
-						// 自定义关卡：场景与快照信息都能同步，多/单人都走直接替换（房客 SelectedLevel 仍是旧值，仅影响按关卡读取的次要设置）。
-						bool skipTreehouse = _skipTreehouse != null && _skipTreehouse.Value;
-						bool __directOk = (!HasRemoteClients() || customPreset || skipTreehouse) && StartDirectReplace(p, xml, targetLevel, targetMode);
+						// 单人/无远程客户端，或勾选了「跳过树屋流程」：直接在当前对局内切场景。
+						// 否则退回树屋方案，因为游戏没有在“对局内”更新房客 SelectedLevel 的 RPC/消息。
+						bool __directOk = (!hasRemoteClients || skipTreehouse) && StartDirectReplace(p, xml, targetLevel, targetMode);
 						if (__directOk) {
 							coroutineStarted = true;
-							SRApi.Notify(SRApi.T("直接替换关卡并加载预设：", "Replacing level directly and loading preset: ") + p.Name
-								+ SRApi.T(" → ", " → ") + (customPreset ? (string.IsNullOrEmpty(p.LevelName) ? SRApi.T("自定义关卡", "Custom level") : p.LevelName) : LevelDisplayNameForScene(presetScene))
-								+ (skipTreehouse && HasRemoteClients() ? SRApi.T("（已跳过树屋流程，房客关卡状态可能不同步）", " (treehouse flow skipped; clients' level state may be out of sync)") : ""));
+							SRApi.LogInfo("[布局预设] 直接替换关卡并加载预设：" + p.Name
+								+ " → " + (customPreset ? (string.IsNullOrEmpty(p.LevelName) ? SRApi.T("自定义关卡", "Custom level") : p.LevelName) : LevelDisplayNameForScene(presetScene))
+								+ (skipTreehouse && hasRemoteClients ? SRApi.T("（已跳过树屋流程，房客关卡状态可能不同步）", " (treehouse flow skipped; clients' level state may be out of sync)") : ""));
 						} else if (customPreset) {
 							SetReloadBusy(false);   // 失败必须释放锁（否则后续所有加载都被拦）
 							SRApi.Notify(SRApi.T("替换自定义关卡失败（详见日志）", "Failed to replace into the custom level (see the log)"));
@@ -1432,7 +1437,7 @@ namespace SR_UCH.Tweaks {
 						} else {
 							lm.StartCoroutine(ReplaceLevelRoutine(p.Name, xml, presetScene, targetLevel, targetMode));
 							coroutineStarted = true;
-							SRApi.Notify(SRApi.T("正在替换关卡并加载预设：", "Replacing level and loading preset: ") + p.Name
+							SRApi.LogInfo("[布局预设] 正在替换关卡并加载预设：" + p.Name
 								+ SRApi.T("（会先回树屋再进入 ", " (returns to the treehouse first, then enters ") + LevelDisplayNameForScene(presetScene) + "）");
 						}
 					} catch (Exception __rx) {
@@ -1471,7 +1476,7 @@ namespace SR_UCH.Tweaks {
 					// 成败提示在协程内真正执行完才发出；锁由协程末尾复位。
 					lm.StartCoroutine(LoadPresetRoutine(p.Name, xml, toMode));
 					coroutineStarted = true;
-					SRApi.Notify(SRApi.T("加载预设：", "Loading preset: ") + p.Name
+					SRApi.LogInfo("[布局预设] " + SRApi.T("加载预设：", "Loading preset: ") + p.Name
 						+ "（" + LevelText(p) + "）"
 						+ SRApi.T("，全员重载中（分数会重置）", "; everyone is reloading (scores will reset)"));
 				} catch (Exception __ex) {
@@ -1685,7 +1690,7 @@ namespace SR_UCH.Tweaks {
 					}
 				} catch (Exception __sx) { SRApi.Guard.Log("布局预设/替换关卡同步状态", __sx); }
 				LobbyManager.instance.StartCoroutine(TreehouseLoadWatchdog(name, xml));
-				SRApi.Notify(SRApi.T("正在替换关卡：进入 ", "Replacing level: entering ") + LevelDisplayNameForScene(presetScene)
+				SRApi.LogInfo("[布局预设] " + SRApi.T("正在替换关卡：进入 ", "Replacing level: entering ") + LevelDisplayNameForScene(presetScene)
 					+ SRApi.T(" 并应用预设 ", " and applying preset ") + name);
 				return true;
 			} catch (Exception __ex) {
@@ -1749,6 +1754,12 @@ namespace SR_UCH.Tweaks {
 				}
 				if (target == GameState.LevelName.BLANKLEVEL) {
 					// 自定义关卡：树屋里没有可用的关卡门，直接替换进 BlankLevel 并带上预设的快照名/代码。
+					// 联机时必须勾选「跳过树屋流程」才允许直接替换（否则只提示，避免房客关卡状态不同步）。
+					bool skipTH = _skipTreehouse != null && _skipTreehouse.Value;
+					if (HasRemoteClients() && !skipTH) {
+						SRApi.Notify(SRApi.T("联机替换自定义关卡需要先勾选『跳过树屋流程』", "Replacing a custom level online requires enabling 'Skip treehouse' first"));
+						return;
+					}
 					if (!AllLobbyPlayersPickedCharacter(lm)) {
 						SRApi.Notify(SRApi.T("有玩家还没选角色：请等所有人选好角色后再加载（否则可能开局异常）", "Some players have not picked a character yet; wait until everyone has one"));
 						return;
@@ -1759,7 +1770,7 @@ namespace SR_UCH.Tweaks {
 					if (StartDirectReplace(p, xml, GameState.LevelName.BLANKLEVEL, __cm)) {
 						SetReloadBusy(true);
 						started = true;
-						SRApi.Notify(SRApi.T("正直接从树屋进入自定义关卡并加载预设：", "Entering the custom level directly from the treehouse and loading the preset: ") + p.Name);
+						SRApi.LogInfo("[布局预设] 正直接从树屋进入自定义关卡并加载预设：" + p.Name);
 					} else {
 						SRApi.Notify(SRApi.T("进入自定义关卡失败（详见日志）", "Failed to enter the custom level (see the log)"));
 					}
@@ -1798,7 +1809,7 @@ namespace SR_UCH.Tweaks {
 				SetReloadBusy(true);
 				lm.StartCoroutine(TreehouseLoadWatchdog(p.Name, xml));
 				started = true;
-				SRApi.Notify(SRApi.T("加载预设并进入关卡：", "Loading preset into level: ") + p.Name
+				SRApi.LogInfo("[布局预设] " + SRApi.T("加载预设并进入关卡：", "Loading preset into level: ") + p.Name
 					+ SRApi.T(" → ", " -> ") + LocalizedLevelName(presetScene));
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/树屋加载", __ex);
