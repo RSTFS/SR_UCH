@@ -1023,14 +1023,6 @@ public partial class SR : ITweak {
             } catch (Exception __ex) { Guard.Log("还原侧栏顺序", __ex); }
         }
 
-        public static void ClearHiddenSections() {
-            try {
-                if (_userHiddenSections.Count == 0) return;
-                if (_sidebarOrderEntry != null) _sidebarOrderEntry.Value = string.Join(",", _allSections.ToArray());
-                RebuildSections(false);
-            } catch (Exception __ex) { Guard.Log("还原侧栏栏目", __ex); }
-        }
-
         // 晚注册：首次扫描之后再注册栏目 -> 立刻重建（否则静默不显示）
         private static void OnNavChanged(string sec) {
             if (!_scanned) return;   // 启动期注册：等 EnsureScanned 一次算完

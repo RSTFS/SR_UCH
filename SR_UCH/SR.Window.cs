@@ -604,69 +604,6 @@ public partial class SR {
 
 // 分区：MonoBehaviour（ManagerUI：Update/LateUpdate/OnGUI 驱动入口）
 
-        // 自适应提示（Toast）：自动换行/宽度、底部居中堆叠、淡入淡出；不依赖游戏自带单行提示。
-        private sealed class ToastItem { public string Text; public float Born, Until; }
-        private static readonly List<ToastItem> _toasts = new List<ToastItem>();
-        private const float ToastLife = 2.6f;
-
-        public static void AddToast(string text) {
-            try {
-                if (string.IsNullOrEmpty(text)) return;
-                float now = Time.unscaledTime;
-                // 0.35 秒内连续多条合并成多行（最多 3 行），避免刷屏
-                if (_toasts.Count > 0) {
-                    ToastItem last = _toasts[_toasts.Count - 1];
-                    if (now - last.Born <= 0.35f) {
-                        if (!last.Text.Contains(text)) {
-                            string[] parts = last.Text.Split('\n');
-                            if (parts.Length < 3) last.Text += "\n" + text;
-                            else last.Text = parts[0] + "\n" + parts[1] + "\n" + parts[2];
-                        }
-                        last.Until = now + ToastLife;
-                        return;
-                    }
-                }
-                _toasts.Add(new ToastItem { Text = text, Born = now, Until = now + ToastLife });
-                while (_toasts.Count > 5) _toasts.RemoveAt(0);
-            } catch { }
-        }
-
-        internal static void DrawToasts() {
-            try {
-                if (_toasts.Count == 0) return;
-                EnsureStyles();
-                float now = Time.unscaledTime;
-                for (int i = _toasts.Count - 1; i >= 0; i--) {
-                    if (now > _toasts[i].Until) _toasts.RemoveAt(i);
-                }
-                if (_toasts.Count == 0) return;
-                GUIStyle st = _labelWrap != null ? _labelWrap : GUI.skin.label;
-                GUIStyle box = _tooltip != null ? _tooltip : GUI.skin.box;
-                float maxW = Mathf.Min(Screen.width * 0.72f, Sc(760f));
-                float y = Screen.height - Sc(36f);
-                int start = Mathf.Max(0, _toasts.Count - 4);
-                for (int i = _toasts.Count - 1; i >= start; i--) {
-                    ToastItem it = _toasts[i];
-                    GUIContent c = new GUIContent(it.Text);
-                    float natural = st.CalcSize(c).x;
-                    float w = Mathf.Clamp(natural + Sc(24f), Sc(160f), maxW);
-                    float h = st.CalcHeight(c, w - Sc(16f)) + Sc(12f);
-                    float x = (Screen.width - w) * 0.5f;
-                    float remain = it.Until - now;
-                    float age = now - it.Born;
-                    float a = Mathf.Clamp01(Mathf.Min(age / 0.12f, remain / 0.4f));
-                    Color oldC = GUI.color;
-                    GUI.color = new Color(1f, 1f, 1f, a);
-                    Rect r = new Rect(x, y - h, w, h);
-                    GUI.Box(r, GUIContent.none, box);
-                    GUI.Label(new Rect(r.x + Sc(8f), r.y + Sc(6f), r.width - Sc(16f), r.height - Sc(12f)), c, st);
-                    GUI.color = oldC;
-                    y -= h + Sc(4f);
-                }
-            } catch { }
-        }
-
-
         private class ManagerUI : MonoBehaviour {
             private bool _startup;
 
@@ -710,7 +647,6 @@ public partial class SR {
                 Guard.Try("绘制面板", () => SR.DrawGUI());
                 // 滚轮仲裁收口：必须在 DrawGUI 之后（界面件已处理完本帧滚轮，Input 读轴的缩放才不会抢滚轮）。
                 Guard.Try("滚轮收口", () => SR.PostGuiWheel());
-                Guard.Try("提示绘制", () => SR.DrawToasts());
                 // 点在下拉框以外 = 收起展开的下拉框：判据是"MouseDown 这一帧无下拉框认领"，不靠坐标
                 // （下拉框矩形在滚动区内容坐标系里）。放在 DrawGUI 之后，按钮自身切换已跑完。
                 Event __ce = Event.current;

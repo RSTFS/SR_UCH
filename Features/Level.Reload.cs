@@ -32,8 +32,7 @@ namespace SR_UCH.Tweaks {
 		// 两个入口共用的防重入判定：重载中提示并拦下，锁残留则放锁放行本次操作。
 		private static bool ReloadBlocked()
 		{
-			if (!_reloadBusy) return false;
-			// 其它功能（布局预设）正在重载时同样拦下，避免两套重载并发。
+			// 先查对方：自己准备动手时，布局预设正在加载就必须拦下（对方忙时自己也要等）。
 			try {
 				Func<bool> other = Slots.Require<Func<bool>>("presets.reloadBusy");
 				if (other != null && other()) {
@@ -41,6 +40,7 @@ namespace SR_UCH.Tweaks {
 					return true;
 				}
 			} catch (Exception __ex) { SRApi.Guard.Log("重载互斥检查", __ex); }
+			if (!_reloadBusy) return false;
 			if (ReloadLockStuck()) {
 				SetReloadBusy(false);
 				SRApi.LogWarn("[重载] 检测到残留的忙碌锁（超过 45 秒未复位），已自动放锁");

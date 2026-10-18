@@ -168,6 +168,9 @@ namespace SR_UCH.Tweaks {
 					"内部状态：预设列表列顺序（逗号分隔的列索引，由表头拖动自动写入）。");
 				_colHiddenEntry = plugin.Config.Bind(Section, ColHiddenKey, "",
 					"内部状态：预设列表隐藏列（逗号分隔的列索引，右键表头隐藏后自动写入）。");
+				// 互斥槽位：关卡重载（Level 功能）动手前会 Require 这个槽位；双方都忙时互相拦下，避免两套重载并发。
+				try { Slots.Provide("presets.reloadBusy", (Func<bool>)(() => _reloadBusy)); }
+				catch (Exception __sx) { SRApi.Guard.Log("布局预设/登记重载互斥槽位", __sx); }
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设 初始化", __ex);
 			}
@@ -1932,8 +1935,7 @@ namespace SR_UCH.Tweaks {
 
 		private static bool ReloadBlocked() {
 			try {
-				if (!_reloadBusy) return false;
-				// 关卡重载正在进行时拦下，避免与 Level 的重载并发。
+				// 先查对方：自己准备动手时，关卡重载正在跑就必须拦下（对方忙时自己也要等）。
 				try {
 					Func<bool> other = Slots.Require<Func<bool>>("level.reloadBusy");
 					if (other != null && other()) {
@@ -1941,6 +1943,7 @@ namespace SR_UCH.Tweaks {
 						return true;
 					}
 				} catch (Exception __ex) { SRApi.Guard.Log("预设/重载互斥检查", __ex); }
+				if (!_reloadBusy) return false;
 				if (_reloadBusyAt >= 0f && Time.unscaledTime - _reloadBusyAt > ReloadLockStale) {
 					SetReloadBusy(false);
 					SRApi.LogWarn("[布局预设] 检测到残留的忙碌锁（超过 45 秒未复位），已自动放锁");
