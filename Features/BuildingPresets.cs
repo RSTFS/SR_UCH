@@ -1414,8 +1414,8 @@ namespace SR_UCH.Tweaks {
 					if (!ConfirmOrArm("replace:" + p.Key)) {
 						_status = SRApi.T("将替换关卡：", "Level will be replaced: ") + LevelDisplayNameForScene(activeScene)
 							+ SRApi.T(" → ", " -> ") + LevelDisplayNameForScene(presetScene)
-							+ SRApi.T("；5 秒内再点一次「确认」执行（联机时会先结束当前对局回到树屋再进入该关卡）",
-								"; click Confirm again within 5 seconds (online: the current match ends and returns to the treehouse before entering that level)");
+							+ SRApi.T("；5 秒内再点一次「确认」执行",
+								"; click Confirm again within 5 seconds");
 						SRApi.Notify(_status);
 						return;
 					}

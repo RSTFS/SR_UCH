@@ -175,6 +175,11 @@ namespace SR_UCH.Tweaks {
 		private static string _levelText;
 		private static string _winText;
 		private static int _lastRound;
+		// 真实回合：GameControl.RoundNumber 会在重载/刷新派对盒时被额外 +1，用“结算记分板”事件
+		// 作为“确实进入下一回合”的证据；未确认的增量先挂起，达到上限时钳制显示。
+		private static int _trueRound;
+		private static int _roundPending;
+		private static bool _roundTallySeen;
 		private static bool _vsPlaceSeen;
 
 		// ---- 树屋/大厅 ----
@@ -201,6 +206,7 @@ namespace SR_UCH.Tweaks {
 		private static readonly string[] _segText = new string[16];
 		private static readonly Color[] _segColor = new Color[16];
 		private static readonly float[] _segW = new float[16];
+		private static readonly float[] _segWSmooth = new float[16];
 		private static readonly int[] _segRow = new int[16];
 		private static readonly float[] _segX = new float[16];
 		private static int _segCount;
@@ -244,6 +250,7 @@ namespace SR_UCH.Tweaks {
 		private static readonly Color[] _hudColors = new Color[24];
 		private static readonly float[] _hudFade = new float[24];
 		private static readonly float[] _hudHeights = new float[24];
+		private static int _heightFrame = -1;   // 行高平滑每帧只推进一次
 		private static float _hudW = 260f;
 		private static float _hudH = 150f;
 		// Custom 布局位置：运行期内存，会话内保持，不写配置。
@@ -379,7 +386,6 @@ namespace SR_UCH.Tweaks {
 			SRApi.RegisterPage(Sec, "hud", "HUD", "HUD", 10, RenderPage1);
 			SRApi.RegisterPage(Sec, "content", "显示内容", "Content", 20, RenderPage2);
 			SRApi.RegisterPage(Sec, "players", "玩家面板", "Player panel", 30, RenderPage3);
-			SRApi.RegisterPage(Sec, "treehouse", "树屋面板", "Treehouse", 40, RenderPage4);
 
 			Loc("Enabled", "显示HUD", "Show HUD",
 				"HUD 总开关\n关闭后完全不绘制 HUD\n纯本地只读，不发送任何网络消息",
@@ -520,127 +526,6 @@ namespace SR_UCH.Tweaks {
 				SRApi.Ctl.SectionTitle(SRApi.T("- 显示列 -", "- Columns -"));
 				for (int i = 0; i < _panelCols.Length; i++) RenderContentRow(_panelCols[i]);
 			} catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 玩家面板页", __ex); }
-		}
-
-		// 只读信息行（自动换行，避免长关卡名/代码超出面板宽度）。
-		private static void InfoLine(string text) {
-			try {
-				if (string.IsNullOrEmpty(text)) return;
-				GUILayout.Label(text, SRApi.Ctl.LabelWrap);
-			} catch {
-				try { GUILayout.Label(text); } catch { }
-			}
-		}
-
-		// 第四页：树屋面板（只读）。
-		private static void RenderPage4() {
-			try {
-				SRApi.Ctl.SectionTitle(SRApi.T("- 树屋面板 -", "- Treehouse -"));
-				bool inTree = false;
-				try { inTree = SRApi.Env.InTreehouse; } catch { inTree = false; }
-				if (!inTree) {
-					InfoLine(SRApi.T("当前不在树屋/大厅。", "Not in the treehouse/lobby."));
-					return;
-				}
-				GameSettings gs = ReadSettings();
-				LobbyManager lm = LobbyManager.instance;
-				LevelSelectController lsc = (lm != null) ? lm.CurrentLevelSelectController : null;
-
-				// 模式
-				string mode = (gs != null) ? ModeName(gs.GameMode) : null;
-				InfoLine(SRApi.T("模式：", "Mode: ") + (string.IsNullOrEmpty(mode) ? "?" : mode));
-
-				// 大厅玩家
-				SRApi.Ctl.SectionTitle(SRApi.T("- 大厅玩家 -", "- Lobby players -"));
-				int count = 0;
-				if (lm != null) {
-					foreach (LobbyPlayer lp in lm.GetLobbyPlayers()) {
-						if (lp == null) continue;
-						count++;
-						string name = LobbyPlayerName(lp);
-						string animal = null;
-						try { animal = AnimalName(lp.PickedAnimal, lp.IsWearingSkin); } catch { animal = null; }
-						string host = "";
-						try { if (lp.IsHost) host = SRApi.T(" [房主]", " [HOST]"); } catch { host = ""; }
-						int num = 0;
-						try { num = lp.networkNumber; } catch { num = 0; }
-						InfoLine("#" + num + " " + name + (string.IsNullOrEmpty(animal) ? "" : " · " + animal) + host);
-					}
-				}
-				if (count == 0) InfoLine(SRApi.T("暂无玩家", "No players"));
-
-				// 已投票关卡（得票数）
-				SRApi.Ctl.SectionTitle(SRApi.T("- 投票关卡 -", "- Voted levels -"));
-				int voteLines = 0;
-				if (lsc != null) {
-					if (lsc.portals != null) {
-						for (int i = 0; i < lsc.portals.Length; i++) {
-							LevelPortal p = lsc.portals[i];
-							if (p == null || p.Votes == null || p.Votes.Count <= 0) continue;
-							InfoLine(PortalName(p) + " ×" + p.Votes.Count);
-							voteLines++;
-						}
-					}
-					if (lsc.snapshotPortals != null) {
-						for (int i = 0; i < lsc.snapshotPortals.Length; i++) {
-							LevelPortal p = lsc.snapshotPortals[i];
-							if (p == null || p.Votes == null || p.Votes.Count <= 0) continue;
-							InfoLine(PortalName(p) + " ×" + p.Votes.Count);
-							voteLines++;
-						}
-					}
-				}
-				if (voteLines == 0) InfoLine(SRApi.T("暂无投票", "No votes yet"));
-
-				// 当前选中关卡（含自定义关卡名/代码）
-				SRApi.Ctl.SectionTitle(SRApi.T("- 当前选中关卡 -", "- Selected level -"));
-				int leadVotes;
-				LevelPortal lead = FindLeadingPortal(lm, out leadVotes);
-				string level = null;
-				string code = null;
-				if (lead != null) { level = PortalName(lead); code = PortalCode(lead); }
-				else { level = CurrentLevelName(out code); }
-				if (!string.IsNullOrEmpty(level)) {
-					string line = SRApi.T("关卡：", "Level: ") + level;
-					if (!string.IsNullOrEmpty(code)) line += SRApi.T("（代码 ", " (code ") + code + ")";
-					InfoLine(line);
-				} else {
-					InfoLine(SRApi.T("未知", "Unknown"));
-				}
-
-				// 开局提示
-				SRApi.Ctl.SectionTitle(SRApi.T("- 开局提示 -", "- Can start -"));
-				int minPlayers = 1;
-				try { if (lsc != null && lsc.MinPlayers > 0) minPlayers = lsc.MinPlayers; } catch { minPlayers = 1; }
-				bool canStart = count > 0 && count >= minPlayers;
-				if (canStart) {
-					InfoLine(SRApi.T("可开局：当前 ", "Can start: ") + count + SRApi.T(" 人（至少 ", " players (min ") + minPlayers + SRApi.T(" 人）", " players)"));
-				} else {
-					InfoLine(SRApi.T("暂不可开局：至少需要 ", "Cannot start yet: need at least ") + minPlayers
-						+ SRApi.T(" 人，当前 ", " players, currently ") + count + SRApi.T(" 人", " players"));
-				}
-			} catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 树屋面板页", __ex); }
-		}
-
-		private static string LobbyPlayerName(LobbyPlayer lp) {
-			string name = null;
-			try { name = lp.playerName; } catch { }
-			if (string.IsNullOrEmpty(name)) { try { name = lp.ValidatedDisplayName; } catch { } }
-			if (!string.IsNullOrEmpty(name)) name = name.Trim();
-			int num = 0;
-			try { num = lp.networkNumber; } catch { num = 0; }
-			if (string.IsNullOrEmpty(name)) name = "P" + num;
-			return SafeText(Truncate(name, 16));
-		}
-
-		private static string PortalCode(LevelPortal p) {
-			try {
-				CustomLevelPortal cp = p as CustomLevelPortal;
-				if (cp != null && cp.snapshotInfo != null && !string.IsNullOrEmpty(cp.snapshotInfo.code)) {
-					return Truncate(cp.snapshotInfo.code, 24);
-				}
-			} catch { }
-			return null;
 		}
 
 		// 仅开关的行（无颜色）。
@@ -920,7 +805,12 @@ namespace SR_UCH.Tweaks {
 				StartPhaseEvent start = e as StartPhaseEvent;
 				if (start != null) { OnPhaseStarted(__instance, start.Phase); return; }
 				EndPhaseEvent end = e as EndPhaseEvent;
-				if (end != null) { OnPhaseEnded(end.Phase); }
+				if (end != null) { OnPhaseEnded(end.Phase); return; }
+				ScoreboardEvent sb = e as ScoreboardEvent;
+				if (sb != null) {
+					// 记分板出现/结算完成 = 本回合确实推进过，可作为“真实回合”增量的证据。
+					try { if (sb.Showing || sb.AfterTally) _roundTallySeen = true; } catch { }
+				}
 			} catch (Exception __ex) { SRApi.Guard.Log("HUD 阶段事件", __ex); }
 		}
 
@@ -953,6 +843,9 @@ namespace SR_UCH.Tweaks {
 					_phase = GameControl.GamePhase.NONE;
 					_phaseStart = Time.unscaledTime;
 					_lastRound = 0;
+					_trueRound = 0;
+					_roundPending = 0;
+					_roundTallySeen = false;
 				}
 				LobbyManager lm = LobbyManager.instance;
 				GameControl gc = (lm != null) ? lm.CurrentGameController : null;
@@ -982,6 +875,9 @@ namespace SR_UCH.Tweaks {
 					_timerText = "00:00";
 					_warnLevel = 0;
 					_lastRound = 0;
+					_trueRound = 0;
+					_roundPending = 0;
+					_roundTallySeen = false;
 				}
 				if (!_eventSeen) {
 					GameControl.GamePhase p = gc.Phase;
@@ -1000,7 +896,7 @@ namespace SR_UCH.Tweaks {
 				UpdateWin(gs);
 				UpdatePanel(gc);
 				UpdateExtraText();
-				UpdateRoundNotice(gc);
+				UpdateRoundNotice();
 				UpdateVisible();
 			} catch (Exception __ex) { SRApi.Guard.Log("HUD 状态更新", __ex); }
 		}
@@ -1039,11 +935,18 @@ namespace SR_UCH.Tweaks {
 			return 1f - inv * inv * inv;
 		}
 
-		// 内容行依次淡入：每行延迟 30ms，0.2s 完成。
+		// 内容行依次淡入：每行延迟 20ms，0.2s 完成。
 		private static float StaggerAlpha(int index) {
 			if (_hudShownAt <= 0f) return 1f;
-			float x = (Time.unscaledTime - _hudShownAt - index * 0.03f) / 0.2f;
+			float x = (Time.unscaledTime - _hudShownAt - index * 0.02f) / 0.2f;
 			return EaseOut(x);
+		}
+
+		// 位移动画与 alpha 分离：位移用 0.25s 的独立 ease-out 进度。
+		private static float StaggerOffset(int index) {
+			if (_hudShownAt <= 0f) return 1f;
+			float x = (Time.unscaledTime - _hudShownAt - index * 0.02f) / 0.25f;
+			return 1f - EaseOut(x);
 		}
 
 		private static GameSettings ReadSettings() {
@@ -1111,15 +1014,45 @@ namespace SR_UCH.Tweaks {
 		}
 
 		// 回合进度格式：「回合：当前/最大」。
+		// 游戏里唯一的回合字段是 GameControl.roundNumber（protected；属性 RoundNumber），
+		// 只在 VersusControl.ToPlaceMode（反编译行 144554）/ ChallengeControl（122107）里 ++；
+		// GameState / ScoreKeeper 都没有回合字段（已全量检索）。该值会被场景重载/刷新派对盒额外 +1，
+		// 因此这里只在“观察到回合结算记分板”后接受增量，未确认的增量挂起；并钳制 ≤ MaxRounds。
 		private static void UpdateRound(GameControl gc, GameSettings gs) {
 			try {
-				int round = gc.RoundNumber;
-				if (round <= 0) { _roundText = null; return; }
+				int candidate = gc.RoundNumber;
+				if (candidate < _trueRound) {
+					// 新对局/重载回退：以较小值重新开始
+					_trueRound = candidate;
+					_roundPending = 0;
+					_roundTallySeen = false;
+				}
+				if (_trueRound <= 0 && candidate > 0) {
+					// 首回合直接接受
+					_trueRound = candidate;
+					_roundPending = 0;
+				} else if (candidate > _trueRound) {
+					if (candidate == _trueRound + 1 && _roundTallySeen) {
+						_trueRound = candidate;
+						_roundPending = 0;
+						_roundTallySeen = false;
+					} else if (candidate > _roundPending) {
+						_roundPending = candidate;   // 未确认（可能是重载/刷新派对盒的额外 +1）
+					}
+				}
+				if (_roundTallySeen && _roundPending > _trueRound) {
+					// 结算已发生：接受此前挂起的真实回合
+					_trueRound = _roundPending;
+					_roundPending = 0;
+					_roundTallySeen = false;
+				}
+				if (_trueRound <= 0) { _roundText = null; return; }
 				int max = 0;
 				try { if (gs != null) max = gs.MaxRounds; } catch { max = 0; }
+				int shown = max > 0 ? Mathf.Min(_trueRound, max) : _trueRound;
 				_roundText = max > 0
-					? SRApi.T("回合：", "Round: ") + round + "/" + max
-					: SRApi.T("回合：", "Round: ") + round;
+					? SRApi.T("回合：", "Round: ") + shown + "/" + max
+					: SRApi.T("回合：", "Round: ") + shown;
 			} catch { _roundText = null; }
 		}
 
@@ -1169,9 +1102,9 @@ namespace SR_UCH.Tweaks {
 			_winText = SRApi.T("获胜：", "Win: ") + target;
 		}
 
-		private static void UpdateRoundNotice(GameControl gc) {
+		private static void UpdateRoundNotice() {
 			try {
-				int round = gc.RoundNumber;
+				int round = _trueRound;
 				if (round <= 0 || round == _lastRound) return;
 				_lastRound = round;
 				if (!RoundNoticeOn()) return;
@@ -1475,6 +1408,12 @@ namespace SR_UCH.Tweaks {
 			_inLobby = false;
 			_lobbyVote = null;
 			for (int i = 0; i < _lineLast.Length; i++) { _lineLast[i] = null; _lineShownAt[i] = 0f; }
+			for (int i = 0; i < _hudHeights.Length; i++) _hudHeights[i] = 0f;
+			for (int i = 0; i < _segWSmooth.Length; i++) _segWSmooth[i] = 0f;
+			_heightFrame = -1;
+			_trueRound = 0;
+			_roundPending = 0;
+			_roundTallySeen = false;
 			_dragging = false;
 		}
 
@@ -1618,17 +1557,16 @@ namespace SR_UCH.Tweaks {
 			_segCount++;
 		}
 
-		// 回合提示：大号 + 1.0→1.15 缩放 + 颜色交替闪烁 + 末尾淡出，约 1.5 秒。
+		// 回合提示：固定大号字 + 颜色交替闪烁 + 末尾淡出，约 1.5 秒（无缩放/位移）。
 		private static void AddRoundNoticeLine(ref int n, float textA) {
 			if (!RoundNoticeOn() || string.IsNullOrEmpty(_roundNoticeText)) return;
 			float t = (Time.unscaledTime - _roundNoticeStart) / RoundNoticeDuration;
 			if (t < 0f || t >= 1f) return;
-			float scale = 1f + 0.15f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t));   // 1.0 → 1.15 → 1.0
 			bool bright = (Mathf.FloorToInt(Time.unscaledTime * 8f) & 1) == 0;
 			float fade = t < 0.7f ? 1f : Mathf.Clamp01(1f - (t - 0.7f) / 0.3f);
 			if (_roundNoticeStyle != null) {
 				float baseSize = (float)FontSize() * SRApi.Ctl.Sc(1.7f);
-				_roundNoticeStyle.fontSize = Mathf.Max(12, Mathf.RoundToInt(baseSize * scale));
+				_roundNoticeStyle.fontSize = Mathf.Max(12, Mathf.RoundToInt(baseSize));
 			}
 			Color c = bright ? Color.white : new Color(1f, 0.85f, 0.3f, 1f);
 			AddLineFade(ref n, _roundNoticeText, null, LineRoundNotice, WithA(c, textA * fade), fade);
@@ -1747,7 +1685,12 @@ namespace SR_UCH.Tweaks {
 				_segRowsW = 0f;
 				for (int i = 0; i < _segCount; i++) {
 					float w = Measure(_segText[i], _smallStyle) + segPad * 2f;
-					_segW[i] = w;
+					// 小段宽度平滑（文本每秒变化时避免整行重排跳变）。
+					if (_heightFrame != Time.frameCount) {
+						if (_segWSmooth[i] <= 0f) _segWSmooth[i] = w;
+						else _segWSmooth[i] = Mathf.MoveTowards(_segWSmooth[i], w, SRApi.Ctl.Sc(480f) * Time.unscaledDeltaTime);
+					}
+					_segW[i] = _segWSmooth[i] > 0f ? _segWSmooth[i] : w;
 					if (rowW > 0f && rowW + segGap + w > maxRowW) { row++; rowW = 0f; }
 					if (rowW > 0f) rowW += segGap;
 					_segRow[i] = row;
@@ -1776,9 +1719,16 @@ namespace SR_UCH.Tweaks {
 					try { th = SRApi.Ctl.TextHeight(_hudPlain[i], textW); } catch { th = 0f; }
 					if (th <= 0f) th = (st != null ? st.fontSize : 14);
 				}
-				_hudHeights[i] = th;   // 行高 = 文本高 + 0
-				contentH += th;
+				// 行高平滑：文本变化导致的高度差用 MoveTowards 过渡，避免整块 HUD 突然重排跳变。
+				if (_hudKinds[i] == LineRoundNotice) {
+					_hudHeights[i] = th;   // 回合提示只有 1.5s，高度直接到位
+				} else if (_heightFrame != Time.frameCount) {
+					if (_hudHeights[i] <= 0f) _hudHeights[i] = th;
+					else _hudHeights[i] = Mathf.MoveTowards(_hudHeights[i], th, SRApi.Ctl.Sc(160f) * Time.unscaledDeltaTime);
+				}
+				contentH += _hudHeights[i];
 			}
+			_heightFrame = Time.frameCount;
 			float panelH = contentH + pad * 2f + segBlockH + ((segBlockH > 0f && n > 0) ? rowGap : 0f);
 			_hudW = panelW;
 			_hudH = panelH;
@@ -1817,7 +1767,7 @@ namespace SR_UCH.Tweaks {
 						if (_segRow[i] != r) continue;
 						float easeSeg = StaggerAlpha(i);
 						if (easeSeg <= 0.001f) continue;
-						Rect sr = new Rect(panel.x + pad + _segX[i], ty + (1f - easeSeg) * SRApi.Ctl.Sc(3f), _segW[i], segH);
+						Rect sr = new Rect(panel.x + pad + _segX[i], ty + StaggerOffset(i) * SRApi.Ctl.Sc(3f), _segW[i], segH);
 						GUI.color = new Color(1f, 1f, 1f, 0.10f * easeSeg);   // 小段自身底色（比整块底稍亮）
 						GUI.DrawTexture(sr, _white);
 						GUI.color = Color.white;
@@ -1836,9 +1786,10 @@ namespace SR_UCH.Tweaks {
 				if (st == null) { ty += _hudHeights[i]; continue; }
 				float lh = _hudHeights[i];
 				float easeLine = StaggerAlpha(i + _segCount);
-				float yOff = (1f - easeLine) * SRApi.Ctl.Sc(3f);
-				Rect lr = new Rect(panel.x + pad, ty + yOff, tw, lh);
 				int kind = _hudKinds[i];
+				// 回合提示只闪烁，不做位移；普通行位移用独立的 ease-out 进度。
+				float yOff = kind == LineRoundNotice ? 0f : StaggerOffset(i + _segCount) * SRApi.Ctl.Sc(3f);
+				Rect lr = new Rect(panel.x + pad, ty + yOff, tw, lh);
 				if (kind == LinePanel) {
 					st.normal.textColor = Color.white;
 					Color old = GUI.color;
