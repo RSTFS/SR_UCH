@@ -1179,6 +1179,7 @@ namespace SR_UCH.Tweaks {
 				}
 				_status = SRApi.T("已导出到剪贴板：", "Exported to clipboard: ") + p.Name;
 				SRApi.LogInfo("[布局预设] " + _status);
+				SRApi.Notify(_status);   // 导出是显式操作，给屏幕提示
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/导出", __ex);
 			}
