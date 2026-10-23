@@ -58,7 +58,7 @@ namespace SR_UCH.Tweaks {
 			new ContentDef {
 				Key = "Show Round", ColorKey = "Color Round",
 				LabelZh = "回合进度", LabelEn = "Round progress",
-				DescZh = "显示回合进度\n显示格式为「回合：当前/最大」，最大回合取游戏设置\n取不到回合信息时隐藏该行",
+				DescZh = "显示回合/重试进度\n普通模式显示「回合：当前/最大」，最大回合取游戏设置；挑战模式显示「重试：N」且无上限\n取不到回合信息时隐藏该行",
 				DescEn = "show round progress\ndisplays \"Round: current/max\", with max taken from game settings\nhidden when round info is unavailable"
 			},
 			new ContentDef {
@@ -1013,6 +1013,16 @@ namespace SR_UCH.Tweaks {
 			}
 		}
 
+		// 挑战模式叫「重试」（无上限），其它模式叫「回合」（有上限）。
+		private static bool IsChallengeMode() {
+			try { GameSettings gs = GameSettings.GetInstance(); return gs != null && gs.GameMode == GameState.GameMode.CHALLENGE; }
+			catch { return false; }
+		}
+
+		private static string RoundWord() {
+			return IsChallengeMode() ? SRApi.T("重试：", "Retry: ") : SRApi.T("回合：", "Round: ");
+		}
+
 		// 回合进度格式：「回合：当前/最大」。
 		// 游戏里唯一的回合字段是 GameControl.roundNumber（protected；属性 RoundNumber），
 		// 只在 VersusControl.ToPlaceMode（反编译行 144554）/ ChallengeControl（122107）里 ++；
@@ -1021,6 +1031,16 @@ namespace SR_UCH.Tweaks {
 		private static void UpdateRound(GameControl gc, GameSettings gs) {
 			try {
 				int candidate = gc.RoundNumber;
+				// 挑战模式：每死一次 = 一次重试，没有「回合上限」概念，也不发结算记分板事件。
+				// 直接采用游戏自身的 roundNumber（避免被“结算证据”门槛卡住），只显示「重试：N」。
+				if (IsChallengeMode()) {
+					if (candidate <= 0) { _roundText = null; return; }
+					_trueRound = candidate;
+					_roundPending = 0;
+					_roundTallySeen = false;
+					_roundText = RoundWord() + candidate;
+					return;
+				}
 				if (candidate < _trueRound) {
 					// 新对局/重载回退：以较小值重新开始
 					_trueRound = candidate;
@@ -1051,8 +1071,8 @@ namespace SR_UCH.Tweaks {
 				try { if (gs != null) max = gs.MaxRounds; } catch { max = 0; }
 				int shown = max > 0 ? Mathf.Min(_trueRound, max) : _trueRound;
 				_roundText = max > 0
-					? SRApi.T("回合：", "Round: ") + shown + "/" + max
-					: SRApi.T("回合：", "Round: ") + shown;
+					? RoundWord() + shown + "/" + max
+					: RoundWord() + shown;
 			} catch { _roundText = null; }
 		}
 
@@ -1108,7 +1128,7 @@ namespace SR_UCH.Tweaks {
 				if (round <= 0 || round == _lastRound) return;
 				_lastRound = round;
 				if (!RoundNoticeOn()) return;
-				_roundNoticeText = SRApi.T("回合：", "Round: ") + round;
+				_roundNoticeText = RoundWord() + round;
 				_roundNoticeStart = Time.unscaledTime;
 			} catch { }
 		}
