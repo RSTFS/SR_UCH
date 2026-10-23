@@ -969,7 +969,7 @@ public partial class SR : ITweak {
                     if (r != 0) return r;
                     return _navOrder.IndexOf(a).CompareTo(_navOrder.IndexOf(b)); // 同顺序值：按注册先后
                 });
-                // 已在底栏注册按钮的栏目不再出现在左栏（如配置工具）
+                // 已在底栏注册按钮的栏目不再出现在左栏
                 for (int i = 0; i < SRApi.FooterButtons.Count; i++) {
                     string fb = SRApi.FooterButtons[i] != null ? SRApi.FooterButtons[i].Id : null;
                     if (!string.IsNullOrEmpty(fb)) registered.Remove(fb);

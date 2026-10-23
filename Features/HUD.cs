@@ -226,6 +226,8 @@ namespace SR_UCH.Tweaks {
 		private static FieldInfo _fPlacementTimer;
 		private static FieldInfo _fLevelTimer;
 		private static FieldInfo _fCountdownTimer;
+		private static FieldInfo _fChallengeRunTime;
+		private static FieldInfo _fChallengeRunStarted;
 
 		// ---- HUD 绘制 ----
 		private static GUIStyle _phaseStyle;
@@ -371,6 +373,8 @@ namespace SR_UCH.Tweaks {
 			SRApi.Ref.Override("VersusControl.placementTimer", "HUD（建造阶段剩余时间）");
 			SRApi.Ref.Override("VersusControl.levelTimer", "HUD（对局已用时间）");
 			SRApi.Ref.Override("VersusControl.countdownTimer", "HUD（决胜倒计时）");
+			SRApi.Ref.Override("ChallengeControl.runTime", "HUD（挑战计时）");
+			SRApi.Ref.Override("ChallengeControl.runStarted", "HUD（挑战是否已开始）");
 			// 枚举下拉框的中文显示名（英文模式仍显示枚举原名）。
 			SRApi.LocEnum("TopLeft", "左上");
 			SRApi.LocEnum("TopRight", "右上");
@@ -954,6 +958,9 @@ namespace SR_UCH.Tweaks {
 		}
 
 		private static void UpdateTimer(GameControl gc, GameSettings gs) {
+			// 挑战模式：计时以游戏自己的 runTime 为准，按空格开始前（runStarted=false）不计数。
+			if (IsChallengeMode()) { UpdateChallengeTimer(gc); return; }
+
 			float elapsed = Mathf.Max(0f, Time.unscaledTime - _phaseStart);
 			float remaining = -1f;
 			bool countdown = false;
@@ -1388,6 +1395,40 @@ namespace SR_UCH.Tweaks {
 				object v = f.GetValue(owner);
 				return (v is float) ? (float)v : -1f;
 			} catch { return -1f; }
+		}
+
+		// 挑战模式计时：读游戏 ChallengeControl 的私有字段 runTime / runStarted（反射缓存，读不到返回 -1/false）。
+		private static void UpdateChallengeTimer(GameControl gc) {
+			try {
+				ChallengeControl cc = gc as ChallengeControl;
+				float run = -1f;
+				bool started = false;
+				if (cc != null) {
+					run = ReadFloatOn(ref _fChallengeRunTime, typeof(ChallengeControl), cc, "runTime", "HUD（挑战计时）");
+					started = ReadBoolOn(ref _fChallengeRunStarted, typeof(ChallengeControl), cc, "runStarted", "HUD（挑战是否已开始）");
+				}
+				if (run < 0f) {
+					float elapsed = Mathf.Max(0f, Time.unscaledTime - _phaseStart);
+					_timerText = FormatClock(started ? Mathf.FloorToInt(elapsed) : 0);
+				} else {
+					_timerText = FormatClock(Mathf.FloorToInt(started ? run : 0f));
+				}
+				_warnLevel = 0;
+			} catch (Exception __ex) { SRApi.Guard.Log("HUD/挑战计时", __ex); _timerText = null; }
+		}
+
+		private static float ReadFloatOn(ref FieldInfo f, System.Type ownerType, object owner, string name, string feature) {
+			if (owner == null || ownerType == null) return -1f;
+			if (f == null) { try { f = SRApi.Ref.Field(ownerType, name, feature); } catch { f = null; } }
+			if (f == null) return -1f;
+			try { object v = f.GetValue(owner); return (v is float) ? (float)v : -1f; } catch { return -1f; }
+		}
+
+		private static bool ReadBoolOn(ref FieldInfo f, System.Type ownerType, object owner, string name, string feature) {
+			if (owner == null || ownerType == null) return false;
+			if (f == null) { try { f = SRApi.Ref.Field(ownerType, name, feature); } catch { f = null; } }
+			if (f == null) return false;
+			try { object v = f.GetValue(owner); return (v is bool) && (bool)v; } catch { return false; }
 		}
 
 		private static string FormatClock(int totalSeconds) {

@@ -34,7 +34,8 @@ namespace SR_UCH.Tweaks {
 		private const int ColTime = 3;
 		private const int ColAction = 4;
 		private const int ColCount = 5;
-		// 列宽（设计单位）默认值与允许范围；顺序与 Col* 一致（操作列也持久化宽度）。
+		// 列宽（设计单位）默认值与允许范围；顺序与 Col* 一致。
+		// 操作列的实际默认宽由 DefaultActionColW() 按当前语言按钮文字实时计算（DefColW[ColAction] 仅作兜底）。
 		private static readonly float[] DefColW = new float[] { 150f, 84f, 64f, 96f, 200f };
 		private const float ColWidthMin = 40f;
 		private const float ColWidthMax = 600f;
@@ -88,7 +89,7 @@ namespace SR_UCH.Tweaks {
 		// 模式筛选（运行期状态，不落配置）："" = 全部；否则为预设目录名（GameState.GameMode 的 ToString）。
 		private static string _modeFilter = "";
 		private static bool _modeFilterOpen;
-		// 加载模式（运行期状态，不落配置）："" = 原生（跟随预设自身保存的模式，保持原有行为）；
+		// 加载模式（运行期状态，不落配置）："" = 默认（跟随预设自身保存的模式，保持原有行为）；
 		// 否则为 GameState.GameMode 的 ToString，加载/重载时强制使用该模式。
 		private static string _loadMode = "";
 		private static bool _loadModeOpen;
@@ -107,6 +108,7 @@ namespace SR_UCH.Tweaks {
 		private static readonly List<Rect> _pinRects = new List<Rect>();
 		private static readonly List<int> _pinRows = new List<int>();
 		// 操作列按钮描述（复用对象，避免逐行分配）：布局 / 命中 / 悬浮统一交给核心 SRApi.TableActionButtons。
+		// 不传固定宽度（widths = null）：核心按当前语言文字宽自适应，避免英文标签被截断。
 		private static PresetInfo _actPreset;
 		private static readonly SRApi.TableAction[] _actActions = new SRApi.TableAction[] {
 			new SRApi.TableAction { OnClick = DoActLoad },
@@ -114,7 +116,6 @@ namespace SR_UCH.Tweaks {
 			new SRApi.TableAction { OnClick = DoActExport },
 			new SRApi.TableAction { OnClick = DoActDelete }
 		};
-		private static readonly float[] _actWidths = new float[] { 34f, 46f, 34f, 34f };
 		private static readonly string[] _cells = new string[ColCount];
 		private static SRApi.TableArgs _args;
 		private static Vector2 _scrollRows;
@@ -336,7 +337,7 @@ namespace SR_UCH.Tweaks {
 				Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
 				if (Event.current != null && Event.current.type == EventType.Layout) { _pageTopY = topProbe.y; _pageTopYSet = true; }
 
-				// 分区 1：保存（名称 + 保存 + 刷新，紧凑一行）。
+				// 分区 1：保存（名称 + 保存，紧凑一行）。
 				SRApi.Ctl.SectionTitle(SRApi.T("- 保存 -", "- Save -"));
 				GUILayout.BeginHorizontal();
 				try {
@@ -346,17 +347,11 @@ namespace SR_UCH.Tweaks {
 					if (typed != null && typed != _newName) _newName = typed;
 					if (GUILayout.Button(SaveButtonText(), SRApi.Ctl.Btn, GUILayout.Width(W(120)), GUILayout.Height(W(24)))) SaveCurrent();
 					GUILayout.FlexibleSpace();
-					if (GUILayout.Button(new GUIContent(SRApi.T("刷新", "Refresh"),
-							SRApi.T("重新扫描预设目录（手动放入/删除了 XML 时用），也用于重建索引",
-								"rescan the presets folder (after manually adding/removing XML files) and rebuild the index")),
-						SRApi.Ctl.Btn, GUILayout.Width(W(56)), GUILayout.Height(W(24)))) {
-						try { _loaded = false; LoadFromDisk(true); } catch (Exception __rx) { SRApi.Guard.Log("布局预设/刷新列表", __rx); }
-					}
 				} finally {
 					GUILayout.EndHorizontal();
 				}
 
-				// 分区 2：导入 / 导出（XML 路径与导入一行；导出全部 / 复制清单一行）。
+				// 分区 2：导入 / 导出（XML 路径单独一行；下一行为 路径导入 / 剪贴板导入 / 全部导出）。
 				SRApi.Ctl.SectionTitle(SRApi.T("- 导入 / 导出 -", "- Import / Export -"));
 				GUILayout.BeginHorizontal();
 				try {
@@ -364,23 +359,20 @@ namespace SR_UCH.Tweaks {
 					string path = SRApi.ClearableTextField(_importPath ?? "", 260, SRApi.Ctl.SearchBox,
 						GUILayout.Width(W(300)), GUILayout.Height(W(24)));
 					if (path != null && path != _importPath) _importPath = path;
-					if (GUILayout.Button(SRApi.T("从路径导入", "Import path"), SRApi.Ctl.Btn,
-						GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ImportFromPath();
-					if (GUILayout.Button(SRApi.T("从剪贴板导入", "Import clipboard"), SRApi.Ctl.Btn,
-						GUILayout.Width(W(120)), GUILayout.Height(W(24)))) ImportFromClipboard();
+					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
 				}
 				GUILayout.BeginHorizontal();
 				try {
+					if (GUILayout.Button(SRApi.T("从路径导入", "Import path"), SRApi.Ctl.Btn,
+						GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ImportFromPath();
+					if (GUILayout.Button(SRApi.T("从剪贴板导入", "Import clipboard"), SRApi.Ctl.Btn,
+						GUILayout.Width(W(120)), GUILayout.Height(W(24)))) ImportFromClipboard();
 					if (GUILayout.Button(new GUIContent(SRApi.T("全部导出到目录", "Export all to folder"),
 						SRApi.T("把所有预设 XML 复制到 预设目录/exports/<时间>/ 下（按模式分子目录），并复制一份 index.json",
 							"copies every preset XML into presets/exports/<time>/ (grouped by mode) and copies index.json as well")),
 						SRApi.Ctl.Btn, GUILayout.Width(W(140)), GUILayout.Height(W(24)))) ExportAllToDirectory();
-					if (GUILayout.Button(new GUIContent(SRApi.T("复制清单", "Copy list"),
-						SRApi.T("把全部预设的名称/模式/关卡/方块数/时间/路径作为文本清单复制到剪贴板",
-							"copies a text list of every preset (name/mode/level/blocks/time/path) to the clipboard")),
-						SRApi.Ctl.Btn, GUILayout.Width(W(100)), GUILayout.Height(W(24)))) CopyAllList();
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
@@ -388,7 +380,7 @@ namespace SR_UCH.Tweaks {
 				GUILayout.Space(W(4));
 
 				// 分区 3：列表工具。分两行避免窗口变窄时控件被挤出页面：
-				// 第一行搜索 / 排序，第二行关卡 / 模式筛选 / 加载模式；标签统一 LabelAuto，控件宽度随 UI 缩放。
+				// 第一行搜索 / 排序 / 刷新，第二行关卡 / 模式筛选 / 加载模式；标签统一 LabelAuto，下拉宽度自适应。
 				SRApi.Ctl.SectionTitle(SRApi.T("- 搜索 / 排序 / 筛选 -", "- Search / sort / filter -"));
 				GUILayout.BeginHorizontal();
 				try {
@@ -407,6 +399,13 @@ namespace SR_UCH.Tweaks {
 					GUILayout.Space(W(8));
 					SRApi.Ctl.LabelAuto(SRApi.T("排序", "Sort"));
 					RenderSortCombo();
+					GUILayout.Space(W(7));
+					if (GUILayout.Button(new GUIContent(SRApi.T("刷新", "Refresh"),
+							SRApi.T("重新扫描预设目录（手动放入/删除了 XML 时用），也用于重建索引",
+								"rescan the presets folder (after manually adding/removing XML files) and rebuild the index")),
+						SRApi.Ctl.Btn, GUILayout.Width(W(56)), GUILayout.Height(W(24)))) {
+						try { _loaded = false; LoadFromDisk(true); } catch (Exception __rx) { SRApi.Guard.Log("布局预设/刷新列表", __rx); }
+					}
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
@@ -480,7 +479,7 @@ namespace SR_UCH.Tweaks {
 				string[] labels = new string[vals.Count];
 				for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
 				bool open = _levelFilterOpen;
-				int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open, W(100));
+				int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open);
 				_levelFilterOpen = open;
 				if (sel >= 0 && sel < vals.Count) _levelFilter = vals[sel];
 			} catch (Exception __ex) {
@@ -520,7 +519,7 @@ namespace SR_UCH.Tweaks {
 				string[] labels = new string[vals.Count];
 				for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
 				bool open = _modeFilterOpen;
-				int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open, W(100));
+				int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open);
 				_modeFilterOpen = open;
 				if (sel >= 0 && sel < vals.Count) _modeFilter = vals[sel];
 			} catch (Exception __ex) {
@@ -548,7 +547,7 @@ namespace SR_UCH.Tweaks {
 			return vals;
 		}
 
-		// 加载模式下拉：原生 + 游戏四模式（派对 / 创意 / 挑战 / 自由）。运行期状态，不落配置。
+		// 加载模式下拉：默认 + 游戏四模式（派对 / 创意 / 挑战 / 自由）。运行期状态，不落配置。
 		// 值为 "" 或 GameState.GameMode 的 ToString；显示名复用 ModeText（游戏本地化 / 中文回退）。
 		private static void RenderLoadModeCombo() {
 			try {
@@ -557,13 +556,13 @@ namespace SR_UCH.Tweaks {
 				for (int i = 0; i < vals.Length; i++) {
 					if (string.Equals(vals[i], _loadMode, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
 				}
-				// 运行期状态被外部改坏时回退到原生，避免下拉框显示空白。
+				// 运行期状态被外部改坏时回退到默认，避免下拉框显示空白。
 				if (cur == 0 && !string.IsNullOrEmpty(_loadMode)) _loadMode = "";
 				string[] labels = new string[vals.Length];
-				labels[0] = SRApi.T("原生", "Native");
+				labels[0] = SRApi.T("默认", "Default");
 				for (int i = 1; i < vals.Length; i++) labels[i] = ModeText(vals[i]);
 				bool open = _loadModeOpen;
-				int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(180));
+				int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open);
 				_loadModeOpen = open;
 				if (sel >= 0 && sel < vals.Length) _loadMode = vals[sel];
 			} catch (Exception __ex) {
@@ -580,7 +579,7 @@ namespace SR_UCH.Tweaks {
 				int cur = Mathf.Clamp(SortMode, 0, opts.Length - 1);
 				bool open;
 				if (e == null || !SRApi.Ctl.EditOpen.TryGetValue(e, out open)) open = false;
-				int sel = SRApi.Ctl.ComboBox(e, opts[cur], vals, opts, ref open, W(110));
+				int sel = SRApi.Ctl.ComboBox(e, opts[cur], vals, opts, ref open);
 				if (sel >= 0) {
 					if (e != null) SRApi.Ctl.SetValue(e, vals[sel]);
 					if (e != null) SRApi.Ctl.EditOpen[e] = false;
@@ -635,6 +634,8 @@ namespace SR_UCH.Tweaks {
 				Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
 				if (box.width < SRApi.Ctl.Sc(220)) return;
 				EnsureCols();
+				// 操作列宽始终跟随当前语言的按钮文字：语言热切换后也能立刻避免英文标签被截断。
+				_colW[ColAction] = DefaultActionColW();
 				if (_args == null) _args = new SRApi.TableArgs();
 				float pinW = SRApi.Ctl.Sc(_colW[ColAction]);
 				float stripW = Mathf.Max(SRApi.Ctl.Sc(80), box.width - pinW);
@@ -822,7 +823,7 @@ namespace SR_UCH.Tweaks {
 				_actActions[ActExport].Label = SRApi.T("导出", "Export");
 				_actActions[ActDelete].Label = delPending ? SRApi.T("确认", "Confirm") : SRApi.T("删除", "Delete");
 				int hover = -1;
-				int hit = SRApi.TableActionButtons(r, _actActions, _actWidths, ref hover);
+				int hit = SRApi.TableActionButtons(r, _actActions, null, ref hover);
 				if (hit >= 0) _actionHitThisFrame = true;
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/操作按钮", __ex);
@@ -893,10 +894,44 @@ namespace SR_UCH.Tweaks {
 							&& k >= 0 && k < ColCount && k != ColAction) _hiddenCols.Add(k);
 					}
 				}
-				// 操作列宽度固定为默认值（表头无法拖动它的宽度，避免手改配置把按钮挤没）。
-				_colW[ColAction] = DefColW[ColAction];
+				// 操作列宽度强制用默认值：默认宽按当前语言的 4 个按钮文字实测（见 DefaultActionColW），
+				// 旧配置里持久化的大宽度会在这里被收敛，避免右侧留白。表头仍可正常显示（宽度不允许拖动）。
+				_colW[ColAction] = DefaultActionColW();
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/读取列设置", __ex);
+			}
+		}
+
+		// 操作列默认宽 = 4 个按钮的自适应文字宽 + 按钮间距 + 钉住列左右边距（设计单位）。
+		// 每行按钮由核心按 BtnClip.CalcSize(label).x + 11px 计算，这里用同一公式取最宽标签（含二次确认的「确认」），
+		// 保证中文 / 英文、普通态 / 确认态都不会被截断；DefColW[ColAction] 仅作样式不可用时的兜底。
+		private static float DefaultActionColW() {
+			try {
+				GUIStyle st = SRApi.Ctl.BtnClip;
+				if (st == null) return DefColW[ColAction];
+				float scale = SRApi.Ctl.Sc(1f);
+				if (scale <= 0f) scale = 1f;
+				string[][] labels = new string[][] {
+					new string[] { SRApi.T("加载", "Load"), SRApi.T("确认", "Confirm") },
+					new string[] { SRApi.T("重命名", "Rename") },
+					new string[] { SRApi.T("导出", "Export") },
+					new string[] { SRApi.T("删除", "Delete"), SRApi.T("确认", "Confirm") }
+				};
+				// 6px = 钉住列左右各 2px + 行内左 2px；间距 2px/个（与核心 TableActionButtons 一致）。
+				float total = SRApi.Ctl.Sc(6f);
+				for (int i = 0; i < labels.Length; i++) {
+					float bw = 0f;
+					for (int j = 0; j < labels[i].Length; j++) {
+						bw = Mathf.Max(bw, st.CalcSize(new GUIContent(labels[i][j])).x);
+					}
+					total += bw + SRApi.Ctl.Sc(11f);
+					if (i > 0) total += SRApi.Ctl.Sc(2f);
+				}
+				float design = Mathf.Ceil(total / scale);
+				return Mathf.Clamp(design, ColWidthMin, ColWidthMax);
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/计算操作列宽", __ex);
+				return DefColW[ColAction];
 			}
 		}
 
@@ -1297,44 +1332,6 @@ namespace SR_UCH.Tweaks {
 			}
 		}
 
-		// 复制全部清单（文本）到剪贴板：名称 / 模式 / 关卡 / 方块数 / 时间 / 路径。
-		private static void CopyAllList() {
-			try {
-				if (!ActionAllowed()) return;
-				// 清单始终导出全部预设（不受搜索过滤影响），按当前排序输出。
-				List<PresetInfo> list = new List<PresetInfo>(_presets);
-				list.Sort(ComparePreset);
-				if (list.Count == 0) {
-					SRApi.LogInfo("[布局预设] " + SRApi.T("当前没有可复制的预设", "There are no presets to copy"));
-					return;
-				}
-				StringBuilder sb = new StringBuilder();
-				sb.AppendLine("SR_UCH layout presets (" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + ")");
-				for (int i = 0; i < list.Count; i++) {
-					PresetInfo p = list[i];
-					if (p == null) continue;
-					sb.Append(i + 1).Append(". ").Append(p.Name ?? "")
-						.Append("\tmode=").Append(p.Mode ?? "")
-						.Append("\tlevel=").Append(LevelText(p))
-						.Append("\tblocks=").Append(Mathf.Max(0, p.Blocks))
-						.Append("\ttime=").Append(p.TimeUtc == DateTime.MinValue ? "-" : p.TimeUtc.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture))
-						.Append("\t").Append(p.FilePath ?? "")
-						.AppendLine();
-				}
-				try {
-					GUIUtility.systemCopyBuffer = sb.ToString();
-				} catch (Exception __ex) {
-					SRApi.Guard.Log("布局预设/复制清单写剪贴板", __ex);
-					SRApi.Notify(SRApi.T("写入剪贴板失败", "Failed to write to the clipboard"));
-					return;
-				}
-				_status = SRApi.T("已复制全部清单（", "Copied the full list (") + list.Count + SRApi.T(" 条）到剪贴板", " presets) to the clipboard");
-				SRApi.LogInfo("[布局预设] " + _status);
-			} catch (Exception __ex) {
-				SRApi.Guard.Log("布局预设/复制清单", __ex);
-			}
-		}
-
 		private static void DeletePreset(PresetInfo p) {
 			try {
 				if (p == null) return;
@@ -1589,7 +1586,7 @@ namespace SR_UCH.Tweaks {
 		}
 
 		// 计算本次加载实际使用的模式：
-		//   1) 原生（_loadMode 为空）：跟随预设自身保存的模式（p.Mode），解析失败时保留调用方传入的当前模式；
+		//   1) 默认（_loadMode 为空）：跟随预设自身保存的模式（p.Mode），解析失败时保留调用方传入的当前模式；
 		//   2) 选择了具体「加载模式」：强制覆盖预设模式，所有加载/重载路径都以它为准。
 		private static GameState.GameMode ResolveLoadMode(PresetInfo p, GameState.GameMode fallback) {
 			GameState.GameMode mode = fallback;
@@ -1847,7 +1844,7 @@ namespace SR_UCH.Tweaks {
 					return;
 				}
 				// 树屋普通关卡：LaunchLevel 会用 GameSettings.GameMode 并 CallRpcSetGameMode 同步给房客，
-				// 因此进入前先按「原生预设模式 / 强制加载模式」设置，保证该路径同样受加载模式控制。
+				// 因此进入前先按「默认预设模式 / 强制加载模式」设置，保证该路径同样受加载模式控制。
 				try {
 					GameSettings __lst = GameSettings.GetInstance();
 					if (__lst != null) __lst.GameMode = ResolveLoadMode(p, __lst.GameMode);

@@ -534,7 +534,7 @@ public partial class SR {
                 _editOpen.Clear();
                 _capturing = null;
             }
-            // 功能注册的底栏按钮（如配置工具）：排在「设置」右侧；带悬停过渡与单击去重
+            // 功能注册的底栏按钮：排在「设置」右侧；带悬停过渡与单击去重
             for (int fbi = 0; fbi < SRApi.FooterButtons.Count; fbi++) {
                 SRApi.FooterButton fb = SRApi.FooterButtons[fbi];
                 if (fb == null || string.IsNullOrEmpty(fb.Id)) continue;

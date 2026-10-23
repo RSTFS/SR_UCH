@@ -22,27 +22,60 @@ public partial class SR {
             return Mathf.Max(minH, SR.ContentArea.height - Sc(26f) - Sc(2f) - SR.FooterHeight - usedAbove - Sc(4f));
         }
 
-        // 统一操作列按钮：在行矩形里按 widths 依次画 BtnClip 按钮，返回本帧左键 MouseUp 命中并已执行回调的下标。
-        // actions / widths 为 null 或空时直接返回 -1；Enabled=false 的按钮画灰且不响应。
+        // 统一操作列按钮：在行矩形里依次画 BtnClip 按钮，返回本帧左键 MouseUp 命中并已执行回调的下标。
+        // widths 为 null、长度不足或某项 <=0 时，该按钮宽度 = BtnClip.CalcSize(label).x + 11px（自适应文字）；
+        // 多个按钮总宽超出行宽时按可用宽度统一收缩，绝不横向溢出。Enabled=false 的按钮画灰且不响应。
         public static int TableActionButtons(Rect rowRect, SRApi.TableAction[] actions, float[] widths, ref int hoverIndex) {
             hoverIndex = -1;
-            if (actions == null || actions.Length == 0 || widths == null || widths.Length == 0) return -1;
+            if (actions == null || actions.Length == 0) return -1;
             try {
                 Event e = Event.current;
                 Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
-                float x = rowRect.x + Sc(2f);
+                float padX = Sc(2f);
                 float y = rowRect.y + Sc(1f);
                 float h = Mathf.Max(Sc(14f), rowRect.height - Sc(2f));
                 float gap = Sc(2f);
-                int hit = -1;
-                for (int i = 0; i < actions.Length && i < widths.Length; i++) {
+                int n = actions.Length;
+                float[] bw = new float[n];
+                int valid = 0;
+                float sum = 0f;
+                for (int i = 0; i < n; i++) {
                     SRApi.TableAction a = actions[i];
                     if (a == null) continue;
-                    float bw = Sc(widths[i]);
-                    if (bw <= 0f) continue;
-                    Rect br = new Rect(x, y, bw, h);
-                    x += bw + gap;
-                    if (br.xMax > rowRect.xMax) break;
+                    float w;
+                    if (widths != null && i < widths.Length && widths[i] > 0f) {
+                        w = Sc(widths[i]);
+                    } else {
+                        GUIStyle st = BtnClip;
+                        w = (st != null ? st.CalcSize(new GUIContent(a.Label ?? "")).x : Sc(30f)) + Sc(11f);
+                    }
+                    if (w <= 0f) w = Sc(8f);
+                    bw[i] = w;
+                    sum += w;
+                    valid++;
+                }
+                if (valid == 0) return -1;
+                float gapTotal = gap * Mathf.Max(0, valid - 1);
+                // 可绘制宽度 = 行宽减去左侧起始内边距（右侧允许画到行边界，不再额外留 padX）。
+                float avail = Mathf.Max(0f, rowRect.width - padX);
+                float need = sum + gapTotal;
+                if (need > avail) {
+                    // 可用宽度不足：按钮和间距一起按比例收缩，保证最后一个按钮不越过行右边界。
+                    float scale = need > 0f ? avail / need : 0f;
+                    for (int i = 0; i < n; i++) if (bw[i] > 0f) bw[i] *= scale;
+                    gap *= scale;
+                }
+                float x = rowRect.x + padX;
+                int hit = -1;
+                for (int i = 0; i < n; i++) {
+                    SRApi.TableAction a = actions[i];
+                    if (a == null) continue;
+                    float curW = bw[i];
+                    if (curW <= 0f) continue;
+                    Rect br = new Rect(x, y, curW, h);
+                    x += curW + gap;
+                    if (br.xMax > rowRect.xMax) br.width = Mathf.Max(0f, rowRect.xMax - br.x);
+                    if (br.width <= 0f) break;
                     bool over = br.Contains(mp);
                     bool enabled = a.Enabled;
                     if (over) hoverIndex = i;
@@ -83,8 +116,36 @@ public partial class SR {
         public static float TextHeight(string text, float width) { return SR.TextHeight(text, width); }
         // 滑块（松左键提交；intStep = 整数步进）
         public static float DrawSlider(Rect rect, float value, float min, float max, bool intStep = false) { return SR.DrawSlider(rect, value, min, max, intStep); }
-        // 下拉框（自绘：列表紧跟按钮下方）；返回选中下标，-1 = 未选
-        public static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width = -1f) { return SR.ComboBox(entry, current, vals, options, ref open, width); }
+        // 下拉框（自绘：列表紧跟按钮下方）；返回选中下标，-1 = 未选。
+        // width <= 0 = 宽度自动：取全部选项 + 当前显示文本的最大 CalcSize，加箭头/内边距；
+        // 下限 80、上限为可用宽度的 60%（优先内容区，其次窗口宽度），长选项不截断也不会撑破页面。
+        public static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width = -1f) {
+            if (width <= 0f) width = AutoComboBoxWidth(options, current);
+            return SR.ComboBox(entry, current, vals, options, ref open, width);
+        }
+
+        private static float AutoComboBoxWidth(string[] options, string current) {
+            float maxText = 0f;
+            try {
+                GUIStyle st = BtnClip;
+                if (st != null) {
+                    if (options != null) {
+                        for (int i = 0; i < options.Length; i++) {
+                            maxText = Mathf.Max(maxText, st.CalcSize(new GUIContent(options[i] ?? "")).x);
+                        }
+                    }
+                    maxText = Mathf.Max(maxText, st.CalcSize(new GUIContent(current ?? "")).x);
+                }
+            } catch { maxText = 0f; }
+            if (maxText <= 0f) maxText = Sc(60f);
+            float avail = 0f;
+            try { avail = SRApi.ContentArea.width; } catch { avail = 0f; }
+            if (avail <= 0f) { try { avail = SRApi.Ctl.WinWidth; } catch { avail = 0f; } }
+            if (avail <= 0f) avail = Screen.width;
+            float minW = Sc(80f);
+            float maxW = Mathf.Max(minW, avail * 0.6f);
+            return Mathf.Clamp(maxText + Sc(30f), minW, maxW);
+        }
         public static void WrapLabel(string text) { SR.WrapLabel(text); }
         public static float SidebarWidth() { return SR.SidebarWidth(); }
         // 写配置值（会标记待保存）

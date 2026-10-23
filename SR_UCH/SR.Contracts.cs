@@ -222,7 +222,7 @@ namespace SR_UCH {
         public static void SetDefaultCombo(ConfigEntryBase entry, ComboMod mod) { Action<ConfigEntryBase, int> f = _setDefaultCombo; if (f != null) f(entry, (int)mod); }
         public static string ClearableTextField(string text, GUIStyle style, params GUILayoutOption[] options) { Func<string, int, GUIStyle, GUILayoutOption[], string> f = _clearableTextField; return f != null ? f(text, -1, style, options) : text; }
         public static string ClearableTextField(string text, int maxLength, GUIStyle style, params GUILayoutOption[] options) { Func<string, int, GUIStyle, GUILayoutOption[], string> f = _clearableTextField; return f != null ? f(text, maxLength, style, options) : text; }
-        // 底栏按钮扩展点：核心在「设置」按钮右侧依次绘制；功能可注册自己的入口（如配置工具）。
+        // 底栏按钮扩展点：核心在「设置」按钮右侧依次绘制；功能可注册自己的入口。
         public sealed class FooterButton {
             public string Id, LabelZh, LabelEn; public Action OnClick;
             public FooterButton(string id, string zh, string en, Action onClick) { Id = id; LabelZh = zh; LabelEn = en; OnClick = onClick; }
@@ -299,6 +299,7 @@ namespace SR_UCH {
             ref bool dragging, ref float grabY, ref float scrollY);
         public delegate float TableAutoHeightFn(float usedAbove, float minH);
         // 统一操作列按钮：给定行矩形按 widths 依次画按钮，返回本帧左键 MouseUp 命中并已执行回调的下标。
+        // widths 可为 null（或某项 <=0）：该按钮宽度按文字自适应，总宽超出行宽时自动收缩。
         public delegate int TableActionButtonsFn(Rect rowRect, TableAction[] actions, float[] widths, ref int hoverIndex);
         private static Action<TableArgs> _tableDraw;
         private static TableDragWatchdogFn _tableDragWatchdog;
@@ -536,7 +537,9 @@ namespace SR_UCH {
             public static float TextHeight(string text, float width) { Func<string, float, float> f = _textHeight; return f != null ? f(text, width) : 0f; }
             public static float DrawSlider(Rect rect, float value, float min, float max, bool intStep) { Func<Rect, float, float, float, bool, float> f = _drawSlider; return f != null ? f(rect, value, min, max, intStep) : value; }
             public static float DrawSlider(Rect rect, float value, float min, float max) { return DrawSlider(rect, value, min, max, false); }
+            // width <= 0 = 自适应：按全部选项 / 当前显示文本的最大宽度 + 箭头内边距，并夹在固定下限与可用宽度 60% 上限之间。
             public static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width) { ComboBoxFn f = _comboBox; return f != null ? f(entry, current, vals, options, ref open, width) : 0; }
+            // 省略宽度 = 自适应（等价 width <= 0）。
             public static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open) { return ComboBox(entry, current, vals, options, ref open, -1f); }
             public static float SidebarWidth() { Func<float> f = _sidebarWidth; return f != null ? f() : 0f; }
             public static float WinWidth { get { Func<float> f = _winWidth; return f != null ? f() : 0f; } }
