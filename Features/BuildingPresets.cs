@@ -106,10 +106,15 @@ namespace SR_UCH.Tweaks {
 		private static readonly List<int> _rowRows = new List<int>();
 		private static readonly List<Rect> _pinRects = new List<Rect>();
 		private static readonly List<int> _pinRows = new List<int>();
-		// 操作列按钮几何（每行 4 个）：与 _pinRects 同一行序，按行依次追加。
-		private static readonly List<Rect> _actRects = new List<Rect>();
-		private static readonly List<int> _actRows = new List<int>();
-		private static readonly List<int> _actKinds = new List<int>();
+		// 操作列按钮描述（复用对象，避免逐行分配）：布局 / 命中 / 悬浮统一交给核心 SRApi.TableActionButtons。
+		private static PresetInfo _actPreset;
+		private static readonly SRApi.TableAction[] _actActions = new SRApi.TableAction[] {
+			new SRApi.TableAction { OnClick = DoActLoad },
+			new SRApi.TableAction { OnClick = DoActRename },
+			new SRApi.TableAction { OnClick = DoActExport },
+			new SRApi.TableAction { OnClick = DoActDelete }
+		};
+		private static readonly float[] _actWidths = new float[] { 34f, 46f, 34f, 34f };
 		private static readonly string[] _cells = new string[ColCount];
 		private static SRApi.TableArgs _args;
 		private static Vector2 _scrollRows;
@@ -198,8 +203,8 @@ namespace SR_UCH.Tweaks {
 				"master switch for layout presets\nwhen on, block layout presets can be saved and loaded on this page\nwhen off, existing presets are still listed but every action is inactive; independent from the mod-wide master switch");
 			SRApi.LocKey(Section, "Max Presets", "预设数量上限", "Max presets");
 			SRApi.LocDesc(Section, "Max Presets",
-				"预设数量上限\n列表最多保留多少个预设，达到上限后必须先删除旧预设才能保存新布局\n范围 1 到 100，默认 100；只限制新保存，不会删除磁盘上已有的预设文件。",
-				"maximum number of presets\ncaps how many presets the list keeps; when reached, delete an old preset before saving a new layout\nrange 1-100, default 100; only limits new saves and never deletes existing preset files");
+				"预设数量上限\n列表最多保留多少个预设，达到上限后必须先删除旧预设才能保存新布局\n范围 1 到 100；只限制新保存，不会删除磁盘上已有的预设文件。",
+				"maximum number of presets\ncaps how many presets the list keeps; when reached, delete an old preset before saving a new layout\nrange 1-100; only limits new saves and never deletes existing preset files");
 			SRApi.LocKey(Section, "Sort Mode", "列表排序", "Sort mode");
 			SRApi.LocDesc(Section, "Sort Mode",
 				"列表排序方式\n0=时间（新→旧），1=名称（A→Z）\n由列表页的排序下拉维护，不在配置区重复显示",
@@ -207,12 +212,13 @@ namespace SR_UCH.Tweaks {
 			// 换场景后下次打开面板重新扫盘（手动放入/删除的 XML、其它存档的改动都能看到）。
 			try { SRApi.RegisterSceneHook(delegate { _loaded = false; }); }
 			catch (Exception __sh) { SRApi.Guard.Log("布局预设/注册场景钩子", __sh); }
-			try { SRApi.HotkeyAction("presets.treehouse", "返回树屋", delegate { ReturnToTreehouse(); }); }
-			catch (Exception __hx) { SRApi.Guard.Log("布局预设/注册返回树屋快捷键", __hx); }
+			// 清掉旧版「返回树屋」按钮留下的快捷键条目（该按钮已改为普通核心按钮，不再提供右键绑定）。
+			try { SRApi.Migration.Remove("Hotkeys", "presets.treehouse"); }
+			catch (Exception __hk) { SRApi.Guard.Log("布局预设/清理返回树屋快捷键", __hk); }
 			SRApi.LocKey(Section, "Skip Treehouse", "跳过树屋流程", "Skip treehouse");
 			SRApi.LocDesc(Section, "Skip Treehouse",
-				"跳过树屋流程\n勾选后联机替换关卡时不再先回树屋，而是直接替换场景进入目标关卡\n房客的关卡选择状态可能不同步（按关卡读取的岩浆/统计等次要设置可能不一致），默认关闭",
-				"skip the treehouse flow\nwhen on, online level replacement switches the scene directly instead of returning to the treehouse first\nclients' selected-level state may be out of sync (minor per-level settings like lava/stats may differ); off by default");
+				"跳过树屋流程\n勾选后联机替换关卡时不再先回树屋，而是直接替换场景进入目标关卡\n房客的关卡选择状态可能不同步（按关卡读取的岩浆/统计等次要设置可能不一致）",
+				"skip the treehouse flow\nwhen on, online level replacement switches the scene directly instead of returning to the treehouse first\nclients' selected-level state may be out of sync (minor per-level settings like lava/stats may differ)");
 			SRApi.LocKey(Section, ColWidthsKey, "列表列宽（内部）", "Preset widths (internal)");
 			SRApi.LocDesc(Section, ColWidthsKey,
 				"预设列表列宽\n由列表表头拖动自动写入，逗号分隔的设计单位\n一般无需手动修改；非法值会回退默认列宽",
@@ -319,6 +325,9 @@ namespace SR_UCH.Tweaks {
 			try {
 				EnsureLoaded();
 				EnsureCols();
+				// 本帧开始前的二次确认状态：只有"之前已确认、本帧又没点中操作按钮"才在空白处取消，
+				// 避免把本帧其它按钮（保存/导入）刚点出来的二次确认立刻清掉。
+				string pendingBefore = _pendingKey;
 				// 页面级滚动关闭：内容按视口高度布局，滚轮只在预设表格内部滚动。
 				try {
 					SRApi.NoPageScrollBars = true;
@@ -353,7 +362,7 @@ namespace SR_UCH.Tweaks {
 				try {
 					SRApi.Ctl.LabelAuto(SRApi.T("XML 路径", "XML path"));
 					string path = SRApi.ClearableTextField(_importPath ?? "", 260, SRApi.Ctl.SearchBox,
-						GUILayout.MinWidth(W(150)), GUILayout.ExpandWidth(true), GUILayout.Height(W(24)));
+						GUILayout.Width(W(300)), GUILayout.Height(W(24)));
 					if (path != null && path != _importPath) _importPath = path;
 					if (GUILayout.Button(SRApi.T("从路径导入", "Import path"), SRApi.Ctl.Btn,
 						GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ImportFromPath();
@@ -379,7 +388,7 @@ namespace SR_UCH.Tweaks {
 				GUILayout.Space(W(4));
 
 				// 分区 3：列表工具。分两行避免窗口变窄时控件被挤出页面：
-				// 第一行搜索 / 排序 / 关卡，第二行模式筛选 / 加载模式；标签统一 LabelAuto，控件宽度随 UI 缩放。
+				// 第一行搜索 / 排序，第二行关卡 / 模式筛选 / 加载模式；标签统一 LabelAuto，控件宽度随 UI 缩放。
 				SRApi.Ctl.SectionTitle(SRApi.T("- 搜索 / 排序 / 筛选 -", "- Search / sort / filter -"));
 				GUILayout.BeginHorizontal();
 				try {
@@ -398,15 +407,15 @@ namespace SR_UCH.Tweaks {
 					GUILayout.Space(W(8));
 					SRApi.Ctl.LabelAuto(SRApi.T("排序", "Sort"));
 					RenderSortCombo();
-					GUILayout.Space(W(8));
-					SRApi.Ctl.LabelAuto(SRApi.T("关卡", "Level"));
-					RenderLevelFilterCombo();
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
 				}
 				GUILayout.BeginHorizontal();
 				try {
+					SRApi.Ctl.LabelAuto(SRApi.T("关卡", "Level"));
+					RenderLevelFilterCombo();
+					GUILayout.Space(W(8));
 					SRApi.Ctl.LabelAuto(SRApi.T("模式", "Mode"));
 					RenderModeFilterCombo();
 					GUILayout.Space(W(8));
@@ -416,22 +425,21 @@ namespace SR_UCH.Tweaks {
 				} finally {
 					GUILayout.EndHorizontal();
 				}
-				// 底部工具：跳过树屋流程（标准配置勾选框）+ 返回树屋（标准动作按钮，可绑定快捷键）。
+				// 底部工具：跳过树屋流程（标准配置勾选框）+ 返回树屋（普通核心按钮）。
 				// 单独一行，不与上面的筛选行混在一起。
 				GUILayout.BeginHorizontal();
 				try {
 					if (_skipTreehouse != null) {
 						// 标准配置行 = 可点击标签（点名称还原默认）+ 核心开关控件
 						SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("跳过树屋流程", "Skip treehouse"),
-							SRApi.T("勾选后联机替换关卡时不再先回树屋，而是直接替换场景（房客关卡状态可能不同步，风险自负）",
-								"when on, online level replacement switches the scene directly instead of returning to the treehouse first (clients' level state may be out of sync)")),
+							SRApi.T("跳过树屋流程\n联机替换关卡时直接替换场景，不先回树屋\n房客的关卡状态可能不同步（风险自负）",
+								"skip the treehouse flow\nreplaces the level scene directly online instead of returning to the treehouse first\nclients' level state may be out of sync (at your own risk)")),
 							_skipTreehouse, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(26));
 						SRApi.Ctl.RenderControl(_skipTreehouse);
 					}
 					GUILayout.Space(SRApi.Ctl.Sc(8));
-					if (SRApi.Ctl.HotkeyButton("presets.treehouse", SRApi.T("返回树屋", "Back to treehouse"),
-						SRApi.T("走游戏原生的结束对局流程回到树屋（房主有效）；右键可绑定快捷键", "ends the current match through the game's native flow and returns to the treehouse (host only); right-click to bind a hotkey"),
-						delegate { ReturnToTreehouse(); }, SRApi.Ctl.Sc(150), SRApi.Ctl.Sc(26))) ReturnToTreehouse();
+					if (GUILayout.Button(SRApi.T("返回树屋", "Back to treehouse"), SRApi.Ctl.Btn,
+						GUILayout.Width(SRApi.Ctl.Sc(150)), GUILayout.Height(SRApi.Ctl.Sc(26)))) ReturnToTreehouse();
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
@@ -448,10 +456,10 @@ namespace SR_UCH.Tweaks {
 					: Mathf.Max(SRApi.Ctl.Sc(120), SRApi.ContentArea.height - SRApi.Ctl.Sc(26) - SRApi.Ctl.Sc(2) - SRApi.Ctl.Sc(30) - usedAbove - SRApi.Ctl.Sc(4));
 				_actionHitThisFrame = false;
 				RenderPresetTable(tableH);
-				// 二次确认取消：本帧 MouseDown 没有命中任何操作按钮 = 点了空白处
+				// 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
 				try {
-					if (!string.IsNullOrEmpty(_pendingKey) && !_actionHitThisFrame
-						&& Event.current != null && Event.current.type == EventType.MouseDown && Event.current.button == 0) {
+					if (!string.IsNullOrEmpty(_pendingKey) && _pendingKey == pendingBefore && !_actionHitThisFrame
+						&& Event.current != null && Event.current.type == EventType.MouseUp && Event.current.button == 0) {
 						ClearPending();
 					}
 				} catch (Exception __pe) { SRApi.Guard.Log("布局预设/空白处取消确认", __pe); }
@@ -540,11 +548,11 @@ namespace SR_UCH.Tweaks {
 			return vals;
 		}
 
-		// 加载模式下拉：原生（跟随预设） + 游戏四模式。运行期状态，不落配置。
+		// 加载模式下拉：原生 + 游戏四模式（派对 / 创意 / 挑战 / 自由）。运行期状态，不落配置。
 		// 值为 "" 或 GameState.GameMode 的 ToString；显示名复用 ModeText（游戏本地化 / 中文回退）。
 		private static void RenderLoadModeCombo() {
 			try {
-				string[] vals = new string[] { "", "FREEPLAY", "PARTY", "CREATIVE", "CHALLENGE" };
+				string[] vals = new string[] { "", "PARTY", "CREATIVE", "CHALLENGE", "FREEPLAY" };
 				int cur = 0;
 				for (int i = 0; i < vals.Length; i++) {
 					if (string.Equals(vals[i], _loadMode, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
@@ -552,7 +560,7 @@ namespace SR_UCH.Tweaks {
 				// 运行期状态被外部改坏时回退到原生，避免下拉框显示空白。
 				if (cur == 0 && !string.IsNullOrEmpty(_loadMode)) _loadMode = "";
 				string[] labels = new string[vals.Length];
-				labels[0] = SRApi.T("原生（跟随预设）", "Native (follow preset)");
+				labels[0] = SRApi.T("原生", "Native");
 				for (int i = 1; i < vals.Length; i++) labels[i] = ModeText(vals[i]);
 				bool open = _loadModeOpen;
 				int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(180));
@@ -567,7 +575,7 @@ namespace SR_UCH.Tweaks {
 		private static void RenderSortCombo() {
 			try {
 				ConfigEntryBase e = SRApi.Ctl.FindEntry(Section, "Sort Mode");
-				string[] opts = new[] { SRApi.T("时间（新→旧）", "Time (newest first)"), SRApi.T("名称（A→Z）", "Name (A-Z)") };
+				string[] opts = new[] { SRApi.T("时间", "Time"), SRApi.T("名称", "Name") };
 				int[] vals = new int[] { 0, 1 };
 				int cur = Mathf.Clamp(SortMode, 0, opts.Length - 1);
 				bool open;
@@ -714,7 +722,6 @@ namespace SR_UCH.Tweaks {
 					SRApi.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _args.moveCol, ref _args.moveDx,
 						ref _args.dragCol, ref _dragH, SaveCols, null, null);
 					SRApi.TableWheelInput(e, box, mp, _maxScrollX, _maxScrollY, ref _scrollCols, ref _scrollRows);
-					HandleActionClicks(visible, e, mp);
 					// 临时诊断日志：点表头时记录核心是否认到拖动/列宽拖动（构建后看 BepInEx 日志即可定位拖拽问题）。
 					if (e.type == EventType.MouseDown && e.button == 0) {
 						try {
@@ -802,70 +809,48 @@ namespace SR_UCH.Tweaks {
 		}
 
 		// 钉住操作列：每行 4 个按钮（加载 / 重命名 / 导出 / 删除），删除在二次确认窗口内显示「确认」。
+		// 按钮布局、命中、悬浮全部由核心统一控件处理；本页只填按钮描述，点击由 DoAct* 分发。
 		private static void DrawActionButtons(List<PresetInfo> visible, int row, Rect r) {
 			try {
-				if (_args == null) return;
 				PresetInfo p = PresetAt(visible, row);
 				if (p == null) return;
+				_actPreset = p;
 				bool delPending = IsPending("del:" + p.Key);
 				bool replacePending = IsPending("replace:" + p.Key);
-				float[] w = new float[] { 34f, 46f, 34f, 34f };
-				float gap = SRApi.Ctl.Sc(2);
-				float x = r.x + SRApi.Ctl.Sc(2);
-				float y = r.y + SRApi.Ctl.Sc(1);
-				float h = Mathf.Max(SRApi.Ctl.Sc(14), r.height - SRApi.Ctl.Sc(2));
-				for (int k = 0; k < 4; k++) {
-					float bw = SRApi.Ctl.Sc(w[k]);
-					Rect br = new Rect(x, y, bw, h);
-					x += bw + gap;
-					if (br.xMax > r.xMax) break;
-					string label;
-					if (k == ActLoad) {
-						label = replacePending ? SRApi.T("确认", "Confirm") : SRApi.T("加载", "Load");
-					} else if (k == ActRename) label = SRApi.T("重命名", "Rename");
-					else if (k == ActExport) label = SRApi.T("导出", "Export");
-					else label = delPending ? SRApi.T("确认", "Confirm") : SRApi.T("删除", "Delete");
-					bool hov = br.Contains(_args.mp);
-					SRApi.Ctl.BtnClip.Draw(br, new GUIContent(label), hov, false, false, false);
-					_actRects.Add(br);
-					_actRows.Add(row);
-					_actKinds.Add(k);
-				}
+				_actActions[ActLoad].Label = replacePending ? SRApi.T("确认", "Confirm") : SRApi.T("加载", "Load");
+				_actActions[ActRename].Label = SRApi.T("重命名", "Rename");
+				_actActions[ActExport].Label = SRApi.T("导出", "Export");
+				_actActions[ActDelete].Label = delPending ? SRApi.T("确认", "Confirm") : SRApi.T("删除", "Delete");
+				int hover = -1;
+				int hit = SRApi.TableActionButtons(r, _actActions, _actWidths, ref hover);
+				if (hit >= 0) _actionHitThisFrame = true;
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/操作按钮", __ex);
 			}
 		}
 
-		// 操作按钮点击：加载 / 重命名（进入下方编辑条）/ 导出到剪贴板 / 删除（两次确认）。
-		private static void HandleActionClicks(List<PresetInfo> visible, Event e, Vector2 mp) {
-			try {
-				if (e == null || e.type != EventType.MouseDown || e.button != 0) {
-					_actRects.Clear();
-					_actRows.Clear();
-					_actKinds.Clear();
-					return;
-				}
-				for (int i = 0; i < _actRects.Count && i < _actRows.Count && i < _actKinds.Count; i++) {
-					if (!_actRects[i].Contains(mp)) continue;
-					PresetInfo p = PresetAt(visible, _actRows[i]);
-					int kind = _actKinds[i];
-					if (p != null) {
-						if (kind == ActLoad) LoadPreset(p);
-						else if (kind == ActRename) { ClearPending(); _renameKey = p.Key; _renameText = p.Name; }
-						else if (kind == ActExport) ExportPreset(p);
-						else if (kind == ActDelete) { if (ConfirmOrArm("del:" + p.Key)) DeletePreset(p); }
-					}
-					_actionHitThisFrame = true;
-					SRApi.BlockWindowDrag = true;
-					e.Use();
-					break;
-				}
-				_actRects.Clear();
-				_actRows.Clear();
-				_actKinds.Clear();
-			} catch (Exception __ex) {
-				SRApi.Guard.Log("布局预设/操作按钮点击", __ex);
-			}
+		// 操作按钮点击分发（由核心在左键 MouseUp 命中后回调）：加载 / 重命名 / 导出 / 删除（两次确认）。
+		private static void DoActLoad() {
+			PresetInfo p = _actPreset;
+			if (p != null) LoadPreset(p);
+		}
+
+		private static void DoActRename() {
+			PresetInfo p = _actPreset;
+			if (p == null) return;
+			ClearPending();
+			_renameKey = p.Key;
+			_renameText = p.Name;
+		}
+
+		private static void DoActExport() {
+			PresetInfo p = _actPreset;
+			if (p != null) ExportPreset(p);
+		}
+
+		private static void DoActDelete() {
+			PresetInfo p = _actPreset;
+			if (p != null && ConfirmOrArm("del:" + p.Key)) DeletePreset(p);
 		}
 
 		// ---------- 列宽 / 列序持久化 ----------

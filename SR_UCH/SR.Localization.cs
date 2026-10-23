@@ -130,23 +130,38 @@ public partial class SR {
             return v;
         }
 
-        //条目默认值后缀（"默认: X" / "Default: X"），按 entry 缓存；经 T() 生成以便语言包翻译。
+        //条目默认值后缀（"默认：X" / "Default: X"），按 entry 缓存；经 T() 生成以便语言包翻译。
+        //无默认值（含 KeyCode.None / 空字符串）时返回 ""，调用方不追加该行。
         internal static string DefaultSuffix(ConfigEntryBase entry) {
             NameCacheSync();
             string cached;
             if (_defSuffix.TryGetValue(entry, out cached)) return cached;
-            string dft = FormatDefaultValue(entry.DefaultValue);
-            cached = string.IsNullOrEmpty(dft) ? "" : T("默认: " + dft, "Default: " + dft);
+            string dft = FormatDefaultValue(entry);
+            cached = string.IsNullOrEmpty(dft) ? "" : T("默认：" + dft, "Default: " + dft);
             _defSuffix[entry] = cached;
             return cached;
         }
 
-        //名称列悬浮说明 = 说明本身（4 行文案已含默认值；不再自动追加默认值/恢复提示）。
+        //按键后缀（"按键：X" / "Key: X"），未绑定（KeyCode.None）时返回 ""。
+        //只用于悬浮提示的第 4 行；标签旁的紧凑键位后缀仍走 SR.KeySuffix。
+        internal static string KeyTipSuffix(ConfigEntry<KeyCode> key) {
+            if (key == null) return "";
+            KeyCode v = KeyCode.None;
+            try { v = key.Value; } catch (Exception __ex) { Guard.Log("按键提示后缀", __ex); return ""; }
+            if (v == KeyCode.None) return "";
+            string txt = ComboKeyDisplay(key, v);
+            return T("按键：" + txt, "Key: " + txt);
+        }
+
+        //名称列悬浮说明 = 说明本身（固定 3 行）+ 核心追加的第 4 行（默认值 / 按键）。
+        //说明文案不再自带默认值；无默认值时只显示 3 行。
         internal static string RowTip(ConfigEntryBase entry, string desc) {
             NameCacheSync();
             string cached;
             if (_rowTipCache.TryGetValue(entry, out cached)) return cached;
             string tip = desc != null ? desc : "";
+            string dft = DefaultSuffix(entry);
+            if (!string.IsNullOrEmpty(dft)) tip += (tip.Length > 0 ? "\n" : "") + dft;
             _rowTipCache[entry] = tip;
             return tip;
         }

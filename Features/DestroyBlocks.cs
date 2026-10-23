@@ -241,21 +241,21 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec("Destroy Blocks", "方块破坏", null);
             SRApi.Nav("Destroy Blocks", 60); // 侧栏栏目顺序
             SRApi.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);
-            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "删除模式切换键\n按住进入删除模式并高亮最近放置的方块，松手退出\n点键框后按新键改绑，支持组合键；左 Alt。", "delete-mode key\nhold to enter delete mode and highlight the most recently placed block; release to exit\nclick the key box and press a new key to rebind (combos supported); Left Alt");
+            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "删除模式切换键\n按住进入删除模式并高亮最近放置的方块，松手退出\n点键框后按新键改绑，支持组合键。", "delete-mode key\nhold to enter delete mode and highlight the most recently placed block; release to exit\nclick the key box and press a new key to rebind (combos supported)");
             SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
             SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除键\n删除当前选中的方块\n滚轮可在候选方块之间切换", "delete key\ndeletes the currently selected block\nthe mouse wheel cycles through candidate blocks");
             SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
-            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n决定本页功能是否生效\n仅房主能删除；房客删除需要 EX 扩展的允许客户端删除；关。", "master switch for block destruction\nenables or disables the feature on this page\nhost only; client-side deletion needs the EX module permission; OFF");
+            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n决定本页功能是否生效\n仅房主能删除；房客删除需要 EX 扩展的允许客户端删除。", "master switch for block destruction\nenables or disables the feature on this page\nhost only; client-side deletion needs the EX module permission");
             SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
-            SRApi.LocDesc("Destroy Blocks", "Select Mode", "候选方块排序方式\n距离＝按离自己的距离由近到远；放置顺序＝最后放置的优先\n只影响选择顺序，不影响列表内容；距离。", "candidate ordering\nDistance = nearest to you first; Placement = most recently placed first\naffects selection order only, not the list contents; Distance");
+            SRApi.LocDesc("Destroy Blocks", "Select Mode", "候选方块排序方式\n距离＝按离自己的距离由近到远；放置顺序＝最后放置的优先\n只影响选择顺序，不影响列表内容。", "candidate ordering\nDistance = nearest to you first; Placement = most recently placed first\naffects selection order only, not the list contents");
             SRApi.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
-            SRApi.LocDesc("Destroy Blocks", "List Mode", "列表模式\n普通＝只列玩家亲手放置的方块；进阶＝场上所有方块单独列出\n普通模式排除炸弹等临时物件；普通。", "list mode\nNormal = only blocks placed by players; Advanced = every block listed individually\nNormal excludes temporary items such as bombs; Normal");
+            SRApi.LocDesc("Destroy Blocks", "List Mode", "列表模式\n普通＝只列玩家亲手放置的方块；进阶＝场上所有方块单独列出\n普通模式排除炸弹等临时物件。", "list mode\nNormal = only blocks placed by players; Advanced = every block listed individually\nNormal excludes temporary items such as bombs");
             SRApi.LocKey("Destroy Blocks", "Track Player", "追踪玩家", null);
-            SRApi.LocDesc("Destroy Blocks", "Track Player", "按玩家号过滤\n不追踪＝所有玩家的方块；1 到 4＝只看对应玩家号\n仅影响列表，需配合列表模式；不追踪。", "player filter\nNoTrack = all players; 1-4 = only blocks placed by that player number\naffects the list only; used with list mode; NoTrack");
+            SRApi.LocDesc("Destroy Blocks", "Track Player", "按玩家号过滤\n不追踪＝所有玩家的方块；1 到 4＝只看对应玩家号\n仅影响列表，需配合列表模式。", "player filter\nNoTrack = all players; 1-4 = only blocks placed by that player number\naffects the list only; used with list mode");
             SRApi.LocEnum("Realtime", "实时");
             SRApi.LocEnum("Snapshot", "暂存");
             SRApi.LocKey("Destroy Blocks", "Refresh Mode", "列表刷新", null);
-            SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "候选列表刷新方式\n实时＝按住切换键期间持续更新；暂存＝按下时重建一次\n实时模式已节流，仅在按住时有开销；实时。", "refresh mode for the candidate list\nRealtime = keeps updating while the toggle key is held; Snapshot = rebuilt once on press\nRealtime is throttled and only costs while held; Realtime");
+            SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "候选列表刷新方式\n实时＝按住切换键期间持续更新；暂存＝按下时重建一次\n实时模式已节流，仅在按住时有开销。", "refresh mode for the candidate list\nRealtime = keeps updating while the toggle key is held; Snapshot = rebuilt once on press\nRealtime is throttled and only costs while held");
         }
 
         // 是否走实时列表（默认实时）

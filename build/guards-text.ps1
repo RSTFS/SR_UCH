@@ -107,13 +107,45 @@ function Check-Encoding {
 }
 
 
-# ---------- 6) 悬浮条目统一格式：每条说明恰好 3 行内容（无行首标签、不写默认值行）----------
+# ---------- 6) 悬浮条目统一格式：每条 LocDesc 说明恰好 3 行（无行首标签、不写默认值行）----------
+# 说明固定 3 行（是什么 / 干什么 / 注意事项）；默认值或按键由核心在生成悬浮提示时追加第 4 行。
+function Split-Args([string]$body) {
+    # body 形如 "(a, b, c)"；按顶层逗号切分，忽略字符串内的逗号与嵌套括号。
+    $inner = $body.Substring(1, $body.Length - 2)
+    $result = New-Object System.Collections.Generic.List[string]
+    $cur = New-Object System.Text.StringBuilder
+    $depth = 0
+    $inStr = $false
+    for ($i = 0; $i -lt $inner.Length; $i++) {
+        $ch = $inner[$i]
+        if ($inStr) {
+            [void]$cur.Append($ch)
+            if ($ch -eq '\') {
+                if ($i + 1 -lt $inner.Length) { [void]$cur.Append($inner[$i + 1]); $i++ }
+            } elseif ($ch -eq '"') { $inStr = $false }
+            continue
+        }
+        if ($ch -eq '"') { $inStr = $true; [void]$cur.Append($ch); continue }
+        if ($ch -eq '(' -or $ch -eq '[' -or $ch -eq '{') { $depth++ }
+        elseif ($ch -eq ')' -or $ch -eq ']' -or $ch -eq '}') { $depth-- }
+        if ($ch -eq ',' -and $depth -eq 0) {
+            $result.Add($cur.ToString().Trim())
+            [void]$cur.Clear()
+            continue
+        }
+        [void]$cur.Append($ch)
+    }
+    $result.Add($cur.ToString().Trim())
+    return ,$result
+}
+
 function Check-DescFormat {
     $files = @(Get-ChildItem -LiteralPath (Join-Path $Root 'Features') -Filter '*.cs' -File)
     $core = Join-Path $Root 'SR_UCH\SR.Core.cs'
     if (Test-Path -LiteralPath $core) { $files += Get-Item -LiteralPath $core }
     $bad = 0
     $total = 0
+    $skipped = 0
     foreach ($f in $files) {
         $txt = Read-Text $f.FullName
         $idx = 0
@@ -128,19 +160,29 @@ function Check-DescFormat {
             }
             if ($m -ge $txt.Length -or $k -lt 0) { break }
             $body = $txt.Substring($k, $m - $k + 1)
-            foreach ($lit in [regex]::Matches($body, '"((?:[^"\\]|\\.)*)"')) {
-                $s = $lit.Groups[1].Value
-                if (-not $s.Contains('\n')) { continue }   # 单行说明不参与（如占位/简短提示）
+            $callArgs = Split-Args $body
+            if ($callArgs.Count -lt 4) { $skipped++; $idx = $m + 1; continue }
+            # 只检查第 3、4 个实参（中文说明 / 英文说明）；变量或字符串拼接无法静态判定，跳过并计数。
+            for ($ai = 2; $ai -le 3; $ai++) {
+                $arg = $callArgs[$ai]
+                if ($arg -notmatch '^"(?:[^"\\]|\\.)*"$') { $skipped++; continue }
+                $s = $arg.Substring(1, $arg.Length - 2)
                 $total++
-                $lines = ([regex]::Matches($s, '\\n')).Count + 1
-                if ($lines -lt 2 -or $lines -gt 3) { $bad++; continue }
+                $parts = $s -split '\\n'
+                if ($parts.Count -ne 3) { $bad++; continue }
+                $empty = $false
+                foreach ($p in $parts) { if ([string]::IsNullOrWhiteSpace($p)) { $empty = $true; break } }
+                if ($empty) { $bad++; continue }
                 if ($s -match '是什么：|干什么：|注意事项：|What: |Does: |Notes: ') { $bad++ }
             }
             $idx = $m + 1
         }
     }
-    if ($bad -gt 0) { Bad ('悬浮条目格式不合规（应为 2~3 行且无行首标签）: ' + $bad + ' 条') }
-    else { Ok ('悬浮条目格式统一（' + $total + ' 条：2~3 行、无行首标签）') }
+    if ($bad -gt 0) {
+        Bad ('悬浮条目格式不合规（LocDesc 必须正好 3 行且无行首标签）: ' + $bad + ' 条')
+    } else {
+        Ok ('悬浮条目格式统一（' + $total + ' 条：正好 3 行、无行首标签；跳过动态文案 ' + $skipped + ' 处）')
+    }
 }
 
 

@@ -44,10 +44,6 @@ public partial class Level {
         GUILayout.BeginHorizontal();
         if (SRApi.Ctl.HotkeyActionButton(SRApi.T("刷新派对盒", "Reroll + reopen box"), SRApi.T("完整重走一遍游戏自己的派对盒流程：按本轮权重重抽道具 + 重新开箱（全员可再选一次）", "Run the game own party-box flow again: reroll with this round weights and reopen the box so everyone can pick again"), LevelPartyBox.RefreshPartyBoxKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBox();
         GUILayout.Space(SRApi.Ctl.Sc(8));
-        GUILayout.FlexibleSpace();
-        GUILayout.EndHorizontal();
-        GUILayout.Space(SRApi.Ctl.Sc(6));
-        GUILayout.BeginHorizontal();
         if (SRApi.Ctl.HotkeyActionButton(SRApi.T("关闭派对盒", "Close party box"), SRApi.T("结束派对盒选择，进入游玩阶段（走游戏原生相位切换，全员同步）", "End the party-box selection and enter the play phase (native phase change, synced)"), LevelPartyBox.ClosePartyBoxKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.ClosePartyBox();
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();

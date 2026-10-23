@@ -246,22 +246,27 @@ public partial class SR {
             return result;
         }
 
-        //可点击的条目标签：左键恢复默认值，右键绑定快捷键；非开关条目的默认值显示在悬浮提示中。
+        //可点击的条目标签：左键恢复默认值，右键绑定快捷键；说明固定 3 行，第 4 行由核心追加默认值 / 按键。
         //hotkey 为 null 时仅 bool 条目接入 "row:段.键" 自动快捷键。
         private static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey = null) {
             GUIContent c2 = content;
             ConfigEntry<KeyCode> hk = hotkey; //只认功能显式传入的键
             try {
                 string tip = content.tooltip != null ? content.tooltip : "";
-                  // 默认值统一用后缀追加（说明文案本身不再写默认值）；点击复位功能保留，但不再显示提示。
-                  if (entry != null) {
-                  string dft = DefaultSuffix(entry);
-                  if (!string.IsNullOrEmpty(dft)) tip += (tip.Length > 0 ? "\n" : "") + dft;
-                  }
+                //第 4 行：已绑键时显示“按键：X”，否则显示“默认：X”；都没有则不追加。
+                //右键提示并入同一行，保证悬浮提示仍为 3 + 1 行。
+                string extra = "";
+                if (entry != null) {
+                    if (hk != null) extra = KeyTipSuffix(hk);
+                    if (string.IsNullOrEmpty(extra)) extra = DefaultSuffix(entry);
+                }
+                if (!string.IsNullOrEmpty(extra)) {
+                    if (hk != null) extra += T("（右键绑定/删除）", " (right-click to bind/remove)");
+                    tip += (tip.Length > 0 ? "\n" : "") + extra;
+                }
                 if (hk != null) {
                     //绑定的键（录制中为 [...]）跟在标签后，宽度按需放宽
                     string txt = content.text + KeySuffix(hk);
-                    tip += (tip.Length > 0 ? "\n" : "") + T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey");
                     c2 = new GUIContent(txt, tip);
                 } else if (tip != content.tooltip) {
                     c2 = new GUIContent(content.text, tip);
@@ -284,17 +289,6 @@ public partial class SR {
             }
             //右键命中区：标签 + 右侧 44px
             if (hk != null) RegisterRowHotkey(hk);
-        }
-
-        private static string FormatDefaultValue(object v) {
-            try {
-                if (v == null) return "";
-                if (v is bool) return "";
-                if (v is KeyCode) return KeyDisplayName((KeyCode)v);
-                if (v is Enum) return EnumDisplayName(v.ToString());
-                if (v is float f) return f.ToString("0.##", CultureInfo.InvariantCulture);
-                return Convert.ToString(v, CultureInfo.InvariantCulture);
-            } catch { return ""; }
         }
 
         private static ConfigFile _visCfg;
@@ -692,8 +686,8 @@ public partial class SR {
                 if (dv is bool) return ((bool)dv) ? (UseEn ? "ON" : "开") : (UseEn ? "OFF" : "关");
                 if (dv is float) return ((float)dv).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
                 if (dv is int) return ((int)dv).ToString();
-                //KeyCode 也是 Enum，必须先判，否则默认值丢失中文键名
-                if (dv is KeyCode) return KeyDisplayName((KeyCode)dv);
+                //KeyCode 也是 Enum，必须先判；未绑定（None）视为无默认值，不追加默认行。
+                if (dv is KeyCode) { KeyCode kc = (KeyCode)dv; return kc == KeyCode.None ? "" : KeyDisplayName(kc); }
                 if (dv is System.Enum) return EnumDisplayName(dv.ToString());
                 return Convert.ToString(dv, System.Globalization.CultureInfo.InvariantCulture);
             } catch { return ""; }

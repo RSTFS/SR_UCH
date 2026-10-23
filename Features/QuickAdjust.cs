@@ -36,17 +36,17 @@ public class QuickAdjust : ITweak {
         SRApi.Nav("Quick Adjust", 30); // 侧栏栏目顺序 30
         SRApi.RegisterPage("Quick Adjust", Render);   // 本功能页自绘
         SRApi.LocKey("Quick Adjust", "Quick Switch", "快速切换", null);
-        SRApi.LocDesc("Quick Adjust", "Quick Switch", "快速切换开关\n自由模式下长按切换键在行动与建造之间切换\n仅自由模式生效，对局中开关立即生效；关。", "quick switch toggle\nin freeplay, hold the switch key to swap between Action and Build\nfreeplay only; the toggle applies immediately in-game; OFF");
+        SRApi.LocDesc("Quick Adjust", "Quick Switch", "快速切换开关\n自由模式下长按切换键在行动与建造之间切换\n仅自由模式生效，对局中开关立即生效。", "quick switch toggle\nin freeplay, hold the switch key to swap between Action and Build\nfreeplay only; the toggle applies immediately in-game");
         SRApi.LocKey("Quick Adjust", "Quick Switch Hold", "等待秒数", null);
         SRApi.LocDesc("Quick Adjust", "Quick Switch Hold", "快速切换长按时间\n设置长按多少秒触发切换\n范围 0 到 2，0 为立即切换", "quick switch hold time\nsets how long the key must be held to trigger the swap\nrange 0-2, 0 = instant");
         SRApi.LocKey("Quick Adjust", "Quick Retry", "死后自动重试", null);
         SRApi.LocDesc("Quick Adjust", "Quick Retry", "死后自动重试开关\n挑战模式死亡后自动重开关卡，无需长按\n仅挑战模式生效", "auto retry toggle\nin challenge mode, restarts the run automatically after death without holding a key\nchallenge mode only");
         SRApi.LocKey("Quick Adjust", "Quick Retry Fast", "快速重试", null);
-        SRApi.LocDesc("Quick Adjust", "Quick Retry Fast", "快速重试开关\n挑战模式死亡后长按重试键到设定秒数自动重试\n仅挑战模式生效，长按时间在下方设置；关。", "quick retry toggle\nin challenge mode, hold the retry key for the set time after death to retry\nchallenge mode only; the hold time is set below; OFF");
+        SRApi.LocDesc("Quick Adjust", "Quick Retry Fast", "快速重试开关\n挑战模式死亡后长按重试键到设定秒数自动重试\n仅挑战模式生效，长按时间在下方设置。", "quick retry toggle\nin challenge mode, hold the retry key for the set time after death to retry\nchallenge mode only; the hold time is set below");
         SRApi.LocKey("Quick Adjust", "Quick Retry Hold", "等待秒数", null);
         SRApi.LocDesc("Quick Adjust", "Quick Retry Hold", "快速重试长按时间\n设置死亡后长按多久触发重试\n范围 0 到 2，0 为立即重试", "quick retry hold time\nsets how long to hold after death before retrying\nrange 0-2, 0 = instant");
         SRApi.LocKey("Quick Adjust", "Score Discount", "分数折扣", null);
-        SRApi.LocDesc("Quick Adjust", "Score Discount", "分数折扣百分比\n把自己的 handicap 设为 100 减折扣值\n范围 0 到 90，0 为关闭；20。", "score discount percentage\nsets your handicap to 100 minus the discount\nrange 0-90, 0 = off; 20");
+        SRApi.LocDesc("Quick Adjust", "Score Discount", "分数折扣百分比\n把自己的 handicap 设为 100 减折扣值\n范围 0 到 90，0 为关闭。", "score discount percentage\nsets your handicap to 100 minus the discount\nrange 0-90, 0 = off");
         SRApi.LocKey("Quick Adjust", "More Discount Values", "更多折扣数值", null);
         SRApi.LocDesc("Quick Adjust", "More Discount Values", "折扣数值输入模式开关\n开启后折扣由整十滑块改为自由输入框\n范围 0 到 90 任意整数，0 为关闭", "discount input mode switch\nturns the tens slider into a free input box\nany integer from 0 to 90, 0 = off");
         // 预登记本页自动快捷键。
@@ -99,11 +99,12 @@ public class QuickAdjust : ITweak {
         GUILayout.Space(SRApi.Ctl.Sc(8));
         ConfigEntryBase more = SRApi.Ctl.FindEntry("Quick Adjust", "More Discount Values");
         if (more != null) {
-            string moreTip = SRApi.T("更多折扣数值（默认关闭）：开启后折扣滑块变为自由输入框（0-90 任意整数，0 = 关闭）。\n",
-                "More discount values (OFF by default): turns the slider into a free input box (0-90 any integer, 0 = off).\n");
-            // 宽度交给 IMGUI 按文字自适应。
-            bool nm = GUILayout.Toggle(moreOn, new GUIContent(SRApi.T("更多折扣数值", "More values"), moreTip), GUILayout.Height(SRApi.Ctl.Sc(30)));
-            if (nm != moreOn) SRApi.Ctl.SetValue(more, nm);
+            // 开关行统一走核心控件：RestoreLabel（说明 + 默认值第 4 行 + 左键复位）+ RenderControl（复选框）。
+            SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("更多折扣数值", "More values"),
+                SRApi.T("折扣数值输入模式开关\n开启后折扣由整十滑块改为自由输入框\n范围 0 到 90 任意整数，0 为关闭。",
+                        "discount input mode switch\nturns the tens slider into a free input box\nany integer from 0 to 90, 0 = off")),
+                more, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(30));
+            SRApi.Ctl.RenderControl(more);
         }
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
@@ -112,14 +113,14 @@ public class QuickAdjust : ITweak {
         SRApi.Ctl.SectionTitle(SRApi.T("- 快速重试 -", "- Quick retry -"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase qr = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry");
-        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("死后自动重试", "Auto retry on death"), SRApi.T("仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n默认关闭；对局中开关立即生效。", "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nOFF by default; takes effect immediately.")), qr, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
+        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("死后自动重试", "Auto retry on death"), SRApi.T("仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n对局中开关立即生效。", "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nTakes effect immediately.")), qr, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
         if (qr != null) SRApi.Ctl.RenderControl(qr);
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(2));
         GUILayout.BeginHorizontal();
         ConfigEntryBase qrf = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Fast");
-        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("快速重试", "Quick retry"), SRApi.T("仅挑战模式：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n默认关闭；对局中开关立即生效。", "Challenge only: after death, hold B for the set seconds to auto-retry.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nOFF by default; takes effect immediately.")), qrf, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
+        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("快速重试", "Quick retry"), SRApi.T("仅挑战模式：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n长按时间在下方设置，对局中开关立即生效。", "Challenge only: after death, hold B for the set seconds to auto-retry.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately.")), qrf, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
         if (qrf != null) SRApi.Ctl.RenderControl(qrf);
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
@@ -150,7 +151,7 @@ public class QuickAdjust : ITweak {
         SRApi.Ctl.SectionTitle(SRApi.T("- 快速切换 -", "- Quick switch -"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase qs = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Switch");
-        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("快速切换", "Quick switch"), SRApi.T("仅自由模式：长按 B 到设定等待秒数切换 行动<->建造 模式。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n默认关闭；对局中开关立即生效。", "Freeplay only: hold B for the set seconds to switch Action<->Build.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nOFF by default; takes effect immediately.")), qs, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
+        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("快速切换", "Quick switch"), SRApi.T("仅自由模式：长按 B 到设定等待秒数切换 行动<->建造 模式。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n长按时间在下方设置，对局中开关立即生效。", "Freeplay only: hold B for the set seconds to switch Action<->Build.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately.")), qs, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
         if (qs != null) SRApi.Ctl.RenderControl(qs);
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();

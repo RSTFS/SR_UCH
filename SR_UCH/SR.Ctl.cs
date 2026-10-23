@@ -22,6 +22,53 @@ public partial class SR {
             return Mathf.Max(minH, SR.ContentArea.height - Sc(26f) - Sc(2f) - SR.FooterHeight - usedAbove - Sc(4f));
         }
 
+        // 统一操作列按钮：在行矩形里按 widths 依次画 BtnClip 按钮，返回本帧左键 MouseUp 命中并已执行回调的下标。
+        // actions / widths 为 null 或空时直接返回 -1；Enabled=false 的按钮画灰且不响应。
+        public static int TableActionButtons(Rect rowRect, SRApi.TableAction[] actions, float[] widths, ref int hoverIndex) {
+            hoverIndex = -1;
+            if (actions == null || actions.Length == 0 || widths == null || widths.Length == 0) return -1;
+            try {
+                Event e = Event.current;
+                Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
+                float x = rowRect.x + Sc(2f);
+                float y = rowRect.y + Sc(1f);
+                float h = Mathf.Max(Sc(14f), rowRect.height - Sc(2f));
+                float gap = Sc(2f);
+                int hit = -1;
+                for (int i = 0; i < actions.Length && i < widths.Length; i++) {
+                    SRApi.TableAction a = actions[i];
+                    if (a == null) continue;
+                    float bw = Sc(widths[i]);
+                    if (bw <= 0f) continue;
+                    Rect br = new Rect(x, y, bw, h);
+                    x += bw + gap;
+                    if (br.xMax > rowRect.xMax) break;
+                    bool over = br.Contains(mp);
+                    bool enabled = a.Enabled;
+                    if (over) hoverIndex = i;
+                    if (over && enabled && !string.IsNullOrEmpty(a.Tip)) GUI.tooltip = a.Tip;
+                    Color old = GUI.color;
+                    try {
+                        if (!enabled) GUI.color = new Color(1f, 1f, 1f, 0.45f);
+                        BtnClip.Draw(br, new GUIContent(a.Label ?? ""), over && enabled, false, false, false);
+                    } finally { GUI.color = old; }
+                    if (!enabled || e == null) continue;
+                    if (e.type == EventType.MouseDown && e.button == 0 && over) BlockWindowDrag = true;
+                    if (e.type == EventType.MouseUp && e.button == 0 && over) {
+                        Action cb = a.OnClick;
+                        if (cb != null) { try { cb(); } catch (Exception __ex2) { Guard.Log("操作列按钮回调", __ex2); } }
+                        hit = i;
+                        e.Use();
+                    }
+                }
+                return hit;
+            } catch (Exception __ex) {
+                Guard.Log("操作列按钮", __ex);
+                hoverIndex = -1;
+                return -1;
+            }
+        }
+
         // 条目标签（可点击恢复默认值；tooltip = 说明 + 后缀追加的默认值，不再带恢复提示）
         public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey = null) { SR.RestoreLabel(content, entry, w, h, hotkey); }
         public static void RenderControl(ConfigEntryBase entry) { SR.RenderControl(entry); }

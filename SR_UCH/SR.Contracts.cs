@@ -284,6 +284,13 @@ namespace SR_UCH {
             public static void Move(string fromSection, string toSection, string key) { Action<string, string, string> f = _move; if (f != null) f(fromSection, toSection, key); }
         }
         // 表格控件门面：TableArgs 是纯数据参数对象（与核心同字段），4 个交互函数委托注入。
+        // 操作列按钮描述：功能页只给文字 / 提示 / 是否可用 / 回调，布局与命中由核心统一处理。
+        public sealed class TableAction {
+            public string Label;      // 按钮文字
+            public string Tip;        // 悬浮提示（可空）
+            public bool Enabled = true;
+            public System.Action OnClick;
+        }
         public delegate void TableDragWatchdogFn(Event e, ref float watchdog, ref bool sbDragging, ref int moveCol,
             ref float moveDx, ref int dragCol, ref bool dragH, Action saveWidths, Action saveTableH, Action resetJoinDown);
         public delegate bool TableWheelInputFn(Event e, Rect box, Vector2 mp, float maxX, float maxY,
@@ -291,6 +298,8 @@ namespace SR_UCH {
         public delegate bool TableScrollbarInputFn(Event e, Vector2 mp, Rect track, Rect thumb, float scrollMax,
             ref bool dragging, ref float grabY, ref float scrollY);
         public delegate float TableAutoHeightFn(float usedAbove, float minH);
+        // 统一操作列按钮：给定行矩形按 widths 依次画按钮，返回本帧左键 MouseUp 命中并已执行回调的下标。
+        public delegate int TableActionButtonsFn(Rect rowRect, TableAction[] actions, float[] widths, ref int hoverIndex);
         private static Action<TableArgs> _tableDraw;
         private static TableDragWatchdogFn _tableDragWatchdog;
         private static TableWheelInputFn _tableWheelInput;
@@ -298,6 +307,7 @@ namespace SR_UCH {
         // 存成 object 而非委托字段：本注入发生在 SR.Initialize（早于功能渲染），
         // 但晚于 MainPlugin 启动期的 SRApi.MissingSinks() 自检；用委托字段会被误报为"未注入"。
         private static object _tableAutoHeight;
+        private static object _tableActionButtons;
         public static void SetTableSinks(Action<TableArgs> tableDraw, TableDragWatchdogFn tableDragWatchdog,
                                          TableWheelInputFn tableWheelInput, TableScrollbarInputFn tableScrollbarInput) {
             _tableDraw = tableDraw; _tableDragWatchdog = tableDragWatchdog;
@@ -310,6 +320,14 @@ namespace SR_UCH {
             TableAutoHeightFn f = _tableAutoHeight as TableAutoHeightFn;
             if (f != null) return f(usedAbove, minH);
             return Mathf.Max(minH, ContentArea.height - Ctl.Sc(26f) - Ctl.Sc(2f) - FooterHeight - usedAbove - Ctl.Sc(4f));
+        }
+        // 操作列按钮统一控件：布局 / 命中 / 悬浮由实现层负责；未注入时返回 -1（不响应）。
+        public static void SetTableActionButtonsSink(TableActionButtonsFn tableActionButtons) { _tableActionButtons = tableActionButtons; }
+        public static int TableActionButtons(Rect rowRect, TableAction[] actions, float[] widths, ref int hoverIndex) {
+            TableActionButtonsFn f = _tableActionButtons as TableActionButtonsFn;
+            if (f != null) return f(rowRect, actions, widths, ref hoverIndex);
+            hoverIndex = -1;
+            return -1;
         }
                     public sealed class TableArgs {
             public Rect box;                 //表格外框（屏幕坐标）

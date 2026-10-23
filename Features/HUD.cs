@@ -394,8 +394,8 @@ namespace SR_UCH.Tweaks {
 				"淡入淡出\nHUD 显示或隐藏时平滑过渡\n关闭则立即显示或隐藏",
 				"fade in/out\nsmoothly transitions the HUD when showing or hiding\nwhen off the HUD appears/disappears instantly");
 			Loc("Show Key", "显示按键", "Show key",
-				"显示按键\n按住或切换用于显示 HUD 的按键，默认 ~\n点右侧键框后按新键改绑，Esc 取消",
-				"show key\nkey used to show the HUD by holding or toggling, default ~\nclick the key box, then press a new key (Esc cancels)");
+				"显示按键\n按住或切换用于显示 HUD 的按键\n点右侧键框后按新键改绑，Esc 取消",
+				"show key\nkey used to show the HUD by holding or toggling\nclick the key box, then press a new key (Esc cancels)");
 			Loc("Show Mode", "显示方式", "Show mode",
 				"显示方式\n按住显示：按住显示键期间显示 HUD\n切换显示：按一下在显示与隐藏之间切换",
 				"show mode\nHold = visible while the show key is held\nToggle = tap the show key to switch visibility");

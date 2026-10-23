@@ -847,6 +847,9 @@ public partial class SR : ITweak {
             // 表格自适应高度助手：公式留在实现层，契约层只负责转发（功能页在 Initialize 之后才会渲染）。
             try { SRApi.SetTableAutoHeightSink(delegate (float __u, float __m) { return SR.Ctl.TableAutoHeight(__u, __m); }); }
             catch (Exception __ex) { Guard.Log("注入表格高度助手", __ex); }
+            // 统一操作列按钮：绘制/命中/悬浮都在实现层，契约层只转发（功能页在 Initialize 之后才会渲染）。
+            try { SRApi.SetTableActionButtonsSink(delegate (Rect __r, SRApi.TableAction[] __a, float[] __w, ref int __h) { return SR.Ctl.TableActionButtons(__r, __a, __w, ref __h); }); }
+            catch (Exception __ex) { Guard.Log("注入统一操作列按钮", __ex); }
             _internalConfig = MainPlugin.Data != null ? MainPlugin.Data : plugin.Config; // 核心条目也走外置文件
             // 界面文案自注册：本处只派发 SR 分部文件，功能在自己的 Initialize 里注册自己的文案。
             SelfRegCore();
@@ -1163,43 +1166,43 @@ public partial class SR : ITweak {
             SR.Nav("Home", 10); // 首页自己的侧栏栏目（顺序 10）
             SR.RegisterPage("Home", RenderHomePage); // 首页也走自绘页注册表（SR.Window 不做 if-else 分派）
             SR.LocKey(Keys.Settings, Keys.UiScale, "界面缩放", null);
-            // 统一登记：功能页里没有自带 LocDesc 的可见条目（4 行：用途 / 行为 / 注意 / 默认）。
+            // 统一登记：功能页里没有自带 LocDesc 的可见条目（3 行：是什么 / 怎么用 / 注意；默认值由核心追加）。
             SR.LocDesc("Chat", "Log Limit", "聊天记录保留条数\n超过上限时丢弃最旧的消息\n仅影响本模组的聊天记录面板", "Chat log size\nolder messages are dropped beyond the limit\naffects this mod chat log panel only");
-            SR.LocDesc("Level", "Party Bomb", "派对盒炸弹开关\n开箱后按概率生成炸弹\n需要房主权限，仅派对盒阶段；关。", "Party box bomb\nspawns a bomb by chance when the box opens\nhost only; party-box phase only; OFF");
+            SR.LocDesc("Level", "Party Bomb", "派对盒炸弹开关\n开箱后按概率生成炸弹\n需要房主权限，仅派对盒阶段。", "Party box bomb\nspawns a bomb by chance when the box opens\nhost only; party-box phase only");
             SR.LocDesc("Level", "Party Bomb Type", "派对盒炸弹类型\n选择生成的炸弹种类\n取值与游戏内炸弹类型一致", "Party box bomb type\nselects which bomb is spawned\nmatches the game bomb types");
             SR.LocDesc("Level", "Refresh Party Box Key", "刷新派对盒快捷键\n按下重走派对盒流程，按权重重新开箱\n不绑键则不生效", "Reroll party box key\npress to reroll and reopen the box\ninactive while unbound");
             SR.LocDesc("Level", "Close Party Box Key", "关闭派对盒快捷键\n按下结束选择，进入游玩阶段\n不绑键则不生效", "Close party box key\npress to end picking and enter play\ninactive while unbound");
-            SR.LocDesc("Online", "Filter Region", "区域筛选\n只显示指定区域的房间\n从下拉选择；留空表示不过滤；空。", "Region filter\nshows lobbies from the selected region only\npick from the dropdown; empty means no filter; empty");
+            SR.LocDesc("Online", "Filter Region", "区域筛选\n只显示指定区域的房间\n从下拉选择；留空表示不过滤。", "Region filter\nshows lobbies from the selected region only\npick from the dropdown; empty means no filter");
             SR.LocDesc("Online", "Filter Mode", "模式筛选\n只显示指定模式的房间\n留空表示不过滤", "Mode filter\nshows lobbies of the selected game mode only\nempty means no filter");
             SR.LocDesc("Online", "Filter Tag", "标签筛选\n只显示含指定标签的房间\n留空表示不过滤", "Tag filter\nshows lobbies with the selected tag only\nempty means no filter");
             SR.LocDesc("Online", "Filter State", "状态筛选\n按房间状态过滤\n留空全部，join 可加入，full 已满，playing 进行中", "State filter\nfilters lobbies by state\nempty = all, join = joinable, full = full, playing = in match");
-            SR.LocDesc("Online", "Filter Min Players", "最少人数筛选\n只显示人数不少于该值的房间\n留空全部；填 1 到 3；lt4 表示少于 4 人；空。", "Min players filter\nshows lobbies with at least that many players\nempty = all; 1-3; lt4 = fewer than 4; empty");
+            SR.LocDesc("Online", "Filter Min Players", "最少人数筛选\n只显示人数不少于该值的房间\n留空全部；填 1 到 3；lt4 表示少于 4 人。", "Min players filter\nshows lobbies with at least that many players\nempty = all; 1-3; lt4 = fewer than 4");
             SR.LocDesc("Online", "Filter AFK", "AFK 筛选\n按房主是否挂机过滤\n留空全部，hide 隐藏挂机，only 只看挂机", "AFK filter\nfilters by whether the host is AFK\nempty = all, hide = hide AFK, only = AFK only");
-            SR.LocDesc("Online", "Search Timeout", "搜索超时秒数\n超过该时间后停止等待房间列表\n仅作为兜底，通常不必修改；15。", "Search timeout\nstops waiting for the lobby list after this many seconds\nfallback only; usually no need to change; 15");
-            SR.LocDesc("Online", "Sort Column", "排序列索引\n指定房间列表按哪一列排序\n一般由表头操作维护，不建议手改；-1（默认排序）。", "Sort column index\nselects the column used to sort the lobby list\nnormally maintained by the header; avoid editing manually; -1 (default order)");
+            SR.LocDesc("Online", "Search Timeout", "搜索超时秒数\n超过该时间后停止等待房间列表\n仅作为兜底，通常不必修改。", "Search timeout\nstops waiting for the lobby list after this many seconds\nfallback only; usually no need to change");
+            SR.LocDesc("Online", "Sort Column", "排序列索引\n指定房间列表按哪一列排序\n一般由表头操作维护，不建议手改。", "Sort column index\nselects the column used to sort the lobby list\nnormally maintained by the header; avoid editing manually");
             SR.LocDesc("Online", "Sort Descending", "排序方向\n开启为从大到小，关闭为从小到大\n与排序列配合使用", "Sort direction\ndescending when on, ascending when off\nused together with the sort column");
             SR.LocDesc("Chat Window", "Key Defaults v2", "内部标记：快捷键默认值已迁移\n仅用于配置迁移，不需要修改\n修改它不会产生任何效果", "Internal flag: key defaults migrated\nused for config migration only\nchanging it has no effect");
             SR.LocDesc("Chat Window", "Defaults v3", "内部标记：字号默认值已迁移\n仅用于配置迁移，不需要修改\n修改它不会产生任何效果", "Internal flag: font defaults migrated\nused for config migration only\nchanging it has no effect");
-            SR.LocDesc(Keys.Settings, Keys.UiScale, "整个界面放大多少. 1.0 是原始大小, 1.3 是默认值. 嫌字小就调大一点.", "UI zoom, default 1.3.");
+            SR.LocDesc(Keys.Settings, Keys.UiScale, "界面缩放\n整个界面按比例放大，1.0 为原始大小\n范围 0.5 到 2；字太小可适当调大", "UI scale\nscales the whole interface; 1.0 is the original size\nrange 0.5-2; increase it if the text is too small");
             // 核心自己的设置项也走"行扩展点"：设置页因此只有一份滑块绘制代码，语言下拉不按 section/key 硬编码。
             SRApi.RowSliders.Add(SettingsSliderRange);
             SR.RowComboOptions.Add(SettingsComboOptions);
             SR.LocKey(Keys.Settings, Keys.DisabledPlugins, "禁用的外部插件", null);
-            SR.LocDesc(Keys.Settings, Keys.DisabledPlugins, "不想让它跟着管理器一起出现的外部插件, 把它的 GUID 填进来, 用分号隔开. 没写进来的默认都启用.", "External plugins to disable, as a semicolon-separated GUID list. Plugins not listed stay enabled.");
+            SR.LocDesc(Keys.Settings, Keys.DisabledPlugins, "禁用的外部插件\n填写要禁用的插件 GUID，用分号分隔\n只影响外部插件加载；留空表示全部启用", "External plugins to disable\nenter the GUIDs to disable, separated by semicolons\naffects external plugin loading only; empty means all enabled");
             SR.LocKey(Keys.Settings, Keys.OpenKey, "打开键", null);
-            SR.LocDesc(Keys.Settings, Keys.OpenKey, "打开和关闭管理器用, 默认 Insert. 想绑组合键就点右边的框, 按住 Shift 或 Ctrl 再按主键.", "Open/close the manager (default Insert). Click the box to bind a combo key.");
+            SR.LocDesc(Keys.Settings, Keys.OpenKey, "打开键\n按下打开或关闭管理器\n点键框后按新键改绑，支持 Shift/Ctrl 组合键", "Open key\npress to open or close the manager\nclick the key box to rebind; Shift/Ctrl combos are supported");
             SR.LocKey(Keys.Settings, Keys.BlockInput, "冻结输入", null);
-            SR.LocDesc(Keys.Settings, Keys.BlockInput, "开着的时候, 管理界面一打开就冻结游戏输入, 免得手一滑把角色弄跑了.", "Freeze game input while the manager is open, so you do not move your character by accident.");
+            SR.LocDesc(Keys.Settings, Keys.BlockInput, "冻结输入\n管理界面打开时冻结游戏输入\n只在你本地生效，不改对局规则", "Freeze input\nfreezes game input while the manager is open\nlocal only; does not change match rules");
             SR.LocKey(Keys.Settings, Keys.WinWidth, "窗口宽度", null);
-            SR.LocDesc(Keys.Settings, Keys.WinWidth, "管理器窗口有多宽, 400 到 1600.", "Manager window width, 400 - 1600.");
+            SR.LocDesc(Keys.Settings, Keys.WinWidth, "窗口宽度\n设置管理器窗口的宽度\n范围 400 到 1600", "Window width\nsets the manager window width\nrange 400-1600");
             SR.LocKey(Keys.Settings, Keys.WinHeight, "窗口高度", null);
-            SR.LocDesc(Keys.Settings, Keys.WinHeight, "管理器窗口有多高, 300 到 1000.", "Manager window height, 300 - 1000.");
+            SR.LocDesc(Keys.Settings, Keys.WinHeight, "窗口高度\n设置管理器窗口的高度\n范围 300 到 1000", "Window height\nsets the manager window height\nrange 300-1000");
             SR.LocKey(Keys.Settings, Keys.WinX, "窗口X", null);
-            SR.LocDesc(Keys.Settings, Keys.WinX, "窗口左边离屏幕左边缘多远, 单位像素, 以屏幕左上角为原点.", "Window X in pixels, measured from the top-left corner of the screen.");
+            SR.LocDesc(Keys.Settings, Keys.WinX, "窗口 X 坐标\n窗口左边距屏幕左边缘的像素距离\n坐标以屏幕左上角为原点", "Window X\nhorizontal pixel distance from the left screen edge\norigin is the top-left corner of the screen");
             SR.LocKey(Keys.Settings, Keys.WinY, "窗口Y", null);
-            SR.LocDesc(Keys.Settings, Keys.WinY, "窗口上边离屏幕上边缘多远, 单位像素, 以屏幕左上角为原点.", "Window Y in pixels, measured from the top-left corner of the screen.");
+            SR.LocDesc(Keys.Settings, Keys.WinY, "窗口 Y 坐标\n窗口上边距屏幕上边缘的像素距离\n坐标以屏幕左上角为原点", "Window Y\nvertical pixel distance from the top screen edge\norigin is the top-left corner of the screen");
             SR.LocKey(Keys.Settings, Keys.SidebarWidth, "栏目宽度", null);
-            SR.LocDesc(Keys.Settings, Keys.SidebarWidth, "左边那一栏有多宽, 单位像素, 填 0 让它自己算, 范围 100 到 320. 也可以直接在窗口里拖侧栏右边缘.", "Left sidebar width in pixels, 0 = auto, 100 - 320. You can also drag the sidebar's right edge.");
+            SR.LocDesc(Keys.Settings, Keys.SidebarWidth, "栏目宽度\n左侧栏目栏的宽度，0 = 自动计算\n范围 100 到 320；也可拖动侧栏右边缘调整", "Sidebar width\nwidth of the left sidebar, 0 = auto\nrange 100-320; you can also drag the sidebar right edge");
             SR.LocKey(Keys.Settings, Keys.Language, "界面语言", null);
         }
 
