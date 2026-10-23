@@ -290,14 +290,26 @@ namespace SR_UCH {
             ref Vector2 scrollCols, ref Vector2 scrollRows);
         public delegate bool TableScrollbarInputFn(Event e, Vector2 mp, Rect track, Rect thumb, float scrollMax,
             ref bool dragging, ref float grabY, ref float scrollY);
+        public delegate float TableAutoHeightFn(float usedAbove, float minH);
         private static Action<TableArgs> _tableDraw;
         private static TableDragWatchdogFn _tableDragWatchdog;
         private static TableWheelInputFn _tableWheelInput;
         private static TableScrollbarInputFn _tableScrollbarInput;
+        // 存成 object 而非委托字段：本注入发生在 SR.Initialize（早于功能渲染），
+        // 但晚于 MainPlugin 启动期的 SRApi.MissingSinks() 自检；用委托字段会被误报为"未注入"。
+        private static object _tableAutoHeight;
         public static void SetTableSinks(Action<TableArgs> tableDraw, TableDragWatchdogFn tableDragWatchdog,
                                          TableWheelInputFn tableWheelInput, TableScrollbarInputFn tableScrollbarInput) {
             _tableDraw = tableDraw; _tableDragWatchdog = tableDragWatchdog;
             _tableWheelInput = tableWheelInput; _tableScrollbarInput = tableScrollbarInput;
+        }
+        // 表格自适应高度助手：页面顶部已用高度 + 表格高度 = 底栏之上可用高度。
+        // 公式（标题栏 26 + 内边距 2 + 底栏 + 行区上下留白 4）由实现层注入；未注入时按同一语义兜底。
+        public static void SetTableAutoHeightSink(TableAutoHeightFn tableAutoHeight) { _tableAutoHeight = tableAutoHeight; }
+        public static float TableAutoHeight(float usedAbove, float minH) {
+            TableAutoHeightFn f = _tableAutoHeight as TableAutoHeightFn;
+            if (f != null) return f(usedAbove, minH);
+            return Mathf.Max(minH, ContentArea.height - Ctl.Sc(26f) - Ctl.Sc(2f) - FooterHeight - usedAbove - Ctl.Sc(4f));
         }
                     public sealed class TableArgs {
             public Rect box;                 //表格外框（屏幕坐标）
@@ -347,6 +359,11 @@ namespace SR_UCH {
             public List<Rect> pinRects = new List<Rect>();
             public List<int> pinRows = new List<int>();
             public Rect pinHeader;
+            // 行交互：核心每帧用 rowRects 做命中并回填，调用方只读。
+            public int rowHover = -1;                       //鼠标命中的数据行号；-1 = 没有
+            public System.Action<int> rowClick;             //左键 MouseUp 命中非钉住列区域时回调行号
+            public System.Action<int> rowDoubleClick;       //0.35 秒内同一行左键点击两次时回调
+            public bool hoverHighlight = true;              //rowHover >= 0 时核心在行矩形上叠一层很淡的高亮
             }
         public static void TableDraw(TableArgs a) { Action<TableArgs> f = _tableDraw; if (f != null) f(a); }
         public static void TableDragWatchdog(Event e, ref float watchdog, ref bool sbDragging, ref int moveCol,
@@ -489,6 +506,8 @@ namespace SR_UCH {
                 _langEn = langEn; _editOpen = editOpen;
             }
             public static float Sc(float v) { Func<float, float> f = _sc; return f != null ? f(v) : v; }
+            // 表格自适应高度助手（Ctl 侧别名；功能层统一从这里取）。
+            public static float TableAutoHeight(float usedAbove, float minH) { return SRApi.TableAutoHeight(usedAbove, minH); }
             public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey) { Action<GUIContent, ConfigEntryBase, float, float, ConfigEntry<KeyCode>> f = _restoreLabel; if (f != null) f(content, entry, w, h, hotkey); }
             public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h) { RestoreLabel(content, entry, w, h, null); }
             public static void RenderControl(ConfigEntryBase entry) { Action<ConfigEntryBase> f = _renderControl; if (f != null) f(entry); }

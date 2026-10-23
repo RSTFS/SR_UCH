@@ -46,7 +46,7 @@ public class QuickAdjust : ITweak {
         SRApi.LocKey("Quick Adjust", "Quick Retry Hold", "等待秒数", null);
         SRApi.LocDesc("Quick Adjust", "Quick Retry Hold", "快速重试长按时间\n设置死亡后长按多久触发重试\n范围 0 到 2，0 为立即重试", "quick retry hold time\nsets how long to hold after death before retrying\nrange 0-2, 0 = instant");
         SRApi.LocKey("Quick Adjust", "Score Discount", "分数折扣", null);
-        SRApi.LocDesc("Quick Adjust", "Score Discount", "分数折扣百分比\n把自己的 handicap 设为 100 减折扣值，在本次房间内持续生效（含后续回合与关卡重载）\n范围 0 到 90，0 为关闭；换房间后自动恢复默认；20。", "score discount percentage\nsets your handicap to 100 minus the discount and stays effective for this room (later rounds and level reloads included)\nrange 0-90, 0 = off; resets when you join another room; 20");
+        SRApi.LocDesc("Quick Adjust", "Score Discount", "分数折扣百分比\n把自己的 handicap 设为 100 减折扣值\n范围 0 到 90，0 为关闭；20。", "score discount percentage\nsets your handicap to 100 minus the discount\nrange 0-90, 0 = off; 20");
         SRApi.LocKey("Quick Adjust", "More Discount Values", "更多折扣数值", null);
         SRApi.LocDesc("Quick Adjust", "More Discount Values", "折扣数值输入模式开关\n开启后折扣由整十滑块改为自由输入框\n范围 0 到 90 任意整数，0 为关闭", "discount input mode switch\nturns the tens slider into a free input box\nany integer from 0 to 90, 0 = off");
         // 预登记本页自动快捷键。
@@ -439,7 +439,7 @@ public class QuickAdjust : ITweak {
 				int target = Mathf.Clamp(100 - scoreDiscount, 10, 100);
 				if (ApplyOwnHandicap(target))
 				{
-					SRApi.Notify(SRApi.T("评分折扣已应用：自己 handicap ", "Score discount applied: own handicap ") + target + SRApi.T("%，本次房间内持续生效", "%, stays effective for this room"));
+					SRApi.Notify(SRApi.T("评分折扣已应用：自己 handicap ", "Score discount applied: own handicap ") + target);
 				}
 				else
 				{

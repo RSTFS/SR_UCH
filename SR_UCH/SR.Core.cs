@@ -844,6 +844,9 @@ public partial class SR : ITweak {
         }
 
         public void Initialize(IFeatureHost plugin) {
+            // 表格自适应高度助手：公式留在实现层，契约层只负责转发（功能页在 Initialize 之后才会渲染）。
+            try { SRApi.SetTableAutoHeightSink(delegate (float __u, float __m) { return SR.Ctl.TableAutoHeight(__u, __m); }); }
+            catch (Exception __ex) { Guard.Log("注入表格高度助手", __ex); }
             _internalConfig = MainPlugin.Data != null ? MainPlugin.Data : plugin.Config; // 核心条目也走外置文件
             // 界面文案自注册：本处只派发 SR 分部文件，功能在自己的 Initialize 里注册自己的文案。
             SelfRegCore();

@@ -447,13 +447,13 @@ namespace SR_UCH.Tweaks {
             // 表格自绘：表头固定，只有房间行滚动；滚动条自绘以跟随界面缩放并在拖到列表外时不断。
             GUILayout.Space(SRApi.Ctl.Sc(3));
             Rect last = GUILayoutUtility.GetLastRect();
-            float footerH = SRApi.FooterHeight > 0f ? SRApi.FooterHeight : SRApi.Ctl.Sc(30);
             // 宽度用纯尺寸计算：布局矩形与屏幕矩形（ContentArea）不同坐标系，混算会导致表格框超宽、操作列被推出屏幕。
             float availW = Mathf.Max(SRApi.Ctl.Sc(220), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(12));
-            // 高度同理：页面可视高度（屏幕量）减去表格上方已用高度（布局量之差）。
-            float pageH = SRApi.ContentArea.height - SRApi.Ctl.Sc(26) - SRApi.Ctl.Sc(2) - footerH;
+            // 高度走核心统一公式：页面可视高度（屏幕量）减去表格上方已用高度（布局量之差）。
             float usedAbove = _pageTopY > 0f ? Mathf.Max(0f, last.yMax - _pageTopY) : 0f;
-            float availH = Mathf.Max(SRApi.Ctl.Sc(140), pageH - usedAbove - SRApi.Ctl.Sc(8));
+            float availH = SRApi.FooterHeight > 0f
+                ? Mathf.Max(SRApi.Ctl.Sc(140), SRApi.Ctl.TableAutoHeight(usedAbove, SRApi.Ctl.Sc(140)) - SRApi.Ctl.Sc(4))
+                : SRApi.Ctl.Sc(140);
             // 拖动中必须读临时值 _dragHTmp（配置值此时还是旧的），否则高度不跟手。
             float hPx = _dragH ? _dragHTmp : (_tableH != null ? _tableH.Value : 0);
             float boxH = hPx > 0f

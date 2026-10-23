@@ -63,6 +63,7 @@ SectionEntries
 SelectedPageId
 T
 TableArgs
+TableAutoHeight
 TableDragWatchdog
 TableDraw
 TableLineStrong

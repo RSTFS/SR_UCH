@@ -16,6 +16,12 @@ public partial class SR {
         // UI 缩放系数（各页像素尺寸都乘它）
         public static float Sc(float v) { return SR.Sc(v); }
 
+        // 表格自适应高度：页面顶部已用高度 usedAbove + 表格高度 = 底栏之上可用高度。
+        // 26 = 窗口标题栏，2 = 内容区内边距，4 = 行区上下留白；均按当前 UI 缩放换算。
+        public static float TableAutoHeight(float usedAbove, float minH) {
+            return Mathf.Max(minH, SR.ContentArea.height - Sc(26f) - Sc(2f) - SR.FooterHeight - usedAbove - Sc(4f));
+        }
+
         // 条目标签（可点击恢复默认值；tooltip = 说明 + 后缀追加的默认值，不再带恢复提示）
         public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey = null) { SR.RestoreLabel(content, entry, w, h, hotkey); }
         public static void RenderControl(ConfigEntryBase entry) { SR.RenderControl(entry); }
@@ -648,6 +654,11 @@ public partial class SR {
 
     //统一入口的参数（表格内容/状态由调用方填；绘制结果回填到列表/矩形里）
 
+    // 行点击状态：按下行用于过滤"从行上按下、在行上松开"的点击（拖列宽/滚动条释放不会误触发）。
+    private static int _rowDownRow = -1;
+    private static int _rowLastClickRow = -1;
+    private static float _rowLastClickTime = -999f;
+
     //统一入口：表头 + 行命中 + 行单元格 + 钉住列命中（滚动条/输入由调用方按需要另调）
     public static void TableDraw(SRApi.TableArgs a) {
         if (a == null || a.colW == null || a.vis == null) return;
@@ -670,6 +681,21 @@ public partial class SR {
                 DrawLine(new Rect(a.box.x, a.box.y + headerH - 1f, a.stripW, 1f), CurStyle.LineStrong);
             }
             TableRowRects(a.rowCount, rowH, a.scrollY, a.rowsH, a.box.y, headerH, a.rowsClip, a.box.x, a.stripW, a.rowRects, a.rowRows);
+            // 行命中：用 rowRects 每帧回填 rowHover（只在行区裁剪内，且不算钉住列区域）。
+            try {
+                Event __re = Event.current;
+                int __hov = -1;
+                if (__re != null && a.rowsClip.width > 0f && a.rowsClip.height > 0f && a.rowsClip.Contains(__re.mousePosition)) {
+                    Vector2 __rmp = __re.mousePosition;
+                    bool __inPin = a.pinW > 0f && __rmp.x >= a.pinX;
+                    if (!__inPin) {
+                        for (int k = 0; k < a.rowRects.Count && k < a.rowRows.Count; k++) {
+                            if (a.rowRects[k].Contains(__rmp)) { __hov = a.rowRows[k]; break; }
+                        }
+                    }
+                }
+                a.rowHover = __hov;
+            } catch (Exception __ex) { Guard.Log("表格行命中", __ex); }
             // 行选中高亮：rowSelected 指定的行由核心画整行高亮。
             if (a.rowSelected != null && a.rowRects != null && a.rowRects.Count > 0) {
                 try {
@@ -788,8 +814,6 @@ public partial class SR {
             Color clipSavedColor = GUI.color; // 异常时也要还原（GUI.color 泄漏会污染游戏界面）
             GUI.BeginClip(new Rect(a.box.x, a.box.y + headerH, a.stripW, a.rowsH));
             try {
-            // 行悬停用的裁剪区内坐标（原点 = 裁剪框左上；mp 是进裁剪前抓的屏幕坐标）。
-            Vector2 __lm = new Vector2(a.mp.x - a.box.x, a.mp.y - a.box.y - headerH);
             for (int i = 0; i < a.rowCount; i++) {
                 float y = i * rowH - a.scrollY;
                 if (y > a.rowsH || y + rowH < 0f) continue;
@@ -801,10 +825,10 @@ public partial class SR {
                     if (alpha < 1f) ab.a *= alpha;
                     DrawFill(new Rect(0f, y, a.stripW, rowH), ab);
                 }
-                // 行悬停反馈：加在隔行底之上、文字之下。
+                // 行悬停反馈：加在隔行底之上、文字之下；默认开启，rowHover 由核心每帧回填。
                 float __hy0 = Mathf.Max(y, 0f), __hy1 = Mathf.Min(y + rowH, a.rowsH);
-                if (__hy1 > __hy0 && __lm.x >= 0f && __lm.x < a.stripW && __lm.y >= __hy0 && __lm.y < __hy1) {
-                    Color __hc = new Color(1f, 1f, 1f, 0.05f);
+                if (a.hoverHighlight && i == a.rowHover && __hy1 > __hy0) {
+                    Color __hc = new Color(1f, 1f, 1f, 0.06f);
                     if (alpha < 1f) __hc.a *= alpha;
                     DrawFill(new Rect(0f, __hy0, a.stripW, __hy1 - __hy0), __hc);
                 }
@@ -844,6 +868,28 @@ public partial class SR {
                 BlockWindowDrag = false;
                 if (a.saveWidths != null) { try { a.saveWidths(); } catch (Exception __sw) { Guard.Log("表格列宽保存", __sw); } }
             }
+            // 行点击/双击：左键从同一行按下再松开才派发；已被其它交互消费的事件（type=Used）不会进到这里。
+            try {
+                Event __ce = Event.current;
+                if (__ce != null) {
+                    if (__ce.type == EventType.MouseDown && __ce.button == 0) {
+                        _rowDownRow = a.rowHover;
+                    } else if (__ce.type == EventType.MouseUp && __ce.button == 0) {
+                        int __clicked = (a.rowHover >= 0 && a.rowHover == _rowDownRow) ? a.rowHover : -1;
+                        _rowDownRow = -1;
+                        if (__clicked >= 0) {
+                            if (a.rowClick != null) { try { a.rowClick(__clicked); } catch (Exception __rc) { Guard.Log("表格行点击", __rc); } }
+                            float __now = Time.unscaledTime;
+                            if (_rowLastClickRow == __clicked && __now - _rowLastClickTime <= 0.35f) {
+                                _rowLastClickRow = -1; _rowLastClickTime = -999f;
+                                if (a.rowDoubleClick != null) { try { a.rowDoubleClick(__clicked); } catch (Exception __rd) { Guard.Log("表格行双击", __rd); } }
+                            } else {
+                                _rowLastClickRow = __clicked; _rowLastClickTime = __now;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception __ex) { Guard.Log("表格行点击派发", __ex); }
         } catch (Exception __ex) { Guard.Log("表格绘制", __ex); }
     }
 

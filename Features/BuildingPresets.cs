@@ -88,6 +88,10 @@ namespace SR_UCH.Tweaks {
 		// 模式筛选（运行期状态，不落配置）："" = 全部；否则为预设目录名（GameState.GameMode 的 ToString）。
 		private static string _modeFilter = "";
 		private static bool _modeFilterOpen;
+		// 加载模式（运行期状态，不落配置）："" = 原生（跟随预设自身保存的模式，保持原有行为）；
+		// 否则为 GameState.GameMode 的 ToString，加载/重载时强制使用该模式。
+		private static string _loadMode = "";
+		private static bool _loadModeOpen;
 
 		// 标准表格（核心 TableDraw）状态：列宽 / 列序 / 隐藏列 / 可见列 / 命中矩形缓存 / 滚动 / 拖拽。
 		private static readonly float[] _colW = new float[ColCount];
@@ -179,7 +183,7 @@ namespace SR_UCH.Tweaks {
 			}
 		}
 
-		// 栏目注册：单页（保存与导入 + 搜索/排序 + 预设列表同页，分区用 SectionTitle）。
+		// 栏目注册：单页（保存 / 导入导出 / 搜索排序筛选 + 预设列表同页，分区用 SectionTitle）。
 		private static void SelfReg() {
 			SRApi.LocSec(Section, "布局预设", "Layout Presets");
 			SRApi.Nav(Section, 45); // 关卡(40) 之后、构建工具(50) 之前
@@ -305,7 +309,7 @@ namespace SR_UCH.Tweaks {
 
 		// ---------- 页面渲染（单页：保存与导入 + 搜索/排序 + 预设列表） ----------
 
-		// 同一页按 SectionTitle 分三个区；页面本身不滚动（NoPageScrollBars + 表格高度按视口计算），
+		// 同一页按 SectionTitle 分保存 / 导入导出 / 搜索排序筛选 / 预设列表四个区；页面本身不滚动（NoPageScrollBars + 表格高度按视口计算），
 		// 预设列表在固定高度区域内用自己的滚轮滚动。
 		// 页面内容在布局空间里的起点 y（零高度探针），用于计算表格上方已用高度（同联机列表）。
 		private static float _pageTopY;
@@ -323,7 +327,8 @@ namespace SR_UCH.Tweaks {
 				Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
 				if (Event.current != null && Event.current.type == EventType.Layout) { _pageTopY = topProbe.y; _pageTopYSet = true; }
 
-				SRApi.Ctl.SectionTitle(SRApi.T("- 保存与导入 -", "- Save & Import -"));
+				// 分区 1：保存（名称 + 保存 + 刷新，紧凑一行）。
+				SRApi.Ctl.SectionTitle(SRApi.T("- 保存 -", "- Save -"));
 				GUILayout.BeginHorizontal();
 				try {
 					SRApi.Ctl.LabelAuto(SRApi.T("预设名称", "Preset name"));
@@ -332,20 +337,28 @@ namespace SR_UCH.Tweaks {
 					if (typed != null && typed != _newName) _newName = typed;
 					if (GUILayout.Button(SaveButtonText(), SRApi.Ctl.Btn, GUILayout.Width(W(120)), GUILayout.Height(W(24)))) SaveCurrent();
 					GUILayout.FlexibleSpace();
+					if (GUILayout.Button(new GUIContent(SRApi.T("刷新", "Refresh"),
+							SRApi.T("重新扫描预设目录（手动放入/删除了 XML 时用），也用于重建索引",
+								"rescan the presets folder (after manually adding/removing XML files) and rebuild the index")),
+						SRApi.Ctl.Btn, GUILayout.Width(W(56)), GUILayout.Height(W(24)))) {
+						try { _loaded = false; LoadFromDisk(true); } catch (Exception __rx) { SRApi.Guard.Log("布局预设/刷新列表", __rx); }
+					}
 				} finally {
 					GUILayout.EndHorizontal();
 				}
+
+				// 分区 2：导入 / 导出（XML 路径与导入一行；导出全部 / 复制清单一行）。
+				SRApi.Ctl.SectionTitle(SRApi.T("- 导入 / 导出 -", "- Import / Export -"));
 				GUILayout.BeginHorizontal();
 				try {
 					SRApi.Ctl.LabelAuto(SRApi.T("XML 路径", "XML path"));
 					string path = SRApi.ClearableTextField(_importPath ?? "", 260, SRApi.Ctl.SearchBox,
-						GUILayout.Width(W(230)), GUILayout.Height(W(24)));
+						GUILayout.MinWidth(W(150)), GUILayout.ExpandWidth(true), GUILayout.Height(W(24)));
 					if (path != null && path != _importPath) _importPath = path;
 					if (GUILayout.Button(SRApi.T("从路径导入", "Import path"), SRApi.Ctl.Btn,
 						GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ImportFromPath();
 					if (GUILayout.Button(SRApi.T("从剪贴板导入", "Import clipboard"), SRApi.Ctl.Btn,
 						GUILayout.Width(W(120)), GUILayout.Height(W(24)))) ImportFromClipboard();
-					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
 				}
@@ -365,7 +378,9 @@ namespace SR_UCH.Tweaks {
 				}
 				GUILayout.Space(W(4));
 
-				SRApi.Ctl.SectionTitle(SRApi.T("- 搜索 / 排序 / 批量 -", "- Search / sort / batch -"));
+				// 分区 3：列表工具。分两行避免窗口变窄时控件被挤出页面：
+				// 第一行搜索 / 排序 / 关卡，第二行模式筛选 / 加载模式；标签统一 LabelAuto，控件宽度随 UI 缩放。
+				SRApi.Ctl.SectionTitle(SRApi.T("- 搜索 / 排序 / 筛选 -", "- Search / sort / filter -"));
 				GUILayout.BeginHorizontal();
 				try {
 					// 搜索标签：LabelAuto 绘制 + 命中区域判定，点击清空搜索框。
@@ -378,7 +393,7 @@ namespace SR_UCH.Tweaks {
 						evSearch.Use();
 					}
 					string q = SRApi.ClearableTextField(_search ?? "", 40, SRApi.Ctl.SearchBox,
-						GUILayout.Width(W(100)), GUILayout.Height(W(24)));
+						GUILayout.Width(W(160)), GUILayout.Height(W(24)));
 					if (q != null && q != _search) _search = q;
 					GUILayout.Space(W(8));
 					SRApi.Ctl.LabelAuto(SRApi.T("排序", "Sort"));
@@ -386,21 +401,23 @@ namespace SR_UCH.Tweaks {
 					GUILayout.Space(W(8));
 					SRApi.Ctl.LabelAuto(SRApi.T("关卡", "Level"));
 					RenderLevelFilterCombo();
-					GUILayout.Space(W(8));
-					SRApi.Ctl.LabelAuto(SRApi.T("模式", "Mode"));
-					RenderModeFilterCombo();
-					GUILayout.Space(W(8));
-					if (GUILayout.Button(new GUIContent(SRApi.T("刷新", "Refresh"),
-							SRApi.T("重新扫描预设目录（手动放入/删除了 XML 时用），也用于重建索引",
-								"rescan the presets folder (after manually adding/removing XML files) and rebuild the index")),
-						SRApi.Ctl.Btn, GUILayout.Width(W(56)), GUILayout.Height(W(24)))) {
-						try { _loaded = false; LoadFromDisk(true); } catch (Exception __rx) { SRApi.Guard.Log("布局预设/刷新列表", __rx); }
-					}
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
 				}
-				// 跳过树屋流程（标准配置勾选框）+ 返回树屋（标准动作按钮，可绑定快捷键）
+				GUILayout.BeginHorizontal();
+				try {
+					SRApi.Ctl.LabelAuto(SRApi.T("模式", "Mode"));
+					RenderModeFilterCombo();
+					GUILayout.Space(W(8));
+					SRApi.Ctl.LabelAuto(SRApi.T("加载模式", "Load mode"));
+					RenderLoadModeCombo();
+					GUILayout.FlexibleSpace();
+				} finally {
+					GUILayout.EndHorizontal();
+				}
+				// 底部工具：跳过树屋流程（标准配置勾选框）+ 返回树屋（标准动作按钮，可绑定快捷键）。
+				// 单独一行，不与上面的筛选行混在一起。
 				GUILayout.BeginHorizontal();
 				try {
 					if (_skipTreehouse != null) {
@@ -421,15 +438,14 @@ namespace SR_UCH.Tweaks {
 				}
 				if (!string.IsNullOrEmpty(_renameKey)) RenderRenameBar();
 				GUILayout.Space(W(2));
-				// 高度：底栏之上可用高度 - 页面顶部已用高度 = 表格高度（Layout 事件用探针重算，窗口变化实时跟随）。
-				// pageH 的 Sc(26) 是窗口标题栏（与联机列表同一公式），FooterHeight 是底栏实际高度。
+				// 高度：核心统一公式（页面顶部已用高度 + 表格高度 = 底栏之上可用高度），窗口变化实时跟随。
 				Rect last = GUILayoutUtility.GetLastRect();
-				float footerH = SRApi.FooterHeight > 0f ? SRApi.FooterHeight : SRApi.Ctl.Sc(30);
-				float pageH = SRApi.ContentArea.height - SRApi.Ctl.Sc(26) - SRApi.Ctl.Sc(2) - footerH;
 				float usedAbove = _pageTopYSet
 					? Mathf.Max(0f, last.yMax - _pageTopY)
 					: SRApi.Ctl.Sc(300);
-				float tableH = Mathf.Max(SRApi.Ctl.Sc(120), pageH - usedAbove - SRApi.Ctl.Sc(4));
+				float tableH = SRApi.FooterHeight > 0f
+					? SRApi.Ctl.TableAutoHeight(usedAbove, SRApi.Ctl.Sc(120))
+					: Mathf.Max(SRApi.Ctl.Sc(120), SRApi.ContentArea.height - SRApi.Ctl.Sc(26) - SRApi.Ctl.Sc(2) - SRApi.Ctl.Sc(30) - usedAbove - SRApi.Ctl.Sc(4));
 				_actionHitThisFrame = false;
 				RenderPresetTable(tableH);
 				// 二次确认取消：本帧 MouseDown 没有命中任何操作按钮 = 点了空白处
@@ -522,6 +538,29 @@ namespace SR_UCH.Tweaks {
 				SRApi.Guard.Log("布局预设/模式筛选项", __ex);
 			}
 			return vals;
+		}
+
+		// 加载模式下拉：原生（跟随预设） + 游戏四模式。运行期状态，不落配置。
+		// 值为 "" 或 GameState.GameMode 的 ToString；显示名复用 ModeText（游戏本地化 / 中文回退）。
+		private static void RenderLoadModeCombo() {
+			try {
+				string[] vals = new string[] { "", "FREEPLAY", "PARTY", "CREATIVE", "CHALLENGE" };
+				int cur = 0;
+				for (int i = 0; i < vals.Length; i++) {
+					if (string.Equals(vals[i], _loadMode, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
+				}
+				// 运行期状态被外部改坏时回退到原生，避免下拉框显示空白。
+				if (cur == 0 && !string.IsNullOrEmpty(_loadMode)) _loadMode = "";
+				string[] labels = new string[vals.Length];
+				labels[0] = SRApi.T("原生（跟随预设）", "Native (follow preset)");
+				for (int i = 1; i < vals.Length; i++) labels[i] = ModeText(vals[i]);
+				bool open = _loadModeOpen;
+				int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(180));
+				_loadModeOpen = open;
+				if (sel >= 0 && sel < vals.Length) _loadMode = vals[sel];
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/渲染加载模式", __ex);
+			}
 		}
 
 		// 排序下拉：只有 时间 / 名称 两项。
@@ -1434,9 +1473,7 @@ namespace SR_UCH.Tweaks {
 						SRApi.Notify(SRApi.T("无法识别预设所属关卡，暂不支持自动替换关卡", "The preset's level could not be recognized; automatic level replacement is not supported"));
 						return;
 					}
-					GameState.GameMode targetMode = st.GameMode;
-					GameState.GameMode parsedMode;
-					if (IsConcreteMode(p.Mode) && TryParseMode(p.Mode, out parsedMode)) targetMode = parsedMode;
+					GameState.GameMode targetMode = ResolveLoadMode(p, st.GameMode);
 					bool skipTreehouse = _skipTreehouse != null && _skipTreehouse.Value;
 					bool hasRemoteClients = HasRemoteClients();
 					// 自定义关卡在联机时只能走「跳过树屋流程」直接替换；未勾选时只提示，不执行。
@@ -1447,6 +1484,7 @@ namespace SR_UCH.Tweaks {
 					if (!ConfirmOrArm("replace:" + p.Key)) {
 						_status = SRApi.T("将替换关卡：", "Level will be replaced: ") + LevelDisplayNameForScene(activeScene)
 							+ SRApi.T(" → ", " -> ") + LevelDisplayNameForScene(presetScene)
+							+ SRApi.T("；目标模式：", "; target mode: ") + ModeText(targetMode.ToString())
 							+ SRApi.T("；5 秒内再点一次「确认」执行",
 								"; click Confirm again within 5 seconds");
 						SRApi.Notify(_status);
@@ -1486,10 +1524,8 @@ namespace SR_UCH.Tweaks {
 				try {
 					// 一次性静态字段：游戏在 OnSetupStartLevel 里读取后立即置 null 并原生广播给全员。
 					QuickSaver.levelPortalXml = xml;
-					// 不再校验/拦截模式差异：按预设自己的模式走原来的重载流程（ReloadScene 会把模式同步给房客）。
-					GameState.GameMode toMode = st.GameMode;
-					GameState.GameMode presetMode;
-					if (IsConcreteMode(p.Mode) && TryParseMode(p.Mode, out presetMode)) toMode = presetMode;
+					// 不再校验/拦截模式差异：按预设自己的模式（或页面选择的加载模式）走原来的重载流程（ReloadScene 会把模式同步给房客）。
+					GameState.GameMode toMode = ResolveLoadMode(p, st.GameMode);
 					try { st.GameMode = toMode; } catch (Exception __mx) { SRApi.Guard.Log("布局预设/设置预设模式", __mx); }
 					MsgPrepareToReloadScene msg = new MsgPrepareToReloadScene {
 						reloadToMode = toMode,
@@ -1565,6 +1601,22 @@ namespace SR_UCH.Tweaks {
 				if (!Enum.TryParse<GameState.GameMode>(mode.Trim(), true, out gm)) return false;
 				return Enum.IsDefined(typeof(GameState.GameMode), gm);
 			} catch { return false; }
+		}
+
+		// 计算本次加载实际使用的模式：
+		//   1) 原生（_loadMode 为空）：跟随预设自身保存的模式（p.Mode），解析失败时保留调用方传入的当前模式；
+		//   2) 选择了具体「加载模式」：强制覆盖预设模式，所有加载/重载路径都以它为准。
+		private static GameState.GameMode ResolveLoadMode(PresetInfo p, GameState.GameMode fallback) {
+			GameState.GameMode mode = fallback;
+			try {
+				GameState.GameMode presetMode;
+				if (p != null && IsConcreteMode(p.Mode) && TryParseMode(p.Mode, out presetMode)) mode = presetMode;
+				GameState.GameMode forcedMode;
+				if (TryParseMode(_loadMode, out forcedMode)) mode = forcedMode;
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/解析加载模式", __ex);
+			}
+			return mode;
 		}
 
 		// 是否还有远程客户端（房主自己不算）：只有单人/无远程玩家时才允许“不经树屋”的直接切关卡，
@@ -1789,9 +1841,7 @@ namespace SR_UCH.Tweaks {
 						SRApi.Notify(SRApi.T("有玩家还没选角色：请等所有人选好角色后再加载（否则可能开局异常）", "Some players have not picked a character yet; wait until everyone has one"));
 						return;
 					}
-					GameState.GameMode __cm = GameSettings.GetInstance().GameMode;
-					GameState.GameMode __pm;
-					if (IsConcreteMode(p.Mode) && TryParseMode(p.Mode, out __pm)) __cm = __pm;
+					GameState.GameMode __cm = ResolveLoadMode(p, GameSettings.GetInstance().GameMode);
 					if (StartDirectReplace(p, xml, GameState.LevelName.BLANKLEVEL, __cm)) {
 						SetReloadBusy(true);
 						started = true;
@@ -1811,6 +1861,12 @@ namespace SR_UCH.Tweaks {
 					SRApi.Notify(SRApi.T("有玩家还没选角色：现在加载会把未选角色的玩家移出房间，请等所有人选好角色后再试", "Some players have not picked a character yet; loading now would remove them from the lobby. Wait until everyone has picked a character"));
 					return;
 				}
+				// 树屋普通关卡：LaunchLevel 会用 GameSettings.GameMode 并 CallRpcSetGameMode 同步给房客，
+				// 因此进入前先按「原生预设模式 / 强制加载模式」设置，保证该路径同样受加载模式控制。
+				try {
+					GameSettings __lst = GameSettings.GetInstance();
+					if (__lst != null) __lst.GameMode = ResolveLoadMode(p, __lst.GameMode);
+				} catch (Exception __mex) { SRApi.Guard.Log("布局预设/树屋加载设置模式", __mex); }
 				// 房主本机不会收到 ClientRpc RpcSetNextLevel，需要自己把加载画面推到 SHOW，否则原生 FadeToLevel 会一直等。
 				try {
 					if (LoadingInterstitialSplash.Instance != null) {

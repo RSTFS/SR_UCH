@@ -385,17 +385,14 @@ namespace SR_UCH.Tweaks {
                         Notes(hiddenColMsg, hiddenColMsg);
                     }
                 } else {
-                    for (int i = 0; i < _rowRectsPage.Count; i++) {
-                        if (!_rowRectsPage[i].Contains(mp)) continue;
-                        int si = _rowRows[i];
-                        Matchmaker.LobbyListInfo li = si >= 0 && si < _shownLobbies.Count ? _shownLobbies[si] : null;
-                        if (li != null) {
-                            _hidden.Add(li.sLobbyID);
-                            _lobbiesDirty = true;   // 可见集合变了，需重算"筛选后 N 个"
-                            Notes("已隐藏房间：" + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner),
-                                  "Hidden: " + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner));
-                        }
-                        break;
+                    // 行命中交给核心每帧回填的 rowHover（与 rowRects 同一套裁剪规则），不再手写矩形遍历。
+                    int si = _tableArgs.rowHover;
+                    Matchmaker.LobbyListInfo li = si >= 0 && si < _shownLobbies.Count ? _shownLobbies[si] : null;
+                    if (li != null) {
+                        _hidden.Add(li.sLobbyID);
+                        _lobbiesDirty = true;   // 可见集合变了，需重算"筛选后 N 个"
+                        Notes("已隐藏房间：" + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner),
+                              "Hidden: " + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner));
                     }
                 }
                 e.Use();
