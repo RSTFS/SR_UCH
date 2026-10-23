@@ -88,6 +88,7 @@ namespace SR_UCH.Tweaks {
             SRApi.Nav(SecOnline, 90);   // 侧栏顺序 90：会话(80) 之后、实验(100) 之前
             SRApi.RegisterPage(SecOnline, RenderOnlinePage);
             SRApi.RegisterTick("联机看门狗", TickOnline); // 每帧：回家看门狗 + 延时加入
+            SRApi.RegisterTick("联机自动进入主菜单", TickAutoEnterMainMenu); // 加入成功后替玩家按一次确认
             // 加入流程本身要用 EventSystem，禁用会卡在"正在进入"：登记门控挂起，让核心不禁用 EventSystem。
             // 屏蔽输入上限 3 秒，超过即不再屏蔽（pending 最长可挂 30 秒）。
         SRApi.RegisterInputGateHold(() => !string.IsNullOrEmpty(_pendingJoin)
@@ -312,6 +313,42 @@ namespace SR_UCH.Tweaks {
             TickWatchdog();
             TickPendingJoin();
         }
+
+        // ---------- 加入房间后自动进入主菜单（跳过"按一次空格/确认"） ----------
+        // 游戏在加入成功后由 Matchmaker.startGameOnInput() 停住等 WaitingForController：
+        // 必须等主菜单里有 Player 才会继续加载树屋。这里用主控制器直接替玩家完成那一次确认。
+        private static bool _autoEnterMainMenu;
+        private static float _autoEnterDeadline = -1f;
+
+        internal static void ArmAutoEnterMainMenu() {
+            _autoEnterMainMenu = true;
+            _autoEnterDeadline = Time.unscaledTime + 180f;
+        }
+
+        private static void TickAutoEnterMainMenu() {
+            if (!_autoEnterMainMenu) return;
+            try {
+                if (Time.unscaledTime > _autoEnterDeadline) { _autoEnterMainMenu = false; return; }
+                if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "MainMenu") return;
+                Matchmaker mm = Matchmaker.Instance;
+                if (mm == null || !mm.WaitingForController) return;
+                bool hasPlayer = false;
+                foreach (Player p in PlayerManager.GetInstance()) { if (p != null) { hasPlayer = true; break; } }
+                if (hasPlayer) { _autoEnterMainMenu = false; return; }
+                Controller ctrl = null;
+                try {
+                    ControllerMonitor cm = ControllerMonitor.Instance;
+                    if (cm != null && cm.mainController != null) ctrl = cm.mainController.controller;
+                } catch (Exception __cm) { SRApi.Guard.Log("联机/取主控制器", __cm); }
+                if (ctrl == null) return;   // 没有主控制器就退回让玩家自己按
+                MainMenuControl menu = UnityEngine.Object.FindObjectOfType<MainMenuControl>();
+                if (menu == null) return;
+                menu.JoinControllerToMainMenu(ctrl, false);
+                _autoEnterMainMenu = false;
+                SRApi.LogInfo("[联机] 已自动加入主菜单玩家，跳过手动按确认");
+            } catch (Exception __ex) { SRApi.Guard.Log("联机/自动进入主菜单", __ex); }
+        }
+
 
         // 游戏本地化小工具：用游戏自己的 I2 术语表，取不到则退回默认值。
         private static void RenderOnlinePage() {

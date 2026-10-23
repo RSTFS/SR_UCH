@@ -46,7 +46,7 @@ public class QuickAdjust : ITweak {
         SRApi.LocKey("Quick Adjust", "Quick Retry Hold", "等待秒数", null);
         SRApi.LocDesc("Quick Adjust", "Quick Retry Hold", "快速重试长按时间\n设置死亡后长按多久触发重试\n范围 0 到 2，0 为立即重试", "quick retry hold time\nsets how long to hold after death before retrying\nrange 0-2, 0 = instant");
         SRApi.LocKey("Quick Adjust", "Score Discount", "分数折扣", null);
-        SRApi.LocDesc("Quick Adjust", "Score Discount", "分数折扣百分比\n把自己的 handicap 设为 100 减折扣值，直接影响本局得分\n范围 0 到 90，0 为关闭；局外修改会在进入对局后自动生效；20。", "score discount percentage\nsets your handicap to 100 minus the discount, affecting your score directly\nrange 0-90, 0 = off; changes made outside a match apply automatically when the match starts; 20");
+        SRApi.LocDesc("Quick Adjust", "Score Discount", "分数折扣百分比\n把自己的 handicap 设为 100 减折扣值，在本次房间内持续生效（含后续回合与关卡重载）\n范围 0 到 90，0 为关闭；换房间后自动恢复默认；20。", "score discount percentage\nsets your handicap to 100 minus the discount and stays effective for this room (later rounds and level reloads included)\nrange 0-90, 0 = off; resets when you join another room; 20");
         SRApi.LocKey("Quick Adjust", "More Discount Values", "更多折扣数值", null);
         SRApi.LocDesc("Quick Adjust", "More Discount Values", "折扣数值输入模式开关\n开启后折扣由整十滑块改为自由输入框\n范围 0 到 90 任意整数，0 为关闭", "discount input mode switch\nturns the tens slider into a free input box\nany integer from 0 to 90, 0 = off");
         // 预登记本页自动快捷键。
@@ -193,6 +193,8 @@ public class QuickAdjust : ITweak {
 			_quickRetryFast = cfg.Bind<bool>("Quick Adjust", "Quick Retry Fast", false, "快速重试（仅挑战模式）：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n默认关闭；对局中开关立即生效。");
 			_quickRetryHoldTime = cfg.Bind<float>("Quick Adjust", "Quick Retry Hold", 0.5f, "快速重试的长按等待秒数（0-2，0=立即；挑战模式死亡后长按 B 达到该秒数自动重试）。");
         // 本类自带 [HarmonyPatch] 但 ITweak 为反射发现，须手动 CreateAndPatchAll；单个目标失效只丢本类功能。
+			try { SRApi.RegisterTick("分数折扣持久化", TickRoomDiscount); }
+			catch (Exception __tk) { SRApi.Guard.Log("快速调整/注册折扣持久化", __tk); }
 			try { Harmony.CreateAndPatchAll(typeof(QuickAdjust), (string)null); }
 			catch (Exception e) { SRApi.LogError("快速调整 补丁注册失败: " + e.Message); }
     }
@@ -245,6 +247,13 @@ public class QuickAdjust : ITweak {
 		// 局内改 handicap 不会刷新计分板（游戏只在开局 SetPlayerCharacter 时调 ScoreLine.SetHandicap），
 		// 故 patch set_NetworkHandicap + OnDeserialize，仅在值变化时刷新。
 		private static readonly Dictionary<GamePlayer, int> _lastHandicapShown = new Dictionary<GamePlayer, int>();
+		// 本次房间折扣目标（-1=未设置）：设置一次后每 0.4s 校对本地 LobbyPlayer.handicap，
+		// 保证重载/换回合/换关卡都不丢；离开房间超过 3 秒或换了房间对象则重置。
+		private static int _roomHandicapTarget = -1;
+		private static LobbyPlayer _roomTargetLp;
+		private static float _roomNullSince = -1f;
+		private static float _discountTickAt = -1f;
+
 
 
 		[HarmonyPatch(typeof(GamePlayer), "set_NetworkHandicap")]
@@ -438,7 +447,9 @@ public class QuickAdjust : ITweak {
 				int target = Mathf.Clamp(100 - scoreDiscount, 10, 100);
 				if (ApplyOwnHandicap(target))
 				{
-					SRApi.Notify(SRApi.T("评分折扣已应用：自己 handicap ", "Score discount applied: own handicap ") + target + SRApi.T("%，本局生效", "%, effective this round"));
+					_roomHandicapTarget = target;
+					_roomTargetLp = FindLocalLobbyPlayer();
+					SRApi.Notify(SRApi.T("评分折扣已应用：自己 handicap ", "Score discount applied: own handicap ") + target + SRApi.T("%，本次房间内持续生效", "%, stays effective for this room"));
 				}
 				else
 				{
@@ -458,37 +469,92 @@ public class QuickAdjust : ITweak {
 		{
 			try
 			{
-				// 走房间玩家表：树屋（单人大厅）与对局内都能取到本地 LobbyPlayer。
-				LobbyManager lm = LobbyManager.instance;
-				if (lm != null && lm.PlayerTracker != null)
-				{
-					for (int i = 0; i < lm.PlayerTracker.NumPlayers; i++)
-					{
-						try
-						{
-							NetworkPlayerTracker.NetPlayerInfo info = lm.PlayerTracker.GetPlayerInfoByIndex(i);
-							LobbyPlayer lp = lm.PlayerTracker.GetLobbyPlayer(info.NetworkNumber);
-							if (lp == null || !lp.IsLocalPlayer) continue;
-							lp.SetPlayerHandicap(value);   // 原生字段，本房间持续有效
-							// 已在本局里：同步 GamePlayer，让平衡板立刻刷新（不改的话等下一局才变）。
-							foreach (Player p in PlayerManager.GetInstance())
-							{
-								if (p == null || p.AssociatedLobbyPlayer != lp) continue;
-								if (p.AssociatedGamePlayer != null)
-								{
-									try { p.AssociatedGamePlayer.CallCmdSetPlayerHandicap(value); }
-									catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.CallCmdSetPlayerHandicap", __ex); }
-								}
-								break;
-							}
-							return true;
-						}
-						catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.FindLocalLobbyPlayer", __ex); }
-					}
-				}
+				LobbyPlayer lp = FindLocalLobbyPlayer();
+				if (lp == null) return false;
+				lp.SetPlayerHandicap(value);   // 原生字段，本房间持续有效
+				SyncLocalGamePlayerHandicap(lp, value);
+				return true;
 			}
 			catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.ApplyOwnHandicap", __ex); }
 			return false;
+		}
+
+		// 房间玩家表：树屋（单人大厅）与对局内都能取到本地 LobbyPlayer。
+		private static LobbyPlayer FindLocalLobbyPlayer()
+		{
+			try
+			{
+				LobbyManager lm = LobbyManager.instance;
+				if (lm == null || lm.PlayerTracker == null) return null;
+				for (int i = 0; i < lm.PlayerTracker.NumPlayers; i++)
+				{
+					try
+					{
+						NetworkPlayerTracker.NetPlayerInfo info = lm.PlayerTracker.GetPlayerInfoByIndex(i);
+						LobbyPlayer lp = lm.PlayerTracker.GetLobbyPlayer(info.NetworkNumber);
+						if (lp != null && lp.IsLocalPlayer) return lp;
+					}
+					catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.FindLocalLobbyPlayer", __ex); }
+				}
+			}
+			catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.FindLocalLobbyPlayer", __ex); }
+			return null;
+		}
+
+		// 已在本局里：同步 GamePlayer，让平衡板立刻刷新（不改的话等下一局才变）。
+		private static void SyncLocalGamePlayerHandicap(LobbyPlayer lp, int value)
+		{
+			try
+			{
+				foreach (Player p in PlayerManager.GetInstance())
+				{
+					if (p == null || p.AssociatedLobbyPlayer != lp) continue;
+					if (p.AssociatedGamePlayer != null)
+					{
+						try { p.AssociatedGamePlayer.CallCmdSetPlayerHandicap(value); }
+						catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.CallCmdSetPlayerHandicap", __ex); }
+					}
+					break;
+				}
+			}
+			catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.SyncLocalGamePlayerHandicap", __ex); }
+		}
+
+		// 每个 0.4s 校对一次：房间内本地 handicap 必须等于目标值；换了房间对象/离开房间则放弃持久化。
+		private static void TickRoomDiscount()
+		{
+			try
+			{
+				if (_roomHandicapTarget < 0) return;
+				float now = Time.unscaledTime;
+				if (_discountTickAt >= 0f && now - _discountTickAt < 0.4f) return;
+				_discountTickAt = now;
+				if (!SRApi.GateMaster) return;
+				LobbyManager lm = LobbyManager.instance;
+				if (lm == null)
+				{
+					// 离开房间超过 3 秒 = 回到主菜单：折扣不再跨房间保留。
+					if (_roomNullSince < 0f) _roomNullSince = now;
+					else if (now - _roomNullSince > 3f) { _roomHandicapTarget = -1; _roomTargetLp = null; _roomNullSince = -1f; }
+					return;
+				}
+				_roomNullSince = -1f;
+				LobbyPlayer lp = FindLocalLobbyPlayer();
+				if (lp == null) return;
+				if (_roomTargetLp != null && !ReferenceEquals(lp, _roomTargetLp))
+				{
+					// 换了房间（新 LobbyPlayer）：折扣只属于上一次房间。
+					_roomHandicapTarget = -1;
+					_roomTargetLp = null;
+					return;
+				}
+				if (_roomTargetLp == null) _roomTargetLp = lp;
+				if (lp.handicap == _roomHandicapTarget) return;
+				lp.SetPlayerHandicap(_roomHandicapTarget);
+				SyncLocalGamePlayerHandicap(lp, _roomHandicapTarget);
+				SRApi.LogInfo("[快速调整] 房间折扣已重新应用：handicap " + _roomHandicapTarget + "%");
+			}
+			catch (Exception __ex) { SRApi.Guard.Log("快速调整/折扣持久化", __ex); }
 		}
 
 		public static void RestoreScoreDiscount()
@@ -502,6 +568,8 @@ public class QuickAdjust : ITweak {
 				}
 				if (ApplyOwnHandicap(100))
 				{
+					_roomHandicapTarget = 100;
+					_roomTargetLp = FindLocalLobbyPlayer();
 					SRApi.Notify(SRApi.T("已恢复：自己 handicap 100%", "Restored: own handicap 100%"));
 				}
 				else

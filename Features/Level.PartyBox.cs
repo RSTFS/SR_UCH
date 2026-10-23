@@ -44,7 +44,6 @@ public partial class Level {
         GUILayout.BeginHorizontal();
         if (SRApi.Ctl.HotkeyActionButton(SRApi.T("刷新派对盒", "Reroll + reopen box"), SRApi.T("完整重走一遍游戏自己的派对盒流程：按本轮权重重抽道具 + 重新开箱（全员可再选一次）", "Run the game own party-box flow again: reroll with this round weights and reopen the box so everyone can pick again"), LevelPartyBox.RefreshPartyBoxKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBox();
         GUILayout.Space(SRApi.Ctl.Sc(8));
-        if (SRApi.Ctl.HotkeyActionButton(SRApi.T("刷新道具", "Reroll items"), SRApi.T("只重抽派对盒里的道具，不重新开箱、不切换相位", "Only reroll the items; no reopen and no phase change"), LevelPartyBox.RefreshPiecesKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBoxPieces();
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(6));
@@ -301,23 +300,18 @@ public partial class Level {
 [SrFeature("sr.levelpartybox", "LevelPartyBox", "1.0")]
 public class LevelPartyBox : ITweak {
         private static ConfigEntry<KeyCode> _refreshPartyBoxKey;
-        private static ConfigEntry<KeyCode> _refreshPiecesKey;
         private static ConfigEntry<KeyCode> _closePartyBoxKey;
 
         public static ConfigEntry<KeyCode> RefreshPartyBoxKeyEntry { get { return _refreshPartyBoxKey; } }
-        public static ConfigEntry<KeyCode> RefreshPiecesKeyEntry { get { return _refreshPiecesKey; } }
         public static ConfigEntry<KeyCode> ClosePartyBoxKeyEntry { get { return _closePartyBoxKey; } }
 
         public void Initialize(IFeatureHost plugin) {
             try {
                 _refreshPartyBoxKey = plugin.Config.Bind("Level", "Refresh Party Box Key", KeyCode.None,
                     "刷新派对盒完整流程的快捷键. 在关卡页的刷新派对盒按钮上右键就能绑, 再右键一次删掉. 按下就直接执行.");
-                _refreshPiecesKey = plugin.Config.Bind("Level", "Refresh Pieces Key", KeyCode.None,
-                    "刷新派对盒道具（只重抽、不开箱、不切相位）快捷键（按下即触发）");
                 _closePartyBoxKey = plugin.Config.Bind("Level", "Close Party Box Key", KeyCode.None,
                     "关闭派对盒快捷键（结束派对盒选择、进入游玩阶段；按下即触发）");
                 SRApi.RegisterKey("关卡-刷新派对盒", _refreshPartyBoxKey, "press");
-                SRApi.RegisterKey("关卡-刷新道具", _refreshPiecesKey, "press");
                 SRApi.RegisterKey("关卡-关闭派对盒", _closePartyBoxKey, "press");
                 SRApi.RegisterTick("派对盒快捷键", Tick);
                 // 反射成员登记：游戏改名时启动自检会告警。
@@ -335,7 +329,6 @@ public class LevelPartyBox : ITweak {
             try {
                 if (!SRApi.GateMaster) return;
                 if (SRApi.ComboKeyDown(_refreshPartyBoxKey)) RefreshPartyBox();
-                if (SRApi.ComboKeyDown(_refreshPiecesKey)) RefreshPartyBoxPieces();
                 if (SRApi.ComboKeyDown(_closePartyBoxKey)) ClosePartyBox();
             } catch (Exception __ex) { SRApi.Guard.Log("派对盒快捷键", __ex); }
         }
@@ -388,20 +381,6 @@ public class LevelPartyBox : ITweak {
         }
 
         // 只重抽盒子里的道具：不重新开箱、不动相位。
-        internal static void RefreshPartyBoxPieces() {
-            try {
-                VersusControl vc = UnityEngine.Object.FindObjectOfType<VersusControl>();
-                if (vc == null) { SRApi.Notify(SRApi.T("请先进入派对模式对局", "Not in a party match")); return; }
-                PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
-                if (pb == null) { SRApi.Notify(SRApi.T("未找到派对盒", "Party box not found")); return; }
-                if (!SRApi.CanDoHost()) return; // 重建道具同样需要服务器权限
-                int oldPieces = DestroyPartyBoxPieces(pb);
-                int amount = oldPieces > 0 ? oldPieces : 1;
-                pb.ChoosePieces(amount, null);
-                SRApi.Notify(SRApi.T("已刷新派对盒道具（", "Rerolled the party box items (") + amount + SRApi.T(" 件）", " items)"));
-            } catch (System.Exception e) { SRApi.LogWarn("刷新派对盒道具失败: " + e.Message); }
-        }
-
         // 关闭派对盒：把原生放置计时推到结束，其余（广播、关盒、收/换光标、相位同步）全部交给游戏自己的状态机与 RPC。
         // 前置条件：需要服务器权限；原生要求 AreAllPiecesReady()，还有人没选完时不会推进相位（此时用「放弃道具」）。
 

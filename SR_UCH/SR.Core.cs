@@ -1165,7 +1165,6 @@ public partial class SR : ITweak {
             SR.LocDesc("Level", "Party Bomb", "派对盒炸弹开关\n开箱后按概率生成炸弹\n需要房主权限，仅派对盒阶段；关。", "Party box bomb\nspawns a bomb by chance when the box opens\nhost only; party-box phase only; OFF");
             SR.LocDesc("Level", "Party Bomb Type", "派对盒炸弹类型\n选择生成的炸弹种类\n取值与游戏内炸弹类型一致", "Party box bomb type\nselects which bomb is spawned\nmatches the game bomb types");
             SR.LocDesc("Level", "Refresh Party Box Key", "刷新派对盒快捷键\n按下重走派对盒流程，按权重重新开箱\n不绑键则不生效", "Reroll party box key\npress to reroll and reopen the box\ninactive while unbound");
-            SR.LocDesc("Level", "Refresh Pieces Key", "刷新道具快捷键\n按下只重抽道具，不重新开箱\n不绑键则不生效", "Reroll items key\npress to reroll items only\ninactive while unbound");
             SR.LocDesc("Level", "Close Party Box Key", "关闭派对盒快捷键\n按下结束选择，进入游玩阶段\n不绑键则不生效", "Close party box key\npress to end picking and enter play\ninactive while unbound");
             SR.LocDesc("Online", "Filter Region", "区域筛选\n只显示指定区域的房间\n从下拉选择；留空表示不过滤；空。", "Region filter\nshows lobbies from the selected region only\npick from the dropdown; empty means no filter; empty");
             SR.LocDesc("Online", "Filter Mode", "模式筛选\n只显示指定模式的房间\n留空表示不过滤", "Mode filter\nshows lobbies of the selected game mode only\nempty means no filter");

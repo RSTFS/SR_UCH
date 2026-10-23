@@ -150,6 +150,7 @@ namespace SR_UCH.Tweaks {
                     GameSettings.GetInstance().StartAsHost = false;
                     SRApi.LogInfo("[联机] StartAsHost=false（加入而非创建）");
                 } catch (Exception __sa) { SRApi.Guard.Log("联机.StartAsHost", __sa); }
+                try { ArmAutoEnterMainMenu(); } catch (Exception __ae) { SRApi.Guard.Log("联机/启用自动进入", __ae); }
                 try { SRApi.LogInfo("[联机] 加入请求 id=" + id + " mm=" + mm.GetType().FullName + " useCode=" + useCode); } catch { }
                 // 必须在这里清掉待加入队列：它是每帧轮询的，不清会重复发起同一次加入。
                 _pendingJoin = "";

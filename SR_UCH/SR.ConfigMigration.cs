@@ -643,16 +643,14 @@ namespace SR_UCH.Tweaks {
                     "Set Spawn Key", "Respawn Key", "Reset Spawn Keys"
                 });
                 // 关卡背景功能已删除：这个键在两个曾用段名里都要清掉。
-                text = RemoveKeys(text, "Level", new[] { "Level Background" });
+                text = RemoveKeys(text, "Level", new[] { "Level Background", "Refresh Pieces Key" });
                 text = RemoveKeys(text, "Scene", new[] { "Level Background" });
                 // 派对盒（刷新/重抽/关闭）的界面与代码都在关卡功能：段从 [EX] 挪到 [Level]。
                 text = MoveKeyBetweenSections(text, "EX", "Level", "Refresh Party Box Key");
-                text = MoveKeyBetweenSections(text, "EX", "Level", "Refresh Pieces Key");
-                text = MoveKeyBetweenSections(text, "EX", "Level", "Close Party Box Key");
+                    text = MoveKeyBetweenSections(text, "EX", "Level", "Close Party Box Key");
                 // 这三个是键位，[Settings] 里的 "组合键 <段> <键>" 条目名要一起搬。
                 text = MoveComboEntry(text, "EX", "Level", "Refresh Party Box Key");
-                text = MoveComboEntry(text, "EX", "Level", "Refresh Pieces Key");
-                text = MoveComboEntry(text, "EX", "Level", "Close Party Box Key");
+                    text = MoveComboEntry(text, "EX", "Level", "Close Party Box Key");
                 // 地图网格的界面与代码都在 EX：段名从 [Freeplay] 改为 [EX]。
                 text = MoveKeyBetweenSections(text, "Freeplay", "EX", "Grid Always On");
                 text = MoveKeyBetweenSections(text, "Freeplay", "EX", "Grid Max Alpha");
