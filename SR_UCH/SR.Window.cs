@@ -486,9 +486,10 @@ public partial class SR {
                     foreach (float __v in _pageFooterH.Values) if (__v > __pfReserve) __pfReserve = __v;
                 }
             } catch { __pfReserve = 0f; }
-            float __rowH = Mathf.Max(Sc(28f), FooterHeight);
-            float __footH = __rowH + Mathf.Max(0f, __pfReserve) + Sc(8f);
-            SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footH);
+            // 固定预留：底栏行高（常量） + 当前栏目页面外框高（按栏目缓存） + 余量。
+            // 不使用任何“测量后反馈”的值，避免预留随帧变化导致底栏漂移。
+            float __footerReserve = Sc(30f) + Mathf.Max(0f, __pfReserve) + Sc(16f);
+            SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
             _scroll = __noScroll
@@ -541,25 +542,15 @@ public partial class SR {
                 if (!any) GUILayout.Label(T("（这个插件没有可显示的配置项）", "(this plugin has no visible settings)"), _label);
             }
             GUILayout.EndScrollView();
+            // 底栏钉底：滚动区已按预留高度固定，这里用弹性空白吸收取整误差，把页脚+底栏压到最底部。
+            GUILayout.FlexibleSpace();
             // 滚轮被下拉框 / 滑块吃掉 -> 撤销本帧页面滚动。
             // 两道判定：1) 盾（绘制前、上一帧矩形命中）；2) 本帧绘制后的控件矩形命中。
             if (WheelShieldHit || (__wasWheel && __overCtrlPrev)) {
                 _scroll = pageBefore;
                 WheelFrame = Time.frameCount;   // 让用 Input 读轴的缩放路径本帧让步
             }
-            // ---------- 底栏（绝对定位，独立区域） ----------
-            // 先把右栏/水平布局收口：底栏不再跟着垂直布局走，而是按“区域底边”固定摆放，
-            // 因此不会被滚动区挤压、也不会随页面内容变化漂移。
-            GUILayout.EndVertical();
-            GUILayout.EndHorizontal();
-
-            float __areaW = winRect.width - Sc(8);
-            float __footX = sbw + Sc(2f);
-            Rect __footRect = new Rect(__footX, Mathf.Max(0f, __areaH - __footH), Mathf.Max(Sc(80f), __areaW - __footX), __footH);
-            GUILayout.BeginArea(__footRect);
-            GUILayout.BeginVertical();
-
-            // 功能页外框部件：量高度并按栏目记住（只用于下一帧预留，底栏位置本身不受影响）。
+            // 功能页外框部件（滚动区之下）：量它的高度并按栏目记住，下一帧（及以后切换回该栏目）预留稳定。
             float __pfTop = 0f;
             try { __pfTop = GUILayoutUtility.GetLastRect().yMax; } catch { }
             if (_mode == Mode.Internal) SR.RenderPageFooter(_selectedInternalSection);
@@ -568,7 +559,6 @@ public partial class SR {
                 float __pfH = Mathf.Max(0f, __pfBottom - __pfTop);
                 if (_mode == Mode.Internal && !string.IsNullOrEmpty(_selectedInternalSection)) _pageFooterH[_selectedInternalSection] = __pfH;
             } catch (Exception __pm) { Guard.Log("页面外框高度测量", __pm); }
-
             GUILayout.BeginHorizontal(_footer);
             // 按钮宽度按文本测量（英文比中文长，固定宽度会截断）
             float settingsW = _btn.CalcSize(new GUIContent(T("设置", "Settings"))).x + Sc(18);
@@ -614,15 +604,14 @@ public partial class SR {
                 }
             }
             GUILayout.FlexibleSpace();   // 底栏不显示 SR 内部版本号
-            // 右下角“模式·关卡”：内容取游戏本地化名称，宽度按实际文字自适应。
+            // 右下角“模式·关卡”：内容取游戏本地化名称，宽度按实际文字自适应（原来固定 160 会截断长关卡名）。
             string __modeLabel = ModeLabel() ?? "";
             float __modeW = Mathf.Max(Sc(60), _label.CalcSize(new GUIContent(__modeLabel)).x + Sc(12));
             GUILayout.Label(__modeLabel, _label, GUILayout.Width(__modeW), GUILayout.Height(Sc(26)));
             GUILayout.EndHorizontal();
-            FooterHeight = GUILayoutUtility.GetLastRect().height;   // 给页面参考（当前行高）
-
+            FooterHeight = GUILayoutUtility.GetLastRect().height;   // 自绘页据此避让
             GUILayout.EndVertical();
-            GUILayout.EndArea();
+            GUILayout.EndHorizontal();
             GUILayout.EndArea();
 
             // 整数对齐 + 尺寸与贴图一致（消除锯齿）；颜色按 ImGui ResizeGrip 三态（accent，0.25 / 0.7 / 0.95）。
