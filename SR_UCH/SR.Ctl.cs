@@ -26,6 +26,11 @@ public partial class SR {
 
         // 表格自适应高度：页面顶部已用高度 usedAbove + 表格高度 = 底栏之上可用高度。
         // 26 = 窗口标题栏，2 = 内容区内边距，4 = 行区上下留白；均按当前 UI 缩放换算。
+        // 竖向滚动条：绘制/配色由核心统一（ImGui Scrollbar 配色）。
+        public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb) {
+            SR.TableScrollbar(track, contentH, viewH, scrollY, dragging, out thumb);
+        }
+
         public static float TableAutoHeight(float usedAbove, float minH) {
             float avail = SRApi.PageViewportHeight > Sc(60f)
                 ? SRApi.PageViewportHeight
@@ -1222,6 +1227,23 @@ public partial class SR {
     }
 
     //竖向滚动条的拖拽 / 点轨道跳转 -> 返回 true 表示本事件已处理（状态以 ref 传入）
+    // 竖向滚动条统一绘制（ImGui ScrollbarBg / Grab / GrabHovered / GrabActive 配色）。
+    public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb) {
+        thumb = default(Rect);
+        try {
+            if (track.width <= 0f || track.height <= 0f || contentH <= viewH + 0.5f) return;
+            float th = Mathf.Max(Sc(20f), track.height * Mathf.Clamp01(viewH / Mathf.Max(1f, contentH)));
+            float maxScroll = Mathf.Max(0f, contentH - viewH);
+            float k2 = maxScroll > 0.01f ? Mathf.Clamp01(scrollY / maxScroll) : 0f;
+            thumb = new Rect(track.x, track.y + (track.height - th) * k2, track.width, th);
+            DrawFill(track, new Color(0.06f, 0.06f, 0.07f, 0.94f));
+            bool hover = Event.current != null && thumb.Contains(Event.current.mousePosition);
+            DrawFill(thumb, dragging ? new Color(0.51f, 0.51f, 0.53f, 1f)
+                : hover ? new Color(0.41f, 0.41f, 0.44f, 1f)
+                : new Color(0.31f, 0.31f, 0.34f, 1f));
+        } catch (Exception __ex) { Guard.Log("表格滚动条绘制", __ex); }
+    }
+
     public static bool TableScrollbarInput(Event e, Vector2 mp, Rect track, Rect thumb, float scrollMax,
         ref bool dragging, ref float grabY, ref float scrollY) {
         if (e == null) return false;

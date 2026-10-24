@@ -250,19 +250,11 @@ namespace SR_UCH.Tweaks {
             _joinHeaderPage = _tableArgs.pinHeader;
             // 空提示由核心的 emptyHint 在行区裁剪内绘制。
             if (_joinW > 0f) SRApi.DrawLine(new Rect(_joinXPage - 1f, box.y + headerH, 1f, rowsH), SRApi.TableLineStrong);   // 钉住列分隔线
-            // 竖向滚动条：几何字段必须在这里赋值，否则核心 TableScrollbarInput 的 track.width > 0 判据不成立。
-            // 颜色对齐 ImGui 的 ScrollbarBg / Grab / GrabHovered / GrabActive。
+            // 竖向滚动条：绘制/配色由核心统一（ImGui Scrollbar 配色），本页只提供几何与输入状态。
             if (_shownLobbies.Count * rowH > rowsH + 0.5f) {
                 Rect __track = new Rect(box.x + viewW + SRApi.Ctl.Sc(1), box.y + headerH, SRApi.Ctl.Sc(13) - SRApi.Ctl.Sc(2), rowsH);
-                float __contentH = _shownLobbies.Count * rowH;
-                float __thumbH = Mathf.Clamp(rowsH * rowsH / Mathf.Max(1f, __contentH), SRApi.Ctl.Sc(18), rowsH);
-                float __ty = __track.y + (_tableMaxY > 0f ? Mathf.Clamp01(_scrollRows.y / _tableMaxY) : 0f) * (rowsH - __thumbH);
-                Rect __thumb = new Rect(__track.x, __ty, __track.width, __thumbH);
-                _sbTrackPage = __track; _sbThumbPage = __thumb;
-                SRApi.DrawFill(__track, new Color(0.06f, 0.06f, 0.07f, 0.94f));                    //ImGui ScrollbarBg
-                SRApi.DrawFill(__thumb, _sbDragging ? new Color(0.51f, 0.51f, 0.53f, 1f)           //ImGui GrabActive
-                                    : __thumb.Contains(mp) ? new Color(0.41f, 0.41f, 0.44f, 1f) //ImGui GrabHovered
-                                    : new Color(0.31f, 0.31f, 0.34f, 1f));                      //ImGui Grab
+                _sbTrackPage = __track;
+                _sbThumbPage = SRApi.TableScrollbar(__track, _shownLobbies.Count * rowH, rowsH, _scrollRows.y, _sbDragging);
             } else {
                 _sbTrackPage = new Rect(0f, 0f, 0f, 0f);
                 _sbThumbPage = new Rect(0f, 0f, 0f, 0f);

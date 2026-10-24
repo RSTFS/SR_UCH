@@ -405,6 +405,17 @@ namespace SR_UCH {
             return f != null && f(e, mp, track, thumb, scrollMax, ref dragging, ref grabY, ref scrollY);
         }
 
+        // 竖向滚动条统一绘制（ImGui 配色）：返回滑块矩形，调用方把它传给 TableScrollbarInput。
+        public delegate void TableScrollbarFn(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb);
+        private static object _tableScrollbar;
+        public static void SetTableScrollbarSink(TableScrollbarFn f) { _tableScrollbar = f; }
+        public static Rect TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging) {
+            Rect thumb = default(Rect);
+            TableScrollbarFn f = _tableScrollbar as TableScrollbarFn;
+            if (f != null) f(track, contentH, viewH, scrollY, dragging, out thumb);
+            return thumb;
+        }
+
         // 行扩展点（与核心同名同签名）：功能向设置页条目行注册过滤/附加控件/滑块范围。
         public delegate bool RowFilterFn(ConfigEntryBase entry);
         public delegate string RowCompanionFn(ConfigEntryBase entry);
