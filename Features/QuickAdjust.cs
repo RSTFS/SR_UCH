@@ -469,7 +469,7 @@ public class QuickAdjust : ITweak {
 				if (ApplyOwnHandicap(target))
 				{
 					_keepHandicap = target == 100 ? 0 : target;
-					SRApi.Notify(SRApi.T("评分百分比：", "Score percentage: ") + target);
+					SRApi.Notify(SRApi.T("评分百分比：", "Score percentage: ") + target + "%");
 				}
 				else
 				{
