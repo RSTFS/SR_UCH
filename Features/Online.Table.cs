@@ -14,10 +14,8 @@ namespace SR_UCH.Tweaks {
     public partial class Online {
         private static void HeightGrip() {
             Rect r = GUILayoutUtility.GetLastRect();
-            GUILayout.Space(SRApi.Ctl.TableGripGap());
-            GUILayout.Box(GUIContent.none, SRApi.Ctl.Footer, GUILayout.Height(SRApi.Ctl.TableGripH()), GUILayout.ExpandWidth(true));
-            Rect grip = GUILayoutUtility.GetLastRect();
-            SRApi.Ctl.TableHeightGrip(_tableH, grip, r.height / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
+            // 核心统一：间隙 + 拖拽条 + 拖动改高度并持久化（与预设列表同一外观/行为）。
+            SRApi.Ctl.TableHeightGripBar(_tableH, r.height / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
         }
 
         // 落盘统一交给 SRApi.Ctl.MarkConfigDirty（节流写盘，失败有 Warning）。

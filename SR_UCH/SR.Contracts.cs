@@ -592,6 +592,22 @@ namespace SR_UCH {
             public static bool TableScrollbarFor(TableArgs a, Event e, ref bool dragging, ref float grabY, ref float scrollY) {
                 return SRApi.TableScrollbarFor(a, e, ref dragging, ref grabY, ref scrollY);
             }
+            // 列表可用高度：内容底界(pageBottomY) - 页面起点(pageTopY)，再按用户自定义高度夹取（entry 值 0 = 自动）。
+            public static float TableFitHeight(float pageBottomY, float pageTopY, ConfigEntryBase heightEntry, float minH) {
+                float used = Mathf.Max(0f, pageBottomY - pageTopY);
+                float h = Mathf.Max(minH, SRApi.PageViewportHeight - used);
+                if (heightEntry != null) {
+                    try { int v = System.Convert.ToInt32(heightEntry.BoxedValue); if (v > 0) h = Mathf.Min(h, Sc(v)); } catch { }
+                }
+                return h;
+            }
+            // 表格底边拖拽条：间隙 + 4px 条 + 拖动改高度并持久化（两个列表同一外观与行为）。
+            public static void TableHeightGripBar(ConfigEntryBase heightEntry, float autoH, int min, int max) {
+                GUILayout.Space(TableGripGap());
+                GUILayout.Box(GUIContent.none, SRApi.Ctl.Footer, GUILayout.Height(TableGripH()), GUILayout.ExpandWidth(true));
+                Rect grip = GUILayoutUtility.GetLastRect();
+                TableHeightGrip(heightEntry, grip, autoH, min, max);
+            }
             // 表格底边拖拽改高度并持久化（entry 为 0 表示自动高度）。grip 为可拖区域，autoH 为当前自动高度（设计单位）。
             public delegate void TableHeightGripFn(ConfigEntryBase entry, Rect grip, float autoH, int min, int max);
             private static object _tableHeightGrip;

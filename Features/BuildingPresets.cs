@@ -486,13 +486,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				// 高度：核心统一公式（页面顶部已用高度 + 表格高度 = 底栏之上可用高度），窗口变化实时跟随。
 				Rect last = GUILayoutUtility.GetLastRect();
 				// 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
-				// 表格高度 = 页面视口高 − 页面内已用高度（都是布局量，不掺窗口/底栏坐标）。
-				// 页面内已用高度：滚动视图内容是“局部坐标”（从 0 开始），因此以页面首帧的局部 Y 为基准。
-				float usedAbove = Mathf.Max(0f, last.yMax - _pageTopY);
-				float tableH = Mathf.Max(SRApi.Ctl.Sc(120), SRApi.PageViewportHeight - usedAbove);
-				// 用户自定义高度优先（0 = 自动）；上限不超过剩余空间。
-				if (_tableHEntry != null && _tableHEntry.Value > 0)
-					tableH = Mathf.Min(tableH, SRApi.Ctl.Sc(_tableHEntry.Value));
+				// 表格高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
+				float tableH = SRApi.Ctl.TableFitHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.TableMinH());
 				_actionHitThisFrame = false;
 				List<PresetInfo> visible = VisiblePresets();
 				RenderPresetTable(tableH, visible);
@@ -785,11 +780,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				};
 				_hiddenBeforeTable = _hiddenCols.Count;
 				SRApi.TableDraw(_args);
-				// 底边拖拽条（与联机列表同一核心实现）：拖动改高度并持久化到 Table Height。
-				GUILayout.Space(SRApi.Ctl.TableGripGap());
-				GUILayout.Box(GUIContent.none, SRApi.Ctl.Footer, GUILayout.Height(SRApi.Ctl.TableGripH()), GUILayout.ExpandWidth(true));
-				Rect __hgrip = GUILayoutUtility.GetLastRect();
-				SRApi.Ctl.TableHeightGrip(_tableHEntry, __hgrip, (box.height + SRApi.Ctl.Sc(8)) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
+				// 底边拖拽条（核心统一绘制 + 拖动 + 持久化）。
+				SRApi.Ctl.TableHeightGripBar(_tableHEntry, (box.height + SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
 				// 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
 				_sbHandled = SRApi.Ctl.TableScrollbarFor(_args, e, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);
 				if (_hiddenCols.Count > _hiddenBeforeTable) {

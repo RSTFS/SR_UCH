@@ -95,3 +95,5 @@ TableAfterDraw
 TableScrollbarFor
 PageViewportHeight
 PageScrollTopY
+TableFitHeight
+TableHeightGripBar

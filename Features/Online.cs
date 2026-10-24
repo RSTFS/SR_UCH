@@ -446,15 +446,12 @@ namespace SR_UCH.Tweaks {
             Rect last = GUILayoutUtility.GetLastRect();
             // 宽度用纯尺寸计算：布局矩形与屏幕矩形（ContentArea）不同坐标系，混算会导致表格框超宽、操作列被推出屏幕。
             float availW = Mathf.Max(SRApi.Ctl.Sc(220), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(12));
-            // 高度走核心统一公式：页面可视高度（屏幕量）减去表格上方已用高度（布局量之差）。
-            // 表格高度 = 页面视口高 − 页面内已用高度（纯布局量，切页/缩放自动一致）。
-            // 页面内已用高度（内容局部坐标）：用页面渲染开始时记下的 _pageTopY 作为基准。
-            float usedAbove = Mathf.Max(0f, last.yMax - _pageTopY);
-            float availH = Mathf.Max(SRApi.Ctl.Sc(140), SRApi.PageViewportHeight - usedAbove);
-            // 拖动中必须读临时值 _dragHTmp（配置值此时还是旧的），否则高度不跟手。
-            float hPx = _dragH ? _dragHTmp : (_tableH != null ? _tableH.Value : 0);
-            float boxH = hPx > 0f
-                ? Mathf.Clamp(SRApi.Ctl.Sc(hPx), SRApi.Ctl.Sc(120), availH)
+            // 高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
+            float availH = SRApi.Ctl.TableFitHeight(last.yMax, _pageTopY, _tableH, SRApi.Ctl.Sc(140));
+            // 拖动中必须读临时值 _dragHTmp（配置值此时还是旧的），否则高度不跟手；上限不超过剩余空间。
+            float maxH = SRApi.Ctl.TableFitHeight(last.yMax, _pageTopY, null, SRApi.Ctl.Sc(140));
+            float boxH = _dragH
+                ? Mathf.Clamp(SRApi.Ctl.Sc(_dragHTmp), SRApi.Ctl.Sc(120), maxH)
                 : availH;
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
