@@ -486,9 +486,9 @@ public partial class SR {
                     foreach (float __v in _pageFooterH.Values) if (__v > __pfReserve) __pfReserve = __v;
                 }
             } catch { __pfReserve = 0f; }
-            // 固定预留：底栏行高（常量） + 当前栏目页面外框高（按栏目缓存） + 余量。
-            // 不使用任何“测量后反馈”的值，避免预留随帧变化导致底栏漂移。
-            float __footerReserve = Sc(30f) + Mathf.Max(0f, __pfReserve) + Sc(16f);
+            // 底栏是固定高度条（与顶栏同款）：布局层只预留“条高 + 该栏目页面外框高 + 小余量”。
+            float __barH = Sc(30f);
+            float __footerReserve = __barH + Mathf.Max(0f, __pfReserve) + Sc(8f);
             SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
@@ -542,15 +542,13 @@ public partial class SR {
                 if (!any) GUILayout.Label(T("（这个插件没有可显示的配置项）", "(this plugin has no visible settings)"), _label);
             }
             GUILayout.EndScrollView();
-            // 底栏钉底：滚动区已按预留高度固定，这里用弹性空白吸收取整误差，把页脚+底栏压到最底部。
-            GUILayout.FlexibleSpace();
             // 滚轮被下拉框 / 滑块吃掉 -> 撤销本帧页面滚动。
             // 两道判定：1) 盾（绘制前、上一帧矩形命中）；2) 本帧绘制后的控件矩形命中。
             if (WheelShieldHit || (__wasWheel && __overCtrlPrev)) {
                 _scroll = pageBefore;
                 WheelFrame = Time.frameCount;   // 让用 Input 读轴的缩放路径本帧让步
             }
-            // 功能页外框部件（滚动区之下）：量它的高度并按栏目记住，下一帧（及以后切换回该栏目）预留稳定。
+            // 功能页外框部件（紧贴底栏条上方）：量它的高度并按栏目记住，供下一帧预留。
             float __pfTop = 0f;
             try { __pfTop = GUILayoutUtility.GetLastRect().yMax; } catch { }
             if (_mode == Mode.Internal) SR.RenderPageFooter(_selectedInternalSection);
@@ -559,41 +557,51 @@ public partial class SR {
                 float __pfH = Mathf.Max(0f, __pfBottom - __pfTop);
                 if (_mode == Mode.Internal && !string.IsNullOrEmpty(_selectedInternalSection)) _pageFooterH[_selectedInternalSection] = __pfH;
             } catch (Exception __pm) { Guard.Log("页面外框高度测量", __pm); }
-            GUILayout.BeginHorizontal(_footer);
-            // 按钮宽度按文本测量（英文比中文长，固定宽度会截断）
-            float settingsW = _btn.CalcSize(new GUIContent(T("设置", "Settings"))).x + Sc(18);
-            if (GUILayout.Button(T("设置", "Settings"), _mode == Mode.Settings ? _selItem : _btn, GUILayout.Width(settingsW))) {
+
+            // 收口页面布局：底栏不再参与垂直布局，改为和顶栏一样“按窗口区域坐标画一条固定条”。
+            GUILayout.EndVertical();
+            GUILayout.EndHorizontal();
+
+            // ---------- 底栏条（顶栏同款：固定高度、背景条 + 左侧按钮 + 右侧状态标签） ----------
+            float __areaW = winRect.width - Sc(8);
+            float __barY = Mathf.Max(0f, __areaH - __barH);
+            Rect __barRect = new Rect(0f, __barY, __areaW, __barH);
+            GUI.Box(__barRect, GUIContent.none, _footer);
+            float __btnY = __barY + Sc(2f);
+            float __btnH = Mathf.Max(Sc(22f), __barH - Sc(4f));
+            float __bx = Sc(4f);
+
+            // 设置
+            string __setLbl = T("设置", "Settings");
+            float __setW = _btn.CalcSize(new GUIContent(__setLbl)).x + Sc(18);
+            if (GUI.Button(new Rect(__bx, __btnY, __setW, __btnH), __setLbl, _mode == Mode.Settings ? _selItem : _btn)) {
                 _mode = Mode.Settings;
                 NoPageScrollBars = false;
                 _editText.Clear();
                 _editOpen.Clear();
                 _capturing = null;
+                BlockWindowDrag = true;
             }
-            // 功能注册的底栏按钮：排在「设置」右侧；带悬停过渡与单击去重
+            __bx += __setW + Sc(4f);
+
+            // 功能注册的底栏按钮
             for (int fbi = 0; fbi < SRApi.FooterButtons.Count; fbi++) {
                 SRApi.FooterButton fb = SRApi.FooterButtons[fbi];
                 if (fb == null || string.IsNullOrEmpty(fb.Id)) continue;
                 string fbLabel = T(fb.LabelZh, fb.LabelEn);
                 if (string.IsNullOrEmpty(fbLabel)) continue;
                 float fbW = _btn.CalcSize(new GUIContent(fbLabel)).x + Sc(18);
+                if (__bx + fbW > __areaW - Sc(8)) break;   // 放不下就不画，避免压到右侧状态标签
+                Rect fbRect = new Rect(__bx, __btnY, fbW, __btnH);
                 bool fbSel = _mode == Mode.Internal && _selectedInternalSection == fb.Id;
-                Rect fbLast;
-                _footerBtnRects.TryGetValue(fb.Id, out fbLast);
-                bool fbHover = fbLast.width > 0f && fbLast.Contains(Event.current.mousePosition);
-                float fbWant = fbHover ? 1f : 0f;
-                float fbCur;
-                _footerBtnHover.TryGetValue(fb.Id, out fbCur);
-                float fbDt = Mathf.Clamp01(Time.unscaledDeltaTime * 10f);
-                fbCur = Mathf.Lerp(fbCur, fbWant, fbDt);
-                _footerBtnHover[fb.Id] = fbCur;
                 Color fbBg = GUI.backgroundColor;
-                GUI.backgroundColor = Color.Lerp(fbBg, new Color(0.72f, 0.88f, 1f, 1f), fbCur * (fbSel ? 0.35f : 0.75f));
-                GUIContent fbContent = new GUIContent(fbLabel, T("打开", "Open ") + fbLabel);
-                bool fbClicked = GUILayout.Button(fbContent, fbSel ? _selItem : _btn, GUILayout.Width(fbW));
+                GUI.backgroundColor = fbSel ? Color.Lerp(fbBg, new Color(0.72f, 0.88f, 1f, 1f), 0.35f) : fbBg;
+                bool fbClicked = GUI.Button(fbRect, new GUIContent(fbLabel, T("打开", "Open ") + fbLabel), fbSel ? _selItem : _btn);
                 GUI.backgroundColor = fbBg;
-                _footerBtnRects[fb.Id] = GUILayoutUtility.GetLastRect();
+                _footerBtnRects[fb.Id] = fbRect;
                 if (fbClicked && _footerClickFrame != Time.frameCount) {
                     _footerClickFrame = Time.frameCount;
+                    BlockWindowDrag = true;
                     try { if (fb.OnClick != null) fb.OnClick(); } catch (Exception __ex) { Guard.Log("底栏按钮", __ex); }
                     _mode = Mode.Internal;
                     _selectedInternalSection = fb.Id;
@@ -602,16 +610,16 @@ public partial class SR {
                     _editOpen.Clear();
                     _capturing = null;
                 }
+                __bx += fbW + Sc(4f);
             }
-            GUILayout.FlexibleSpace();   // 底栏不显示 SR 内部版本号
-            // 右下角“模式·关卡”：内容取游戏本地化名称，宽度按实际文字自适应（原来固定 160 会截断长关卡名）。
+
+            // 右下角“模式·关卡”：内容取游戏本地化名称，宽度按实际文字自适应，右对齐。
             string __modeLabel = ModeLabel() ?? "";
             float __modeW = Mathf.Max(Sc(60), _label.CalcSize(new GUIContent(__modeLabel)).x + Sc(12));
-            GUILayout.Label(__modeLabel, _label, GUILayout.Width(__modeW), GUILayout.Height(Sc(26)));
-            GUILayout.EndHorizontal();
-            FooterHeight = GUILayoutUtility.GetLastRect().height;   // 自绘页据此避让
-            GUILayout.EndVertical();
-            GUILayout.EndHorizontal();
+            float __modeX = Mathf.Max(__bx + Sc(4f), __areaW - __modeW - Sc(6f));
+            GUI.Label(new Rect(__modeX, __barY + Sc(2f), __modeW, __btnH), __modeLabel, _label);
+
+            FooterHeight = __barH;   // 给页面参考（固定条高）
             GUILayout.EndArea();
 
             // 整数对齐 + 尺寸与贴图一致（消除锯齿）；颜色按 ImGui ResizeGrip 三态（accent，0.25 / 0.7 / 0.95）。
