@@ -14,8 +14,8 @@ namespace SR_UCH.Tweaks {
     public partial class Online {
         private static void HeightGrip() {
             Rect r = GUILayoutUtility.GetLastRect();
-            GUILayout.Space(SRApi.Ctl.Sc(2));
-            GUILayout.Box(GUIContent.none, SRApi.Ctl.Footer, GUILayout.Height(SRApi.Ctl.Sc(4)), GUILayout.ExpandWidth(true));
+            GUILayout.Space(SRApi.Ctl.TableGripGap());
+            GUILayout.Box(GUIContent.none, SRApi.Ctl.Footer, GUILayout.Height(SRApi.Ctl.TableGripH()), GUILayout.ExpandWidth(true));
             Rect grip = GUILayoutUtility.GetLastRect();
             SRApi.Ctl.TableHeightGrip(_tableH, grip, r.height / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
         }
@@ -161,11 +161,11 @@ namespace SR_UCH.Tweaks {
             Event e = Event.current;
             Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
             CollectShown();
-            float rowH = SRApi.Ctl.Sc(26), headerH = SRApi.Ctl.Sc(24);
+            float rowH = SRApi.Ctl.TableRowH(), headerH = SRApi.Ctl.TableHeaderH();
             float rowsH = Mathf.Max(SRApi.Ctl.Sc(20), box.height - headerH);
             float contentH = _shownLobbies.Count * rowH;
             bool overflow = contentH > rowsH + 0.5f;                    //只有真的超出才画滚动条
-            float sbW = overflow ? SRApi.Ctl.Sc(13) : 0f;
+            float sbW = overflow ? SRApi.Ctl.TableScrollbarW() : 0f;
             float viewW = Mathf.Max(SRApi.Ctl.Sc(60), box.width - sbW);
             // 操作列钉在表格右边缘，不参与横向滚动，加入按钮始终可见可点。
             float joinW = SRApi.Ctl.Sc(_cw[JoinCol]);

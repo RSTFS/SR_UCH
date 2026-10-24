@@ -23,6 +23,13 @@ public partial class SR {
 
         // 统一控件高度：按钮 / 输入框 / 下拉框 / 复选框同高（默认 26，按 UI 缩放；功能可用 ControlHeight 覆盖）。
         public static float ControlH() { return SR.ControlH(); }
+        // 表格尺寸令牌：行高/表头高/拖拽条/滚动条宽/最小高度（全部随 UI 缩放，页面不再写死字面量）。
+        public static float TableRowH() { return Sc(26f); }
+        public static float TableHeaderH() { return Sc(24f); }
+        public static float TableGripH() { return Sc(4f); }
+        public static float TableGripGap() { return Sc(2f); }
+        public static float TableScrollbarW() { return Sc(13f); }
+        public static float TableMinH() { return Sc(120f); }
 
         // 表格自适应高度：页面顶部已用高度 usedAbove + 表格高度 = 底栏之上可用高度。
         // 26 = 窗口标题栏，2 = 内容区内边距，4 = 行区上下留白；均按当前 UI 缩放换算。
@@ -1062,9 +1069,11 @@ public partial class SR {
             Color clipSavedColor = GUI.color; // 异常时也要还原（GUI.color 泄漏会污染游戏界面）
             GUI.BeginClip(new Rect(a.box.x, a.box.y + headerH, a.stripW, a.rowsH));
             try {
-            for (int i = 0; i < a.rowCount; i++) {
+            // 只遍历可见行：O(可见行数) 而不是 O(总行数)，大列表滚动时显著省 CPU。
+            int __firstRow = Mathf.Max(0, Mathf.FloorToInt(a.scrollY / Mathf.Max(1f, rowH)));
+            int __lastRow = Mathf.Min(a.rowCount - 1, Mathf.CeilToInt((a.scrollY + a.rowsH) / Mathf.Max(1f, rowH)));
+            for (int i = __firstRow; i <= __lastRow; i++) {
                 float y = i * rowH - a.scrollY;
-                if (y > a.rowsH || y + rowH < 0f) continue;
                 string[] rc = a.rowCells != null ? a.rowCells(i) : null;
                 float alpha = a.rowAlpha != null ? a.rowAlpha(i) : 1f;
                 // 隔行底：按真实行号取奇偶（行号不随滚动变化，条纹稳定）；行透明时底也跟着淡。
@@ -1426,9 +1435,10 @@ public partial class SR {
     public static void TableRowRects(int rowCount, float rowH, float scrollY, float rowsH, float boxY, float headerH,
         Rect rowsClip, float boxX, float stripW, List<Rect> rowRects, List<int> rowRows) {
         rowRects.Clear(); rowRows.Clear();
-        for (int i = 0; i < rowCount; i++) {
+        int first = Mathf.Max(0, Mathf.FloorToInt(scrollY / Mathf.Max(1f, rowH)));
+        int last = Mathf.Min(rowCount - 1, Mathf.CeilToInt((scrollY + rowsH) / Mathf.Max(1f, rowH)));
+        for (int i = first; i <= last; i++) {
             float y = i * rowH - scrollY;
-            if (y > rowsH || y + rowH < 0f) continue;
             float ry = boxY + headerH + y;
             float hy0 = Mathf.Max(ry, rowsClip.y);
             float hy1 = Mathf.Min(ry + rowH, rowsClip.yMax);

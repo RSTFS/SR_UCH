@@ -574,6 +574,13 @@ namespace SR_UCH {
             public static float Sc(float v) { Func<float, float> f = _sc; return f != null ? f(v) : v; }
             // 表格自适应高度助手（Ctl 侧别名；功能层统一从这里取）。
             public static float TableAutoHeight(float usedAbove, float minH) { return SRApi.TableAutoHeight(usedAbove, minH); }
+            // 表格尺寸令牌（随 UI 缩放；页面不再写死 26/24/13 等字面量）。
+            public static float TableRowH() { return Sc(26f); }
+            public static float TableHeaderH() { return Sc(24f); }
+            public static float TableGripH() { return Sc(4f); }
+            public static float TableGripGap() { return Sc(2f); }
+            public static float TableScrollbarW() { return Sc(13f); }
+            public static float TableMinH() { return Sc(120f); }
             // 列表高度自适应 / 自校准 / 一体化滚动条（功能层统一入口）。
             public static float TableAutoFit(float contentBottomY, float currentY, float minH, ref float bias) {
                 return SRApi.TableAutoFit(contentBottomY, currentY, minH, ref bias);

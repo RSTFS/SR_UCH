@@ -684,12 +684,12 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				SRApi.Ctl.SectionTitle(title);
 				float titleH = 0f;
 				try { titleH = Mathf.Max(0f, GUILayoutUtility.GetLastRect().height); } catch { }
-				float rowH = SRApi.Ctl.Sc(26);
-				float headerH = SRApi.Ctl.Sc(24);
+				float rowH = SRApi.Ctl.TableRowH();
+				float headerH = SRApi.Ctl.TableHeaderH();
 				if (tableH <= 0f) tableH = TableHeight();
 				// Render() 传入的 tableH 是「分区标题 + 表格」可用的总高度；分区标题本身也占高，
 				// 这里扣掉它的实测高度，否则表格底部会超出可视区、最后一行被底栏裁掉且滚不到。
-				tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH - titleH - SRApi.Ctl.Sc(8));   // 8px 给底边拖拽条
+				tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH - titleH - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));   // 8px 给底边拖拽条
 				float rowsH = Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH);
 				Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
 				if (box.width < SRApi.Ctl.Sc(220)) return;
@@ -700,7 +700,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				float pinW = SRApi.Ctl.Sc(_colW[ColAction]);
 				// 有纵向溢出时，在数据区与钉住列之间预留滚动条宽度（与联机列表一致）。
 				bool __overflowY = visible.Count * rowH > rowsH + 0.5f;
-				float __sbW = __overflowY ? SRApi.Ctl.Sc(13) : 0f;
+				float __sbW = __overflowY ? SRApi.Ctl.TableScrollbarW() : 0f;
 				float stripW = Mathf.Max(SRApi.Ctl.Sc(80), box.width - pinW - __sbW);
 				float totalW = 0f;
 				for (int i = 0; i < _order.Length; i++) {
@@ -777,8 +777,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				_hiddenBeforeTable = _hiddenCols.Count;
 				SRApi.TableDraw(_args);
 				// 底边拖拽条（与联机列表同一核心实现）：拖动改高度并持久化到 Table Height。
-				GUILayout.Space(SRApi.Ctl.Sc(2));
-				GUILayout.Box(GUIContent.none, SRApi.Ctl.Footer, GUILayout.Height(SRApi.Ctl.Sc(4)), GUILayout.ExpandWidth(true));
+				GUILayout.Space(SRApi.Ctl.TableGripGap());
+				GUILayout.Box(GUIContent.none, SRApi.Ctl.Footer, GUILayout.Height(SRApi.Ctl.TableGripH()), GUILayout.ExpandWidth(true));
 				Rect __hgrip = GUILayoutUtility.GetLastRect();
 				SRApi.Ctl.TableHeightGrip(_tableHEntry, __hgrip, (box.height + SRApi.Ctl.Sc(8)) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
 				// 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
