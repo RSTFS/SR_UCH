@@ -469,11 +469,11 @@ public class QuickAdjust : ITweak {
 				if (ApplyOwnHandicap(target))
 				{
 					_keepHandicap = target == 100 ? 0 : target;
-					SRApi.Notify(SRApi.T("已应用 handicap ", "Applied handicap ") + target + SRApi.T("（等效折扣 ", " (discount ") + (100 - target) + "%）");
+					SRApi.Notify(SRApi.T("评分百分比：", "Score percentage: ") + target);
 				}
 				else
 				{
-					SRApi.Notify(SRApi.T("需要在房间内（大厅或树屋）才能修改 handicap", "Change the handicap while in a room (lobby or treehouse)"));
+					SRApi.Notify(SRApi.T("评分百分比应用失败", "Failed to apply score percentage"));
 				}
 			}
 			catch (Exception ex)
@@ -598,11 +598,11 @@ public class QuickAdjust : ITweak {
 				if (ApplyOwnHandicap(100))
 				{
 					_keepHandicap = 0;
-					SRApi.Notify(SRApi.T("已恢复：自己 handicap 100%", "Restored: own handicap 100%"));
+					SRApi.Notify(SRApi.T("评分百分比：100%", "Score percentage: 100%"));
 				}
 				else
 				{
-					SRApi.Notify(SRApi.T("需要在房间内（大厅或树屋）才能恢复评分折扣", "Restore the score discount while in a room (lobby or treehouse)"));
+					SRApi.Notify(SRApi.T("评分百分比还原失败", "Failed to restore score percentage"));
 				}
 			}
 			catch (Exception ex)
