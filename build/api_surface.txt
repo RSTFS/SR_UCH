@@ -89,3 +89,4 @@ ToHex
 ToColor32
 FromColor32
 TableScrollbar
+PageContentBottomY

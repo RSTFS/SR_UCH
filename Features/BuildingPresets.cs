@@ -467,12 +467,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				GUILayout.Space(W(2));
 				// 高度：核心统一公式（页面顶部已用高度 + 表格高度 = 底栏之上可用高度），窗口变化实时跟随。
 				Rect last = GUILayoutUtility.GetLastRect();
-				float usedAbove = _pageTopYSet
-					? Mathf.Max(0f, last.yMax - _pageTopY)
-					: SRApi.Ctl.Sc(300);
-				float tableH = SRApi.FooterHeight > 0f
-					? SRApi.Ctl.TableAutoHeight(usedAbove, SRApi.Ctl.Sc(120))
-					: Mathf.Max(SRApi.Ctl.Sc(120), SRApi.ContentArea.height - SRApi.Ctl.Sc(26) - SRApi.Ctl.Sc(2) - SRApi.Ctl.Sc(30) - usedAbove - SRApi.Ctl.Sc(4));
+				// 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
+				float tableH = SRApi.PageContentBottomY > 1f
+					? Mathf.Max(SRApi.Ctl.Sc(120), SRApi.PageContentBottomY - last.yMax - SRApi.Ctl.Sc(2))
+					: SRApi.Ctl.TableAutoHeight(Mathf.Max(0f, last.yMax - _pageTopY), SRApi.Ctl.Sc(120));
 				_actionHitThisFrame = false;
 				RenderPresetTable(tableH);
 				// 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处

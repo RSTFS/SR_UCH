@@ -476,6 +476,8 @@ namespace SR_UCH {
         public static Rect ContentArea { get { Func<Rect> f = _contentArea; return f != null ? f() : default(Rect); } set { Action<Rect> a = _setContentArea; if (a != null) a(value); } }
         // 页面可视高度（滚动区真实视口，已扣除窗口标题/页头/底栏）：功能页的表格高度应以它为准。
         public static float PageViewportHeight;
+        // 页面内容底界（布局坐标）：滚动区顶 + 视口高 = 底栏条上沿。表格高度按它算可精确贴底。
+        public static float PageContentBottomY;
         public static float FooterHeight { get { Func<float> f = _footerHeight; return f != null ? f() : 0f; } set { Action<float> a = _setFooterHeight; if (a != null) a(value); } }
         public static Vector2 PageScroll { get { Func<Vector2> f = _pageScroll; return f != null ? f() : default(Vector2); } set { Action<Vector2> a = _setPageScroll; if (a != null) a(value); } }
         public static bool NoPageScrollBars { get { Func<bool> f = _noPageScrollBars; return f != null && f(); } set { Action<bool> a = _setNoPageScrollBars; if (a != null) a(value); } }
