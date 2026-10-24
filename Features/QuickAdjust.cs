@@ -12,6 +12,7 @@ namespace SR_UCH.Tweaks {
 public class QuickAdjust : ITweak {
 
 		private static ConfigEntry<int> _handicap;
+		private static ConfigEntry<bool> _moreHandicap;
     private static ConfigEntry<bool> _quickSwitchEnabled;
     private static ConfigEntry<float> _quickSwitchHold;
     private static ConfigEntry<bool> _quickRetryEnabled;
@@ -46,6 +47,8 @@ public class QuickAdjust : ITweak {
         SRApi.LocDesc("Quick Adjust", "Quick Retry Hold", "快速重试长按时间\n设置死亡后长按多久触发重试\n范围 0 到 2，0 为立即重试", "quick retry hold time\nsets how long to hold after death before retrying\nrange 0-2, 0 = instant");
 		SRApi.LocKey("Quick Adjust", "Handicap", "评分（handicap）", null);
 		SRApi.LocDesc("Quick Adjust", "Handicap", "当前 handicap 数值\n直接设置自己那行的 handicap（10-100，整十）\n等效折扣 = 100 减该数值，100 即不折扣。", "current handicap value\nsets your own handicap directly (10-100 in tens)\nequivalent discount = 100 minus this value, 100 = no discount");
+		SRApi.LocKey("Quick Adjust", "More Handicap Values", "更多数值", null);
+		SRApi.LocDesc("Quick Adjust", "More Handicap Values", "自由输入模式开关\n开启后 handicap 由整十滑块改为输入框\n范围 10 到 100 任意整数。", "free input mode switch\nturns the tens slider into an input box\nany integer from 10 to 100");
         // 预登记本页自动快捷键。
         SRApi.HotkeyAction("qa.apply_discount", "应用折扣", () => QuickAdjust.ApplyScoreDiscount());
         SRApi.HotkeyAction("qa.restore_discount", "恢复原值", () => QuickAdjust.RestoreScoreDiscount());
@@ -63,12 +66,35 @@ public class QuickAdjust : ITweak {
 		float __dcw = Mathf.Max(SRApi.Ctl.Sc(64), SRApi.Ctl.LabelWrap.CalcSize(__dct).x + SRApi.Ctl.Sc(8));
 		GUILayout.Label(__dct, SRApi.Ctl.LabelWrap, GUILayout.Width(__dcw), GUILayout.Height(SRApi.Ctl.Sc(52)));
 		int slideVal = Mathf.Clamp(discVal, 10, 100);
-		Rect sr = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(220), SRApi.Ctl.Sc(28));
-		float nv = SRApi.Ctl.DrawSlider(sr, slideVal, 10f, 100f, true);
-		int nslide = Mathf.Clamp(Mathf.RoundToInt(nv / 10f) * 10, 10, 100);
-		if (nslide != slideVal && disc != null) SRApi.Ctl.SetValue(disc, nslide);
+		int nslide;
+		if (QuickAdjust.MoreHandicapOn) {
+			string cur = slideVal.ToString();
+			string nvText = SRApi.ClearableTextField(cur, SRApi.Ctl.SearchBox, GUILayout.Width(SRApi.Ctl.Sc(80)), GUILayout.Height(SRApi.Ctl.Sc(26)));
+			int parsed;
+			if (nvText != cur && int.TryParse(nvText, out parsed)) {
+				parsed = Mathf.Clamp(parsed, 10, 100);
+				if (disc != null) SRApi.Ctl.SetValue(disc, parsed);
+			}
+			nslide = Mathf.Clamp(discVal, 10, 100);
+		} else {
+			Rect sr = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(220), SRApi.Ctl.Sc(28));
+			float nv = SRApi.Ctl.DrawSlider(sr, slideVal, 10f, 100f, true);
+			nslide = Mathf.Clamp(Mathf.RoundToInt(nv / 10f) * 10, 10, 100);
+			if (nslide != slideVal && disc != null) SRApi.Ctl.SetValue(disc, nslide);
+		}
 		GUILayout.Label(nslide.ToString(), SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(52)), GUILayout.Height(SRApi.Ctl.Sc(26)));
 		GUILayout.Label(SRApi.T("（等效折扣 ", "(discount ") + (100 - nslide) + "%）", SRApi.Ctl.LabelWrap, GUILayout.Height(SRApi.Ctl.Sc(26)));
+		GUILayout.FlexibleSpace();
+		GUILayout.EndHorizontal();
+		GUILayout.BeginHorizontal();
+		ConfigEntryBase more = SRApi.Ctl.FindEntry("Quick Adjust", "More Handicap Values");
+		if (more != null) {
+			SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("自由输入数值", "Free value"),
+				SRApi.T("自由输入模式开关\n开启后 handicap 由整十滑块改为输入框\n范围 10 到 100 任意整数。",
+						"free input mode switch\nturns the tens slider into an input box\nany integer from 10 to 100")),
+				more, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(30));
+			SRApi.Ctl.RenderControl(more);
+		}
 		GUILayout.FlexibleSpace();
 		GUILayout.EndHorizontal();
 		GUILayout.Space(SRApi.Ctl.Sc(2));
@@ -162,6 +188,7 @@ public class QuickAdjust : ITweak {
 			// InvalidCastException（被 MainPlugin 兜住，但本功能静默消失）。
 			ConfigFile cfg = plugin.Config;
 		_handicap = cfg.Bind<int>("Quick Adjust", "Handicap", 100, "当前 handicap：直接设置自己那行的 handicap（范围 10-100，整十；等效折扣 = 100 - 该值）。");
+		_moreHandicap = cfg.Bind<bool>("Quick Adjust", "More Handicap Values", false, "自由输入数值：选中后 handicap 滑块变为输入框（10-100 任意整数）。");
 			_quickSwitchEnabled = cfg.Bind<bool>("Quick Adjust", "Quick Switch", false, "快速切换（仅自由模式）：长按 B 到设定等待秒数切换 行动<->建造 模式。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n默认关闭；对局中开关立即生效。");
 			_quickSwitchHold = cfg.Bind<float>("Quick Adjust", "Quick Switch Hold", 0.5f, "快速切换的长按等待秒数（0-2，0=立即；自由模式长按 B 达到该秒数切换行动/建造）。");
 			_quickRetryEnabled = cfg.Bind<bool>("Quick Adjust", "Quick Retry", false, "死后自动重试（仅挑战模式）：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n默认关闭；对局中开关立即生效。");
@@ -214,6 +241,7 @@ public class QuickAdjust : ITweak {
 		}
 
 		public static int HandicapValue => (_handicap != null) ? Mathf.Clamp(_handicap.Value, 10, 100) : 100;
+		public static bool MoreHandicapOn => _moreHandicap != null && _moreHandicap.Value;
 
 
 		// 局内改 handicap 不会刷新计分板（游戏只在开局 SetPlayerCharacter 时调 ScoreLine.SetHandicap），
