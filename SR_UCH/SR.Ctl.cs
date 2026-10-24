@@ -1573,9 +1573,10 @@ public partial class SR {
 
     // ================= 颜色选择器（统一调色板）=================
     // 功能层只用 SRApi.Ctl.ColorEdit / ColorSwatch / ColorPanel / PreviewColor / ResetColor。
-    // 展开状态、当前 H/S/V、hex 与 RGB 文本、拖动标记、上次绘制帧号全部按 ConfigEntryBase 存在这里，
-    // 功能页不再持有任何调色板状态，也不再自己解析/换算颜色（解析统一走 SRApi.ColorHex）。
-    // 写盘只走 SR.SetValue（= SRApi.Ctl.SetValue，配置由核心节流落盘）；拖动与输入过程中只改"预览色"。
+    // 版式对齐 ImGui ColorPicker3：预览行 → 饱和度×明度方块（H 固定）+ 竖向色相条 → 24 色常用色网格
+    // → H/S/V 三行 → RGB 三行 → Hex 行 → 复制/粘贴/还原默认。
+    // 直接拖动方块 / 色相条时只改“预览色”（Dirty），鼠标松开或回车才写盘；文本输入回车 / 失焦提交；
+    // 切条目、收起、关窗、切页仍由 Close / Tick 兜底提交。展开、拖动、输入状态全部按 ConfigEntryBase 保存在这里。
     internal static class ColorPicker {
         // 常用色：8 档灰阶 + 16 常见色（12 列 × 2 行，对应 ImGui 的 palette 区）。
         private static readonly string[] Palette = new string[] {
@@ -1586,19 +1587,23 @@ public partial class SR {
             "#26A69A", "#7CB342", "#FFB300", "#8D6E63"
         };
         private const int PaletteCols = 12;   // 每行色块数
-        private const int HueSteps = 12;      // H 变体条档数
+        private const int SvTexSize = 96;     // S/V 方块贴图分辨率（只随 H 变化，避免逐像素逐帧绘制）
+        private static Texture2D _svTex;
+        private static float _svTexHue = -1f;
+        private static Color32[] _svPixels;
 
         // 一个颜色键的可变状态。
         private sealed class State {
             public bool Open;          // 调色板是否展开
             public float H, S = 1f, V = 1f;
             public bool Dirty;         // 预览已变、配置未写（拖动中不写盘）
-            public bool Sliding;       // HSV 滑块正在拖动（松手才落盘）
+            public bool Sliding;       // 滑块 / 方块 / 色相条正在拖动（松手才落盘）
             public bool TextPending;   // hex/RGB 输入框里有未提交的文本
             public string HexEdit = "#FFFFFF";
             public string[] Rgb = new string[] { "255", "255", "255" };
             public string Focus;       // 上一帧的输入焦点（失焦即提交）
             public int Frame = -1;     // 调色板最近绘制的帧号（离开页面/关窗兜底落盘）
+            public int Drag;           // 0=无 1=S/V 方块 2=色相条
         }
 
         private static readonly Dictionary<ConfigEntryBase, State> _states = new Dictionary<ConfigEntryBase, State>();
@@ -1725,6 +1730,7 @@ public partial class SR {
             PickFrom(s, c, false);
             s.Dirty = false;
             s.Sliding = false;
+            s.Drag = 0;
             s.TextPending = false;
             s.Focus = null;
             SyncText(s, true);
@@ -1750,27 +1756,29 @@ public partial class SR {
             s.Open = false;
             s.Dirty = false;
             s.Sliding = false;
+            s.Drag = 0;
             s.TextPending = false;
             s.Focus = null;
             if (ReferenceEquals(_open, e)) _open = null;
         }
 
-        // 立即落盘（只在有色板/滑块/文本改动后调用；拖动过程中不写配置）。
+        // 立即落盘（只在色板/方块/色相条/滑块/文本改动后调用；拖动过程中不写配置）。
         private static void Commit(ConfigEntryBase e, State s) {
             try {
                 if (!s.Dirty || e == null) return;
                 SetValue(e, SRApi.ColorHex.ToHex(PickerColor(s)));
                 s.Dirty = false;
                 s.Sliding = false;
+                s.Drag = 0;
             } catch (Exception __ex) { Guard.Log("颜色写入", __ex); }
         }
 
-        // 应用一个颜色：commit=true 时同时写配置（色板 / 色相档 / 粘贴）。
+        // 应用一个颜色：commit=true 时同时写配置（色板 / 粘贴）。
         private static void Apply(ConfigEntryBase e, State s, Color c, bool keepHueIfGray, bool commit) {
             PickFrom(s, c, keepHueIfGray);
             s.TextPending = false;
             s.Dirty = true;
-            SyncText(s, false);
+            SyncText(s, true);   // 选色后文本必须跟着预览走，避免旧输入在失焦时把新颜色覆盖回去
             if (commit) Commit(e, s);
         }
 
@@ -1811,61 +1819,14 @@ public partial class SR {
 
         // ------------------------- 绘制 -------------------------
 
-        private static void DrawPanel(ConfigEntryBase e, State s) {
-            s.Frame = Time.frameCount;
-            Event ev = Event.current;
-            bool enter = ev != null && ev.type == EventType.KeyDown
-                && (ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter)
-                && (IsFocused(HexField) || IsRgbFocused());
-
-            try { GUILayout.Label(T("调色板", "Palette"), Ctl.SecHeader); } catch { }
-            DrawHeader(e, s);
-            GUILayout.Space(Sc(4f));
-            DrawPaletteGrid(e, s);
-            GUILayout.Space(Sc(4f));
-            DrawHueStrip(e, s);
-            GUILayout.Space(Sc(4f));
-            DrawHueBar(Sc(200f), Sc(6f));
-            DrawHsvRow(e, s, T("色相", "Hue"), 0, 0f, 360f);
-            DrawHsvRow(e, s, T("饱和", "Sat"), 1, 0f, 100f);
-            DrawHsvRow(e, s, T("明度", "Val"), 2, 0f, 100f);
-            GUILayout.Space(Sc(4f));
-            DrawRgbRow(e, s);
-            DrawHexRow(e, s);
-            GUILayout.Space(Sc(2f));
-            DrawActions(e, s);
-
-            // 回车应用（不吞其它按键）；失焦提交；HSV 滑块松手提交。
-            if (enter) ApplyText(e, s);
-            HandleFocus(e, s);
-            if (s.Dirty && s.Sliding && ev != null
-                && (ev.type == EventType.MouseUp || (ev.type == EventType.Repaint && !Input.GetMouseButton(0)))) {
-                Commit(e, s);
-            }
-        }
-
-        // 预览色块 + #RRGGBB + 收起：ImGui ColorPicker 的顶部预览行。
-        private static void DrawHeader(ConfigEntryBase e, State s) {
-            float h = Ctl.ControlH();
-            GUILayout.BeginHorizontal();
-            try {
-                Rect pv = GUILayoutUtility.GetRect(Sc(84f), h);
-                PreviewBox(pv, Quant(PickerColor(s)));
-                GUILayout.Label(SRApi.ColorHex.ToHex(PickerColor(s)), Ctl.Label, GUILayout.Width(Sc(78f)), GUILayout.Height(h));
-                GUILayout.FlexibleSpace();
-                if (GUILayout.Button(T("收起", "Collapse"), Ctl.Btn, GUILayout.Width(Sc(88f)), GUILayout.Height(h))) Close(e, s);
-            } catch (Exception __ex) { Guard.Log("调色板顶栏", __ex); }
-            GUILayout.EndHorizontal();
-        }
-
-        // 色板格子宽度：按内容区可用宽度自适应（窗口变窄或放大 UI 时不撑破页面），上限 22。
-        private static float CellW() {
-            float gap = Sc(3f);
+        // 面板宽度：默认 340 设计单位；窗口变窄时按可用宽度收缩（低于 240 时优先不撑破页面）。
+        private static float PanelWidth() {
             float avail = AvailWidth();
-            float cw = (avail - (PaletteCols - 1) * gap) / PaletteCols;
-            return Mathf.Clamp(cw, Sc(12f), Sc(22f));
+            float pw = Mathf.Min(Sc(340f), avail);
+            return Mathf.Max(Sc(120f), pw);
         }
 
+        // 内容区可用宽度：优先 ContentArea，其次窗口宽度扣侧栏；下限 120，避免除零。
         private static float AvailWidth() {
             float w = 0f;
             try { w = ContentArea.width; } catch { w = 0f; }
@@ -1874,9 +1835,222 @@ public partial class SR {
             return Mathf.Max(Sc(120f), w - Sc(12f));
         }
 
+        // 文本测量：标签列按当前语言的实测宽度计算，不再写死 34 / 14。
+        private static float TextW(string text, GUIStyle st) {
+            try { return st != null ? st.CalcSize(new GUIContent(text ?? "")).x : Sc(24f); }
+            catch { return Sc(24f); }
+        }
+
+        // 同一列取最大值 + 8px：用于 H/S/V、RGB、Hex 的标签列。
+        private static float LabelCol(params string[] texts) {
+            float w = 0f;
+            if (texts != null) {
+                for (int i = 0; i < texts.Length; i++) w = Mathf.Max(w, TextW(texts[i], Ctl.Label));
+            }
+            return w + Sc(8f);
+        }
+
+        // 按钮宽度：按文字实测宽度 + 内边距，英文/其它语言不截断。
+        private static float BtnW(string text) {
+            return TextW(text, Ctl.Btn) + Sc(12f);
+        }
+
+        private static void HoverTip(Rect r, string tip) {
+            try {
+                Event ev = Event.current;
+                if (ev != null && r.Contains(ev.mousePosition)) GUI.tooltip = tip;
+            } catch { }
+        }
+
+        private static void DrawPanel(ConfigEntryBase e, State s) {
+            s.Frame = Time.frameCount;
+            Event ev = Event.current;
+            bool enter = ev != null && ev.type == EventType.KeyDown
+                && (ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter);
+            bool enterText = enter && (IsFocused(HexField) || IsRgbFocused());
+            float pw = PanelWidth();
+
+            GUILayout.BeginVertical(GUILayout.Width(pw));
+            try {
+                try { GUILayout.Label(T("调色板", "Palette"), Ctl.SecHeader); } catch { }
+                DrawHeader(e, s, pw);
+                GUILayout.Space(Sc(6f));
+                DrawSvBlock(e, s, pw);
+                GUILayout.Space(Sc(6f));
+                DrawPaletteGrid(e, s, pw);
+                GUILayout.Space(Sc(4f));
+
+                // H/S/V 与 Hex 共用同一标签列：取当前语言里最宽的文本 + 8px。
+                float labelW = LabelCol(T("色相", "Hue"), T("饱和", "Sat"), T("明度", "Val"), "Hex");
+                DrawHsvRow(e, s, T("色相", "Hue"), 0, 0f, 360f, pw, labelW);
+                DrawHsvRow(e, s, T("饱和", "Sat"), 1, 0f, 100f, pw, labelW);
+                DrawHsvRow(e, s, T("明度", "Val"), 2, 0f, 100f, pw, labelW);
+                GUILayout.Space(Sc(4f));
+                DrawRgbRow(e, s, pw);
+                DrawHexRow(e, s, pw, labelW);
+                GUILayout.Space(Sc(2f));
+                DrawActions(e, s, pw);
+            } finally { GUILayout.EndVertical(); }
+
+            // 回车提交（不吞其它按键）；失焦提交；方块/色相条/HSV 滑块松手提交。
+            if (enterText) ApplyText(e, s);
+            else if (enter && s.Dirty) Commit(e, s);
+            HandleFocus(e, s);
+            if (s.Dirty && s.Sliding && ev != null
+                && (ev.type == EventType.MouseUp || (ev.type == EventType.Repaint && !Input.GetMouseButton(0)))) {
+                Commit(e, s);
+                BlockWindowDrag = false;
+            }
+        }
+
+        // 预览色块 + #RRGGBB + 收起：ImGui ColorPicker 的顶部预览行。
+        private static void DrawHeader(ConfigEntryBase e, State s, float pw) {
+            float h = Ctl.ControlH();
+            float collapseW = BtnW(T("收起", "Collapse"));
+            float hexW = TextW("#FFFFFF", Ctl.Label) + Sc(8f);
+            float previewW = Mathf.Clamp(pw - hexW - collapseW - Sc(16f), Sc(44f), Sc(84f));
+            GUILayout.BeginHorizontal();
+            try {
+                Rect pv = GUILayoutUtility.GetRect(previewW, h);
+                PreviewBox(pv, Quant(PickerColor(s)));
+                GUILayout.Label(SRApi.ColorHex.ToHex(PickerColor(s)), Ctl.Label, GUILayout.Width(hexW), GUILayout.Height(h));
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button(T("收起", "Collapse"), Ctl.Btn, GUILayout.Width(collapseW), GUILayout.Height(h))) Close(e, s);
+            } catch (Exception __ex) { Guard.Log("调色板顶栏", __ex); }
+            GUILayout.EndHorizontal();
+        }
+
+        // 色板主体：左边饱和度×明度方块，右边竖向色相条（ImGui ColorPicker3 布局）。
+        private static void DrawSvBlock(ConfigEntryBase e, State s, float pw) {
+            float hueW = Sc(24f), gap = Sc(8f);
+            float side = Mathf.Min(Sc(150f), Mathf.Max(Sc(72f), pw - hueW - gap - Sc(8f)));
+            Rect sq = default(Rect), hb = default(Rect);
+            GUILayout.BeginHorizontal();
+            try {
+                sq = GUILayoutUtility.GetRect(side, side);
+                GUILayout.Space(gap);
+                hb = GUILayoutUtility.GetRect(hueW, side);
+                GUILayout.FlexibleSpace();
+            } finally { GUILayout.EndHorizontal(); }
+            DrawSvSquare(e, s, sq);
+            DrawHueBar(e, s, hb);
+        }
+
+        // 饱和度（X）× 明度（Y）二维方块：H 固定；贴图只随 H 变化，拖动时每秒最多重建几十次小图。
+        private static void DrawSvSquare(ConfigEntryBase e, State s, Rect r) {
+            if (r.width <= 0f || r.height <= 0f) return;
+            DrawFill(r, Color.black);
+            if (Event.current != null && Event.current.type == EventType.Repaint) {
+                Texture2D tex = null;
+                try { tex = SvTexture(s.H); } catch { }
+                if (tex != null) {
+                    Color old = GUI.color;
+                    try { GUI.color = Color.white; GUI.DrawTexture(r, tex); } finally { GUI.color = old; }
+                }
+            }
+            Ring(r, new Color(0f, 0f, 0f, 0.75f));
+
+            float mx = r.x + Mathf.Clamp01(s.S) * r.width;
+            float my = r.y + (1f - Mathf.Clamp01(s.V)) * r.height;
+            float d = Sc(7f);
+            Rect m = new Rect(
+                Mathf.Clamp(mx - d / 2f, r.x, Mathf.Max(r.x, r.xMax - d)),
+                Mathf.Clamp(my - d / 2f, r.y, Mathf.Max(r.y, r.yMax - d)), d, d);
+            DrawFill(m, Color.white);
+            Ring(m, Color.black);
+            HandleSvInput(e, s, r);
+            HoverTip(r, T("拖动选择饱和度与明度；松开写入配置", "drag to pick saturation/value; release to apply"));
+        }
+
+        // 竖向色相条：顶部 0°、底部 360°，点击/拖动立即更新预览，松开落盘。
+        private static void DrawHueBar(ConfigEntryBase e, State s, Rect r) {
+            if (r.width <= 0f || r.height <= 0f) return;
+            int n = 96;
+            float seg = r.height / n;
+            for (int i = 0; i < n; i++) {
+                DrawFill(new Rect(r.x, r.y + i * seg, r.width, seg + 1f), Color.HSVToRGB(i / (float)n, 1f, 1f));
+            }
+            Ring(r, new Color(0f, 0f, 0f, 0.75f));
+
+            float hy = r.y + Mathf.Repeat(s.H, 1f) * r.height;
+            float markerY = Mathf.Clamp(hy - Sc(1f), r.y, Mathf.Max(r.y, r.yMax - Sc(2f)));
+            DrawFill(new Rect(r.x, markerY, r.width, Sc(2f)), Color.white);
+            DrawFill(new Rect(r.x, markerY, r.width, Sc(1f)), new Color(0f, 0f, 0f, 0.85f));
+            HandleHueInput(e, s, r);
+            HoverTip(r, T("拖动选择色相；松开写入配置", "drag to pick hue; release to apply"));
+        }
+
+        // S/V 方块命中：按下、拖动只改预览；松开写盘。
+        private static void HandleSvInput(ConfigEntryBase e, State s, Rect r) {
+            Event ev = Event.current;
+            if (ev == null || r.width <= 0f || r.height <= 0f) return;
+            Vector2 mp = ev.mousePosition;
+            if (ev.type == EventType.MouseDown && ev.button == 0 && r.Contains(mp)) {
+                s.Drag = 1;
+            } else if (ev.type == EventType.MouseUp && s.Drag == 1) {
+                SetSvFromRect(s, r, mp);
+                s.Dirty = true;
+                s.TextPending = false;
+                SyncText(s, true);
+                Commit(e, s);
+                BlockWindowDrag = false;
+                ev.Use();
+                return;
+            } else if (!(s.Drag == 1 && ev.type == EventType.MouseDrag && ev.button == 0)) {
+                return;
+            }
+            SetSvFromRect(s, r, mp);
+            s.Dirty = true;
+            s.Sliding = true;
+            s.TextPending = false;
+            SyncText(s, true);
+            BlockWindowDrag = true;
+            ev.Use();
+        }
+
+        private static void SetSvFromRect(State s, Rect r, Vector2 mp) {
+            s.S = Mathf.Clamp01((mp.x - r.x) / Mathf.Max(1f, r.width));
+            s.V = Mathf.Clamp01(1f - (mp.y - r.y) / Mathf.Max(1f, r.height));
+        }
+
+        // 色相条命中：按下、拖动只改预览；松开写盘。
+        private static void HandleHueInput(ConfigEntryBase e, State s, Rect r) {
+            Event ev = Event.current;
+            if (ev == null || r.height <= 0f) return;
+            Vector2 mp = ev.mousePosition;
+            if (ev.type == EventType.MouseDown && ev.button == 0 && r.Contains(mp)) {
+                s.Drag = 2;
+            } else if (ev.type == EventType.MouseUp && s.Drag == 2) {
+                SetHueFromRect(s, r, mp);
+                s.Dirty = true;
+                s.TextPending = false;
+                SyncText(s, true);
+                Commit(e, s);
+                BlockWindowDrag = false;
+                ev.Use();
+                return;
+            } else if (!(s.Drag == 2 && ev.type == EventType.MouseDrag && ev.button == 0)) {
+                return;
+            }
+            SetHueFromRect(s, r, mp);
+            s.Dirty = true;
+            s.Sliding = true;
+            s.TextPending = false;
+            SyncText(s, true);
+            BlockWindowDrag = true;
+            ev.Use();
+        }
+
+        private static void SetHueFromRect(State s, Rect r, Vector2 mp) {
+            float t = Mathf.Clamp01((mp.y - r.y) / Mathf.Max(1f, r.height));
+            s.H = Mathf.Repeat(t, 1f);
+        }
+
         // 24 色网格，点击即应用；当前色用黑白双描边高亮。
-        private static void DrawPaletteGrid(ConfigEntryBase e, State s) {
-            float cw = CellW(), ch = Sc(18f), gap = Sc(3f);
+        private static void DrawPaletteGrid(ConfigEntryBase e, State s, float pw) {
+            float gap = Sc(3f);
+            float cw = Mathf.Clamp((pw - (PaletteCols - 1) * gap) / PaletteCols, Sc(10f), Sc(28f));
+            float ch = Mathf.Clamp(cw * 0.85f, Sc(16f), Sc(22f));
             int rows = (Palette.Length + PaletteCols - 1) / PaletteCols;
             Rect box = GUILayoutUtility.GetRect(PaletteCols * cw + (PaletteCols - 1) * gap, rows * ch + (rows - 1) * gap);
             Color cur = Quant(PickerColor(s));
@@ -1885,41 +2059,6 @@ public partial class SR {
                 Rect cr = new Rect(box.x + col * (cw + gap), box.y + row * (ch + gap), cw, ch);
                 Color pc = SRApi.ColorHex.ParseHex(Palette[i], Color.white);
                 if (DrawCell(cr, pc, SameColor(pc, cur), Palette[i])) Apply(e, s, pc, true, true);
-            }
-        }
-
-        // 当前 S/V 下的 H 变体条（12 档），点击即应用。
-        private static void DrawHueStrip(ConfigEntryBase e, State s) {
-            float cw = CellW(), ch = Sc(18f), gap = Sc(3f);
-            Rect box = GUILayoutUtility.GetRect(HueSteps * cw + (HueSteps - 1) * gap, ch);
-            int curIdx = Mathf.Clamp((int)(Mathf.Repeat(s.H, 1f) * HueSteps), 0, HueSteps - 1);
-            for (int i = 0; i < HueSteps; i++) {
-                float h = (i + 0.5f) / HueSteps;
-                Color hc = HueVariant(s, h);
-                Rect cr = new Rect(box.x + i * (cw + gap), box.y, cw, ch);
-                if (!DrawCell(cr, hc, i == curIdx, SRApi.ColorHex.ToHex(hc))) continue;
-                if (s.S <= 0.001f) s.S = 1f; // 灰阶上点色相档：恢复饱和，避免点了看不到变化
-                s.H = h;
-                s.TextPending = false;
-                s.Dirty = true;
-                SyncText(s, false);
-                Commit(e, s);
-            }
-        }
-
-        // 当前 S/V 下的某档色相；S≈0 时按全饱和绘制（与点击后的恢复规则一致）。
-        private static Color HueVariant(State s, float h) {
-            float sat = s.S <= 0.001f ? 1f : Mathf.Clamp01(s.S);
-            return Quant(Color.HSVToRGB(Mathf.Repeat(h, 1f), sat, Mathf.Clamp01(s.V)));
-        }
-
-        // 纯视觉色相条（全饱和 24 段），给 H 滑块一个 ImGui 式的参考底。
-        private static void DrawHueBar(float width, float height) {
-            Rect r = GUILayoutUtility.GetRect(width, height);
-            int n = 24;
-            float cw = r.width / n;
-            for (int i = 0; i < n; i++) {
-                DrawFill(new Rect(r.x + i * cw, r.y, cw + 0.5f, r.height), Color.HSVToRGB((i + 0.5f) / n, 1f, 1f));
             }
         }
 
@@ -1933,17 +2072,19 @@ public partial class SR {
             return GUI.Button(r, new GUIContent("", tip), GUIStyle.none);
         }
 
-        // H/S/V 一行：标签 + 滑块（整数步进）+ 读数；拖动只改预览。
-        private static void DrawHsvRow(ConfigEntryBase e, State s, string label, int which, float min, float max) {
+        // H/S/V 一行：自适应标签列 + 滑块（整数步进）+ 读数；拖动只改预览，松手由 DrawPanel 落盘。
+        private static void DrawHsvRow(ConfigEntryBase e, State s, string label, int which, float min, float max, float pw, float labelW) {
             float rowH = Ctl.ControlH();
+            float numW = TextW("360", Ctl.Label) + Sc(8f);
+            float sliderW = Mathf.Max(Sc(48f), pw - labelW - numW - Sc(10f));
             float cur = which == 0 ? s.H * 360f : (which == 1 ? s.S * 100f : s.V * 100f);
             float nv = cur;
             GUILayout.BeginHorizontal();
             try {
-                GUILayout.Label(label, Ctl.Label, GUILayout.Width(Sc(34f)), GUILayout.Height(rowH));
-                Rect sl = GUILayoutUtility.GetRect(Sc(200f), rowH);
+                GUILayout.Label(label, Ctl.Label, GUILayout.Width(labelW), GUILayout.Height(rowH));
+                Rect sl = GUILayoutUtility.GetRect(sliderW, rowH);
                 nv = Ctl.DrawSlider(sl, cur, min, max, true);
-                GUILayout.Label(Mathf.RoundToInt(nv).ToString(CultureInfo.InvariantCulture), Ctl.Label, GUILayout.Width(Sc(36f)), GUILayout.Height(rowH));
+                GUILayout.Label(Mathf.RoundToInt(nv).ToString(CultureInfo.InvariantCulture), Ctl.Label, GUILayout.Width(numW), GUILayout.Height(rowH));
             } catch (Exception __ex) { Guard.Log("调色板滑块", __ex); }
             GUILayout.EndHorizontal();
             if (Mathf.Abs(nv - cur) < 0.0001f) return;
@@ -1957,16 +2098,19 @@ public partial class SR {
         }
 
         // R/G/B 整数输入（0-255）：三格都合法即时预览，回车/失焦提交；非法格红框。
-        private static void DrawRgbRow(ConfigEntryBase e, State s) {
+        private static void DrawRgbRow(ConfigEntryBase e, State s, float pw) {
             float rowH = Ctl.ControlH();
+            float labelW = LabelCol("R", "G", "B");
+            float gap = Sc(6f);
+            float fieldW = Mathf.Max(Sc(30f), (pw - 3f * labelW - 2f * gap - Sc(36f)) / 3f);
             GUILayout.BeginHorizontal();
             try {
                 for (int i = 0; i < 3; i++) {
-                    if (i > 0) GUILayout.Space(Sc(8f));
-                    GUILayout.Label(i == 0 ? "R" : (i == 1 ? "G" : "B"), Ctl.Label, GUILayout.Width(Sc(14f)), GUILayout.Height(rowH));
+                    if (i > 0) GUILayout.Space(gap);
+                    GUILayout.Label(i == 0 ? "R" : (i == 1 ? "G" : "B"), Ctl.Label, GUILayout.Width(labelW), GUILayout.Height(rowH));
                     GUI.SetNextControlName(RgbFields[i]);
                     string before = s.Rgb[i] ?? "";
-                    string after = GUILayout.TextField(before, 3, Ctl.SearchBox, GUILayout.Width(Sc(48f)), GUILayout.Height(rowH));
+                    string after = GUILayout.TextField(before, 3, Ctl.SearchBox, GUILayout.Width(fieldW), GUILayout.Height(rowH));
                     Rect fr = GUILayoutUtility.GetLastRect();
                     if (after != before) {
                         s.Rgb[i] = after;
@@ -1992,41 +2136,82 @@ public partial class SR {
         }
 
         // Hex 输入：#RRGGBB；内容非法时实时红框，回车/失焦回退为当前色。
-        private static void DrawHexRow(ConfigEntryBase e, State s) {
+        private static void DrawHexRow(ConfigEntryBase e, State s, float pw, float labelW) {
             float rowH = Ctl.ControlH();
+            float hintW = Mathf.Max(Sc(56f), TextW(T("回车应用", "Enter to apply"), Ctl.Label) + Sc(8f));
+            float fieldW = Mathf.Max(Sc(48f), pw - labelW - hintW - Sc(12f));
             GUILayout.BeginHorizontal();
             try {
-                GUILayout.Label("Hex", Ctl.Label, GUILayout.Width(Sc(34f)), GUILayout.Height(rowH));
+                GUILayout.Label("Hex", Ctl.Label, GUILayout.Width(labelW), GUILayout.Height(rowH));
                 GUI.SetNextControlName(HexField);
-                s.HexEdit = GUILayout.TextField(s.HexEdit ?? "", 7, Ctl.SearchBox, GUILayout.Width(Sc(96f)), GUILayout.Height(rowH));
+                s.HexEdit = GUILayout.TextField(s.HexEdit ?? "", 7, Ctl.SearchBox, GUILayout.Width(fieldW), GUILayout.Height(rowH));
                 Rect fr = GUILayoutUtility.GetLastRect();
                 Color probe;
                 if (!SRApi.ColorHex.ParseHex(s.HexEdit, out probe)) Ring(fr, new Color(0.9f, 0.25f, 0.2f, 0.9f));
-                GUILayout.Label(T("回车应用", "Enter to apply"), Ctl.Label, GUILayout.Width(Sc(110f)), GUILayout.Height(rowH));
+                GUILayout.Label(T("回车应用", "Enter to apply"), Ctl.Label, GUILayout.Width(hintW), GUILayout.Height(rowH));
             } catch (Exception __ex) { Guard.Log("调色板 Hex", __ex); }
             GUILayout.EndHorizontal();
             if (!string.Equals(s.HexEdit, SRApi.ColorHex.ToHex(PickerColor(s)))) s.TextPending = true;
         }
 
         // 复制 / 粘贴 / 还原默认（剪贴板走 GUIUtility.systemCopyBuffer）。
-        private static void DrawActions(ConfigEntryBase e, State s) {
+        private static void DrawActions(ConfigEntryBase e, State s, float pw) {
             float h = Ctl.ControlH();
+            string copy = T("复制", "Copy"), paste = T("粘贴", "Paste"), reset = T("还原默认", "Reset");
+            float gap = Sc(6f);
+            float copyW = BtnW(copy), pasteW = BtnW(paste), resetW = BtnW(reset);
+            float total = copyW + pasteW + resetW + 2f * gap;
+            float budget = Mathf.Max(Sc(60f), pw - Sc(24f));
+            if (total > budget && total > 0f) {
+                float k = budget / total;
+                copyW *= k; pasteW *= k; resetW *= k; gap *= k;
+            }
             GUILayout.BeginHorizontal();
             try {
-                if (GUILayout.Button(new GUIContent(T("复制", "Copy"), T("把当前颜色复制到系统剪贴板", "copy the current color to the system clipboard")),
-                    Ctl.Btn, GUILayout.Width(Sc(64f)), GUILayout.Height(h))) {
+                if (GUILayout.Button(new GUIContent(copy, T("把当前颜色复制到系统剪贴板", "copy the current color to the system clipboard")),
+                    Ctl.Btn, GUILayout.Width(copyW), GUILayout.Height(h))) {
                     try { GUIUtility.systemCopyBuffer = SRApi.ColorHex.ToHex(PickerColor(s)); } catch { }
                 }
-                if (GUILayout.Button(new GUIContent(T("粘贴", "Paste"), T("从剪贴板读取 #RRGGBB；格式非法则忽略", "paste #RRGGBB from the clipboard; invalid text is ignored")),
-                    Ctl.Btn, GUILayout.Width(Sc(64f)), GUILayout.Height(h))) {
+                GUILayout.Space(gap);
+                if (GUILayout.Button(new GUIContent(paste, T("从剪贴板读取 #RRGGBB；格式非法则忽略", "paste #RRGGBB from the clipboard; invalid text is ignored")),
+                    Ctl.Btn, GUILayout.Width(pasteW), GUILayout.Height(h))) {
                     Color c;
                     if (SRApi.ColorHex.ParseHex(GUIUtility.systemCopyBuffer, out c)) { Apply(e, s, c, true, true); SyncText(s, true); }
                 }
-                if (GUILayout.Button(new GUIContent(T("还原默认", "Reset"), T("写回该颜色键的默认值", "write back the default value of this color key")),
-                    Ctl.Btn, GUILayout.Width(Sc(88f)), GUILayout.Height(h))) Reset(e);
+                GUILayout.Space(gap);
+                if (GUILayout.Button(new GUIContent(reset, T("写回该颜色键的默认值", "write back the default value of this color key")),
+                    Ctl.Btn, GUILayout.Width(resetW), GUILayout.Height(h))) Reset(e);
                 GUILayout.FlexibleSpace();
             } catch (Exception __ex) { Guard.Log("调色板操作", __ex); }
             GUILayout.EndHorizontal();
+        }
+
+        // 当前 H 对应的 S/V 方块贴图：像素 (x,y) = HSV(H, x/(w-1), y/(h-1))。
+        // 只随 H 变化；拖动色相条时逐帧重建 96×96 小图，开销远低于逐格 DrawFill。
+        private static Texture2D SvTexture(float h) {
+            h = Mathf.Repeat(h, 1f);
+            if (_svTex != null && Mathf.Abs(_svTexHue - h) < 0.0005f) return _svTex;
+            try {
+                if (_svTex == null) {
+                    _svTex = new Texture2D(SvTexSize, SvTexSize, TextureFormat.RGBA32, false);
+                    _svTex.hideFlags = HideFlags.HideAndDontSave;
+                    _svTex.wrapMode = TextureWrapMode.Clamp;
+                    _svTex.filterMode = FilterMode.Bilinear;
+                }
+                if (_svPixels == null || _svPixels.Length != SvTexSize * SvTexSize) _svPixels = new Color32[SvTexSize * SvTexSize];
+                Color32[] px = _svPixels;
+                float denom = SvTexSize - 1f;
+                for (int y = 0; y < SvTexSize; y++) {
+                    float v = y / denom;
+                    for (int x = 0; x < SvTexSize; x++) {
+                        px[y * SvTexSize + x] = SRApi.ColorHex.ToColor32(Color.HSVToRGB(h, x / denom, v));
+                    }
+                }
+                _svTex.SetPixels32(px);
+                _svTex.Apply(false, false);
+                _svTexHue = h;
+                return _svTex;
+            } catch { return _svTex; }
         }
 
         // ------------------------- 输入 / 焦点 -------------------------
@@ -2161,6 +2346,7 @@ public partial class SR {
             Ring(new Rect(r.x + 1f, r.y + 1f, Mathf.Max(1f, r.width - 2f), Mathf.Max(1f, r.height - 2f)), new Color(1f, 1f, 1f, 0.85f));
         }
     }
+
 
 	}
 }

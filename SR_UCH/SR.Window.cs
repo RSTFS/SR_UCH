@@ -130,7 +130,6 @@ public partial class SR {
         // 右栏底部那行（设置 / 模式）的高度：自绘页据此给表格留出底部空间，否则末行会被盖住。
         public static float FooterHeight;
         private static readonly Dictionary<string, float> _pageFooterH = new Dictionary<string, float>();
-        private static bool _diagOn;
         private static float _pageUsedTop;   // 上一帧量到的页头/页签底部 Y（Layout 帧兜底用）   // 各栏目页面外框按钮高度（切换栏目不跳）
         // 底栏注册按钮的悬停过渡与命中矩形（按 id 缓存）
         private static readonly Dictionary<string, float> _footerBtnHover = new Dictionary<string, float>();
