@@ -859,7 +859,7 @@ public partial class SR : ITweak {
             try { SRApi.SetTableScrollbarForSink(delegate (SRApi.TableArgs __a, Event __e, ref bool __dr, ref float __gy, ref float __sy) { return SR.Ctl.TableScrollbarFor(__a, __e, ref __dr, ref __gy, ref __sy); }); }
             catch (Exception __ex) { Guard.Log("注入表格滚动条一体化", __ex); }
             // 竖向滚动条绘制（ImGui 配色）由核心统一提供。
-            try { SRApi.SetTableScrollbarSink(delegate (Rect __t, float __ch, float __vh, float __sy, bool __dr, out Rect __th, bool __vis) { SR.Ctl.TableScrollbar(__t, __ch, __vh, __sy, __dr, out __th, __vis); }); }
+            try { SRApi.SetTableScrollbarSink(delegate (Rect __t, float __ch, float __vh, float __sy, bool __dr, out Rect __th, bool __vis, float __al) { SR.Ctl.TableScrollbar(__t, __ch, __vh, __sy, __dr, out __th, __vis, __al); }); }
             catch (Exception __ex) { Guard.Log("注入表格滚动条", __ex); }
             // “不写绑定提示”的快捷键按钮：与普通 HotkeyButton 同一套右键绑键逻辑，只少了提示行。
             try { SRApi.Ctl.SetHotkeyButtonNoHintSink(delegate (string __id, string __l, string __t, Action __a, float __w, float __h) { return SR.Ctl.HotkeyButtonNoHint(__id, __l, __t, __a, __w, __h); }); }

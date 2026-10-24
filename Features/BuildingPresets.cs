@@ -307,8 +307,15 @@ namespace SR_UCH.Tweaks {
 		}
 
 		// 当前搜索过滤（名称 / 关卡 / 模式）+ 关卡下拉筛选 + 排序后的可见列表。
+		private static int _visFrame = -1;
+		private static readonly List<PresetInfo> _visFrameBuf = new List<PresetInfo>();
+
 		private static List<PresetInfo> VisiblePresets() {
-			List<PresetInfo> list = new List<PresetInfo>();
+			// 同一帧只过滤+排序一次（Render 和表格绘制都会调用它），避免重复 O(n log n)。
+			if (_visFrame == Time.frameCount) return _visFrameBuf;
+			_visFrame = Time.frameCount;
+			List<PresetInfo> list = _visFrameBuf;
+			list.Clear();
 			try {
 				string q = (_search ?? "").Trim();
 				for (int i = 0; i < _presets.Count; i++) {
@@ -485,7 +492,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				if (_tableHEntry != null && _tableHEntry.Value > 0)
 					tableH = Mathf.Min(tableH, SRApi.Ctl.Sc(_tableHEntry.Value));
 				_actionHitThisFrame = false;
-				RenderPresetTable(tableH);
+				List<PresetInfo> visible = VisiblePresets();
+				RenderPresetTable(tableH, visible);
 				// 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
 				try {
 					if (!string.IsNullOrEmpty(_pendingKey) && _pendingKey == pendingBefore && !_actionHitThisFrame
@@ -676,9 +684,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 		}
 
 		// 标准表格：核心 TableDraw 负责表头/行/拖列宽/换列位/钉住操作列；本页只提供列定义、单元格文本与操作按钮。
-		private static void RenderPresetTable(float tableH) {
+		private static void RenderPresetTable(float tableH, List<PresetInfo> visible) {
 			try {
-				List<PresetInfo> visible = VisiblePresets();
 				string title = SRApi.T("- 预设列表", "- Preset list") + " (" + visible.Count + "/" + _presets.Count
 					+ SRApi.T("，上限 ", ", limit ") + MaxPresets + ")";
 				SRApi.Ctl.SectionTitle(title);

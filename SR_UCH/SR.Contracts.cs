@@ -387,7 +387,8 @@ namespace SR_UCH {
             public System.Action<int> rowClick;             //左键 MouseUp 命中非钉住列区域时回调行号
             public System.Action<int> rowDoubleClick;
             public System.Action<int> rowRightClick;   // 右键单击行（MouseUp 右键，仅在行上）
-            public System.Action<int> headerShiftClick; // Shift+左键单击表头（参数=数据列下标）       //0.35 秒内同一行左键点击两次时回调
+            public System.Action<int> headerShiftClick; // Shift+左键单击表头（参数=数据列下标）
+            public float scrollbarAlpha;   // 滚动条淡入淡出透明度（核心维护）       //0.35 秒内同一行左键点击两次时回调
             public bool hoverHighlight = true;              //rowHover >= 0 时核心在行矩形上叠一层很淡的高亮
             }
         public static void TableDraw(TableArgs a) { Action<TableArgs> f = _tableDraw; if (f != null) f(a); }
@@ -406,13 +407,13 @@ namespace SR_UCH {
         }
 
         // 竖向滚动条统一绘制（ImGui 配色）：返回滑块矩形，调用方把它传给 TableScrollbarInput。
-        public delegate void TableScrollbarFn(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb, bool visible);
+        public delegate void TableScrollbarFn(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb, bool visible, float alpha);
         private static object _tableScrollbar;
         public static void SetTableScrollbarSink(TableScrollbarFn f) { _tableScrollbar = f; }
-        public static Rect TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, bool visible = true) {
+        public static Rect TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, bool visible = true, float alpha = 1f) {
             Rect thumb = default(Rect);
             TableScrollbarFn f = _tableScrollbar as TableScrollbarFn;
-            if (f != null) f(track, contentH, viewH, scrollY, dragging, out thumb, visible);
+            if (f != null) f(track, contentH, viewH, scrollY, dragging, out thumb, visible, alpha);
             return thumb;
         }
         // 列表高度自适应：返回“内容底界 - 当前布局 Y + 历史偏差”，并在绘制后用 TableAfterDraw 自校准。

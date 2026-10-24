@@ -88,14 +88,16 @@ public partial class SR {
             Rect thumb;
             Vector2 __mp = Event.current != null ? Event.current.mousePosition : Vector2.zero;
             // 默认隐藏：只有正在拖动、或鼠标正好落在滚动条区域时才显示（悬停整张表不显示）。
+            // 淡入淡出：悬停轨道/拖动 → 1，否则 → 0（每帧按时间平滑过渡）。
             bool __show = dragging || track.Contains(__mp);
-            TableScrollbar(track, contentH, a.rowsH, scrollY, dragging, out thumb, __show);
+            a.scrollbarAlpha = Mathf.MoveTowards(a.scrollbarAlpha, __show ? 1f : 0f, Time.unscaledDeltaTime * 8f);
+            TableScrollbar(track, contentH, a.rowsH, scrollY, dragging, out thumb, a.scrollbarAlpha > 0.02f, a.scrollbarAlpha);
             if (e == null) return false;
             return SRApi.TableScrollbarInput(e, e.mousePosition, track, thumb, maxScroll, ref dragging, ref grabY, ref scrollY);
         } catch (Exception __ex) { Guard.Log("表格滚动条一体化", __ex); return false; }
     }
 
-    public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb, bool visible = true) {
+    public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb, bool visible = true, float alpha = 1f) {
             SR.TableScrollbar(track, contentH, viewH, scrollY, dragging, out thumb);
         }
 
