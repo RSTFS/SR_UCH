@@ -137,43 +137,52 @@ public partial class SR {
 
         //自检块：显示启动自检结果（补丁目标 + 反射成员 + 扩展点 / 孤儿键 / 运行时异常）。
         //置于设置页：属诊断信息，不占侧栏栏目。
+        // 换行标签：GUILayout.Label 对 wordWrap 样式不会自动撑高，必须按可用宽度实测高度，
+        // 否则长行（扩展点列表、反射目标等）会被裁掉下半截。
+        private static void AuditLabel(string text) {
+            if (string.IsNullOrEmpty(text)) return;
+            float w = Mathf.Max(Sc(180f), SR.ContentArea.width - Sc(28f));
+            float h = _labelWrap.CalcHeight(new GUIContent(text), w);
+            GUILayout.Label(text, _labelWrap, GUILayout.Height(Mathf.Max(Sc(18f), h)));
+        }
+
         private static void RenderAuditBlock() {
             try {
                 GUILayout.Space(Sc(6));
                 GUILayout.Label("- " + T("自检", "Self-check") + " -", _secHeader);
                 GUILayout.Label(T("按名绑定的补丁目标", "Named patch targets") + "："
-                    + SR.AuditPatchOk + " / " + SR.AuditPatchTotal, _labelWrap);
-                GUILayout.Label(T("反射成员", "Reflected members") + "：" + SR.AuditRefOk + " / " + SR.AuditRefTotal, _labelWrap);
+                    + SR.AuditPatchOk + " / " + SR.AuditPatchTotal);
+                AuditLabel(T("反射成员", "Reflected members") + "：" + SR.AuditRefOk + " / " + SR.AuditRefTotal);
                 System.Collections.Generic.IList<SR.AuditIssue> issues = SR.AuditIssues;
                 if (issues == null || issues.Count == 0) {
-                    GUILayout.Label(T("按名绑定的目标全部有效。", "All name-bound targets are valid."), _labelWrap);
+                    AuditLabel(T("按名绑定的目标全部有效。", "All name-bound targets are valid."));
                 } else {
-                    GUILayout.Label(T("以下目标已失效 -> 对应功能不会生效（开关还在、行为没了）：",
-                        "These targets no longer exist - the listed features will NOT work:"), _labelWrap);
+                    AuditLabel(T("以下目标已失效 -> 对应功能不会生效（开关还在、行为没了）：",
+                        "These targets no longer exist - the listed features will NOT work:"));
                     for (int i = 0; i < issues.Count; i++) {
                         //AuditIssue.Kind 取值是中文（"补丁" / "反射"），须映射为当前语言；未知取值原样输出。
                         string kindRaw = issues[i].Kind;
                         string kindTxt = kindRaw == "补丁" ? T("补丁", "Patch")
                                        : kindRaw == "反射" ? T("反射", "Reflection")
                                        : kindRaw;
-                        GUILayout.Label("   ✗  " + kindTxt + "  " + issues[i].Target + "   <- " + issues[i].Scope, _labelWrap);
+                        AuditLabel("   ✗  " + kindTxt + "  " + issues[i].Target + "   <- " + issues[i].Scope);
                     }
                 }
                 //显示当前生效的扩展点数量，便于外部模块对接时确认是否接上。
-                GUILayout.Label(T("扩展点", "Extension points") + "："
+                AuditLabel(T("扩展点", "Extension points") + "："
                     + T("槽位 ", "slots ") + Slots.Count
                     + T("（", " (") + string.Join(", ", new List<string>(Slots.Names).ToArray()) + ")"
                     + T("，覆盖层 ", ", overlays ") + SR.OverlayCount
-                    + T("，UI 阻断 ", ", UI blockers ") + SR.UiBlockProviderCount, _labelWrap);
+                    + T("，UI 阻断 ", ", UI blockers ") + SR.UiBlockProviderCount);
                 if (Slots.MissCount > 0) {
-                    GUILayout.Label(T("没人提供的槽位", "Unclaimed slots") + "：" + Slots.MissCount
+                    AuditLabel(T("没人提供的槽位", "Unclaimed slots") + "：" + Slots.MissCount
                         + T("（取用时返回 null，详见日志", " (Require returned null; see log)") + "："
-                        + string.Join(", ", new List<string>(Slots.MissNames).ToArray()) + ")", _labelWrap);
+                        + string.Join(", ", new List<string>(Slots.MissNames).ToArray()) + ")");
                 }
                 if (SR.OrphanKeyCount > 0) {
                     GUILayout.BeginHorizontal();
-                    GUILayout.Label(T("配置里的孤儿键", "Orphan config keys") + "：" + SR.OrphanKeyCount
-                        + T("（没有代码再读它；详见日志）", " (nothing reads them any more; see log)"), _labelWrap);
+                    AuditLabel(T("配置里的孤儿键", "Orphan config keys") + "：" + SR.OrphanKeyCount
+                        + T("（没有代码再读它；详见日志）", " (nothing reads them any more; see log)"));
                     //一键清理这些键（原子替换，原文件备份为 .bak）
                     if (GUILayout.Button(T("清理", "Clean up"), _btn, GUILayout.Width(Sc(64)), GUILayout.Height(Sc(24)))) {
                         int cleaned = SR.CleanOrphanKeys();
@@ -185,19 +194,19 @@ public partial class SR {
                     GUILayout.EndHorizontal();
                 }
                 if (ConfigMigration.RuleConflictCount > 0) {
-                    GUILayout.Label(T("迁移规则冲突", "Migration rule conflicts") + "：" + ConfigMigration.RuleConflictCount
-                        + T("（会让某些设置每次启动被删/读不到；详见日志", " (some settings get deleted or unreadable every launch; see log)"), _labelWrap);
+                    AuditLabel(T("迁移规则冲突", "Migration rule conflicts") + "：" + ConfigMigration.RuleConflictCount
+                        + T("（会让某些设置每次启动被删/读不到；详见日志", " (some settings get deleted or unreadable every launch; see log)"));
                 }
                 if (SR.FallbackSectionCount > 0) {
-                    GUILayout.Label(T("没有归属的配置段", "Unowned config sections") + "：" + SR.FallbackSectionCount
-                        + T("（会在侧栏以兜底页出现；详见日志", " (shown as fallback pages; see log)"), _labelWrap);
+                    AuditLabel(T("没有归属的配置段", "Unowned config sections") + "：" + SR.FallbackSectionCount
+                        + T("（会在侧栏以兜底页出现；详见日志", " (shown as fallback pages; see log)"));
                 }
                 //显示运行期异常计数与最近一条，弥补启动自检只能看到静态失效的缺口。
                 if (SR.Guard.WarnCount > 0) {
-                    GUILayout.Label(T("运行时异常次数", "Runtime errors") + "：" + SR.Guard.WarnCount, _labelWrap);
+                    AuditLabel(T("运行时异常次数", "Runtime errors") + "：" + SR.Guard.WarnCount);
                     if (!string.IsNullOrEmpty(SR.Guard.LastWhat)) {
-                        GUILayout.Label(T("最近一次", "Last") + "：" + SR.Guard.LastWhat
-                            + " - " + (SR.Guard.LastError ?? ""), _labelWrap);
+                        AuditLabel(T("最近一次", "Last") + "：" + SR.Guard.LastWhat
+                            + " - " + (SR.Guard.LastError ?? ""));
                     }
                 }
             } catch (Exception __ex) { Guard.Log("渲染自检块", __ex); }
