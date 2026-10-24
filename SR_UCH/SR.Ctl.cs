@@ -1,6 +1,7 @@
 // 控件与页面能力门面：管理器通用控件（按键录制/右键绑键/开关/滑块/下拉）、首页、Ctl 门面、行页扩展点 RowHooks、表格控件 TableArgs -> TableDraw。
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using BepInEx.Configuration;
 using UnityEngine;
 using BepInEx;
@@ -13,8 +14,15 @@ public partial class SR {
 
     public static class Ctl {
 
+        // 颜色调色板自注入：核心在 Ctl 首次被访问时把实现挂到契约层门面。
+        // 放在这里而不是 MainPlugin 的注入清单里 —— 新增 Set*Sinks 会要求 MainPlugin 同步改（该文件由他人收尾）。
+        static Ctl() { SR.ColorPicker.Wire(); }
+
         // UI 缩放系数（各页像素尺寸都乘它）
         public static float Sc(float v) { return SR.Sc(v); }
+
+        // 统一控件高度：按钮 / 输入框 / 下拉框 / 复选框同高（默认 26，按 UI 缩放；功能可用 ControlHeight 覆盖）。
+        public static float ControlH() { return SR.ControlH(); }
 
         // 表格自适应高度：页面顶部已用高度 usedAbove + 表格高度 = 底栏之上可用高度。
         // 26 = 窗口标题栏，2 = 内容区内边距，4 = 行区上下留白；均按当前 UI 缩放换算。
@@ -124,6 +132,7 @@ public partial class SR {
         // 下限 80、上限为可用宽度的 60%（优先内容区，其次窗口宽度），长选项不截断也不会撑破页面。
         public static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width = -1f) {
             if (width <= 0f) width = AutoComboBoxWidth(options, current);
+            // 高度由 SR.ComboBox 统一取 ControlH()（与按钮/输入框同高），这里只管宽度与命中。
             return SR.ComboBox(entry, current, vals, options, ref open, width);
         }
 
@@ -147,7 +156,8 @@ public partial class SR {
             if (avail <= 0f) avail = Screen.width;
             float minW = Sc(80f);
             float maxW = Mathf.Max(minW, avail * 0.6f);
-            return Mathf.Clamp(maxText + Sc(30f), minW, maxW);
+            // 左右内边距（与按钮同一套 FramePadding）+ 箭头区，宽度随缩放走。
+            return Mathf.Clamp(maxText + Sc(FramePadX * 2 + 20f), minW, maxW);
         }
         public static void WrapLabel(string text) { SR.WrapLabel(text); }
         public static float SidebarWidth() { return SR.SidebarWidth(); }
@@ -1452,6 +1462,602 @@ public partial class SR {
         Action f;
         if (string.IsNullOrEmpty(section) || !_pageFooters.TryGetValue(section, out f)) return;
         try { f(); } catch (Exception __ex) { Guard.Log("功能页底栏(" + section + ")", __ex); }
+    }
+
+    // 统一控件高度：按钮 / 输入框 / 下拉框 / 复选框同高（默认 26，按 UI 缩放；功能可用 ControlHeight 覆盖）。
+    public static float ControlH() {
+        try { return Sc(ControlHeight > 0f ? ControlHeight : 26f); } catch { return Sc(26f); }
+    }
+
+    // ================= 颜色选择器（统一调色板）=================
+    // 功能层只用 SRApi.Ctl.ColorEdit / ColorSwatch / ColorPanel / PreviewColor / ResetColor。
+    // 展开状态、当前 H/S/V、hex 与 RGB 文本、拖动标记、上次绘制帧号全部按 ConfigEntryBase 存在这里，
+    // 功能页不再持有任何调色板状态，也不再自己解析/换算颜色（解析统一走 SRApi.ColorHex）。
+    // 写盘只走 SR.SetValue（= SRApi.Ctl.SetValue，配置由核心节流落盘）；拖动与输入过程中只改"预览色"。
+    internal static class ColorPicker {
+        // 常用色：8 档灰阶 + 16 常见色（12 列 × 2 行，对应 ImGui 的 palette 区）。
+        private static readonly string[] Palette = new string[] {
+            "#000000", "#1A1A1A", "#333333", "#4D4D4D", "#666666", "#808080", "#B3B3B3", "#FFFFFF",
+            "#E53935", "#FB8C00", "#FDD835", "#43A047",
+            "#00ACC1", "#1E88E5", "#3949AB", "#5E35B1",
+            "#8E24AA", "#D81B60", "#F06292", "#FF7043",
+            "#26A69A", "#7CB342", "#FFB300", "#8D6E63"
+        };
+        private const int PaletteCols = 12;   // 每行色块数
+        private const int HueSteps = 12;      // H 变体条档数
+
+        // 一个颜色键的可变状态。
+        private sealed class State {
+            public bool Open;          // 调色板是否展开
+            public float H, S = 1f, V = 1f;
+            public bool Dirty;         // 预览已变、配置未写（拖动中不写盘）
+            public bool Sliding;       // HSV 滑块正在拖动（松手才落盘）
+            public bool TextPending;   // hex/RGB 输入框里有未提交的文本
+            public string HexEdit = "#FFFFFF";
+            public string[] Rgb = new string[] { "255", "255", "255" };
+            public string Focus;       // 上一帧的输入焦点（失焦即提交）
+            public int Frame = -1;     // 调色板最近绘制的帧号（离开页面/关窗兜底落盘）
+        }
+
+        private static readonly Dictionary<ConfigEntryBase, State> _states = new Dictionary<ConfigEntryBase, State>();
+        private static ConfigEntryBase _open;   // 当前展开的条目（同一时间只展开一个）
+        private static bool _tickHooked;
+        private const string HexField = "SR_ColorHex";
+        private static readonly string[] RgbFields = new string[] { "SR_ColorR", "SR_ColorG", "SR_ColorB" };
+
+        // 契约层门面注入：由 Ctl 的静态构造器调用一次。
+        internal static void Wire() {
+            SRApi.Ctl.WireColorPicker(Edit, Swatch, Panel, Preview, Reset);
+        }
+
+        // 每帧兜底落盘：首次使用时挂上（此时 SR 已初始化，RegisterTick 一定可用）。
+        private static void EnsureTick() {
+            if (_tickHooked) return;
+            _tickHooked = true;
+            try { RegisterTick("颜色调色板兜底落盘", Tick); } catch { }
+        }
+
+        private static State Get(ConfigEntryBase e) {
+            State s;
+            if (e != null && _states.TryGetValue(e, out s)) return s;
+            s = new State();
+            if (e != null) { Load(s, ReadColor(e)); _states[e] = s; }
+            return s;
+        }
+
+        // ------------------------- 对外三件套 -------------------------
+
+        // 颜色条目：标签（点名称还原默认色）+ 色块（点开展开/收起）+ 展开后的调色板。
+        public static bool Edit(GUIContent label, ConfigEntryBase e, float width, float height) {
+            if (e == null) return false;
+            EnsureTick();
+            bool changed = false;
+            float h = height > 0f ? height : Ctl.ControlH();
+            float w = width > 0f ? width : Sc(150f);
+            GUILayout.BeginHorizontal();
+            try {
+                if (label != null && !string.IsNullOrEmpty(label.text)) {
+                    if (GUILayout.Button(label, Ctl.Label, GUILayout.Width(w), GUILayout.Height(h))) { Reset(e); changed = true; }
+                    GUILayout.Space(Sc(6f));
+                }
+                Rect sr = GUILayoutUtility.GetRect(Sc(64f), h);
+                if (Swatch(sr, e)) changed = true;
+                GUILayout.FlexibleSpace();
+            } catch (Exception __ex) { Guard.Log("颜色条目", __ex); }
+            GUILayout.EndHorizontal();
+            Panel(e);
+            return changed;
+        }
+
+        // 只画一个色块按钮（无标签），返回是否被点击；供自绘行使用。
+        public static bool Swatch(Rect r, ConfigEntryBase e) {
+            if (e == null) return false;
+            EnsureTick();
+            try {
+                State s = Get(e);
+                s.Frame = Time.frameCount;
+                Color c = s.Dirty ? Quant(PickerColor(s)) : ReadColor(e);
+                DrawFill(r, c);
+                Ring(r, new Color(1f, 1f, 1f, 0.35f));
+                string tip = T("点击打开/收起调色板", "click to open/close the color picker");
+                if (!GUI.Button(r, new GUIContent("", tip), GUIStyle.none)) return false;
+                if (s.Open) Close(e, s); else Open(e, s);
+                return true;
+            } catch (Exception __ex) { Guard.Log("颜色色块", __ex); return false; }
+        }
+
+        // 自绘行在 EndHorizontal 之后调用：该条目展开时画统一调色板，收起时什么都不画。
+        public static void Panel(ConfigEntryBase e) {
+            if (e == null) return;
+            State s;
+            if (!_states.TryGetValue(e, out s) || !s.Open) return;
+            try { DrawPanel(e, s); } catch (Exception __ex) { Guard.Log("颜色调色板", __ex); }
+        }
+
+        // 未落盘的预览色（null = 没有预览，调用方读配置值）。
+        public static Color? Preview(ConfigEntryBase e) {
+            try {
+                State s;
+                if (e == null || !_states.TryGetValue(e, out s) || !s.Dirty) return null;
+                return Quant(PickerColor(s));
+            } catch { return null; }
+        }
+
+        // 写回该颜色键的默认值（点名称 / 调色板里的「还原默认」共用）。
+        public static void Reset(ConfigEntryBase e) {
+            if (e == null) return;
+            try {
+                string hex = DefaultHex(e);
+                SetValue(e, hex);
+                State s;
+                if (_states.TryGetValue(e, out s)) {
+                    Load(s, SRApi.ColorHex.ParseHex(hex, Color.white));
+                }
+            } catch (Exception __ex) { Guard.Log("颜色还原默认", __ex); }
+        }
+
+        // ------------------------- 状态与写盘 -------------------------
+
+        private static Color PickerColor(State s) {
+            return Color.HSVToRGB(Mathf.Clamp01(s.H), Mathf.Clamp01(s.S), Mathf.Clamp01(s.V));
+        }
+
+        // 预览/写盘统一走 Color32 量化：预览、hex 标签与实际文字颜色完全一致。
+        private static Color Quant(Color c) {
+            return SRApi.ColorHex.FromColor32(SRApi.ColorHex.ToColor32(c));
+        }
+
+        // RGB→HSV；keepHueIfGray 时 V=0 或 S=0 保留原色相（ImGui 行为，拖到底不丢 hue）。
+        private static void PickFrom(State s, Color c, bool keepHueIfGray) {
+            try {
+                c = Quant(c);
+                float h, sat, v;
+                Color.RGBToHSV(c, out h, out sat, out v);
+                if (!keepHueIfGray || (sat > 0.0001f && v > 0.0001f)) s.H = Mathf.Repeat(h, 1f);
+                s.S = Mathf.Clamp01(sat);
+                s.V = Mathf.Clamp01(v);
+            } catch { }
+        }
+
+        private static void Load(State s, Color c) {
+            PickFrom(s, c, false);
+            s.Dirty = false;
+            s.Sliding = false;
+            s.TextPending = false;
+            s.Focus = null;
+            SyncText(s, true);
+        }
+
+        private static void Open(ConfigEntryBase e, State s) {
+            if (_open != null && !ReferenceEquals(_open, e)) {
+                State prev;
+                if (_states.TryGetValue(_open, out prev)) Close(_open, prev);
+            }
+            _open = e;
+            s.Open = true;
+            Load(s, ReadColor(e));
+        }
+
+        // 收起：先把拖动/输入中的预览写回，避免预览色留在界面上。
+        private static void Close(ConfigEntryBase e, State s) {
+            try {
+                // 顺序与 ImGui 一致：先提交预览，再提交文本（文本是最后一次编辑，必须最后生效）。
+                Commit(e, s);
+                if (s.TextPending) FlushText(e, s);
+            } catch { }
+            s.Open = false;
+            s.Dirty = false;
+            s.Sliding = false;
+            s.TextPending = false;
+            s.Focus = null;
+            if (ReferenceEquals(_open, e)) _open = null;
+        }
+
+        // 立即落盘（只在有色板/滑块/文本改动后调用；拖动过程中不写配置）。
+        private static void Commit(ConfigEntryBase e, State s) {
+            try {
+                if (!s.Dirty || e == null) return;
+                SetValue(e, SRApi.ColorHex.ToHex(PickerColor(s)));
+                s.Dirty = false;
+                s.Sliding = false;
+            } catch (Exception __ex) { Guard.Log("颜色写入", __ex); }
+        }
+
+        // 应用一个颜色：commit=true 时同时写配置（色板 / 色相档 / 粘贴）。
+        private static void Apply(ConfigEntryBase e, State s, Color c, bool keepHueIfGray, bool commit) {
+            PickFrom(s, c, keepHueIfGray);
+            s.TextPending = false;
+            s.Dirty = true;
+            SyncText(s, false);
+            if (commit) Commit(e, s);
+        }
+
+        // 兜底落盘：切页 / 关窗后调色板不再绘制，把预览与输入框里的值写回。
+        private static void Tick() {
+            try {
+                State s;
+                if (_open == null || !_states.TryGetValue(_open, out s)) return;
+                if (s.Frame >= 0 && Time.frameCount - s.Frame <= 8) return;
+                Commit(_open, s);
+                if (s.TextPending) FlushText(_open, s);
+            } catch { }
+        }
+
+        private static string DefaultHex(ConfigEntryBase e) {
+            try {
+                Color c;
+                if (e != null && SRApi.ColorHex.ParseHex(e.DefaultValue as string, out c)) return SRApi.ColorHex.ToHex(c);
+            } catch { }
+            return "#FFFFFF";
+        }
+
+        private static Color ReadColor(ConfigEntryBase e) {
+            try { return SRApi.ColorHex.ParseHex(e != null ? e.BoxedValue as string : null, Color.white); }
+            catch { return Color.white; }
+        }
+
+        // 文本同步：hex/RGB 跟着当前 HSV 走；force=false 时不覆盖正在输入的框。
+        private static void SyncText(State s, bool force) {
+            try {
+                Color32 c = SRApi.ColorHex.ToColor32(PickerColor(s));
+                if (force || !IsFocused(HexField)) s.HexEdit = SRApi.ColorHex.ToHex(PickerColor(s));
+                for (int i = 0; i < 3; i++) {
+                    if (force || !IsFocused(RgbFields[i])) s.Rgb[i] = Comp(c, i).ToString(CultureInfo.InvariantCulture);
+                }
+            } catch { }
+        }
+
+        // ------------------------- 绘制 -------------------------
+
+        private static void DrawPanel(ConfigEntryBase e, State s) {
+            s.Frame = Time.frameCount;
+            Event ev = Event.current;
+            bool enter = ev != null && ev.type == EventType.KeyDown
+                && (ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter)
+                && (IsFocused(HexField) || IsRgbFocused());
+
+            try { GUILayout.Label(T("调色板", "Palette"), Ctl.SecHeader); } catch { }
+            DrawHeader(e, s);
+            GUILayout.Space(Sc(4f));
+            DrawPaletteGrid(e, s);
+            GUILayout.Space(Sc(4f));
+            DrawHueStrip(e, s);
+            GUILayout.Space(Sc(4f));
+            DrawHueBar(Sc(200f), Sc(6f));
+            DrawHsvRow(e, s, T("色相", "Hue"), 0, 0f, 360f);
+            DrawHsvRow(e, s, T("饱和", "Sat"), 1, 0f, 100f);
+            DrawHsvRow(e, s, T("明度", "Val"), 2, 0f, 100f);
+            GUILayout.Space(Sc(4f));
+            DrawRgbRow(e, s);
+            DrawHexRow(e, s);
+            GUILayout.Space(Sc(2f));
+            DrawActions(e, s);
+
+            // 回车应用（不吞其它按键）；失焦提交；HSV 滑块松手提交。
+            if (enter) ApplyText(e, s);
+            HandleFocus(e, s);
+            if (s.Dirty && s.Sliding && ev != null
+                && (ev.type == EventType.MouseUp || (ev.type == EventType.Repaint && !Input.GetMouseButton(0)))) {
+                Commit(e, s);
+            }
+        }
+
+        // 预览色块 + #RRGGBB + 收起：ImGui ColorPicker 的顶部预览行。
+        private static void DrawHeader(ConfigEntryBase e, State s) {
+            float h = Ctl.ControlH();
+            GUILayout.BeginHorizontal();
+            try {
+                Rect pv = GUILayoutUtility.GetRect(Sc(84f), h);
+                PreviewBox(pv, Quant(PickerColor(s)));
+                GUILayout.Label(SRApi.ColorHex.ToHex(PickerColor(s)), Ctl.Label, GUILayout.Width(Sc(78f)), GUILayout.Height(h));
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button(T("收起", "Collapse"), Ctl.Btn, GUILayout.Width(Sc(88f)), GUILayout.Height(h))) Close(e, s);
+            } catch (Exception __ex) { Guard.Log("调色板顶栏", __ex); }
+            GUILayout.EndHorizontal();
+        }
+
+        // 色板格子宽度：按内容区可用宽度自适应（窗口变窄或放大 UI 时不撑破页面），上限 22。
+        private static float CellW() {
+            float gap = Sc(3f);
+            float avail = AvailWidth();
+            float cw = (avail - (PaletteCols - 1) * gap) / PaletteCols;
+            return Mathf.Clamp(cw, Sc(12f), Sc(22f));
+        }
+
+        private static float AvailWidth() {
+            float w = 0f;
+            try { w = ContentArea.width; } catch { w = 0f; }
+            if (w <= 0f) { try { w = Ctl.WinWidth > 0f ? Ctl.WinWidth - SidebarWidth() : 0f; } catch { w = 0f; } }
+            if (w <= 0f) w = Sc(300f);
+            return Mathf.Max(Sc(120f), w - Sc(12f));
+        }
+
+        // 24 色网格，点击即应用；当前色用黑白双描边高亮。
+        private static void DrawPaletteGrid(ConfigEntryBase e, State s) {
+            float cw = CellW(), ch = Sc(18f), gap = Sc(3f);
+            int rows = (Palette.Length + PaletteCols - 1) / PaletteCols;
+            Rect box = GUILayoutUtility.GetRect(PaletteCols * cw + (PaletteCols - 1) * gap, rows * ch + (rows - 1) * gap);
+            Color cur = Quant(PickerColor(s));
+            for (int i = 0; i < Palette.Length; i++) {
+                int col = i % PaletteCols, row = i / PaletteCols;
+                Rect cr = new Rect(box.x + col * (cw + gap), box.y + row * (ch + gap), cw, ch);
+                Color pc = SRApi.ColorHex.ParseHex(Palette[i], Color.white);
+                if (DrawCell(cr, pc, SameColor(pc, cur), Palette[i])) Apply(e, s, pc, true, true);
+            }
+        }
+
+        // 当前 S/V 下的 H 变体条（12 档），点击即应用。
+        private static void DrawHueStrip(ConfigEntryBase e, State s) {
+            float cw = CellW(), ch = Sc(18f), gap = Sc(3f);
+            Rect box = GUILayoutUtility.GetRect(HueSteps * cw + (HueSteps - 1) * gap, ch);
+            int curIdx = Mathf.Clamp((int)(Mathf.Repeat(s.H, 1f) * HueSteps), 0, HueSteps - 1);
+            for (int i = 0; i < HueSteps; i++) {
+                float h = (i + 0.5f) / HueSteps;
+                Color hc = HueVariant(s, h);
+                Rect cr = new Rect(box.x + i * (cw + gap), box.y, cw, ch);
+                if (!DrawCell(cr, hc, i == curIdx, SRApi.ColorHex.ToHex(hc))) continue;
+                if (s.S <= 0.001f) s.S = 1f; // 灰阶上点色相档：恢复饱和，避免点了看不到变化
+                s.H = h;
+                s.TextPending = false;
+                s.Dirty = true;
+                SyncText(s, false);
+                Commit(e, s);
+            }
+        }
+
+        // 当前 S/V 下的某档色相；S≈0 时按全饱和绘制（与点击后的恢复规则一致）。
+        private static Color HueVariant(State s, float h) {
+            float sat = s.S <= 0.001f ? 1f : Mathf.Clamp01(s.S);
+            return Quant(Color.HSVToRGB(Mathf.Repeat(h, 1f), sat, Mathf.Clamp01(s.V)));
+        }
+
+        // 纯视觉色相条（全饱和 24 段），给 H 滑块一个 ImGui 式的参考底。
+        private static void DrawHueBar(float width, float height) {
+            Rect r = GUILayoutUtility.GetRect(width, height);
+            int n = 24;
+            float cw = r.width / n;
+            for (int i = 0; i < n; i++) {
+                DrawFill(new Rect(r.x + i * cw, r.y, cw + 0.5f, r.height), Color.HSVToRGB((i + 0.5f) / n, 1f, 1f));
+            }
+        }
+
+        // 单个色板格子：填充 + 外黑描边 + 选中白内框 + 悬停 hex 提示 + 点击判定。
+        private static bool DrawCell(Rect r, Color c, bool selected, string tip) {
+            DrawFill(r, c);
+            Ring(r, new Color(0f, 0f, 0f, selected ? 0.9f : 0.4f));
+            if (selected) {
+                Ring(new Rect(r.x + 1f, r.y + 1f, Mathf.Max(1f, r.width - 2f), Mathf.Max(1f, r.height - 2f)), new Color(1f, 1f, 1f, 0.95f));
+            }
+            return GUI.Button(r, new GUIContent("", tip), GUIStyle.none);
+        }
+
+        // H/S/V 一行：标签 + 滑块（整数步进）+ 读数；拖动只改预览。
+        private static void DrawHsvRow(ConfigEntryBase e, State s, string label, int which, float min, float max) {
+            float rowH = Ctl.ControlH();
+            float cur = which == 0 ? s.H * 360f : (which == 1 ? s.S * 100f : s.V * 100f);
+            float nv = cur;
+            GUILayout.BeginHorizontal();
+            try {
+                GUILayout.Label(label, Ctl.Label, GUILayout.Width(Sc(34f)), GUILayout.Height(rowH));
+                Rect sl = GUILayoutUtility.GetRect(Sc(200f), rowH);
+                nv = Ctl.DrawSlider(sl, cur, min, max, true);
+                GUILayout.Label(Mathf.RoundToInt(nv).ToString(CultureInfo.InvariantCulture), Ctl.Label, GUILayout.Width(Sc(36f)), GUILayout.Height(rowH));
+            } catch (Exception __ex) { Guard.Log("调色板滑块", __ex); }
+            GUILayout.EndHorizontal();
+            if (Mathf.Abs(nv - cur) < 0.0001f) return;
+            if (which == 0) s.H = Mathf.Clamp01(nv / 360f);
+            else if (which == 1) s.S = Mathf.Clamp01(nv / 100f);
+            else s.V = Mathf.Clamp01(nv / 100f);
+            s.Dirty = true;
+            s.Sliding = true;        // 滑块拖动中：松手才写配置
+            s.TextPending = false;   // 滑块是最后动作：之前没提交的文本以预览为准
+            SyncText(s, false);
+        }
+
+        // R/G/B 整数输入（0-255）：三格都合法即时预览，回车/失焦提交；非法格红框。
+        private static void DrawRgbRow(ConfigEntryBase e, State s) {
+            float rowH = Ctl.ControlH();
+            GUILayout.BeginHorizontal();
+            try {
+                for (int i = 0; i < 3; i++) {
+                    if (i > 0) GUILayout.Space(Sc(8f));
+                    GUILayout.Label(i == 0 ? "R" : (i == 1 ? "G" : "B"), Ctl.Label, GUILayout.Width(Sc(14f)), GUILayout.Height(rowH));
+                    GUI.SetNextControlName(RgbFields[i]);
+                    string before = s.Rgb[i] ?? "";
+                    string after = GUILayout.TextField(before, 3, Ctl.SearchBox, GUILayout.Width(Sc(48f)), GUILayout.Height(rowH));
+                    Rect fr = GUILayoutUtility.GetLastRect();
+                    if (after != before) {
+                        s.Rgb[i] = after;
+                        s.TextPending = true;
+                        ApplyRgbPreview(s);
+                    }
+                    int probe;
+                    if (!TryParseComp(s.Rgb[i], out probe)) Ring(fr, new Color(0.9f, 0.25f, 0.2f, 0.9f));
+                }
+            } catch (Exception __ex) { Guard.Log("调色板 RGB", __ex); }
+            GUILayout.EndHorizontal();
+        }
+
+        // 三格都合法才更新预览（非法格保持上一次的有效值）。
+        private static void ApplyRgbPreview(State s) {
+            int r, g, b;
+            if (!TryParseComp(s.Rgb[0], out r)) return;
+            if (!TryParseComp(s.Rgb[1], out g)) return;
+            if (!TryParseComp(s.Rgb[2], out b)) return;
+            PickFrom(s, new Color(r / 255f, g / 255f, b / 255f, 1f), true);
+            s.Dirty = true;
+            SyncText(s, false);
+        }
+
+        // Hex 输入：#RRGGBB；内容非法时实时红框，回车/失焦回退为当前色。
+        private static void DrawHexRow(ConfigEntryBase e, State s) {
+            float rowH = Ctl.ControlH();
+            GUILayout.BeginHorizontal();
+            try {
+                GUILayout.Label("Hex", Ctl.Label, GUILayout.Width(Sc(34f)), GUILayout.Height(rowH));
+                GUI.SetNextControlName(HexField);
+                s.HexEdit = GUILayout.TextField(s.HexEdit ?? "", 7, Ctl.SearchBox, GUILayout.Width(Sc(96f)), GUILayout.Height(rowH));
+                Rect fr = GUILayoutUtility.GetLastRect();
+                Color probe;
+                if (!SRApi.ColorHex.ParseHex(s.HexEdit, out probe)) Ring(fr, new Color(0.9f, 0.25f, 0.2f, 0.9f));
+                GUILayout.Label(T("回车应用", "Enter to apply"), Ctl.Label, GUILayout.Width(Sc(110f)), GUILayout.Height(rowH));
+            } catch (Exception __ex) { Guard.Log("调色板 Hex", __ex); }
+            GUILayout.EndHorizontal();
+            if (!string.Equals(s.HexEdit, SRApi.ColorHex.ToHex(PickerColor(s)))) s.TextPending = true;
+        }
+
+        // 复制 / 粘贴 / 还原默认（剪贴板走 GUIUtility.systemCopyBuffer）。
+        private static void DrawActions(ConfigEntryBase e, State s) {
+            float h = Ctl.ControlH();
+            GUILayout.BeginHorizontal();
+            try {
+                if (GUILayout.Button(new GUIContent(T("复制", "Copy"), T("把当前颜色复制到系统剪贴板", "copy the current color to the system clipboard")),
+                    Ctl.Btn, GUILayout.Width(Sc(64f)), GUILayout.Height(h))) {
+                    try { GUIUtility.systemCopyBuffer = SRApi.ColorHex.ToHex(PickerColor(s)); } catch { }
+                }
+                if (GUILayout.Button(new GUIContent(T("粘贴", "Paste"), T("从剪贴板读取 #RRGGBB；格式非法则忽略", "paste #RRGGBB from the clipboard; invalid text is ignored")),
+                    Ctl.Btn, GUILayout.Width(Sc(64f)), GUILayout.Height(h))) {
+                    Color c;
+                    if (SRApi.ColorHex.ParseHex(GUIUtility.systemCopyBuffer, out c)) { Apply(e, s, c, true, true); SyncText(s, true); }
+                }
+                if (GUILayout.Button(new GUIContent(T("还原默认", "Reset"), T("写回该颜色键的默认值", "write back the default value of this color key")),
+                    Ctl.Btn, GUILayout.Width(Sc(88f)), GUILayout.Height(h))) Reset(e);
+                GUILayout.FlexibleSpace();
+            } catch (Exception __ex) { Guard.Log("调色板操作", __ex); }
+            GUILayout.EndHorizontal();
+        }
+
+        // ------------------------- 输入 / 焦点 -------------------------
+
+        // 回车：hex 优先（合法则应用，非法回退文本），RGB 三格合法则应用；随后落盘。
+        private static void ApplyText(ConfigEntryBase e, State s) {
+            try {
+                Color c;
+                if (IsFocused(HexField)) {
+                    if (SRApi.ColorHex.ParseHex(s.HexEdit, out c)) { PickFrom(s, c, true); s.Dirty = true; }
+                    Commit(e, s);
+                    s.HexEdit = SRApi.ColorHex.ToHex(PickerColor(s));
+                } else if (IsRgbFocused()) {
+                    int r, g, b;
+                    if (TryParseComp(s.Rgb[0], out r) && TryParseComp(s.Rgb[1], out g) && TryParseComp(s.Rgb[2], out b)) {
+                        PickFrom(s, new Color(r / 255f, g / 255f, b / 255f, 1f), true);
+                        s.Dirty = true;
+                    }
+                    Commit(e, s);
+                }
+                s.TextPending = false;
+                SyncText(s, true);
+            } catch (Exception __ex) { Guard.Log("调色板输入", __ex); }
+        }
+
+        // 失焦提交：hex/RGB 输入框失去焦点即校验并落盘（与 ImGui 的输入框一致）。
+        private static void HandleFocus(ConfigEntryBase e, State s) {
+            try {
+                string cur = null;
+                try { cur = GUI.GetNameOfFocusedControl(); } catch { cur = null; }
+                if (string.IsNullOrEmpty(cur)) cur = null;
+                string prev = s.Focus;
+                if (string.Equals(prev, cur)) return;
+                s.Focus = cur;
+                if (prev == null) return;
+                if (prev == HexField) {
+                    Color c;
+                    if (SRApi.ColorHex.ParseHex(s.HexEdit, out c)) { PickFrom(s, c, true); s.Dirty = true; }
+                    Commit(e, s);
+                    s.HexEdit = SRApi.ColorHex.ToHex(PickerColor(s));
+                    s.TextPending = false;
+                    SyncText(s, true);
+                } else if (IsRgbName(prev)) {
+                    int r, g, b;
+                    if (TryParseComp(s.Rgb[0], out r) && TryParseComp(s.Rgb[1], out g) && TryParseComp(s.Rgb[2], out b)) {
+                        PickFrom(s, new Color(r / 255f, g / 255f, b / 255f, 1f), true);
+                        s.Dirty = true;
+                    }
+                    Commit(e, s);
+                    s.TextPending = false;
+                    SyncText(s, true);
+                }
+            } catch (Exception __ex) { Guard.Log("调色板失焦", __ex); }
+        }
+
+        // 不依赖 GUI 焦点地解析文本并写盘（关窗时兜底）：hex 优先，其次 RGB 三格。
+        // 写完把 H/S/V 与预览标记一起对齐，避免下一次 Commit 用旧预览把文本值覆盖回去。
+        private static void FlushText(ConfigEntryBase e, State s) {
+            try {
+                s.TextPending = false;
+                if (e == null) return;
+                Color c;
+                if (SRApi.ColorHex.ParseHex(s.HexEdit, out c)) {
+                    SetValue(e, SRApi.ColorHex.ToHex(c));
+                    PickFrom(s, c, true);
+                    s.Dirty = false;
+                    return;
+                }
+                int r, g, b;
+                if (TryParseComp(s.Rgb[0], out r) && TryParseComp(s.Rgb[1], out g) && TryParseComp(s.Rgb[2], out b)) {
+                    Color rgb = new Color(r / 255f, g / 255f, b / 255f, 1f);
+                    SetValue(e, SRApi.ColorHex.ToHex(rgb));
+                    PickFrom(s, rgb, true);
+                    s.Dirty = false;
+                }
+            } catch { }
+        }
+
+        // 单个分量（0-255）：空串/非数字/越界都算非法。
+        private static bool TryParseComp(string str, out int v) {
+            v = 0;
+            try {
+                if (string.IsNullOrEmpty(str)) return false;
+                string t = str.Trim();
+                if (t.Length == 0 || t.Length > 3) return false;
+                int n;
+                if (!int.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) return false;
+                if (n < 0 || n > 255) return false;
+                v = n;
+                return true;
+            } catch { return false; }
+        }
+
+        private static int Comp(Color32 c, int i) { return i == 0 ? c.r : (i == 1 ? c.g : c.b); }
+
+        private static bool SameColor(Color a, Color b) {
+            Color32 x = SRApi.ColorHex.ToColor32(a), y = SRApi.ColorHex.ToColor32(b);
+            return x.r == y.r && x.g == y.g && x.b == y.b;
+        }
+
+        private static bool IsRgbName(string name) {
+            if (name == null) return false;
+            for (int i = 0; i < RgbFields.Length; i++) if (RgbFields[i] == name) return true;
+            return false;
+        }
+
+        private static bool IsRgbFocused() {
+            for (int i = 0; i < RgbFields.Length; i++) if (IsFocused(RgbFields[i])) return true;
+            return false;
+        }
+
+        private static bool IsFocused(string name) {
+            try { return !string.IsNullOrEmpty(name) && GUI.GetNameOfFocusedControl() == name; }
+            catch { return false; }
+        }
+
+        // ------------------------- 绘制原语 -------------------------
+
+        // 1px 描边（白贴图着色）：色板选中框、色块边界、输入框错误提示共用。
+        private static void Ring(Rect r, Color c) {
+            if (Event.current == null || Event.current.type != EventType.Repaint) return;
+            DrawFill(new Rect(r.x, r.y, r.width, 1f), c);
+            DrawFill(new Rect(r.x, r.yMax - 1f, r.width, 1f), c);
+            DrawFill(new Rect(r.x, r.y, 1f, r.height), c);
+            DrawFill(new Rect(r.xMax - 1f, r.y, 1f, r.height), c);
+        }
+
+        // 预览色块：外黑内白双描边，浅色/深色色块上边界都清楚。
+        private static void PreviewBox(Rect r, Color c) {
+            DrawFill(r, c);
+            Ring(r, new Color(0f, 0f, 0f, 0.9f));
+            Ring(new Rect(r.x + 1f, r.y + 1f, Mathf.Max(1f, r.width - 2f), Mathf.Max(1f, r.height - 2f)), new Color(1f, 1f, 1f, 0.85f));
+        }
     }
 
 	}

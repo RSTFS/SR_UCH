@@ -76,3 +76,15 @@ UiOpen
 WheelFrame
 RegisterFooterButton
 HotkeyButtonNoHint
+# 颜色：统一调色板（核心 SR.ColorPicker 实现，状态按 ConfigEntryBase 保存）
+ColorEdit
+ColorSwatch
+ColorPanel
+PreviewColor
+ResetColor
+# 颜色文本工具（纯 BCL/引擎实现，功能层不再自带 hex 解析）
+ColorHex
+ParseHex
+ToHex
+ToColor32
+FromColor32

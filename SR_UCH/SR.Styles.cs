@@ -14,6 +14,16 @@ public partial class SR {
         private static Font _origSkinFont;                 //全局皮肤的原始字体（恢复用）
         private static bool _origSelColorSaved;
         private static Color _origSelColor;               //全局皮肤的原始选择色
+
+        // 控件内边距（对齐 Dear ImGui 的 FramePadding 节奏）：按钮、输入框、下拉框、复选框共用同一套水平内边距，
+        // 底部 5px 是 CJK 字形下沉余量（微软雅黑字形的下半截会被裁），不要跟着水平值一起改小。
+        internal const int FramePadX = 10;          // 左右内边距
+        internal const int FramePadTop = 3;         // 上内边距
+        internal const int FramePadBottom = 5;      // 下内边距（CJK 基线偏移余量）
+        // 章节标题 / 分组的间距节奏：标题上方 8px、下方 6px（与 ItemSpacing 同一量级，保持 6/8 节奏）。
+        internal const int SectionGapTop = 8;
+        internal const int SectionGapBottom = 6;
+
         private static Texture2D Solid(Color c) {
             Texture2D t = new Texture2D(1, 1);
             t.SetPixel(0, 0, c);
@@ -42,7 +52,8 @@ public partial class SR {
             s.active.background = Solid(active);
             s.active.textColor = text;
             s.alignment = TextAnchor.MiddleLeft;
-            s.padding = new RectOffset(8, 6, 3, 5);
+            // 水平内边距 10px（按钮文字不贴边），垂直 3/5（底部 5 给 CJK 字形留余量）。
+            s.padding = new RectOffset(FramePadX, FramePadX, FramePadTop, FramePadBottom);
             _styleList.Add(s);
             return s;
         }
@@ -219,8 +230,8 @@ public partial class SR {
             _secHeader = new GUIStyle(_label);
             _secHeader.fontStyle = FontStyle.Bold;
             _secHeader.normal.textColor = new Color(0.65f, 0.78f, 1f, 1f);
-            // 章节标题上下留 6/2px：对应 ImGui 的 ItemSpacing，让分区有呼吸感。
-            _secHeader.margin = new RectOffset(0, 0, 6, 2);
+            // 章节标题上下固定节奏（上 8 / 下 6）：对应 ImGui 的 ItemSpacing，让分区有呼吸感。
+            _secHeader.margin = new RectOffset(0, 0, SectionGapTop, SectionGapBottom);
             _styleList.Add(_secHeader);
 
             _labelWrap = new GUIStyle(_label);
@@ -336,7 +347,8 @@ public partial class SR {
             _searchBox.active.textColor = _cText;
             _searchBox.focused.background = Solid(_cFrameHover);
             _searchBox.focused.textColor = _cText;
-            _searchBox.padding = new RectOffset(6, 6, 3, 5);
+            // 输入框与按钮同一套内边距：同排控件里的文字基线一致。
+            _searchBox.padding = new RectOffset(FramePadX, FramePadX, FramePadTop, FramePadBottom);
             _styleList.Add(_searchBox);
 
             //Dear ImGui 风格滑块：轨道 / 已填充 / 把手（normal、hover、active 三态）

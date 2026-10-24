@@ -2,6 +2,7 @@
 // 硬约定：本文件不得引用 SR 的其它文件，须能单独编译成程序集；槽位只传 BCL / 引擎 / 游戏类型。
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using BepInEx.Configuration;
 using UnityEngine;
@@ -574,7 +575,8 @@ namespace SR_UCH {
             try {
                 GUIStyle st = Style("Label");
                 GUIContent c = new GUIContent(text ?? "");
-                float w = Mathf.Max(minWidth, st.CalcSize(c).x + 2f);
+                // 左右各留 2px（随 UI 缩放）：与按钮/输入框的 FramePadding 同一节奏，文字不会被裁边。
+                float w = Mathf.Max(minWidth, st.CalcSize(c).x + Sc(4f));
                 float h = Mathf.Max(st.CalcSize(c).y, st.CalcHeight(c, w));
                 GUILayout.Label(c, st, GUILayout.Width(w), GUILayout.Height(h));
             } catch {
@@ -600,6 +602,81 @@ namespace SR_UCH {
             public static void ScrollToBottom() { Action a = _scrollToBottom; if (a != null) a(); }
             public static void NoteEntryBound() { Action a = _noteEntryBound; if (a != null) a(); }
             public static void MarkConfigDirty(ConfigFile cfg) { Action<ConfigFile> f = _markConfigDirty; if (f != null) f(cfg); }
+
+            // ---- 颜色条目：统一调色板（预览 + 24 色网格 + H 变体条 + H/S/V 滑块 + RGB/Hex + 复制/粘贴/还原默认）----
+            // 值格式 "#RRGGBB"。展开、拖动、输入等状态全部在核心按 ConfigEntryBase 保存，功能页不持有任何调色板状态；
+            // 写盘走 SetValue + MarkConfigDirty（节流落盘），拖动/输入过程中只改"预览色"，由 PreviewColor 供功能页取用。
+            public delegate bool ColorEditFn(GUIContent label, ConfigEntryBase entry, float width, float height);
+            public delegate bool ColorSwatchFn(Rect rect, ConfigEntryBase entry);
+            public delegate void ColorPanelFn(ConfigEntryBase entry);
+            public delegate Color? ColorPreviewFn(ConfigEntryBase entry);
+            public delegate void ColorResetFn(ConfigEntryBase entry);
+            // 存 object 而非委托：注入点在 SR.Ctl 首次被使用（早于任何页面渲染，但晚于 MainPlugin 的缺失通道自检），
+            // 用委托字段会被 SRApi.MissingSinks() 误报为"未注入"（与 TableAutoHeight / HotkeyButtonNoHint 同一处理）。
+            private static object _colorEdit, _colorSwatch, _colorPanel, _colorPreview, _colorReset;
+            public static void WireColorPicker(ColorEditFn edit, ColorSwatchFn swatch, ColorPanelFn panel,
+                                               ColorPreviewFn preview, ColorResetFn reset) {
+                _colorEdit = edit; _colorSwatch = swatch; _colorPanel = panel; _colorPreview = preview; _colorReset = reset;
+            }
+            // 颜色条目（标签 + 色块 + 展开的调色板）：点名称还原默认色，点色块展开/收起；返回本帧是否改动了颜色值。
+            public static bool ColorEdit(GUIContent label, ConfigEntryBase entry, float width, float height) {
+                ColorEditFn f = _colorEdit as ColorEditFn;
+                return f != null && f(label, entry, width, height);
+            }
+            // 只画一个色块按钮（无标签），返回是否被点击；供自绘行使用。
+            public static bool ColorSwatch(Rect rect, ConfigEntryBase entry) {
+                ColorSwatchFn f = _colorSwatch as ColorSwatchFn;
+                return f != null && f(rect, entry);
+            }
+            // 自绘行在 EndHorizontal 之后调用：该条目展开时画统一调色板，收起时什么都不画。
+            public static void ColorPanel(ConfigEntryBase entry) {
+                ColorPanelFn f = _colorPanel as ColorPanelFn;
+                if (f != null) f(entry);
+            }
+            // 未落盘的预览色；null = 没有预览（调用方读配置值）。
+            public static Color? PreviewColor(ConfigEntryBase entry) {
+                ColorPreviewFn f = _colorPreview as ColorPreviewFn;
+                if (f == null) return null;
+                return f(entry);
+            }
+            // 把颜色键写回默认值（点名称 / 调色板里的「还原默认」共用同一条路径）。
+            public static void ResetColor(ConfigEntryBase entry) {
+                ColorResetFn f = _colorReset as ColorResetFn;
+                if (f != null) f(entry);
+            }
+        }
+
+        // 颜色文本工具（纯 BCL/引擎实现，无实现层依赖）：功能层解析/格式化 "#RRGGBB" 统一走这里，
+        // 不要在功能页里重复写一套 hex 解析。往返不变：hex → Color → hex 经过同一套 Color32 量化。
+        public static class ColorHex {
+            public static bool ParseHex(string hex, out Color c) {
+                c = Color.white;
+                try {
+                    if (string.IsNullOrEmpty(hex)) return false;
+                    string t = hex.Trim();
+                    if (t.Length > 0 && t[0] == '#') t = t.Substring(1);
+                    if (t.Length != 6) return false;
+                    int v;
+                    if (!int.TryParse(t, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out v)) return false;
+                    c = FromColor32(new Color32((byte)((v >> 16) & 0xFF), (byte)((v >> 8) & 0xFF), (byte)(v & 0xFF), 255));
+                    return true;
+                } catch { return false; }
+            }
+            public static Color ParseHex(string hex, Color fallback) { Color c; return ParseHex(hex, out c) ? c : fallback; }
+            public static string ToHex(Color c) {
+                Color32 q = ToColor32(c);
+                return "#" + q.r.ToString("X2", CultureInfo.InvariantCulture)
+                    + q.g.ToString("X2", CultureInfo.InvariantCulture)
+                    + q.b.ToString("X2", CultureInfo.InvariantCulture);
+            }
+            // 唯一的 Color→Color32 归一化入口：预览、色板、实际文字颜色都走这里，避免多套取整逻辑。
+            public static Color32 ToColor32(Color c) {
+                int r = Mathf.Clamp(Mathf.RoundToInt(c.r * 255f), 0, 255);
+                int g = Mathf.Clamp(Mathf.RoundToInt(c.g * 255f), 0, 255);
+                int b = Mathf.Clamp(Mathf.RoundToInt(c.b * 255f), 0, 255);
+                return new Color32((byte)r, (byte)g, (byte)b, 255);
+            }
+            public static Color FromColor32(Color32 c) { return new Color(c.r / 255f, c.g / 255f, c.b / 255f, 1f); }
         }
 
         // 本地化门面：语言引擎（语言包 / 词条表 / 缓存）留在核心，契约层只转发，行为不变。
