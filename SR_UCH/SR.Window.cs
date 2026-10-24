@@ -177,18 +177,18 @@ public partial class SR {
 
         // 标题栏绝对布局；右端 = 总开关 + 关闭
         private static float DrawTitleBar(float width) {
-            float barH = Sc(24);
+            float barH = Sc(26);
             Rect barRect = new Rect(0, 0, width, barH);
             GUI.Box(barRect, GUIContent.none, _title);
-            float tY = (barH - Sc(24)) / 2f;
-            GUI.Label(new Rect(Sc(8), tY, Sc(110), Sc(24)), "SR＿UCH", _titleLabel);
+            float tY = (barH - Sc(26)) / 2f;
+            GUI.Label(new Rect(Sc(8), tY, Sc(110), Sc(26)), "SR＿UCH", _titleLabel);
             // 关闭按钮左边：本 Mod 总开关（关闭时内部功能运行时失效，各功能开关值不变，会写盘）
             float mw = Sc(96);
             float mx = barRect.width - Sc(32) - Sc(4) - mw;
             // 提示标签宽度必须止于总开关左边，窗口不够宽时从左对齐方向裁掉，不被总开关压住。
-            GUI.Label(new Rect(Sc(124), tY, Mathf.Max(Sc(40), mx - Sc(124) - Sc(6)), Sc(24)),
+            GUI.Label(new Rect(Sc(124), tY, Mathf.Max(Sc(40), mx - Sc(124) - Sc(6)), Sc(26)),
                 T("INS开关界面&悬停条目查看说明", "INS: manager · hover entries for tooltips"), _titleMid);
-            if (GUI.Button(new Rect(mx, tY, mw, Sc(24)),
+            if (GUI.Button(new Rect(mx, tY, mw, Sc(26)),
                 new GUIContent(AllEnabled ? T("总开关：开", "Master ON") : T("总开关：关", "Master OFF"),
                     T("本 Mod 总开关：关闭时所有内部功能运行时失效，各功能开关值保持不变", "Mod master switch: off disables all internal features at runtime")),
                 AllEnabled ? _selItem : _btn)) {
@@ -198,7 +198,7 @@ public partial class SR {
                     Guard.Try("总开关自动保存", () => _allEnabledEntry.ConfigFile.Save()); // 失败记日志
                 }
             }
-            if (GUI.Button(new Rect(barRect.width - Sc(24), tY, Sc(24), Sc(24)), "X", _btn)) CloseMenu();
+            if (GUI.Button(new Rect(barRect.width - Sc(26), tY, Sc(26), Sc(26)), "X", _btn)) CloseMenu();
             return barH;
         }
 
@@ -482,7 +482,7 @@ public partial class SR {
             // 底栏现在是固定条，不再需要“用其它栏目最大值兜底”；未知栏目按 0，否则表格会被凭空缩短（底部多出一截空白）。
             try { _pageFooterH.TryGetValue(_selectedInternalSection, out __pfReserve); } catch { __pfReserve = 0f; }
             // 底栏是固定高度条（与顶栏同款）：布局层只预留“条高 + 该栏目页面外框高 + 小余量”。
-            float __barH = Sc(28f);
+            float __barH = Sc(26f);
             float __footerReserve = __barH + Mathf.Max(0f, __pfReserve) + Sc(2f);
             SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 页面内容必须以这条 y 为底界（= 滚动区顶 + 视口高 = 底栏条上沿）：列表高度按它算，随窗口大小自适应。

@@ -135,6 +135,7 @@ namespace SR_UCH.Tweaks {
 		private static float _maxScrollY;
 		private static bool _sbDragging;
 		private static float _sbGrabY;
+		private static float _tableBias;   // 表格高度自校准偏差（按实际画出的底边与内容底界之差累积）
 		private static Rect _sbTrack;
 		private static Rect _sbThumb;
 		private static bool _dragH;
@@ -472,7 +473,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				Rect last = GUILayoutUtility.GetLastRect();
 				// 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
 				float tableH = SRApi.PageContentBottomY > 1f
-					? Mathf.Max(SRApi.Ctl.Sc(120), SRApi.PageContentBottomY - last.yMax - SRApi.Ctl.Sc(2))
+					? Mathf.Max(SRApi.Ctl.Sc(120), SRApi.PageContentBottomY - last.yMax - SRApi.Ctl.Sc(2) + _tableBias)
 					: SRApi.Ctl.TableAutoHeight(Mathf.Max(0f, last.yMax - _pageTopY), SRApi.Ctl.Sc(120));
 				_actionHitThisFrame = false;
 				RenderPresetTable(tableH);
@@ -779,6 +780,17 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 					SaveCols();
 					SRApi.LogInfo("[布局预设] " + SRApi.T("已隐藏列（Shift+右键表头可恢复全部列）", "Column hidden (Shift+right-click the header to restore all columns)"));
 				}
+				// 高度自校准：用实际画出的表格底边和内容底界比较，下一帧把差值补进 tableH。
+				// 不依赖任何坐标换算假设，切换页面/缩放/改窗口后都会在一帧内收敛到底。
+				try {
+					if (SRApi.PageContentBottomY > 1f) {
+						float __gap = SRApi.PageContentBottomY - box.yMax;
+						if (Mathf.Abs(__gap) > 0.5f) {
+							_tableBias = Mathf.Clamp(_tableBias + __gap, -SRApi.Ctl.Sc(160), SRApi.Ctl.Sc(160));
+							SRApi.LogInfo("[布局预设] 表格高度校准: gap=" + __gap.ToString("0.0") + " bias=" + _tableBias.ToString("0.0"));
+						}
+					}
+				} catch (Exception __tb) { SRApi.Guard.Log("布局预设/表格高度校准", __tb); }
 				if (e != null) {
 					// 拖拽兜底复位（拖列宽 / 换列位由核心处理，这里只接住状态与落盘回调）。
 					SRApi.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _args.moveCol, ref _args.moveDx,

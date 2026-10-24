@@ -52,7 +52,8 @@ namespace SR_UCH.Tweaks {
         private static float _abortDeadline, _forceDeadline, _forceRawDeadline;   //回家看门狗的三级时限
         private static float[] _cw;                         //当前列宽
         private static bool _widthsLoaded;                  // 列宽是否已初始化
-        private static bool _dragH;                         //正在拖表格高度
+        private static bool _dragH;
+        private static float _tableBias;   // 表格高度自校准偏差                         //正在拖表格高度
         private static float _dragHY0, _dragH0;
         private static float _dragHTmp;                      // 拖表格高度期间的临时值（拖动中不写配置）
         // 对局内点加入：先退出当前房间，退出后立刻加入。
@@ -447,7 +448,7 @@ namespace SR_UCH.Tweaks {
             float availW = Mathf.Max(SRApi.Ctl.Sc(220), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(12));
             // 高度走核心统一公式：页面可视高度（屏幕量）减去表格上方已用高度（布局量之差）。
             float availH = SRApi.PageContentBottomY > 1f
-                ? Mathf.Max(SRApi.Ctl.Sc(140), SRApi.PageContentBottomY - last.yMax - SRApi.Ctl.Sc(2))
+                ? Mathf.Max(SRApi.Ctl.Sc(140), SRApi.PageContentBottomY - last.yMax - SRApi.Ctl.Sc(2) + _tableBias)
                 : SRApi.Ctl.Sc(140);
             // 拖动中必须读临时值 _dragHTmp（配置值此时还是旧的），否则高度不跟手。
             float hPx = _dragH ? _dragHTmp : (_tableH != null ? _tableH.Value : 0);
@@ -458,6 +459,13 @@ namespace SR_UCH.Tweaks {
                 GUILayout.Width(availW), GUILayout.Height(boxH));
             TableDraw(box);
             TableInput(box, Event.current);
+            // 高度自校准：按实际画出的表格底边与内容底界之差，下一帧补进 availH（切页/缩放后一帧内贴底）。
+            try {
+                if (SRApi.PageContentBottomY > 1f) {
+                    float __gap = SRApi.PageContentBottomY - box.yMax;
+                    if (Mathf.Abs(__gap) > 0.5f) _tableBias = Mathf.Clamp(_tableBias + __gap, -SRApi.Ctl.Sc(160), SRApi.Ctl.Sc(160));
+                }
+            } catch (Exception __tb) { SRApi.Guard.Log("联机/表格高度校准", __tb); }
             HeightGrip();   // 表格底边：拖动改高度
         }
 
