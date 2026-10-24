@@ -469,9 +469,13 @@ public partial class SR {
             // 真实页面视口 = 内容区高 - 已用页头高 - 底栏保留高：显式限制滚动区高度，
             // 否则滚动区会吃满剩余空间、底栏压住最后几行（预设/联机列表“最后一项显示不全”的根因）。
             float __areaH = winRect.height - Sc(8);
+            // 页头高度兜底：Layout 帧/首次进入时 GetLastRect 可能还是 0，
+            // 用页签+页头的固定高度（设计单位 58）兜底，保证滚动区底 = 底栏上沿。
+            float __usedTopFallback = Sc(58f);
             // Layout 阶段 GetLastRect 可能还是 0（布局尚未计算完）：用上一帧量到的页头高度，
             // 否则 Layout 帧会把“视口”算成满高，滚动区把底栏顶出可视区（底栏只剩上边一点）。
-            float __usedTop = _pageUsedTop;
+            float __usedTop = Mathf.Max(Sc(1f), _pageUsedTop);
+            if (_pageUsedTop <= Sc(1f)) _pageUsedTop = __usedTopFallback;
             if (Event.current == null || Event.current.type != EventType.Layout) {
                 float __measured = 0f;
                 try { __measured = GUILayoutUtility.GetLastRect().yMax; } catch (Exception __ut) { Guard.Log("页面视口/页头高度", __ut); }
@@ -488,14 +492,7 @@ public partial class SR {
             // 页面内容必须以这条 y 为底界（= 滚动区顶 + 视口高 = 底栏条上沿）：列表高度按它算，随窗口大小自适应。
             SRApi.PageScrollTopY = __usedTop;
             SRApi.PageContentBottomY = __usedTop + SRApi.PageViewportHeight;
-            if (Time.frameCount % 120 == 0) {
-                try {
-                    SRApi.LogInfo("[SR诊断] areaH=" + __areaH.ToString("0.0") + " usedTop=" + __usedTop.ToString("0.0")
-                        + " barH=" + __barH.ToString("0.0") + " viewport=" + SRApi.PageViewportHeight.ToString("0.0")
-                        + " footerTop=" + (__areaH - __barH).ToString("0.0") + " scrollY=" + _scroll.y.ToString("0.0")
-                        + " section=" + _selectedInternalSection);
-                } catch { }
-            }
+
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
             _scroll = __noScroll

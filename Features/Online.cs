@@ -458,14 +458,7 @@ namespace SR_UCH.Tweaks {
                 : availH;
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
-            if (Time.frameCount % 120 == 0) {
-                try {
-                    SRApi.LogInfo("[SR诊断/联机] pageTop=" + _pageTopY.ToString("0.0") + " lastY=" + last.yMax.ToString("0.0")
-                        + " usedAbove=" + usedAbove.ToString("0.0") + " availH=" + availH.ToString("0.0")
-                        + " boxH=" + boxH.ToString("0.0") + " viewport=" + SRApi.PageViewportHeight.ToString("0.0")
-                        + " savedH=" + (_tableH != null ? _tableH.Value : -1));
-                } catch { }
-            }
+
             TableDraw(box);
             TableInput(box, Event.current);
 

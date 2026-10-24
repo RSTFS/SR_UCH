@@ -201,9 +201,11 @@ namespace SR_UCH.Tweaks {
 					"内部状态：预设列表列顺序（逗号分隔的列索引，由表头拖动自动写入）。");
 				_colHiddenEntry = plugin.Config.Bind(Section, ColHiddenKey, "",
 					"内部状态：预设列表隐藏列（逗号分隔的列索引，右键表头隐藏后自动写入）。");
+			// 注意：不要用 AcceptableValueRange(120,1000)——它会把默认值 0 夹成 120，等于强制固定高度。
 			_tableHEntry = plugin.Config.Bind(Section, "Table Height", 0,
-				new ConfigDescription(SRApi.T("预设列表高度（0 = 自动；拖动表格底边可直接修改并保存）", "Preset list height (0 = auto; drag the table bottom edge to change and save)"),
-					new AcceptableValueRange<int>(120, 1000)));
+				new ConfigDescription(SRApi.T("预设列表高度（0 = 自动；拖动表格底边可直接修改并保存）", "Preset list height (0 = auto; drag the table bottom edge to change and save)")));
+			// 旧版本的默认值被夹成 120，一次性复位为 0（自动）。
+			if (_tableHEntry.Value == 120) _tableHEntry.Value = 0;
 				// 互斥槽位：关卡重载（Level 功能）动手前会 Require 这个槽位；双方都忙时互相拦下，避免两套重载并发。
 				try { Slots.Provide("presets.reloadBusy", (Func<bool>)(() => _reloadBusy)); }
 				catch (Exception __sx) { SRApi.Guard.Log("布局预设/登记重载互斥槽位", __sx); }
@@ -493,14 +495,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 					tableH = Mathf.Min(tableH, SRApi.Ctl.Sc(_tableHEntry.Value));
 				_actionHitThisFrame = false;
 				List<PresetInfo> visible = VisiblePresets();
-				if (Time.frameCount % 120 == 0) {
-                    try {
-                        SRApi.LogInfo("[SR诊断/预设] pageTop=" + _pageTopY.ToString("0.0") + " lastY=" + last.yMax.ToString("0.0")
-                            + " usedAbove=" + usedAbove.ToString("0.0") + " tableH=" + tableH.ToString("0.0")
-                            + " viewport=" + SRApi.PageViewportHeight.ToString("0.0")
-                            + " savedH=" + (_tableHEntry != null ? _tableHEntry.Value : -1));
-                    } catch { }
-                }
 				RenderPresetTable(tableH, visible);
 				// 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
 				try {
@@ -694,6 +688,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 		// 标准表格：核心 TableDraw 负责表头/行/拖列宽/换列位/钉住操作列；本页只提供列定义、单元格文本与操作按钮。
 		private static void RenderPresetTable(float tableH, List<PresetInfo> visible) {
 			try {
+				if (SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() < SRApi.Ctl.Sc(220)) return;
 				string title = SRApi.T("- 预设列表", "- Preset list") + " (" + visible.Count + "/" + _presets.Count
 					+ SRApi.T("，上限 ", ", limit ") + MaxPresets + ")";
 				SRApi.Ctl.SectionTitle(title);
@@ -707,7 +702,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH - titleH - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));   // 8px 给底边拖拽条
 				float rowsH = Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH);
 				Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
-				if (box.width < SRApi.Ctl.Sc(220)) return;
+				if (box.width < SRApi.Ctl.Sc(120)) return;
 				EnsureCols();
 				// 操作列宽始终跟随当前语言的按钮文字：语言热切换后也能立刻避免英文标签被截断。
 				_colW[ColAction] = DefaultActionColW();
