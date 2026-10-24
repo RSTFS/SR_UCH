@@ -320,7 +320,10 @@ namespace SR_UCH {
         public static float TableAutoHeight(float usedAbove, float minH) {
             TableAutoHeightFn f = _tableAutoHeight as TableAutoHeightFn;
             if (f != null) return f(usedAbove, minH);
-            return Mathf.Max(minH, ContentArea.height - Ctl.Sc(26f) - Ctl.Sc(2f) - FooterHeight - usedAbove - Ctl.Sc(4f));
+            float avail = PageViewportHeight > Ctl.Sc(60f)
+                ? PageViewportHeight
+                : (ContentArea.height - Ctl.Sc(26f) - Ctl.Sc(2f) - FooterHeight);
+            return Mathf.Max(minH, avail - usedAbove - Ctl.Sc(4f));
         }
         // 操作列按钮统一控件：布局 / 命中 / 悬浮由实现层负责；未注入时返回 -1（不响应）。
         public static void SetTableActionButtonsSink(TableActionButtonsFn tableActionButtons) { _tableActionButtons = tableActionButtons; }
@@ -457,6 +460,8 @@ namespace SR_UCH {
             _tableLineStrong = tableLineStrong; _drawFill = drawFill;
         }
         public static Rect ContentArea { get { Func<Rect> f = _contentArea; return f != null ? f() : default(Rect); } set { Action<Rect> a = _setContentArea; if (a != null) a(value); } }
+        // 页面可视高度（滚动区真实视口，已扣除窗口标题/页头/底栏）：功能页的表格高度应以它为准。
+        public static float PageViewportHeight;
         public static float FooterHeight { get { Func<float> f = _footerHeight; return f != null ? f() : 0f; } set { Action<float> a = _setFooterHeight; if (a != null) a(value); } }
         public static Vector2 PageScroll { get { Func<Vector2> f = _pageScroll; return f != null ? f() : default(Vector2); } set { Action<Vector2> a = _setPageScroll; if (a != null) a(value); } }
         public static bool NoPageScrollBars { get { Func<bool> f = _noPageScrollBars; return f != null && f(); } set { Action<bool> a = _setNoPageScrollBars; if (a != null) a(value); } }

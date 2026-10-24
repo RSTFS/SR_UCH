@@ -19,7 +19,10 @@ public partial class SR {
         // 表格自适应高度：页面顶部已用高度 usedAbove + 表格高度 = 底栏之上可用高度。
         // 26 = 窗口标题栏，2 = 内容区内边距，4 = 行区上下留白；均按当前 UI 缩放换算。
         public static float TableAutoHeight(float usedAbove, float minH) {
-            return Mathf.Max(minH, SR.ContentArea.height - Sc(26f) - Sc(2f) - SR.FooterHeight - usedAbove - Sc(4f));
+            float avail = SRApi.PageViewportHeight > Sc(60f)
+                ? SRApi.PageViewportHeight
+                : (SR.ContentArea.height - Sc(26f) - Sc(2f) - SR.FooterHeight);
+            return Mathf.Max(minH, avail - usedAbove - Sc(4f));
         }
 
         // 统一操作列按钮：在行矩形里依次画 BtnClip 按钮，返回本帧左键 MouseUp 命中并已执行回调的下标。

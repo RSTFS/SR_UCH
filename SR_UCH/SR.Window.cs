@@ -464,11 +464,18 @@ public partial class SR {
             }
 
             Vector2 pageBefore = _scroll;
+            // 真实页面视口 = 内容区高 - 已用页头高 - 底栏保留高：显式限制滚动区高度，
+            // 否则滚动区会吃满剩余空间、底栏压住最后几行（预设/联机列表“最后一项显示不全”的根因）。
+            float __areaH = winRect.height - Sc(8);
+            float __usedTop = 0f;
+            try { __usedTop = GUILayoutUtility.GetLastRect().yMax; } catch (Exception __ut) { Guard.Log("页面视口/页头高度", __ut); }
+            float __footerReserve = Mathf.Max(Sc(30f), FooterHeight) + Sc(4f);
+            SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
             _scroll = __noScroll
-                ? GUILayout.BeginScrollView(_scroll, false, false, GUIStyle.none, GUIStyle.none, GUIStyle.none)
-                : GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUIStyle.none);   // 隐藏滚动条（滚轮照旧可用）
+                ? GUILayout.BeginScrollView(_scroll, false, false, GUIStyle.none, GUIStyle.none, GUIStyle.none, GUILayout.Height(SRApi.PageViewportHeight))
+                : GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUIStyle.none, GUILayout.Height(SRApi.PageViewportHeight));   // 隐藏滚动条（滚轮照旧可用）
             if (_scroll != pageBefore) WheelFrame = Time.frameCount; // 页面滚动区吃掉了滚轮
             ConfigFile curConfig = _mode == Mode.Internal
                 ? _internalConfig
