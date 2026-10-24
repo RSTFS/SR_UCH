@@ -106,6 +106,7 @@ namespace SR_UCH.Tweaks {
 		private static readonly float[] _colW = new float[ColCount];
 		private static int[] _order = new int[] { 0, 1, 2, 3, 4 };
 		private static readonly HashSet<int> _hiddenCols = new HashSet<int>();
+		private static SRApi.TableState _tableCols;   // 列宽/列序/隐藏列（核心统一持久化）
 		private static bool _colsLoaded;
 		private static int _hiddenBeforeTable;
 		private static readonly List<int> _vis = new List<int>(ColCount);
@@ -934,41 +935,17 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 			if (_colsLoaded) return;
 			_colsLoaded = true;
 			try {
-				for (int i = 0; i < ColCount; i++) _colW[i] = DefColW[i];
-				for (int i = 0; i < ColCount; i++) _order[i] = i;
-				string w = _colWidthsEntry != null ? _colWidthsEntry.Value : null;
-				if (!string.IsNullOrEmpty(w)) {
-					string[] p = w.Split(',');
-					if (p.Length == ColCount) {
-						for (int i = 0; i < p.Length; i++) {
-							float f;
-							if (float.TryParse(p[i], NumberStyles.Float, CultureInfo.InvariantCulture, out f)
-								&& f >= ColWidthMin && f <= ColWidthMax) _colW[i] = f;
-						}
-					}
+				float[] dw = new float[ColCount];
+				for (int i = 0; i < ColCount; i++) dw[i] = DefColW[i];
+				_tableCols = new SRApi.TableState(_colWidthsEntry, _colOrderEntry, _colHiddenEntry, dw);
+				for (int i = 0; i < ColCount; i++) {
+					float w = _tableCols.Widths[i];
+					_colW[i] = (w >= ColWidthMin && w <= ColWidthMax) ? w : DefColW[i];
 				}
-				string o = _colOrderEntry != null ? _colOrderEntry.Value : null;
-				if (!string.IsNullOrEmpty(o)) {
-					string[] p = o.Split(',');
-					int[] src = new int[p.Length];
-					bool ok = p.Length == ColCount;
-					for (int i = 0; ok && i < p.Length; i++) {
-						if (!int.TryParse(p[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out src[i])) ok = false;
-					}
-					if (ok) _order = NormalizeOrder(src);
-				}
-				// 隐藏列：逐项做范围/合法性裁剪（操作列固定可见，不允许被隐藏）。
-				string h = _colHiddenEntry != null ? _colHiddenEntry.Value : null;
-				if (!string.IsNullOrEmpty(h)) {
-					string[] p = h.Split(',');
-					for (int i = 0; i < p.Length; i++) {
-						int k;
-						if (int.TryParse(p[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out k)
-							&& k >= 0 && k < ColCount && k != ColAction) _hiddenCols.Add(k);
-					}
-				}
-				// 操作列宽度强制用默认值：默认宽按当前语言的 4 个按钮文字实测（见 DefaultActionColW），
-				// 旧配置里持久化的大宽度会在这里被收敛，避免右侧留白。表头仍可正常显示（宽度不允许拖动）。
+				_order = NormalizeOrder(_tableCols.Order);
+				_hiddenCols.Clear();
+				foreach (int h in _tableCols.Hidden) if (h >= 0 && h < ColCount && h != ColAction) _hiddenCols.Add(h);
+				// 操作列宽度强制用默认值（按当前语言按钮文字实测）。
 				_colW[ColAction] = DefaultActionColW();
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/读取列设置", __ex);
@@ -1052,28 +1029,14 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 
 		private static void SaveCols() {
 			try {
-				if (_colWidthsEntry != null && _colW != null) {
-					string[] p = new string[ColCount];
-					for (int i = 0; i < ColCount; i++) p[i] = Mathf.RoundToInt(_colW[i]).ToString(CultureInfo.InvariantCulture);
-					_colWidthsEntry.Value = string.Join(",", p);
-				}
-				if (_colOrderEntry != null && _order != null) {
-					string[] p = new string[_order.Length];
-					for (int i = 0; i < _order.Length; i++) p[i] = _order[i].ToString(CultureInfo.InvariantCulture);
-					_colOrderEntry.Value = string.Join(",", p);
-				}
-				if (_colHiddenEntry != null) {
-					List<string> l = new List<string>();
-					foreach (int k in _hiddenCols) l.Add(k.ToString(CultureInfo.InvariantCulture));
-					l.Sort();
-					_colHiddenEntry.Value = string.Join(",", l.ToArray());
-				}
-				// 配置落盘走核心节流器（MarkConfigDirty + FlushConfig）。
-				if (_colWidthsEntry != null) SRApi.Ctl.MarkConfigDirty(_colWidthsEntry.ConfigFile);
-				SRApi.FlushConfig();
-			} catch (Exception __ex) {
-				SRApi.Guard.Log("布局预设/保存列设置", __ex);
-			}
+				EnsureCols();
+				if (_tableCols == null) return;
+				for (int i = 0; i < ColCount && i < _tableCols.Widths.Length; i++) _tableCols.Widths[i] = _colW[i];
+				_tableCols.Order = _order;
+				_tableCols.Hidden.Clear();
+				foreach (int h in _hiddenCols) _tableCols.Hidden.Add(h);
+				_tableCols.Save();
+			} catch (Exception __ex) { SRApi.Guard.Log("布局预设/保存列设置", __ex); }
 		}
 
 		// ---------- 二次确认 ----------
