@@ -483,7 +483,7 @@ public partial class SR {
             try { _pageFooterH.TryGetValue(_selectedInternalSection, out __pfReserve); } catch { __pfReserve = 0f; }
             // 底栏是固定高度条（与顶栏同款）：布局层只预留“条高 + 该栏目页面外框高 + 小余量”。
             float __barH = Sc(26f);
-            float __footerReserve = __barH + Mathf.Max(0f, __pfReserve) + Sc(2f);
+            float __footerReserve = __barH + Mathf.Max(0f, __pfReserve);
             SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 页面内容必须以这条 y 为底界（= 滚动区顶 + 视口高 = 底栏条上沿）：列表高度按它算，随窗口大小自适应。
             SRApi.PageContentBottomY = __usedTop + SRApi.PageViewportHeight;

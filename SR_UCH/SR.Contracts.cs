@@ -406,13 +406,13 @@ namespace SR_UCH {
         }
 
         // 竖向滚动条统一绘制（ImGui 配色）：返回滑块矩形，调用方把它传给 TableScrollbarInput。
-        public delegate void TableScrollbarFn(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb);
+        public delegate void TableScrollbarFn(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb, bool visible);
         private static object _tableScrollbar;
         public static void SetTableScrollbarSink(TableScrollbarFn f) { _tableScrollbar = f; }
-        public static Rect TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging) {
+        public static Rect TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, bool visible = true) {
             Rect thumb = default(Rect);
             TableScrollbarFn f = _tableScrollbar as TableScrollbarFn;
-            if (f != null) f(track, contentH, viewH, scrollY, dragging, out thumb);
+            if (f != null) f(track, contentH, viewH, scrollY, dragging, out thumb, visible);
             return thumb;
         }
         // 列表高度自适应：返回“内容底界 - 当前布局 Y + 历史偏差”，并在绘制后用 TableAfterDraw 自校准。

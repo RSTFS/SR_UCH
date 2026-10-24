@@ -30,7 +30,7 @@ public partial class SR {
         // 列表高度自适应（配 TableAfterDraw 自校准）：窗口/页头/切换页面后一帧内贴底。
     public static float TableAutoFit(float contentBottomY, float currentY, float minH, ref float bias) {
         if (contentBottomY <= 1f) return minH;
-        return Mathf.Max(minH, contentBottomY - currentY - Sc(2f) + bias);
+        return Mathf.Max(minH, contentBottomY - currentY + bias);
     }
     public static void TableAfterDraw(float contentBottomY, float drawnBottom, ref float bias) {
         try {
@@ -52,13 +52,15 @@ public partial class SR {
             float tx = a.pinW > 0f ? a.pinX + a.pinW : a.box.x + a.stripW;
             Rect track = new Rect(tx, a.box.y + a.headerH, sw, a.rowsH);
             Rect thumb;
-            TableScrollbar(track, contentH, a.rowsH, scrollY, dragging, out thumb);
+            Vector2 __mp = Event.current != null ? Event.current.mousePosition : Vector2.zero;
+            bool __show = dragging || a.box.Contains(__mp) || track.Contains(__mp);
+            TableScrollbar(track, contentH, a.rowsH, scrollY, dragging, out thumb, __show);
             if (e == null) return false;
             return SRApi.TableScrollbarInput(e, e.mousePosition, track, thumb, maxScroll, ref dragging, ref grabY, ref scrollY);
         } catch (Exception __ex) { Guard.Log("表格滚动条一体化", __ex); return false; }
     }
 
-    public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb) {
+    public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb, bool visible = true) {
             SR.TableScrollbar(track, contentH, viewH, scrollY, dragging, out thumb);
         }
 
@@ -858,6 +860,7 @@ public partial class SR {
 
     // 行点击状态：按下行用于过滤"从行上按下、在行上松开"的点击（拖列宽/滚动条释放不会误触发）。
     private static int _rowDownRow = -1;
+    private static int _emptyHintFrame = -1;   // 空提示绘制帧（防重复）
     private static int _rowLastClickRow = -1;
     private static float _rowLastClickTime = -999f;
 
@@ -1018,7 +1021,8 @@ public partial class SR {
                 }
             }
             //空列表提示：调用方给文本，本控件负责居中（三处列表同一观感）
-            if (a.rowCount == 0 && a.emptyHint != null) {
+            if (a.rowCount == 0 && a.emptyHint != null && _emptyHintFrame != Time.frameCount) {
+                _emptyHintFrame = Time.frameCount;   // 同一帧只画一次（防止页面/核心重复绘制出现两条提示）
                 string eh = null;
                 try { eh = a.emptyHint(); } catch { eh = null; }
                 if (!string.IsNullOrEmpty(eh)) {
