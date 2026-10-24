@@ -306,38 +306,34 @@ namespace SR_UCH.Tweaks {
 		}
 
 		// 当前搜索过滤（名称 / 关卡 / 模式）+ 关卡下拉筛选 + 排序后的可见列表。
-		private static int _visFrame = -1;
-		private static readonly List<PresetInfo> _visFrameBuf = new List<PresetInfo>();
+		private static readonly SRApi.TableSource<PresetInfo> _visSource = new SRApi.TableSource<PresetInfo>();
+		private static long _visStamp = -1;
 
 		private static List<PresetInfo> VisiblePresets() {
-			// 同一帧只过滤+排序一次（Render 和表格绘制都会调用它），避免重复 O(n log n)。
-			if (_visFrame == Time.frameCount) return _visFrameBuf;
-			_visFrame = Time.frameCount;
-			List<PresetInfo> list = _visFrameBuf;
-			list.Clear();
+			// 核心数据管线：过滤/排序每帧最多一次（同一帧多次调用返回同一份缓存）。
+			_visSource.Filter = PassPresetFilter;
+			_visSource.Sort = ComparePreset;
+			long stamp = Time.frameCount;
+			if (_visStamp != stamp) { _visSource.Invalidate(); _visStamp = stamp; }
+			return _visSource.Refresh(_presets, stamp);
+		}
+
+		// 过滤条件（原 VisiblePresets 内的判断，原样保留语义）。
+		private static bool PassPresetFilter(PresetInfo p) {
 			try {
 				string q = (_search ?? "").Trim();
-				for (int i = 0; i < _presets.Count; i++) {
-					PresetInfo p = _presets[i];
-					if (p == null) continue;
-					if (string.Equals(_typeFilter, "preset", StringComparison.Ordinal) && p.IsLocal) continue;
-					if (string.Equals(_typeFilter, "local", StringComparison.Ordinal) && !p.IsLocal) continue;
-					if (!string.IsNullOrEmpty(_levelFilter)
-						&& !string.Equals(p.Level, _levelFilter, StringComparison.OrdinalIgnoreCase)) continue;
-					if (!string.IsNullOrEmpty(_modeFilter)
-						&& !string.Equals(p.Mode, _modeFilter, StringComparison.OrdinalIgnoreCase)) continue;
-					if (q.Length > 0) {
-						// 名称 / 关卡名是规格要求的过滤维度；模式文本也顺手匹配，便于按模式搜索。
-						bool hit = ContainsText(p.Name, q) || ContainsText(p.Level, q) || ContainsText(ModeText(p.Mode), q);
-						if (!hit) continue;
-					}
-					list.Add(p);
+				if (string.Equals(_typeFilter, "preset", StringComparison.Ordinal) && p.IsLocal) return false;
+				if (string.Equals(_typeFilter, "local", StringComparison.Ordinal) && !p.IsLocal) return false;
+				if (!string.IsNullOrEmpty(_levelFilter)
+					&& !string.Equals(p.Level, _levelFilter, StringComparison.OrdinalIgnoreCase)) return false;
+				if (!string.IsNullOrEmpty(_modeFilter)
+					&& !string.Equals(p.Mode, _modeFilter, StringComparison.OrdinalIgnoreCase)) return false;
+				if (q.Length > 0) {
+					bool hit = ContainsText(p.Name, q) || ContainsText(p.Level, q) || ContainsText(ModeText(p.Mode), q);
+					if (!hit) return false;
 				}
-				list.Sort(ComparePreset);
-			} catch (Exception __ex) {
-				SRApi.Guard.Log("布局预设/过滤排序", __ex);
-			}
-			return list;
+				return true;
+			} catch { return false; }
 		}
 
 		private static bool ContainsText(string text, string query) {

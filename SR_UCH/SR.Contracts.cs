@@ -531,6 +531,36 @@ namespace SR_UCH {
         public static void DrawLine(Rect r) { DrawFill(r, new Color(1f, 1f, 1f, 0.22f)); }
 
         // UI 工具箱门面（IMGUI 控件/样式/布局）：实现在核心，契约层只转发。
+        // 通用列表数据管线：过滤 / 排序结果按“版本戳”缓存，每帧最多重算一次。
+        // 页面只需提供源数据 + 过滤/排序委托 + 一个版本戳（通常用 Time.frameCount 或配置脏标记）。
+        public sealed class TableSource<T> where T : class {
+            private readonly List<T> _rows = new List<T>();
+            private readonly List<T> _buf = new List<T>();
+            public Func<T, bool> Filter;          // null = 全部通过
+            public Comparison<T> Sort;            // null = 保持源顺序
+            public long Stamp { get; private set; }   // 上次重算用的版本戳
+            public List<T> Rows { get { return _rows; } }
+
+            public List<T> Refresh(IList<T> source, long stamp) {
+                if (Stamp == stamp) return _rows;
+                Stamp = stamp;
+                _rows.Clear();
+                if (source == null) return _rows;
+                _buf.Clear();
+                for (int i = 0; i < source.Count; i++) {
+                    T v = source[i];
+                    if (v == null) continue;
+                    if (Filter != null) { try { if (!Filter(v)) continue; } catch { continue; } }
+                    _buf.Add(v);
+                }
+                if (Sort != null) { try { _buf.Sort(Sort); } catch { } }
+                _rows.AddRange(_buf);
+                return _rows;
+            }
+
+            public void Invalidate() { Stamp = long.MinValue; }
+        }
+
         public static class Ctl {
             public delegate int ComboBoxFn(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width);
             private static Func<float, float> _sc;
