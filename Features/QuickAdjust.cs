@@ -432,10 +432,23 @@ public class QuickAdjust : ITweak {
 
 		private static void ApplyKeepOnce(GamePlayer gp) {
 			try {
-				if (_keepHandicap <= 0 || gp == null) return;
-				if (!gp.isLocalPlayer) return;
-				gp.CallCmdSetPlayerHandicap(_keepHandicap);
-			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust/新关卡补发折扣", __ex); }
+				if (gp == null || !gp.isLocalPlayer) return;
+				// 房间权威值是 LobbyPlayer.handicap（树屋评分板改的就是它，跨关卡一直保留）。
+				// GamePlayer.Handicap 只用于计分板显示，每关重建后回到 100，这里按房间值补一次。
+				int want = 100;
+				try {
+					foreach (Player p in PlayerManager.GetInstance()) {
+						if (p == null) continue;
+						LobbyPlayer lp = p.AssociatedLobbyPlayer;
+						if (lp == null || !lp.IsLocalPlayer) continue;
+						want = lp.Networkhandicap;
+						break;
+					}
+				} catch { want = _keepHandicap > 0 ? _keepHandicap : 100; }
+				if (want <= 0) want = 100;
+				if (gp.Handicap == want) return;
+				gp.CallCmdSetPlayerHandicap(want);
+			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust/新关卡同步显示折扣", __ex); }
 		}
 
 		// 已应用的折扣目标（10~100；0 = 未应用）。切换关卡 / 重建 GamePlayer 后由 Tick 自动补回。
