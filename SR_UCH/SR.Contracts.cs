@@ -582,6 +582,14 @@ namespace SR_UCH {
             public static bool TableScrollbarFor(TableArgs a, Event e, ref bool dragging, ref float grabY, ref float scrollY) {
                 return SRApi.TableScrollbarFor(a, e, ref dragging, ref grabY, ref scrollY);
             }
+            // 表格底边拖拽改高度并持久化（entry 为 0 表示自动高度）。grip 为可拖区域，autoH 为当前自动高度（设计单位）。
+            public delegate void TableHeightGripFn(ConfigEntryBase entry, Rect grip, float autoH, int min, int max);
+            private static object _tableHeightGrip;
+            public static void SetTableHeightGripSink(TableHeightGripFn f) { _tableHeightGrip = f; }
+            public static void TableHeightGrip(ConfigEntryBase entry, Rect grip, float autoH, int min, int max) {
+                TableHeightGripFn f = _tableHeightGrip as TableHeightGripFn;
+                if (f != null) f(entry, grip, autoH, min, max);
+            }
             public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey) { Action<GUIContent, ConfigEntryBase, float, float, ConfigEntry<KeyCode>> f = _restoreLabel; if (f != null) f(content, entry, w, h, hotkey); }
             public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h) { RestoreLabel(content, entry, w, h, null); }
             public static void RenderControl(ConfigEntryBase entry) { Action<ConfigEntryBase> f = _renderControl; if (f != null) f(entry); }

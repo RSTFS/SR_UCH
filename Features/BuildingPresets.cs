@@ -68,6 +68,7 @@ namespace SR_UCH.Tweaks {
 		private static ConfigEntry<string> _colWidthsEntry;
 		private static ConfigEntry<string> _colOrderEntry;
 		private static ConfigEntry<string> _colHiddenEntry;
+		private static ConfigEntry<int> _tableHEntry;
 		// 运行期快照：配置变化回调里即时更新，供每帧渲染读取（避免每帧访问 ConfigEntry）。
 		private static bool _featureOn;
 		private static int _sortMode;
@@ -200,6 +201,9 @@ namespace SR_UCH.Tweaks {
 					"内部状态：预设列表列顺序（逗号分隔的列索引，由表头拖动自动写入）。");
 				_colHiddenEntry = plugin.Config.Bind(Section, ColHiddenKey, "",
 					"内部状态：预设列表隐藏列（逗号分隔的列索引，右键表头隐藏后自动写入）。");
+			_tableHEntry = plugin.Config.Bind(Section, "Table Height", 0,
+				new ConfigDescription(SRApi.T("预设列表高度（0 = 自动；拖动表格底边可直接修改并保存）", "Preset list height (0 = auto; drag the table bottom edge to change and save)"),
+					new AcceptableValueRange<int>(120, 1000)));
 				// 互斥槽位：关卡重载（Level 功能）动手前会 Require 这个槽位；双方都忙时互相拦下，避免两套重载并发。
 				try { Slots.Provide("presets.reloadBusy", (Func<bool>)(() => _reloadBusy)); }
 				catch (Exception __sx) { SRApi.Guard.Log("布局预设/登记重载互斥槽位", __sx); }
@@ -476,6 +480,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				// 表格高度 = 页面视口高 − 页面内已用高度（都是布局量，不掺窗口/底栏坐标）。
 				float usedAbove = _pageTopYSet ? Mathf.Max(0f, last.yMax - _pageTopY) : SRApi.Ctl.Sc(300);
 				float tableH = Mathf.Max(SRApi.Ctl.Sc(120), SRApi.PageViewportHeight - usedAbove);
+				// 用户自定义高度优先（0 = 自动）；上限不超过剩余空间。
+				if (_tableHEntry != null && _tableHEntry.Value > 0)
+					tableH = Mathf.Min(tableH, SRApi.Ctl.Sc(_tableHEntry.Value));
 				_actionHitThisFrame = false;
 				RenderPresetTable(tableH);
 				// 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
@@ -681,7 +688,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				if (tableH <= 0f) tableH = TableHeight();
 				// Render() 传入的 tableH 是「分区标题 + 表格」可用的总高度；分区标题本身也占高，
 				// 这里扣掉它的实测高度，否则表格底部会超出可视区、最后一行被底栏裁掉且滚不到。
-				tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH - titleH);
+				tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH - titleH - SRApi.Ctl.Sc(8));   // 8px 给底边拖拽条
 				float rowsH = Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH);
 				Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
 				if (box.width < SRApi.Ctl.Sc(220)) return;
@@ -768,6 +775,11 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				};
 				_hiddenBeforeTable = _hiddenCols.Count;
 				SRApi.TableDraw(_args);
+				// 底边拖拽条（与联机列表同一核心实现）：拖动改高度并持久化到 Table Height。
+				GUILayout.Space(SRApi.Ctl.Sc(2));
+				GUILayout.Box(GUIContent.none, SRApi.Ctl.Footer, GUILayout.Height(SRApi.Ctl.Sc(4)), GUILayout.ExpandWidth(true));
+				Rect __hgrip = GUILayoutUtility.GetLastRect();
+				SRApi.Ctl.TableHeightGrip(_tableHEntry, __hgrip, (box.height + SRApi.Ctl.Sc(8)) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
 				// 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
 				_sbHandled = SRApi.Ctl.TableScrollbarFor(_args, e, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);
 				if (_hiddenCols.Count > _hiddenBeforeTable) {

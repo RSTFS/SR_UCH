@@ -32,6 +32,33 @@ public partial class SR {
         if (contentBottomY <= 1f) return minH;
         return Mathf.Max(minH, contentBottomY - currentY + bias);
     }
+    // 表格底边拖拽改高度：核心统一处理按下/拖动/松手写盘（entry 值 0 = 自动高度）。
+    private sealed class HeightDrag { public bool on; public float y0; public float h0; }
+    private static readonly Dictionary<ConfigEntryBase, HeightDrag> _heightDrags = new Dictionary<ConfigEntryBase, HeightDrag>();
+    public static void TableHeightGrip(ConfigEntryBase entry, Rect grip, float autoH, int min, int max) {
+        try {
+            if (entry == null) return;
+            Event e = Event.current;
+            if (e == null) return;
+            HeightDrag st;
+            if (!_heightDrags.TryGetValue(entry, out st)) { st = new HeightDrag(); _heightDrags[entry] = st; }
+            float cur = autoH;
+            try { int v = System.Convert.ToInt32(entry.BoxedValue); if (v > 0) cur = v; } catch { }
+            if (e.type == EventType.MouseDown && e.button == 0 && grip.Contains(e.mousePosition)) {
+                st.on = true; st.y0 = e.mousePosition.y; st.h0 = cur;
+                BlockWindowDrag = true; e.Use();
+            } else if (e.type == EventType.MouseDrag && st.on) {
+                float h = st.h0 + (e.mousePosition.y - st.y0) / Mathf.Max(0.0001f, Sc(1f));
+                entry.BoxedValue = Mathf.Clamp(Mathf.RoundToInt(h), min, max);
+                BlockWindowDrag = true; e.Use();
+            } else if (e.type == EventType.MouseUp && st.on) {
+                st.on = false; BlockWindowDrag = false;
+                MarkConfigDirty(entry.ConfigFile);
+                e.Use();
+            }
+        } catch (Exception __ex) { Guard.Log("表格高度拖拽", __ex); }
+    }
+
     public static void TableAfterDraw(float contentBottomY, float drawnBottom, ref float bias) {
         try {
             if (contentBottomY <= 1f) return;

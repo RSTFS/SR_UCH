@@ -854,6 +854,8 @@ public partial class SR : ITweak {
             catch (Exception __ex) { Guard.Log("注入表格高度自适应", __ex); }
             try { SRApi.SetTableAfterDrawSink(delegate (float __b, float __d, ref float __bias) { SR.Ctl.TableAfterDraw(__b, __d, ref __bias); }); }
             catch (Exception __ex) { Guard.Log("注入表格高度校准", __ex); }
+            try { SRApi.Ctl.SetTableHeightGripSink(delegate (ConfigEntryBase __e, Rect __g, float __ah, int __min, int __max) { SR.Ctl.TableHeightGrip(__e, __g, __ah, __min, __max); }); }
+            catch (Exception __ex) { Guard.Log("注入表格高度拖拽", __ex); }
             try { SRApi.SetTableScrollbarForSink(delegate (SRApi.TableArgs __a, Event __e, ref bool __dr, ref float __gy, ref float __sy) { return SR.Ctl.TableScrollbarFor(__a, __e, ref __dr, ref __gy, ref __sy); }); }
             catch (Exception __ex) { Guard.Log("注入表格滚动条一体化", __ex); }
             // 竖向滚动条绘制（ImGui 配色）由核心统一提供。

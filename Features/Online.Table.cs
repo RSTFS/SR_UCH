@@ -13,28 +13,11 @@ using UnityEngine.SceneManagement;
 namespace SR_UCH.Tweaks {
     public partial class Online {
         private static void HeightGrip() {
-            Event e = Event.current;
             Rect r = GUILayoutUtility.GetLastRect();
             GUILayout.Space(SRApi.Ctl.Sc(2));
             GUILayout.Box(GUIContent.none, SRApi.Ctl.Footer, GUILayout.Height(SRApi.Ctl.Sc(4)), GUILayout.ExpandWidth(true));
             Rect grip = GUILayoutUtility.GetLastRect();
-            if (e == null) return;
-            if (e.type == EventType.MouseDown && e.button == 0 && grip.Contains(e.mousePosition)) {
-                _dragH = true;
-                _dragHY0 = e.mousePosition.y;
-                _dragH0 = _tableH != null && _tableH.Value > 0 ? _tableH.Value : (r.height / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)));
-                // 临时值为 0 表示本次按下后尚无真正的 MouseDrag；只点击不拖动时不会把自动高度误写成固定高度。
-                _dragHTmp = _tableH != null && _tableH.Value > 0 ? _tableH.Value : 0f;
-                SRApi.BlockWindowDrag = true;
-                e.Use();
-            } else if (e.type == EventType.MouseDrag && _dragH) {
-                // _dragH0 是设计单位，鼠标位移是屏幕像素，必须再除一次 SRApi.Ctl.Sc(1)。
-                int v = Mathf.Clamp(Mathf.RoundToInt(_dragH0 + (e.mousePosition.y - _dragHY0) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f))), 120, 1000);
-                // 拖动期间只累加到 _dragHTmp，松手时由 SaveTableH 一次性写入配置（每帧写会触发 setter 与范围校验）。
-                _dragHTmp = v;
-                SRApi.BlockWindowDrag = true;
-                e.Use();
-            }
+            SRApi.Ctl.TableHeightGrip(_tableH, grip, r.height / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
         }
 
         // 落盘统一交给 SRApi.Ctl.MarkConfigDirty（节流写盘，失败有 Warning）。
