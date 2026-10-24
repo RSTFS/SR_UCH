@@ -424,13 +424,25 @@ public class QuickAdjust : ITweak {
 			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.Send", __ex); }
 		}
 
-		// 同房间内定期补发（早期做法）：切关卡会重建 GamePlayer，这里 0.4s 检查一次并补回。
-		private static float _keepAt = -999f;
+		// 持久化（优化版）：新 GamePlayer 生成时记一个"待补发"时间点，Tick 到点只补一次。
+		// 不常驻轮询，也不反复改数值；切关卡/重开一局都会重新触发一次。
+		private static float _keepApplyAt = -1f;
+
+		[HarmonyPatch(typeof(GamePlayer), "OnStartClient")]
+		private static void OnStartClientQueueKeep(GamePlayer __instance) { QueueKeepIfLocal(__instance); }
+
+		[HarmonyPatch(typeof(GamePlayer), "OnStartServer")]
+		private static void OnStartServerQueueKeep(GamePlayer __instance) { QueueKeepIfLocal(__instance); }
+
+		private static void QueueKeepIfLocal(GamePlayer gp) {
+			try { if (_keepHandicap > 0 && gp != null && gp.isLocalPlayer) _keepApplyAt = Time.unscaledTime + 0.8f; }
+			catch { }
+		}
+
 		private static void TickKeepHandicap() {
 			try {
-				if (_keepHandicap <= 0) return;
-				if (Time.unscaledTime - _keepAt < 0.4f) return;
-				_keepAt = Time.unscaledTime;
+				if (_keepHandicap <= 0 || _keepApplyAt < 0f || Time.unscaledTime < _keepApplyAt) return;
+				_keepApplyAt = -1f;
 				foreach (Player p in PlayerManager.GetInstance()) {
 					if (p == null) continue;
 					LobbyPlayer lp = null;

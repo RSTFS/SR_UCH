@@ -678,14 +678,16 @@ public partial class SR {
         }
 
         // 悬浮提示显示延迟（参考 Dear ImGui 的 tooltip 延迟）与淡入，避免鼠标扫过控件时提示乱闪。
-        private const float TipDelay = 0.35f;
+        private const float TipDelay = 0.2f;
         private const float TipFade = 0.12f;
         private static string _tipShownKey;
         private static float _tipShownAt = -999f;
 
         private static void DrawTooltip(Vector2 mp) {
             string tip = GUI.tooltip;
-            if (string.IsNullOrEmpty(tip)) { _tipShownKey = null; return; }
+            // 注意：Layout 帧里 GUI.tooltip 往往为空，不能因此重置计时，
+            // 否则延迟永远走不完 → 所有悬浮说明看起来"消失"。空值时保持状态直接返回。
+            if (string.IsNullOrEmpty(tip)) return;
             if (tip != _tipShownKey) { _tipShownKey = tip; _tipShownAt = Time.unscaledTime; }
             float __age = Time.unscaledTime - _tipShownAt;
             if (__age < TipDelay) return;
