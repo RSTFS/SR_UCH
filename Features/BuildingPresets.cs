@@ -422,7 +422,7 @@ namespace SR_UCH.Tweaks {
 					if (GUILayout.Button(new GUIContent(SRApi.T("刷新", "Refresh"),
 							SRApi.T("重新扫描预设目录（手动放入/删除了 XML 时用），也用于重建索引",
 								"rescan the presets folder (after manually adding/removing XML files) and rebuild the index")),
-						SRApi.Ctl.Btn, GUILayout.Width(W(56)), GUILayout.Height(W(24)))) {
+						SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Btn.CalcSize(new GUIContent(SRApi.T("刷新", "Refresh"))).x + SRApi.Ctl.Sc(18)), GUILayout.Height(W(24)))) {
 						try { _loaded = false; LoadFromDisk(true); } catch (Exception __rx) { SRApi.Guard.Log("布局预设/刷新列表", __rx); }
 					}
 					GUILayout.FlexibleSpace();

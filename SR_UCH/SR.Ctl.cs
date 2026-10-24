@@ -433,13 +433,22 @@ public partial class SR {
             return clicked && !capturing; //左键（非捕捉）触发切换
         }
 
+        // 快捷键文本：统一放进悬浮提示（按钮文字不再拼 [键]，否则绑定后按钮被截断）。
+        private static string KeyTip(ConfigEntry<KeyCode> key) {
+            try {
+                if (key == null || key.Value == KeyCode.None) return "";
+                return "\n" + T("按键：", "Key: ") + SR.KeySuffix(key).Trim().Trim('[', ']');
+            } catch { return ""; }
+        }
+
         //操作按钮：左键触发操作。bindable=true 时该按钮支持右键绑定快捷键（其余按钮右键无反应）。
         private static bool HotkeyActionButton(string label, string tooltip, ConfigEntry<KeyCode> keyEntry, float width = 0f, bool bindable = false) {
             bool capturing = keyEntry != null && _capturing == keyEntry;
-            // 快捷键框只显示按键本身；动作名放进悬浮提示。
-            string text = label + SR.KeySuffix(keyEntry);
+            // 按钮文字只显示动作名；按键进悬浮提示（绑定后不会把按钮文字挤爆）。
+            string text = label;
             if (keyEntry != null) {
                 string actTip = string.IsNullOrEmpty(tooltip) ? label : label + "\n" + tooltip;
+                actTip += KeyTip(keyEntry);
                 tooltip = bindable ? actTip + "\n" + T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey") : actTip;
             }
             float w = width > 0f ? width : Sc(150);
@@ -485,7 +494,7 @@ public partial class SR {
             int evBtn = e != null ? e.button : 0;
             float bw = width > 0f ? width : Sc(150);
             float bh = height > 0f ? height : Sc(30);
-            bool clicked = GUILayout.Button(new GUIContent(label + SR.KeySuffix(key), tip),
+            bool clicked = GUILayout.Button(new GUIContent(label, tip + KeyTip(key)),
                 capturing ? _capture : _btn, GUILayout.Width(bw), GUILayout.Height(bh));
             if (clicked && evBtn != 0) clicked = false; //右键绝不触发左键动作
             if (key != null && e != null) TryBindByRightClick(key, GUILayoutUtility.GetLastRect());
@@ -503,7 +512,7 @@ public partial class SR {
             int evBtn = e != null ? e.button : 0;
             float bw = width > 0f ? width : Sc(150);
             float bh = height > 0f ? height : Sc(30);
-            bool clicked = GUILayout.Button(new GUIContent(label + SR.KeySuffix(key), tip),
+            bool clicked = GUILayout.Button(new GUIContent(label, tip + KeyTip(key)),
                 capturing ? _capture : _btn, GUILayout.Width(bw), GUILayout.Height(bh));
             if (clicked && evBtn != 0) clicked = false;
             if (key != null && e != null) TryBindByRightClick(key, GUILayoutUtility.GetLastRect());

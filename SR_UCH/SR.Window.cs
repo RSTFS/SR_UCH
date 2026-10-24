@@ -129,7 +129,7 @@ public partial class SR {
 
         // 右栏底部那行（设置 / 模式）的高度：自绘页据此给表格留出底部空间，否则末行会被盖住。
         public static float FooterHeight;
-        private static float _footerReserveMeasured = 30f;   // 上一帧底栏块实测高度（含页面外框按钮）
+        private static readonly Dictionary<string, float> _pageFooterH = new Dictionary<string, float>();   // 各栏目页面外框按钮高度（切换栏目不跳）
         // 底栏注册按钮的悬停过渡与命中矩形（按 id 缓存）
         private static readonly Dictionary<string, float> _footerBtnHover = new Dictionary<string, float>();
         private static readonly Dictionary<string, Rect> _footerBtnRects = new Dictionary<string, Rect>();
@@ -470,9 +470,16 @@ public partial class SR {
             float __areaH = winRect.height - Sc(8);
             float __usedTop = 0f;
             try { __usedTop = GUILayoutUtility.GetLastRect().yMax; } catch (Exception __ut) { Guard.Log("页面视口/页头高度", __ut); }
-            // 底栏实际块高（含页面外框按钮 RenderPageFooter）由上一帧量得；只用 FooterHeight 会漏掉外框按钮，
-            // 导致滚动区把底栏顶出可视区（底栏直接消失）。
-            float __footerReserve = Mathf.Max(Sc(30f), _footerReserveMeasured) + Sc(2f);
+            // 底栏预留 = 底栏行高（上一帧，稳定） + 当前栏目页面外框按钮高（按栏目记住，切栏目不会跳）。
+            float __pfReserve = 0f;
+            try {
+                if (!_pageFooterH.TryGetValue(_selectedInternalSection, out __pfReserve)) {
+                    // 首次进入该栏目：用已见过的最大外框高度先兜住，避免切栏目瞬间底栏被顶掉（闪烁）。
+                    __pfReserve = 0f;
+                    foreach (float __v in _pageFooterH.Values) if (__v > __pfReserve) __pfReserve = __v;
+                }
+            } catch { __pfReserve = 0f; }
+            float __footerReserve = Mathf.Max(Sc(30f), FooterHeight) + Mathf.Max(0f, __pfReserve) + Sc(4f);
             SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
@@ -532,8 +539,15 @@ public partial class SR {
                 _scroll = pageBefore;
                 WheelFrame = Time.frameCount;   // 让用 Input 读轴的缩放路径本帧让步
             }
-            // 功能页外框部件（滚动区之下）
+            // 功能页外框部件（滚动区之下）：量它的高度并按栏目记住，下一帧（及以后切换回该栏目）预留稳定。
+            float __pfTop = 0f;
+            try { __pfTop = GUILayoutUtility.GetLastRect().yMax; } catch { }
             if (_mode == Mode.Internal) SR.RenderPageFooter(_selectedInternalSection);
+            try {
+                float __pfBottom = GUILayoutUtility.GetLastRect().yMax;
+                float __pfH = Mathf.Max(0f, __pfBottom - __pfTop);
+                if (_mode == Mode.Internal && !string.IsNullOrEmpty(_selectedInternalSection)) _pageFooterH[_selectedInternalSection] = __pfH;
+            } catch (Exception __pm) { Guard.Log("页面外框高度测量", __pm); }
             GUILayout.BeginHorizontal(_footer);
             // 按钮宽度按文本测量（英文比中文长，固定宽度会截断）
             float settingsW = _btn.CalcSize(new GUIContent(T("设置", "Settings"))).x + Sc(18);
@@ -585,12 +599,6 @@ public partial class SR {
             GUILayout.Label(__modeLabel, _label, GUILayout.Width(__modeW), GUILayout.Height(Sc(26)));
             GUILayout.EndHorizontal();
             FooterHeight = GUILayoutUtility.GetLastRect().height;   // 自绘页据此避让
-            // 量本帧底栏块的真实高度：底栏底边 - (滚动区顶 + 视口高)，供下一帧预留（收敛后底栏稳定可见）。
-            try {
-                float __fbBottom = GUILayoutUtility.GetLastRect().yMax;
-                float __fbBlock = __fbBottom - (__usedTop + SRApi.PageViewportHeight);
-                if (__fbBlock > Sc(4f)) _footerReserveMeasured = Mathf.Clamp(__fbBlock, Sc(30f), Sc(220f));
-            } catch (Exception __fm) { Guard.Log("底部块高度测量", __fm); }
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
             GUILayout.EndArea();

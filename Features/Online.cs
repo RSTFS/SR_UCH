@@ -81,7 +81,7 @@ namespace SR_UCH.Tweaks {
         private const int OldSkillCol = 3;
 
         // 默认列宽，顺序：区域 人数 游戏质量 进度 游戏模式 标签 房主 限制 标记 综合分 操作。
-        private static readonly float[] DefWidths = { 62f, 44f, 76f, 66f, 80f, 50f, 86f, 78f, 50f, 54f, 70f };
+        private static readonly float[] DefWidths = { 62f, 53f, 76f, 66f, 80f, 50f, 86f, 78f, 50f, 65f, 70f };   // 人数 +20%（44→53）、综合分 +20%（54→65）
 
         public void Initialize(IFeatureHost plugin) {
             SRApi.LocSec(SecOnline, "联机", "Online");
@@ -655,7 +655,11 @@ namespace SR_UCH.Tweaks {
                     if (p.Length == _cw.Length) {
                         for (int i = 0; i < p.Length; i++) {
                             float f;
-                            if (float.TryParse(p[i], NumberStyles.Float, CultureInfo.InvariantCulture, out f) && f >= 28f && f <= 600f) _cw[i] = f;
+                            if (float.TryParse(p[i], NumberStyles.Float, CultureInfo.InvariantCulture, out f) && f >= 28f && f <= 600f) {
+                        _cw[i] = f;
+                        // 人数 / 综合分：默认宽已 +20%，旧持久化值更窄时按新默认抬高，避免表头被截。
+                        if ((i == 1 || i == 9) && _cw[i] < DefWidths[i]) _cw[i] = DefWidths[i];
+                    }
                         }
                     }
                 }

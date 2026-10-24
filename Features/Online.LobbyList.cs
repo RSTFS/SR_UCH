@@ -102,12 +102,9 @@ namespace SR_UCH.Tweaks {
 
         private static string DispRegion(string code) {
             // 先过 SRApi.T：语言包可覆盖"亚太/欧盟/美国"，也可覆盖 "AP"/"EU"/"US" 这些英文原名。
-            if (code == "AP") { string ap = SRApi.T("亚太", "AP"); return En ? ap : ZhTerm("Network/region_shortname_ap", ap); }
-            if (code == "EU") { string eu = SRApi.T("欧盟", "EU"); return En ? eu : ZhTerm("Network/region_shortname_eu", eu); }
-            if (code == "US") { string us = SRApi.T("美国", "US"); return En ? us : ZhTerm("Network/region_shortname_us", us); }
-            // 区域对象为 null（游戏没给该字段 / id 对不上）：说明是取不到，而非某个区域。
-            if (code == NoneCode) return SRApi.T("未知(无区域数据)", "unknown (no region)");
-            if (string.IsNullOrEmpty(code)) return SRApi.T("未知", "unknown");
+            // 直接显示游戏给到的区域短代码（AP / EU / US 或原始短名），不翻译成长名。
+            if (code == NoneCode) return "-";
+            if (string.IsNullOrEmpty(code)) return "-";
             return code;
         }
 
@@ -222,9 +219,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string FlagsText(Matchmaker.LobbyListInfo li) {
-            string s = li.usingMods ? SRApi.T("修改器", "mod") : "";
-            if (li.isAFK) s += (s.Length > 0 ? "+" : "") + "AFK";
-            return s;
+            return li.usingMods ? SRApi.T("修改器", "mod") : "";
         }
 
         private static string Val(ConfigEntry<string> e) { return e != null ? (e.Value ?? "") : ""; }
