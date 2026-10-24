@@ -138,7 +138,6 @@ namespace SR_UCH.Tweaks {
 
 		// ---- 树屋/大厅 ----
 		private static bool _inLobby;
-		private static string _lobbyVote;
 
 		// ---- 回合提示动画 ----
 		private static string _roundNoticeText;
@@ -593,7 +592,7 @@ namespace SR_UCH.Tweaks {
 					// 树屋/大厅：HUD 完全不显示（用户要求删除大厅显示）。
 					if (_gc != null || _hasGame) ResetGameState();
 					_inLobby = false;
-					_lobbyVote = null;
+					
 					StepAlpha(false);
 					return;
 				}
@@ -1047,7 +1046,7 @@ namespace SR_UCH.Tweaks {
 			_lastRound = 0;
 			_vsPlaceSeen = false;
 			_inLobby = false;
-			_lobbyVote = null;
+			
 			for (int i = 0; i < _lineLast.Length; i++) { _lineLast[i] = null; _lineShownAt[i] = 0f; }
 			for (int i = 0; i < _hudHeights.Length; i++) _hudHeights[i] = 0f;
 			for (int i = 0; i < _segWSmooth.Length; i++) _segWSmooth[i] = 0f;

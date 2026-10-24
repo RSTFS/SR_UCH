@@ -21,13 +21,8 @@ namespace SR_UCH.Tweaks {
         // 落盘统一交给 SRApi.Ctl.MarkConfigDirty（节流写盘，失败有 Warning）。
         // 拖动期间高度只写 _dragHTmp，到这里才同步进配置；核心的拖拽看门狗也会调本方法。
         private static void SaveTableH() {
-            if (_tableH != null) {
-                if (_dragHTmp > 0f) {
-                    int h = Mathf.RoundToInt(_dragHTmp);
-                    if (h != _tableH.Value) _tableH.Value = h;
-                }
-                SRApi.Ctl.MarkConfigDirty(_tableH.ConfigFile);
-            }
+            // 高度由核心拖拽条直接写入配置，这里只需触发落盘。
+            if (_tableH != null) SRApi.Ctl.MarkConfigDirty(_tableH.ConfigFile);
         }
 
         private static void SaveEntry(ConfigEntryBase e) { if (e != null) SRApi.Ctl.MarkConfigDirty(e.ConfigFile); }
@@ -94,6 +89,7 @@ namespace SR_UCH.Tweaks {
         private static readonly List<int> _rowRows = new List<int>();             //房间行 -> _shownLobbies 下标
         private static readonly List<Rect> _joinRectsPage = new List<Rect>();     //加入按钮（页面坐标，钉在右边）
         private static readonly List<int> _joinRows = new List<int>();            //加入按钮 -> _shownLobbies 下标
+        private static bool _dragH;   // 核心拖拽看门狗需要一个 ref bool（高度拖拽由核心处理）
         private static bool _sbDragging;
         private static bool _sbHandled;   // 本帧核心滚动条是否已处理鼠标事件                //正在拖竖向滚动条
         private static float _sbGrabY;                  //按下时鼠标相对滑块顶部的偏移

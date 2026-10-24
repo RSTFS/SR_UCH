@@ -136,10 +136,7 @@ namespace SR_UCH.Tweaks {
 		private static float _maxScrollY;
 		private static bool _sbDragging;
 		private static float _sbGrabY;
-		private static float _tableBias;   // 表格高度自校准偏差（核心 TableAutoFit/TableAfterDraw 维护）
 		private static bool _sbHandled;    // 本帧核心滚动条是否已处理鼠标事件
-		private static Rect _sbTrack;
-		private static Rect _sbThumb;
 		private static bool _dragH;
 		private static float _dragWatchdog;
 		// 关卡列显示模式：false = 关卡名称（本地化），true = 关卡代码（快照码/场景名）；运行期状态，不落配置。
@@ -354,7 +351,6 @@ namespace SR_UCH.Tweaks {
 		// 预设列表在固定高度区域内用自己的滚轮滚动。
 		// 页面内容在布局空间里的起点 y（零高度探针），用于计算表格上方已用高度（同联机列表）。
 		private static float _pageTopY;
-		private static bool _pageTopYSet;
 
 		private static void Render() {
 			try {
@@ -369,7 +365,7 @@ namespace SR_UCH.Tweaks {
 					SRApi.PageScroll = Vector2.zero;
 				} catch (Exception __ex) { SRApi.Guard.Log("布局预设/关闭页面滚动", __ex); }
 				Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
-				if (Event.current != null && Event.current.type == EventType.Layout) { _pageTopY = topProbe.y; _pageTopYSet = true; }
+				if (Event.current != null && Event.current.type == EventType.Layout) { _pageTopY = topProbe.y; }
 
 				// 分区 1：保存（名称 + 保存，紧凑一行）。
 				SRApi.Ctl.SectionTitle(SRApi.T("- 保存 -", "- Save -"));

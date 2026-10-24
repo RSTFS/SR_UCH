@@ -52,10 +52,6 @@ namespace SR_UCH.Tweaks {
         private static float _abortDeadline, _forceDeadline, _forceRawDeadline;   //回家看门狗的三级时限
         private static float[] _cw;                         //当前列宽
         private static bool _widthsLoaded;                  // 列宽是否已初始化
-        private static bool _dragH;
-        private static float _tableBias;   // 表格高度自校准偏差                         //正在拖表格高度
-        private static float _dragHY0, _dragH0;
-        private static float _dragHTmp;                      // 拖表格高度期间的临时值（拖动中不写配置）
         // 对局内点加入：先退出当前房间，退出后立刻加入。
         private static string _pendingJoin = "";
         private static bool _pendingUseCode;                 //true = 按房间码加入
@@ -359,11 +355,7 @@ namespace SR_UCH.Tweaks {
             // 本页无页面级滚动：表头 / 筛选必须始终可见，房间只在下方框内滚动。
             SRApi.PageScroll = Vector2.zero;
             SRApi.NoPageScrollBars = true;   // 页面级横纵向滚动条都关闭
-            // 列宽拖动的 MouseUp 收尾由核心 TableDraw 统一处理（清 dragCol + saveWidths 回调）；
-            // 这里只收尾表格高度拖动（核心的拖拽看门狗不管高度）。
-            if (Event.current != null && Event.current.type == EventType.MouseUp) {
-                if (_dragH) { _dragH = false; SRApi.BlockWindowDrag = false; SaveTableH(); }
-            }
+            // 列宽拖动 / 表格高度拖动的收尾都由核心处理，这里无需再收尾。
             EnsureWidths();
             // 页面内容在布局空间的起点 y（零高度探针），用于计算表格上方已用高度。
             Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
@@ -448,11 +440,8 @@ namespace SR_UCH.Tweaks {
             float availW = Mathf.Max(SRApi.Ctl.Sc(220), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(12));
             // 高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
             float availH = SRApi.Ctl.TableFitHeight(last.yMax, _pageTopY, _tableH, SRApi.Ctl.Sc(140));
-            // 拖动中必须读临时值 _dragHTmp（配置值此时还是旧的），否则高度不跟手；上限不超过剩余空间。
-            float maxH = SRApi.Ctl.TableFitHeight(last.yMax, _pageTopY, null, SRApi.Ctl.Sc(140));
-            float boxH = _dragH
-                ? Mathf.Clamp(SRApi.Ctl.Sc(_dragHTmp), SRApi.Ctl.Sc(120), maxH)
-                : availH;
+            // 高度由核心拖拽条直接写入配置，这里只按可用高度铺满。
+            float boxH = availH;
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
 

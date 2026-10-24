@@ -453,7 +453,6 @@ public class QuickAdjust : ITweak {
 
 		// 已应用的折扣目标（10~100；0 = 未应用）。切换关卡 / 重建 GamePlayer 后由 Tick 自动补回。
 		private static int _keepHandicap;
-		private static float _keepAt = -999f;
 
 		// 每 0.5 秒检查一次本地 GamePlayer 的 handicap，被新关卡重置就重新下发（原生 Command）。
 		public static void ApplyScoreDiscount()
