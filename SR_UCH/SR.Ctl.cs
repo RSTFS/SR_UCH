@@ -591,9 +591,19 @@ public partial class SR {
             try { _tipKey = null; _tipLines = new string[0]; _tipContent.text = ""; } catch { }
         }
 
+        // 悬浮提示显示延迟（参考 Dear ImGui 的 tooltip 延迟）与淡入，避免鼠标扫过控件时提示乱闪。
+        private const float TipDelay = 0.35f;
+        private const float TipFade = 0.12f;
+        private static string _tipShownKey;
+        private static float _tipShownAt = -999f;
+
         private static void DrawTooltip(Vector2 mp) {
             string tip = GUI.tooltip;
-            if (tip == null || tip.Length == 0) return;
+            if (string.IsNullOrEmpty(tip)) { _tipShownKey = null; return; }
+            if (tip != _tipShownKey) { _tipShownKey = tip; _tipShownAt = Time.unscaledTime; }
+            float __age = Time.unscaledTime - _tipShownAt;
+            if (__age < TipDelay) return;
+            float __alpha = Mathf.Clamp01((__age - TipDelay) / TipFade);
             if (tip != _tipKey) {
                 _tipKey = tip;
                 _tipContent.text = tip;
@@ -612,7 +622,10 @@ public partial class SR {
             _tooltip.wordWrap = _tipWrap;   //样式是全局共享的，每帧都要设回本条 tooltip 的模式
             float x = Mathf.Clamp(mp.x + 16, 2f, Mathf.Max(2f, Screen.width - _tipW - 6));
             float y = Mathf.Clamp(mp.y + 16, 2f, Mathf.Max(2f, Screen.height - _tipH - 10));
+            Color __oldTipColor = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, __alpha);
             GUI.Box(new Rect(x, y, _tipW, _tipH + 8), _tipContent, _tooltip);
+            GUI.color = __oldTipColor;
         }
 // 分区：RowHooks（功能对通用条目行的扩展点）
 // SR.Settings 渲染条目行时不硬编码 section/key，功能在 Initialize/SelfReg 里注册以下扩展点。

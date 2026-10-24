@@ -479,16 +479,11 @@ public partial class SR {
             }
             // 底栏预留 = 底栏行高（上一帧，稳定） + 当前栏目页面外框按钮高（按栏目记住，切栏目不会跳）。
             float __pfReserve = 0f;
-            try {
-                if (!_pageFooterH.TryGetValue(_selectedInternalSection, out __pfReserve)) {
-                    // 首次进入该栏目：用已见过的最大外框高度先兜住，避免切栏目瞬间底栏被顶掉（闪烁）。
-                    __pfReserve = 0f;
-                    foreach (float __v in _pageFooterH.Values) if (__v > __pfReserve) __pfReserve = __v;
-                }
-            } catch { __pfReserve = 0f; }
+            // 底栏现在是固定条，不再需要“用其它栏目最大值兜底”；未知栏目按 0，否则表格会被凭空缩短（底部多出一截空白）。
+            try { _pageFooterH.TryGetValue(_selectedInternalSection, out __pfReserve); } catch { __pfReserve = 0f; }
             // 底栏是固定高度条（与顶栏同款）：布局层只预留“条高 + 该栏目页面外框高 + 小余量”。
             float __barH = Sc(30f);
-            float __footerReserve = __barH + Mathf.Max(0f, __pfReserve) + Sc(8f);
+            float __footerReserve = __barH + Mathf.Max(0f, __pfReserve) + Sc(4f);
             SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;

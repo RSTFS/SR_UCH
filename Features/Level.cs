@@ -26,7 +26,6 @@ public partial class Level : ITweak {
         SRApi.LocDesc("Level", "Reload Mode", "关卡重载模式\n保留方块和分数＝保留方块并给全员补分；只保留方块＝保留方块但分数清零\n补分在下一回合结算时显示，未安装本模组的房客同样生效。", "level reload mode\nKeep blocks and score = blocks kept and scores refilled; Blocks only = blocks kept but scores reset\nrefill appears at the next round settlement and also covers clients without this mod");
         // 预登记本页自动快捷键：不预登记则重启后在首次打开本页前按键无效；渲染时 HotkeyButton 会再登记一次（同 id 幂等）。
         SRApi.HotkeyAction("level.reload", "重载关卡", () => Level.ReloadLevel());
-        SRApi.HotkeyAction("level.broadcast", "广播方块快照", () => Level.BroadcastSnapshot());
     }
 
     public void Initialize(IFeatureHost plugin) {

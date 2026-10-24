@@ -219,6 +219,8 @@ public partial class SR {
             _secHeader = new GUIStyle(_label);
             _secHeader.fontStyle = FontStyle.Bold;
             _secHeader.normal.textColor = new Color(0.65f, 0.78f, 1f, 1f);
+            // 章节标题上下留 6/2px：对应 ImGui 的 ItemSpacing，让分区有呼吸感。
+            _secHeader.margin = new RectOffset(0, 0, 6, 2);
             _styleList.Add(_secHeader);
 
             _labelWrap = new GUIStyle(_label);

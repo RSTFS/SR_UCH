@@ -745,30 +745,30 @@ namespace SR_UCH.Tweaks {
         private static readonly string[] Titles = { "区域", "人数", "游戏质量", "进度", "游戏模式", "标签", "房主", "限制", "标识", "综合分", "操作" };
         private static readonly string[] TitlesEn = { "Region", "Players", "Quality", "Progress", "Mode", "Tag", "Host", "Limit", "Flags", "Combined", "Operation" };
         private static readonly string[] TitleTips = {
-            "服务器区域（游戏自己的本地化短名，显示为 亚太/欧盟/美国）",
-            "当前人数 / 4（房间最多 4 人，人满不可加入）",
+            "服务器区域",
+            "当前人数（人满不可加入）",
             "✓ = 房主质量分达到 OkMatchScore，✓✓ = 达到 GoodMatchScore，再一个 ✓ = 匹配质量系数达到 SkillMatchQualityThreshold。\n系数 = CalculatedSkillMatchQuality（0~1）：游戏用大厅玩家技能串算出的技能匹配质量，越接近 1 = 房里玩家水平和本地玩家越接近（匹配越好）。\nShift+单击本列表头=显示/隐藏这个系数（默认不显示，只显示 ✓；开启后本列在 ✓ 后追加 0~1 的系数）。",
-            "游戏自己的对局进度：大厅中 / 房主AFK / 剩余百分比",
-            "游戏模式（默认规则集）；自定义规则集显示规则集名",
-            "房间标签（游戏本地化）",
+            "游戏自己的对局进度：大厅中  / 剩余百分比",
+            "游戏模式",
+            "房间标签",
             "房主名字",
-            "制胜积分 / 长度限制（轮数、时间或 无限制）",
-            "标识 / 房主AFK",
-            "房间综合分 = 房主质量分 + 技能换算分（游戏自己排序用的房间质量分，越大越靠前）。默认隐藏：右键表头综合分即可让它常驻显示。",
-            "点加入进房（在对局内会先退出当前房间，回到界面就自动加入）；不可加入的显示原因并压暗",
+            "制胜积分 / 长度限制",
+            "标识",
+            "房间综合分 = 房主质量分 + 技能换算分（游戏自己排序用的房间质量分，越大越靠前）。",
+            "点加入进房（在对局内会先退出当前房间，回到界面就自动加入）",
         };
         private static readonly string[] TitleTipsEn = {
-            "Server region (game-localized short name, shown as AP/EU/US)",
-            "Players / 4 (a lobby holds at most 4; a full lobby cannot be joined)",
+            "Server region",
+            "Players(a full lobby cannot be joined)",
             "✓ = host quality reaches OkMatchScore, ✓✓ = reaches GoodMatchScore, plus another ✓ when the skill-match coefficient reaches SkillMatchQualityThreshold.\nCoefficient = CalculatedSkillMatchQuality (0-1): the game's skill-match quality computed from the lobby's player skills; closer to 1 = the players' skill is closer to yours.\nShift+click this header to show/hide that coefficient (hidden by default, marks only; when ON the column appends the 0-1 coefficient after the marks).",
-            "The game's own match progress: in lobby / host AFK / remaining percent",
-            "Game mode (default ruleset); a custom ruleset shows the ruleset name",
-            "Lobby tag (game-localized)",
+            "The game's own match progress: in lobby / remaining percent",
+            "Game mode",
+            "Lobby tag",
             "Host name",
-            "Win points / length limit (rounds, time or no limit)",
-            "Mods / host AFK",
+            "Win points / length limit",
+            "Flags",
             "Combined score = host quality score + skill-derived score (the game's own ordering key; higher ranks first). Hidden by default: right-click this header to keep it visible.",
-            "Click Join to enter. While in a session it leaves the current one first and joins automatically. Unjoinable rows are dimmed",
+            "Click Join to enter. While in a session it leaves the current one first and joins automatically.",
         };
 
         // 列顺序 / 被隐藏的列
