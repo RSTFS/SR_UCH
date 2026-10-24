@@ -482,7 +482,7 @@ public partial class SR {
             // 底栏现在是固定条，不再需要“用其它栏目最大值兜底”；未知栏目按 0，否则表格会被凭空缩短（底部多出一截空白）。
             try { _pageFooterH.TryGetValue(_selectedInternalSection, out __pfReserve); } catch { __pfReserve = 0f; }
             // 底栏是固定高度条（与顶栏同款）：布局层只预留“条高 + 该栏目页面外框高 + 小余量”。
-            float __barH = Sc(24f);
+            float __barH = Sc(28f);
             float __footerReserve = __barH + Mathf.Max(0f, __pfReserve) + Sc(2f);
             SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 页面内容必须以这条 y 为底界（= 滚动区顶 + 视口高 = 底栏条上沿）：列表高度按它算，随窗口大小自适应。
@@ -568,7 +568,7 @@ public partial class SR {
             SRApi.DrawFill(new Rect(0f, __barY, __areaW, 1f), new Color(0f, 0f, 0f, 0.55f));
             SRApi.DrawFill(new Rect(0f, __barY + 1f, __areaW, 1f), new Color(1f, 1f, 1f, 0.06f));
             float __btnY = __barY + Sc(2f);
-            float __btnH = Mathf.Max(Sc(20f), __barH - Sc(4f));
+            float __btnH = Mathf.Max(Sc(22f), __barH - Sc(4f));
             float __bx = Sc(4f);
 
             // 设置

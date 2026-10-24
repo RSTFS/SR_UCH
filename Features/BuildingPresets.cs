@@ -134,6 +134,9 @@ namespace SR_UCH.Tweaks {
 		private static float _maxScrollX;
 		private static float _maxScrollY;
 		private static bool _sbDragging;
+		private static float _sbGrabY;
+		private static Rect _sbTrack;
+		private static Rect _sbThumb;
 		private static bool _dragH;
 		private static float _dragWatchdog;
 		// 关卡列显示模式：false = 关卡名称（本地化），true = 关卡代码（快照码/场景名）；运行期状态，不落配置。
@@ -685,7 +688,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				_colW[ColAction] = DefaultActionColW();
 				if (_args == null) _args = new SRApi.TableArgs();
 				float pinW = SRApi.Ctl.Sc(_colW[ColAction]);
-				float stripW = Mathf.Max(SRApi.Ctl.Sc(80), box.width - pinW);
+				// 有纵向溢出时，在数据区与钉住列之间预留滚动条宽度（与联机列表一致）。
+				bool __overflowY = visible.Count * rowH > rowsH + 0.5f;
+				float __sbW = __overflowY ? SRApi.Ctl.Sc(13) : 0f;
+				float stripW = Mathf.Max(SRApi.Ctl.Sc(80), box.width - pinW - __sbW);
 				float totalW = 0f;
 				for (int i = 0; i < _order.Length; i++) {
 					int ci = _order[i];
@@ -760,6 +766,14 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				};
 				_hiddenBeforeTable = _hiddenCols.Count;
 				SRApi.TableDraw(_args);
+				// 竖向滚动条（核心统一绘制/配色）：没有溢出时清空热区。
+				if (__overflowY) {
+					_sbTrack = new Rect(box.x + stripW, box.y + headerH, __sbW, rowsH);
+					_sbThumb = SRApi.TableScrollbar(_sbTrack, visible.Count * rowH, rowsH, _scrollRows.y, _sbDragging);
+				} else {
+					_sbTrack = new Rect(0f, 0f, 0f, 0f);
+					_sbThumb = new Rect(0f, 0f, 0f, 0f);
+				}
 				if (_hiddenCols.Count > _hiddenBeforeTable) {
 					// 核心在右键表头时把列加进 hidden 集合；这里落盘持久化（Shift+右键清空由 resetAll 回调处理）。
 					SaveCols();
@@ -769,7 +783,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 					// 拖拽兜底复位（拖列宽 / 换列位由核心处理，这里只接住状态与落盘回调）。
 					SRApi.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _args.moveCol, ref _args.moveDx,
 						ref _args.dragCol, ref _dragH, SaveCols, null, null);
-					SRApi.TableWheelInput(e, box, mp, _maxScrollX, _maxScrollY, ref _scrollCols, ref _scrollRows);
+					bool __sbHandled = SRApi.TableScrollbarInput(e, mp, _sbTrack, _sbThumb, _maxScrollY,
+						ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);
+					if (!__sbHandled)
+						SRApi.TableWheelInput(e, box, mp, _maxScrollX, _maxScrollY, ref _scrollCols, ref _scrollRows);
 					// 临时诊断日志：点表头时记录核心是否认到拖动/列宽拖动（构建后看 BepInEx 日志即可定位拖拽问题）。
 					if (e.type == EventType.MouseDown && e.button == 0) {
 						try {
