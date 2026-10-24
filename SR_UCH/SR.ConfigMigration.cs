@@ -639,7 +639,9 @@ namespace SR_UCH.Tweaks {
             // 源键残留 / 已删除的「技能系数」取值键一并清掉。
             text = RemoveKeys(text, "Online", new[] { "Hidden Columns 4", "Column Widths 4", "Skill Mode" });
             text = RemoveKeys(text, "Player Tracker", new[] { "Show Own Trail" });
-            text = RemoveKeys(text, "Destroy Blocks", new[] { "Realtime Interval" });
+            // 方块破坏已按参考实现整体重写：旧的「列表 / 选择模式 / 删除键」那套全部删除，
+            // 只剩选择键与烟雾动画两个键。旧键（含 [Settings] 里的组合键条目）一并清掉。
+            text = RemoveKeys(text, "Destroy Blocks", new[] { "Realtime Interval", "Enabled", "Toggle Key", "Delete Key", "Select Mode", "List Mode", "Track Player", "Refresh Mode" });
             text = RemoveKeys(text, "Settings", new[] { "Show Advanced" });
             // HUD 玩家面板已删除：[Round HUD] 段里的总开关、五个列开关与五个列颜色键必须清掉，
             // 否则老配置会留下永远不再读取的脏键（界面已无对应行）。

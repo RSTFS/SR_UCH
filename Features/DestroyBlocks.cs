@@ -1,625 +1,553 @@
-// 方块破坏：列出现场方块、按玩家归属筛选、远程销毁。
-// 槽位：对外 DestroyBlocks.IsPlayerPlaced / PlayerPlacedBlocks / AttributeToHost，向内取 Blocks.AllowClientsOn。
+// 方块破坏：按玩家收集放置历史，按住选择键显示名牌标签，按 1-9 回滚该玩家最近的放置。
+// 机制照参考实现 RemovePlayerPlacements：只用 GameEvent 监听收集 + 每帧按键，不注册任何 Harmony 补丁。
+// 房主端才有意义（回滚要发网络信号，只有房主权威）；房客只提示“仅房主可用”。
+// 槽位：对外 DestroyBlocks.IsPlayerPlaced / PlayerPlacedBlocks / AttributeToHost，供 EX 与关卡快照经 Slots 取用。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
 using GameEvent;
-using HarmonyLib;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace SR_UCH.Tweaks {
-    [SrFeature("sr.destroyblocks", "DestroyBlocks", "1.0")]
+    [SrFeature("sr.destroyblocks", "DestroyBlocks", "2.0")]
     public class DestroyBlocks : ITweak {
+        private const string Sec = "Destroy Blocks";
+        private const string KeySelection = "Selection Key"; // 选择键（按住进入选择态）
+        private const string KeyUseSmoke = "Use Smoke";      // 回滚时是否播烟雾动画
+
         private static IFeatureHost _mp; // 仅用于读 Config（契约类型）
-        private static int _index;
-        private static List<Placeable> Blocks = new List<Placeable>();
-        private static bool _altDown;
-        private static Placeable _selected;
-        private static Placeable _tintedBlock; // 当前高亮方块
-        private static ConfigEntry<KeyCode> _toggleKey;
-        private static ConfigEntry<KeyCode> _deleteKey;
-        private static ConfigEntry<SelectMode> _selectMode;
-        private static ConfigEntry<ListMode> _listMode;
-        private static ConfigEntry<TrackMode> _trackMode;
-        private static ConfigEntry<RefreshMode> _refreshMode;
+        private static ConfigEntry<KeyCode> _selectKey;
+        private static ConfigEntry<bool> _useSmoke;
 
-        public enum SelectMode {
-            Placement,
-            Distance
+        // 放置历史：玩家号 -> 该玩家的放置序列（索引越大越新，回滚从末尾往前按 offsetIndex 取）。
+        private static readonly Dictionary<int, List<Placement>> _history = new Dictionary<int, List<Placement>>();
+
+        // 一条放置记录：对象本身、ID、原始位置/朝向、是否已销毁、放置者信息。
+        public class Placement {
+            public Placeable placedObject;
+            public int id;
+            public Vector2 originalPosition;
+            public Quaternion originalRotation;
+            public bool destroyed;
+            public PlayerRef playerRef;
         }
 
-        // 列表模式：普通只列有玩家放置记录的方块，进阶列出全部方块。
-        public enum ListMode {
-            Normal,
-            Advanced
-        }
-
-        // 追踪玩家：不追踪 = 全部；#1-#4 = 只找对应玩家号的方块（仅普通列表模式相关）。
-        public enum TrackMode {
-            NoTrack,
-            P1,
-            P2,
-            P3,
-            P4
-        }
-
-        // 列表刷新方式（按住切换键期间）：实时 = 候选表持续保持最新，别人刚放/刚删即时可见；
-        // 暂存 = 只在按下切换键时重建一次，整段按住期间不再扫描，开销最小。
-        public enum RefreshMode {
-            Realtime,
-            Snapshot
-        }
-
-        // 实时列表的重建节流：事件标脏后最快 RealtimeMinInterval 重建一次，避免每帧遍历上千个 AllPlaceables。
-        // RealtimeFallbackInterval 兜底重建事件未覆盖的变化（重载 / 快照重建）。
-        private const float RealtimeMinInterval = 0.1f;
-        private const float RealtimeFallbackInterval = 0.5f;
-        private static bool _listDirty; // 有变化待刷新（由放置/销毁事件置位）
-        private static float _lastListRebuildAt = -999f; // 上次全量重建的时刻
-
-        // 允许客户端删除由外部模块（EX）经槽位登记，此处用时拉取，避免初始化顺序问题；槽位名不带模块名，任何模块都能登记。
-        // Slots.Provide 是覆盖语义（同一槽位重复登记以最后一次为准）；未登记时房客不能删。
-        private const string SlotAllowClients = "Blocks.AllowClientsOn"; // Func<bool>
-        private static Func<bool> _allowCached; // 取到后缓存委托
-        public static bool AllowClientsOn {
-            get {
-                if (_allowCached == null) _allowCached = Slots.Require<Func<bool>>(SlotAllowClients);
-                Func<bool> f = _allowCached;
-                return f != null && f();
-            }
-        }
-        // 追踪玩家仅在列表模式 = 普通时显示。
-        public static bool TrackPlayerVisible { get { return _listMode == null || _listMode.Value == ListMode.Normal; } }
-        private static Dictionary<Placeable, PlacementInfo> _placements = new Dictionary<Placeable, PlacementInfo>();
-        // 把快照加载出来的方块登记为房主（1 号）放置；由关卡功能经 DestroyBlocks.AttributeToHost 槽位调用。
-        public static void AttributeToHost(List<Placeable> blocks) {
-            try {
-                if (blocks == null || blocks.Count == 0) return;
-                string hostName = null;
-                // 必须一并填 color：PlacementInfo.color 默认 (0,0,0,0)，UpdateInfoTag 会无条件赋值，漏填会让名牌文字全透明。
-                Color hostColor = Color.white;
-                try {
-                    LobbyManager lm = LobbyManager.instance;
-                    if (lm != null) {
-                        LobbyPlayer lp = lm.GetLobbyPlayer(1);
-                        if (lp != null) {
-                            hostName = lp.playerName;
-                            hostColor = lp.NetworkPlayerColor;
-                        }
-                    }
-                } catch { }
-                if (string.IsNullOrEmpty(hostName)) hostName = "Host";
-                for (int i = 0; i < blocks.Count; i++) {
-                    Placeable p = blocks[i];
-                    if (p == null) continue;
-                    PlacementInfo info = new PlacementInfo();
-                    info.playerNumber = 1;
-                    info.playerName = hostName;
-                    info.color = hostColor;
-                    _placements[p] = info;
-                }
-                _listDirty = true;
-            } catch (Exception __ex) { SRApi.Guard.Log("构建对象归属房主", __ex); }
-        }
-
-        private static GameObject _infoTag;
-        private static Text _infoText;
-        private static Placeable _infoTarget;
-        private static bool _infoTagTried;
-        public static bool Enabled = true;
-
-        public class PlacementInfo {
+        // 放置者快照：名字取 LobbyManager，颜色取 LobbyPlayer.NetworkPlayerColor。
+        public class PlayerRef {
+            public string name;
             public int playerNumber;
-            public string playerName;
             public Color color;
         }
 
-        // 临时道具（炸弹，放置后自爆）记成“玩家放置”会在普通列表留下永远删不到的幽灵项。
-        // PlayerNumber <= 0 表示非玩家放置（系统 / 关卡自带件）。
+        // 一个名牌标签：tagObj 是克隆出来的标签，targetObj 是它跟随的方块。
+        private class HighlightEntry {
+            public GameObject tagObj;
+            public GameObject targetObj;
+        }
+
+        private static readonly List<HighlightEntry> _tags = new List<HighlightEntry>();
+        private static Character[] _characters;     // 每帧角色缓存，按下选择键时重扫
+        private static GameObject _nameTagPrefab;    // 从角色光标名牌克隆出来的 prefab 缓存
+        private static int _offsetIndex;             // 往回第几个放置（0 = 最新）
+        private static int _lastOffsetIndex;         // 上次滚轮后的下标，仅用于变化判定
+        private static bool _indicating;             // 当前是否已显示指示标签
+
+        // 临时道具（炸弹，放置后自爆）不能进历史：回滚它们等于无意义的重播。
+        // 名字与参考实现逐字一致；PlayerNumber <= 0 表示非玩家放置（系统 / 关卡自带件），同样忽略。
         private static readonly string[] _tmpPieces = new string[] { "Bomb Mini", "3x3 Bomb", "Bomb Mega" };
 
-        private static bool IsPlayerPlacement(Placeable p, int playerNumber) {
-            if (p == null || playerNumber <= 0) return false;
-            string n = p.Name;
-            if (string.IsNullOrEmpty(n)) return true;
-            for (int i = 0; i < _tmpPieces.Length; i++) {
-                if (n == _tmpPieces[i]) return false;
-            }
-            return true;
-        }
+        // 回滚是否播放烟雾动画（未绑定时按关闭处理）。
+        private static bool UseSmoke { get { return _useSmoke != null && _useSmoke.Value; } }
 
-        // 普通页（本栏目唯一页面）：直接渲染本栏目的通用设置条目。
-        private static void RenderNormalPage() {
-            SRApi.RenderSectionEntries("Destroy Blocks");
-        }
-
-
-        // 方块破坏的唯一实现，保证各入口行为一致。
-        // DestroySelf 自带网络同步（发 MsgPieceDestroyed），不可再显式广播以免重复。
-        private static void DestroyBlockNative(int index) {
+        // 房主判定：参考实现用 LobbyManager.instance.IsHost（离线 StartHost 时也为 true）。
+        private static bool IsHostNow() {
             try {
-                if (index < 0 || index >= Blocks.Count) return;
-                Placeable target = Blocks[index];
-                if (target == null) return;
-                target.DestroySelf();
-                // DestroySelf 对已放置方块只做 Disable + 置 MarkedForDestruction，不销毁 GameObject，需手动调 OnDestroy 立刻摘干净。
-                // 必须走虚方法调用（Bomb / ActiveBlock 均 override），且 OnDestroy 幂等，之后 Unity 真销毁再调也无副作用。
-                target.OnDestroy();
-                _placements.Remove(target); // 本路径不发 DestroyPieceEvent，必须自己清记录，避免强引用已销毁对象
-            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.原生销毁", __ex); }
+                LobbyManager lm = LobbyManager.instance;
+                return lm != null && lm.IsHost;
+            } catch { return false; }
         }
 
+        // ---------------------------- 历史收集 ----------------------------
 
-        // 多对象道具：游戏只为“主体”发 PiecePlacedEvent，子元件需沿 Placeable.ParentPiece 向上找归属。
-        private static PlacementInfo ResolveInfo(Placeable p) {
+        // 取放置者信息：名字 / 颜色都来自 LobbyManager，取不到时用中性占位，颜色兜底为白色。
+        private static PlayerRef MakePlayerRef(int playerNumber) {
+            PlayerRef pref = new PlayerRef();
+            pref.playerNumber = playerNumber;
+            pref.name = "Player " + playerNumber;
+            pref.color = Color.white;
+            try {
+                LobbyManager lm = LobbyManager.instance;
+                if (lm != null) {
+                    LobbyPlayer lp = lm.GetLobbyPlayer(playerNumber);
+                    if (lp != null) {
+                        if (!string.IsNullOrEmpty(lp.playerName)) pref.name = lp.playerName;
+                        // Color 默认是 (0,0,0,0)：漏填 alpha 会让名牌文字全透明，故显式兜底。
+                        pref.color = lp.NetworkPlayerColor;
+                        if (pref.color.a <= 0.01f) pref.color.a = 1f;
+                    }
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.玩家信息", __ex); }
+            return pref;
+        }
+
+        // 记一条放置：忽略炸弹等临时件与玩家号 <= 0 的系统件。
+        private static void AddPlacement(int playerNumber, Placeable placedObject) {
+            try {
+                if (placedObject == null || playerNumber <= 0) return;
+                string name = placedObject.Name;
+                if (!string.IsNullOrEmpty(name)) {
+                    for (int i = 0; i < _tmpPieces.Length; i++) {
+                        if (name == _tmpPieces[i]) return;
+                    }
+                }
+                Placement pl = new Placement();
+                pl.placedObject = placedObject;
+                pl.id = placedObject.ID;
+                pl.originalPosition = placedObject.OriginalPosition;
+                pl.originalRotation = placedObject.OriginalRotation;
+                pl.destroyed = false;
+                pl.playerRef = MakePlayerRef(playerNumber);
+                List<Placement> list;
+                if (!_history.TryGetValue(playerNumber, out list) || list == null) {
+                    list = new List<Placement>();
+                    _history[playerNumber] = list;
+                }
+                list.Add(pl);
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.记录放置", __ex); }
+        }
+
+        // 从所有玩家的历史里摘掉某对象（销毁事件 / 已失效对象）。
+        private static void RemoveFromHistory(Placeable p) {
+            if (p == null) return;
+            try {
+                foreach (KeyValuePair<int, List<Placement>> kv in _history) {
+                    List<Placement> list = kv.Value;
+                    if (list == null) continue;
+                    for (int i = list.Count - 1; i >= 0; i--) {
+                        Placement pl = list[i];
+                        if (pl != null && pl.placedObject == p) list.RemoveAt(i);
+                    }
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.移除记录", __ex); }
+        }
+
+        // 某对象的记录（子元件沿 ParentPiece 上溯，与旧实现的归属解析一致）。
+        private static Placement FindHistoryOf(Placeable p) {
             if (p == null) return null;
-            PlacementInfo info;
-            if (_placements.TryGetValue(p, out info)) return info;
+            Placement pl = FindDirect(p);
+            if (pl != null) return pl;
             try {
                 Placeable cur = p;
                 for (int i = 0; i < 8; i++) {
                     Placeable up = cur.ParentPiece;
                     if (up == null || up == cur) break;
-                    if (_placements.TryGetValue(up, out info)) return info;
+                    pl = FindDirect(up);
+                    if (pl != null) return pl;
                     cur = up;
                 }
-            } catch (Exception __ex) { SRApi.Guard.Log("解析子元件归属", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.解析子元件归属", __ex); }
             return null;
         }
 
-        public class PlacementListener : GameEvent.IGameEventListener {
+        private static Placement FindDirect(Placeable p) {
+            if (p == null) return null;
+            foreach (KeyValuePair<int, List<Placement>> kv in _history) {
+                List<Placement> list = kv.Value;
+                if (list == null) continue;
+                for (int i = 0; i < list.Count; i++) {
+                    Placement pl = list[i];
+                    if (pl != null && pl.placedObject == p) return pl;
+                }
+            }
+            return null;
+        }
+
+        private static void ClearHistory() {
+            _history.Clear();
+        }
+
+        // 所有历史里最长的一条（滚轮下标的钳制上限）。
+        private static int MaxHistory() {
+            int max = 0;
+            foreach (KeyValuePair<int, List<Placement>> kv in _history) {
+                List<Placement> list = kv.Value;
+                if (list != null && list.Count > max) max = list.Count;
+            }
+            return max;
+        }
+
+        private static void ClampOffset() {
+            _offsetIndex = Mathf.Clamp(_offsetIndex, 0, Mathf.Max(0, MaxHistory() - 1));
+            _lastOffsetIndex = _offsetIndex;
+        }
+
+        // ---------------------------- 事件监听 ----------------------------
+
+        // 参考实现用三个独立监听器，这里合并成一个：三张表都登记同一对象，语义一致。
+        // 事件回调抛异常会冒到 GameEventManager 日志并影响同链其它监听器，故整段兜住。
+        public class Collector : GameEvent.IGameEventListener {
             public void handleEvent(GameEvent.GameEvent e) {
                 try {
-                    GameEvent.PiecePlacedEvent ppe = e as GameEvent.PiecePlacedEvent;
-                    if (ppe != null) {
-                        if (!IsPlayerPlacement(ppe.PlacedBlock, ppe.PlayerNumber)) return;
-                        PlacementInfo info = new PlacementInfo();
-                        info.playerNumber = ppe.PlayerNumber;
-                        LobbyManager lm = LobbyManager.instance;
-                        if (lm != null) {
-                            LobbyPlayer lp = lm.GetLobbyPlayer(ppe.PlayerNumber);
-                            if (lp != null) {
-                                info.playerName = lp.playerName;
-                                info.color = lp.NetworkPlayerColor;
-                            }
-                        }
-                        if (string.IsNullOrEmpty(info.playerName)) info.playerName = "Player " + info.playerNumber;
-                        _placements[ppe.PlacedBlock] = info;
-                        _listDirty = true; // 实时列表：候选表待刷新
+                    // 总开关关闭时不收集：关掉功能后历史不再增长，也不会残留跨开关的旧记录。
+                    if (!SRApi.GateMaster) return;
+                    PiecePlacedEvent placed = e as PiecePlacedEvent;
+                    if (placed != null) {
+                        if (placed.PlayerNumber == 0) return;
+                        AddPlacement(placed.PlayerNumber, placed.PlacedBlock);
                         return;
                     }
-                    GameEvent.DestroyPieceEvent dpe = e as GameEvent.DestroyPieceEvent;
-                    if (dpe != null && dpe.Piece != null) {
-                        _placements.Remove(dpe.Piece);
-                        _listDirty = true; // 方块没了，候选表要跟着变
+                    DestroyPieceEvent destroyed = e as DestroyPieceEvent;
+                    if (destroyed != null) {
+                        RemoveFromHistory(destroyed.Piece);
+                        return;
                     }
-                } catch (Exception __ex) { SRApi.Guard.Log("记录方块放置者(本地)", __ex); }
+                    StartPhaseEvent phase = e as StartPhaseEvent;
+                    if (phase != null && phase.Phase == GameControl.GamePhase.START) {
+                        // 新回合：上一回合的放置已随关卡重置消失，历史与指示标签一并作废。
+                        ClearHistory();
+                        HideIndicator();
+                    }
+                } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.事件", __ex); }
             }
         }
 
-        // PiecePlacedEvent 只在放置者本地触发，房主端缺房客的方块；PiecePlaced 网络消息所有端都收，故从这里补记录。
-        public class NetworkPlacementListener : GameEvent.IGameEventListener {
-            public void handleEvent(GameEvent.GameEvent e) {
-                try {
-                    GameEvent.NetworkMessageReceivedEvent nm = e as GameEvent.NetworkMessageReceivedEvent;
-                    if (nm == null || nm.Message == null) return;
-                    if (nm.Message.msgType != NetMsgTypes.PiecePlaced) return;
-                    MsgPiecePlaced msg = nm.ReadMessage as MsgPiecePlaced;
-                    if (msg == null || msg.PieceID == 0) return;
-                    Placeable p = FindPlaceableByID(msg.PieceID);
-                    if (p == null) return;
-                    if (!IsPlayerPlacement(p, msg.PlayerNumber)) return;
-                    PlacementInfo info = new PlacementInfo();
-                    info.playerNumber = msg.PlayerNumber;
-                    LobbyManager lm = LobbyManager.instance;
-                    if (lm != null) {
-                        LobbyPlayer lp = lm.GetLobbyPlayer(msg.PlayerNumber);
-                        if (lp != null) {
-                            info.playerName = lp.playerName;
-                            info.color = lp.NetworkPlayerColor;
-                        }
-                    }
-                    if (string.IsNullOrEmpty(info.playerName)) info.playerName = "Player " + info.playerNumber;
-                    _placements[p] = info;
-                    _listDirty = true; // 别人放的方块：实时列表要立刻看到
-                } catch (Exception __ex) { SRApi.Guard.Log("记录方块放置者", __ex); }
+        private static void OnSceneChanged(Scene a, Scene b) {
+            ClearHistory();
+            // 角色缓存与名牌 prefab 都指向旧场景对象，必须一起清。
+            _characters = null;
+            _nameTagPrefab = null;
+            _offsetIndex = 0;
+            _lastOffsetIndex = 0;
+            HideIndicator();
+        }
+
+        // ---------------------------- 交互 ----------------------------
+
+        // 每帧入口（SRApi.RegisterTick）：先判总开关 / 面板 / 模式，再处理按住、数字键与滚轮。
+        private static void Tick() {
+          try {
+            if (_selectKey == null) return;
+            if (!SRApi.GateMaster) { if (_indicating) HideIndicator(); return; }
+            // 面板打开时不抢输入：选择键默认 Alt，开着界面按它会干扰键位录制。
+            if (SRApi.UiOpen) { if (_indicating) HideIndicator(); return; }
+            // 仅派对 / 创意 / 自由建造模式（与旧实现的模式门一致）；不满足时收起标签，免得停在画面上。
+            if (!SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay)) {
+                if (_indicating) HideIndicator();
+                return;
             }
 
-        private static Placeable FindPlaceableByID(int id) {
-                foreach (Placeable p in Placeable.AllPlaceables) {
-                    // 必须过滤 MarkedForDestruction：DestroySelf 后的对象仍留在 AllPlaceables，只判 null + ID 会把死方块当作有效目标。
-                    if (p != null && !p.MarkedForDestruction && p.ID == id) return p;
+            bool down = SRApi.ComboKeyDown(_selectKey);
+            bool held = SRApi.ComboKeyHeld(_selectKey);
+            if (down) {
+                _offsetIndex = 0;
+                _lastOffsetIndex = 0;
+                _characters = null; // 每次按下重扫角色，别长期持有已销毁的对象
+                if (!IsHostNow()) { SRApi.NotifyT("仅房主可用", "Host only"); return; }
+            }
+            if (!held) {
+                if (_indicating) HideIndicator();
+                return;
+            }
+            if (!IsHostNow()) {
+                if (_indicating) HideIndicator(); // 房客不该留指示标签
+                return;
+            }
+            if (_characters == null) _characters = UnityEngine.Object.FindObjectsOfType<Character>();
+            ShowIndicator();
+            // 数字键 1..9（主键盘与小键盘）：回滚对应玩家偏移后的那个放置。
+            for (int i = 1; i <= 9; i++) {
+                if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + (i - 1))) ||
+                    Input.GetKeyDown((KeyCode)((int)KeyCode.Keypad1 + (i - 1)))) {
+                    Rollback(i);
+                    break;
                 }
-                return null;
             }
+            Scroll();
+            UpdateHighlights();
+          } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.按键", __ex); }
         }
+
+        // 滚轮：offsetIndex 在 [0, max(count)-1] 内加减，切换“回滚第几个最近的放置”。
+        private static void Scroll() {
+            // 面板未绘制的那一帧核心拿不到滚轮事件，故再退回读输入轴兜底（老 Unity 路径仍可能为 0）。
+            float wheel = SRApi.TakeWheelEvent();
+            if (Mathf.Abs(wheel) < 0.0001f) {
+                try { wheel = Input.GetAxis("Mouse ScrollWheel"); } catch { wheel = 0f; }
+                if (Mathf.Abs(wheel) > 0.0001f) SRApi.MarkWheelUsed(); // 滚轮已被选择器吃掉，相机让路
+            }
+            if (Mathf.Abs(wheel) < 0.0001f) return;
+            int step = wheel < 0f ? 1 : -1; // 向下滚 = 往回更早的放置
+            _offsetIndex = Mathf.Clamp(_offsetIndex + step, 0, Mathf.Max(0, MaxHistory() - 1));
+            if (_offsetIndex != _lastOffsetIndex) {
+                // 偏移变了：标签要跟着换到另一批方块上。
+                HideIndicator();
+                ShowIndicator();
+            }
+            _lastOffsetIndex = _offsetIndex;
+        }
+
+        // 取某玩家偏移后的放置；列表空 / 无该玩家时返回 null。
+        private static Placement GetPlacementWithOffsetBy(int playerNumber) {
+            List<Placement> list;
+            if (!_history.TryGetValue(playerNumber, out list) || list == null || list.Count == 0) return null;
+            int index = Mathf.Clamp(list.Count - 1 - _offsetIndex, 0, list.Count - 1);
+            return list[index];
+        }
+
+        // 回滚：把该玩家偏移后的那条放置销毁（发网络信号，全员同步）。
+        private static void Rollback(int playerNumber) {
+            try {
+                Placement pl = GetPlacementWithOffsetBy(playerNumber);
+                if (pl == null) return;
+                if (pl.destroyed) return;
+                List<Placement> list;
+                if (!_history.TryGetValue(playerNumber, out list) || list == null) return;
+                Placeable obj = pl.placedObject;
+                if (obj == null || obj.gameObject == null) {
+                    // 已被游戏自己回收（掉出界 / 被炸）：只摘记录，不销毁。
+                    list.Remove(pl);
+                    ClampOffset();
+                    return;
+                }
+                list.Remove(pl);
+                ClampOffset();
+                // 三个 bool：销毁子件 / 播烟雾动画 / 发网络信号。DestroySelf 自身会发 MsgPieceDestroyed。
+                obj.DestroySelf(false, UseSmoke, true);
+                HideIndicator();
+                ShowIndicator();
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.回滚", __ex); }
+        }
+
+        // ---------------------------- 指示标签 ----------------------------
+
+        private static HighlightEntry FindTag(GameObject target) {
+            for (int i = 0; i < _tags.Count; i++) {
+                HighlightEntry h = _tags[i];
+                if (h != null && h.targetObj == target) return h;
+            }
+            return null;
+        }
+
+        // 为每位玩家偏移后的放置克隆一个名牌：文本 “(玩家号) 玩家名”，颜色取该玩家颜色。
+        private static void ShowIndicator() {
+            if (_indicating) return;
+            try {
+                foreach (KeyValuePair<int, List<Placement>> kv in _history) {
+                    List<Placement> list = kv.Value;
+                    if (list == null || list.Count == 0) continue;
+                    int index = Mathf.Clamp(list.Count - 1 - _offsetIndex, 0, list.Count - 1);
+                    Placement pl = list[index];
+                    if (pl == null || pl.destroyed) continue;
+                    Placeable placed = pl.placedObject;
+                    if (placed == null) continue;
+                    GameObject target = placed.gameObject;
+                    if (target == null) continue;
+                    if (FindTag(target) != null) continue; // 同一方块已经有标签，不重复克隆
+                    string hint = "(" + kv.Key + ") " + (pl.playerRef != null ? pl.playerRef.name : "");
+                    Color color = pl.playerRef != null ? pl.playerRef.color : Color.white;
+                    Highlight(target, hint, color);
+                }
+                _indicating = true;
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.显示指示", __ex); }
+        }
+
+        // 克隆一个名牌并把它放到目标方块位置（父级置空，避免复制游戏 UI 层级导致布局错乱）。
+        private static void Highlight(GameObject target, string hint, Color color) {
+            try {
+                if (target == null) return;
+                GameObject tag = GetCopiedNameTag();
+                if (tag == null) return;
+                tag.transform.SetParent(null);
+                tag.transform.position = target.transform.position;
+                Text text = tag.GetComponentInChildren<Text>();
+                if (text != null) {
+                    text.text = hint;
+                    text.color = color;
+                }
+                HighlightEntry entry = new HighlightEntry();
+                entry.tagObj = tag;
+                entry.targetObj = target;
+                _tags.Add(entry);
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.克隆名牌", __ex); }
+        }
+
+        // 每帧跟随：目标被销毁就销毁标签，否则把标签挪到目标位置。
+        private static void UpdateHighlights() {
+            if (!_indicating) return;
+            try {
+                for (int i = _tags.Count - 1; i >= 0; i--) {
+                    HighlightEntry h = _tags[i];
+                    if (h == null || h.targetObj == null) {
+                        if (h != null && h.tagObj != null) UnityEngine.Object.Destroy(h.tagObj);
+                        _tags.RemoveAt(i);
+                    } else if (h.tagObj != null) {
+                        h.tagObj.transform.position = h.targetObj.transform.position;
+                    }
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.更新指示", __ex); }
+        }
+
+        private static void HideIndicator() {
+            if (!_indicating) return;
+            try {
+                for (int i = 0; i < _tags.Count; i++) {
+                    if (_tags[i] != null && _tags[i].tagObj != null) UnityEngine.Object.Destroy(_tags[i].tagObj);
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.隐藏指示", __ex); }
+            _tags.Clear();
+            _indicating = false;
+        }
+
+        // 从任一角色光标的 nameTag 缓存 prefab，再克隆；缓存失效（切场景）后重新扫描。
+        private static GameObject GetCopiedNameTag() {
+            if (_nameTagPrefab == null) {
+                if (_characters == null) return null;
+                for (int i = 0; i < _characters.Length; i++) {
+                    Character ch = _characters[i];
+                    if (ch == null || ch.AssociatedGamePlayer == null) continue;
+                    var cursor = ch.AssociatedGamePlayer.CursorInstance;
+                    if (cursor == null || cursor.nameTag == null) continue;
+                    _nameTagPrefab = cursor.nameTag.gameObject;
+                    break;
+                }
+            }
+            if (_nameTagPrefab == null) return null;
+            GameObject go = UnityEngine.Object.Instantiate(_nameTagPrefab);
+            if (go == null) return null;
+            NameTag nt = go.GetComponent<NameTag>();
+            if (nt != null) {
+                // 克隆体的名牌默认是给光标用的，这里强制全不透明并压到最上层。
+                nt.currentAlpha = 1f;
+                if (nt.nameCanvasGroup != null) nt.nameCanvasGroup.alpha = 1f;
+                if (nt.canvas != null) nt.canvas.sortingOrder = 32767;
+            }
+            return go;
+        }
+
+        // ---------------------------- 对外槽位 ----------------------------
+
+        // 供外部模块（EX 清除地图对象 / 无视对象）调用：是否为玩家放置的道具。
+        public static bool IsPlayerPlaced(Placeable p) {
+            try { return FindHistoryOf(p) != null; } catch { return false; }
+        }
+
+        // 玩家放置的方块清单（不销毁），供清场功能使用。
+        public static List<Placeable> PlayerPlacedBlocks() {
+            List<Placeable> result = new List<Placeable>();
+            try {
+                foreach (KeyValuePair<int, List<Placement>> kv in _history) {
+                    List<Placement> list = kv.Value;
+                    if (list == null) continue;
+                    for (int i = 0; i < list.Count; i++) {
+                        Placeable obj = list[i] != null ? list[i].placedObject : null;
+                        // 游戏自己销毁方块时不派发 DestroyPieceEvent，这里顺手过滤死对象。
+                        if (obj == null || obj.MarkedForDestruction) continue;
+                        if (result.Contains(obj)) continue;
+                        result.Add(obj);
+                    }
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.玩家放置清单", __ex); }
+            return result;
+        }
+
+        // 把快照加载出来的方块登记为房主（1 号）放置；由关卡功能经 DestroyBlocks.AttributeToHost 槽位调用。
+        public static void AttributeToHost(List<Placeable> blocks) {
+            try {
+                if (blocks == null || blocks.Count == 0) return;
+                for (int i = 0; i < blocks.Count; i++) {
+                    Placeable p = blocks[i];
+                    if (p == null) continue;
+                    if (FindHistoryOf(p) != null) continue; // 已有归属的不重复登记
+                    AddPlacement(1, p);
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.归属房主", __ex); }
+        }
+
+        // 槽位名：与调用方的唯一约定是“名字 + 委托签名”，刻意用 private const，调用方另写自己的常量。
+        private const string SlotIsPlayerPlaced = "DestroyBlocks.IsPlayerPlaced";        // Func<Placeable,bool>
+        private const string SlotPlayerPlacedBlocks = "DestroyBlocks.PlayerPlacedBlocks"; // Func<List<Placeable>>
+        private const string SlotAttributeToHost = "DestroyBlocks.AttributeToHost";      // Action<List<Placeable>>
+
+        // ---------------------------- 页面 ----------------------------
+
+        private static void RenderPage() {
+            try {
+                SRApi.Ctl.SectionTitle("- " + SRApi.T("选择与回滚", "Selection and rollback") + " -",
+                    SRApi.T("方块破坏：按住选择键后，场上每位玩家最近放置的方块上会出现“(玩家号) 玩家名”标签。\n按住期间按数字键 1-9 回滚对应玩家的放置，滚轮切换要回滚第几个最近的放置。\n仅房主可用，回滚会通过网络信号同步给所有玩家。",
+                        "Block destruction: while the selection key is held, each player's latest placement is labelled with \"(player number) name\".\nPress 1-9 while holding to roll back that player's placement; the wheel picks which recent placement.\nHost only; rollbacks are synced to every player through the network."));
+
+                ConfigEntryBase keyEntry = SRApi.Ctl.FindEntry(Sec, KeySelection);
+                GUILayout.BeginHorizontal();
+                SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("选择键", "Selection key"),
+                    SRApi.T("选择键\n按住显示放置标签，按 1-9 回滚，滚轮切换层级\n仅房主可用；点键框后按新键改绑。",
+                        "selection key\nhold to show placement labels, press 1-9 to roll back, wheel changes the level\nhost only; click the key box and press a new key to rebind")),
+                    keyEntry, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(52));
+                if (keyEntry != null) SRApi.Ctl.RenderControl(keyEntry);
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
+                GUILayout.Space(SRApi.Ctl.Sc(2));
+
+                ConfigEntryBase smokeEntry = SRApi.Ctl.FindEntry(Sec, KeyUseSmoke);
+                GUILayout.BeginHorizontal();
+                SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("使用烟雾动画", "Use smoke animation"),
+                    SRApi.T("使用烟雾动画\n回滚销毁方块时播放游戏原生的烟雾特效\n默认关闭；只影响画面表现。",
+                        "smoke animation\nplays the game's native smoke effect when a rolled-back block is destroyed\noff by default; visual only")),
+                    smokeEntry, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(52));
+                if (smokeEntry != null) SRApi.Ctl.RenderControl(smokeEntry);
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
+
+                SRApi.Ctl.SectionTitle("- " + SRApi.T("操作方式", "How to use") + " -",
+                    SRApi.T("操作步骤\n按住选择键 → 看标签确认玩家号 → 按 1-9 回滚\n标签只在本机显示，回滚结果对全员生效。",
+                        "Steps\nhold the selection key, read the label to confirm the player number, then press 1-9 to roll back\nlabels are local only; the rollback itself applies to everyone"));
+                float width = Mathf.Max(SRApi.Ctl.Sc(160), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(36));
+                string steps = SRApi.T(
+                    "1. 按住「选择键」，场上每位玩家最新放置的方块上出现标签。\n2. 标签文本是“(玩家号) 玩家名”，按数字键 1-9 回滚对应玩家那一条。\n3. 滚轮上滚 = 回滚更早的放置，下滚 = 回到最新的放置；松手退出。",
+                    "1. Hold the selection key: every player's latest placement gets a label.\n2. The label reads \"(player number) name\"; press 1-9 to roll back that player's entry.\n3. Wheel up picks an older placement, wheel down returns to the newest; release to exit.");
+                GUILayout.Label(steps, SRApi.Ctl.LabelWrap, GUILayout.Width(width), GUILayout.Height(SRApi.Ctl.TextHeight(steps, width)));
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.页面", __ex); }
+        }
+
+        // ---------------------------- 注册 ----------------------------
 
         private static void SelfReg() {
-            SRApi.RowFilters.Add(TrackPlayerRowVisible); // 通用条目行扩展点
-            SRApi.LocSec("Destroy Blocks", "方块破坏", null);
-            SRApi.Nav("Destroy Blocks", 60); // 侧栏栏目顺序
-            SRApi.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);
-            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "删除模式切换键\n按住进入删除模式并高亮最近放置的方块，松手退出\n点键框后按新键改绑，支持组合键。", "delete-mode key\nhold to enter delete mode and highlight the most recently placed block; release to exit\nclick the key box and press a new key to rebind (combos supported)");
-            SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
-            SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除键\n删除当前选中的方块\n滚轮可在候选方块之间切换", "delete key\ndeletes the currently selected block\nthe mouse wheel cycles through candidate blocks");
-            SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
-            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n决定本页功能是否生效\n仅房主能删除；房客删除需要 EX 扩展的允许客户端删除。", "master switch for block destruction\nenables or disables the feature on this page\nhost only; client-side deletion needs the EX module permission");
-            SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
-            SRApi.LocDesc("Destroy Blocks", "Select Mode", "候选方块排序方式\n距离＝按离自己的距离由近到远；放置顺序＝最后放置的优先\n只影响选择顺序，不影响列表内容。", "candidate ordering\nDistance = nearest to you first; Placement = most recently placed first\naffects selection order only, not the list contents");
-            SRApi.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
-            SRApi.LocDesc("Destroy Blocks", "List Mode", "列表模式\n普通＝只列玩家亲手放置的方块；进阶＝场上所有方块单独列出\n普通模式排除炸弹等临时物件。", "list mode\nNormal = only blocks placed by players; Advanced = every block listed individually\nNormal excludes temporary items such as bombs");
-            SRApi.LocKey("Destroy Blocks", "Track Player", "追踪玩家", null);
-            SRApi.LocDesc("Destroy Blocks", "Track Player", "按玩家号过滤\n不追踪＝所有玩家的方块；1 到 4＝只看对应玩家号\n仅影响列表，需配合列表模式。", "player filter\nNoTrack = all players; 1-4 = only blocks placed by that player number\naffects the list only; used with list mode");
-            SRApi.LocEnum("Realtime", "实时");
-            SRApi.LocEnum("Snapshot", "暂存");
-            SRApi.LocKey("Destroy Blocks", "Refresh Mode", "列表刷新", null);
-            SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "候选列表刷新方式\n实时＝按住切换键期间持续更新；暂存＝按下时重建一次\n实时模式已节流，仅在按住时有开销。", "refresh mode for the candidate list\nRealtime = keeps updating while the toggle key is held; Snapshot = rebuilt once on press\nRealtime is throttled and only costs while held");
-        }
-
-        // 是否走实时列表（默认实时）
-        private static bool RealtimeListOn { get { return _refreshMode == null || _refreshMode.Value == RefreshMode.Realtime; } }
-
-        private static bool TrackPlayerRowVisible(ConfigEntryBase e) {
-            if (e.Definition.Section != "Destroy Blocks" || e.Definition.Key != "Track Player") return true;
-            return TrackPlayerVisible;
+            SRApi.LocSec(Sec, "方块破坏", null);
+            SRApi.Nav(Sec, 60); // 侧栏栏目顺序
+            SRApi.LocKey(Sec, KeySelection, "选择键", null);
+            SRApi.LocDesc(Sec, KeySelection,
+                "方块破坏的选择键\n按住显示每位玩家最近放置的方块标签，并按 1-9 回滚\n仅房主可用；松开即退出，不改变对局规则。",
+                "selection key for block destruction\nhold it to label each player's latest placement and press 1-9 to roll it back\nhost only; releasing the key exits without changing match rules");
+            SRApi.LocKey(Sec, KeyUseSmoke, "使用烟雾动画", null);
+            SRApi.LocDesc(Sec, KeyUseSmoke,
+                "回滚时的烟雾动画\n开启后销毁方块会播放游戏原生的烟雾特效\n默认关闭；只影响画面表现，不改判定。",
+                "smoke animation on rollback\nplays the game's native smoke effect when a rolled-back block is destroyed\noff by default; visual only, does not affect gameplay");
+            SRApi.RegisterPage(Sec, "Normal", "普通", "Normal", 10, RenderPage);
         }
 
         public void Initialize(IFeatureHost plugin) {
             SelfReg();
             _mp = plugin;
-            ConfigEntry<bool> enabled = _mp.Config.Bind("Destroy Blocks", "Enabled", false, "方块破坏功能总开关（仅房主可用）");
-            Enabled = enabled.Value;
-            enabled.SettingChanged += (s, e) => Enabled = enabled.Value;
-            _toggleKey = _mp.Config.Bind(
-                "Destroy Blocks",
-                "Toggle Key",
-                KeyCode.LeftAlt,
-                "Keybind for holding to enter destroy mode (also highlights the block to delete)");
-            _deleteKey = _mp.Config.Bind(
-                "Destroy Blocks",
-                "Delete Key",
-                KeyCode.Backspace,
-                "Keybind for deleting the currently selected block");
-            SRApi.RegisterKey("方块破坏-切换", _toggleKey, "hold");
-            SRApi.RegisterKey("方块破坏-删除", _deleteKey, "press");
-            // 本功能只有一个页面（原高级页已整体删除）。
-            SRApi.RegisterPage("Destroy Blocks", "Normal", "普通", "Normal", 10, RenderNormalPage);
-            _selectMode = _mp.Config.Bind(
-                "Destroy Blocks",
-                "Select Mode",
-                SelectMode.Distance,
-                "选择模式：距离 = 方块按离自己的距离排序，初始选最近的，滚轮从近到远；放置顺序 = 最后放的先选，依次往回。");
-            _listMode = _mp.Config.Bind(
-                "Destroy Blocks",
-                "List Mode",
-                ListMode.Normal,
-                "列表模式：普通 = 只列出玩家确切放置过的方块（关卡初始布局/系统方块不出现）；进阶 = 所有方块单独列出，不在乎有没有玩家号。");
-            // 该行可见性取决于列表模式（见 TrackPlayerRowVisible），而条目缓存只按绑定版本失效，故切换时需主动失效。
-            _listMode.SettingChanged += (s, e) => SRApi.Ctl.NoteEntryBound();
-            _trackMode = _mp.Config.Bind(
-                "Destroy Blocks",
-                "Track Player",
-                TrackMode.NoTrack,
-                "追踪玩家：不追踪 = 找所有玩家的方块；#1-#4 = 只找对应玩家号的方块。");
-            _refreshMode = _mp.Config.Bind(
-                "Destroy Blocks",
-                "Refresh Mode",
-                RefreshMode.Realtime,
-                "列表刷新：实时 = 按住切换键期间候选表持续保持最新（已节流，只在按住时有开销）；暂存 = 只在按下切换键那一刻重建一次。");
-            // 过滤条件变了：实时模式下候选表要重新过滤一次。
-            _listMode.SettingChanged += (s, e) => _listDirty = true;
-            _trackMode.SettingChanged += (s, e) => _listDirty = true;
+            _selectKey = _mp.Config.Bind(Sec, KeySelection, KeyCode.LeftAlt, "方块破坏选择键：按住显示放置标签，按 1-9 回滚（仅房主）。");
+            _useSmoke = _mp.Config.Bind(Sec, KeyUseSmoke, false, "回滚时是否播放烟雾动画（默认关闭，仅画面表现）。");
+            // 预登记本页快捷键：不预登记则重启后在首次打开本页前按住按键无效（同 id 幂等）。
+            SRApi.RegisterKey("方块破坏-选择", _selectKey, "hold");
 
-            // 补丁注册失败不能连带跳过后面的 Listener 注册与场景订阅。
-            try { Harmony.CreateAndPatchAll(typeof(DestroyBlocks)); } catch (Exception e) { SRApi.LogError("方块破坏 补丁注册失败: " + e.Message); }
-            PlacementListener listener = new PlacementListener();
-            GameEventManager.ChangeListener<GameEvent.PiecePlacedEvent>(listener, true);
-            GameEventManager.ChangeListener<GameEvent.DestroyPieceEvent>(listener, true);
-            // 补记非本端放置的方块归属，供追踪模式按玩家号筛选。
-            NetworkPlacementListener netListener = new NetworkPlacementListener();
-            GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(netListener, true);
+            // 事件监听（不是 Harmony 补丁）：三类事件都登记同一个收集器。
+            Collector collector = new Collector();
+            GameEventManager.ChangeListener<GameEvent.PiecePlacedEvent>(collector, true);
+            GameEventManager.ChangeListener<GameEvent.DestroyPieceEvent>(collector, true);
+            GameEventManager.ChangeListener<GameEvent.StartPhaseEvent>(collector, true);
             SceneManager.activeSceneChanged += OnSceneChanged;
+
+            // 每帧按键 / 标签刷新：核心逐帧 try/catch 调用，功能被总开关禁用时自行早退。
+            SRApi.RegisterTick("方块破坏-选择", Tick);
 
             // 对外能力槽位：调用方经 Slots.Require 按名取用，不引用本类，取不到即降级。
             Slots.Provide(SlotIsPlayerPlaced, (Func<Placeable, bool>)IsPlayerPlaced);
             Slots.Provide(SlotPlayerPlacedBlocks, (Func<List<Placeable>>)PlayerPlacedBlocks);
-            // 归属登记同样走槽位，避免与关卡功能产生编译期引用（拆分编译会 CS0103）。
             Slots.Provide(SlotAttributeToHost, (Action<List<Placeable>>)AttributeToHost);
-        }
-
-        // 槽位名：与调用方的唯一约定是“名字 + 委托签名”，刻意用 private const，调用方另写自己的常量以免编译期依赖。
-        // 名字一经发布不再更改（改需两边同步）。
-        private const string SlotIsPlayerPlaced = "DestroyBlocks.IsPlayerPlaced";        // Func<Placeable,bool>
-        private const string SlotPlayerPlacedBlocks = "DestroyBlocks.PlayerPlacedBlocks"; // Func<List<Placeable>>
-        private const string SlotAttributeToHost = "DestroyBlocks.AttributeToHost";      // Action<List<Placeable>>
-
-        private static void OnSceneChanged(Scene a, Scene b) {
-            _placements.Clear();
-            // 候选表与选中态跨场景作废：旧场景的 Placeable 已销毁，留着会被当作有效选中项（AddBombTint 会抛异常）。
-            // Blocks 只在按住切换键时重建，清空不影响正常流程。
-            Blocks.Clear();
-            _selected = null;
-            _tintedBlock = null;
-            _index = 0;
-            _listDirty = false;
-            _lastListRebuildAt = -999f; // 新场景：下次按住切换键时无条件重建一次
-            DestroyInfoTag();
-        }
-
-        [HarmonyPatch(typeof(GameControl), "Update")]
-        [HarmonyPrefix]
-        static void Controls(GameControl __instance) {
-            if (!SRApi.GateMaster) return;
-            if (!Enabled) return;
-            if (SRApi.UiOpen && SRApi.BlockInput) return; 
-            // 仅派对 / 创意 / 自由建造模式；已接入 IgnoreModeLimit 豁免。
-            if (!SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay)) return;
-            // 仅房主能删：SR 侧没有方块删除的网络同步通道，房客删除只有本机生效，会造成脱同步；房客需开 EX 的“允许客户端删除”。
-            // 有意不接 GateHost（豁免只解决权限、解决不了同步）；判据用 SRApi.CanControlLocally，勿用 is GamesparksMatchmakingLobby（离线/大厅为空时会短路放行）。
-            if (!AllowClientsOn && !SRApi.CanControlLocally) return;
-            if (SRApi.ComboKeyDown(_toggleKey)) {
-                _altDown = true;
-                RebuildList();
-                _lastListRebuildAt = Time.unscaledTime;
-                _listDirty = false;
-                if (Blocks.Count <= 0) return;
-                if (_selectMode != null && _selectMode.Value == SelectMode.Distance) {
-                    SortByDistance(); // 距离模式：近 -> 远
-                    _index = 0;
-                } else {
-                    _index = Blocks.Count - 1;
-                }
-                _selected = Blocks[_index];
-            }
-            if (SRApi.ComboKeyHeld(_toggleKey)) 
-            {
-                // 实时列表：按住期间保持候选表最新（事件置脏 + 节流重建）；暂存模式或不按住时完全不跑。
-                if (RealtimeListOn) TickRealtimeList();
-
-                if (Blocks.Count <= 0) return;
-                Placeable prev = _selected;
-                if (prev != null) {
-                    for (int i = 0; i < Blocks.Count; i++) {
-                        if (Blocks[i] == prev) { _index = i; break; }
-                    }
-                }
-                if (_index < 0 || _index >= Blocks.Count) _index = Blocks.Count - 1;
-                if (SRApi.ComboKeyDown(_deleteKey)) {
-                    Placeable target = Blocks[_index];
-                    if (target == null || target.MarkedForDestruction) {
-                        Blocks.RemoveAt(_index);
-                        if (_index >= Blocks.Count) _index = Blocks.Count - 1;
-                        _tintedBlock = null;
-                        return;
-                    }
-
-                    // DestroySelf 自身会发 MsgPieceDestroyed，再显式广播会发两条（接收端报 "already marked"）。
-                    DestroyBlockNative(_index);
-                    Blocks.RemoveAt(_index);
-                    _index--;
-                    if (_index < 0) _index = 0;
-                    _selected = null;
-                    _tintedBlock = null; 
-                    if (Blocks.Count <= 0) return;
-                }
-                // 滚轮量必须取 SRApi.TakeWheelEvent()：Input.GetAxis("Mouse ScrollWheel") 在本环境恒为 0，滚轮切换永不生效。
-                // TakeWheelEvent 由每帧执行的 ManagerUI.OnGUI 从事件 delta 记录，面板关着也有效。
-                float wheel = SRApi.TakeWheelEvent();
-                if (wheel != 0f) {
-                    _index += wheel > 0f ? 1 : -1;
-                    SRApi.MarkWheelUsed(); // 滚轮已被选块器吃掉，地图/自由相机让路
-                }
-                if (_index >= Blocks.Count) _index = 0;
-                if (_index < 0) _index = Blocks.Count - 1;
-                _selected = Blocks[_index];
-                if (_selected != _tintedBlock) {
-                    if (_tintedBlock != null) {
-                        try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.GetAxis", __ex); }
-                    }
-                    // Color 的分量是 0..1 浮点而非 0..255 整数，此处按真实意图写不透明白色。
-                    try { _selected.AddBombTint(new Color(1f, 1f, 1f, 1f)); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.RemoveBombTint", __ex); }
-                    _tintedBlock = _selected;
-                }
-                try { _selected.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.AddBombTint", __ex); } // 每帧应用高亮色（bombTints > 0 -> 白色）
-                try { UpdateInfoTag(_selected); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.UpdateInfoTag", __ex); }
-            } 
-            else if(_altDown)
-            {
-                _altDown = false;
-                if (_tintedBlock != null) {
-                    try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.UpdateInfoTag", __ex); }
-                }
-                _tintedBlock = null;
-                _selected = null;
-                DestroyInfoTag();
-                RebuildList();
-                if (Blocks.Count <= 0) return;
-                if (_index < 0 || _index >= Blocks.Count) _index = Blocks.Count - 1;
-                try { Blocks[_index].Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.松开重选高亮", __ex); }
-            }
-        }
-
-        private static void SortByDistance() {
-            try {
-                Vector3 me = LocalPlayerPos();
-                Blocks.Sort((a, b) => {
-                    float da = (a.transform.position - me).sqrMagnitude;
-                    float db = (b.transform.position - me).sqrMagnitude;
-                    return da.CompareTo(db);
-                });
-            } catch (Exception __ex) { SRApi.Guard.Log("按距离排序方块", __ex); }
-        }
-
-        // 本地角色位置按帧缓存：距离模式每次重建都要排序，FindObjectsOfType<Character> 不宜反复全场景遍历。
-        private static int _localPosFrame = -1;
-        private static Vector3 _localPosCache = Vector3.zero;
-
-        private static Vector3 LocalPlayerPos() {
-            if (_localPosFrame == Time.frameCount) return _localPosCache;
-            _localPosFrame = Time.frameCount;
-            _localPosCache = Vector3.zero;
-            try {
-                foreach (Character c in UnityEngine.Object.FindObjectsOfType<Character>()) {
-                    if (c != null && c.hasAuthority) { _localPosCache = c.transform.position; break; }
-                }
-            } catch (Exception __ex) { SRApi.Guard.Log("获取本地角色位置", __ex); }
-            return _localPosCache;
-        }
-
-        // 本方法跑在 GameControl.Update 链路上（按住 Alt 时最坏每秒 10 次），遍历 AllPlaceables 期间别的脚本可能
-        // Object.Destroy(p)，MissingReferenceException 不能外泄，整段须兜住。
-        private static void RebuildList() {
-          try {
-            Blocks.Clear();
-            bool normalOnly = _listMode == null || _listMode.Value == ListMode.Normal;
-            bool trackOn = _trackMode != null && _trackMode.Value != TrackMode.NoTrack;
-            // 不追踪的进阶模式用不到放置者信息；ResolveInfo 最坏沿 ParentPiece 上溯 8 层，是整段扫描的最大开销。
-            bool needInfo = normalOnly || trackOn;
-            foreach (Placeable p in Placeable.AllPlaceables) {
-                if (p == null) continue;
-                // DestroySelf 只隐藏渲染器、不移出 AllPlaceables，故 activeSelf 检查不够，MarkedForDestruction 才可靠。
-                if (p.MarkedForDestruction) continue;
-                if (!p.gameObject.activeSelf) continue;
-                string name = p.Name;
-                if (name == null) name = "";
-                if (name.Contains("SetPiece")) continue;
-                if (name.Contains("Goal Block")) continue;
-                if (name.Contains("Start Plank")) continue;
-                if (p.isSetPiece) continue;
-                PlacementInfo pi = needInfo ? ResolveInfo(p) : null; // 自身记录，或沿 ParentPiece 找到主体记录
-                if (normalOnly && pi == null) continue;
-                if (trackOn) {
-                    if (pi == null || pi.playerNumber != (int)_trackMode.Value) continue;
-                }
-                Blocks.Add(p);
-            }
-          } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.RebuildList", __ex); }
-        }
-
-        // 实时列表：按住切换键期间的节流重建，最快 RealtimeMinInterval 一次；不按切换键或暂存模式下不会被调用。
-        // 同 RebuildList：跑在 GameControl.Update 链路上，异常不能外泄。
-        private static void TickRealtimeList() {
-          try {
-            float now = Time.unscaledTime;
-            // 兜底：放置/销毁事件未覆盖的变化（重载关卡、快照重建）靠固定间隔兜住，不由其它页面的开关决定。
-            bool stale = (now - _lastListRebuildAt) >= RealtimeFallbackInterval;
-            if (!_listDirty && !stale) return;
-            if (now - _lastListRebuildAt < RealtimeMinInterval) return; // 节流：最快 10Hz
-            _lastListRebuildAt = now;
-            _listDirty = false;
-            RefreshListKeepSelection();
-          } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.TickRealtimeList", __ex); }
-        }
-
-        // 重建候选表并按引用找回当前选中项：实时模式下列表反复重建，不保选中项会导致高亮乱跳。
-        // 同 RebuildList：异常会抛进 GameControl.Update 链路，须兜住。
-        private static void RefreshListKeepSelection() {
-          try {
-            Placeable prev = (_selected != null ? _selected : _tintedBlock);
-            // 选中项已被标记销毁时不可再高亮（AddBombTint 对已销毁对象会抛异常）
-            if (prev != null && prev.MarkedForDestruction) prev = null;
-            RebuildList();
-            if (_selectMode != null && _selectMode.Value == SelectMode.Distance) SortByDistance();
-            if (Blocks.Count <= 0) {
-                _index = 0;
-                _selected = null;
-                if (_tintedBlock != null) {
-                    try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.清空高亮", __ex); }
-                    _tintedBlock = null;
-                }
-                DestroyInfoTag();
-                return;
-            }
-            if (prev != null) {
-                for (int i = 0; i < Blocks.Count; i++) {
-                    if (Blocks[i] == prev) { _index = i; _selected = Blocks[i]; return; }
-                }
-            }
-            // 选中项已不在列表（多半被别人删了）：就地钳制同一下标，跳到头/尾会让选中项乱飞。
-            if (_index >= Blocks.Count) _index = Blocks.Count - 1;
-            if (_index < 0) _index = 0;
-            _selected = Blocks[_index];
-          } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.RefreshListKeepSelection", __ex); }
-        }
-
-        // 在选中方块上方显示浮动名牌，按玩家颜色着色。
-        private static void UpdateInfoTag(Placeable p) {
-            if (p == _infoTarget) {
-                if (_infoTag != null) _infoTag.transform.position = p.transform.position + new Vector3(0f, 1.5f, 0f);
-                return;
-            }
-            _infoTarget = p;
-            if (!EnsureInfoTag()) return;
-            PlacementInfo info = ResolveInfo(p); // 子元件显示所属主体的放置者
-            string label = info != null ? "#" + info.playerNumber + " " + info.playerName : "Unknown";
-            if (_infoText != null) {
-                _infoText.text = label;
-                if (info != null) _infoText.color = info.color;
-            }
-            if (_infoTag != null) _infoTag.transform.position = p.transform.position + new Vector3(0f, 1.5f, 0f);
-        }
-
-        private static bool EnsureInfoTag() {
-            if (_infoTag != null) return true;
-            if (_infoTagTried) return false;
-            // 从角色光标复制名牌
-            foreach (Character c in UnityEngine.Object.FindObjectsOfType<Character>()) {
-                if (c == null) continue;
-                GamePlayer gp = c.AssociatedGamePlayer;
-                if (gp == null || gp.CursorInstance == null) continue;
-                if (gp.CursorInstance.nameTag == null) continue;
-                GameObject prefab = gp.CursorInstance.nameTag.gameObject;
-                GameObject go = (GameObject)UnityEngine.Object.Instantiate(prefab);
-                NameTag nt = go.GetComponent<NameTag>();
-                if (nt != null) {
-                    nt.currentAlpha = 1f;
-                    if (nt.nameCanvasGroup != null) nt.nameCanvasGroup.alpha = 1f;
-                    if (nt.canvas != null) nt.canvas.sortingOrder = 32767;
-                }
-                go.transform.SetParent(null);
-                _infoText = go.GetComponentInChildren<Text>();
-                _infoTag = go;
-                _infoTagTried = true; // 只在成功后标记：创建失败时按住期间仍会重试
-                return true;
-            }
-            return false;
-        }
-
-
-        // 供外部模块（EX 清除地图对象 / 无视对象）调用：是否为玩家放置的道具（关卡自带布局与系统件不算）。
-        // 走与列表模式相同的归属解析（含多对象道具子部件），不暴露内部字典。
-        public static bool IsPlayerPlaced(Placeable p) {
-            try { return ResolveInfo(p) != null; } catch { return false; }
-        }
-
-        // 玩家放置的方块清单（不销毁），供清场功能使用。
-        public static List<Placeable> PlayerPlacedBlocks() {
-            List<Placeable> list = new List<Placeable>();
-            try {
-                foreach (Placeable p in Placeable.AllPlaceables) {
-                    if (p == null) continue;
-                    // 顺带回收死条目：游戏自己销毁方块（掉出界 / 被炸 / 关卡重置）时不派发 DestroyPieceEvent，
-                    // 记录会强引用住已销毁的 Unity 对象使其无法 GC，故这里顺手清掉。
-                    if (p.MarkedForDestruction) { _placements.Remove(p); continue; }
-                    if (ResolveInfo(p) == null) continue; // 关卡自带布局没有归属，不算玩家放置
-                    list.Add(p);
-                }
-            } catch (Exception __ex) { SRApi.Guard.Log("收集玩家放置方块", __ex); }
-            return list;
-        }
-
-
-
-        private static void DestroyInfoTag() {
-            if (_infoTag != null) {
-                UnityEngine.Object.Destroy(_infoTag);
-                _infoTag = null;
-            }
-            _infoText = null;
-            _infoTarget = null;
-            _infoTagTried = false;
         }
     }
 }
