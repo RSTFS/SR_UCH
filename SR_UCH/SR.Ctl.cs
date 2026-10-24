@@ -35,7 +35,7 @@ public partial class SR {
             float avail = SRApi.PageViewportHeight > Sc(60f)
                 ? SRApi.PageViewportHeight
                 : (SR.ContentArea.height - Sc(26f) - Sc(2f) - SR.FooterHeight);
-            return Mathf.Max(minH, avail - usedAbove - Sc(4f));
+            return Mathf.Max(minH, avail - usedAbove - Sc(2f));
         }
 
         // 统一操作列按钮：在行矩形里依次画 BtnClip 按钮，返回本帧左键 MouseUp 命中并已执行回调的下标。

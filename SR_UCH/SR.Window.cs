@@ -198,7 +198,7 @@ public partial class SR {
                     Guard.Try("总开关自动保存", () => _allEnabledEntry.ConfigFile.Save()); // 失败记日志
                 }
             }
-            if (GUI.Button(new Rect(barRect.width - Sc(32), tY, Sc(26), Sc(26)), "X", _btn)) CloseMenu();
+            if (GUI.Button(new Rect(barRect.width - Sc(26), tY, Sc(26), Sc(26)), "X", _btn)) CloseMenu();
             return barH;
         }
 
@@ -482,8 +482,8 @@ public partial class SR {
             // 底栏现在是固定条，不再需要“用其它栏目最大值兜底”；未知栏目按 0，否则表格会被凭空缩短（底部多出一截空白）。
             try { _pageFooterH.TryGetValue(_selectedInternalSection, out __pfReserve); } catch { __pfReserve = 0f; }
             // 底栏是固定高度条（与顶栏同款）：布局层只预留“条高 + 该栏目页面外框高 + 小余量”。
-            float __barH = Sc(30f);
-            float __footerReserve = __barH + Mathf.Max(0f, __pfReserve) + Sc(4f);
+            float __barH = Sc(26f);
+            float __footerReserve = __barH + Mathf.Max(0f, __pfReserve) + Sc(2f);
             SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
@@ -562,6 +562,9 @@ public partial class SR {
             float __barY = Mathf.Max(0f, __areaH - __barH);
             Rect __barRect = new Rect(0f, __barY, __areaW, __barH);
             GUI.Box(__barRect, GUIContent.none, _footer);
+            // 顶部 1px 分隔线：底栏比顶栏更暗、且有明确边界，视觉上不会和标题栏混淆。
+            SRApi.DrawFill(new Rect(0f, __barY, __areaW, 1f), new Color(0f, 0f, 0f, 0.55f));
+            SRApi.DrawFill(new Rect(0f, __barY + 1f, __areaW, 1f), new Color(1f, 1f, 1f, 0.06f));
             float __btnY = __barY + Sc(2f);
             float __btnH = Mathf.Max(Sc(22f), __barH - Sc(4f));
             float __bx = Sc(4f);
@@ -589,8 +592,13 @@ public partial class SR {
                 if (__bx + fbW > __areaW - Sc(8)) break;   // 放不下就不画，避免压到右侧状态标签
                 Rect fbRect = new Rect(__bx, __btnY, fbW, __btnH);
                 bool fbSel = _mode == Mode.Internal && _selectedInternalSection == fb.Id;
+                bool fbHover = fbRect.Contains(Event.current != null ? Event.current.mousePosition : Vector2.zero);
+                float fbCur; _footerBtnHover.TryGetValue(fb.Id, out fbCur);
+                fbCur = Mathf.Lerp(fbCur, fbHover ? 1f : 0f, Mathf.Clamp01(Time.unscaledDeltaTime * 12f));
+                _footerBtnHover[fb.Id] = fbCur;
                 Color fbBg = GUI.backgroundColor;
-                GUI.backgroundColor = fbSel ? Color.Lerp(fbBg, new Color(0.72f, 0.88f, 1f, 1f), 0.35f) : fbBg;
+                GUI.backgroundColor = fbSel ? Color.Lerp(fbBg, new Color(0.72f, 0.88f, 1f, 1f), 0.35f)
+                    : Color.Lerp(fbBg, new Color(0.78f, 0.84f, 0.98f, 1f), fbCur * 0.45f);
                 bool fbClicked = GUI.Button(fbRect, new GUIContent(fbLabel, T("打开", "Open ") + fbLabel), fbSel ? _selItem : _btn);
                 GUI.backgroundColor = fbBg;
                 _footerBtnRects[fb.Id] = fbRect;

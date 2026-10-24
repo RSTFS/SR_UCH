@@ -324,7 +324,7 @@ namespace SR_UCH {
             float avail = PageViewportHeight > Ctl.Sc(60f)
                 ? PageViewportHeight
                 : (ContentArea.height - Ctl.Sc(26f) - Ctl.Sc(2f) - FooterHeight);
-            return Mathf.Max(minH, avail - usedAbove - Ctl.Sc(4f));
+            return Mathf.Max(minH, avail - usedAbove - Ctl.Sc(2f));
         }
         // 操作列按钮统一控件：布局 / 命中 / 悬浮由实现层负责；未注入时返回 -1（不响应）。
         public static void SetTableActionButtonsSink(TableActionButtonsFn tableActionButtons) { _tableActionButtons = tableActionButtons; }
