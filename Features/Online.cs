@@ -616,7 +616,24 @@ namespace SR_UCH.Tweaks {
 
         // 列宽 / 列顺序 / 隐藏列（可拖动 + 持久化）
         // 用显式的 _widthsLoaded 作为一次性初始化哨兵。
+        // 核心列状态：接管列宽/列序/隐藏列（格式与旧配置兼容）。
+        private static void InitCols() {
+            if (_cols != null) return;
+            try {
+                float[] dw = new float[ColCount];
+                for (int i = 0; i < ColCount && i < DefWidths.Length; i++) dw[i] = SRApi.Ctl.Sc(DefWidths[i]);
+                _cols = new SRApi.TableState(_colWidths, _colOrder, _hiddenColsEntry, dw);
+                _cw = _cols.Widths;
+                _order = _cols.Order;
+                _hiddenCols.Clear();
+                foreach (int __h in _cols.Hidden) _hiddenCols.Add(__h);
+                _widthsLoaded = true;
+            } catch (Exception __ex) { SRApi.Guard.Log("联机/列状态初始化", __ex); }
+        }
+
         private static void EnsureWidths() {
+            InitCols();
+            if (_cols != null) { _widthsLoaded = true; return; }
             if (_widthsLoaded) return;
             _widthsLoaded = true;   // 列宽填上后不再重进
             _cw = (float[])DefWidths.Clone();
@@ -698,22 +715,12 @@ namespace SR_UCH.Tweaks {
 
         private static void SaveCols() {
             try {
-                if (_colWidths != null && _cw != null) {
-                    string[] p = new string[_cw.Length];
-                    for (int i = 0; i < _cw.Length; i++) p[i] = Mathf.RoundToInt(_cw[i]).ToString(CultureInfo.InvariantCulture);
-                    _colWidths.Value = string.Join(",", p);
-                }
-                if (_colOrder != null && _order != null) {
-                    string[] p = new string[_order.Length];
-                    for (int i = 0; i < _order.Length; i++) p[i] = _order[i].ToString(CultureInfo.InvariantCulture);
-                    _colOrder.Value = string.Join(",", p);
-                }
-                if (_hiddenColsEntry != null) {
-                    List<string> l = new List<string>();
-                    foreach (int k in _hiddenCols) l.Add(k.ToString(CultureInfo.InvariantCulture));
-                    _hiddenColsEntry.Value = string.Join(",", l.ToArray());
-                }
-                if (_colWidths != null) SRApi.Ctl.MarkConfigDirty(_colWidths.ConfigFile); //落盘走节流器（失败有 Warning）
+                InitCols();
+                if (_cols == null) return;
+                _cols.Order = _order;
+                _cols.Hidden.Clear();
+                foreach (int __h in _hiddenCols) _cols.Hidden.Add(__h);
+                _cols.Save();
             } catch (Exception __ex) { SRApi.Guard.Log("保存列设置", __ex); }
         }
 
@@ -753,6 +760,7 @@ namespace SR_UCH.Tweaks {
         };
 
         // 列顺序 / 被隐藏的列
+        private static SRApi.TableState _cols;   // 列宽/列序/隐藏列（核心统一持久化）
         private static int[] _order;
         private static readonly HashSet<int> _hiddenCols = new HashSet<int>();
         private static ConfigEntry<string> _colOrder, _hiddenColsEntry;

@@ -531,7 +531,92 @@ namespace SR_UCH {
         public static void DrawLine(Rect r) { DrawFill(r, new Color(1f, 1f, 1f, 0.22f)); }
 
         // UI 工具箱门面（IMGUI 控件/样式/布局）：实现在核心，契约层只转发。
-        // 通用列表数据管线：过滤 / 排序结果按“版本戳”缓存，每帧最多重算一次。
+        // 表格列状态（列宽 / 列序 / 隐藏列）统一持久化：格式与旧实现完全一致（逗号分隔的三条配置）。
+    // 页面只需持有实例并把 Order/Hidden/Widths 当作自己的工作数组即可。
+    public sealed class TableState {
+        private readonly BepInEx.Configuration.ConfigEntry<string> _w, _o, _h;
+        private readonly float[] _defaultW;
+        private readonly int _count;
+        public int[] Order;
+        public readonly HashSet<int> Hidden = new HashSet<int>();
+        public float[] Widths;
+
+        public TableState(BepInEx.Configuration.ConfigEntry<string> widths, BepInEx.Configuration.ConfigEntry<string> order,
+                          BepInEx.Configuration.ConfigEntry<string> hidden, float[] defaults) {
+            _w = widths; _o = order; _h = hidden;
+            _count = defaults != null ? defaults.Length : 0;
+            _defaultW = defaults != null ? (float[])defaults.Clone() : new float[0];
+            Widths = (float[])_defaultW.Clone();
+            Order = new int[_count];
+            for (int i = 0; i < _count; i++) Order[i] = i;
+            Load();
+        }
+
+        public void Load() {
+            try {
+                if (_w != null && !string.IsNullOrEmpty(_w.Value)) {
+                    string[] parts = _w.Value.Split(',');
+                    for (int i = 0; i < parts.Length && i < Widths.Length; i++) {
+                        float v;
+                        if (float.TryParse(parts[i].Trim(), System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out v) && v > 0f) Widths[i] = v;
+                    }
+                }
+                if (_o != null && !string.IsNullOrEmpty(_o.Value)) {
+                    string[] parts = _o.Value.Split(',');
+                    List<int> ord = new List<int>();
+                    for (int i = 0; i < parts.Length; i++) {
+                        int v;
+                        if (int.TryParse(parts[i].Trim(), out v) && v >= 0 && v < _count && !ord.Contains(v)) ord.Add(v);
+                    }
+                    for (int k = 0; k < _count; k++) if (!ord.Contains(k)) ord.Add(k);
+                    if (ord.Count == _count) Order = ord.ToArray();
+                }
+                if (_h != null && !string.IsNullOrEmpty(_h.Value)) {
+                    Hidden.Clear();
+                    foreach (string s in _h.Value.Split(',')) {
+                        int v;
+                        if (int.TryParse(s.Trim(), out v) && v >= 0 && v < _count) Hidden.Add(v);
+                    }
+                    if (Hidden.Count >= _count) { Hidden.Clear(); }   // 至少留一列
+                }
+            } catch { }
+        }
+
+        public void Save() {
+            try {
+                if (_w != null && Widths != null) {
+                    string[] p = new string[Widths.Length];
+                    for (int i = 0; i < Widths.Length; i++) p[i] = Mathf.RoundToInt(Widths[i]).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    _w.Value = string.Join(",", p);
+                }
+                if (_o != null && Order != null) {
+                    string[] p = new string[Order.Length];
+                    for (int i = 0; i < Order.Length; i++) p[i] = Order[i].ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    _o.Value = string.Join(",", p);
+                }
+                if (_h != null) {
+                    List<int> hs = new List<int>(Hidden);
+                    hs.Sort();
+                    string[] p = new string[hs.Count];
+                    for (int i = 0; i < hs.Count; i++) p[i] = hs[i].ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    _h.Value = string.Join(",", p);
+                }
+                BepInEx.Configuration.ConfigFile f = _w != null ? _w.ConfigFile : (_o != null ? _o.ConfigFile : null);
+                if (f != null) f.Save();
+            } catch { }
+        }
+
+        // 还原：列宽回默认、列序回自然序、隐藏清空。
+        public void ResetAll() {
+            for (int i = 0; i < Widths.Length && i < _defaultW.Length; i++) Widths[i] = _defaultW[i];
+            for (int i = 0; i < Order.Length; i++) Order[i] = i;
+            Hidden.Clear();
+            Save();
+        }
+    }
+
+    // 通用列表数据管线：过滤 / 排序结果按“版本戳”缓存，每帧最多重算一次。
         // 页面只需提供源数据 + 过滤/排序委托 + 一个版本戳（通常用 Time.frameCount 或配置脏标记）。
         public sealed class TableSource<T> where T : class {
             private readonly List<T> _rows = new List<T>();

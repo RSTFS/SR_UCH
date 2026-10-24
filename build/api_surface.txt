@@ -99,3 +99,4 @@ TableFitHeight
 TableHeightGripBar
 Diag
 TableSource
+TableState
