@@ -93,7 +93,8 @@ namespace SR_UCH.Tweaks {
 		private static string _modeFilter = "";
 		private static bool _modeFilterOpen;
 		// 类型筛选（运行期状态，不落配置）："" = 全部，preset = 预设，local = 游戏本地保存关卡。
-		private static string _typeFilter = "";
+		// 默认「预设」：打开页面先只显示预设库，需要时再切到全部/本地。
+		private static string _typeFilter = "preset";
 		private static bool _typeFilterOpen;
 		// 加载模式（运行期状态，不落配置）："" = 默认（跟随预设自身保存的模式，保持原有行为）；
 		// 否则为 GameState.GameMode 的 ToString，加载/重载时强制使用该模式。
@@ -575,11 +576,12 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 					SRApi.T("预设", "Presets"),
 					SRApi.T("本地", "Local")
 				};
-				int cur = 0;
+				int cur = 1; // 默认「预设」
 				for (int i = 0; i < vals.Length; i++) {
 					if (string.Equals(vals[i], _typeFilter, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
 				}
-				if (cur == 0 && !string.IsNullOrEmpty(_typeFilter)) _typeFilter = "";
+				// 运行期状态被外部改坏时回退到默认「预设」（与下拉索引 1 对应）。
+				if (!string.Equals(vals[cur], _typeFilter, StringComparison.OrdinalIgnoreCase)) _typeFilter = "preset";
 				bool open = _typeFilterOpen;
 				int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(90));
 				_typeFilterOpen = open;
@@ -669,9 +671,14 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				string title = SRApi.T("- 预设列表", "- Preset list") + " (" + visible.Count + "/" + _presets.Count
 					+ SRApi.T("，上限 ", ", limit ") + MaxPresets + ")";
 				SRApi.Ctl.SectionTitle(title);
+				float titleH = 0f;
+				try { titleH = Mathf.Max(0f, GUILayoutUtility.GetLastRect().height); } catch { }
 				float rowH = SRApi.Ctl.Sc(26);
 				float headerH = SRApi.Ctl.Sc(24);
 				if (tableH <= 0f) tableH = TableHeight();
+				// Render() 传入的 tableH 是「分区标题 + 表格」可用的总高度；分区标题本身也占高，
+				// 这里扣掉它的实测高度，否则表格底部会超出可视区、最后一行被底栏裁掉且滚不到。
+				tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH - titleH);
 				float rowsH = Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH);
 				Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
 				if (box.width < SRApi.Ctl.Sc(220)) return;

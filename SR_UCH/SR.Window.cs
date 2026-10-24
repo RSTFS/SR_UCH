@@ -569,7 +569,10 @@ public partial class SR {
                 }
             }
             GUILayout.FlexibleSpace();   // 底栏不显示 SR 内部版本号
-            GUILayout.Label(ModeLabel(), _label, GUILayout.Width(Sc(160)), GUILayout.Height(Sc(26)));
+            // 右下角“模式·关卡”：内容取游戏本地化名称，宽度按实际文字自适应（原来固定 160 会截断长关卡名）。
+            string __modeLabel = ModeLabel() ?? "";
+            float __modeW = Mathf.Max(Sc(60), _label.CalcSize(new GUIContent(__modeLabel)).x + Sc(12));
+            GUILayout.Label(__modeLabel, _label, GUILayout.Width(__modeW), GUILayout.Height(Sc(26)));
             GUILayout.EndHorizontal();
             FooterHeight = GUILayoutUtility.GetLastRect().height;   // 自绘页据此避让
             GUILayout.EndVertical();

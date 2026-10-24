@@ -751,8 +751,8 @@ namespace SR_UCH.Tweaks {
         private const int ColCount = 11;         // v5：删除技能系数列后的列数
         private const int CombinedCol = 9;       // 综合分列 = LobbyHealthNum + LobbySkillNum（游戏排序用的房间质量分）
         private const int JoinCol = 10;          //操作列：不可隐藏（否则没法加入）
-        private static readonly string[] Titles = { "区域", "人数", "游戏质量", "进度", "游戏模式", "标签", "房主", "限制", "标记", "综合分", "操作" };
-        private static readonly string[] TitlesEn = { "Region", "Players", "Quality", "Progress", "Mode", "Tag", "Host", "Limit", "Flags", "Combined", "Operation" };
+        private static readonly string[] Titles = { "区域", "人数", "游戏质量", "进度", "游戏模式", "标签", "房主", "限制", "修改器", "综合分", "操作" };
+        private static readonly string[] TitlesEn = { "Region", "Players", "Quality", "Progress", "Mode", "Tag", "Host", "Limit", "Mods", "Combined", "Operation" };
         private static readonly string[] TitleTips = {
             "服务器区域（游戏自己的本地化短名，显示为 亚太/欧盟/美国）",
             "当前人数 / 4（房间最多 4 人，人满不可加入）",
@@ -762,7 +762,7 @@ namespace SR_UCH.Tweaks {
             "房间标签（游戏本地化）",
             "房主名字",
             "制胜积分 / 长度限制（轮数、时间或 无限制）",
-            "模组 / 房主AFK",
+            "修改器 / 房主AFK",
             "房间综合分 = 房主质量分 + 技能换算分（游戏自己排序用的房间质量分，越大越靠前）。默认隐藏：右键表头综合分即可让它常驻显示。",
             "点加入进房（在对局内会先退出当前房间，回到界面就自动加入）；不可加入的显示原因并压暗",
         };

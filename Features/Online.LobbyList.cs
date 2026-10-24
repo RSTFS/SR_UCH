@@ -222,7 +222,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string FlagsText(Matchmaker.LobbyListInfo li) {
-            string s = li.usingMods ? SRApi.T("模组", "mods") : "";
+            string s = li.usingMods ? SRApi.T("修改器", "mod") : "";
             if (li.isAFK) s += (s.Length > 0 ? "+" : "") + "AFK";
             return s;
         }
