@@ -488,6 +488,14 @@ public partial class SR {
             // 页面内容必须以这条 y 为底界（= 滚动区顶 + 视口高 = 底栏条上沿）：列表高度按它算，随窗口大小自适应。
             SRApi.PageScrollTopY = __usedTop;
             SRApi.PageContentBottomY = __usedTop + SRApi.PageViewportHeight;
+            if (Time.frameCount % 120 == 0) {
+                try {
+                    SRApi.LogInfo("[SR诊断] areaH=" + __areaH.ToString("0.0") + " usedTop=" + __usedTop.ToString("0.0")
+                        + " barH=" + __barH.ToString("0.0") + " viewport=" + SRApi.PageViewportHeight.ToString("0.0")
+                        + " footerTop=" + (__areaH - __barH).ToString("0.0") + " scrollY=" + _scroll.y.ToString("0.0")
+                        + " section=" + _selectedInternalSection);
+                } catch { }
+            }
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
             _scroll = __noScroll

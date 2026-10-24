@@ -493,6 +493,14 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 					tableH = Mathf.Min(tableH, SRApi.Ctl.Sc(_tableHEntry.Value));
 				_actionHitThisFrame = false;
 				List<PresetInfo> visible = VisiblePresets();
+				if (Time.frameCount % 120 == 0) {
+                    try {
+                        SRApi.LogInfo("[SR诊断/预设] pageTop=" + _pageTopY.ToString("0.0") + " lastY=" + last.yMax.ToString("0.0")
+                            + " usedAbove=" + usedAbove.ToString("0.0") + " tableH=" + tableH.ToString("0.0")
+                            + " viewport=" + SRApi.PageViewportHeight.ToString("0.0")
+                            + " savedH=" + (_tableHEntry != null ? _tableHEntry.Value : -1));
+                    } catch { }
+                }
 				RenderPresetTable(tableH, visible);
 				// 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
 				try {
