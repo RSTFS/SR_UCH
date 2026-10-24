@@ -130,8 +130,7 @@ public partial class SR {
         // 右栏底部那行（设置 / 模式）的高度：自绘页据此给表格留出底部空间，否则末行会被盖住。
         public static float FooterHeight;
         private static readonly Dictionary<string, float> _pageFooterH = new Dictionary<string, float>();
-        private static float _pageUsedTop;   // 上一帧量到的页头/页签底部 Y（Layout 帧兜底用）
-        private static float _footerOverflow;   // 上一帧底栏超出区域的高度（自动补偿预留）   // 各栏目页面外框按钮高度（切换栏目不跳）
+        private static float _pageUsedTop;   // 上一帧量到的页头/页签底部 Y（Layout 帧兜底用）   // 各栏目页面外框按钮高度（切换栏目不跳）
         // 底栏注册按钮的悬停过渡与命中矩形（按 id 缓存）
         private static readonly Dictionary<string, float> _footerBtnHover = new Dictionary<string, float>();
         private static readonly Dictionary<string, Rect> _footerBtnRects = new Dictionary<string, Rect>();
@@ -487,8 +486,9 @@ public partial class SR {
                     foreach (float __v in _pageFooterH.Values) if (__v > __pfReserve) __pfReserve = __v;
                 }
             } catch { __pfReserve = 0f; }
-            float __footerReserve = Mathf.Max(Sc(30f), FooterHeight) + Mathf.Max(0f, __pfReserve) + Mathf.Clamp(_footerOverflow, 0f, Sc(80f)) + Sc(28f);
-            SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
+            float __rowH = Mathf.Max(Sc(28f), FooterHeight);
+            float __footH = __rowH + Mathf.Max(0f, __pfReserve) + Sc(8f);
+            SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footH);
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
             _scroll = __noScroll
@@ -547,7 +547,19 @@ public partial class SR {
                 _scroll = pageBefore;
                 WheelFrame = Time.frameCount;   // 让用 Input 读轴的缩放路径本帧让步
             }
-            // 功能页外框部件（滚动区之下）：量它的高度并按栏目记住，下一帧（及以后切换回该栏目）预留稳定。
+            // ---------- 底栏（绝对定位，独立区域） ----------
+            // 先把右栏/水平布局收口：底栏不再跟着垂直布局走，而是按“区域底边”固定摆放，
+            // 因此不会被滚动区挤压、也不会随页面内容变化漂移。
+            GUILayout.EndVertical();
+            GUILayout.EndHorizontal();
+
+            float __areaW = winRect.width - Sc(8);
+            float __footX = sbw + Sc(2f);
+            Rect __footRect = new Rect(__footX, Mathf.Max(0f, __areaH - __footH), Mathf.Max(Sc(80f), __areaW - __footX), __footH);
+            GUILayout.BeginArea(__footRect);
+            GUILayout.BeginVertical();
+
+            // 功能页外框部件：量高度并按栏目记住（只用于下一帧预留，底栏位置本身不受影响）。
             float __pfTop = 0f;
             try { __pfTop = GUILayoutUtility.GetLastRect().yMax; } catch { }
             if (_mode == Mode.Internal) SR.RenderPageFooter(_selectedInternalSection);
@@ -556,6 +568,7 @@ public partial class SR {
                 float __pfH = Mathf.Max(0f, __pfBottom - __pfTop);
                 if (_mode == Mode.Internal && !string.IsNullOrEmpty(_selectedInternalSection)) _pageFooterH[_selectedInternalSection] = __pfH;
             } catch (Exception __pm) { Guard.Log("页面外框高度测量", __pm); }
+
             GUILayout.BeginHorizontal(_footer);
             // 按钮宽度按文本测量（英文比中文长，固定宽度会截断）
             float settingsW = _btn.CalcSize(new GUIContent(T("设置", "Settings"))).x + Sc(18);
@@ -601,22 +614,15 @@ public partial class SR {
                 }
             }
             GUILayout.FlexibleSpace();   // 底栏不显示 SR 内部版本号
-            // 右下角“模式·关卡”：内容取游戏本地化名称，宽度按实际文字自适应（原来固定 160 会截断长关卡名）。
+            // 右下角“模式·关卡”：内容取游戏本地化名称，宽度按实际文字自适应。
             string __modeLabel = ModeLabel() ?? "";
             float __modeW = Mathf.Max(Sc(60), _label.CalcSize(new GUIContent(__modeLabel)).x + Sc(12));
             GUILayout.Label(__modeLabel, _label, GUILayout.Width(__modeW), GUILayout.Height(Sc(26)));
             GUILayout.EndHorizontal();
-            FooterHeight = GUILayoutUtility.GetLastRect().height;   // 自绘页据此避让
-            // 底栏是否被挤出可视区：直接量“底栏底边 - 区域底边”。>0 说明预留不足，下一帧按此补偿，
-            // 不依赖 FooterHeight/页面外框高度的估算（任何估算误差都会被这一步自动纠正）。
-            try {
-                float __bottom = GUILayoutUtility.GetLastRect().yMax;
-                float __overflow = __bottom - __areaH;
-                if (__overflow < 0f) __overflow = 0f;
-                _footerOverflow = Mathf.Clamp(Mathf.Lerp(_footerOverflow, __overflow, 0.5f), 0f, Sc(240f));
-            } catch (Exception __fo) { Guard.Log("底栏溢出测量", __fo); }
+            FooterHeight = GUILayoutUtility.GetLastRect().height;   // 给页面参考（当前行高）
+
             GUILayout.EndVertical();
-            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
             GUILayout.EndArea();
 
             // 整数对齐 + 尺寸与贴图一致（消除锯齿）；颜色按 ImGui ResizeGrip 三态（accent，0.25 / 0.7 / 0.95）。
