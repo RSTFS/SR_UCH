@@ -93,3 +93,4 @@ PageContentBottomY
 TableAutoFit
 TableAfterDraw
 TableScrollbarFor
+PageViewportHeight
