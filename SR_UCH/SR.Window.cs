@@ -129,7 +129,9 @@ public partial class SR {
 
         // 右栏底部那行（设置 / 模式）的高度：自绘页据此给表格留出底部空间，否则末行会被盖住。
         public static float FooterHeight;
-        private static readonly Dictionary<string, float> _pageFooterH = new Dictionary<string, float>();   // 各栏目页面外框按钮高度（切换栏目不跳）
+        private static readonly Dictionary<string, float> _pageFooterH = new Dictionary<string, float>();
+        private static float _pageUsedTop;   // 上一帧量到的页头/页签底部 Y（Layout 帧兜底用）
+        private static float _footerOverflow;   // 上一帧底栏超出区域的高度（自动补偿预留）   // 各栏目页面外框按钮高度（切换栏目不跳）
         // 底栏注册按钮的悬停过渡与命中矩形（按 id 缓存）
         private static readonly Dictionary<string, float> _footerBtnHover = new Dictionary<string, float>();
         private static readonly Dictionary<string, Rect> _footerBtnRects = new Dictionary<string, Rect>();
@@ -468,8 +470,14 @@ public partial class SR {
             // 真实页面视口 = 内容区高 - 已用页头高 - 底栏保留高：显式限制滚动区高度，
             // 否则滚动区会吃满剩余空间、底栏压住最后几行（预设/联机列表“最后一项显示不全”的根因）。
             float __areaH = winRect.height - Sc(8);
-            float __usedTop = 0f;
-            try { __usedTop = GUILayoutUtility.GetLastRect().yMax; } catch (Exception __ut) { Guard.Log("页面视口/页头高度", __ut); }
+            // Layout 阶段 GetLastRect 可能还是 0（布局尚未计算完）：用上一帧量到的页头高度，
+            // 否则 Layout 帧会把“视口”算成满高，滚动区把底栏顶出可视区（底栏只剩上边一点）。
+            float __usedTop = _pageUsedTop;
+            if (Event.current == null || Event.current.type != EventType.Layout) {
+                float __measured = 0f;
+                try { __measured = GUILayoutUtility.GetLastRect().yMax; } catch (Exception __ut) { Guard.Log("页面视口/页头高度", __ut); }
+                if (__measured > Sc(1f)) { __usedTop = __measured; _pageUsedTop = __measured; }
+            }
             // 底栏预留 = 底栏行高（上一帧，稳定） + 当前栏目页面外框按钮高（按栏目记住，切栏目不会跳）。
             float __pfReserve = 0f;
             try {
@@ -479,7 +487,7 @@ public partial class SR {
                     foreach (float __v in _pageFooterH.Values) if (__v > __pfReserve) __pfReserve = __v;
                 }
             } catch { __pfReserve = 0f; }
-            float __footerReserve = Mathf.Max(Sc(30f), FooterHeight) + Mathf.Max(0f, __pfReserve) + Sc(4f);
+            float __footerReserve = Mathf.Max(Sc(30f), FooterHeight) + Mathf.Max(0f, __pfReserve) + Mathf.Clamp(_footerOverflow, 0f, Sc(80f)) + Sc(28f);
             SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
@@ -599,6 +607,14 @@ public partial class SR {
             GUILayout.Label(__modeLabel, _label, GUILayout.Width(__modeW), GUILayout.Height(Sc(26)));
             GUILayout.EndHorizontal();
             FooterHeight = GUILayoutUtility.GetLastRect().height;   // 自绘页据此避让
+            // 底栏是否被挤出可视区：直接量“底栏底边 - 区域底边”。>0 说明预留不足，下一帧按此补偿，
+            // 不依赖 FooterHeight/页面外框高度的估算（任何估算误差都会被这一步自动纠正）。
+            try {
+                float __bottom = GUILayoutUtility.GetLastRect().yMax;
+                float __overflow = __bottom - __areaH;
+                if (__overflow < 0f) __overflow = 0f;
+                _footerOverflow = Mathf.Clamp(Mathf.Lerp(_footerOverflow, __overflow, 0.5f), 0f, Sc(240f));
+            } catch (Exception __fo) { Guard.Log("底栏溢出测量", __fo); }
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
             GUILayout.EndArea();
