@@ -484,14 +484,17 @@ public partial class SR {
             // 底栏是固定高度条（与顶栏同款）：布局层只预留“条高 + 该栏目页面外框高 + 小余量”。
             float __barH = Sc(26f);
             float __footerReserve = __barH + Mathf.Max(0f, __pfReserve);
-            SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
+            // 视口高度：本帧先用上一帧实测值（首次用“区域高 - 底栏”兜底），
+            // 本帧结束再按滚动区实测高度刷新；滚动区本身是弹性高度，页面高度变化不会反过来改变它。
+            if (SRApi.PageViewportHeight <= Sc(60f))
+                SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __footerReserve);
             // 页面内容必须以这条 y 为底界（= 滚动区顶 + 视口高 = 底栏条上沿）：列表高度按它算，随窗口大小自适应。
             SRApi.PageContentBottomY = __usedTop + SRApi.PageViewportHeight;
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
             _scroll = __noScroll
-                ? GUILayout.BeginScrollView(_scroll, false, false, GUIStyle.none, GUIStyle.none, GUIStyle.none, GUILayout.Height(SRApi.PageViewportHeight))
-                : GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUIStyle.none, GUILayout.Height(SRApi.PageViewportHeight));   // 隐藏滚动条（滚轮照旧可用）
+                ? GUILayout.BeginScrollView(_scroll, false, false, GUIStyle.none, GUIStyle.none, GUIStyle.none, GUILayout.ExpandHeight(true))
+                : GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUIStyle.none, GUILayout.ExpandHeight(true));   // 弹性占满剩余高度
             if (_scroll != pageBefore) WheelFrame = Time.frameCount; // 页面滚动区吃掉了滚轮
             ConfigFile curConfig = _mode == Mode.Internal
                 ? _internalConfig
@@ -539,6 +542,14 @@ public partial class SR {
                 if (!any) GUILayout.Label(T("（这个插件没有可显示的配置项）", "(this plugin has no visible settings)"), _label);
             }
             GUILayout.EndScrollView();
+            // 实测滚动区高度：它就是页面可用视口（下一帧给表格算高度用）。
+            // 滚动区是弹性高度，不受页面内容影响，所以这个值不会形成抖动反馈。
+            try {
+                Rect __sv = GUILayoutUtility.GetLastRect();
+                if (__sv.height > Sc(40f)) SRApi.PageViewportHeight = __sv.height;
+            } catch (Exception __vm) { Guard.Log("页面视口实测", __vm); }
+            // 底部为底栏条留出空间（底栏是绝对绘制的，这里只负责不让页面内容压到它）。
+            GUILayout.Space(__barH + Sc(2f));
             // 滚轮被下拉框 / 滑块吃掉 -> 撤销本帧页面滚动。
             // 两道判定：1) 盾（绘制前、上一帧矩形命中）；2) 本帧绘制后的控件矩形命中。
             if (WheelShieldHit || (__wasWheel && __overCtrlPrev)) {
