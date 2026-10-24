@@ -590,18 +590,10 @@ namespace SR_UCH.Tweaks {
 				LobbyManager lm = LobbyManager.instance;
 				GameControl gc = (lm != null) ? lm.CurrentGameController : null;
 				if (gc == null) {
+					// 树屋/大厅：HUD 完全不显示（用户要求删除大厅显示）。
 					if (_gc != null || _hasGame) ResetGameState();
-					// 树屋/大厅：显示「大厅」标题 + 当前投票关卡；无倒计时/回合。
-					bool inTreehouse = false;
-					try { inTreehouse = SRApi.Env.InTreehouse; } catch { inTreehouse = false; }
-					if (inTreehouse) {
-						_inLobby = true;
-						UpdateLobby();
-						UpdateExtraText();
-						UpdateVisible();
-						return;
-					}
 					_inLobby = false;
+					_lobbyVote = null;
 					StepAlpha(false);
 					return;
 				}
@@ -891,15 +883,6 @@ namespace SR_UCH.Tweaks {
 		}
 
 		// 树屋/大厅：只保留标题「大厅」与当前投票关卡；玩家列表随玩家面板一并删除。
-		private static void UpdateLobby() {
-			try {
-				_lobbyVote = FindLeadingVote(LobbyManager.instance);
-			} catch (Exception __ex) {
-				_lobbyVote = null;
-				SRApi.Guard.Log("HUD 大厅信息", __ex);
-			}
-		}
-
 		// 得票最多的关卡传送门（没有票就返回 null）。
 		private static LevelPortal FindLeadingPortal(LobbyManager lm, out int votes) {
 			votes = 0;
@@ -1215,8 +1198,7 @@ namespace SR_UCH.Tweaks {
 			if (_hudAlpha <= 0.004f) return;
 			if (!SRApi.GateMaster) return;
 			bool inGame = _hasGame && _phase != GameControl.GamePhase.NONE;
-			bool inLobby = _inLobby;
-			if (!inGame && !inLobby) return;
+			if (!inGame) return;   // 大厅/树屋不画 HUD
 			EnsureStyles();
 			float hudA = _hudAlpha;
 			float textA = Opacity() * hudA;
@@ -1225,16 +1207,7 @@ namespace SR_UCH.Tweaks {
 			// 1) 拼行。
 			int n = 0;
 			_segCount = 0;
-			if (inLobby) {
-				// 树屋/大厅：只有标题「大厅」+ 当前投票关卡（玩家列表随玩家面板删除），没有倒计时/回合。
-				string title = SRApi.T("大厅", "Lobby");
-				float ft = SlotFadeChange(20, title);
-				AddLineFade(ref n, title, null, LinePhase, WithA(Color.white, textA * ft));
-				if (!string.IsNullOrEmpty(_lobbyVote)) {
-					float fv = SlotFadeChange(21, _lobbyVote);
-					AddLineFade(ref n, _lobbyVote, null, LineSmall, WithA(Color.white, textA * fv));
-				}
-			} else {
+			{
 				Color cPhase = Col(_colPhase, Color.white);
 				Color cCountdown = Col(_colCountdown, Color.white);
 				Color cRound = Col(_colRound, Color.white);
