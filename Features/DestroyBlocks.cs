@@ -17,6 +17,10 @@ namespace SR_UCH.Tweaks {
         private static List<Placeable> Blocks = new List<Placeable>();
         private static bool _altDown;
         private static Placeable _selected;
+        private static GameObject _infoTag;
+        private static Text _infoText;
+        private static Placeable _infoTarget;
+        private static bool _infoTagTried;
         private static Placeable _tintedBlock; // 当前高亮方块
         private static ConfigEntry<KeyCode> _toggleKey;
         private static ConfigEntry<KeyCode> _deleteKey;
@@ -307,7 +311,7 @@ namespace SR_UCH.Tweaks {
                 "Refresh Mode",
                 RefreshMode.Realtime,
                 "列表刷新：实时 = 按住切换键期间候选表持续保持最新（已节流，只在按住时有开销）；暂存 = 只在按下切换键那一刻重建一次。");
-            _useSmoke = _mp.Config.Bind("Destroy Blocks", "Use Smoke", false, "破坏动画：删除方块时是否播放破坏动画/烟雾（默认关闭）。");
+            _useSmoke = _mp.Config.Bind("Destroy Blocks", "Use Smoke", true, "破坏动画：删除方块时是否播放破坏动画/烟雾（默认关闭）。");
             // 过滤条件变了：实时模式下候选表要重新过滤一次。
             _listMode.SettingChanged += (s, e) => _listDirty = true;
             _trackMode.SettingChanged += (s, e) => _listDirty = true;
@@ -345,6 +349,7 @@ namespace SR_UCH.Tweaks {
             _index = 0;
             _listDirty = false;
             _lastListRebuildAt = -999f; // 新场景：下次按住切换键时无条件重建一次
+            DestroyInfoTag();
         }
 
         [HarmonyPatch(typeof(GameControl), "Update")]
@@ -422,6 +427,7 @@ namespace SR_UCH.Tweaks {
                     _tintedBlock = _selected;
                 }
                 try { _selected.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.AddBombTint", __ex); } // 每帧应用高亮色（bombTints > 0 -> 白色）
+                try { UpdateInfoTag(_selected); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.UpdateInfoTag", __ex); }
             } 
             else if(_altDown)
             {
@@ -431,6 +437,7 @@ namespace SR_UCH.Tweaks {
                 }
                 _tintedBlock = null;
                 _selected = null;
+                DestroyInfoTag();
                 RebuildList();
                 if (Blocks.Count <= 0) return;
                 if (_index < 0 || _index >= Blocks.Count) _index = Blocks.Count - 1;
@@ -541,6 +548,54 @@ namespace SR_UCH.Tweaks {
         }
 
 
+
+        // 选中方块上方的名牌（参考 RemovePlayerPlacements：克隆角色光标名牌，显示 (玩家号) 名字 + 玩家颜色）。
+        private static void UpdateInfoTag(Placeable p) {
+            if (p == _infoTarget) {
+                if (_infoTag != null) _infoTag.transform.position = p.transform.position + new Vector3(0f, 1.5f, 0f);
+                return;
+            }
+            _infoTarget = p;
+            if (!EnsureInfoTag()) return;
+            PlacementInfo info = ResolveInfo(p);
+            string label = info != null ? "(" + info.playerNumber + ") " + info.playerName : "?";
+            if (_infoText != null) {
+                _infoText.text = label;
+                if (info != null) _infoText.color = info.color;
+            }
+            if (_infoTag != null) _infoTag.transform.position = p.transform.position + new Vector3(0f, 1.5f, 0f);
+        }
+
+        private static bool EnsureInfoTag() {
+            if (_infoTag != null) return true;
+            if (_infoTagTried) return false;
+            foreach (Character c in UnityEngine.Object.FindObjectsOfType<Character>()) {
+                if (c == null) continue;
+                GamePlayer gp = c.AssociatedGamePlayer;
+                if (gp == null || gp.CursorInstance == null || gp.CursorInstance.nameTag == null) continue;
+                GameObject go = (GameObject)UnityEngine.Object.Instantiate(gp.CursorInstance.nameTag.gameObject);
+                NameTag nt = go.GetComponent<NameTag>();
+                if (nt != null) {
+                    nt.currentAlpha = 1f;
+                    if (nt.nameCanvasGroup != null) nt.nameCanvasGroup.alpha = 1f;
+                    if (nt.canvas != null) nt.canvas.sortingOrder = 32767;
+                }
+                go.transform.SetParent(null);
+                _infoText = go.GetComponentInChildren<Text>();
+                _infoTag = go;
+                _infoTagTried = true;
+                return true;
+            }
+            _infoTagTried = true;
+            return false;
+        }
+
+        private static void DestroyInfoTag() {
+            if (_infoTag != null) { UnityEngine.Object.Destroy(_infoTag); _infoTag = null; }
+            _infoText = null;
+            _infoTarget = null;
+            _infoTagTried = false;
+        }
         // 供外部模块调用：是否为玩家放置的道具（关卡自带布局与系统件不算）。
         public static bool IsPlayerPlaced(Placeable p) {
             try { return ResolveInfo(p) != null; } catch { return false; }

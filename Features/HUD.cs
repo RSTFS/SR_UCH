@@ -698,8 +698,12 @@ namespace SR_UCH.Tweaks {
 				break;
 			}
 			case GameControl.GamePhase.PLACE: {
-				// 派对模式：建造阶段就是“倒数”，从设置的建造秒数（PlaceTime）往下走。
+				// 派对模式：建造阶段以游戏自己的 placementTimer 为准（每个派对盒/每次进入建造都会重置）。
 				if (IsPartyMode(gs)) {
+					if (vs != null) {
+						float pt = ReadFloat(ref _fPlacementTimer, vs, "placementTimer", "HUD（建造剩余时间）");
+						if (pt >= 0f) { countdown = true; remaining = pt; break; }
+					}
 					float partyTotal = gs != null ? gs.PlaceTime : 0f;
 					if (partyTotal > 0.05f) { countdown = true; remaining = partyTotal - elapsed; }
 					break;
