@@ -837,6 +837,20 @@ public partial class SR {
                 DrawLine(new Rect(a.box.x, a.box.y + headerH - 1f, a.stripW, 1f), CurStyle.LineStrong);
             }
             TableRowRects(a.rowCount, rowH, a.scrollY, a.rowsH, a.box.y, headerH, a.rowsClip, a.box.x, a.stripW, a.rowRects, a.rowRows);
+            // 表头 Shift+左键：交给页面处理列头专属开关（如联机列表的“质量系数”）。
+            // 必须用 MouseDown 判定：IMGUI 到 MouseUp 时修饰键可能已丢。
+            try {
+                Event __he = Event.current;
+                if (__he != null && __he.type == EventType.MouseDown && __he.button == 0 && __he.shift
+                    && a.headerShiftClick != null && a.headerCells.Count > 0) {
+                    for (int __hk = 0; __hk < a.headerCells.Count && __hk < a.headerCols.Count; __hk++) {
+                        if (!a.headerCells[__hk].Contains(__he.mousePosition)) continue;
+                        a.headerShiftClick(a.headerCols[__hk]);
+                        __he.Use();
+                        break;
+                    }
+                }
+            } catch (Exception __ex) { Guard.Log("表头Shift点击派发", __ex); }
             // 行命中：用 rowRects 每帧回填 rowHover（只在行区裁剪内，且不算钉住列区域）。
             try {
                 Event __re = Event.current;
@@ -1030,6 +1044,13 @@ public partial class SR {
                 if (__ce != null) {
                     if (__ce.type == EventType.MouseDown && __ce.button == 0) {
                         _rowDownRow = a.rowHover;
+                    } else if (__ce.type == EventType.MouseUp && __ce.button == 1) {
+                        // 行右键（核心统一派发；钉住操作列区域不算行命中）。
+                        int __rr = a.rowHover;
+                        if (__rr >= 0 && a.rowRightClick != null) {
+                            try { a.rowRightClick(__rr); } catch (Exception __rc2) { Guard.Log("表格行右键", __rc2); }
+                            __ce.Use();
+                        }
                     } else if (__ce.type == EventType.MouseUp && __ce.button == 0) {
                         int __clicked = (a.rowHover >= 0 && a.rowHover == _rowDownRow) ? a.rowHover : -1;
                         _rowDownRow = -1;

@@ -457,14 +457,8 @@ namespace SR_UCH.Tweaks {
                 : availH;
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
-            // Shift+左键点「游戏质量」列头：必须在页面自己的 MouseDown 里先记下来（此时 Event.current.shift 可靠），
-            // 因为核心的 click 回调要等 MouseUp 才派发，IMGUI 的修饰键到 MouseUp 时可能已经丢了。
-            Event __hdrEv = Event.current;
-            bool __hdrShift = __hdrEv != null && __hdrEv.type == EventType.MouseDown && __hdrEv.button == 0 && ShiftHeldNow();
-            Vector2 __hdrMp = __hdrEv != null ? __hdrEv.mousePosition : Vector2.zero;
             TableDraw(box);
             TableInput(box, Event.current);
-            HandleQualityHeaderMouseDown(__hdrMp, __hdrShift);
             HeightGrip();   // 表格底边：拖动改高度
         }
 

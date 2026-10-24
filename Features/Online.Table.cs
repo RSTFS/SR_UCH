@@ -78,6 +78,18 @@ namespace SR_UCH.Tweaks {
         }
 
         // 切换「游戏质量」列的技能匹配质量系数显示；页面 MouseDown 与核心 click 两条入口共用。
+        // 行右键：隐藏该房间（核心 rowRightClick 回调，参数=可见行下标）。
+        private static void HideLobbyAt(int row) {
+            try {
+                Matchmaker.LobbyListInfo li = row >= 0 && row < _shownLobbies.Count ? _shownLobbies[row] : null;
+                if (li == null) return;
+                _hidden.Add(li.sLobbyID);
+                _lobbiesDirty = true;
+                Notes("已隐藏房间：" + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner),
+                      "Hidden: " + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner));
+            } catch (Exception __ex) { SRApi.Guard.Log("联机/隐藏房间", __ex); }
+        }
+
         private static void ToggleQualityCoeff(string from) {
             if (_showQualityCoeff == null) return;
             bool v = !_showQualityCoeff.Value;
@@ -92,45 +104,8 @@ namespace SR_UCH.Tweaks {
 
         // 页面自己的 Shift+左键质量列表头入口：本帧表头几何刚由 TableDraw 算好，直接复算命中，
         // 完全不依赖核心 MouseUp 的 click 派发（根因见文件头对 TableColMove 的说明）。
-        private static void HandleQualityHeaderMouseDown(Vector2 mp, bool shift) {
-            try {
-                if (!shift) return;
-                int hit = HeaderColAt(mp);
-                // 实机排查用：确认 Shift+左键的按下事件确实进到页面、且命中的是不是质量列。
-                try {
-                    SRApi.LogInfo("[联机] Shift+左键按下：表头命中列=" + hit + "（质量列=" + QualityCol
-                        + "，Event.shift=" + (Event.current != null && Event.current.shift) + "）");
-                } catch { }
-                if (hit != QualityCol) return;
-                // 本次按下由页面处理：清掉核心刚记下的列头拖动状态，避免 MouseUp 再回调一次 click 把开关切回去。
-                _tableArgs.moveCol = -1;
-                _tableArgs.moveDx = 0f;
-                ToggleQualityCoeff("页面 MouseDown");
-            } catch (Exception __ex) { SRApi.Guard.Log("联机表头 Shift 点击", __ex); }
-        }
-
         // 表头命中（独立复算，避免依赖 core headerCells 的时序）：返回命中的数据列索引，未命中 -1。
         // 列序/隐藏/横向滚动与核心 DeriveVisibleCols 同一套规则；钉住的操作列不参与。
-        private static int HeaderColAt(Vector2 mp) {
-            try {
-                if (_order == null || _cw == null || _order.Length != ColCount || _cw.Length != ColCount) return -1;
-                Rect box = _tableArgs.box;
-                float headerH = SRApi.Ctl.Sc(24);
-                if (box.width <= 0f || box.height <= 0f) return -1;
-                if (mp.y < box.y || mp.y >= box.y + headerH) return -1;
-                float x = box.x - _scrollCols.x;
-                float stripEnd = box.x + _tableArgs.stripW;
-                float sepW = SRApi.Ctl.Sc(4f);   // 右边 4px 是核心的列宽分隔线（拖列宽用），不算点击表头
-                for (int i = 0; i < ColCount; i++) {
-                    int ci = _order[i];
-                    if (ci < 0 || ci >= ColCount || ci == JoinCol || _hiddenCols.Contains(ci)) continue;
-                    float w = SRApi.Ctl.Sc(_cw[ci]);
-                    if (mp.x >= x && mp.x < x + w - sepW && mp.x >= box.x && mp.x < stripEnd) return ci;
-                    x += w;
-                }
-            } catch { }
-            return -1;
-        }
         private static readonly List<Matchmaker.LobbyListInfo> _shownLobbies = new List<Matchmaker.LobbyListInfo>();
         private static readonly List<Rect> _headerCellsPage = new List<Rect>();   //可滚动列的表头单元格（页面坐标）
         private static readonly List<int> _headerCols = new List<int>();          //上表每个单元格 -> 列索引
@@ -257,6 +232,10 @@ namespace SR_UCH.Tweaks {
             // Shift+右键 = 还原全部：接到本表自己的还原例程 ResetTable。
             _tableArgs.resetAll = delegate { ResetTable(); };
         _tableArgs.click = HeaderClickOnce;
+            // 表头 Shift+左键（核心在 MouseDown 派发，修饰键可靠）：质量列切换系数显示。
+            _tableArgs.headerShiftClick = delegate(int ci) { if (ci == QualityCol) ToggleQualityCoeff("core headerShiftClick"); };
+            // 行右键（核心派发，钉住操作列不算行命中）：隐藏该房间。
+            _tableArgs.rowRightClick = delegate(int row) { HideLobbyAt(row); };
             _tableArgs.rowCells = delegate(int r) { return CellTexts(_shownLobbies[r]); };
             _tableArgs.rowAlpha = delegate(int r) { return IsJoinable(_shownLobbies[r]) ? 1f : 0.55f; };
             _tableArgs.headerCells = _headerCellsPage; _tableArgs.headerCols = _headerCols;
@@ -384,18 +363,9 @@ namespace SR_UCH.Tweaks {
                         string hiddenColMsg = SRApi.T("已隐藏列：", "Hidden column: ") + nm;
                         Notes(hiddenColMsg, hiddenColMsg);
                     }
-                } else {
-                    // 行命中交给核心每帧回填的 rowHover（与 rowRects 同一套裁剪规则），不再手写矩形遍历。
-                    int si = _tableArgs.rowHover;
-                    Matchmaker.LobbyListInfo li = si >= 0 && si < _shownLobbies.Count ? _shownLobbies[si] : null;
-                    if (li != null) {
-                        _hidden.Add(li.sLobbyID);
-                        _lobbiesDirty = true;   // 可见集合变了，需重算"筛选后 N 个"
-                        Notes("已隐藏房间：" + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner),
-                              "Hidden: " + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner));
-                    }
+                    e.Use();   // 表头右键隐藏列由核心完成，这里只负责落盘/提示
                 }
-                e.Use();
+                // 行右键隐藏房间：已交给核心 rowRightClick 回调（HideLobbyAt），页面不再自行命中。
             }
             // 加入按钮：手动点击
             for (int i = 0; i < _joinRectsPage.Count; i++) {

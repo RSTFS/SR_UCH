@@ -384,7 +384,9 @@ namespace SR_UCH {
             // 行交互：核心每帧用 rowRects 做命中并回填，调用方只读。
             public int rowHover = -1;                       //鼠标命中的数据行号；-1 = 没有
             public System.Action<int> rowClick;             //左键 MouseUp 命中非钉住列区域时回调行号
-            public System.Action<int> rowDoubleClick;       //0.35 秒内同一行左键点击两次时回调
+            public System.Action<int> rowDoubleClick;
+            public System.Action<int> rowRightClick;   // 右键单击行（MouseUp 右键，仅在行上）
+            public System.Action<int> headerShiftClick; // Shift+左键单击表头（参数=数据列下标）       //0.35 秒内同一行左键点击两次时回调
             public bool hoverHighlight = true;              //rowHover >= 0 时核心在行矩形上叠一层很淡的高亮
             }
         public static void TableDraw(TableArgs a) { Action<TableArgs> f = _tableDraw; if (f != null) f(a); }
