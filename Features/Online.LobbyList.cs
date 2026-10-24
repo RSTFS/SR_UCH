@@ -288,29 +288,34 @@ namespace SR_UCH.Tweaks {
 
         // 排序：表头选定的排序列优先；否则可加入的排最前，其内部按房间健康分降序，其余按进度。
         // 最后用 sLobbyID 兜底（List.Sort 不稳定，键相同会每帧互换导致表格闪）。
-        private static void SortLobbies() {
+        // 筛选谓词：区域/模式/标签/状态 + 隐藏列表（供核心 TableSource 使用）。
+        private static bool PassLobbyFilter(Matchmaker.LobbyListInfo li) {
             try {
-                _lobbies.Sort((a, b) => {
-                    if (ReferenceEquals(a, b)) return 0;
-                    if (a == null) return 1;
-                    if (b == null) return -1;
-                    if (_sortCol >= 0) {
-                        int r = CompareCol(_sortCol, a, b);
-                        if (r != 0) return _sortDesc ? -r : r;
-                        return string.Compare(a.sLobbyID, b.sLobbyID, StringComparison.Ordinal);
-                    }
-                    bool ja = IsJoinable(a), jb = IsJoinable(b);
-                    if (ja != jb) return ja ? -1 : 1;
-                    // 只在两边都可加入时按游戏自己的 CombinedHealthSkill 降序（后端已算好）。
-                    if (ja) {
-                        int h = b.CombinedHealthSkill.CompareTo(a.CombinedHealthSkill);   //降序
-                        if (h != 0) return h;
-                    }
-                    int c = a.matchProgress.CompareTo(b.matchProgress);
-                    if (c != 0) return c;
-                    return string.Compare(a.sLobbyID, b.sLobbyID, StringComparison.Ordinal);
-                });
-            } catch (Exception __ex) { SRApi.Guard.Log("房间排序", __ex); }
+                if (li == null) return false;
+                if (_hidden.Contains(li.sLobbyID)) return false;
+                return PassFilter(li);
+            } catch { return false; }
+        }
+
+        // 排序比较器：表头排序列优先；否则可加入的排最前，其内部按房间健康分降序，其余按进度；sLobbyID 兜底。
+        private static int CompareLobbies(Matchmaker.LobbyListInfo a, Matchmaker.LobbyListInfo b) {
+            if (ReferenceEquals(a, b)) return 0;
+            if (a == null) return 1;
+            if (b == null) return -1;
+            if (_sortCol >= 0) {
+                int r = CompareCol(_sortCol, a, b);
+                if (r != 0) return _sortDesc ? -r : r;
+                return string.Compare(a.sLobbyID, b.sLobbyID, StringComparison.Ordinal);
+            }
+            bool ja = IsJoinable(a), jb = IsJoinable(b);
+            if (ja != jb) return ja ? -1 : 1;
+            if (ja) {
+                int h = b.CombinedHealthSkill.CompareTo(a.CombinedHealthSkill);
+                if (h != 0) return h;
+            }
+            int c = a.matchProgress.CompareTo(b.matchProgress);
+            if (c != 0) return c;
+            return string.Compare(a.sLobbyID, b.sLobbyID, StringComparison.Ordinal);
         }
 
         // 按某一列比较两个房间：数值列用真实数值（文本比较下 "10" < "2"），其余列用显示文本。

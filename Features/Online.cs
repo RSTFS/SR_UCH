@@ -409,9 +409,7 @@ namespace SR_UCH.Tweaks {
                 // 统计文案仅在列表真的变了或搜索已结束时刷新，避免把"搜索中..."覆盖成"共 0 个房间"。
                 // 错误提示粘住：_lobbyErr 时不覆盖 _lobbyMsg。
                 bool refreshMsg = !_lobbyErr && (_lobbiesDirty || !_lobbySearching);
-                _lobbiesDirty = false;
                 _lobbySortAt = Time.unscaledTime;
-                SortLobbies();
                 if (refreshMsg) UpdateLobbyMsg();
             }
             string hint = SRApi.T("（点刷新列表查询）表头：左键点=按该列排序（升->降->默认），拖分隔线=调列宽（<->），拖表头=换列位置（+），Shift+点游戏质量=显示/隐藏匹配质量系数，右键=隐藏该列，Shift+右键=还原；右键某行=隐藏该房间；滚轮=上下，Ctrl+滚轮=左右；表格底边可拖高度",

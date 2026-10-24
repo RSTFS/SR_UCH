@@ -82,7 +82,7 @@ namespace SR_UCH.Tweaks {
         // 完全不依赖核心 MouseUp 的 click 派发（根因见文件头对 TableColMove 的说明）。
         // 表头命中（独立复算，避免依赖 core headerCells 的时序）：返回命中的数据列索引，未命中 -1。
         // 列序/隐藏/横向滚动与核心 DeriveVisibleCols 同一套规则；钉住的操作列不参与。
-        private static readonly List<Matchmaker.LobbyListInfo> _shownLobbies = new List<Matchmaker.LobbyListInfo>();
+        private static List<Matchmaker.LobbyListInfo> _shownLobbies = new List<Matchmaker.LobbyListInfo>();
         private static readonly List<Rect> _headerCellsPage = new List<Rect>();   //可滚动列的表头单元格（页面坐标）
         private static readonly List<int> _headerCols = new List<int>();          //上表每个单元格 -> 列索引
         private static readonly List<Rect> _rowRectsPage = new List<Rect>();      //房间行（页面坐标，已按可视区裁剪）
@@ -103,15 +103,19 @@ namespace SR_UCH.Tweaks {
         private static int _clickFrame = -1;            //表头单击一帧只处理一次
         private static readonly SRApi.TableArgs _tableArgs = new SRApi.TableArgs(); //统一入口参数（复用，避免每帧分配）
 
-        // 当前会显示的房间（筛选 + 未隐藏），顺序已由 SortLobbies 排好。
+        private static readonly SRApi.TableSource<Matchmaker.LobbyListInfo> _lobbySource =
+            new SRApi.TableSource<Matchmaker.LobbyListInfo>();
+
+        // 当前会显示的房间（筛选 + 未隐藏 + 排序）：统一走核心数据管线，最多每 0.5 秒或脏标记时重算一次。
         private static void CollectShown() {
-            _shownLobbies.Clear();
-            for (int i = 0; i < _lobbies.Count; i++) {
-                Matchmaker.LobbyListInfo li = _lobbies[i];
-                if (li == null || !PassFilter(li)) continue;
-                if (_hidden.Contains(li.sLobbyID)) continue;
-                _shownLobbies.Add(li);
-            }
+            try {
+                if (_lobbiesDirty) { _lobbySource.Invalidate(); }
+                _lobbySource.Filter = PassLobbyFilter;
+                _lobbySource.Sort = CompareLobbies;
+                long stamp = (long)(Time.unscaledTime * 2f);
+                _shownLobbies = _lobbySource.Refresh(_lobbies, stamp);
+                _lobbiesDirty = false;   // 本次已按脏标记重算，清掉避免每帧重复排序
+            } catch (Exception __ex) { SRApi.Guard.Log("联机/筛选排序", __ex); }
         }
 
         // 可视行的单元格文本数组：按房间跨帧复用同一份数组，仅在首次出现时分配。
