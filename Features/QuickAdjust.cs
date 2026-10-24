@@ -45,65 +45,65 @@ public class QuickAdjust : ITweak {
         SRApi.LocDesc("Quick Adjust", "Quick Retry Fast", "快速重试开关\n挑战模式死亡后长按重试键到设定秒数自动重试\n仅挑战模式生效，长按时间在下方设置。", "quick retry toggle\nin challenge mode, hold the retry key for the set time after death to retry\nchallenge mode only; the hold time is set below");
         SRApi.LocKey("Quick Adjust", "Quick Retry Hold", "等待秒数", null);
         SRApi.LocDesc("Quick Adjust", "Quick Retry Hold", "快速重试长按时间\n设置死亡后长按多久触发重试\n范围 0 到 2，0 为立即重试", "quick retry hold time\nsets how long to hold after death before retrying\nrange 0-2, 0 = instant");
-		SRApi.LocKey("Quick Adjust", "Handicap", "评分（handicap）", null);
-		SRApi.LocDesc("Quick Adjust", "Handicap", "当前 handicap 数值\n直接设置自己那行的 handicap（10-100，整十）\n等效折扣 = 100 减该数值，100 即不折扣。", "current handicap value\nsets your own handicap directly (10-100 in tens)\nequivalent discount = 100 minus this value, 100 = no discount");
+		SRApi.LocKey("Quick Adjust", "Handicap", "评分百分比", null);
+		SRApi.LocDesc("Quick Adjust", "Handicap", "当前评分百分比\n直接设置自己那行的评分百分比（10-100，整十）\n等效折扣 = 100 减该数值，100 即不折扣。", "current score percentage\nsets your own score percentage directly (10-100 in tens)\nequivalent discount = 100 minus this value, 100 = no discount");
 		SRApi.LocKey("Quick Adjust", "More Handicap Values", "更多数值", null);
 		SRApi.LocDesc("Quick Adjust", "More Handicap Values", "自由输入模式开关\n开启后 handicap 由整十滑块改为输入框\n范围 10 到 100 任意整数。", "free input mode switch\nturns the tens slider into an input box\nany integer from 10 to 100");
         // 预登记本页自动快捷键。
         SRApi.HotkeyAction("qa.apply_discount", "应用折扣", () => QuickAdjust.ApplyScoreDiscount());
-        SRApi.HotkeyAction("qa.restore_discount", "恢复原值", () => QuickAdjust.RestoreScoreDiscount());
+        SRApi.HotkeyAction("qa.restore_discount", "还原折扣", () => QuickAdjust.RestoreScoreDiscount());
     }
 
     public static void Render() {
         try {
         // 每对 BeginHorizontal/EndHorizontal 之间都有会抛异常的控件，任一抛出会使 IMGUI 布局栈失衡，
         // 故整段包 try/catch。
-		SRApi.Ctl.SectionTitle(SRApi.T("- 评分 handicap -", "- Handicap -"));
+		SRApi.Ctl.SectionTitle(SRApi.T("- 评分百分比 -", "- Score percentage -"));
 		GUILayout.BeginHorizontal();
 		ConfigEntryBase disc = SRApi.Ctl.FindEntry("Quick Adjust", "Handicap");
 		int discVal = QuickAdjust.HandicapValue;
-		GUIContent __dct = new GUIContent(SRApi.T("handicap", "handicap"));
-		float __dcw = Mathf.Max(SRApi.Ctl.Sc(64), SRApi.Ctl.LabelWrap.CalcSize(__dct).x + SRApi.Ctl.Sc(8));
+		// 悬浮说明：直接给标签挂 tooltip（本页自定义控件不走条目自动提示）。
+		GUIContent __dct = new GUIContent(SRApi.T("评分百分比", "Score percentage"),
+			SRApi.T("当前评分百分比\n直接设置自己那行的评分百分比（10-100）\n等效折扣 = 100 减该数值，100 即不折扣。",
+				"current score percentage\nsets your own score percentage directly (10-100)\nequivalent discount = 100 minus this value, 100 = no discount"));
+		float __dcw = Mathf.Max(SRApi.Ctl.Sc(84), SRApi.Ctl.LabelWrap.CalcSize(new GUIContent(__dct.text)).x + SRApi.Ctl.Sc(8));
 		GUILayout.Label(__dct, SRApi.Ctl.LabelWrap, GUILayout.Width(__dcw), GUILayout.Height(SRApi.Ctl.Sc(52)));
 		int slideVal = Mathf.Clamp(discVal, 10, 100);
-		int nslide;
 		if (QuickAdjust.MoreHandicapOn) {
+			// 自由输入：隐藏右侧数值标签，输入框自己显示数值。
 			string cur = slideVal.ToString();
-			string nvText = SRApi.ClearableTextField(cur, SRApi.Ctl.SearchBox, GUILayout.Width(SRApi.Ctl.Sc(80)), GUILayout.Height(SRApi.Ctl.Sc(26)));
+			string nvText = SRApi.ClearableTextField(cur, SRApi.Ctl.SearchBox, GUILayout.Width(SRApi.Ctl.Sc(90)), GUILayout.Height(SRApi.Ctl.Sc(26)));
 			int parsed;
 			if (nvText != cur && int.TryParse(nvText, out parsed)) {
 				parsed = Mathf.Clamp(parsed, 10, 100);
 				if (disc != null) SRApi.Ctl.SetValue(disc, parsed);
 			}
-			nslide = Mathf.Clamp(discVal, 10, 100);
 		} else {
-			Rect sr = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(220), SRApi.Ctl.Sc(28));
+			Rect sr = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(200), SRApi.Ctl.Sc(28));
 			float nv = SRApi.Ctl.DrawSlider(sr, slideVal, 10f, 100f, true);
-			nslide = Mathf.Clamp(Mathf.RoundToInt(nv / 10f) * 10, 10, 100);
+			int nslide = Mathf.Clamp(Mathf.RoundToInt(nv / 10f) * 10, 10, 100);
 			if (nslide != slideVal && disc != null) SRApi.Ctl.SetValue(disc, nslide);
+			GUILayout.Label(nslide + "%", SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(56)), GUILayout.Height(SRApi.Ctl.Sc(26)));
 		}
-		GUILayout.Label(nslide.ToString(), SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(52)), GUILayout.Height(SRApi.Ctl.Sc(26)));
-		GUILayout.Label(SRApi.T("（等效折扣 ", "(discount ") + (100 - nslide) + "%）", SRApi.Ctl.LabelWrap, GUILayout.Height(SRApi.Ctl.Sc(26)));
-		GUILayout.FlexibleSpace();
-		GUILayout.EndHorizontal();
-		GUILayout.BeginHorizontal();
+		GUILayout.Space(SRApi.Ctl.Sc(10));
+		// 「更多数值」开关放在滑块右边同一行。
 		ConfigEntryBase more = SRApi.Ctl.FindEntry("Quick Adjust", "More Handicap Values");
 		if (more != null) {
-			SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("自由输入数值", "Free value"),
-				SRApi.T("自由输入模式开关\n开启后 handicap 由整十滑块改为输入框\n范围 10 到 100 任意整数。",
+			SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("更多数值", "More values"),
+				SRApi.T("自由输入模式开关\n开启后评分百分比由整十滑块改为输入框\n范围 10 到 100 任意整数。",
 						"free input mode switch\nturns the tens slider into an input box\nany integer from 10 to 100")),
-				more, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(30));
+				more, SRApi.Ctl.Sc(110), SRApi.Ctl.Sc(26));
 			SRApi.Ctl.RenderControl(more);
 		}
 		GUILayout.FlexibleSpace();
 		GUILayout.EndHorizontal();
 		GUILayout.Space(SRApi.Ctl.Sc(2));
 		GUILayout.BeginHorizontal();
-		if (SRApi.Ctl.HotkeyButton("qa.apply_discount", SRApi.T("应用", "Apply"), SRApi.T("把 handicap 设成上面的数值.\n滑块 10 到 100 整十走, 100 不折扣, 10 相当于减 90%.\n这一局立刻生效, 平衡板上能看到.", "Set your handicap to the value above.\nSlider goes 10-100 in tens: 100 = no discount, 10 = 90% off.\nTakes effect immediately and shows on the balancer."), QuickAdjust.ApplyScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
+		if (SRApi.Ctl.HotkeyButton("qa.apply_discount", SRApi.T("应用折扣", "Apply"), SRApi.T("把评分百分比设成上面的数值.\n滑块 10 到 100 整十走, 100 不折扣, 10 相当于减 90%.\n这一局立刻生效, 平衡板上能看到.", "Set your score percentage to the value above.\nSlider goes 10-100 in tens: 100 = no discount, 10 = 90% off.\nTakes effect immediately and shows on the balancer."), QuickAdjust.ApplyScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
 			QuickAdjust.ApplyScoreDiscount();
 		}
 		GUILayout.Space(SRApi.Ctl.Sc(8));
-		if (SRApi.Ctl.HotkeyButton("qa.restore_discount", SRApi.T("恢复 100", "Restore 100"), SRApi.T("把 handicap 恢复为 100%（不折扣）.\n等价于滑块拖到 100 再应用.\n只影响自己那一行.", "Restore your handicap to 100% (no discount).\nSame as setting the slider to 100 and applying.\nAffects only your own row."), QuickAdjust.RestoreScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
+		if (SRApi.Ctl.HotkeyButton("qa.restore_discount", SRApi.T("还原折扣", "Restore"), SRApi.T("把评分百分比恢复为 100%（不折扣）.\n等价于滑块拖到 100 再应用.\n只影响自己那一行.", "Restore your score percentage to 100% (no discount).\nSame as setting the slider to 100 and applying.\nAffects only your own row."), QuickAdjust.RestoreScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
 			QuickAdjust.RestoreScoreDiscount();
 		}
 		GUILayout.FlexibleSpace();
@@ -195,6 +195,7 @@ public class QuickAdjust : ITweak {
 			_quickRetryFast = cfg.Bind<bool>("Quick Adjust", "Quick Retry Fast", false, "快速重试（仅挑战模式）：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n默认关闭；对局中开关立即生效。");
 			_quickRetryHoldTime = cfg.Bind<float>("Quick Adjust", "Quick Retry Hold", 0.5f, "快速重试的长按等待秒数（0-2，0=立即；挑战模式死亡后长按 B 达到该秒数自动重试）。");
         // 本类自带 [HarmonyPatch] 但 ITweak 为反射发现，须手动 CreateAndPatchAll；单个目标失效只丢本类功能。
+			try { SRApi.RegisterTick("评分百分比-保持", TickKeepHandicap); } catch { }
 			try { Harmony.CreateAndPatchAll(typeof(QuickAdjust), (string)null); }
 			catch (Exception e) { SRApi.LogError("快速调整 补丁注册失败: " + e.Message); }
     }
@@ -423,33 +424,23 @@ public class QuickAdjust : ITweak {
 			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.Send", __ex); }
 		}
 
-		// 新关卡会重建 GamePlayer（Handicap 回到 100）。这里在它生成时补发一次已保存的折扣，
-		// 事件驱动、不做轮询，也不会反复改动数值。
-		[HarmonyPatch(typeof(GamePlayer), "OnStartClient")]
-		private static void OnStartClientApplyKeep(GamePlayer __instance) { ApplyKeepOnce(__instance); }
-
-		[HarmonyPatch(typeof(GamePlayer), "OnStartServer")]
-		private static void OnStartServerApplyKeep(GamePlayer __instance) { ApplyKeepOnce(__instance); }
-
-		private static void ApplyKeepOnce(GamePlayer gp) {
+		// 同房间内定期补发（早期做法）：切关卡会重建 GamePlayer，这里 0.4s 检查一次并补回。
+		private static float _keepAt = -999f;
+		private static void TickKeepHandicap() {
 			try {
-				if (gp == null || !gp.isLocalPlayer) return;
-				// 房间权威值是 LobbyPlayer.handicap（树屋评分板改的就是它，跨关卡一直保留）。
-				// GamePlayer.Handicap 只用于计分板显示，每关重建后回到 100，这里按房间值补一次。
-				int want = 100;
-				try {
-					foreach (Player p in PlayerManager.GetInstance()) {
-						if (p == null) continue;
-						LobbyPlayer lp = p.AssociatedLobbyPlayer;
-						if (lp == null || !lp.IsLocalPlayer) continue;
-						want = lp.Networkhandicap;
-						break;
-					}
-				} catch { want = _keepHandicap > 0 ? _keepHandicap : 100; }
-				if (want <= 0) want = 100;
-				if (gp.Handicap == want) return;
-				gp.CallCmdSetPlayerHandicap(want);
-			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust/新关卡同步显示折扣", __ex); }
+				if (_keepHandicap <= 0) return;
+				if (Time.unscaledTime - _keepAt < 0.4f) return;
+				_keepAt = Time.unscaledTime;
+				foreach (Player p in PlayerManager.GetInstance()) {
+					if (p == null) continue;
+					LobbyPlayer lp = null;
+					try { lp = p.AssociatedLobbyPlayer; } catch { }
+					if (lp == null || !lp.IsLocalPlayer) continue;
+					try { if (lp.Networkhandicap != _keepHandicap) lp.SetPlayerHandicap(_keepHandicap); } catch { }
+					try { if (p.AssociatedGamePlayer != null && p.AssociatedGamePlayer.Handicap != _keepHandicap) p.AssociatedGamePlayer.CallCmdSetPlayerHandicap(_keepHandicap); } catch { }
+					break;
+				}
+			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.TickKeepHandicap", __ex); }
 		}
 
 		// 已应用的折扣目标（10~100；0 = 未应用）。切换关卡 / 重建 GamePlayer 后由 Tick 自动补回。
