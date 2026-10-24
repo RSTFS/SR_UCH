@@ -2353,7 +2353,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 						string snapName = doc.DocumentElement.GetAttribute("snapshotName");
 						if (string.IsNullOrEmpty(snapName)) snapName = doc.DocumentElement.GetAttribute("levelName");
 						if (!string.IsNullOrEmpty(snapName)) li.Name = snapName;
-						li.Mode = LocalModeFromFilename(fn);
+						li.Mode = "";   // 本地快照不存 GameMode：留空表示跟随当前/所选的加载模式，避免按后缀误判成派对
 						li.Blocks = blocks;
 						li.Ok = blocks > 0;
 						li.TimeUtc = File.GetLastWriteTimeUtc(fp);
