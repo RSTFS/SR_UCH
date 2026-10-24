@@ -688,13 +688,6 @@ namespace SR_UCH.Tweaks {
 			// 挑战模式：计时以游戏自己的 runTime 为准，按空格开始前（runStarted=false）不计数。
 			if (IsChallengeMode() && gc is ChallengeControl) { UpdateChallengeTimer(gc); return; }
 
-			// 派对模式：建造阶段不计时（不累加、不倒数，按挑战风格的 00:00 显示），进入跑动阶段后照常计时。
-			if (IsPartyMode(gs) && _phase == GameControl.GamePhase.PLACE) {
-				_timerText = FormatClock(0);
-				_warnLevel = 0;
-				return;
-			}
-
 			float elapsed = Mathf.Max(0f, Time.unscaledTime - _phaseStart);
 			float remaining = -1f;
 			bool countdown = false;
@@ -706,6 +699,12 @@ namespace SR_UCH.Tweaks {
 				break;
 			}
 			case GameControl.GamePhase.PLACE: {
+				// 派对模式：建造阶段就是“倒数”，从设置的建造秒数（PlaceTime）往下走。
+				if (IsPartyMode(gs)) {
+					float partyTotal = gs != null ? gs.PlaceTime : 0f;
+					if (partyTotal > 0.05f) { countdown = true; remaining = partyTotal - elapsed; }
+					break;
+				}
 				bool useTimer = gs != null && gs.UsePlaceTimer;
 				if (useTimer) {
 					if (vs != null) {

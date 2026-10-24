@@ -194,7 +194,6 @@ public class QuickAdjust : ITweak {
 			_quickRetryFast = cfg.Bind<bool>("Quick Adjust", "Quick Retry Fast", false, "快速重试（仅挑战模式）：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n默认关闭；对局中开关立即生效。");
 			_quickRetryHoldTime = cfg.Bind<float>("Quick Adjust", "Quick Retry Hold", 0.5f, "快速重试的长按等待秒数（0-2，0=立即；挑战模式死亡后长按 B 达到该秒数自动重试）。");
         // 本类自带 [HarmonyPatch] 但 ITweak 为反射发现，须手动 CreateAndPatchAll；单个目标失效只丢本类功能。
-			try { SRApi.RegisterTick("评分折扣-保持", TickKeepHandicap); } catch { }
 			try { Harmony.CreateAndPatchAll(typeof(QuickAdjust), (string)null); }
 			catch (Exception e) { SRApi.LogError("快速调整 补丁注册失败: " + e.Message); }
     }
@@ -423,33 +422,27 @@ public class QuickAdjust : ITweak {
 			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.Send", __ex); }
 		}
 
+		// 新关卡会重建 GamePlayer（Handicap 回到 100）。这里在它生成时补发一次已保存的折扣，
+		// 事件驱动、不做轮询，也不会反复改动数值。
+		[HarmonyPatch(typeof(GamePlayer), "OnStartClient")]
+		private static void OnStartClientApplyKeep(GamePlayer __instance) { ApplyKeepOnce(__instance); }
+
+		[HarmonyPatch(typeof(GamePlayer), "OnStartServer")]
+		private static void OnStartServerApplyKeep(GamePlayer __instance) { ApplyKeepOnce(__instance); }
+
+		private static void ApplyKeepOnce(GamePlayer gp) {
+			try {
+				if (_keepHandicap <= 0 || gp == null) return;
+				if (!gp.isLocalPlayer) return;
+				gp.CallCmdSetPlayerHandicap(_keepHandicap);
+			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust/新关卡补发折扣", __ex); }
+		}
+
 		// 已应用的折扣目标（10~100；0 = 未应用）。切换关卡 / 重建 GamePlayer 后由 Tick 自动补回。
 		private static int _keepHandicap;
 		private static float _keepAt = -999f;
 
 		// 每 0.5 秒检查一次本地 GamePlayer 的 handicap，被新关卡重置就重新下发（原生 Command）。
-		private static void TickKeepHandicap() {
-			try {
-				if (_keepHandicap <= 0) return;
-				if (Time.unscaledTime - _keepAt < 0.5f) return;
-				_keepAt = Time.unscaledTime;
-				foreach (Player p in PlayerManager.GetInstance()) {
-					if (p == null) continue;
-					LobbyPlayer lp = null;
-					try { lp = p.AssociatedLobbyPlayer; } catch { }
-					if (lp == null || !lp.IsLocalPlayer) continue;
-					GamePlayer gp = p.AssociatedGamePlayer;
-					if (gp == null) continue;
-					int cur;
-					try { cur = gp.Handicap; } catch { continue; }
-					if (cur == _keepHandicap) continue;
-					try { gp.CallCmdSetPlayerHandicap(_keepHandicap); } catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust/补发折扣", __ex); }
-					try { lp.SetPlayerHandicap(_keepHandicap); } catch { }
-					break;
-				}
-			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.TickKeepHandicap", __ex); }
-		}
-
 		public static void ApplyScoreDiscount()
 		{
 			try
