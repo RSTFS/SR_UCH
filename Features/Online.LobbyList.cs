@@ -100,15 +100,40 @@ namespace SR_UCH.Tweaks {
             return zh;
         }
 
-        private static string DispRegion(string code) {
-            // 先过 SRApi.T：语言包可覆盖"亚太/欧盟/美国"，也可覆盖 "AP"/"EU"/"US" 这些英文原名。
-            // 直接显示游戏给到的区域短代码（AP / EU / US 或原始短名），不翻译成长名。
-            if (code == NoneCode) return "-";
-            if (string.IsNullOrEmpty(code)) return "-";
-            return code;
+        // 区域归一化：把代码、“亚太/欧盟/美国”、region_shortname_xx、英文名统一归到 AP/EU/US。
+        // 筛选与显示都走这一套，避免“存的是代码、比较的是本地化名”导致筛选失效。
+        private static string NormRegion(string s) {
+            if (string.IsNullOrEmpty(s)) return "";
+            string x = s.ToLowerInvariant();
+            if (x.Contains("europe") || x.Contains("_eu") || x.Contains("-eu") || x.Contains(" eu") || x.Contains("欧盟") || x.Contains("欧洲")) return "EU";
+            if (x.Contains("asia") || x.Contains("_ap") || x.Contains("-ap") || x.Contains(" ap") || x.Contains("亚太") || x.Contains("亚洲")) return "AP";
+            if (x.Contains("america") || x.Contains("_us") || x.Contains("-us") || x.Contains("_na") || x.Contains(" us") || x.Contains("美国") || x.Contains("美洲") || x.Contains("北美")) return "US";
+            return s;
         }
 
-        private static string RegionShort(Matchmaker.LobbyListInfo li) { return DispRegion(RegionCode(li)); }
+        private static string DispRegion(string code) {
+            if (code == NoneCode || string.IsNullOrEmpty(code)) return "-";
+            string n = NormRegion(code);
+            if (n == "AP") return SRApi.T("亚太", "Asia Pacific");
+            if (n == "EU") return SRApi.T("欧盟", "Europe");
+            if (n == "US") return SRApi.T("美国", "America");
+            return code;   // 认不出来的原始短名原样显示
+        }
+
+        private static string RegionShort(Matchmaker.LobbyListInfo li) {
+            // 优先用游戏区域对象的本地化短名（LocalizedShortName），拿不到再按代码翻译。
+            try {
+                object r = li != null ? li.UnityServerRegion : null;
+                if (r != null) {
+                    RegionMember m = RegionMembers(r.GetType());
+                    string loc = m.Loc != null ? (m.Loc.GetValue(r, null) as string) : null;
+                    if (!string.IsNullOrEmpty(loc) && loc.IndexOf('/') < 0 && loc.IndexOf("region_", StringComparison.OrdinalIgnoreCase) < 0
+                        && loc.IndexOf("Network/", StringComparison.OrdinalIgnoreCase) < 0)
+                        return loc;
+                }
+            } catch { }
+            return DispRegion(RegionCode(li));
+        }
 
         // 房间满 4 人不可加入（游戏自己的列表也是 Players"/4"）。
         private static bool IsFull(Matchmaker.LobbyListInfo li) { return li.Players >= 4; }
@@ -228,7 +253,12 @@ namespace SR_UCH.Tweaks {
             try {
                 string v;
                 v = Val(_fRegion);
-                if (v.Length > 0 && RegionCode(li) != v) return false;
+                if (v.Length > 0) {
+                    // 存的是代码、显示的是本地化名：两边都归一化后再比，避免筛选选了却没效果。
+                    string want = NormRegion(v);
+                    string have = NormRegion(RegionCode(li));
+                    if (want != have) return false;
+                }
                 v = Val(_fMode);
                 if (v.Length > 0) {
                 string __gm = li.gameMode.ToString();
