@@ -621,7 +621,7 @@ namespace SR_UCH.Tweaks {
             // EX 模块的遗留键（EX 在仓库外，无法自带清理规则）：已确认没有任何代码再读。
             text = RemoveKeys(text, "EX", new[] { "Clear Party Box Key", "Coin Amount" });
             // 快速自杀功能已删除：清理其遗留键。
-            text = RemoveKeys(text, "Quick Adjust", new[] { "Enabled", "Keybind" });
+            text = RemoveKeys(text, "Quick Adjust", new[] { "Enabled", "Keybind", "Score Discount", "More Discount Values" });
             text = RemoveKeys(text, "Internal", new[] { "P Suicide Migrated" });
             // 对局记录功能已删除（2026-10）：清理其配置段遗留键。
             text = RemoveKeys(text, "Match Replay", new[] { "Enabled", "Max Sessions", "Record Scores", "Record Blocks" });

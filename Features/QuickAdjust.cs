@@ -11,8 +11,7 @@ namespace SR_UCH.Tweaks {
 [SrFeature("sr.quickadjust", "QuickAdjust", "1.0")]
 public class QuickAdjust : ITweak {
 
-    private static ConfigEntry<int> _scoreDiscount;
-    private static ConfigEntry<bool> _moreDiscount;
+		private static ConfigEntry<int> _handicap;
     private static ConfigEntry<bool> _quickSwitchEnabled;
     private static ConfigEntry<float> _quickSwitchHold;
     private static ConfigEntry<bool> _quickRetryEnabled;
@@ -45,10 +44,8 @@ public class QuickAdjust : ITweak {
         SRApi.LocDesc("Quick Adjust", "Quick Retry Fast", "快速重试开关\n挑战模式死亡后长按重试键到设定秒数自动重试\n仅挑战模式生效，长按时间在下方设置。", "quick retry toggle\nin challenge mode, hold the retry key for the set time after death to retry\nchallenge mode only; the hold time is set below");
         SRApi.LocKey("Quick Adjust", "Quick Retry Hold", "等待秒数", null);
         SRApi.LocDesc("Quick Adjust", "Quick Retry Hold", "快速重试长按时间\n设置死亡后长按多久触发重试\n范围 0 到 2，0 为立即重试", "quick retry hold time\nsets how long to hold after death before retrying\nrange 0-2, 0 = instant");
-        SRApi.LocKey("Quick Adjust", "Score Discount", "分数折扣", null);
-        SRApi.LocDesc("Quick Adjust", "Score Discount", "分数折扣百分比\n把自己的 handicap 设为 100 减折扣值\n范围 0 到 90，0 为关闭。", "score discount percentage\nsets your handicap to 100 minus the discount\nrange 0-90, 0 = off");
-        SRApi.LocKey("Quick Adjust", "More Discount Values", "更多折扣数值", null);
-        SRApi.LocDesc("Quick Adjust", "More Discount Values", "折扣数值输入模式开关\n开启后折扣由整十滑块改为自由输入框\n范围 0 到 90 任意整数，0 为关闭", "discount input mode switch\nturns the tens slider into a free input box\nany integer from 0 to 90, 0 = off");
+		SRApi.LocKey("Quick Adjust", "Handicap", "评分（handicap）", null);
+		SRApi.LocDesc("Quick Adjust", "Handicap", "当前 handicap 数值\n直接设置自己那行的 handicap（10-100，整十）\n等效折扣 = 100 减该数值，100 即不折扣。", "current handicap value\nsets your own handicap directly (10-100 in tens)\nequivalent discount = 100 minus this value, 100 = no discount");
         // 预登记本页自动快捷键。
         SRApi.HotkeyAction("qa.apply_discount", "应用折扣", () => QuickAdjust.ApplyScoreDiscount());
         SRApi.HotkeyAction("qa.restore_discount", "恢复原值", () => QuickAdjust.RestoreScoreDiscount());
@@ -58,56 +55,34 @@ public class QuickAdjust : ITweak {
         try {
         // 每对 BeginHorizontal/EndHorizontal 之间都有会抛异常的控件，任一抛出会使 IMGUI 布局栈失衡，
         // 故整段包 try/catch。
-        SRApi.Ctl.SectionTitle(SRApi.T("- 分数折扣 -", "- Score discount -"));
-        // 折扣默认整十滑块，开启更多折扣数值后改为自由输入框。
-        GUILayout.BeginHorizontal();
-        ConfigEntryBase disc = SRApi.Ctl.FindEntry("Quick Adjust", "Score Discount");
-        int discVal = QuickAdjust.ScoreDiscount;
-        bool moreOn = QuickAdjust.MoreDiscountOn;
-        // 标签宽度自适应：取"文本宽度+余量"与 64 的较大值，避免英文标签被截断。
-        GUIContent __dct = new GUIContent(SRApi.T("折扣 %", "Discount %"));
-        float __dcw = Mathf.Max(SRApi.Ctl.Sc(64), SRApi.Ctl.LabelWrap.CalcSize(__dct).x + SRApi.Ctl.Sc(8));
-        GUILayout.Label(__dct, SRApi.Ctl.LabelWrap, GUILayout.Width(__dcw), GUILayout.Height(SRApi.Ctl.Sc(52)));
-        if (moreOn) {
-            string cur = discVal.ToString();
-            string nv = SRApi.ClearableTextField(cur, SRApi.Ctl.SearchBox, GUILayout.Width(SRApi.Ctl.Sc(80)), GUILayout.Height(SRApi.Ctl.Sc(26)));
-            int parsed;
-            if (nv != cur && int.TryParse(nv, out parsed)) {
-                parsed = Mathf.Clamp(parsed, 0, 90);
-                if (disc != null) SRApi.Ctl.SetValue(disc, parsed);
-            }
-        } else {
-            int slideVal = Mathf.Clamp((discVal + 5) / 10 * 10, 0, 90);
-            Rect sr = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(220), SRApi.Ctl.Sc(28));
-            float nv = SRApi.Ctl.DrawSlider(sr, slideVal, 0f, 90f, true);
-            int nslide = Mathf.RoundToInt(nv / 10f) * 10;
-            // 值变了就写
-            if (nslide != slideVal && disc != null) SRApi.Ctl.SetValue(disc, nslide);
-            GUILayout.Label(nslide + "%", SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(52)), GUILayout.Height(SRApi.Ctl.Sc(26)));
-        }
-        GUILayout.FlexibleSpace();
-        GUILayout.EndHorizontal();
-        GUILayout.Space(SRApi.Ctl.Sc(2));
-        GUILayout.BeginHorizontal();
-        if (SRApi.Ctl.HotkeyButton("qa.apply_discount", SRApi.T("应用折扣", "Apply"), SRApi.T("把自己那行的 handicap 设成 100 减折扣.\n滑块按 0 到 90 整十走: 0 是关掉, 90 会把 handicap 压到 10, 也就是最多减 90%.\n这一局立刻生效, 平衡板上能看到; 点恢复原值就回到 100%.", "Set your handicap to 100 minus the discount.\nSlider goes 0-90 in tens: 0 = off, 90 sets the handicap to 10 (a 90% cap).\nTakes effect immediately and shows on the balancer. Restore sets it back to 100%."), QuickAdjust.ApplyScoreDiscount, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(30))) {
-            QuickAdjust.ApplyScoreDiscount();
-        }
+		SRApi.Ctl.SectionTitle(SRApi.T("- 评分 handicap -", "- Handicap -"));
+		GUILayout.BeginHorizontal();
+		ConfigEntryBase disc = SRApi.Ctl.FindEntry("Quick Adjust", "Handicap");
+		int discVal = QuickAdjust.HandicapValue;
+		GUIContent __dct = new GUIContent(SRApi.T("handicap", "handicap"));
+		float __dcw = Mathf.Max(SRApi.Ctl.Sc(64), SRApi.Ctl.LabelWrap.CalcSize(__dct).x + SRApi.Ctl.Sc(8));
+		GUILayout.Label(__dct, SRApi.Ctl.LabelWrap, GUILayout.Width(__dcw), GUILayout.Height(SRApi.Ctl.Sc(52)));
+		int slideVal = Mathf.Clamp(discVal, 10, 100);
+		Rect sr = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(220), SRApi.Ctl.Sc(28));
+		float nv = SRApi.Ctl.DrawSlider(sr, slideVal, 10f, 100f, true);
+		int nslide = Mathf.Clamp(Mathf.RoundToInt(nv / 10f) * 10, 10, 100);
+		if (nslide != slideVal && disc != null) SRApi.Ctl.SetValue(disc, nslide);
+		GUILayout.Label(nslide.ToString(), SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(52)), GUILayout.Height(SRApi.Ctl.Sc(26)));
+		GUILayout.Label(SRApi.T("（等效折扣 ", "(discount ") + (100 - nslide) + "%）", SRApi.Ctl.LabelWrap, GUILayout.Height(SRApi.Ctl.Sc(26)));
+		GUILayout.FlexibleSpace();
+		GUILayout.EndHorizontal();
+		GUILayout.Space(SRApi.Ctl.Sc(2));
+		GUILayout.BeginHorizontal();
+		if (SRApi.Ctl.HotkeyButton("qa.apply_discount", SRApi.T("应用", "Apply"), SRApi.T("把 handicap 设成上面的数值.\n滑块 10 到 100 整十走, 100 不折扣, 10 相当于减 90%.\n这一局立刻生效, 平衡板上能看到.", "Set your handicap to the value above.\nSlider goes 10-100 in tens: 100 = no discount, 10 = 90% off.\nTakes effect immediately and shows on the balancer."), QuickAdjust.ApplyScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
+			QuickAdjust.ApplyScoreDiscount();
+		}
+		GUILayout.Space(SRApi.Ctl.Sc(8));
+		if (SRApi.Ctl.HotkeyButton("qa.restore_discount", SRApi.T("恢复 100", "Restore 100"), SRApi.T("把 handicap 恢复为 100%（不折扣）.\n等价于滑块拖到 100 再应用.\n只影响自己那一行.", "Restore your handicap to 100% (no discount).\nSame as setting the slider to 100 and applying.\nAffects only your own row."), QuickAdjust.RestoreScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
+			QuickAdjust.RestoreScoreDiscount();
+		}
+		GUILayout.FlexibleSpace();
+		GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(8));
-        if (SRApi.Ctl.HotkeyButton("qa.restore_discount", SRApi.T("恢复原值", "Restore"), SRApi.T("把自己的 handicap 恢复为 100%（清除折扣）", "Restore your handicap to 100% (clears the discount)"), QuickAdjust.RestoreScoreDiscount, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(30))) {
-            QuickAdjust.RestoreScoreDiscount();
-        }
-        GUILayout.Space(SRApi.Ctl.Sc(8));
-        ConfigEntryBase more = SRApi.Ctl.FindEntry("Quick Adjust", "More Discount Values");
-        if (more != null) {
-            // 开关行统一走核心控件：RestoreLabel（说明 + 默认值第 4 行 + 左键复位）+ RenderControl（复选框）。
-            SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("更多折扣数值", "More values"),
-                SRApi.T("折扣数值输入模式开关\n开启后折扣由整十滑块改为自由输入框\n范围 0 到 90 任意整数，0 为关闭。",
-                        "discount input mode switch\nturns the tens slider into a free input box\nany integer from 0 to 90, 0 = off")),
-                more, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(30));
-            SRApi.Ctl.RenderControl(more);
-        }
-        GUILayout.FlexibleSpace();
-        GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(6));
 
         SRApi.Ctl.SectionTitle(SRApi.T("- 快速重试 -", "- Quick retry -"));
@@ -186,8 +161,7 @@ public class QuickAdjust : ITweak {
 			// 走契约 IFeatureHost.Config：把 host 硬转成 BaseUnityPlugin 会在非 BaseUnityPlugin 宿主下抛
 			// InvalidCastException（被 MainPlugin 兜住，但本功能静默消失）。
 			ConfigFile cfg = plugin.Config;
-			_scoreDiscount = cfg.Bind<int>("Quick Adjust", "Score Discount", 20, "评分折扣 %：把自己的得分平衡板 handicap 设为 100-折扣 %（范围 0-90：滑块模式整十，勾选更多折扣数值后可填任意整数如 85 -> handicap 15%；上限 90 = handicap 10；0 = 关闭；只影响自己）。\n默认 20（handicap 80%）；平衡板上自己那一行显示为对应百分比；可随时点恢复原值还原。");
-			_moreDiscount = cfg.Bind<bool>("Quick Adjust", "More Discount Values", false, "更多折扣数值：选中后折扣滑块变为自由输入框（0-90 任意整数，0 = 关闭）。");
+		_handicap = cfg.Bind<int>("Quick Adjust", "Handicap", 100, "当前 handicap：直接设置自己那行的 handicap（范围 10-100，整十；等效折扣 = 100 - 该值）。");
 			_quickSwitchEnabled = cfg.Bind<bool>("Quick Adjust", "Quick Switch", false, "快速切换（仅自由模式）：长按 B 到设定等待秒数切换 行动<->建造 模式。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n默认关闭；对局中开关立即生效。");
 			_quickSwitchHold = cfg.Bind<float>("Quick Adjust", "Quick Switch Hold", 0.5f, "快速切换的长按等待秒数（0-2，0=立即；自由模式长按 B 达到该秒数切换行动/建造）。");
 			_quickRetryEnabled = cfg.Bind<bool>("Quick Adjust", "Quick Retry", false, "死后自动重试（仅挑战模式）：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n默认关闭；对局中开关立即生效。");
@@ -239,9 +213,8 @@ public class QuickAdjust : ITweak {
 			return s;
 		}
 
-		public static int ScoreDiscount => (_scoreDiscount != null) ? Mathf.Clamp(_scoreDiscount.Value, 0, 90) : 0;
+		public static int HandicapValue => (_handicap != null) ? Mathf.Clamp(_handicap.Value, 10, 100) : 100;
 
-		public static bool MoreDiscountOn => _moreDiscount != null && _moreDiscount.Value;
 
 		// 局内改 handicap 不会刷新计分板（游戏只在开局 SetPlayerCharacter 时调 ScoreLine.SetHandicap），
 		// 故 patch set_NetworkHandicap + OnDeserialize，仅在值变化时刷新。
@@ -464,21 +437,15 @@ public class QuickAdjust : ITweak {
 					SRApi.Notify(SRApi.MsgMasterOff);
 					return;
 				}
-				int scoreDiscount = ScoreDiscount;
-				if (scoreDiscount <= 0)
-				{
-					SRApi.Notify(SRApi.T("评分折扣为 0，未应用", "Score discount is 0, not applied"));
-					return;
-				}
-				int target = Mathf.Clamp(100 - scoreDiscount, 10, 100);
+				int target = Mathf.Clamp(HandicapValue, 10, 100);
 				if (ApplyOwnHandicap(target))
 				{
 					_keepHandicap = target == 100 ? 0 : target;
-					SRApi.Notify(SRApi.T("评分折扣已应用：自己 handicap ", "Score discount applied: own handicap ") + target);
+					SRApi.Notify(SRApi.T("已应用 handicap ", "Applied handicap ") + target + SRApi.T("（等效折扣 ", " (discount ") + (100 - target) + "%）");
 				}
 				else
 				{
-					SRApi.Notify(SRApi.T("需要在房间内（大厅或树屋）才能修改评分折扣", "Change the score discount while in a room (lobby or treehouse)"));
+					SRApi.Notify(SRApi.T("需要在房间内（大厅或树屋）才能修改 handicap", "Change the handicap while in a room (lobby or treehouse)"));
 				}
 			}
 			catch (Exception ex)
