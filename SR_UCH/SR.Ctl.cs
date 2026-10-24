@@ -689,9 +689,8 @@ public partial class SR {
             // 否则延迟永远走不完 → 所有悬浮说明看起来"消失"。空值时保持状态直接返回。
             if (string.IsNullOrEmpty(tip)) return;
             if (tip != _tipShownKey) { _tipShownKey = tip; _tipShownAt = Time.unscaledTime; }
-            float __age = Time.unscaledTime - _tipShownAt;
-            if (__age < TipDelay) return;
-            float __alpha = Mathf.Clamp01((__age - TipDelay) / TipFade);
+            // 不做延迟：悬停即显示（淡入仍保留一帧内的轻微过渡）。
+            float __alpha = 1f;
             if (tip != _tipKey) {
                 _tipKey = tip;
                 _tipContent.text = tip;
