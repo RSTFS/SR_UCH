@@ -354,6 +354,9 @@ namespace SR_UCH.Tweaks {
 
         [HarmonyPatch(typeof(GameControl), "Update")]
         [HarmonyPrefix]
+        static void DiagPatch() { try { SRApi.Diag("DestroyBlocks hist=" + _placements.Count + " blocks=" + Blocks.Count + " idx=" + _index); } catch { } }
+
+        [HarmonyPrefix]
         static void Controls(GameControl __instance) {
             if (!SRApi.GateMaster) return;
             if (!Enabled) return;

@@ -505,6 +505,11 @@ namespace SR_UCH {
         public static float PageContentBottomY;
         // 页面滚动区顶（布局坐标）：页面内“已用高度”一律 = 当前布局Y - 这个值。
         public static float PageScrollTopY;
+        // 轻量诊断浮层：功能每帧可把状态写进来，按 F9 在窗口左上角显示（空则不显示）。
+        public static readonly System.Collections.Generic.List<string> DiagLines = new System.Collections.Generic.List<string>();
+        public static void Diag(string line) {
+            try { if (!string.IsNullOrEmpty(line) && DiagLines.Count < 24) DiagLines.Add(line); } catch { }
+        }
         public static float FooterHeight { get { Func<float> f = _footerHeight; return f != null ? f() : 0f; } set { Action<float> a = _setFooterHeight; if (a != null) a(value); } }
         public static Vector2 PageScroll { get { Func<Vector2> f = _pageScroll; return f != null ? f() : default(Vector2); } set { Action<Vector2> a = _setPageScroll; if (a != null) a(value); } }
         public static bool NoPageScrollBars { get { Func<bool> f = _noPageScrollBars; return f != null && f(); } set { Action<bool> a = _setNoPageScrollBars; if (a != null) a(value); } }

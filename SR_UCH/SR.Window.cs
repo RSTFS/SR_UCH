@@ -130,6 +130,7 @@ public partial class SR {
         // 右栏底部那行（设置 / 模式）的高度：自绘页据此给表格留出底部空间，否则末行会被盖住。
         public static float FooterHeight;
         private static readonly Dictionary<string, float> _pageFooterH = new Dictionary<string, float>();
+        private static bool _diagOn;
         private static float _pageUsedTop;   // 上一帧量到的页头/页签底部 Y（Layout 帧兜底用）   // 各栏目页面外框按钮高度（切换栏目不跳）
         // 底栏注册按钮的悬停过渡与命中矩形（按 id 缓存）
         private static readonly Dictionary<string, float> _footerBtnHover = new Dictionary<string, float>();
@@ -472,11 +473,11 @@ public partial class SR {
             // Layout 阶段 GetLastRect 可能还是 0（布局尚未计算完）：用上一帧量到的页头高度，
             // 否则 Layout 帧会把“视口”算成满高，滚动区把底栏顶出可视区（底栏只剩上边一点）。
             float __usedTop = _pageUsedTop;
-            if (Event.current == null || Event.current.type != EventType.Layout) {
-                float __measured = 0f;
-                try { __measured = GUILayoutUtility.GetLastRect().yMax; } catch (Exception __ut) { Guard.Log("页面视口/页头高度", __ut); }
-                if (__measured > Sc(1f)) { __usedTop = __measured; _pageUsedTop = __measured; }
-            }
+            // 零高度探针：Layout 帧也能拿到"当前光标所在的准确 y"，不再依赖 GetLastRect 的上一帧值或兜底常量。
+            try {
+                Rect __probe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
+                if (__probe.y > Sc(1f)) { __usedTop = __probe.y; _pageUsedTop = __probe.y; }
+            } catch (Exception __ut) { Guard.Log("页面视口/页头高度", __ut); }
             // 底栏预留 = 底栏行高（上一帧，稳定） + 当前栏目页面外框按钮高（按栏目记住，切栏目不会跳）。
             float __pfReserve = 0f;
             // 底栏现在是固定条，不再需要“用其它栏目最大值兜底”；未知栏目按 0，否则表格会被凭空缩短（底部多出一截空白）。
@@ -490,6 +491,9 @@ public partial class SR {
                 SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __footerReserve);
             // 页面内容必须以这条 y 为底界（= 滚动区顶 + 视口高 = 底栏条上沿）：列表高度按它算，随窗口大小自适应。
             SRApi.PageContentBottomY = __usedTop + SRApi.PageViewportHeight;
+            SRApi.Diag("mode=" + _mode + " section=" + _selectedInternalSection);
+            SRApi.Diag("areaH=" + __areaH.ToString("0.0") + " usedTop=" + __usedTop.ToString("0.0") + " barH=" + __barH.ToString("0.0"));
+            SRApi.Diag("viewport=" + SRApi.PageViewportHeight.ToString("0.0") + " footerTop=" + (__areaH - __barH).ToString("0.0") + " scrollY=" + _scroll.y.ToString("0.0"));
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
             _scroll = __noScroll
@@ -651,6 +655,21 @@ public partial class SR {
             Texture2D curTex = CursorResize && _cursorResizeTex != null ? _cursorResizeTex
                 : (CursorMove && _cursorMoveTex != null ? _cursorMoveTex : _cursorTex);
             if (curTex != null) GUI.DrawTexture(new Rect(mouse.x - Sc(7), mouse.y - Sc(7), Sc(15), Sc(15)), curTex);
+            // F9：诊断浮层
+            try {
+                if (Event.current != null && Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.F9) _diagOn = !_diagOn;
+                if (_diagOn && SRApi.DiagLines.Count > 0) {
+                    float lh = Sc(16f);
+                    float w = Sc(460f);
+                    float h = lh * (SRApi.DiagLines.Count + 1) + Sc(8f);
+                    Rect box = new Rect(Sc(8f), Sc(34f), w, h);
+                    SRApi.DrawFill(box, new Color(0f, 0f, 0f, 0.72f));
+                    GUI.Label(new Rect(box.x + Sc(6f), box.y + Sc(4f), box.width - Sc(12f), lh), "SR DIAG (F9)", _label);
+                    for (int i = 0; i < SRApi.DiagLines.Count; i++)
+                        GUI.Label(new Rect(box.x + Sc(6f), box.y + Sc(4f) + lh * (i + 1), box.width - Sc(12f), lh), SRApi.DiagLines[i], _label);
+                }
+            } catch (Exception __dg) { Guard.Log("诊断浮层", __dg); }
+            SRApi.DiagLines.Clear();   // 帧末清空：功能可在任意时机写入，下一帧浮层显示
             DrawTooltip(mouse);
             } finally {
                 GUI.matrix = prevMatrix; GUI.color = prevColor; GUI.skin.font = SR.Ctl.OrigSkinFont() ?? _prevFont;

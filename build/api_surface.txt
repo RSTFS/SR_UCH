@@ -97,3 +97,4 @@ PageViewportHeight
 PageScrollTopY
 TableFitHeight
 TableHeightGripBar
+Diag

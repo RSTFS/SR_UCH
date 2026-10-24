@@ -744,6 +744,7 @@ namespace SR_UCH.Tweaks {
 			default:
 				break;
 			}
+			SRApi.Diag("HUD phase=" + _phase + " timer=" + _timerText + " down=" + countdown + " remain=" + remaining.ToString("0.0"));
 			if (countdown) {
 				if (remaining < 0f) remaining = 0f;
 				_timerText = FormatClock(Mathf.CeilToInt(remaining));
