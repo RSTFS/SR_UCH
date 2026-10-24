@@ -398,7 +398,6 @@ public class LevelPartyBox : ITweak {
                 // 计时归零并进入警告窗口：下一帧游戏自己走完剩余原生流程。
                 pt.SetValue(vc, 0f);
                 pw.SetValue(vc, true);
-                SRApi.LogInfo("[关卡派对盒] 已把原生放置计时推到结束，后续交给游戏自己的流程（关盒/同步/光标）");
                 SRApi.Notify(SRApi.T("已关闭派对盒", "Party box closed"));
             } catch (Exception __ex) { SRApi.LogWarn("关闭派对盒失败: " + __ex.Message); }
         }
