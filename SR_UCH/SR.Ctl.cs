@@ -27,7 +27,38 @@ public partial class SR {
         // 表格自适应高度：页面顶部已用高度 usedAbove + 表格高度 = 底栏之上可用高度。
         // 26 = 窗口标题栏，2 = 内容区内边距，4 = 行区上下留白；均按当前 UI 缩放换算。
         // 竖向滚动条：绘制/配色由核心统一（ImGui Scrollbar 配色）。
-        public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb) {
+        // 列表高度自适应（配 TableAfterDraw 自校准）：窗口/页头/切换页面后一帧内贴底。
+    public static float TableAutoFit(float contentBottomY, float currentY, float minH, ref float bias) {
+        if (contentBottomY <= 1f) return minH;
+        return Mathf.Max(minH, contentBottomY - currentY - Sc(2f) + bias);
+    }
+    public static void TableAfterDraw(float contentBottomY, float drawnBottom, ref float bias) {
+        try {
+            if (contentBottomY <= 1f) return;
+            float gap = contentBottomY - drawnBottom;
+            if (Mathf.Abs(gap) > 0.5f) bias = Mathf.Clamp(bias + gap, -Sc(160f), Sc(160f));
+        } catch (Exception __ex) { Guard.Log("表格高度自校准", __ex); }
+    }
+    // 竖向滚动条一体化：几何来自 TableArgs（box/stripW/rowsH/rowCount/rowH），绘制+输入一次完成。
+    public static bool TableScrollbarFor(SRApi.TableArgs a, Event e, ref bool dragging, ref float grabY, ref float scrollY) {
+        try {
+            if (a == null || a.box.width <= 0f || a.rowsH <= 0f) return false;
+            float contentH = a.rowCount * a.rowH;
+            if (contentH <= a.rowsH + 0.5f) return false;
+            float maxScroll = Mathf.Max(0f, contentH - a.rowsH);
+            float sw = Sc(13f);
+            // 有钉住列时滚动条放在钉住列外侧（联机列表的加入列在左、滚动条在最右）；
+            // 没有钉住列时放在数据区右缘。两种列表共用同一规则，避免压住钉住列。
+            float tx = a.pinW > 0f ? a.pinX + a.pinW : a.box.x + a.stripW;
+            Rect track = new Rect(tx, a.box.y + a.headerH, sw, a.rowsH);
+            Rect thumb;
+            TableScrollbar(track, contentH, a.rowsH, scrollY, dragging, out thumb);
+            if (e == null) return false;
+            return SRApi.TableScrollbarInput(e, e.mousePosition, track, thumb, maxScroll, ref dragging, ref grabY, ref scrollY);
+        } catch (Exception __ex) { Guard.Log("表格滚动条一体化", __ex); return false; }
+    }
+
+    public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb) {
             SR.TableScrollbar(track, contentH, viewH, scrollY, dragging, out thumb);
         }
 

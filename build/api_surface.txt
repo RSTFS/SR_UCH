@@ -90,3 +90,6 @@ ToColor32
 FromColor32
 TableScrollbar
 PageContentBottomY
+TableAutoFit
+TableAfterDraw
+TableScrollbarFor

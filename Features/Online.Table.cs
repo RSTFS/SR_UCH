@@ -113,7 +113,8 @@ namespace SR_UCH.Tweaks {
         private static readonly List<int> _rowRows = new List<int>();             //房间行 -> _shownLobbies 下标
         private static readonly List<Rect> _joinRectsPage = new List<Rect>();     //加入按钮（页面坐标，钉在右边）
         private static readonly List<int> _joinRows = new List<int>();            //加入按钮 -> _shownLobbies 下标
-        private static bool _sbDragging;                //正在拖竖向滚动条
+        private static bool _sbDragging;
+        private static bool _sbHandled;   // 本帧核心滚动条是否已处理鼠标事件                //正在拖竖向滚动条
         private static float _sbGrabY;                  //按下时鼠标相对滑块顶部的偏移
         private static float _tableMaxX, _tableMaxY;
         private static float _joinW, _joinXPage;  // 钉在右边的操作列几何
@@ -250,15 +251,8 @@ namespace SR_UCH.Tweaks {
             _joinHeaderPage = _tableArgs.pinHeader;
             // 空提示由核心的 emptyHint 在行区裁剪内绘制。
             if (_joinW > 0f) SRApi.DrawLine(new Rect(_joinXPage - 1f, box.y + headerH, 1f, rowsH), SRApi.TableLineStrong);   // 钉住列分隔线
-            // 竖向滚动条：绘制/配色由核心统一（ImGui Scrollbar 配色），本页只提供几何与输入状态。
-            if (_shownLobbies.Count * rowH > rowsH + 0.5f) {
-                Rect __track = new Rect(box.x + viewW + SRApi.Ctl.Sc(1), box.y + headerH, SRApi.Ctl.Sc(13) - SRApi.Ctl.Sc(2), rowsH);
-                _sbTrackPage = __track;
-                _sbThumbPage = SRApi.TableScrollbar(__track, _shownLobbies.Count * rowH, rowsH, _scrollRows.y, _sbDragging);
-            } else {
-                _sbTrackPage = new Rect(0f, 0f, 0f, 0f);
-                _sbThumbPage = new Rect(0f, 0f, 0f, 0f);
-            }
+            // 竖向滚动条：几何/绘制/输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
+            _sbHandled = SRApi.Ctl.TableScrollbarFor(_tableArgs, Event.current, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);
         }
 
         // 钉住列的加入按钮：核心 pinDraw 已给出裁剪后的矩形，这里只画按钮与悬停/按下态。
@@ -319,7 +313,7 @@ namespace SR_UCH.Tweaks {
                     SaveWidths, SaveTableH, delegate { _joinDownRow = -1; });
             } catch (Exception __ex) { SRApi.Guard.Log("联机表格输入处理", __ex); } // 兜底：表头拖拽 / 列宽 / 加入点击都在这里
             //竖向滚动条拖拽 / 点轨道 -> 核心实现
-            if (SRApi.TableScrollbarInput(e, mp, _sbTrackPage, _sbThumbPage, _tableMaxY, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y)) return;
+            if (_sbHandled) return;   // 核心滚动条已处理本帧事件
             //滚轮（纵向 / Ctrl 横向 / 无纵向余量转横向）-> 核心实现
             SRApi.TableWheelInput(e, box, mp, _tableMaxX, _tableMaxY, ref _scrollCols, ref _scrollRows);
             // 光标：调整光标（分隔线悬停 / 拖列宽）由核心 TableDraw 统一置位，本页只补拖拽期间与移动光标。

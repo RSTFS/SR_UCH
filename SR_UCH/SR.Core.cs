@@ -850,6 +850,12 @@ public partial class SR : ITweak {
             // 统一操作列按钮：绘制/命中/悬浮都在实现层，契约层只转发（功能页在 Initialize 之后才会渲染）。
             try { SRApi.SetTableActionButtonsSink(delegate (Rect __r, SRApi.TableAction[] __a, float[] __w, ref int __h) { return SR.Ctl.TableActionButtons(__r, __a, __w, ref __h); }); }
             catch (Exception __ex) { Guard.Log("注入统一操作列按钮", __ex); }
+            try { SRApi.SetTableAutoFitSink(delegate (float __b, float __y, float __m, ref float __bias) { return SR.Ctl.TableAutoFit(__b, __y, __m, ref __bias); }); }
+            catch (Exception __ex) { Guard.Log("注入表格高度自适应", __ex); }
+            try { SRApi.SetTableAfterDrawSink(delegate (float __b, float __d, ref float __bias) { SR.Ctl.TableAfterDraw(__b, __d, ref __bias); }); }
+            catch (Exception __ex) { Guard.Log("注入表格高度校准", __ex); }
+            try { SRApi.SetTableScrollbarForSink(delegate (SRApi.TableArgs __a, Event __e, ref bool __dr, ref float __gy, ref float __sy) { return SR.Ctl.TableScrollbarFor(__a, __e, ref __dr, ref __gy, ref __sy); }); }
+            catch (Exception __ex) { Guard.Log("注入表格滚动条一体化", __ex); }
             // 竖向滚动条绘制（ImGui 配色）由核心统一提供。
             try { SRApi.SetTableScrollbarSink(delegate (Rect __t, float __ch, float __vh, float __sy, bool __dr, out Rect __th) { SR.Ctl.TableScrollbar(__t, __ch, __vh, __sy, __dr, out __th); }); }
             catch (Exception __ex) { Guard.Log("注入表格滚动条", __ex); }

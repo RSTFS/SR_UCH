@@ -135,7 +135,8 @@ namespace SR_UCH.Tweaks {
 		private static float _maxScrollY;
 		private static bool _sbDragging;
 		private static float _sbGrabY;
-		private static float _tableBias;   // 表格高度自校准偏差（按实际画出的底边与内容底界之差累积）
+		private static float _tableBias;   // 表格高度自校准偏差（核心 TableAutoFit/TableAfterDraw 维护）
+		private static bool _sbHandled;    // 本帧核心滚动条是否已处理鼠标事件
 		private static Rect _sbTrack;
 		private static Rect _sbThumb;
 		private static bool _dragH;
@@ -472,9 +473,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				// 高度：核心统一公式（页面顶部已用高度 + 表格高度 = 底栏之上可用高度），窗口变化实时跟随。
 				Rect last = GUILayoutUtility.GetLastRect();
 				// 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
-				float tableH = SRApi.PageContentBottomY > 1f
-					? Mathf.Max(SRApi.Ctl.Sc(120), SRApi.PageContentBottomY - last.yMax - SRApi.Ctl.Sc(2) + _tableBias)
-					: SRApi.Ctl.TableAutoHeight(Mathf.Max(0f, last.yMax - _pageTopY), SRApi.Ctl.Sc(120));
+				float tableH = SRApi.Ctl.TableAutoFit(SRApi.PageContentBottomY, last.yMax, SRApi.Ctl.Sc(120), ref _tableBias);
+				if (SRApi.PageContentBottomY <= 1f)
+					tableH = SRApi.Ctl.TableAutoHeight(Mathf.Max(0f, last.yMax - _pageTopY), SRApi.Ctl.Sc(120));
 				_actionHitThisFrame = false;
 				RenderPresetTable(tableH);
 				// 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
@@ -767,37 +768,20 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				};
 				_hiddenBeforeTable = _hiddenCols.Count;
 				SRApi.TableDraw(_args);
-				// 竖向滚动条（核心统一绘制/配色）：没有溢出时清空热区。
-				if (__overflowY) {
-					_sbTrack = new Rect(box.x + stripW, box.y + headerH, __sbW, rowsH);
-					_sbThumb = SRApi.TableScrollbar(_sbTrack, visible.Count * rowH, rowsH, _scrollRows.y, _sbDragging);
-				} else {
-					_sbTrack = new Rect(0f, 0f, 0f, 0f);
-					_sbThumb = new Rect(0f, 0f, 0f, 0f);
-				}
+				// 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
+				_sbHandled = SRApi.Ctl.TableScrollbarFor(_args, e, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);
 				if (_hiddenCols.Count > _hiddenBeforeTable) {
 					// 核心在右键表头时把列加进 hidden 集合；这里落盘持久化（Shift+右键清空由 resetAll 回调处理）。
 					SaveCols();
 					SRApi.LogInfo("[布局预设] " + SRApi.T("已隐藏列（Shift+右键表头可恢复全部列）", "Column hidden (Shift+right-click the header to restore all columns)"));
 				}
-				// 高度自校准：用实际画出的表格底边和内容底界比较，下一帧把差值补进 tableH。
-				// 不依赖任何坐标换算假设，切换页面/缩放/改窗口后都会在一帧内收敛到底。
-				try {
-					if (SRApi.PageContentBottomY > 1f) {
-						float __gap = SRApi.PageContentBottomY - box.yMax;
-						if (Mathf.Abs(__gap) > 0.5f) {
-							_tableBias = Mathf.Clamp(_tableBias + __gap, -SRApi.Ctl.Sc(160), SRApi.Ctl.Sc(160));
-							SRApi.LogInfo("[布局预设] 表格高度校准: gap=" + __gap.ToString("0.0") + " bias=" + _tableBias.ToString("0.0"));
-						}
-					}
-				} catch (Exception __tb) { SRApi.Guard.Log("布局预设/表格高度校准", __tb); }
+				// 高度自校准交给核心：按实际画出的底边与内容底界的差值在下一帧补齐。
+				SRApi.Ctl.TableAfterDraw(SRApi.PageContentBottomY, box.yMax, ref _tableBias);
 				if (e != null) {
 					// 拖拽兜底复位（拖列宽 / 换列位由核心处理，这里只接住状态与落盘回调）。
 					SRApi.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _args.moveCol, ref _args.moveDx,
 						ref _args.dragCol, ref _dragH, SaveCols, null, null);
-					bool __sbHandled = SRApi.TableScrollbarInput(e, mp, _sbTrack, _sbThumb, _maxScrollY,
-						ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);
-					if (!__sbHandled)
+					if (!_sbHandled)
 						SRApi.TableWheelInput(e, box, mp, _maxScrollX, _maxScrollY, ref _scrollCols, ref _scrollRows);
 					// 临时诊断日志：点表头时记录核心是否认到拖动/列宽拖动（构建后看 BepInEx 日志即可定位拖拽问题）。
 					if (e.type == EventType.MouseDown && e.button == 0) {

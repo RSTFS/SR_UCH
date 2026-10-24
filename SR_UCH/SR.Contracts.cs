@@ -415,6 +415,30 @@ namespace SR_UCH {
             if (f != null) f(track, contentH, viewH, scrollY, dragging, out thumb);
             return thumb;
         }
+        // 列表高度自适应：返回“内容底界 - 当前布局 Y + 历史偏差”，并在绘制后用 TableAfterDraw 自校准。
+        public delegate float TableAutoFitFn(float contentBottomY, float currentY, float minH, ref float bias);
+        private static object _tableAutoFit;
+        public static void SetTableAutoFitSink(TableAutoFitFn f) { _tableAutoFit = f; }
+        public static float TableAutoFit(float contentBottomY, float currentY, float minH, ref float bias) {
+            TableAutoFitFn f = _tableAutoFit as TableAutoFitFn;
+            return f != null ? f(contentBottomY, currentY, minH, ref bias) : minH;
+        }
+        public delegate void TableAfterDrawFn(float contentBottomY, float drawnBottom, ref float bias);
+        private static object _tableAfterDraw;
+        public static void SetTableAfterDrawSink(TableAfterDrawFn f) { _tableAfterDraw = f; }
+        public static void TableAfterDraw(float contentBottomY, float drawnBottom, ref float bias) {
+            TableAfterDrawFn f = _tableAfterDraw as TableAfterDrawFn;
+            if (f != null) f(contentBottomY, drawnBottom, ref bias);
+        }
+        // 竖向滚动条一体化：按 TableArgs 自动定位（数据区右侧、钉住列之前），绘制并处理输入；返回事件是否被处理。
+        public delegate bool TableScrollbarForFn(TableArgs a, Event e, ref bool dragging, ref float grabY, ref float scrollY);
+        private static object _tableScrollbarFor;
+        public static void SetTableScrollbarForSink(TableScrollbarForFn f) { _tableScrollbarFor = f; }
+        public static bool TableScrollbarFor(TableArgs a, Event e, ref bool dragging, ref float grabY, ref float scrollY) {
+            TableScrollbarForFn f = _tableScrollbarFor as TableScrollbarForFn;
+            return f != null && f(a, e, ref dragging, ref grabY, ref scrollY);
+        }
+
 
         // 行扩展点（与核心同名同签名）：功能向设置页条目行注册过滤/附加控件/滑块范围。
         public delegate bool RowFilterFn(ConfigEntryBase entry);
@@ -548,6 +572,16 @@ namespace SR_UCH {
             public static float Sc(float v) { Func<float, float> f = _sc; return f != null ? f(v) : v; }
             // 表格自适应高度助手（Ctl 侧别名；功能层统一从这里取）。
             public static float TableAutoHeight(float usedAbove, float minH) { return SRApi.TableAutoHeight(usedAbove, minH); }
+            // 列表高度自适应 / 自校准 / 一体化滚动条（功能层统一入口）。
+            public static float TableAutoFit(float contentBottomY, float currentY, float minH, ref float bias) {
+                return SRApi.TableAutoFit(contentBottomY, currentY, minH, ref bias);
+            }
+            public static void TableAfterDraw(float contentBottomY, float drawnBottom, ref float bias) {
+                SRApi.TableAfterDraw(contentBottomY, drawnBottom, ref bias);
+            }
+            public static bool TableScrollbarFor(TableArgs a, Event e, ref bool dragging, ref float grabY, ref float scrollY) {
+                return SRApi.TableScrollbarFor(a, e, ref dragging, ref grabY, ref scrollY);
+            }
             public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey) { Action<GUIContent, ConfigEntryBase, float, float, ConfigEntry<KeyCode>> f = _restoreLabel; if (f != null) f(content, entry, w, h, hotkey); }
             public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h) { RestoreLabel(content, entry, w, h, null); }
             public static void RenderControl(ConfigEntryBase entry) { Action<ConfigEntryBase> f = _renderControl; if (f != null) f(entry); }
