@@ -1179,8 +1179,6 @@ public partial class SR : ITweak {
             SR.LocDesc("Online", "Filter Mode", "模式筛选\n只显示指定模式的房间\n留空表示不过滤", "Mode filter\nshows lobbies of the selected game mode only\nempty means no filter");
             SR.LocDesc("Online", "Filter Tag", "标签筛选\n只显示含指定标签的房间\n留空表示不过滤", "Tag filter\nshows lobbies with the selected tag only\nempty means no filter");
             SR.LocDesc("Online", "Filter State", "状态筛选\n按房间状态过滤\n留空全部，join 可加入，full 已满，playing 进行中", "State filter\nfilters lobbies by state\nempty = all, join = joinable, full = full, playing = in match");
-            SR.LocDesc("Online", "Filter Min Players", "最少人数筛选\n只显示人数不少于该值的房间\n留空全部；填 1 到 3；lt4 表示少于 4 人。", "Min players filter\nshows lobbies with at least that many players\nempty = all; 1-3; lt4 = fewer than 4");
-            SR.LocDesc("Online", "Filter AFK", "AFK 筛选\n按房主是否挂机过滤\n留空全部，hide 隐藏挂机，only 只看挂机", "AFK filter\nfilters by whether the host is AFK\nempty = all, hide = hide AFK, only = AFK only");
             SR.LocDesc("Online", "Search Timeout", "搜索超时秒数\n超过该时间后停止等待房间列表\n仅作为兜底，通常不必修改。", "Search timeout\nstops waiting for the lobby list after this many seconds\nfallback only; usually no need to change");
             SR.LocDesc("Online", "Sort Column", "排序列索引\n指定房间列表按哪一列排序\n一般由表头操作维护，不建议手改。", "Sort column index\nselects the column used to sort the lobby list\nnormally maintained by the header; avoid editing manually");
             SR.LocDesc("Online", "Sort Descending", "排序方向\n开启为从大到小，关闭为从小到大\n与排序列配合使用", "Sort direction\ndescending when on, ascending when off\nused together with the sort column");

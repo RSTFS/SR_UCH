@@ -20,7 +20,7 @@ namespace SR_UCH.Tweaks {
 
         // 筛选与表格配置（下拉框存字符串，空 = 全部 / 默认）
         private static ConfigEntry<string> _fState;   //筛选：房间状态（"" = 全部；join/full/playing）
-        private static ConfigEntry<string> _fRegion, _fMode, _fTag, _fMinPlayers, _fAfk;
+        private static ConfigEntry<string> _fRegion, _fMode, _fTag;
         private static ConfigEntry<int> _searchTimeout;
         private static float SearchTimeout() {
             try { if (_searchTimeout != null) return (float)_searchTimeout.Value; } catch { }
@@ -113,9 +113,7 @@ namespace SR_UCH.Tweaks {
             _fRegion = plugin.Config.Bind(SecOnline, "Filter Region", "", "按区域挑房间, 从下拉里选一个.");
             _fMode = plugin.Config.Bind(SecOnline, "Filter Mode", "", "按游戏模式挑房间, 从下拉里选一个.");
             _fTag = plugin.Config.Bind(SecOnline, "Filter Tag", "", "按房间标签挑房间, 从下拉里选一个.");
-            _fMinPlayers = plugin.Config.Bind(SecOnline, "Filter Min Players", "", "按人数挑房间. 留空是全部, 填 1 到 3 表示人数不少于这个数, 填 lt4 表示少于 4 人.");
             _fState = plugin.Config.Bind(SecOnline, "Filter State", "", "按房间状态挑. 留空是全部, join 只看还能加入的, full 只看人已满的, playing 只看正在打的.");
-            _fAfk = plugin.Config.Bind(SecOnline, "Filter AFK", "hide", "按房主有没有挂机来挑. 留空是全部, hide 把挂机的藏起来, only 只看挂机的.");
             _searchTimeout = plugin.Config.Bind(SecOnline, "Search Timeout", 15,
                 new ConfigDescription("搜房间最多等多少秒, 5 到 60. 到点还没收到搜索结束的信号就不等了. 网慢或者房间多的时候可以调大.",
                     new AcceptableValueRange<int>(5, 60)));
@@ -431,20 +429,13 @@ namespace SR_UCH.Tweaks {
                 GUILayout.Label(string.Format(SRApi.T("已隐藏 {0} 个房间（Shift+右键表格可恢复）", "{0} lobbies hidden (Shift+right-click the table to restore)"), hiddenNow), SRApi.Ctl.Label);
             }
 
-            // 筛选：第一行 区域 / 模式 / 标签，第二行 人数 / AFK / 状态；下拉框固定宽度，同时只开一个。
-            float cellW = Mathf.Max(SRApi.Ctl.Sc(120), (SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40)) / 3f - SRApi.Ctl.Sc(10));
+            // 筛选：单行 区域 / 模式 / 标签 / 状态（状态下沉到标签右面）；下拉框宽度按 4 个均分。
+            float cellW = Mathf.Max(SRApi.Ctl.Sc(96), (SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40)) / 4f - SRApi.Ctl.Sc(8));
             GUILayout.Space(SRApi.Ctl.Sc(2));
             GUILayout.BeginHorizontal();
             DropFilter("区域", "Region", "按服务器区域筛选（亚太/欧盟/美国）。", "Filter by server region (AP / EU / US).", "Filter Region", RegionVals(), cellW);
             DropFilter("模式", "Mode", "按游戏模式筛选。", "Filter by game mode.", "Filter Mode", ModeVals, cellW);
             DropFilter("标签", "Tag", "按房间标签筛选。", "Filter by lobby tag.", "Filter Tag", TagVals, cellW);
-            GUILayout.FlexibleSpace();
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            DropFilter("人数", "Players", "按人数筛选：≥N 或<4（= 还有空位）。", "Filter by players: at least N, or '< 4' (has a free slot).", "Filter Min Players",
-                PlayerVals, cellW);
-            DropFilter("AFK", "AFK", "房主 AFK 筛选（游戏自己的 isAFK 字段）。", "Filter by host AFK (the game's own isAFK field).", "Filter AFK",
-                AfkVals, cellW);
             DropFilter("状态", "State", "按房间状态筛选：可加入 / 人满 / 对局中。", "Filter by lobby state: joinable / full / in match.", "Filter State", StateVals, cellW);
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
@@ -485,8 +476,6 @@ namespace SR_UCH.Tweaks {
                                                   v == "FREEPLAY" ? "Freeplay" : v == "CREATIVE" ? "Creative" : v == "PARTY" ? "Party" : "Challenge");
             if (key == "Filter Tag") return SRApi.T(v == "Fun" ? "好玩" : v == "Competitive" ? "竞技" : v == "Beginner" ? "新手" : "自定义关卡",
                                                  v == "Fun" ? "Fun" : v == "Competitive" ? "Competitive" : v == "Beginner" ? "Beginner" : "Custom levels");
-            if (key == "Filter Min Players") return v == "lt4" ? "<4" : "≥" + v;
-            if (key == "Filter AFK") return v == "hide" ? SRApi.T("隐藏AFK", "hide AFK") : SRApi.T("仅AFK", "only AFK");
             if (key == "Filter State") return v == "join" ? SRApi.T("可加入", "joinable") : v == "full" ? SRApi.T("人满", "full") : v == "playing" ? SRApi.T("对局中", "in match") : SRApi.T("全部", "all");
             return v; // 区域等：值本身就是显示名
         }
@@ -496,8 +485,6 @@ namespace SR_UCH.Tweaks {
         private const float FilterLabelW = 46f;
         private const float FilterComboW = 104f;
         // 固定选项值用静态数组，避免每帧构造。
-        private static readonly string[] PlayerVals = { "1", "2", "3", "lt4" };
-        private static readonly string[] AfkVals = { "hide", "only" };
         private static readonly string[] StateVals = { "join", "full", "playing" };   //#4 状态筛选
 
         // 下拉选项按版本戳缓存：选项只与界面语言和值列表长度有关，变化时才重建。
@@ -751,8 +738,8 @@ namespace SR_UCH.Tweaks {
         private const int ColCount = 11;         // v5：删除技能系数列后的列数
         private const int CombinedCol = 9;       // 综合分列 = LobbyHealthNum + LobbySkillNum（游戏排序用的房间质量分）
         private const int JoinCol = 10;          //操作列：不可隐藏（否则没法加入）
-        private static readonly string[] Titles = { "区域", "人数", "游戏质量", "进度", "游戏模式", "标签", "房主", "限制", "修改器", "综合分", "操作" };
-        private static readonly string[] TitlesEn = { "Region", "Players", "Quality", "Progress", "Mode", "Tag", "Host", "Limit", "Mods", "Combined", "Operation" };
+        private static readonly string[] Titles = { "区域", "人数", "游戏质量", "进度", "游戏模式", "标签", "房主", "限制", "标识", "综合分", "操作" };
+        private static readonly string[] TitlesEn = { "Region", "Players", "Quality", "Progress", "Mode", "Tag", "Host", "Limit", "Flags", "Combined", "Operation" };
         private static readonly string[] TitleTips = {
             "服务器区域（游戏自己的本地化短名，显示为 亚太/欧盟/美国）",
             "当前人数 / 4（房间最多 4 人，人满不可加入）",
@@ -762,7 +749,7 @@ namespace SR_UCH.Tweaks {
             "房间标签（游戏本地化）",
             "房主名字",
             "制胜积分 / 长度限制（轮数、时间或 无限制）",
-            "修改器 / 房主AFK",
+            "标识 / 房主AFK",
             "房间综合分 = 房主质量分 + 技能换算分（游戏自己排序用的房间质量分，越大越靠前）。默认隐藏：右键表头综合分即可让它常驻显示。",
             "点加入进房（在对局内会先退出当前房间，回到界面就自动加入）；不可加入的显示原因并压暗",
         };

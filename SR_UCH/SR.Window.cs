@@ -129,6 +129,7 @@ public partial class SR {
 
         // 右栏底部那行（设置 / 模式）的高度：自绘页据此给表格留出底部空间，否则末行会被盖住。
         public static float FooterHeight;
+        private static float _footerReserveMeasured = 30f;   // 上一帧底栏块实测高度（含页面外框按钮）
         // 底栏注册按钮的悬停过渡与命中矩形（按 id 缓存）
         private static readonly Dictionary<string, float> _footerBtnHover = new Dictionary<string, float>();
         private static readonly Dictionary<string, Rect> _footerBtnRects = new Dictionary<string, Rect>();
@@ -469,7 +470,9 @@ public partial class SR {
             float __areaH = winRect.height - Sc(8);
             float __usedTop = 0f;
             try { __usedTop = GUILayoutUtility.GetLastRect().yMax; } catch (Exception __ut) { Guard.Log("页面视口/页头高度", __ut); }
-            float __footerReserve = Mathf.Max(Sc(30f), FooterHeight) + Sc(4f);
+            // 底栏实际块高（含页面外框按钮 RenderPageFooter）由上一帧量得；只用 FooterHeight 会漏掉外框按钮，
+            // 导致滚动区把底栏顶出可视区（底栏直接消失）。
+            float __footerReserve = Mathf.Max(Sc(30f), _footerReserveMeasured) + Sc(2f);
             SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
@@ -582,6 +585,12 @@ public partial class SR {
             GUILayout.Label(__modeLabel, _label, GUILayout.Width(__modeW), GUILayout.Height(Sc(26)));
             GUILayout.EndHorizontal();
             FooterHeight = GUILayoutUtility.GetLastRect().height;   // 自绘页据此避让
+            // 量本帧底栏块的真实高度：底栏底边 - (滚动区顶 + 视口高)，供下一帧预留（收敛后底栏稳定可见）。
+            try {
+                float __fbBottom = GUILayoutUtility.GetLastRect().yMax;
+                float __fbBlock = __fbBottom - (__usedTop + SRApi.PageViewportHeight);
+                if (__fbBlock > Sc(4f)) _footerReserveMeasured = Mathf.Clamp(__fbBlock, Sc(30f), Sc(220f));
+            } catch (Exception __fm) { Guard.Log("底部块高度测量", __fm); }
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
             GUILayout.EndArea();

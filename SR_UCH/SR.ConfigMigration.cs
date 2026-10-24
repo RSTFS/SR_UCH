@@ -647,6 +647,7 @@ namespace SR_UCH.Tweaks {
                 });
                 // 关卡背景功能已删除：这个键在两个曾用段名里都要清掉。
                 text = RemoveKeys(text, "Level", new[] { "Level Background", "Refresh Pieces Key" });
+            text = RemoveKeys(text, "Online", new[] { "Filter Min Players", "Filter AFK" });
                 text = RemoveKeys(text, "Scene", new[] { "Level Background" });
                 // 派对盒（刷新/重抽/关闭）的界面与代码都在关卡功能：段从 [EX] 挪到 [Level]。
                 text = MoveKeyBetweenSections(text, "EX", "Level", "Refresh Party Box Key");

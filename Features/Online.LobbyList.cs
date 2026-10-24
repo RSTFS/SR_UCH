@@ -242,19 +242,10 @@ namespace SR_UCH.Tweaks {
             }
                 v = Val(_fTag);
                 if (v.Length > 0 && li.lobbyTag.ToString() != v) return false;
-                v = Val(_fMinPlayers);
-                if (v == "lt4") { if (li.Players >= 4) return false; }
-                else {
-                    int min;
-                    if (v.Length > 0 && int.TryParse(v, out min) && li.Players < min) return false;
-                }
                 v = Val(_fState);
                 if (v == "join") { if (!IsJoinable(li)) return false; }        //可加入：游戏自己的"能不能进"判据
                 else if (v == "full") { if (!IsFull(li)) return false; }        //人满
                 else if (v == "playing") { if (li.matchProgress == 0) return false; } //对局中：进度 != 0
-                v = Val(_fAfk);
-                if (v == "hide" && li.isAFK) return false;
-                if (v == "only" && !li.isAFK) return false;
                 return true;
             } catch { return true; }
         }
