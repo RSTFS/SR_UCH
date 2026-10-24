@@ -597,12 +597,8 @@ namespace SR_UCH.Tweaks {
                 // [EX] 段里混着的本仓库自带功能归位，值必须跟着走。
                 text = MoveKeyBetweenSections(text, "EX", "Level", "Party Bomb");
                 text = MoveKeyBetweenSections(text, "EX", "Level", "Party Bomb Type");
-                // 允许客户端删除是外部模块的功能：老配置在 [EX]，曾搬到 [Destroy Blocks]，现统一搬回 [EX]（幂等）。
-                text = MoveKeyBetweenSections(text, "Destroy Blocks", "EX", "Allow Clients");
-                text = MoveKeyBetweenSections(text, "Destroy Blocks", "EX", "Allow Clients Key");
-                // 键搬家必须连 [Settings] 里的 "组合键 <段> <键>" 条目一起改，否则已绑定的修饰键静默丢失。
-                text = MoveComboEntry(text, "Destroy Blocks", "EX", "Allow Clients Key");
-                // 会话内容页两个开关从 [Settings] 归位到 [Chat]（配置跟功能走），须搬值。
+                                        // 键搬家必须连 [Settings] 里的 "组合键 <段> <键>" 条目一起改，否则已绑定的修饰键静默丢失。
+                        // 会话内容页两个开关从 [Settings] 归位到 [Chat]（配置跟功能走），须搬值。
                 text = MoveKeyBetweenSections(text, "Settings", "Chat", "Filter Quick Msgs");
                 text = MoveKeyBetweenSections(text, "Settings", "Chat", "Show Time");
                 // 老 cfg 的 [视野]（已改名为 [Camera]）里的自由相机设置要搬到实际绑定段 [Experiments]。

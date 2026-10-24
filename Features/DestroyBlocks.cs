@@ -64,17 +64,6 @@ namespace SR_UCH.Tweaks {
         private static bool _listDirty; // 有变化待刷新（由放置/销毁事件置位）
         private static float _lastListRebuildAt = -999f; // 上次全量重建的时刻
 
-        // 允许客户端删除由外部模块（EX）经槽位登记，此处用时拉取，避免初始化顺序问题；槽位名不带模块名，任何模块都能登记。
-        // Slots.Provide 是覆盖语义（同一槽位重复登记以最后一次为准）；未登记时房客不能删。
-        private const string SlotAllowClients = "Blocks.AllowClientsOn"; // Func<bool>
-        private static Func<bool> _allowCached; // 取到后缓存委托
-        public static bool AllowClientsOn {
-            get {
-                if (_allowCached == null) _allowCached = Slots.Require<Func<bool>>(SlotAllowClients);
-                Func<bool> f = _allowCached;
-                return f != null && f();
-            }
-        }
         // 追踪玩家仅在列表模式 = 普通时显示。
         public static bool TrackPlayerVisible { get { return _listMode == null || _listMode.Value == ListMode.Normal; } }
         private static Dictionary<Placeable, PlacementInfo> _placements = new Dictionary<Placeable, PlacementInfo>();
@@ -144,9 +133,8 @@ namespace SR_UCH.Tweaks {
                 if (index < 0 || index >= Blocks.Count) return;
                 Placeable target = Blocks[index];
                 if (target == null) return;
-                target.DestroySelf(false, _useSmoke != null && _useSmoke.Value, true);
-                // DestroySelf 对已放置方块只做 Disable + 置 MarkedForDestruction，不销毁 GameObject，需手动调 OnDestroy 立刻摘干净。
-                // 必须走虚方法调用（Bomb / ActiveBlock 均 override），且 OnDestroy 幂等，之后 Unity 真销毁再调也无副作用。
+                // 与旧版一致的销毁路径：DestroySelf 自带网络同步；补一次 OnDestroy 立刻摘干净。
+                target.DestroySelf();
                 target.OnDestroy();
                 _placements.Remove(target); // 本路径不发 DestroyPieceEvent，必须自己清记录，避免强引用已销毁对象
             } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.原生销毁", __ex); }
@@ -246,7 +234,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
             SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除键\n删除当前选中的方块\n滚轮可在候选方块之间切换", "delete key\ndeletes the currently selected block\nthe mouse wheel cycles through candidate blocks");
             SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
-            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n决定本页功能是否生效\n仅房主能删除；房客删除需要 EX 扩展的允许客户端删除。", "master switch for block destruction\nenables or disables the feature on this page\nhost only; client-side deletion needs the EX module permission");
+            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n决定本页功能是否生效\n仅房主能删除。", "master switch for block destruction\nenables or disables the feature on this page\nhost only; client-side deletion needs the EX module permission");
             SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
             SRApi.LocDesc("Destroy Blocks", "Select Mode", "候选方块排序方式\n距离＝按离自己的距离由近到远；放置顺序＝最后放置的优先\n只影响选择顺序，不影响列表内容。", "candidate ordering\nDistance = nearest to you first; Placement = most recently placed first\naffects selection order only, not the list contents");
             SRApi.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
@@ -326,18 +314,11 @@ namespace SR_UCH.Tweaks {
             GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(netListener, true);
             SceneManager.activeSceneChanged += OnSceneChanged;
 
-            // 对外能力槽位：调用方经 Slots.Require 按名取用，不引用本类，取不到即降级。
-            Slots.Provide(SlotIsPlayerPlaced, (Func<Placeable, bool>)IsPlayerPlaced);
-            Slots.Provide(SlotPlayerPlacedBlocks, (Func<List<Placeable>>)PlayerPlacedBlocks);
             // 归属登记同样走槽位，避免与关卡功能产生编译期引用（拆分编译会 CS0103）。
-            Slots.Provide(SlotAttributeToHost, (Action<List<Placeable>>)AttributeToHost);
         }
 
         // 槽位名：与调用方的唯一约定是“名字 + 委托签名”，刻意用 private const，调用方另写自己的常量以免编译期依赖。
         // 名字一经发布不再更改（改需两边同步）。
-        private const string SlotIsPlayerPlaced = "DestroyBlocks.IsPlayerPlaced";        // Func<Placeable,bool>
-        private const string SlotPlayerPlacedBlocks = "DestroyBlocks.PlayerPlacedBlocks"; // Func<List<Placeable>>
-        private const string SlotAttributeToHost = "DestroyBlocks.AttributeToHost";      // Action<List<Placeable>>
 
         private static void OnSceneChanged(Scene a, Scene b) {
             _placements.Clear();
@@ -360,9 +341,9 @@ namespace SR_UCH.Tweaks {
             if (SRApi.UiOpen && SRApi.BlockInput) return; 
             // 仅派对 / 创意 / 自由建造模式；已接入 IgnoreModeLimit 豁免。
             if (!SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay)) return;
-            // 仅房主能删：SR 侧没有方块删除的网络同步通道，房客删除只有本机生效，会造成脱同步；房客需开 EX 的“允许客户端删除”。
+            // 仅房主能删：SR 侧没有方块删除的网络同步通道，房客删除会造成脱同步。
             // 有意不接 GateHost（豁免只解决权限、解决不了同步）；判据用 SRApi.CanControlLocally，勿用 is GamesparksMatchmakingLobby（离线/大厅为空时会短路放行）。
-            if (!AllowClientsOn && !SRApi.CanControlLocally) return;
+            if (!SRApi.CanControlLocally) return;   // 仅房主可删（无外部扩展）
             if (SRApi.ComboKeyDown(_toggleKey)) {
                 _altDown = true;
                 RebuildList();
