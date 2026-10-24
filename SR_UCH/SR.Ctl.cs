@@ -53,7 +53,8 @@ public partial class SR {
             Rect track = new Rect(tx, a.box.y + a.headerH, sw, a.rowsH);
             Rect thumb;
             Vector2 __mp = Event.current != null ? Event.current.mousePosition : Vector2.zero;
-            bool __show = dragging || a.box.Contains(__mp) || track.Contains(__mp);
+            // 默认隐藏：只有正在拖动、或鼠标正好落在滚动条区域时才显示（悬停整张表不显示）。
+            bool __show = dragging || track.Contains(__mp);
             TableScrollbar(track, contentH, a.rowsH, scrollY, dragging, out thumb, __show);
             if (e == null) return false;
             return SRApi.TableScrollbarInput(e, e.mousePosition, track, thumb, maxScroll, ref dragging, ref grabY, ref scrollY);

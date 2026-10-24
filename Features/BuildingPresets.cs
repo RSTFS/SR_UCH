@@ -473,9 +473,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				// 高度：核心统一公式（页面顶部已用高度 + 表格高度 = 底栏之上可用高度），窗口变化实时跟随。
 				Rect last = GUILayoutUtility.GetLastRect();
 				// 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
-				float tableH = SRApi.Ctl.TableAutoFit(SRApi.PageContentBottomY, last.yMax, SRApi.Ctl.Sc(120), ref _tableBias);
-				if (SRApi.PageContentBottomY <= 1f)
-					tableH = SRApi.Ctl.TableAutoHeight(Mathf.Max(0f, last.yMax - _pageTopY), SRApi.Ctl.Sc(120));
+				// 表格高度 = 页面视口高 − 页面内已用高度（都是布局量，不掺窗口/底栏坐标）。
+				float usedAbove = _pageTopYSet ? Mathf.Max(0f, last.yMax - _pageTopY) : SRApi.Ctl.Sc(300);
+				float tableH = Mathf.Max(SRApi.Ctl.Sc(120), SRApi.PageViewportHeight - usedAbove);
 				_actionHitThisFrame = false;
 				RenderPresetTable(tableH);
 				// 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
@@ -775,8 +775,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 					SaveCols();
 					SRApi.LogInfo("[布局预设] " + SRApi.T("已隐藏列（Shift+右键表头可恢复全部列）", "Column hidden (Shift+right-click the header to restore all columns)"));
 				}
-				// 高度自校准交给核心：按实际画出的底边与内容底界的差值在下一帧补齐。
-				SRApi.Ctl.TableAfterDraw(SRApi.PageContentBottomY, box.yMax, ref _tableBias);
+
 				if (e != null) {
 					// 拖拽兜底复位（拖列宽 / 换列位由核心处理，这里只接住状态与落盘回调）。
 					SRApi.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _args.moveCol, ref _args.moveDx,
