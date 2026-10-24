@@ -75,3 +75,4 @@ TakeWheelEvent
 UiOpen
 WheelFrame
 RegisterFooterButton
+HotkeyButtonNoHint

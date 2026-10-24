@@ -548,6 +548,15 @@ namespace SR_UCH {
             public static bool HotkeyActionButton(string label, string tooltip, ConfigEntry<KeyCode> keyEntry) { return HotkeyActionButton(label, tooltip, keyEntry, 0f, false); }
             public static bool HotkeyButton(string id, string label, string tooltip, Action action, float width, float height) { Func<string, string, string, Action, float, float, bool> f = _hotkeyButton; return f != null && f(id, label, tooltip, action, width, height); }
             public static bool HotkeyButton(string id, string label, string tooltip, Action action) { return HotkeyButton(id, label, tooltip, action, 0f, 0f); }
+            // 与 HotkeyButton 相同（右键可绑键），但悬浮提示不追加"右键：绑定/删除快捷键"这一行。
+            public delegate bool HotkeyButtonNoHintFn(string id, string label, string tooltip, Action action, float width, float height);
+            private static object _hotkeyButtonNoHint;
+            public static void SetHotkeyButtonNoHintSink(HotkeyButtonNoHintFn f) { _hotkeyButtonNoHint = f; }
+            public static bool HotkeyButtonNoHint(string id, string label, string tooltip, Action action, float width, float height) {
+                HotkeyButtonNoHintFn f = _hotkeyButtonNoHint as HotkeyButtonNoHintFn;
+                return f != null && f(id, label, tooltip, action, width, height);
+            }
+            public static bool HotkeyButtonNoHint(string id, string label, string tooltip, Action action) { return HotkeyButtonNoHint(id, label, tooltip, action, 0f, 0f); }
             private static GUIStyle Style(string name) { Func<string, GUIStyle> f = _style; return f != null ? f(name) : null; }
             public static GUIStyle Label { get { return Style("Label"); } }
             public static GUIStyle LabelWrap { get { return Style("LabelWrap"); } }

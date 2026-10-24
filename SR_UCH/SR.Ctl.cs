@@ -171,6 +171,11 @@ public partial class SR {
         public static bool HotkeyButton(string id, string label, string tooltip, Action action, float width = 0f, float height = 0f) {
             return SR.HotkeyButton(id, label, tooltip, action, width, height);
         }
+
+        // 右键仍可绑键，只是不在悬浮提示里写明（返回树屋这类“不需要提示绑定”的按钮用）。
+        public static bool HotkeyButtonNoHint(string id, string label, string tooltip, Action action, float width = 0f, float height = 0f) {
+            return SR.HotkeyButtonNoHint(id, label, tooltip, action, width, height);
+        }
         public static string HotkeyText(string id) { return SR.HotkeyText(id); }
         // 悬浮提示框（在 OnGUI 末尾统一绘制；功能页无需关心）
         public static void DrawTooltip(Vector2 mp) { SR.DrawTooltip(mp); }
@@ -480,6 +485,24 @@ public partial class SR {
             bool clicked = GUILayout.Button(new GUIContent(label + SR.KeySuffix(key), tip),
                 capturing ? _capture : _btn, GUILayout.Width(bw), GUILayout.Height(bh));
             if (clicked && evBtn != 0) clicked = false; //右键绝不触发左键动作
+            if (key != null && e != null) TryBindByRightClick(key, GUILayoutUtility.GetLastRect());
+            return clicked && !capturing;
+        }
+
+        // 与 HotkeyButton 相同（右键可绑键、点击执行），但悬浮提示里不追加“右键：绑定/删除快捷键”。
+        public static bool HotkeyButtonNoHint(string id, string label, string tooltip, Action action, float width = 0f, float height = 0f) {
+            SR.HotkeyAction(id, label, action);
+            ConfigEntry<KeyCode> key = SR.Hotkey(id);
+            bool capturing = key != null && _capturing == key;
+            string tip = "";
+            if (!string.IsNullOrEmpty(tooltip)) tip += "\n" + tooltip;
+            Event e = Event.current;
+            int evBtn = e != null ? e.button : 0;
+            float bw = width > 0f ? width : Sc(150);
+            float bh = height > 0f ? height : Sc(30);
+            bool clicked = GUILayout.Button(new GUIContent(label + SR.KeySuffix(key), tip),
+                capturing ? _capture : _btn, GUILayout.Width(bw), GUILayout.Height(bh));
+            if (clicked && evBtn != 0) clicked = false;
             if (key != null && e != null) TryBindByRightClick(key, GUILayoutUtility.GetLastRect());
             return clicked && !capturing;
         }

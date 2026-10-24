@@ -340,7 +340,12 @@ namespace SR_UCH.Tweaks {
                     ControllerMonitor cm = ControllerMonitor.Instance;
                     if (cm != null && cm.mainController != null) ctrl = cm.mainController.controller;
                 } catch (Exception __cm) { SRApi.Guard.Log("联机/取主控制器", __cm); }
-                if (ctrl == null) return;   // 没有主控制器就退回让玩家自己按
+                // 没有“主控制器”时用游戏自己的键盘控制器（原生按空格/确认用的就是它），
+                // 否则从 SR 列表点加入（纯鼠标操作）时永远拿不到控制器，只能手动按键。
+                if (ctrl == null) {
+                    try { ctrl = GameState.GetInstance().Keyboard; } catch (Exception __kb) { SRApi.Guard.Log("联机/取键盘控制器", __kb); }
+                }
+                if (ctrl == null) return;   // 连键盘控制器都没有就退回让玩家自己按
                 MainMenuControl menu = UnityEngine.Object.FindObjectOfType<MainMenuControl>();
                 if (menu == null) return;
                 menu.JoinControllerToMainMenu(ctrl, false);

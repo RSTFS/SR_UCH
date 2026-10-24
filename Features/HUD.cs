@@ -959,7 +959,7 @@ namespace SR_UCH.Tweaks {
 
 		private static void UpdateTimer(GameControl gc, GameSettings gs) {
 			// 挑战模式：计时以游戏自己的 runTime 为准，按空格开始前（runStarted=false）不计数。
-			if (IsChallengeMode()) { UpdateChallengeTimer(gc); return; }
+			if (IsChallengeMode() && gc is ChallengeControl) { UpdateChallengeTimer(gc); return; }
 
 			float elapsed = Mathf.Max(0f, Time.unscaledTime - _phaseStart);
 			float remaining = -1f;

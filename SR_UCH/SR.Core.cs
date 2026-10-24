@@ -850,6 +850,9 @@ public partial class SR : ITweak {
             // 统一操作列按钮：绘制/命中/悬浮都在实现层，契约层只转发（功能页在 Initialize 之后才会渲染）。
             try { SRApi.SetTableActionButtonsSink(delegate (Rect __r, SRApi.TableAction[] __a, float[] __w, ref int __h) { return SR.Ctl.TableActionButtons(__r, __a, __w, ref __h); }); }
             catch (Exception __ex) { Guard.Log("注入统一操作列按钮", __ex); }
+            // “不写绑定提示”的快捷键按钮：与普通 HotkeyButton 同一套右键绑键逻辑，只少了提示行。
+            try { SRApi.Ctl.SetHotkeyButtonNoHintSink(delegate (string __id, string __l, string __t, Action __a, float __w, float __h) { return SR.Ctl.HotkeyButtonNoHint(__id, __l, __t, __a, __w, __h); }); }
+            catch (Exception __ex) { Guard.Log("注入无提示快捷键按钮", __ex); }
             _internalConfig = MainPlugin.Data != null ? MainPlugin.Data : plugin.Config; // 核心条目也走外置文件
             // 界面文案自注册：本处只派发 SR 分部文件，功能在自己的 Initialize 里注册自己的文案。
             SelfRegCore();

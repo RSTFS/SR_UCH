@@ -50,6 +50,9 @@ namespace SR_UCH.Tweaks {
 		// 从剪贴板导入的上限：方块数 / XML 字符数。超出直接拒绝，避免一次性重建拖垮帧率或整段解析爆内存。
 		private const int MaxImportBlocks = 3000;
 		private const int MaxImportChars = 2000000;
+		// 游戏本地关卡快照：7z 压缩文件的大小 / 解压后 XML 大小上限（与导入上限同一套防护，防止畸形文件拖垮扫描）。
+		private const int MaxSnapshotBytes = 4 * 1024 * 1024;
+		private const int MaxLocalXmlBytes = 8 * 1024 * 1024;
 		// 二次确认窗口（秒）：超时后按钮自动恢复第一次点击前的文案。
 		private const float ConfirmWindow = 5f;
 		// 重载锁自愈阈值（秒）：与功能 Level 的 45 秒保持一致。
@@ -89,6 +92,9 @@ namespace SR_UCH.Tweaks {
 		// 模式筛选（运行期状态，不落配置）："" = 全部；否则为预设目录名（GameState.GameMode 的 ToString）。
 		private static string _modeFilter = "";
 		private static bool _modeFilterOpen;
+		// 类型筛选（运行期状态，不落配置）："" = 全部，preset = 预设，local = 游戏本地保存关卡。
+		private static string _typeFilter = "";
+		private static bool _typeFilterOpen;
 		// 加载模式（运行期状态，不落配置）："" = 默认（跟随预设自身保存的模式，保持原有行为）；
 		// 否则为 GameState.GameMode 的 ToString，加载/重载时强制使用该模式。
 		private static string _loadMode = "";
@@ -115,6 +121,10 @@ namespace SR_UCH.Tweaks {
 			new SRApi.TableAction { OnClick = DoActRename },
 			new SRApi.TableAction { OnClick = DoActExport },
 			new SRApi.TableAction { OnClick = DoActDelete }
+		};
+		// 本地关卡（游戏存档）只提供「加载」，不提供重命名/导出/删除，避免误动游戏存档。
+		private static readonly SRApi.TableAction[] _actLocalActions = new SRApi.TableAction[] {
+			new SRApi.TableAction { OnClick = DoActLoad }
 		};
 		private static readonly string[] _cells = new string[ColCount];
 		private static SRApi.TableArgs _args;
@@ -144,8 +154,11 @@ namespace SR_UCH.Tweaks {
 			public int Blocks = -1;  // -1 = 索引里没有，需要从 XML 现算
 			public DateTime TimeUtc = DateTime.MinValue;
 			public bool Ok;          // XML 可解析且方块数 > 0（存 index.json；缺字段按 false，扫描时自愈）
+			// 来源：false = 本功能 presets 目录里的预设；true = 游戏本地保存的自定义关卡（.snapshot，只读）。
+			public bool IsLocal;
+			public string LocalRelative = ""; // 本地条目在 snapshots 目录里的相对文件名（key 用 "local:"+相对路径）
 
-			public string Key { get { return Mode + "/" + File; } }
+			public string Key { get { return IsLocal ? "local:" + LocalRelative : Mode + "/" + File; } }
 		}
 
 		public void Initialize(IFeatureHost plugin) {
@@ -213,9 +226,9 @@ namespace SR_UCH.Tweaks {
 			// 换场景后下次打开面板重新扫盘（手动放入/删除的 XML、其它存档的改动都能看到）。
 			try { SRApi.RegisterSceneHook(delegate { _loaded = false; }); }
 			catch (Exception __sh) { SRApi.Guard.Log("布局预设/注册场景钩子", __sh); }
-			// 清掉旧版「返回树屋」按钮留下的快捷键条目（该按钮已改为普通核心按钮，不再提供右键绑定）。
-			try { SRApi.Migration.Remove("Hotkeys", "presets.treehouse"); }
-			catch (Exception __hk) { SRApi.Guard.Log("布局预设/清理返回树屋快捷键", __hk); }
+			// 返回树屋：注册动作并允许右键绑键（悬浮提示里不写绑定说明）。
+			try { SRApi.HotkeyAction("presets.treehouse", "返回树屋", delegate { ReturnToTreehouse(); }); }
+			catch (Exception __hk) { SRApi.Guard.Log("布局预设/注册返回树屋快捷键", __hk); }
 			SRApi.LocKey(Section, "Skip Treehouse", "跳过树屋流程", "Skip treehouse");
 			SRApi.LocDesc(Section, "Skip Treehouse",
 				"跳过树屋流程\n勾选后联机替换关卡时不再先回树屋，而是直接替换场景进入目标关卡\n房客的关卡选择状态可能不同步（按关卡读取的岩浆/统计等次要设置可能不一致）",
@@ -291,6 +304,8 @@ namespace SR_UCH.Tweaks {
 				for (int i = 0; i < _presets.Count; i++) {
 					PresetInfo p = _presets[i];
 					if (p == null) continue;
+					if (string.Equals(_typeFilter, "preset", StringComparison.Ordinal) && p.IsLocal) continue;
+					if (string.Equals(_typeFilter, "local", StringComparison.Ordinal) && !p.IsLocal) continue;
 					if (!string.IsNullOrEmpty(_levelFilter)
 						&& !string.Equals(p.Level, _levelFilter, StringComparison.OrdinalIgnoreCase)) continue;
 					if (!string.IsNullOrEmpty(_modeFilter)
@@ -394,8 +409,11 @@ namespace SR_UCH.Tweaks {
 						evSearch.Use();
 					}
 					string q = SRApi.ClearableTextField(_search ?? "", 40, SRApi.Ctl.SearchBox,
-						GUILayout.Width(W(160)), GUILayout.Height(W(24)));
+						GUILayout.Width(W(120)), GUILayout.Height(W(24)));
 					if (q != null && q != _search) _search = q;
+					GUILayout.Space(W(8));
+					SRApi.Ctl.LabelAuto(SRApi.T("类型", "Type"));
+					RenderTypeFilterCombo();
 					GUILayout.Space(W(8));
 					SRApi.Ctl.LabelAuto(SRApi.T("排序", "Sort"));
 					RenderSortCombo();
@@ -437,8 +455,9 @@ namespace SR_UCH.Tweaks {
 						SRApi.Ctl.RenderControl(_skipTreehouse);
 					}
 					GUILayout.Space(SRApi.Ctl.Sc(8));
-					if (GUILayout.Button(SRApi.T("返回树屋", "Back to treehouse"), SRApi.Ctl.Btn,
-						GUILayout.Width(SRApi.Ctl.Sc(150)), GUILayout.Height(SRApi.Ctl.Sc(26)))) ReturnToTreehouse();
+if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "Back to treehouse"),
+						SRApi.T("走游戏原生的结束对局流程回到树屋（房主有效）", "ends the current match through the game's native flow and returns to the treehouse (host only)"),
+						delegate { ReturnToTreehouse(); }, SRApi.Ctl.Sc(150), SRApi.Ctl.Sc(26))) ReturnToTreehouse();
 					GUILayout.FlexibleSpace();
 				} finally {
 					GUILayout.EndHorizontal();
@@ -545,6 +564,29 @@ namespace SR_UCH.Tweaks {
 				SRApi.Guard.Log("布局预设/模式筛选项", __ex);
 			}
 			return vals;
+		}
+
+		// 类型筛选下拉：全部 / 预设 / 本地（游戏保存的自定义关卡）。运行期状态，不落配置。
+		private static void RenderTypeFilterCombo() {
+			try {
+				string[] vals = new string[] { "", "preset", "local" };
+				string[] labels = new string[] {
+					SRApi.T("全部", "All"),
+					SRApi.T("预设", "Presets"),
+					SRApi.T("本地", "Local")
+				};
+				int cur = 0;
+				for (int i = 0; i < vals.Length; i++) {
+					if (string.Equals(vals[i], _typeFilter, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
+				}
+				if (cur == 0 && !string.IsNullOrEmpty(_typeFilter)) _typeFilter = "";
+				bool open = _typeFilterOpen;
+				int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(90));
+				_typeFilterOpen = open;
+				if (sel >= 0 && sel < vals.Length) _typeFilter = vals[sel];
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/渲染类型筛选", __ex);
+			}
 		}
 
 		// 加载模式下拉：默认 + 游戏四模式（派对 / 创意 / 挑战 / 自由）。运行期状态，不落配置。
@@ -796,7 +838,9 @@ namespace SR_UCH.Tweaks {
 				for (int i = 0; i < ColCount; i++) _cells[i] = "";
 				return _cells;
 			}
-			_cells[ColName] = p.Name ?? "";
+			_cells[ColName] = p.IsLocal
+				? SRApi.T("本地", "Local") + " · " + (p.Name ?? "")
+				: (p.Name ?? "");
 			_cells[ColLevel] = _levelShowCode ? LevelCodeText(p) : LevelText(p);
 			_cells[ColMode] = ModeText(p.Mode);
 			_cells[ColTime] = TimeText(p);
@@ -816,13 +860,19 @@ namespace SR_UCH.Tweaks {
 				PresetInfo p = PresetAt(visible, row);
 				if (p == null) return;
 				_actPreset = p;
-				bool delPending = IsPending("del:" + p.Key);
 				bool replacePending = IsPending("replace:" + p.Key);
+				int hover = -1;
+				if (p.IsLocal) {
+					// 本地关卡只给「加载」一个按钮
+					_actLocalActions[0].Label = replacePending ? SRApi.T("确认", "Confirm") : SRApi.T("加载", "Load");
+					if (SRApi.TableActionButtons(r, _actLocalActions, null, ref hover) >= 0) _actionHitThisFrame = true;
+					return;
+				}
+				bool delPending = IsPending("del:" + p.Key);
 				_actActions[ActLoad].Label = replacePending ? SRApi.T("确认", "Confirm") : SRApi.T("加载", "Load");
 				_actActions[ActRename].Label = SRApi.T("重命名", "Rename");
 				_actActions[ActExport].Label = SRApi.T("导出", "Export");
 				_actActions[ActDelete].Label = delPending ? SRApi.T("确认", "Confirm") : SRApi.T("删除", "Delete");
-				int hover = -1;
 				int hit = SRApi.TableActionButtons(r, _actActions, null, ref hover);
 				if (hit >= 0) _actionHitThisFrame = true;
 			} catch (Exception __ex) {
@@ -838,7 +888,7 @@ namespace SR_UCH.Tweaks {
 
 		private static void DoActRename() {
 			PresetInfo p = _actPreset;
-			if (p == null) return;
+			if (p == null || p.IsLocal) return;
 			ClearPending();
 			_renameKey = p.Key;
 			_renameText = p.Name;
@@ -846,12 +896,12 @@ namespace SR_UCH.Tweaks {
 
 		private static void DoActExport() {
 			PresetInfo p = _actPreset;
-			if (p != null) ExportPreset(p);
+			if (p != null && !p.IsLocal) ExportPreset(p);
 		}
 
 		private static void DoActDelete() {
 			PresetInfo p = _actPreset;
-			if (p != null && ConfirmOrArm("del:" + p.Key)) DeletePreset(p);
+			if (p != null && !p.IsLocal && ConfirmOrArm("del:" + p.Key)) DeletePreset(p);
 		}
 
 		// ---------- 列宽 / 列序持久化 ----------
@@ -1097,7 +1147,7 @@ namespace SR_UCH.Tweaks {
 					}
 				} else {
 					ClearPending();
-					if (_presets.Count >= MaxPresets) {
+					if (CountPresetEntries() >= MaxPresets) {
 						SRApi.Notify(SRApi.T("预设数量已达上限 ", "Preset limit reached: ") + MaxPresets
 							+ SRApi.T("，请先删除旧预设", "; delete an old preset first"));
 						return;
@@ -1264,6 +1314,7 @@ namespace SR_UCH.Tweaks {
 		private static void ExportPreset(PresetInfo p) {
 			try {
 				if (p == null) return;
+				if (p.IsLocal) return; // 本地关卡是游戏存档，不提供导出
 				if (!ActionAllowed()) return;
 				string xml = ReadAllText(p.FilePath);
 				if (string.IsNullOrEmpty(xml)) {
@@ -1289,7 +1340,7 @@ namespace SR_UCH.Tweaks {
 		private static void ExportAllToDirectory() {
 			try {
 				if (!ActionAllowed()) return;
-				if (_presets.Count == 0) {
+				if (CountPresetEntries() == 0) {
 					SRApi.LogInfo("[布局预设] " + SRApi.T("当前没有可导出的预设", "There are no presets to export"));
 					return;
 				}
@@ -1298,7 +1349,7 @@ namespace SR_UCH.Tweaks {
 				int failed = 0;
 				for (int i = 0; i < _presets.Count; i++) {
 					PresetInfo p = _presets[i];
-					if (p == null) continue;
+					if (p == null || p.IsLocal) continue;
 					try {
 						string xml = ReadAllText(p.FilePath);
 						if (string.IsNullOrEmpty(xml)) { failed++; continue; }
@@ -1335,6 +1386,7 @@ namespace SR_UCH.Tweaks {
 		private static void DeletePreset(PresetInfo p) {
 			try {
 				if (p == null) return;
+				if (p.IsLocal) return; // 游戏本地存档不允许从这里删除
 				if (!ActionAllowed()) return;
 				try {
 					if (File.Exists(p.FilePath)) File.Delete(p.FilePath);
@@ -1355,6 +1407,7 @@ namespace SR_UCH.Tweaks {
 		private static void CommitRename(PresetInfo p) {
 			try {
 				if (p == null) return;
+				if (p.IsLocal) return; // 本地关卡名来自游戏存档，不在这里改名
 				if (!ActionAllowed()) return;
 				string name = (_renameText ?? "").Trim();
 				if (name.Length == 0) {
@@ -1420,7 +1473,7 @@ namespace SR_UCH.Tweaks {
 					return;
 				}
 				if (ReloadBlocked()) return;
-				string xml = ReadAllText(p.FilePath);
+				string xml = ReadPresetXml(p);
 				if (string.IsNullOrEmpty(xml)) {
 					SRApi.Notify(SRApi.T("读取预设文件失败", "Failed to read the preset file"));
 					return;
@@ -1788,7 +1841,7 @@ namespace SR_UCH.Tweaks {
 					return;
 				}
 				if (ReloadBlocked()) return;
-				string xml = ReadAllText(p.FilePath);
+				string xml = ReadPresetXml(p);
 				if (string.IsNullOrEmpty(xml)) {
 					SRApi.Notify(SRApi.T("读取预设文件失败", "Failed to read the preset file"));
 					return;
@@ -2086,7 +2139,11 @@ namespace SR_UCH.Tweaks {
 			bool upgraded = false; // 旧索引缺字段 / 出现新文件 / 强制重校验结果变化：扫完回写一次
 			try {
 				string root = PresetsRoot();
-				if (!Directory.Exists(root)) return;
+				if (!Directory.Exists(root)) {
+					LoadLocalSnapshots();
+					SortPresets();
+					return;
+				}
 				Dictionary<string, PresetInfo> byKey = new Dictionary<string, PresetInfo>(StringComparer.OrdinalIgnoreCase);
 				Dictionary<string, bool> completeIdx = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 				string index = Path.Combine(root, IndexFileName);
@@ -2188,11 +2245,156 @@ namespace SR_UCH.Tweaks {
 					try { if (!File.Exists(pi.FilePath)) continue; } catch { continue; }
 					_presets.Add(pi);
 				}
+				LoadLocalSnapshots(); // 游戏本地保存的自定义关卡（只读，不写 index.json）
 				SortPresets();
 				if (upgraded) SaveIndex(); // 自愈结果立刻落盘（旧索引升级 / 新文件补登记）
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/扫描目录", __ex);
 			}
+		}
+
+		// ---------- 游戏本地保存的自定义关卡（只读扫描） ----------
+
+		// 游戏快照目录：优先用游戏自己的 QuickSaver.LocalSavesFolder（PC = Application.persistentDataPath + "/snapshots"），
+		// 取不到时退回 persistentDataPath 拼接。只读，不写/不删任何文件。
+		private static string LocalSnapshotsFolder() {
+			try {
+				string f = QuickSaver.LocalSavesFolder;
+				if (!string.IsNullOrEmpty(f)) return f;
+			} catch (Exception __ex) { SRApi.Guard.Log("布局预设/本地快照目录(游戏)", __ex); }
+			try { return Path.Combine(Application.persistentDataPath, "snapshots"); } catch { return null; }
+		}
+
+		// 本地快照是 SevenZipHelper 压缩的 UTF8 XML（与原版 DoLocalSave 一致）：校验压缩大小/解压大小/字符数/方块数后
+		// 用 ParseXmlSafe 解析，返回解压后的 XML 字符串。只读，绝不写回。
+		private static string ReadLocalSnapshotXml(string path, out XmlDocument doc, out int blocks) {
+			doc = null;
+			blocks = 0;
+			try {
+				if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
+				FileInfo fi = new FileInfo(path);
+				if (fi.Length <= 0 || fi.Length > MaxSnapshotBytes) {
+					SRApi.LogWarn("[布局预设] 本地关卡文件大小异常，已跳过: " + path + " (" + fi.Length + "B)");
+					return null;
+				}
+				byte[] bytes = File.ReadAllBytes(path);
+				// 7z/LZMA 头：前 5 字节是编码属性，随后 8 字节是解压后字节数（小端）。先按声明大小拦截解压炸弹。
+				if (bytes.Length >= 13) {
+					long declared = 0L;
+					for (int i = 0; i < 8; i++) declared |= (long)bytes[5 + i] << (8 * i);
+					if (declared > MaxLocalXmlBytes) {
+						SRApi.LogWarn("[布局预设] 本地关卡解压后过大，已跳过: " + path + " (" + declared + "B)");
+						return null;
+					}
+				}
+				byte[] raw = SevenZip.Compression.LZMA.SevenZipHelper.Decompress(bytes);
+				if (raw == null || raw.Length == 0 || raw.Length > MaxLocalXmlBytes) return null;
+				string xml = Encoding.UTF8.GetString(raw);
+				if (string.IsNullOrEmpty(xml) || xml.Length > MaxImportChars) return null;
+				doc = ParseXmlSafe(xml);
+				if (doc == null || doc.DocumentElement == null || doc.DocumentElement.Name != "scene") return null;
+				blocks = CountBlocks(doc);
+				if (blocks > MaxImportBlocks) {
+					SRApi.LogWarn("[布局预设] 本地关卡方块数超限，已跳过: " + path + " (" + blocks + ")");
+					return null;
+				}
+				return xml;
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/读取本地关卡快照", __ex);
+				return null;
+			}
+		}
+
+		// 本地关卡展示名：文件名去掉 .snapshot 与 .c/.v 后缀（游戏自己的 GetSnapshotNameWithoutSuffix 同一规则），
+		// 空名回退文件名。
+		private static string LocalLevelName(string fileName) {
+			try {
+				string n = fileName ?? "";
+				if (n.EndsWith(".snapshot", StringComparison.OrdinalIgnoreCase)) n = n.Substring(0, n.Length - 9);
+				if (n.EndsWith(".c", StringComparison.OrdinalIgnoreCase) || n.EndsWith(".v", StringComparison.OrdinalIgnoreCase))
+					n = n.Substring(0, n.Length - 2);
+				return string.IsNullOrEmpty(n) ? (fileName ?? "") : n;
+			} catch { return fileName ?? ""; }
+		}
+
+		// 本地关卡模式：快照 XML 本身不存 GameMode；只能从文件名后缀推断关卡类型（.c=挑战 / .v=对战），
+		// 其它情况留空（列表显示 -），避免瞎猜。
+		private static string LocalModeFromFilename(string fileName) {
+			try {
+				string n = fileName ?? "";
+				if (n.EndsWith(".c.snapshot", StringComparison.OrdinalIgnoreCase)) return GameState.GameMode.CHALLENGE.ToString();
+				if (n.EndsWith(".v.snapshot", StringComparison.OrdinalIgnoreCase)) return GameState.GameMode.PARTY.ToString();
+			} catch { }
+			return "";
+		}
+
+		// 扫描 snapshots 目录，把本地保存的自定义关卡追加进 _presets（IsLocal=true，key="local:"+文件名）。
+		private static void LoadLocalSnapshots() {
+			try {
+				string folder = LocalSnapshotsFolder();
+				if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder)) return;
+				string[] files = Directory.GetFiles(folder, "*.snapshot");
+				for (int i = 0; i < files.Length; i++) {
+					string fp = files[i];
+					string fn = Path.GetFileName(fp);
+					try {
+						XmlDocument doc;
+						int blocks;
+						string xml = ReadLocalSnapshotXml(fp, out doc, out blocks);
+						if (string.IsNullOrEmpty(xml) || doc == null || doc.DocumentElement == null) continue;
+						PresetInfo li = new PresetInfo();
+						li.IsLocal = true;
+						li.LocalRelative = fn;
+						li.File = fn;
+						li.FilePath = fp;
+						li.Name = LocalLevelName(fn);
+						// 快照里若带 snapshotName/levelName（部分导入/下载的 .snapshot），优先用它作为名称；
+						// 原版本地保存的 XML 没有该属性，按文件名回退。
+						string snapName = doc.DocumentElement.GetAttribute("snapshotName");
+						if (string.IsNullOrEmpty(snapName)) snapName = doc.DocumentElement.GetAttribute("levelName");
+						if (!string.IsNullOrEmpty(snapName)) li.Name = snapName;
+						li.Mode = LocalModeFromFilename(fn);
+						li.Blocks = blocks;
+						li.Ok = blocks > 0;
+						li.TimeUtc = File.GetLastWriteTimeUtc(fp);
+						li.Level = doc.DocumentElement.GetAttribute("levelSceneName") ?? "";
+						// 自定义关卡（BlankLevel）用文件名作为实际关卡名；内置关卡让 LevelText 走本地化场景名。
+						if (string.Equals(li.Level, "BlankLevel", StringComparison.OrdinalIgnoreCase)) li.LevelName = li.Name;
+						string code = doc.DocumentElement.GetAttribute("snapshotCode");
+						if (string.IsNullOrEmpty(code)) code = doc.DocumentElement.GetAttribute("levelCode");
+						li.LevelCode = code ?? "";
+						_presets.Add(li);
+					} catch (Exception __ex) {
+						SRApi.Guard.Log("布局预设/扫描本地关卡单项", __ex);
+					}
+				}
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/扫描本地关卡", __ex);
+			}
+		}
+
+		// 统一读取入口：预设读 .xml 文本；本地关卡解压 .snapshot（仍走同一套大小/方块上限）。
+		private static string ReadPresetXml(PresetInfo p) {
+			try {
+				if (p == null) return null;
+				if (!p.IsLocal) return ReadAllText(p.FilePath);
+				XmlDocument doc;
+				int blocks;
+				return ReadLocalSnapshotXml(p.FilePath, out doc, out blocks);
+			} catch (Exception __ex) {
+				SRApi.Guard.Log("布局预设/读取预设XML", __ex);
+				return null;
+			}
+		}
+
+		private static int CountPresetEntries() {
+			try {
+				int n = 0;
+				for (int i = 0; i < _presets.Count; i++) {
+					if (_presets[i] != null && !_presets[i].IsLocal) n++;
+				}
+				return n;
+			} catch { return 0; }
 		}
 
 		private static void SaveIndex() {
@@ -2201,8 +2403,12 @@ namespace SR_UCH.Tweaks {
 				Directory.CreateDirectory(root);
 				StringBuilder sb = new StringBuilder();
 				sb.Append("{\n  \"version\": ").Append(IndexVersion).Append(",\n  \"entries\": [\n");
+				bool first = true;
 				for (int i = 0; i < _presets.Count; i++) {
 					PresetInfo p = _presets[i];
+					if (p == null || p.IsLocal) continue; // 本地关卡是游戏存档，不写进预设索引
+					if (!first) sb.Append(",\n");
+					first = false;
 					sb.Append("    {\"file\":\"").Append(JsonEsc(p.File))
 						.Append("\",\"name\":\"").Append(JsonEsc(p.Name))
 						.Append("\",\"mode\":\"").Append(JsonEsc(p.Mode))
@@ -2212,9 +2418,8 @@ namespace SR_UCH.Tweaks {
 						.Append("\",\"blocks\":").Append(Mathf.Max(0, p.Blocks))
 						.Append(",\"time\":\"").Append(JsonEsc(TimeIso(p.TimeUtc)))
 						.Append("\",\"ok\":").Append(p.Ok ? "true" : "false").Append("}");
-					if (i < _presets.Count - 1) sb.Append(',');
-					sb.Append('\n');
 				}
+				if (!first) sb.Append('\n');
 				sb.Append("  ]\n}\n");
 				File.WriteAllText(Path.Combine(root, IndexFileName), sb.ToString(), new UTF8Encoding(false));
 			} catch (Exception __ex) {
