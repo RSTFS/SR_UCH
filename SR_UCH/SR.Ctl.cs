@@ -86,19 +86,20 @@ public partial class SR {
             float tx = a.pinW > 0f ? a.pinX + a.pinW : a.box.x + a.stripW;
             Rect track = new Rect(tx, a.box.y + a.headerH, sw, a.rowsH);
             Rect thumb;
-            Vector2 __mp = Event.current != null ? Event.current.mousePosition : Vector2.zero;
-            // 默认隐藏：只有正在拖动、或鼠标正好落在滚动条区域时才显示（悬停整张表不显示）。
-            // 默认隐藏：只有拖动、或鼠标正好落在滚动条轨道上才显示；离开立即归零（不留残影）。
-            bool __show = dragging || track.Contains(__mp);
-            a.scrollbarAlpha = __show ? Mathf.MoveTowards(a.scrollbarAlpha, 1f, Time.unscaledDeltaTime * 8f) : 0f;
-            TableScrollbar(track, contentH, a.rowsH, scrollY, dragging, out thumb, a.scrollbarAlpha > 0.02f, a.scrollbarAlpha);
+            // 滚动条只有“隐藏 / 显示”两态：默认隐藏，不会因为鼠标悬停自动出现。
+            // 列表滚动统一走滚轮 / Ctrl+滚轮；若以后要显示，把 __show 改成 true 即可。
+            bool __show = false;
+            a.scrollbarAlpha = __show ? 1f : 0f;
+            TableScrollbar(track, contentH, a.rowsH, scrollY, dragging, out thumb, __show, a.scrollbarAlpha);
+            // 不可见时不接受点击/拖动，避免“看不见却能点”的隐形热区。
+            if (!__show) return false;
             if (e == null) return false;
             return SRApi.TableScrollbarInput(e, e.mousePosition, track, thumb, maxScroll, ref dragging, ref grabY, ref scrollY);
         } catch (Exception __ex) { Guard.Log("表格滚动条一体化", __ex); return false; }
     }
 
     public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb, bool visible = true, float alpha = 1f) {
-            SR.TableScrollbar(track, contentH, viewH, scrollY, dragging, out thumb);
+            SR.TableScrollbar(track, contentH, viewH, scrollY, dragging, out thumb, visible, alpha);
         }
 
         public static float TableAutoHeight(float usedAbove, float minH) {
@@ -1302,7 +1303,7 @@ public partial class SR {
 
     //竖向滚动条的拖拽 / 点轨道跳转 -> 返回 true 表示本事件已处理（状态以 ref 传入）
     // 竖向滚动条统一绘制（ImGui ScrollbarBg / Grab / GrabHovered / GrabActive 配色）。
-    public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb) {
+    public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb, bool visible = true, float alpha = 1f) {
         thumb = default(Rect);
         try {
             if (track.width <= 0f || track.height <= 0f || contentH <= viewH + 0.5f) return;
@@ -1310,11 +1311,14 @@ public partial class SR {
             float maxScroll = Mathf.Max(0f, contentH - viewH);
             float k2 = maxScroll > 0.01f ? Mathf.Clamp01(scrollY / maxScroll) : 0f;
             thumb = new Rect(track.x, track.y + (track.height - th) * k2, track.width, th);
-            DrawFill(track, new Color(0.06f, 0.06f, 0.07f, 0.94f));
+            // visible=false / alpha<=0：只算几何不绘制（默认隐藏时完全不产生绘制调用）。
+            if (!visible || alpha <= 0.01f) return;
+            float a = Mathf.Clamp01(alpha);
+            DrawFill(track, new Color(0.06f, 0.06f, 0.07f, 0.94f * a));
             bool hover = Event.current != null && thumb.Contains(Event.current.mousePosition);
-            DrawFill(thumb, dragging ? new Color(0.51f, 0.51f, 0.53f, 1f)
-                : hover ? new Color(0.41f, 0.41f, 0.44f, 1f)
-                : new Color(0.31f, 0.31f, 0.34f, 1f));
+            DrawFill(thumb, dragging ? new Color(0.51f, 0.51f, 0.53f, a)
+                : hover ? new Color(0.41f, 0.41f, 0.44f, a)
+                : new Color(0.31f, 0.31f, 0.34f, a));
         } catch (Exception __ex) { Guard.Log("表格滚动条绘制", __ex); }
     }
 
