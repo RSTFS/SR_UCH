@@ -407,6 +407,30 @@ public partial class SR {
                 }
             }
             GUILayout.EndScrollView();
+            GUILayout.EndVertical();
+            GUILayout.Space(Sc(2));
+            GUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+            if (_mode == Mode.Settings) {
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button(T("恢复默认", "Defaults"), _btn, GUILayout.Width(Sc(84)))) {
+                    if (_internalConfig != null) {
+                        foreach (ConfigEntryBase ce in AllEntries(_internalConfig)) {
+                            Guard.Try("恢复默认值 " + ce.Definition.Key, () => ce.BoxedValue = ce.DefaultValue);
+                        }
+                        Guard.Try("写盘保存配置", () => _internalConfig.Save());
+                        // 恢复默认的收尾：编辑框 / 展开态 / 枚举下拉缓存都要清，并置键位脏
+                        // （否则下拉仍显示旧选项，带序列前键的快捷键也一直不触发）。
+                        _editText.Clear();
+                        _editOpen.Clear();
+                        _enumOptions.Clear();
+                        Guard.Try("重置键位监听", () => MarkKeyChanged());
+                    }
+                }
+                GUILayout.FlexibleSpace();
+                GUILayout.Label(T("恢复所有 SR＿UCH 配置为默认值", "Reset all SR＿UCH settings to defaults"), _label);
+                GUILayout.EndHorizontal();
+                GUILayout.Space(Sc(4));
+            }
             float colWidth = EntryNameWidth();
             // 功能页外框部件（滚动区之外，功能自注册，仅在对应栏目被选中时调用）。
             // 页签必须画在页面外框（顶栏）之前，否则顶栏会压在上面。
@@ -445,13 +469,9 @@ public partial class SR {
             // 真实页面视口 = 内容区高 - 已用页头高 - 底栏保留高：显式限制滚动区高度，
             // 否则滚动区会吃满剩余空间、底栏压住最后几行（预设/联机列表“最后一项显示不全”的根因）。
             float __areaH = winRect.height - Sc(8);
-            // 页头高度兜底：Layout 帧/首次进入时 GetLastRect 可能还是 0，
-            // 用页签+页头的固定高度（设计单位 58）兜底，保证滚动区底 = 底栏上沿。
-            float __usedTopFallback = Sc(58f);
             // Layout 阶段 GetLastRect 可能还是 0（布局尚未计算完）：用上一帧量到的页头高度，
             // 否则 Layout 帧会把“视口”算成满高，滚动区把底栏顶出可视区（底栏只剩上边一点）。
-            float __usedTop = Mathf.Max(Sc(1f), _pageUsedTop);
-            if (_pageUsedTop <= Sc(1f)) _pageUsedTop = __usedTopFallback;
+            float __usedTop = _pageUsedTop;
             if (Event.current == null || Event.current.type != EventType.Layout) {
                 float __measured = 0f;
                 try { __measured = GUILayoutUtility.GetLastRect().yMax; } catch (Exception __ut) { Guard.Log("页面视口/页头高度", __ut); }
@@ -466,9 +486,7 @@ public partial class SR {
             float __footerReserve = __barH + Mathf.Max(0f, __pfReserve);
             SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 页面内容必须以这条 y 为底界（= 滚动区顶 + 视口高 = 底栏条上沿）：列表高度按它算，随窗口大小自适应。
-            SRApi.PageScrollTopY = __usedTop;
             SRApi.PageContentBottomY = __usedTop + SRApi.PageViewportHeight;
-
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
             _scroll = __noScroll
@@ -521,7 +539,6 @@ public partial class SR {
                 if (!any) GUILayout.Label(T("（这个插件没有可显示的配置项）", "(this plugin has no visible settings)"), _label);
             }
             GUILayout.EndScrollView();
-
             // 滚轮被下拉框 / 滑块吃掉 -> 撤销本帧页面滚动。
             // 两道判定：1) 盾（绘制前、上一帧矩形命中）；2) 本帧绘制后的控件矩形命中。
             if (WheelShieldHit || (__wasWheel && __overCtrlPrev)) {

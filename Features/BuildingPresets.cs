@@ -688,7 +688,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 		// 标准表格：核心 TableDraw 负责表头/行/拖列宽/换列位/钉住操作列；本页只提供列定义、单元格文本与操作按钮。
 		private static void RenderPresetTable(float tableH, List<PresetInfo> visible) {
 			try {
-				if (SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() < SRApi.Ctl.Sc(220)) return;
 				string title = SRApi.T("- 预设列表", "- Preset list") + " (" + visible.Count + "/" + _presets.Count
 					+ SRApi.T("，上限 ", ", limit ") + MaxPresets + ")";
 				SRApi.Ctl.SectionTitle(title);
@@ -702,7 +701,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH - titleH - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));   // 8px 给底边拖拽条
 				float rowsH = Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH);
 				Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
-				if (box.width < SRApi.Ctl.Sc(120)) return;
+				if (box.width < SRApi.Ctl.Sc(220)) return;
 				EnsureCols();
 				// 操作列宽始终跟随当前语言的按钮文字：语言热切换后也能立刻避免英文标签被截断。
 				_colW[ColAction] = DefaultActionColW();
