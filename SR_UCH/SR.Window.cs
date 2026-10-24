@@ -408,6 +408,7 @@ public partial class SR {
                 }
             }
             GUILayout.EndScrollView();
+            GUILayout.Space(Sc(26f));   // 底栏是绝对绘制的：左栏列表必须在底栏之上结束，否则会盖住/穿透点击
             GUILayout.EndVertical();
             GUILayout.Space(Sc(2));
             GUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
@@ -657,16 +658,23 @@ public partial class SR {
             if (curTex != null) GUI.DrawTexture(new Rect(mouse.x - Sc(7), mouse.y - Sc(7), Sc(15), Sc(15)), curTex);
             // F9：诊断浮层
             try {
-                if (Event.current != null && Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.F9) _diagOn = !_diagOn;
-                if (_diagOn && SRApi.DiagLines.Count > 0) {
-                    float lh = Sc(16f);
-                    float w = Sc(460f);
-                    float h = lh * (SRApi.DiagLines.Count + 1) + Sc(8f);
-                    Rect box = new Rect(Sc(8f), Sc(34f), w, h);
-                    SRApi.DrawFill(box, new Color(0f, 0f, 0f, 0.72f));
-                    GUI.Label(new Rect(box.x + Sc(6f), box.y + Sc(4f), box.width - Sc(12f), lh), "SR DIAG (F9)", _label);
+                if (SR.DiagEnabled && SRApi.DiagLines.Count > 0) {
+                    float w = Sc(520f);
+                    float __innerW = w - Sc(12f);
+                    float __y = Sc(4f);
+                    // 先按换行测量总高，避免长行被裁掉。
+                    float __total = _label.CalcHeight(new GUIContent("SR DIAG"), __innerW) + Sc(4f);
                     for (int i = 0; i < SRApi.DiagLines.Count; i++)
-                        GUI.Label(new Rect(box.x + Sc(6f), box.y + Sc(4f) + lh * (i + 1), box.width - Sc(12f), lh), SRApi.DiagLines[i], _label);
+                        __total += _labelWrap.CalcHeight(new GUIContent(SRApi.DiagLines[i]), __innerW);
+                    Rect box = new Rect(Sc(8f), Sc(34f), w, Mathf.Min(__total + Sc(10f), Screen.height * 0.5f));
+                    SRApi.DrawFill(box, new Color(0f, 0f, 0f, 0.78f));
+                    GUI.Label(new Rect(box.x + Sc(6f), box.y + Sc(2f), __innerW, _label.CalcHeight(new GUIContent("SR DIAG"), __innerW)), "SR DIAG", _label);
+                    __y += _label.CalcHeight(new GUIContent("SR DIAG"), __innerW) + Sc(2f);
+                    for (int i = 0; i < SRApi.DiagLines.Count; i++) {
+                        float hh = _labelWrap.CalcHeight(new GUIContent(SRApi.DiagLines[i]), __innerW);
+                        GUI.Label(new Rect(box.x + Sc(6f), box.y + Sc(2f) + __y, __innerW, hh), SRApi.DiagLines[i], _labelWrap);
+                        __y += hh;
+                    }
                 }
             } catch (Exception __dg) { Guard.Log("诊断浮层", __dg); }
             SRApi.DiagLines.Clear();   // 帧末清空：功能可在任意时机写入，下一帧浮层显示

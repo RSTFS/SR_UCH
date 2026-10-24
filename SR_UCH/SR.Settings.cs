@@ -142,21 +142,21 @@ public partial class SR {
                 GUILayout.Space(Sc(6));
                 GUILayout.Label("- " + T("自检", "Self-check") + " -", _secHeader);
                 GUILayout.Label(T("按名绑定的补丁目标", "Named patch targets") + "："
-                    + SR.AuditPatchOk + " / " + SR.AuditPatchTotal, _label);
-                GUILayout.Label(T("反射成员", "Reflected members") + "：" + SR.AuditRefOk + " / " + SR.AuditRefTotal, _label);
+                    + SR.AuditPatchOk + " / " + SR.AuditPatchTotal, _labelWrap);
+                GUILayout.Label(T("反射成员", "Reflected members") + "：" + SR.AuditRefOk + " / " + SR.AuditRefTotal, _labelWrap);
                 System.Collections.Generic.IList<SR.AuditIssue> issues = SR.AuditIssues;
                 if (issues == null || issues.Count == 0) {
-                    GUILayout.Label(T("按名绑定的目标全部有效。", "All name-bound targets are valid."), _label);
+                    GUILayout.Label(T("按名绑定的目标全部有效。", "All name-bound targets are valid."), _labelWrap);
                 } else {
                     GUILayout.Label(T("以下目标已失效 -> 对应功能不会生效（开关还在、行为没了）：",
-                        "These targets no longer exist - the listed features will NOT work:"), _label);
+                        "These targets no longer exist - the listed features will NOT work:"), _labelWrap);
                     for (int i = 0; i < issues.Count; i++) {
                         //AuditIssue.Kind 取值是中文（"补丁" / "反射"），须映射为当前语言；未知取值原样输出。
                         string kindRaw = issues[i].Kind;
                         string kindTxt = kindRaw == "补丁" ? T("补丁", "Patch")
                                        : kindRaw == "反射" ? T("反射", "Reflection")
                                        : kindRaw;
-                        GUILayout.Label("   ✗  " + kindTxt + "  " + issues[i].Target + "   <- " + issues[i].Scope, _label);
+                        GUILayout.Label("   ✗  " + kindTxt + "  " + issues[i].Target + "   <- " + issues[i].Scope, _labelWrap);
                     }
                 }
                 //显示当前生效的扩展点数量，便于外部模块对接时确认是否接上。
@@ -164,16 +164,16 @@ public partial class SR {
                     + T("槽位 ", "slots ") + Slots.Count
                     + T("（", " (") + string.Join(", ", new List<string>(Slots.Names).ToArray()) + ")"
                     + T("，覆盖层 ", ", overlays ") + SR.OverlayCount
-                    + T("，UI 阻断 ", ", UI blockers ") + SR.UiBlockProviderCount, _label);
+                    + T("，UI 阻断 ", ", UI blockers ") + SR.UiBlockProviderCount, _labelWrap);
                 if (Slots.MissCount > 0) {
                     GUILayout.Label(T("没人提供的槽位", "Unclaimed slots") + "：" + Slots.MissCount
                         + T("（取用时返回 null，详见日志", " (Require returned null; see log)") + "："
-                        + string.Join(", ", new List<string>(Slots.MissNames).ToArray()) + ")", _label);
+                        + string.Join(", ", new List<string>(Slots.MissNames).ToArray()) + ")", _labelWrap);
                 }
                 if (SR.OrphanKeyCount > 0) {
                     GUILayout.BeginHorizontal();
                     GUILayout.Label(T("配置里的孤儿键", "Orphan config keys") + "：" + SR.OrphanKeyCount
-                        + T("（没有代码再读它；详见日志）", " (nothing reads them any more; see log)"), _label);
+                        + T("（没有代码再读它；详见日志）", " (nothing reads them any more; see log)"), _labelWrap);
                     //一键清理这些键（原子替换，原文件备份为 .bak）
                     if (GUILayout.Button(T("清理", "Clean up"), _btn, GUILayout.Width(Sc(64)), GUILayout.Height(Sc(24)))) {
                         int cleaned = SR.CleanOrphanKeys();
@@ -186,18 +186,18 @@ public partial class SR {
                 }
                 if (ConfigMigration.RuleConflictCount > 0) {
                     GUILayout.Label(T("迁移规则冲突", "Migration rule conflicts") + "：" + ConfigMigration.RuleConflictCount
-                        + T("（会让某些设置每次启动被删/读不到；详见日志", " (some settings get deleted or unreadable every launch; see log)"), _label);
+                        + T("（会让某些设置每次启动被删/读不到；详见日志", " (some settings get deleted or unreadable every launch; see log)"), _labelWrap);
                 }
                 if (SR.FallbackSectionCount > 0) {
                     GUILayout.Label(T("没有归属的配置段", "Unowned config sections") + "：" + SR.FallbackSectionCount
-                        + T("（会在侧栏以兜底页出现；详见日志", " (shown as fallback pages; see log)"), _label);
+                        + T("（会在侧栏以兜底页出现；详见日志", " (shown as fallback pages; see log)"), _labelWrap);
                 }
                 //显示运行期异常计数与最近一条，弥补启动自检只能看到静态失效的缺口。
                 if (SR.Guard.WarnCount > 0) {
-                    GUILayout.Label(T("运行时异常次数", "Runtime errors") + "：" + SR.Guard.WarnCount, _label);
+                    GUILayout.Label(T("运行时异常次数", "Runtime errors") + "：" + SR.Guard.WarnCount, _labelWrap);
                     if (!string.IsNullOrEmpty(SR.Guard.LastWhat)) {
                         GUILayout.Label(T("最近一次", "Last") + "：" + SR.Guard.LastWhat
-                            + " - " + (SR.Guard.LastError ?? ""), _label);
+                            + " - " + (SR.Guard.LastError ?? ""), _labelWrap);
                     }
                 }
             } catch (Exception __ex) { Guard.Log("渲染自检块", __ex); }

@@ -23,6 +23,8 @@ public partial class SR : ITweak {
         private static ConfigEntry<float> _uiScaleEntry;
         private static ConfigEntry<string> _disabledPluginsEntry;
         private static ConfigEntry<bool> _allEnabledEntry;
+        private static ConfigEntry<bool> _diagEntry;
+        public static bool DiagEnabled { get { return _diagEntry != null && _diagEntry.Value; } }
         // 对外（附加模块 DLL）暴露的注册接口版本：外部模块初始化时比对自己的需求版本，不匹配就提示 / 降级。
         // 用 static readonly 而非 const：const 会在编译外部模块时被内联，握手只能靠运行时读取生效。
         public static readonly int ApiVersion = 3;
@@ -914,7 +916,10 @@ public partial class SR : ITweak {
             _sidebarW = _sidebarWEntry.Value;
             _sidebarWEntry.SettingChanged += (s, e) => _sidebarW = _sidebarWEntry.Value;
             // 加载后清理已迁到 Experiments.cs（section 同时改为 Experiments，界面位置不变）
-            _allEnabledEntry = plugin.Config.Bind(Keys.Settings, Keys.AllEnabled, false, "整个 Mod 的总开关. 关掉以后所有内部功能都不生效, 但每个功能的开关值不会被改掉.\n默认是关的, 改动会自动保存, 下次启动保持上次的状态.");
+            _diagEntry = plugin.Config.Bind(Keys.Settings, "Show Diagnostics", false, "显示诊断浮层：在窗口左上角显示页面几何/HUD/方块破坏等状态，供排查问题用。");
+        SRApi.LocKey(Keys.Settings, "Show Diagnostics", "显示诊断浮层", null);
+        SRApi.LocDesc(Keys.Settings, "Show Diagnostics", "显示诊断浮层\n在窗口左上角叠加页面几何与功能状态\n仅用于排查问题，平时可关闭。", "show diagnostics overlay\noverlays page geometry and feature state at the window's top-left\nfor troubleshooting only; keep it off normally");
+        _allEnabledEntry = plugin.Config.Bind(Keys.Settings, Keys.AllEnabled, false, "整个 Mod 的总开关. 关掉以后所有内部功能都不生效, 但每个功能的开关值不会被改掉.\n默认是关的, 改动会自动保存, 下次启动保持上次的状态.");
             AllEnabled = _allEnabledEntry.Value;
             // 总开关关闭也走 FireDismissUi（与换场景、对局开始、EX 强制回主界面并列）
             _allEnabledEntry.SettingChanged += (s, e) => {
