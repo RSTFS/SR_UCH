@@ -634,7 +634,7 @@ public partial class SR {
                     for (int i = 0; i < SRApi.DiagLines.Count; i++)
                         __total += _labelWrap.CalcHeight(new GUIContent(SRApi.DiagLines[i]), __innerW);
                     Rect box = new Rect(Sc(8f), Sc(34f), w, Mathf.Min(__total + Sc(10f), Screen.height * 0.5f));
-                    SRApi.DrawFill(box, new Color(0f, 0f, 0f, 0.78f));
+                    SR.DrawRounded(box, new Color(0f, 0f, 0f, 0.78f), Sc(6f));
                     GUI.Label(new Rect(box.x + Sc(6f), box.y + Sc(2f), __innerW, _label.CalcHeight(new GUIContent("SR DIAG"), __innerW)), "SR DIAG", _label);
                     __y += _label.CalcHeight(new GUIContent("SR DIAG"), __innerW) + Sc(2f);
                     for (int i = 0; i < SRApi.DiagLines.Count; i++) {
