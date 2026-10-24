@@ -502,6 +502,8 @@ namespace SR_UCH {
         public static float PageViewportHeight;
         // 页面内容底界（布局坐标）：滚动区顶 + 视口高 = 底栏条上沿。表格高度按它算可精确贴底。
         public static float PageContentBottomY;
+        // 页面滚动区顶（布局坐标）：页面内“已用高度”一律 = 当前布局Y - 这个值。
+        public static float PageScrollTopY;
         public static float FooterHeight { get { Func<float> f = _footerHeight; return f != null ? f() : 0f; } set { Action<float> a = _setFooterHeight; if (a != null) a(value); } }
         public static Vector2 PageScroll { get { Func<Vector2> f = _pageScroll; return f != null ? f() : default(Vector2); } set { Action<Vector2> a = _setPageScroll; if (a != null) a(value); } }
         public static bool NoPageScrollBars { get { Func<bool> f = _noPageScrollBars; return f != null && f(); } set { Action<bool> a = _setNoPageScrollBars; if (a != null) a(value); } }

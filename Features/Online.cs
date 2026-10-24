@@ -448,7 +448,7 @@ namespace SR_UCH.Tweaks {
             float availW = Mathf.Max(SRApi.Ctl.Sc(220), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(12));
             // 高度走核心统一公式：页面可视高度（屏幕量）减去表格上方已用高度（布局量之差）。
             // 表格高度 = 页面视口高 − 页面内已用高度（纯布局量，切页/缩放自动一致）。
-            float usedAbove = _pageTopY > 0f ? Mathf.Max(0f, last.yMax - _pageTopY) : 0f;
+            float usedAbove = Mathf.Max(0f, last.yMax - SRApi.PageScrollTopY);
             float availH = Mathf.Max(SRApi.Ctl.Sc(140), SRApi.PageViewportHeight - usedAbove);
             // 拖动中必须读临时值 _dragHTmp（配置值此时还是旧的），否则高度不跟手。
             float hPx = _dragH ? _dragHTmp : (_tableH != null ? _tableH.Value : 0);

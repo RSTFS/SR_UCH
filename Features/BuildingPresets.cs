@@ -478,7 +478,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				Rect last = GUILayoutUtility.GetLastRect();
 				// 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
 				// 表格高度 = 页面视口高 − 页面内已用高度（都是布局量，不掺窗口/底栏坐标）。
-				float usedAbove = _pageTopYSet ? Mathf.Max(0f, last.yMax - _pageTopY) : SRApi.Ctl.Sc(300);
+				// 页面内已用高度：以核心给出的“滚动区顶”为基准（与视口同一坐标系，切页/缩放一致）。
+				float usedAbove = Mathf.Max(0f, last.yMax - SRApi.PageScrollTopY);
 				float tableH = Mathf.Max(SRApi.Ctl.Sc(120), SRApi.PageViewportHeight - usedAbove);
 				// 用户自定义高度优先（0 = 自动）；上限不超过剩余空间。
 				if (_tableHEntry != null && _tableHEntry.Value > 0)

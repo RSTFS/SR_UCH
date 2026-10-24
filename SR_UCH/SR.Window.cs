@@ -486,6 +486,7 @@ public partial class SR {
             float __footerReserve = __barH + Mathf.Max(0f, __pfReserve);
             SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             // 页面内容必须以这条 y 为底界（= 滚动区顶 + 视口高 = 底栏条上沿）：列表高度按它算，随窗口大小自适应。
+            SRApi.PageScrollTopY = __usedTop;
             SRApi.PageContentBottomY = __usedTop + SRApi.PageViewportHeight;
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
