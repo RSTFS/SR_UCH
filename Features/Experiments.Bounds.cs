@@ -264,7 +264,7 @@ public partial class Experiments : ITweak
 					BoxCollider2D bc = g.GetComponent<BoxCollider2D>();
 					if (bc != null) { _wallCol[k] = bc; any = true; }
 				}
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			if (!any) { /* 扫不到留待下次：场景可能未加载完，或本关卡没有这三面墙 */ }
 		}
 
@@ -315,14 +315,14 @@ public partial class Experiments : ITweak
 					foreach (KeyValuePair<MonoBehaviour, bool> kv in _fixWas) {
 						FixCameraToBoundaries f = kv.Key as FixCameraToBoundaries;
 						if (f == null) continue;
-						try { f.isCameraConfigured = false; if (!f.enabled) f.enabled = true; nb++; } catch { }
+						try { f.isCameraConfigured = false; if (!f.enabled) f.enabled = true; nb++; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 					}
 					_fixWas.Clear();
 					// ② 当前场景中的控制器
 					for (int i = 0; i < fs.Length; i++) {
 						FixCameraToBoundaries f = fs[i];
 						if (f == null) continue;
-						try { f.isCameraConfigured = false; if (!f.enabled) f.enabled = true; nb++; } catch { }
+						try { f.isCameraConfigured = false; if (!f.enabled) f.enabled = true; nb++; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 					}
 					// ③ 曾打开的 ZoomCamera 按原值还回
 					if (_zcTouched) {
@@ -413,7 +413,7 @@ public partial class Experiments : ITweak
 					SRApi.LogWarn("[关卡边界] 硬解除半径必须大于 0, 已按 1 处理（填 0 会让取景框塌成一个点）");
 					return 1f;
 				}
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return DefaultHardRadius;
 		}
 		private static Bounds Huge(Vector3 center) {
@@ -430,7 +430,7 @@ public partial class Experiments : ITweak
 					System.Reflection.FieldInfo fi = t.GetField("boundary", BF);
 					if (fi != null) { _fiBoundary = fi; break; }
 				}
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return _fiBoundary;
 		}
 		// ZoomCamera.frame 是 protected 字段，即相机实际取景框。
@@ -440,7 +440,7 @@ public partial class Experiments : ITweak
 				const System.Reflection.BindingFlags BF = System.Reflection.BindingFlags.Instance
 					| System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
 				_fiFrame = typeof(ZoomCamera).GetField("frame", BF);
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return _fiFrame;
 		}
 		private static bool ReadCursorBounds(PiecePlacementCursor c, out Bounds b) {
@@ -461,7 +461,7 @@ public partial class Experiments : ITweak
 			int nb = 0;
 			foreach (KeyValuePair<PiecePlacementCursor, Bounds> kv in _curOrig) {
 				if (kv.Key == null) continue;
-				try { kv.Key.SetBounds(kv.Value); nb++; } catch { }
+				try { kv.Key.SetBounds(kv.Value); nb++; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			}
 			_curOrig.Clear();
 			if (nb > 0) SRApi.LogInfo("[关卡边界] " + why + "，已还原 " + nb + " 个光标");
@@ -481,7 +481,7 @@ public partial class Experiments : ITweak
 						if (ReadCursorBounds(c, out cb) && !_curOrig.ContainsKey(c)) _curOrig[c] = cb;
 						// 只用 SetBounds(Bounds)，它只写 boundary 字段；
 						// SetBounds(Collider2D) 会改写 boundingCollider（即 CheckColliding.CheckBounds 的来源），改错后再也放不下。
-						try { c.SetBounds(Huge(c.transform.position)); n++; } catch { }
+						try { c.SetBounds(Huge(c.transform.position)); n++; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 					}
 				} else {
 					// 子开关关闭：立刻写回原值。
@@ -500,7 +500,7 @@ public partial class Experiments : ITweak
 						} else cam = "无相机";
 					} else {
 						if (_zcHas) {
-							try { ZoomCamera z0 = Zc(); if (z0 != null) z0.SetBounds(_zcOrig); } catch { }
+							try { ZoomCamera z0 = Zc(); if (z0 != null) z0.SetBounds(_zcOrig); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 							_zcHas = false;
 						}
 						cam = "相机=不动";
@@ -523,7 +523,7 @@ public partial class Experiments : ITweak
 			try {
 				PiecePlacementCursor[] a = UnityEngine.Object.FindObjectsOfType<PiecePlacementCursor>();
 				if (a != null) _cursors = a;
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return _cursors;
 		}
 		private static global::Level[] Levels() {
@@ -533,7 +533,7 @@ public partial class Experiments : ITweak
 			try {
 				global::Level[] a = UnityEngine.Object.FindObjectsOfType<global::Level>();
 				if (a != null) _lvCache = a;
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return _lvCache != null ? _lvCache : _noLevels;
 		}
 		private static global::Level FirstLevel(global::Level[] lvs) {
@@ -548,7 +548,7 @@ public partial class Experiments : ITweak
 			try {
 				ZoomCamera a = null; ZoomCamera[] zs = SRApi.FrameObjects<ZoomCamera>(); if (zs != null) for (int zi = 0; zi < zs.Length; zi++) { if (zs[zi] != null) { a = zs[zi]; break; } }
 				if (a != null) _zc = a;
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return _zc;
 		}
 		private static FixCameraToBoundaries[] Fixers() {
@@ -558,14 +558,14 @@ public partial class Experiments : ITweak
 			try {
 				FixCameraToBoundaries[] a = UnityEngine.Object.FindObjectsOfType<FixCameraToBoundaries>();
 				if (a != null) _fixers = a;
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return _fixers;
 		}
 		private static Vector3 LevelCenter() {
 			global::Level lv = FirstLevel(Levels());
 			if (lv == null) return Vector3.zero;
-			try { if (lv.CameraBounds != null) return lv.CameraBounds.bounds.center; } catch { }
-			try { return lv.GetCameraBounds().center; } catch { }
+			try { if (lv.CameraBounds != null) return lv.CameraBounds.bounds.center; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+			try { return lv.GetCameraBounds().center; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return Vector3.zero;
 		}
 
@@ -602,7 +602,7 @@ public partial class Experiments : ITweak
 				if (zc == null) return "相机=无";
 				Bounds fr = default(Bounds);
 				System.Reflection.FieldInfo fi = FrameField();
-				if (fi != null) { try { object v = fi.GetValue(zc); if (v != null) fr = (Bounds)v; } catch { } }
+				if (fi != null) { try { object v = fi.GetValue(zc); if (v != null) fr = (Bounds)v; } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
 				Bounds bd = zc.GetBounds();
 				Vector3 cp = zc.transform.position;
 				string curs = "光标=无";
@@ -658,15 +658,15 @@ public partial class Experiments : ITweak
 						// SetBounds(Collider2D) 会改写 boundingCollider（全库无复位代码），改错后只有切场景能恢复。
 						kv.Key.SetBounds(kv.Value);
 						ncur++;
-					} catch { }
+					} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				}
 				_curOrig.Clear();
 				rb.Add("光标原值×" + ncur);
 				ZoomCamera zc = Zc();
-				if (zc != null && _zcHas) { try { zc.SetBounds(_zcOrig); rb.Add("相机=原快照"); } catch { } }
+				if (zc != null && _zcHas) { try { zc.SetBounds(_zcOrig); rb.Add("相机=原快照"); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
 				_zcHas = false;
 				// 仅在相机项开过（_zcTouched）且原值本为关闭时把 ZoomCamera.enabled 关回，其余情况不动。
-				if (_zcTouched) { try { ZoomCamera zr = Zc(); if (zr != null && !_zcWasEnabled && zr.enabled) zr.enabled = false; } catch { } }
+				if (_zcTouched) { try { ZoomCamera zr = Zc(); if (zr != null && !_zcWasEnabled && zr.enabled) zr.enabled = false; } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
 				_zcTouched = false;
 				Status = "（已还原为游戏原值）" + string.Join(" ", rb.ToArray());
 			} catch (Exception __ex) { Status = "（还原异常：" + __ex.Message + "）已还原：" + string.Join(" ", rb.ToArray()); SRApi.Guard.Log("关卡边界 还原", __ex); }
@@ -745,7 +745,7 @@ public partial class Experiments : ITweak
 			try {
 				// 扫描时机：首次 / 换场景立即全扫，之后按 unscaled 时间每 2.5 秒复查一次（覆盖加载后才生成的对象）。
 				string sc = "";
-				try { sc = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name; } catch { }
+				try { sc = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				float now = Time.unscaledTime;
 				// 次数上限：换场景清零，本场景最多扫 Ui3ScanMaxTries 次（≈15 秒）后放弃，避免无限期全场景扫描。
 				if (sc != _scanScene) { _scanScene = sc; _ui3ScanTries = 0; }
@@ -784,10 +784,10 @@ public partial class Experiments : ITweak
 			try {
 				foreach (KeyValuePair<Renderer, bool> kv in _wasOn) {
 					if (kv.Key == null) continue;
-					try { kv.Key.enabled = kv.Value; } catch { }
+					try { kv.Key.enabled = kv.Value; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				}
 				_wasOn.Clear();
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			_hitCount = -1;
 			Note = "";
 		}

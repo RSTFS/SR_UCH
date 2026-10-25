@@ -461,7 +461,7 @@ public partial class Chat : ITweak {
                 float dy = on && _posY != null ? _posY.Value : 0f;
                 if (!on) {
                     if (_posApplied) { // 撤掉最后一次施加的偏移
-                        try { node.anchoredPosition = node.anchoredPosition - new Vector2(_posLastDx, _posLastDy); } catch { }
+                        try { node.anchoredPosition = node.anchoredPosition - new Vector2(_posLastDx, _posLastDy); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                         _posApplied = false; _posHaveBase = false;
                     }
                     return;

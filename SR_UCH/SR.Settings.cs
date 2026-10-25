@@ -631,7 +631,7 @@ public partial class SR {
                 bool first = _cfgCountSeen < 0;
                 _cfgCountSeen = n;
                 if (!first) _entryVersion++;   //首次仅记录基线
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
         //public：功能（独立程序集）按段取条目表以渲染自己的页面。

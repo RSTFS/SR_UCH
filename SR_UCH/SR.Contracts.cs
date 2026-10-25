@@ -49,7 +49,7 @@ namespace SR_UCH {
                 int c;
                 _misses.TryGetValue(slot, out c);
                 _misses[slot] = c + 1;
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
         public static void Provide(string slot, object impl) {
@@ -143,7 +143,7 @@ namespace SR_UCH {
                     fi.MinContract = a.MinContract; fi.DependsOn = a.DependsOn; fi.Provides = a.Provides;
                     fi.ManifestMissing = false;
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             fi.ContractTooNew = fi.MinContract > SRContract.Version;
             return fi;
         }
@@ -192,13 +192,13 @@ namespace SR_UCH {
             _info = info; _warn = warn; _error = error;
         }
         public static void SetNotifySink(Action<string> notify) { _notify = notify; }
-        internal static void Warn(string msg) { try { Action<string> w = _warn; if (w != null) w(msg); } catch { } }
+        internal static void Warn(string msg) { try { Action<string> w = _warn; if (w != null) w(msg); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         private static string Str(object m) { try { return m == null ? "" : m.ToString(); } catch { return "<ToString 失败>"; } }
-        public static void LogInfo(object m) { try { Action<string> a = _info; if (a != null) a(Str(m)); } catch { } }
-        public static void LogWarn(object m) { try { Action<string> a = _warn; if (a != null) a(Str(m)); } catch { } }
-        public static void LogError(object m) { try { Action<string> a = _error; if (a != null) a(Str(m)); } catch { } }
+        public static void LogInfo(object m) { try { Action<string> a = _info; if (a != null) a(Str(m)); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
+        public static void LogWarn(object m) { try { Action<string> a = _warn; if (a != null) a(Str(m)); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
+        public static void LogError(object m) { try { Action<string> a = _error; if (a != null) a(Str(m)); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         // 用户提示（右下角/系统消息）：实现层注入 ShowUserMessage（同时会写日志）。
-        public static void Notify(string text) { try { Action<string> n = _notify; if (n != null) n(text ?? ""); } catch { } }
+        public static void Notify(string text) { try { Action<string> n = _notify; if (n != null) n(text ?? ""); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         public static void Notify(string text, params object[] args) {
             if (args == null || args.Length == 0) { Notify(text); return; }
             try { Notify(string.Format(text, args)); } catch { Notify(text); }
@@ -522,7 +522,7 @@ namespace SR_UCH {
         // 轻量诊断浮层：功能每帧可把状态写进来，按 F9 在窗口左上角显示（空则不显示）。
         public static readonly System.Collections.Generic.List<string> DiagLines = new System.Collections.Generic.List<string>();
         public static void Diag(string line) {
-            try { if (!string.IsNullOrEmpty(line) && DiagLines.Count < 24) DiagLines.Add(line); } catch { }
+            try { if (!string.IsNullOrEmpty(line) && DiagLines.Count < 24) DiagLines.Add(line); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
         public static float FooterHeight { get { Func<float> f = _footerHeight; return f != null ? f() : 0f; } set { Action<float> a = _setFooterHeight; if (a != null) a(value); } }
         public static Vector2 PageScroll { get { Func<Vector2> f = _pageScroll; return f != null ? f() : default(Vector2); } set { Action<Vector2> a = _setPageScroll; if (a != null) a(value); } }
@@ -594,7 +594,7 @@ namespace SR_UCH {
                     }
                     if (Hidden.Count >= _count) { Hidden.Clear(); }   // 至少留一列
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
         public void Save() {
@@ -618,7 +618,7 @@ namespace SR_UCH {
                 }
                 BepInEx.Configuration.ConfigFile f = _w != null ? _w.ConfigFile : (_o != null ? _o.ConfigFile : null);
                 if (f != null) f.Save();
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
         // 还原：列宽回默认、列序回自然序、隐藏清空。
@@ -652,7 +652,7 @@ namespace SR_UCH {
                     if (Filter != null) { try { if (!Filter(v)) continue; } catch { continue; } }
                     _buf.Add(v);
                 }
-                if (Sort != null) { try { _buf.Sort(Sort); } catch { } }
+                if (Sort != null) { try { _buf.Sort(Sort); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
                 _rows.AddRange(_buf);
                 return _rows;
             }
@@ -732,7 +732,7 @@ namespace SR_UCH {
                     TableColumn c = cols[i];
                     if (c == null) { w[i] = Sc(60f); continue; }
                     float tw = 0f;
-                    try { tw = Label.CalcSize(new GUIContent(T(c.TitleZh, c.TitleEn))).x; } catch { }
+                    try { tw = Label.CalcSize(new GUIContent(T(c.TitleZh, c.TitleEn))).x; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     w[i] = Mathf.Max(Sc(c.MinW), tw + Sc(c.PadW));
                 }
                 return w;
@@ -757,7 +757,7 @@ namespace SR_UCH {
                 float used = Mathf.Max(0f, pageBottomY - pageTopY);
                 float h = Mathf.Max(minH, SRApi.PageViewportHeight - used);
                 if (heightEntry != null) {
-                    try { int v = System.Convert.ToInt32(heightEntry.BoxedValue); if (v > 0) h = Mathf.Min(h, Sc(v)); } catch { }
+                    try { int v = System.Convert.ToInt32(heightEntry.BoxedValue); if (v > 0) h = Mathf.Min(h, Sc(v)); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 }
                 return h;
             }
@@ -821,7 +821,7 @@ namespace SR_UCH {
                 float h = Mathf.Max(st.CalcSize(c).y, st.CalcHeight(c, w));
                 GUILayout.Label(c, st, GUILayout.Width(w), GUILayout.Height(h));
             } catch {
-                try { GUILayout.Label(text ?? ""); } catch { }
+                try { GUILayout.Label(text ?? ""); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             }
         }
             public static GUIStyle ChatLabel { get { return Style("ChatLabel"); } }
@@ -832,7 +832,7 @@ namespace SR_UCH {
             try {
                 GUIContent c = new GUIContent(title, tip);
                 GUILayout.Label(c, SecHeader, GUILayout.Width(SecHeader.CalcSize(c).x));
-            } catch { try { GUILayout.Label(title, SecHeader); } catch { } }
+            } catch { try { GUILayout.Label(title, SecHeader); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         }
             public static GUIStyle Btn { get { return Style("Btn"); } }
             public static GUIStyle BtnClip { get { return Style("BtnClip"); } }
@@ -1054,7 +1054,7 @@ namespace SR_UCH {
                     FieldInfo[] fs = owners[i].GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
                     for (int j = 0; j < fs.Length; j++) if (typeof(Delegate).IsAssignableFrom(fs[j].FieldType)) n++;
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return n;
         }
 
@@ -1075,7 +1075,7 @@ namespace SR_UCH {
                         if (!optional) miss.Add(name);
                     }
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return miss.ToArray();
         }
         // 已注入的 API 通道总数（自检用）
@@ -1087,7 +1087,7 @@ namespace SR_UCH {
                     FieldInfo[] fs = owners[i].GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
                     for (int j = 0; j < fs.Length; j++) if (typeof(Delegate).IsAssignableFrom(fs[j].FieldType) && fs[j].GetValue(null) != null) n++;
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return n;
         }
 
@@ -1116,7 +1116,7 @@ namespace SR_UCH {
                     WarnCount++;
                     SRApi.Warn("[Guard] " + what + " 失败: " + (ex != null ? ex.Message : "未知错误"));
                 } catch (Exception __ex) {
-                    try { LastWhat = what; LastError = "Warn 自身失败: " + __ex.GetType().Name; } catch { }
+                    try { LastWhat = what; LastError = "Warn 自身失败: " + __ex.GetType().Name; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 }
             }
         }

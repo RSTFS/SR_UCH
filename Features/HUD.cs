@@ -548,7 +548,7 @@ namespace SR_UCH.Tweaks {
 				ScoreboardEvent sb = e as ScoreboardEvent;
 				if (sb != null) {
 					// 记分板出现/结算完成 = 本回合确实推进过，可作为“真实回合”增量的证据。
-					try { if (sb.Showing || sb.AfterTally) _roundTallySeen = true; } catch { }
+					try { if (sb.Showing || sb.AfterTally) _roundTallySeen = true; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				}
 			} catch (Exception __ex) { SRApi.Guard.Log("HUD 阶段事件", __ex); }
 		}
@@ -881,7 +881,7 @@ namespace SR_UCH.Tweaks {
 				if (!RoundNoticeOn()) return;
 				_roundNoticeText = RoundWord() + round;
 				_roundNoticeStart = Time.unscaledTime;
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 		}
 
 		// 树屋/大厅：只保留标题「大厅」与当前投票关卡；玩家列表随玩家面板一并删除。

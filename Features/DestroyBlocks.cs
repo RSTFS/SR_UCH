@@ -83,7 +83,7 @@ namespace SR_UCH.Tweaks {
                             hostColor = lp.NetworkPlayerColor;
                         }
                     }
-                } catch { }
+                } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 if (string.IsNullOrEmpty(hostName)) hostName = "Host";
                 for (int i = 0; i < blocks.Count; i++) {
                     Placeable p = blocks[i];

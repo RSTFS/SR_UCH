@@ -36,7 +36,7 @@ namespace SR_UCH {
             ModLogger = Logger;
             // PatchOwnConfigFile 需显式注册（CreateAndPatchAll 不递归发现独立类型），失败只记日志。
             try { HarmonyLib.Harmony.CreateAndPatchAll(typeof(PatchOwnConfigFile)); }
-            catch (Exception __pf) { try { ModLogger.LogWarning("配置外置补丁(PatchOwnConfigFile)注册失败: " + __pf.Message); } catch { } }
+            catch (Exception __pf) { try { ModLogger.LogWarning("配置外置补丁(PatchOwnConfigFile)注册失败: " + __pf.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
 
             // 独立配置文件（旧 cfg 自动迁移）
             try {
@@ -55,8 +55,8 @@ namespace SR_UCH {
                         System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
                     if (__cf != null && Data != null) { __cf.SetValue(this, Data); ModLogger.LogInfo("[配置] 插件 Config 已指向 SR_UCH_data.cfg（外置生效）"); }
                     else ModLogger.LogWarning("[配置] 未找到 Config 后备字段，配置外置可能未生效");
-                } catch (Exception __cfx) { try { ModLogger.LogWarning("配置外置(后备字段)失败: " + __cfx.Message); } catch { } }
-            } catch (Exception __de) { try { ModLogger.LogWarning("配置外置失败: " + __de.Message); } catch { } }
+                } catch (Exception __cfx) { try { ModLogger.LogWarning("配置外置(后备字段)失败: " + __cfx.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
+            } catch (Exception __de) { try { ModLogger.LogWarning("配置外置失败: " + __de.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
 
             // 在任何 Bind 之前把旧 GUID 的 cfg 复制成新名字（GUID 改名导致文件名变化）。
             try {
@@ -67,7 +67,7 @@ namespace SR_UCH {
                     System.IO.File.Copy(__oldCfg, __newCfg, false);
                     ModLogger.LogInfo("[配置] 已从旧 GUID 配置迁移: com.gamingbeast.SR_UCH.cfg -> com.rs.SR_UCH.cfg");
                 }
-            } catch (Exception __mig) { try { ModLogger.LogWarning("配置迁移失败: " + __mig.Message); } catch { } }
+            } catch (Exception __mig) { try { ModLogger.LogWarning("配置迁移失败: " + __mig.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
             // 程序集解析：外部功能 / 语言包 DLL 只引用 SR_UCH.dll（不引用 BepInEx），全局注册一次。
             AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
             // 契约层 API 门面的日志出口：接到本插件的日志系统。
@@ -207,7 +207,7 @@ namespace SR_UCH {
                 // P0-1：API 通道自检 —— 漏注入的 sink 会让对应功能静默失效，这里必须报错。
                 string[] __miss = SRApi.MissingSinks();
                 if (__miss.Length > 0) ModLogger.LogError("[SR.Api] 未注入的 API 通道 (" + __miss.Length + "): " + string.Join(", ", __miss));
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。
             List<Type> __tweaks = new List<Type>();
@@ -234,20 +234,20 @@ namespace SR_UCH {
             // 放在本程序集扫描与 EX 之后（EX 的硬编码路径不受影响）。
             LoadExternal();
             // 功能清单（SMAPI 的 manifest 等价物）：内置 / 外部 / EX 的 ITweak 全部就位后统一登记，校验依赖与契约版本。
-            try { Features.Rebuild(); if (Features.ProblemCount > 0) ModLogger.LogInfo(Features.Describe()); } catch (Exception __ft) { try { ModLogger.LogWarning("[SR.Feat] 功能清单登记失败: " + __ft.Message); } catch { } }
+            try { Features.Rebuild(); if (Features.ProblemCount > 0) ModLogger.LogInfo(Features.Describe()); } catch (Exception __ft) { try { ModLogger.LogWarning("[SR.Feat] 功能清单登记失败: " + __ft.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
             // 启动自检（补丁目标 / 反射成员）：必须在全部功能与 EX 都挂完之后，结论进日志。
-            try { SR.RunStartupAudit(); } catch (Exception __ex) { try { ModLogger.LogWarning("[SR] 启动自检失败: " + __ex.Message); } catch { } }
+            try { SR.RunStartupAudit(); } catch (Exception __ex) { try { ModLogger.LogWarning("[SR] 启动自检失败: " + __ex.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
             // P1-1：运行时冒烟测试标记 —— 单行、固定格式、可被脚本 grep（build\smoke.ps1）。
             try {
-                try { ModLogger.LogInfo("[SR] 游戏版本=" + UnityEngine.Application.version + " | 契约=v" + SRContract.Version); } catch { }
+                try { ModLogger.LogInfo("[SR] 游戏版本=" + UnityEngine.Application.version + " | 契约=v" + SRContract.Version); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 string[] __miss = SRApi.MissingSinks();
                 string __gv = "?";
-                try { __gv = UnityEngine.Application.version; } catch { }
+                try { __gv = UnityEngine.Application.version; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 if (__miss.Length == 0 && Features.ProblemCount == 0)
                     ModLogger.LogInfo("[SR.SelfTest] OK 游戏版本=" + __gv + " 契约=v" + SRContract.Version + " 补丁=" + SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " 反射=" + SR.AuditRefOk + "/" + SR.AuditRefTotal + " 功能=" + Features.Count + " API=" + SRApi.SinkCount() + "/" + SRApi.SinkTotal());
                 else
                     ModLogger.LogError("[SR.SelfTest] FAIL 游戏版本=" + __gv + " API通道缺失=" + __miss.Length + " 功能表问题=" + Features.ProblemCount + " 缺失=" + string.Join(",", __miss));
-            } catch (Exception __st) { try { ModLogger.LogError("[SR.SelfTest] FAIL 自检异常: " + __st.Message); } catch { } }
+            } catch (Exception __st) { try { ModLogger.LogError("[SR.SelfTest] FAIL 自检异常: " + __st.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         }
 
         // 只认 SR_UCH 这几个程序集名：外部 DLL 编译时引用的就是它。
@@ -257,7 +257,7 @@ namespace SR_UCH {
                 // 拆分模式下核心文件名是 SR_Manager.dll / SR_UCH_Manager.dll（程序集标识仍是 "SR_UCH"）。
                 if (want.Name == "SR_UCH" || want.Name == "SR_Manager" || want.Name == "SR_UCH_Manager")
                     return typeof(MainPlugin).Assembly;
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return null;
         }
 
@@ -292,7 +292,7 @@ namespace SR_UCH {
                         if (a.IsDynamic) continue;
                         string an = Path.GetFileNameWithoutExtension(a.Location);
                         if (string.Equals(an, name, StringComparison.OrdinalIgnoreCase)) { asm = a; break; }
-                    } catch { }
+                    } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 }
                 if (asm == null) asm = Assembly.LoadFrom(dll);
                 if (asm == null) return;
@@ -300,7 +300,7 @@ namespace SR_UCH {
                 // 同一份程序集只处理一次：重复会 Initialize 两遍、补丁打两遍。
                 // 语言包允许随独立 BepInEx 插件提供，故不能按"是不是刚加载的"判断。
                 string key = null;
-                try { key = asm.FullName; } catch { }
+                try { key = asm.FullName; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 if (string.IsNullOrEmpty(key)) key = dll;
                 if (!_extSeen.Add(key)) return;
 
@@ -316,7 +316,7 @@ namespace SR_UCH {
                         for (int ai = 0; ai < attrs.Length; ai++) {
                             if (attrs[ai] != null && attrs[ai].GetType().Name == "BepInPluginAttribute") { isBepInPlugin = true; break; }
                         }
-                    } catch { }
+                    } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 }
                 for (int i = 0; i < types.Length; i++) {
                     Type t = types[i];

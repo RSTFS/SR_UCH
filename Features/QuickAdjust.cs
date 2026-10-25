@@ -195,7 +195,7 @@ public class QuickAdjust : ITweak {
 			_quickRetryFast = cfg.Bind<bool>("Quick Adjust", "Quick Retry Fast", false, "快速重试（仅挑战模式）：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n默认关闭；对局中开关立即生效。");
 			_quickRetryHoldTime = cfg.Bind<float>("Quick Adjust", "Quick Retry Hold", 0.5f, "快速重试的长按等待秒数（0-2，0=立即；挑战模式死亡后长按 B 达到该秒数自动重试）。");
         // 本类自带 [HarmonyPatch] 但 ITweak 为反射发现，须手动 CreateAndPatchAll；单个目标失效只丢本类功能。
-			try { SRApi.RegisterTick("评分百分比-保持", TickKeepHandicap); } catch { }
+			try { SRApi.RegisterTick("评分百分比-保持", TickKeepHandicap); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			try { Harmony.CreateAndPatchAll(typeof(QuickAdjust), (string)null); }
 			catch (Exception e) { SRApi.LogError("快速调整 补丁注册失败: " + e.Message); }
     }
@@ -436,7 +436,7 @@ public class QuickAdjust : ITweak {
 
 		private static void QueueKeepIfLocal(GamePlayer gp) {
 			try { if (_keepHandicap > 0 && gp != null && gp.isLocalPlayer) _keepApplyAt = Time.unscaledTime + 0.8f; }
-			catch { }
+			catch { /* 静默：非关键路径，失败可直接忽略 */ }
 		}
 
 		private static void TickKeepHandicap() {
@@ -446,10 +446,10 @@ public class QuickAdjust : ITweak {
 				foreach (Player p in PlayerManager.GetInstance()) {
 					if (p == null) continue;
 					LobbyPlayer lp = null;
-					try { lp = p.AssociatedLobbyPlayer; } catch { }
+					try { lp = p.AssociatedLobbyPlayer; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 					if (lp == null || !lp.IsLocalPlayer) continue;
-					try { if (lp.Networkhandicap != _keepHandicap) lp.SetPlayerHandicap(_keepHandicap); } catch { }
-					try { if (p.AssociatedGamePlayer != null && p.AssociatedGamePlayer.Handicap != _keepHandicap) p.AssociatedGamePlayer.CallCmdSetPlayerHandicap(_keepHandicap); } catch { }
+					try { if (lp.Networkhandicap != _keepHandicap) lp.SetPlayerHandicap(_keepHandicap); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+					try { if (p.AssociatedGamePlayer != null && p.AssociatedGamePlayer.Handicap != _keepHandicap) p.AssociatedGamePlayer.CallCmdSetPlayerHandicap(_keepHandicap); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 					break;
 				}
 			} catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.TickKeepHandicap", __ex); }

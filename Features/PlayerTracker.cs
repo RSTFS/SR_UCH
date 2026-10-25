@@ -118,7 +118,7 @@ namespace SR_UCH.Tweaks {
                   } catch (Exception e) {
                         // PlayerLine 是结构体，不能与 null 比较，只判 character
                         SRApi.Guard.Log("轨迹更新 " + (pl.character != null ? pl.character.name : "?"), e);
-                        try { ClearLine(pl.line); } catch { }   // 出错的玩家本帧不画，下帧重试
+                        try { ClearLine(pl.line); } catch { /* 静默：非关键路径，失败可直接忽略 */ }   // 出错的玩家本帧不画，下帧重试
                   }
                 }
             }

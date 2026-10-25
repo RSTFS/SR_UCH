@@ -38,7 +38,7 @@ public partial class SR {
                 if (c == null) { w[i] = Sc(60f); continue; }
                 string title = SRApi.T(c.TitleZh, c.TitleEn);
                 float tw = 0f;
-                try { tw = Label.CalcSize(new GUIContent(title)).x; } catch { }
+                try { tw = Label.CalcSize(new GUIContent(title)).x; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 w[i] = Mathf.Max(Sc(c.MinW), tw + Sc(c.PadW));
             }
             return w;
@@ -69,7 +69,7 @@ public partial class SR {
             HeightDrag st;
             if (!_heightDrags.TryGetValue(entry, out st)) { st = new HeightDrag(); _heightDrags[entry] = st; }
             float cur = autoH;
-            try { int v = System.Convert.ToInt32(entry.BoxedValue); if (v > 0) cur = v; } catch { }
+            try { int v = System.Convert.ToInt32(entry.BoxedValue); if (v > 0) cur = v; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             if (e.type == EventType.MouseDown && e.button == 0 && grip.Contains(e.mousePosition)) {
                 st.on = true; st.y0 = e.mousePosition.y; st.h0 = cur;
                 BlockWindowDrag = true; e.Use();
@@ -693,7 +693,7 @@ public partial class SR {
         private static GUIContent TipLineContent(string s) { _tipLineContent.text = s; return _tipLineContent; }
         // 关闭界面时清空提示缓存，避免 tooltip 文本跨帧残留（表头提示延迟消失）。
         public static void ClearTip() {
-            try { _tipKey = null; _tipLines = new string[0]; _tipContent.text = ""; } catch { }
+            try { _tipKey = null; _tipLines = new string[0]; _tipContent.text = ""; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
         // 悬浮提示显示延迟（参考 Dear ImGui 的 tooltip 延迟）与淡入，避免鼠标扫过控件时提示乱闪。
@@ -1703,7 +1703,7 @@ public partial class SR {
         private static void EnsureTick() {
             if (_tickHooked) return;
             _tickHooked = true;
-            try { RegisterTick("颜色调色板兜底落盘", Tick); } catch { }
+            try { RegisterTick("颜色调色板兜底落盘", Tick); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
         private static State Get(ConfigEntryBase e) {
@@ -1805,7 +1805,7 @@ public partial class SR {
                 if (!keepHueIfGray || (sat > 0.0001f && v > 0.0001f)) s.H = Mathf.Repeat(h, 1f);
                 s.S = Mathf.Clamp01(sat);
                 s.V = Mathf.Clamp01(v);
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
         private static void Load(State s, Color c) {
@@ -1834,7 +1834,7 @@ public partial class SR {
                 // 顺序与 ImGui 一致：先提交预览，再提交文本（文本是最后一次编辑，必须最后生效）。
                 Commit(e, s);
                 if (s.TextPending) FlushText(e, s);
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             s.Open = false;
             s.Dirty = false;
             s.Sliding = false;
@@ -1872,14 +1872,14 @@ public partial class SR {
                 if (s.Frame >= 0 && Time.frameCount - s.Frame <= 8) return;
                 Commit(_open, s);
                 if (s.TextPending) FlushText(_open, s);
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
         private static string DefaultHex(ConfigEntryBase e) {
             try {
                 Color c;
                 if (e != null && SRApi.ColorHex.ParseHex(e.DefaultValue as string, out c)) return SRApi.ColorHex.ToHex(c);
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return "#FFFFFF";
         }
 
@@ -1896,7 +1896,7 @@ public partial class SR {
                 for (int i = 0; i < 3; i++) {
                     if (force || !IsFocused(RgbFields[i])) s.Rgb[i] = Comp(c, i).ToString(CultureInfo.InvariantCulture);
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
         // ------------------------- 绘制 -------------------------
@@ -1941,7 +1941,7 @@ public partial class SR {
             try {
                 Event ev = Event.current;
                 if (ev != null && r.Contains(ev.mousePosition)) GUI.tooltip = tip;
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
         private static void DrawPanel(ConfigEntryBase e, State s) {
@@ -1954,7 +1954,7 @@ public partial class SR {
 
             GUILayout.BeginVertical(GUILayout.Width(pw));
             try {
-                try { GUILayout.Label(T("调色板", "Palette"), Ctl.SecHeader); } catch { }
+                try { GUILayout.Label(T("调色板", "Palette"), Ctl.SecHeader); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 DrawHeader(e, s, pw);
                 GUILayout.Space(Sc(6f));
                 DrawSvBlock(e, s, pw);
@@ -2024,7 +2024,7 @@ public partial class SR {
             DrawFill(r, Color.black);
             if (Event.current != null && Event.current.type == EventType.Repaint) {
                 Texture2D tex = null;
-                try { tex = SvTexture(s.H); } catch { }
+                try { tex = SvTexture(s.H); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 if (tex != null) {
                     Color old = GUI.color;
                     try { GUI.color = Color.white; GUI.DrawTexture(r, tex); } finally { GUI.color = old; }
@@ -2252,7 +2252,7 @@ public partial class SR {
             try {
                 if (GUILayout.Button(new GUIContent(copy, T("把当前颜色复制到系统剪贴板", "copy the current color to the system clipboard")),
                     Ctl.Btn, GUILayout.Width(copyW), GUILayout.Height(h))) {
-                    try { GUIUtility.systemCopyBuffer = SRApi.ColorHex.ToHex(PickerColor(s)); } catch { }
+                    try { GUIUtility.systemCopyBuffer = SRApi.ColorHex.ToHex(PickerColor(s)); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 }
                 GUILayout.Space(gap);
                 if (GUILayout.Button(new GUIContent(paste, T("从剪贴板读取 #RRGGBB；格式非法则忽略", "paste #RRGGBB from the clipboard; invalid text is ignored")),
@@ -2369,7 +2369,7 @@ public partial class SR {
                     PickFrom(s, rgb, true);
                     s.Dirty = false;
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
         // 单个分量（0-255）：空串/非数字/越界都算非法。

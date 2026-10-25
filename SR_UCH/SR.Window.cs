@@ -203,10 +203,10 @@ public partial class SR {
         }
 
         private static void DrawGUI() {
-            if (!_visible) { try { ClearTip(); } catch { } }
+            if (!_visible) { try { ClearTip(); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
             if (!_visible && _uiAlpha <= 0.01f && !AnyUiBlocked()) {
                 // 面板已关：把自绘页声明的系统光标形状收掉，否则 <->/+ 光标会留在屏幕上
-                try { ClearTip(); } catch { }
+                try { ClearTip(); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 RunFrameEndHooks();
                 return;
             }
@@ -561,7 +561,7 @@ public partial class SR {
             }
             // 功能页外框部件（紧贴底栏条上方）：量它的高度并按栏目记住，供下一帧预留。
             float __pfTop = 0f;
-            try { __pfTop = GUILayoutUtility.GetLastRect().yMax; } catch { }
+            try { __pfTop = GUILayoutUtility.GetLastRect().yMax; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             if (_mode == Mode.Internal) SR.RenderPageFooter(_selectedInternalSection);
             try {
                 float __pfBottom = GUILayoutUtility.GetLastRect().yMax;

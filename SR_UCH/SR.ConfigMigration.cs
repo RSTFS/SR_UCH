@@ -467,9 +467,9 @@ namespace SR_UCH.Tweaks {
                 File.WriteAllText(tmpPath, text, new UTF8Encoding(false));
                 try { File.Replace(tmpPath, cfgPath, cfgPath + ".bak"); }
                 catch (Exception __rep) {
-                    try { File.Copy(cfgPath, cfgPath + ".bak", true); } catch { }
+                    try { File.Copy(cfgPath, cfgPath + ".bak", true); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     File.WriteAllText(cfgPath, text, new UTF8Encoding(false));
-                    try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { }
+                    try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     SR.LogWarn("[" + logTag + "] 原子替换失败，已退回备份加覆盖写: " + __rep.Message);
                 }
                 return true;
@@ -751,9 +751,9 @@ namespace SR_UCH.Tweaks {
                 try {
                     File.Replace(tmpPath, cfgPath, cfgPath + ".bak");
                 } catch (Exception __rep) {
-                    try { File.Copy(cfgPath, cfgPath + ".bak", true); } catch { }
+                    try { File.Copy(cfgPath, cfgPath + ".bak", true); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     File.WriteAllText(cfgPath, text, new UTF8Encoding(false));
-                    try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { }
+                    try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     SR.LogWarn("[配置迁移] 原子替换失败，已退回备份加覆盖写: " + __rep.Message);
                 }
                 return true;

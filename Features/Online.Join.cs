@@ -41,7 +41,7 @@ namespace SR_UCH.Tweaks {
                 "联机：判断客户端是否已在平台房间里（加入前必须先退出）");
             bool InLobby() { try { return inLobby != null && (bool)inLobby.GetValue(mm); } catch { return false; } }
             if (InLobby()) {
-                try { SRApi.LogInfo("[联机] 已在房间中，先离开..."); } catch { }
+                try { SRApi.LogInfo("[联机] 已在房间中，先离开..."); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 try {
                     // LeaveLobby 声明在基类 Matchmaker 上，直接调用交由虚方法分发。
                     try { mm.LeaveLobby(null, UserMessageManager.UserMsgPriority.lo); }
@@ -56,7 +56,7 @@ namespace SR_UCH.Tweaks {
                         SRApi.LogWarn("[联机] 等待离开超时，已补发一次 LeaveLobby");
                     } catch (Exception __lv3) { SRApi.Guard.Log("联机.补发离开房间", __lv3); }
                 }
-                try { SRApi.LogInfo("[联机] 离开完成(inLobby=" + InLobby() + ")，开始加入"); } catch { }
+                try { SRApi.LogInfo("[联机] 离开完成(inLobby=" + InLobby() + ")，开始加入"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             }
             // Steam 通道判定放在 JoinFlow：它是两条加入路径（直接加入 / 延时加入）的汇聚点。
             // sLobbyID 在 Steam 平台是 GUID，真正的 Steam 房间号在 UnityMatchID。
@@ -114,7 +114,7 @@ namespace SR_UCH.Tweaks {
                 if (mm != null) {
                     // reason 不能传自定义串：LeaveLobby 会把它弹成 3 秒高优先级提示，传 null 则跳过。
                     // 第二个参数必须保留：LeaveLobby 只有 (string, UserMsgPriority) 一个重载。
-                    try { SRApi.LogInfo("[联机] 离开当前房间以切换（reason 传 null，不弹提示）"); } catch { }
+                    try { SRApi.LogInfo("[联机] 离开当前房间以切换（reason 传 null，不弹提示）"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     mm.LeaveLobby(null, UserMessageManager.UserMsgPriority.hi);
                 }
             } catch (Exception e) { SRApi.LogWarn("切换房间前退出失败: " + e.Message); }
@@ -127,7 +127,7 @@ namespace SR_UCH.Tweaks {
                 LobbyManager lm = LobbyManager.instance;
                 // 游戏的 IsInOnlineGame 在非房主分支恒为 true，故补一层"客户端是否真的连着"；下面的 CurrentMatchmakingLobby 兜底。
                 bool connected = false;
-                try { connected = lm != null && lm.client != null && lm.client.isConnected; } catch { }
+                try { connected = lm != null && lm.client != null && lm.client.isConnected; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 if (lm != null && (lm.IsHost || (connected && lm.IsInOnlineGame))) return true;
                 if (Matchmaker.CurrentMatchmakingLobby != null) return true;
             } catch (Exception __ex) { SRApi.Guard.Log("判定是否在联机中", __ex); }
@@ -151,11 +151,11 @@ namespace SR_UCH.Tweaks {
                     SRApi.LogInfo("[联机] StartAsHost=false（加入而非创建）");
                 } catch (Exception __sa) { SRApi.Guard.Log("联机.StartAsHost", __sa); }
                 try { ArmAutoEnterMainMenu(); } catch (Exception __ae) { SRApi.Guard.Log("联机/启用自动进入", __ae); }
-                try { SRApi.LogInfo("[联机] 加入请求 id=" + id + " mm=" + mm.GetType().FullName + " useCode=" + useCode); } catch { }
+                try { SRApi.LogInfo("[联机] 加入请求 id=" + id + " mm=" + mm.GetType().FullName + " useCode=" + useCode); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 // 必须在这里清掉待加入队列：它是每帧轮询的，不清会重复发起同一次加入。
                 _pendingJoin = "";
                 try { mm.StartCoroutine(JoinFlow(id, useCode, mm)); return; } catch (Exception __jf) { SRApi.Guard.Log("联机.加入流程", __jf); }
-                try { SRApi.LogInfo("[联机] 协程启动失败，退回直接 JoinLobby"); } catch { }
+                try { SRApi.LogInfo("[联机] 协程启动失败，退回直接 JoinLobby"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 mm.JoinLobby(id, useCode, new UnityEngine.Events.UnityAction<bool>(ok => {
                     try {
                         _pendingJoin = "";

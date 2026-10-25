@@ -52,7 +52,7 @@ namespace SR_UCH.Tweaks {
 			try {
 				if (doc != null && doc.DocumentElement != null
 					&& doc.DocumentElement.GetAttribute("srSnapshot") == "1") return true;
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return false;
 		}
 
@@ -194,7 +194,7 @@ namespace SR_UCH.Tweaks {
                     int nFix = 0;
                     System.Collections.Generic.HashSet<Placeable> initFix = InitialLevelPieces(__instance);
                     GameState gsFix = null;
-                    try { gsFix = GameState.GetInstance(); } catch { }
+                    try { gsFix = GameState.GetInstance(); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     foreach (Placeable fp in Placeable.AllPlaceables) {
                         if (fp == null || fp.MarkedForDestruction) continue;
                         if (initFix.Contains(fp)) continue; // 关卡自带件不动

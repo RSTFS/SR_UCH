@@ -123,7 +123,7 @@ public partial class SR {
         }
         //绘制结束后还原全局选择色（GUI.skin 为全局共享皮肤）。
         internal static void RestoreSkinSelectionColor() {
-            try { if (_origSelColorSaved && GUI.skin != null) GUI.skin.settings.selectionColor = _origSelColor; } catch { }
+            try { if (_origSelColorSaved && GUI.skin != null) GUI.skin.settings.selectionColor = _origSelColor; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
         private static void EnsureStyles() {

@@ -444,7 +444,7 @@ public class LevelPartyBox : ITweak {
                     VersusControl vc = UnityEngine.Object.FindObjectOfType<VersusControl>();
                     System.Reflection.FieldInfo f = vc != null ? SRApi.Ref.Field(typeof(VersusControl), "IsSecondBox", "关卡派对盒流程") : null;
                     if (f != null) extra = (bool)f.GetValue(vc);
-                } catch { }
+                } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 try { pb.ShowBox(extra); } catch (Exception __ex) { SRApi.LogWarn("重新开箱(本地)失败: " + __ex.Message); }
                 try {
                     if (UnityEngine.Networking.NetworkServer.active) {

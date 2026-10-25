@@ -23,7 +23,7 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<string> _fRegion, _fMode, _fTag;
         private static ConfigEntry<int> _searchTimeout;
         private static float SearchTimeout() {
-            try { if (_searchTimeout != null) return (float)_searchTimeout.Value; } catch { }
+            try { if (_searchTimeout != null) return (float)_searchTimeout.Value; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return 15f;
         }
         // 表格列宽（像素，逗号分隔；表头分隔线可拖动）/ 表格高度（0 = 自动）
@@ -181,7 +181,7 @@ namespace SR_UCH.Tweaks {
             _pendingJoin = "";
             _pendingSteamId = 0;   // 取消待加入，Steam 房号一并作废
             // reason 不能传自定义串：游戏会把它当成玩家可见提示弹出；传 null 则不覆盖游戏自己设的 abortReason。
-            try { SRApi.LogInfo("[联机] 请求返回主界面（reason 传 null，避免把调试串弹给玩家）"); } catch { }
+            try { SRApi.LogInfo("[联机] 请求返回主界面（reason 传 null，避免把调试串弹给玩家）"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             try { Matchmaker.ReturnToMainMenu(null); }
             catch (Exception e) { SRApi.LogWarn("返回主界面失败: " + e.Message); }
             // 不等游戏的优雅收尾，先做无损的部分：放出被等待的加载遮罩、清房间列表与表格几何缓存、收界面状态。
@@ -398,7 +398,7 @@ namespace SR_UCH.Tweaks {
             // Searching 是实例属性，须先用 IsInstantiated 询问，避免读属性触发 .Instance 的惰性创建。
             if (_lobbySearching) {
                 bool gameDone = false;
-                try { if (Matchmaker.IsInstantiated) gameDone = !Matchmaker.Instance.Searching; } catch { }
+                try { if (Matchmaker.IsInstantiated) gameDone = !Matchmaker.Instance.Searching; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 if (gameDone || Time.unscaledTime - _lobbySearchAt > SearchTimeout()) {
                     _lobbySearching = false;
                     PruneHidden();   // 搜索结束这一帧裁剪一次
@@ -485,7 +485,7 @@ namespace SR_UCH.Tweaks {
                 string s = SRApi.CurrentLanguageId + "|" + SRApi.LangVer;
                 for (int i = 0; i < s.Length; i++) h = h * 31 + s[i];
                 int n = -1;
-                try { if (RelayConstants.AVAILABLE_REGIONS != null) n = RelayConstants.AVAILABLE_REGIONS.Count; } catch { }
+                try { if (RelayConstants.AVAILABLE_REGIONS != null) n = RelayConstants.AVAILABLE_REGIONS.Count; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 return h * 31 + n;
             }
         }

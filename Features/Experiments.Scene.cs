@@ -127,7 +127,7 @@ public partial class Experiments : ITweak
         // Instance 为空时才回退全场景扫描，回退路径 15 帧节流。
         private static int _splashScanAt = -9999;
         private static LoadingInterstitialSplash FindSplash() {
-            try { LoadingInterstitialSplash inst = LoadingInterstitialSplash.Instance; if (inst != null) return inst; } catch { }
+            try { LoadingInterstitialSplash inst = LoadingInterstitialSplash.Instance; if (inst != null) return inst; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             if (Time.frameCount - _splashScanAt < 15) return null;
             _splashScanAt = Time.frameCount;
             try { return UnityEngine.Object.FindObjectOfType<LoadingInterstitialSplash>(); } catch { return null; }
@@ -212,7 +212,7 @@ public partial class Experiments : ITweak
                     if (Time.realtimeSinceStartup >= _runningUntil) _runningUntil = -1f;
                     else if (SRApi.Env.SceneName == _target) _runningUntil = -1f;
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
     }
     // 树屋：立即开始。
@@ -268,7 +268,7 @@ public partial class Experiments : ITweak
                     Character c = chars[i];
                     if (c != null && c.hasAuthority) { hostChar = c; break; }
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             if (hostChar == null) {
                 SRApi.Notify(SRApi.T("未选择关卡", "No level selected"));
                 return;

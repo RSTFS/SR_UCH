@@ -40,7 +40,7 @@ public partial class SR {
                 try { wheel = Mathf.Abs(e.delta.y) > 0.001f ? -e.delta.y : -e.delta.x; } catch { wheel = 0f; }
                 if (WheelTakenThisFrame) return;                            //本帧已被界面件吃掉
                 if (Mathf.Abs(wheel) < 0.0001f) return;
-                try { WheelEventValue = wheel; } catch { }
+                try { WheelEventValue = wheel; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 //分发给已注册的滚轮消费者（地图缩放 / 自由相机缩放），消费逻辑由功能自己声明。
                 if (FireWheel(wheel)) MarkWheelUsed();
             } catch (Exception __ex) { Guard.Log("滚轮仲裁", __ex); }
@@ -80,7 +80,7 @@ public partial class SR {
             try { sc = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle; } catch { sc = -1; }
             if (sc != _esGateScene) {
                 if (_gatedEventSystem != null) {
-                    try { _gatedEventSystem.enabled = _esGateWasEnabled; } catch { }
+                    try { _gatedEventSystem.enabled = _esGateWasEnabled; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 }
                 _gatedEventSystem = null;
                 _esGateWasEnabled = true;

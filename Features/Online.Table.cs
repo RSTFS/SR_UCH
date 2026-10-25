@@ -48,8 +48,8 @@ namespace SR_UCH.Tweaks {
 
         // Shift 状态：MouseUp/Used 事件上的修饰键不可靠，补 Input.GetKey 兜底。
         private static bool ShiftHeldNow() {
-            try { if (Event.current != null && Event.current.shift) return true; } catch { }
-            try { return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift); } catch { }
+            try { if (Event.current != null && Event.current.shift) return true; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+            try { return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return false;
         }
 
@@ -73,7 +73,7 @@ namespace SR_UCH.Tweaks {
             SaveEntry(_showQualityCoeff);
             try {
                 SRApi.LogInfo("[联机] 游戏质量系数 -> " + (v ? "开（显示 0~1）" : "关（仅 ✓）") + "；入口=" + from);
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             Notes(v ? "游戏质量：显示技能匹配系数（0~1）" : "游戏质量：仅显示 ✓",
                   v ? "Quality: showing the skill-match coefficient (0-1)" : "Quality: marks only");
         }
@@ -286,7 +286,7 @@ namespace SR_UCH.Tweaks {
                     Rect sep = new Rect(cell.xMax - SRApi.Ctl.Sc(3), cell.y, SRApi.Ctl.Sc(7), cell.height);
                     if (sep.Contains(mp)) return true;
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return false;
         }
 
@@ -348,7 +348,7 @@ namespace SR_UCH.Tweaks {
                 // 只在按下到松开之间阻止窗口拖动：无条件设 true 会让鼠标悬停即锁住窗口拖动。
                 if (e.type == EventType.MouseDown && e.button == 0) { _joinDownRow = si; _joinDownId = li.sLobbyID; SRApi.BlockWindowDrag = true; e.Use(); }
                 else if (e.type == EventType.MouseUp && e.button == 0 && !string.IsNullOrEmpty(_joinDownId) && _joinDownId == li.sLobbyID) {
-                    try { SRApi.LogInfo("[联机] 列表项 sLobbyID=" + li.sLobbyID + " UnityMatchID=" + li.UnityMatchID + " (UnityMatchID=0 表示该列表不是 Steam 大厅数据)"); } catch { }
+                    try { SRApi.LogInfo("[联机] 列表项 sLobbyID=" + li.sLobbyID + " UnityMatchID=" + li.UnityMatchID + " (UnityMatchID=0 表示该列表不是 Steam 大厅数据)"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     _joinDownRow = -1; _joinDownId = null; SRApi.BlockWindowDrag = false; JoinLobbySteam(li.UnityMatchID, li.sLobbyID); e.Use();
                 }
                 break;

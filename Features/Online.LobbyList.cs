@@ -16,7 +16,7 @@ namespace SR_UCH.Tweaks {
             try {
                 string s = I2.Loc.LocalizationManager.GetTranslation(key);
                 if (!string.IsNullOrEmpty(s)) return s;
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return fallback;
         }
 
@@ -41,7 +41,7 @@ namespace SR_UCH.Tweaks {
             if (_regionMembers.TryGetValue(t, out m)) return m;
             m = new RegionMember();
             // 属性没有 SRApi.Ref 的按名取法，保留 raw 反射；字段走 SRApi.Ref.Field（失效会进自检告警）。
-            try { m.Loc = t.GetProperty("LocalizedShortName"); } catch { }
+            try { m.Loc = t.GetProperty("LocalizedShortName"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             m.Short = SRApi.Ref.Field(t, "shortName", "联机列表");
             m.Name = SRApi.Ref.Field(t, "name", "联机列表");
             m.Id = SRApi.Ref.Field(t, "id", "联机列表");
@@ -80,7 +80,7 @@ namespace SR_UCH.Tweaks {
                     if (string.IsNullOrEmpty(raw) && m.Name != null) raw = m.Name.GetValue(r) as string;
                     if (string.IsNullOrEmpty(raw) && m.Id != null) raw = m.Id.GetValue(r) as string;
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             string s = ((loc ?? "") + " " + (raw ?? "")).ToLowerInvariant();
             // 按词 / 后缀判断：region_shortname_ap、ap-southeast、asia 均归亚太。
             if (s.Contains("europe") || s.Contains("_eu") || s.Contains("-eu") || s.Contains(" eu")) return "EU";
@@ -96,7 +96,7 @@ namespace SR_UCH.Tweaks {
             try {
                 string s = I2.Loc.LocalizationManager.GetTranslation(key);
                 if (!string.IsNullOrEmpty(s) && s.IndexOf("Network/") < 0 && s.IndexOf("region_") < 0 && s.IndexOf('/') < 0) return s;
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return zh;
         }
 
@@ -131,7 +131,7 @@ namespace SR_UCH.Tweaks {
                         && loc.IndexOf("Network/", StringComparison.OrdinalIgnoreCase) < 0)
                         return loc;
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return DispRegion(RegionCode(li));
         }
 
@@ -224,7 +224,7 @@ namespace SR_UCH.Tweaks {
                 try {
                     string s = GameSettings.ConvertLobbyTag(li.lobbyTag);
                     if (!string.IsNullOrEmpty(s)) return s;
-                } catch { }
+                } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             }
             return DispName("Filter Tag", li.lobbyTag.ToString());
         }
@@ -343,7 +343,7 @@ namespace SR_UCH.Tweaks {
                     Matchmaker.LobbyListInfo li = _lobbies[i];
                     if (li != null && _hidden.Contains(li.sLobbyID)) n++;
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return n;
         }
 

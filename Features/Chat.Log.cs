@@ -32,7 +32,7 @@ public partial class Chat : ITweak {
 		private static ConfigEntry<int> _chatLogLimitEntry;
 		// 取值必须夹紧在 100-5000：AcceptableValueRange 只约束 UI，配置文件被手改成越界值时会导致聊天记录恒被清空。
 		private static int LogLimit() {
-			try { if (_chatLogLimitEntry != null) return Mathf.Clamp(_chatLogLimitEntry.Value, 100, 5000); } catch { }
+			try { if (_chatLogLimitEntry != null) return Mathf.Clamp(_chatLogLimitEntry.Value, 100, 5000); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return 500;
 		}
 		private static bool _chatShowTime = true; //每条消息前显示具体时间
@@ -202,7 +202,7 @@ public partial class Chat : ITweak {
 			_hasNew = false;
 			_newCount = 0;
 			_forcePrev = true;
-			try { SRApi.Ctl.ScrollToBottom(); } catch { }
+			try { SRApi.Ctl.ScrollToBottom(); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 		}
 
 		// 对话列表自动滚动状态机（每帧一次）：

@@ -220,9 +220,9 @@ function Check-BareCatch {
         $n = ([regex]::Matches($txt, 'catch\s*\{\s*\}')).Count
         if ($n -gt 0) { $total += $n; $rows += [pscustomobject]@{ Name = $f.Name; N = $n } }
     }
-    if ($total -eq 0) { Write-Host '  [ 统计 ] 裸 catch { }：0 处' ; return }
+    if ($total -eq 0) { Ok '裸 catch 全部带注释（0 处）' ; return }
     $top = ($rows | Sort-Object N -Descending | Select-Object -First 6 | ForEach-Object { $_.Name + '=' + $_.N }) -join ', '
-    Write-Host ('  [ 统计 ] 裸 catch { }：' + $total + ' 处（' + $rows.Count + ' 个文件；最多：' + $top + '）')
+    Bad ('裸 catch { } 未注释：' + $total + ' 处（' + $rows.Count + ' 个文件；最多：' + $top + '）')
 }
 
 Write-Host '== SR_UCH 文本类守卫（不需要游戏 / 不需要 csc）=='

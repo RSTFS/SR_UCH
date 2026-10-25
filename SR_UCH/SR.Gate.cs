@@ -220,7 +220,7 @@ public partial class SR {
         public static bool CanDoHost() {
             string why;
             bool ok = CanDo(Cap.HostOnly, out why);
-            if (!ok && !string.IsNullOrEmpty(why)) { try { Notify(why); } catch { } }
+            if (!ok && !string.IsNullOrEmpty(why)) { try { Notify(why); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
             return ok;
         }
 

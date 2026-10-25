@@ -161,7 +161,7 @@ public partial class SR : ITweak {
                     if (t.GetField(member, F) != null) return true;
                     // 属性也算"存在"：UIGraphic.Visible 是属性，只查字段 / 方法会误报失效。
                     // GetProperty 在同名属性隐藏 / 歧义时会抛 AmbiguousMatchException -> 包住。
-                    try { if (t.GetProperty(member, F) != null) return true; } catch { }
+                    try { if (t.GetProperty(member, F) != null) return true; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     MethodInfo[] methods = t.GetMethods(F);
                     for (int i = 0; i < methods.Length; i++) if (methods[i].Name == member) return true;
                     // 嵌套类型也算成员：EX 反射的 ScoreKeeper.scoreInfo 是 private struct，误报会把真失效淹掉。
@@ -694,7 +694,7 @@ public partial class SR : ITweak {
                     if (string.Equals(an, mine, StringComparison.OrdinalIgnoreCase)) continue;
                     return an;
                 }
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return "";
         }
         private static bool NoteOverrideSource(string kind) {
@@ -752,9 +752,9 @@ public partial class SR : ITweak {
 
         // 日志门面：内部不裸调 MainPlugin.ModLogger（极早期可能为 null，catch 里裸调会二次抛 NRE）。
         // 参数用 object（与 BepInEx ILogger.LogInfo(object) 一致）：调用点会传异常对象。
-        public static void LogInfo(object m) { try { if (MainPlugin.ModLogger != null) MainPlugin.ModLogger.LogInfo(m); } catch { } }
-        public static void LogWarn(object m) { try { if (MainPlugin.ModLogger != null) MainPlugin.ModLogger.LogWarning(m); } catch { } }
-        public static void LogError(object m) { try { if (MainPlugin.ModLogger != null) MainPlugin.ModLogger.LogError(m); } catch { } }
+        public static void LogInfo(object m) { try { if (MainPlugin.ModLogger != null) MainPlugin.ModLogger.LogInfo(m); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
+        public static void LogWarn(object m) { try { if (MainPlugin.ModLogger != null) MainPlugin.ModLogger.LogWarning(m); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
+        public static void LogError(object m) { try { if (MainPlugin.ModLogger != null) MainPlugin.ModLogger.LogError(m); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
 
         // 屏幕合并：游戏 MessageComponent 只有一个 Text、没有队列（后发覆盖先发），
         // 故在 0.35 秒窗口内把多条合成多行（最多 3 行，再多写"等 N 条"）；只影响屏幕，日志每条独立。
@@ -775,7 +775,7 @@ public partial class SR : ITweak {
         private static void ShowUserMessage(string text) {
             if (string.IsNullOrEmpty(text)) return;
             string scene = "";
-            try { scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name; } catch { }
+            try { scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             if (_tipDown && scene == _tipDownScene) return;   // 本场景已知不可用：跳过（日志照常）
             string show = text;
             try {
@@ -1187,7 +1187,7 @@ public partial class SR : ITweak {
                 try {
                     SR.LogWarn("[SR] 扫描插件表时没找到自己的 GUID（" + MainPlugin.PluginGuid
                         + "）-> 组合键补建与配置落盘节流未启用。请检查 GUID 是否与 [BepInPlugin] 一致。");
-                } catch { }
+                } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             }
         }
 

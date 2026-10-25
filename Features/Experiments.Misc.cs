@@ -174,14 +174,14 @@ public partial class Experiments : ITweak
                 // 只受模组总开关限制，不受「自由相机」开关限制。
                 if (!SRApi.GateMaster) {
                     if (_followOrig >= 0f) {
-                        try { if (_followZc != null) _followZc.MaxFollowSpeed = _followOrig; } catch { }
+                        try { if (_followZc != null) _followZc.MaxFollowSpeed = _followOrig; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     }
                     _followOrig = -1f;      // 下次生效时重新取（相机可能已更换）
                     _followLastMul = -1f;   // 状态文案随之失效
                     return;
                 }
                 ZoomCamera zc = null;
-                try { ZoomCamera[] zs = SRApi.FrameObjects<ZoomCamera>(); zc = zs != null && zs.Length > 0 ? zs[0] : null; } catch { }
+                try { ZoomCamera[] zs = SRApi.FrameObjects<ZoomCamera>(); zc = zs != null && zs.Length > 0 ? zs[0] : null; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 if (zc == null) return;
                 if (_followZc != zc) { _followZc = zc; _followOrig = -1f; }   // 相机换了就重取原值
                 if (_followOrig < 0f) _followOrig = zc.MaxFollowSpeed;
@@ -199,7 +199,7 @@ public partial class Experiments : ITweak
         // 启用时把滑条与 _savedFov 同步为相机当前视野。
         private static void OnLockChanged(object s, EventArgs e) {
             try {
-                if (_on != null && _on.Value) { float v = CurrentFov(); _fov.Value = Mathf.Clamp(v, MinFov, MaxFov); _savedFov = v; Camera g = GameCamera(); if (g != null) { try { if (g.orthographic) g.orthographicSize = _fov.Value; else g.fieldOfView = _fov.Value; } catch { } } }
+                if (_on != null && _on.Value) { float v = CurrentFov(); _fov.Value = Mathf.Clamp(v, MinFov, MaxFov); _savedFov = v; Camera g = GameCamera(); if (g != null) { try { if (g.orthographic) g.orthographicSize = _fov.Value; else g.fieldOfView = _fov.Value; } catch { /* 静默：非关键路径，失败可直接忽略 */ } } }
                 SRApi.Notify((_on != null && _on.Value) ? SRApi.T("自由相机：开", "Free camera: ON")
                                                  : SRApi.T("自由相机：关（已还原）", "Free camera: OFF (restored)"));
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 开关变化", __ex); }
@@ -268,12 +268,12 @@ public partial class Experiments : ITweak
                 if (!inGame) { RestoreFov(cam); return; }
                 if (cam.orthographic) cam.orthographicSize = Mathf.Clamp(_fov.Value, MinFov, MaxFov);
                 else cam.fieldOfView = Mathf.Clamp(_fov.Value, MinFov, MaxFov);
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
         // 还原开启时抓到的原视野并清掉标记（两个早退分支共用）。
         private static void RestoreFov(Camera cam) {
             if (_savedFov <= 0f || cam == null) return;
-            try { if (cam.orthographic) cam.orthographicSize = _savedFov; else cam.fieldOfView = _savedFov; } catch { }
+            try { if (cam.orthographic) cam.orthographicSize = _savedFov; else cam.fieldOfView = _savedFov; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             _savedFov = -1f;
         }
     }

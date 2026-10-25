@@ -680,7 +680,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 					+ SRApi.T("，上限 ", ", limit ") + MaxPresets + ")";
 				SRApi.Ctl.SectionTitle(title);
 				float titleH = 0f;
-				try { titleH = Mathf.Max(0f, GUILayoutUtility.GetLastRect().height); } catch { }
+				try { titleH = Mathf.Max(0f, GUILayoutUtility.GetLastRect().height); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				float rowH = SRApi.Ctl.TableRowH();
 				float headerH = SRApi.Ctl.TableHeaderH();
 				if (tableH <= 0f) tableH = TableHeight();
@@ -1218,7 +1218,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 					return;
 				}
 				string defaultName = null;
-				try { defaultName = Path.GetFileNameWithoutExtension(path); } catch { }
+				try { defaultName = Path.GetFileNameWithoutExtension(path); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				ImportXmlText(xml, defaultName, SRApi.T("文件", "file"));
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/导入(路径)", __ex);
@@ -1285,17 +1285,17 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 		private static string ResolveImportPath(string input) {
 			try {
 				if (string.IsNullOrEmpty(input)) return null;
-				try { if (File.Exists(input)) return Path.GetFullPath(input); } catch { }
+				try { if (File.Exists(input)) return Path.GetFullPath(input); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				string p = null;
-				try { p = Path.Combine(Paths.BepInExRootPath, input); if (File.Exists(p)) return p; } catch { }
-				try { p = Path.Combine(Paths.ConfigPath, input); if (File.Exists(p)) return p; } catch { }
+				try { p = Path.Combine(Paths.BepInExRootPath, input); if (File.Exists(p)) return p; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+				try { p = Path.Combine(Paths.ConfigPath, input); if (File.Exists(p)) return p; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				try {
                 // 先净化文件名，再取全路径并确认仍在预设根目录内（防目录穿越）。
                 string safe = SafeFileName(input);
                 string root2 = Path.GetFullPath(PresetsRoot());
                 string full = Path.GetFullPath(Path.Combine(root2, safe));
                 if (full.StartsWith(root2, StringComparison.OrdinalIgnoreCase) && File.Exists(full)) return full;
-            } catch { }
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/解析导入路径", __ex);
 			}
@@ -1481,9 +1481,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				}
 				string presetScene = "";
 				string activeScene = "";
-				try { presetScene = doc.DocumentElement.GetAttribute("levelSceneName"); } catch { }
+				try { presetScene = doc.DocumentElement.GetAttribute("levelSceneName"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				if (string.IsNullOrEmpty(presetScene)) presetScene = p.Level ?? "";
-				try { activeScene = SceneManager.GetActiveScene().name; } catch { }
+				try { activeScene = SceneManager.GetActiveScene().name; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				bool levelMismatch = !string.IsNullOrEmpty(presetScene) && !string.IsNullOrEmpty(activeScene)
 					&& !string.Equals(presetScene, activeScene, StringComparison.Ordinal);
 				// 自定义关卡：场景名都是 BlankLevel，要靠快照名/代码区分是不是同一个自定义关卡。
@@ -1539,7 +1539,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 						}
 					} catch (Exception __rx) {
 						SRApi.Guard.Log("布局预设/开始替换关卡", __rx);
-						try { QuickSaver.levelPortalXml = null; } catch { }
+						try { QuickSaver.levelPortalXml = null; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 						SetReloadBusy(false);
 						SRApi.Notify(SRApi.T("加载预设失败：无法开始替换关卡", "Failed to load the preset: could not start the level replacement"));
 					}
@@ -1704,7 +1704,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				return true;
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/直接替换关卡", __ex);
-				try { QuickSaver.levelPortalXml = null; } catch { }
+				try { QuickSaver.levelPortalXml = null; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				return false;
 			}
 		}
@@ -1848,7 +1848,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 					return;
 				}
 				string presetScene = "";
-				try { presetScene = doc.DocumentElement.GetAttribute("levelSceneName"); } catch { }
+				try { presetScene = doc.DocumentElement.GetAttribute("levelSceneName"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				if (string.IsNullOrEmpty(presetScene)) presetScene = p.Level ?? "";
 				GameState.LevelName target;
 				if (!TrySceneToLevel(presetScene, out target)) {
@@ -2315,7 +2315,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				string n = fileName ?? "";
 				if (n.EndsWith(".c.snapshot", StringComparison.OrdinalIgnoreCase)) return GameState.GameMode.CHALLENGE.ToString();
 				if (n.EndsWith(".v.snapshot", StringComparison.OrdinalIgnoreCase)) return GameState.GameMode.PARTY.ToString();
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return "";
 		}
 
@@ -2424,14 +2424,14 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				for (int i = 0; i < _presets.Count; i++) {
 					if (string.Equals(_presets[i].Key, key, StringComparison.OrdinalIgnoreCase)) return _presets[i];
 				}
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return null;
 		}
 
 		private static void SortPresets() {
 			try {
 				_presets.Sort(ComparePreset);
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 		}
 
 		// 文件名安全化：去掉 Windows 不允许的字符，截断长度并处理空名。
@@ -2626,7 +2626,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				DateTime dt;
 				if (!string.IsNullOrEmpty(s) && DateTime.TryParse(s, CultureInfo.InvariantCulture,
 					DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out dt)) return dt;
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return DateTime.MinValue;
 		}
 
@@ -2705,7 +2705,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 		private static string CurrentLevelDisplayName(string scene) {
 			try {
 				string active = "";
-				try { active = SceneManager.GetActiveScene().name; } catch { }
+				try { active = SceneManager.GetActiveScene().name; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				if (string.Equals(active, "BlankLevel", StringComparison.OrdinalIgnoreCase)) {
 					string custom = CurrentCustomLevelName();
 					if (!string.IsNullOrEmpty(custom)) return custom;
@@ -2722,7 +2722,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				if (!string.IsNullOrEmpty(p.LevelCode)) return p.LevelCode;
 				if (!string.IsNullOrEmpty(p.Level)
 					&& !string.Equals(p.Level, "BlankLevel", StringComparison.OrdinalIgnoreCase)) return p.Level;
-			} catch { }
+			} catch { /* 静默：非关键路径，失败可直接忽略 */ }
 			return "-";
 		}
 
@@ -2739,7 +2739,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 		private static string CurrentLevelCode(string scene) {
 			try {
 				string active = "";
-				try { active = SceneManager.GetActiveScene().name; } catch { }
+				try { active = SceneManager.GetActiveScene().name; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
 				if (string.Equals(active, "BlankLevel", StringComparison.OrdinalIgnoreCase)) {
 					GameState gs = GameState.GetInstance();
 					if (gs != null) {
