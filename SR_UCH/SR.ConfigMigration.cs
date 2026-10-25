@@ -550,14 +550,8 @@ namespace SR_UCH.Tweaks {
         }
 
         // 返回 true 表示文件被改写过（调用方应随后 ConfigFile.Reload()）
-        public static bool Migrate(string cfgPath) {
-            try {
-                if (string.IsNullOrEmpty(cfgPath) || !File.Exists(cfgPath)) return false;
-                string text = File.ReadAllText(cfgPath, Encoding.UTF8);
-                string[] lines = text.Replace("\r\n", "\n").Split('\n');
-                // 基准须取在换行归一化之后、改名之前：取在归一化前（CRLF）text == orig 恒不成立，会每次启动白重写文件。
-                // 取在改名之后，则只有改名（无搬移/清理）时 text == orig 成立、改名结果不落盘，迁移等于没生效。
-                string orig = string.Join("\n", lines);
+        // 第一遍：段名与键名改名（含组合键内嵌的 section/key），就地改写 lines。
+        private static void RenameSectionsAndKeys(string[] lines) {
                 for (int i = 0; i < lines.Length; i++) {
                     string line = lines[i];
                     string trimmed = line.TrimStart();
@@ -591,6 +585,17 @@ namespace SR_UCH.Tweaks {
                         }
                     }
                 }
+        }
+
+        public static bool Migrate(string cfgPath) {
+            try {
+                if (string.IsNullOrEmpty(cfgPath) || !File.Exists(cfgPath)) return false;
+                string text = File.ReadAllText(cfgPath, Encoding.UTF8);
+                string[] lines = text.Replace("\r\n", "\n").Split('\n');
+                // 基准须取在换行归一化之后、改名之前：取在归一化前（CRLF）text == orig 恒不成立，会每次启动白重写文件。
+                // 取在改名之后，则只有改名（无搬移/清理）时 text == orig 成立、改名结果不落盘，迁移等于没生效。
+                string orig = string.Join("\n", lines);
+                RenameSectionsAndKeys(lines);
                 text = string.Join("\n", lines);
                 // "GC After Load" 已归实验页：从 [Freeplay] 搬到 [Experiments]，不搬值则原设置读不到。
                 text = MoveKeyBetweenSections(text, "Freeplay", "Experiments", "GC After Load");
