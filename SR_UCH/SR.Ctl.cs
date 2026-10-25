@@ -680,6 +680,17 @@ public partial class SR {
         // 悬浮提示显示延迟（参考 Dear ImGui 的 tooltip 延迟）与淡入，避免鼠标扫过控件时提示乱闪。
         private const float TipDelay = 0.2f;
         private const float TipFade = 0.12f;
+        // 悬浮文本专用样式：零内边距，高度由整块 CalcHeight 得出（不再逐行累加，避免虚高）。
+        private static GUIStyle _tipText;
+        private static GUIStyle TipTextStyle() {
+            if (_tipText == null) {
+                _tipText = new GUIStyle(_labelWrap);
+                _tipText.padding = new RectOffset(0, 0, 0, 0);
+                _tipText.margin = new RectOffset(0, 0, 0, 0);
+                _tipText.wordWrap = true;
+            }
+            return _tipText;
+        }
         private static string _tipShownKey;
         private static float _tipShownAt = -999f;
 
@@ -696,19 +707,19 @@ public partial class SR {
                 _tipKey = tip;
                 _tipContent.text = tip;
                 _tipLines = tip.Split('\n');
+                GUIStyle st = TipTextStyle();
                 float limit = Mathf.Min(Sc(600f), Screen.width * 0.62f);
                 float maxLine = 0f;
                 for (int i = 0; i < _tipLines.Length; i++) {
-                    float lw = _labelWrap.CalcSize(new GUIContent(_tipLines[i])).x;
+                    float lw = st.CalcSize(new GUIContent(_tipLines[i])).x;
                     if (lw > maxLine) maxLine = lw;
                 }
-                float innerW = Mathf.Min(limit, maxLine + Sc(6f));
-                float h = 0f;
-                for (int i = 0; i < _tipLines.Length; i++)
-                    h += _labelWrap.CalcHeight(new GUIContent(_tipLines[i]), innerW);
+                float innerW = Mathf.Max(Sc(40f), Mathf.Min(limit, maxLine + 2f));
+                // 整块测量（含换行），样式零内边距 → 高度就是文字实际需要的高度，不多不少。
+                float h = st.CalcHeight(_tipContent, innerW);
                 _tipInnerW = innerW;
-                _tipW = innerW + Sc(14f);                 // 左右内边距
-                _tipH = h + Sc(10f);                      // 上下内边距
+                _tipW = innerW + Sc(12f);
+                _tipH = h + Sc(8f);
             }
             float x = Mathf.Clamp(mp.x + 16f, 2f, Mathf.Max(2f, Screen.width - _tipW - 6f));
             float y = Mathf.Clamp(mp.y + 16f, 2f, Mathf.Max(2f, Screen.height - _tipH - 10f));
@@ -716,7 +727,7 @@ public partial class SR {
             GUI.color = new Color(1f, 1f, 1f, __alpha);
             Rect __tipRect = new Rect(x, y, _tipW, _tipH);
             DrawRounded(__tipRect, new Color(0.08f, 0.08f, 0.09f, 0.96f), Sc(6f));
-            GUI.Label(new Rect(__tipRect.x + Sc(7f), __tipRect.y + Sc(5f), _tipInnerW, _tipH - Sc(10f)), _tipContent, _labelWrap);
+            GUI.Label(new Rect(__tipRect.x + Sc(6f), __tipRect.y + Sc(4f), _tipInnerW, _tipH - Sc(8f)), _tipContent, TipTextStyle());
             GUI.color = __oldTipColor;
         }
 // 分区：RowHooks（功能对通用条目行的扩展点）
