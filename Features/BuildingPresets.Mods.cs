@@ -212,11 +212,15 @@ namespace SR_UCH.Tweaks {
         private static string ModsLabel(PresetInfo p) {
             try {
                 if (p == null || p.IsLocal) return "-";
-                string m = p.ModsMode ?? ModsInherit;
-                if (m == ModsOff) return SRApi.T("关", "Off");
-                if (m == ModsCustom) return SRApi.T("改", "Set");
-                return SRApi.T("继承", "Inherit");
+                return IsCustomData(p) ? SRApi.T("自定义", "Custom") : SRApi.T("默认", "Default");
             } catch { return "-"; }
+        }
+
+        // 这条预设是否带自定义数据（修改器自定义 / 规则 / 积分 / 模块概率任一开启）。
+        private static bool IsCustomData(PresetInfo p) {
+            if (p == null) return false;
+            if (string.Equals(p.ModsMode, ModsCustom, StringComparison.Ordinal)) return true;
+            return p.ApplyRules || p.ApplyPoints || p.ApplyBlocks;
         }
 
         // 编辑器页面（占用表格区域）：策略三选一 + 自定义时的 24 项格子。
@@ -285,7 +289,7 @@ namespace SR_UCH.Tweaks {
                 GUILayout.BeginHorizontal();
                 try {
                     SRApi.Ctl.LabelAuto(SRApi.T("借用游戏界面", "Game UI"));
-                    if (GUILayout.Button(new GUIContent(SRApi.T("打开规则书", "Open rulebook"),
+                    if (GUILayout.Button(new GUIContent(SRApi.T("打开游戏界面", "Open game UI"),
                             SRApi.T("先收起本面板，再打开游戏自己的规则书（规则 / 积分 / 模块概率 / 修改器都在里面）\n需在树屋或关卡里、由房主操作",
                                 "closes this panel and opens the game's own rulebook (rules / points / block odds / modifiers)\nhost only, in the treehouse or a level")),
                         SRApi.Ctl.Btn, GUILayout.Width(W(110)), GUILayout.Height(W(24)))) OpenGameRulebook();
@@ -293,10 +297,6 @@ namespace SR_UCH.Tweaks {
                             SRApi.T("把游戏当前的规则 / 积分 / 模块概率 / 修改器读进来，写到这条预设（三个开关自动打勾）",
                                 "read the game's current rules / points / block odds / modifiers into this preset (the three toggles are turned on)")),
                         SRApi.Ctl.Btn, GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ReadAllFromGame(p);
-                    if (GUILayout.Button(new GUIContent(SRApi.T("只读修改器", "Mods only"),
-                            SRApi.T("只把游戏当前的 24 项修改器读进下面的自定义值，不动规则/积分/模块",
-                                "only pull the game's 24 current modifiers into the custom values below")),
-                        SRApi.Ctl.Btn, GUILayout.Width(W(96)), GUILayout.Height(W(24)))) ReadModsFromGame();
                     GUILayout.FlexibleSpace();
                 } finally {
                     GUILayout.EndHorizontal();
@@ -318,50 +318,62 @@ namespace SR_UCH.Tweaks {
 
         // 24 项三列网格：模式索引用输入框（0 = 默认），开关用核心复选框。
         private static void RenderModsGrid() {
-            const int Cols = 3;
+            // 两列 × 12 行：标签列固定宽、控件列固定宽 -> 同列逐行对齐。
+            // 外面套固定高度的滚动区：列表比视口高时可用滚轮上下滚动（之前没有滚动区）。
+            const int Cols = 2;
             int perCol = (Mods.Length + Cols - 1) / Cols;
-            for (int row = 0; row < perCol; row++) {
-                GUILayout.BeginHorizontal();
-                try {
-                    for (int c = 0; c < Cols; c++) {
-                        int idx = c * perCol + row;
-                        if (idx >= Mods.Length) { GUILayout.FlexibleSpace(); continue; }
-                        ModDef d = Mods[idx];
-                        string label = SRApi.T(d.Zh, d.En);
-                        string tip = SRApi.T(d.Zh + "\n预设快照 <mods> 里的 " + d.Attr + "\n"
-                                              + (d.IsBool ? "开关：勾选 = 开，取消 = 关" : "模式索引：0 = 默认，数值含义由游戏决定"),
-                                             d.En + "\npreset snapshot attribute " + d.Attr + "\n"
-                                              + (d.IsBool ? "boolean switch: checked = on" : "mode index: 0 = default; meaning is defined by the game"));
-                        GUIContent lc = new GUIContent(label, tip);
-                        float lw = SRApi.Ctl.Label.CalcSize(new GUIContent(label)).x + SRApi.Ctl.Sc(6);
-                        GUILayout.Label(lc, SRApi.Ctl.Label, GUILayout.Width(Mathf.Min(lw, W(120))), GUILayout.Height(W(24)));
-                        string cur;
-                        if (!_modsDraft.TryGetValue(d.Attr, out cur) || cur == null) cur = ModDefault(d);
-                        if (d.IsBool) {
-                            bool on = string.Equals(cur, "True", StringComparison.OrdinalIgnoreCase);
-                            Rect cr = GUILayoutUtility.GetRect(W(26), W(24), GUILayout.Width(W(26)), GUILayout.Height(W(24)));
-                            if (SRApi.Ctl.Checkbox(cr, on, tip)) _modsDraft[d.Attr] = on ? "False" : "True";
-                        } else {
-                            RenderModCombo(d, cur);
+            float labelW = W(104);
+            float ctrlW = W(150);
+            float rowH2 = W(26);
+            float gridH = Mathf.Min(perCol * rowH2 + W(8), W(300));
+            _modsScroll = GUILayout.BeginScrollView(_modsScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.Height(gridH));
+            try {
+                for (int row = 0; row < perCol; row++) {
+                    GUILayout.BeginHorizontal();
+                    try {
+                        for (int c = 0; c < Cols; c++) {
+                            int idx = c * perCol + row;
+                            if (idx >= Mods.Length) { GUILayout.Space(labelW + ctrlW + W(16)); continue; }
+                            ModDef d = Mods[idx];
+                            string label = SRApi.T(d.Zh, d.En);
+                            string tip = SRApi.T(d.Zh + "\n预设快照 <mods> 里的 " + d.Attr + "\n"
+                                                  + (d.IsBool ? "开关：勾选 = 开，取消 = 关" : "模式：选项来自游戏内的取值表"),
+                                                 d.En + "\npreset snapshot attribute " + d.Attr + "\n"
+                                                  + (d.IsBool ? "boolean switch: checked = on" : "mode: options come from the game's own value table"));
+                            GUILayout.Label(new GUIContent(label, tip), SRApi.Ctl.Label,
+                                GUILayout.Width(labelW), GUILayout.Height(rowH2));
+                            string cur;
+                            if (!_modsDraft.TryGetValue(d.Attr, out cur) || cur == null) cur = ModDefault(d);
+                            if (d.IsBool) {
+                                bool on = string.Equals(cur, "True", StringComparison.OrdinalIgnoreCase);
+                                Rect cr = GUILayoutUtility.GetRect(W(26), rowH2, GUILayout.Width(W(26)), GUILayout.Height(rowH2));
+                                if (SRApi.Ctl.Checkbox(cr, on, tip)) _modsDraft[d.Attr] = on ? "False" : "True";
+                                GUILayout.Space(ctrlW - W(26));
+                            } else {
+                                RenderModCombo(d, cur, ctrlW);
+                            }
+                            if (c < Cols - 1) GUILayout.Space(W(14));
                         }
-                        if (c < Cols - 1) GUILayout.Space(W(10));
+                        GUILayout.FlexibleSpace();
+                    } finally {
+                        GUILayout.EndHorizontal();
                     }
-                    GUILayout.FlexibleSpace();
-                } finally {
-                    GUILayout.EndHorizontal();
                 }
+            } finally {
+                GUILayout.EndScrollView();
             }
-            GUILayout.Space(W(4));
-            LabelWrapText(SRApi.T("数值项的 0 表示默认；自定义只影响加载，不改写预设文件本身。",
-                "0 means default for numeric entries; custom values only affect loading, the preset file stays untouched."));
+            GUILayout.Space(W(2));
+            LabelWrapText(SRApi.T("数值项的 0 表示默认；自定义只影响加载，不改写预设文件本身。滚轮可上下滚动列表。",
+                "0 means default for numeric entries; custom values only affect loading, the preset file stays untouched. Scroll the wheel to move through the list."));
         }
 
 
         // ---------- 下拉框（数值项）：选项与文案都取自游戏 Modifiers 自带的取值表 / 名称函数 ----------
         private static readonly Dictionary<string, string[]> _modOptCache = new Dictionary<string, string[]>();
         private static readonly Dictionary<string, bool> _modComboOpen = new Dictionary<string, bool>();
+        private static Vector2 _modsScroll;   // 修改器网格的滚动位置
 
-        private static void RenderModCombo(ModDef d, string curRaw) {
+        private static void RenderModCombo(ModDef d, string curRaw, float ctrlW) {
             try {
                 string[] opts = ModOptions(d);
                 int cur = 0;
@@ -370,7 +382,7 @@ namespace SR_UCH.Tweaks {
                 if (cur >= opts.Length) cur = opts.Length - 1;
                 bool open;
                 if (!_modComboOpen.TryGetValue(d.Attr, out open)) open = false;
-                int pick = SRApi.Ctl.ComboBox(null, opts[cur], opts, opts, ref open, W(160));
+                int pick = SRApi.Ctl.ComboBox(null, opts[cur], opts, opts, ref open, ctrlW);
                 _modComboOpen[d.Attr] = open;
                 if (pick >= 0 && pick != cur) _modsDraft[d.Attr] = pick.ToString(CultureInfo.InvariantCulture);
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/修改器下拉", __ex); }
@@ -423,7 +435,40 @@ namespace SR_UCH.Tweaks {
         }
 
         // 名称：优先用游戏自带的 Get*ValueString（已本地化），没有对应函数的项返回 null 只显示下标。
+        // 末日两项的名称必须带"延迟秒数"（游戏函数签名是 (模式, 延迟)），延迟取游戏内 DoomsdayModifierTimes。
+        private static int DoomsdayDelay(int i, int fallback) {
+            try {
+                Modifiers m = Modifiers.GetInstance();
+                if (m == null || m.DoomsdayModifierTimes == null || m.DoomsdayModifierTimes.Length == 0) return fallback;
+                return m.DoomsdayModifierTimes[Mathf.Clamp(i, 0, m.DoomsdayModifierTimes.Length - 1)];
+            } catch { return fallback; }
+        }
+
+        // 没有名称函数的速度类：显示游戏内系数（×1.25），总比只有下标强。
+        private static string SpeedLabel(float v) {
+            try { return "×" + v.ToString("0.##", CultureInfo.InvariantCulture); }
+            catch { return null; }
+        }
+
+        private static float ArrayAt(float[] a, int i) {
+            if (a == null || a.Length == 0) return 1f;
+            return a[Mathf.Clamp(i, 0, a.Length - 1)];
+        }
+
         private static string ModOptionLabel(ModDef d, int i) {
+            try {
+                Modifiers m = Modifiers.GetInstance();
+                if (m != null) {
+                    switch (d.Attr) {
+                        case "GameSpeedMode": return SpeedLabel(ArrayAt(m.GameSpeedValues, i));
+                        case "PlatformSpeedMode": return SpeedLabel(ArrayAt(m.PlatformMoveSpeedValues, i));
+                        case "RateOfFireMode": return SpeedLabel(ArrayAt(m.RateOfFireValues, i));
+                        case "ProjectileSpeedMode": return SpeedLabel(ArrayAt(m.ProjectileSpeedValues, i));
+                        case "DoomsdayMeteorsMode": return Modifiers.GetDoomsdayMeteorsValueString(i, DoomsdayDelay(i, 0));
+                        case "DoomsdayLavaMode": return Modifiers.GetDoomsdayLavaValueString(i, DoomsdayDelay(i, 0));
+                    }
+                }
+            } catch { /* 静默：拿不到就退回固定函数表 */ }
             switch (d.Attr) {
                 case "GravityMode": return Modifiers.GetGravityValueString(i);
                 case "JumpSpeedMode": return Modifiers.GetJumpSpeedValueString(i);
@@ -433,8 +478,6 @@ namespace SR_UCH.Tweaks {
                 case "CharacterSizeMode": return Modifiers.GetCharacterSizeValueString(i);
                 case "PostDeathBehaviorMode": return Modifiers.GetPostDeathBehaviorValueString(i);
                 case "CameraFlipMode": return Modifiers.GetCameraFlipValueString(i);
-                case "DoomsdayMeteorsMode": return Modifiers.GetDoomsdayMeteorsValueString(i, 0);
-                case "DoomsdayLavaMode": return Modifiers.GetDoomsdayLavaValueString(i, 0);
                 case "InvisibilityMode": return Modifiers.GetInvisibilityModeValueString(i);
                 default: return null;
             }
@@ -598,6 +641,78 @@ namespace SR_UCH.Tweaks {
                 case "Frictionless": return "frictionless";
                 default: return null;
             }
+        }
+
+
+        // ---------- 「数据」列的悬浮预览：把这条预设的自定义内容逐行列出来 ----------
+        private static void UpdateDataCellTip() {
+            try {
+                Event e = Event.current;
+                if (e == null || _args == null || _args.rowRects == null || _args.vis == null || _args.colW == null) return;
+                if (e.type == EventType.Layout) return;
+                Vector2 mp = e.mousePosition;
+                if (!_args.box.Contains(mp)) return;
+                int row = -1;
+                for (int i = 0; i < _args.rowRects.Count && i < _args.rowRows.Count; i++) {
+                    if (_args.rowRects[i].Contains(mp)) { row = _args.rowRows[i]; break; }
+                }
+                if (row < 0) return;
+                // 数据列在可视列里的横向区间（与核心 DrawTableCells 同一套排布：从 box.x - scrollX 起逐列累加）。
+                float x = _args.box.x - _args.scrollX;
+                float w = 0f;
+                bool found = false;
+                for (int k = 0; k < _args.vis.Count; k++) {
+                    int ci = _args.vis[k];
+                    if (ci == _args.pinCol) continue;
+                    float cw = SRApi.Ctl.Sc(_args.colW[ci]);
+                    if (ci == ColMods) { w = cw; found = true; break; }
+                    x += cw;
+                }
+                if (!found || w <= 0f) return;
+                if (mp.x < x || mp.x > x + w) return;
+                string tip = DataPreviewTip(_currentVisibleRow(row));
+                if (!string.IsNullOrEmpty(tip)) GUI.tooltip = tip;
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/数据列悬浮", __ex); }
+        }
+
+        // 可见行 -> 预设（行号是 visible 列表的下标，与 RowCells 用的是同一份）。
+        private static PresetInfo _currentVisibleRow(int row) {
+            try {
+                List<PresetInfo> vis = _visibleCache;
+                if (vis == null || row < 0 || row >= vis.Count) return null;
+                return vis[row];
+            } catch { return null; }
+        }
+
+        // 多行预览：模式 + 各项非默认修改器 + 规则/积分/模块概率开关。
+        private static string DataPreviewTip(PresetInfo p) {
+            try {
+                if (p == null) return null;
+                if (!IsCustomData(p)) return SRApi.T("默认：加载时用预设自带的修改器，不动规则/积分/模块概率\n点操作列「改器」可改成自定义",
+                    "Default: uses the preset's own modifiers and leaves rules/points/block odds alone\nuse the Mods button in the actions column to customise");
+                StringBuilder sb = new StringBuilder();
+                sb.Append(SRApi.T("自定义数据", "Custom data"));
+                if (string.Equals(p.ModsMode, ModsCustom, StringComparison.Ordinal)) {
+                    sb.Append("\n").Append(SRApi.T("修改器：", "Modifiers: "));
+                    int shown = 0;
+                    for (int i = 0; i < Mods.Length && shown < 12; i++) {
+                        ModDef d = Mods[i];
+                        string v;
+                        if (p.ModsVals == null || !p.ModsVals.TryGetValue(d.Attr, out v)) continue;
+                        if (string.IsNullOrEmpty(v) || v == ModDefault(d)) continue;   // 只列非默认项
+                        if (shown > 0) sb.Append(" · ");
+                        sb.Append(SRApi.T(d.Zh, d.En)).Append('=').Append(v);
+                        shown++;
+                    }
+                    if (shown == 0) sb.Append(SRApi.T("（全部默认）", "(all default)"));
+                } else if (string.Equals(p.ModsMode, ModsOff, StringComparison.Ordinal)) {
+                    sb.Append("\n").Append(SRApi.T("修改器：全部写成默认值", "Modifiers: reset to defaults"));
+                }
+                if (p.ApplyRules) sb.Append("\n").Append(SRApi.T("游戏规则：随预设应用", "Rules: applied with the preset"));
+                if (p.ApplyPoints) sb.Append("\n").Append(SRApi.T("积分设置：随预设应用", "Points: applied with the preset"));
+                if (p.ApplyBlocks) sb.Append("\n").Append(SRApi.T("模块概率：随预设应用", "Block odds: applied with the preset"));
+                return sb.ToString();
+            } catch { return null; }
         }
 
         // 选中态标记（契约层不暴露 SelItem 样式，用文字前缀即可）。

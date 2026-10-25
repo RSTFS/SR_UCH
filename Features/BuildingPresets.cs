@@ -318,6 +318,8 @@ namespace SR_UCH.Tweaks {
         private static readonly SRApi.TableSource<PresetInfo> _visSource = new SRApi.TableSource<PresetInfo>();
         private static long _visStamp = -1;
 
+        private static List<PresetInfo> _visibleCache;   // 当前表格的可见行（供数据列悬浮预览取预设）
+
         private static List<PresetInfo> VisiblePresets() {
             // 核心数据管线：过滤/排序每帧最多一次（同一帧多次调用返回同一份缓存）。
             _visSource.Filter = PassPresetFilter;
@@ -458,6 +460,12 @@ namespace SR_UCH.Tweaks {
                     GUILayout.Space(W(8));
                     SRApi.Ctl.LabelAuto(SRApi.T("加载模式", "Load mode"));
                     RenderLoadModeCombo();
+                    GUILayout.Space(W(8));
+                    // 右侧：直接打开游戏自己的界面（规则 / 积分 / 模块概率 / 修改器都在里面），改完回来点「读取游戏当前」。
+                    if (GUILayout.Button(new GUIContent(SRApi.T("游戏界面", "Game UI"),
+                            SRApi.T("打开游戏自己的规则书界面\n规则、积分设置、模块概率、修改器都在里面\n本面板会自动收起；需在树屋里由房主操作",
+                                "opens the game's own rulebook UI\nrules, points, block odds and modifiers all live there\nthis panel closes itself; host only, in the treehouse")),
+                        SRApi.Ctl.Btn, GUILayout.Width(W(96)), GUILayout.Height(W(24)))) OpenGameRulebook();
                     GUILayout.FlexibleSpace();
                 } finally {
                     GUILayout.EndHorizontal();
@@ -686,6 +694,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
         // 标准表格：核心 TableDraw 负责表头/行/拖列宽/换列位/钉住操作列；本页只提供列定义、单元格文本与操作按钮。
         private static void RenderPresetTable(float tableH, List<PresetInfo> visible) {
             try {
+                _visibleCache = visible;   // 悬浮预览按行号取预设时用（与 RowCells 同一份列表）
                 string title = SRApi.T("- 预设列表", "- Preset list") + " (" + visible.Count + "/" + _presets.Count
                     + SRApi.T("，上限 ", ", limit ") + MaxPresets + ")";
                 SRApi.Ctl.SectionTitle(title);
@@ -782,6 +791,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 };
                 _hiddenBeforeTable = _hiddenCols.Count;
                 SRApi.TableDraw(_args);
+                UpdateDataCellTip();   // 鼠标悬浮「数据」列单元格 -> 列出该预设的自定义数据
                 // 底边拖拽条（核心统一绘制 + 拖动 + 持久化）。
                 SRApi.Ctl.TableHeightGripBar(_tableHEntry, (box.height + SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
                 // 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
@@ -845,7 +855,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 case ColName: return SRApi.T("名称", "Name");
                 case ColLevel: return _levelShowCode ? SRApi.T("关卡代码", "Level code") : SRApi.T("关卡", "Level");
                 case ColMode: return SRApi.T("模式", "Mode");
-                case ColMods: return SRApi.T("修改器", "Mods");
+                case ColMods: return SRApi.T("数据", "Data");
                 case ColTime: return SRApi.T("时间", "Time");
                 case ColAction: return SRApi.T("操作", "Actions");
                 default: return "";
@@ -859,8 +869,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     case ColLevel: return SRApi.T("预设所属关卡；单击「关卡」表头可在关卡名称 / 关卡代码之间切换（代码缺失显示 -）",
                         "the level this preset belongs to; click the Level header to toggle between level name and level code (code shows - when unavailable)");
                     case ColMode: return SRApi.T("保存时所在的游戏模式", "game mode the preset was saved in");
-                    case ColMods: return SRApi.T("加载这条预设时怎么处理关卡修改器\n继承 = 用预设自带的（默认）\n关 = 全部还原默认；改 = 用你设定的值（点操作列的「改器」编辑）",
-                        "how the level modifiers are handled when this preset loads\nInherit = use the preset's own (default)\nOff = reset all to defaults; Set = use your custom values (edit with the Mods button)");
+                    case ColMods: return SRApi.T("这条预设带的自定义数据\n默认 = 全部用预设自带；自定义 = 修改器/规则/积分/模块概率按你的设定\n鼠标停在该列格子上可预览具体内容",
+                        "custom data carried by this preset\nDefault = use whatever the preset has; Custom = your own modifiers/rules/points/block odds\nhover a cell in this column to preview the details");
                     case ColTime: return SRApi.T("保存时间（本地时间）", "save time (local time)");
                     case ColAction: return SRApi.T("加载 / 修改器 / 重命名 / 导出到剪贴板 / 删除；删除需点两次确认", "load / modifiers / rename / export to clipboard / delete; delete needs a second click");
                     default: return null;
