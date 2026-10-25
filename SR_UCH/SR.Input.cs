@@ -102,8 +102,17 @@ public partial class SR {
             }
         }
 
+        // 每帧只计算一次：9 个每帧补丁（角色 Update/FixedUpdate、光标、GameControl 等）
+        // 每帧会读上数百次，避免每次走属性 + 布尔 + 委托分发。
+        // 注：物理步（FixedUpdate）可能读到上一帧的值，门控不需要亚帧精度。
+        private static int _ilFrame = -1;
+        private static bool _ilValue;
         internal static bool InputLocked {
-            get { return (UiOpen && BlockInput) || AnyUiBlocked(); }
+            get {
+                int f = Time.frameCount;
+                if (f != _ilFrame) { _ilFrame = f; _ilValue = (UiOpen && BlockInput) || AnyUiBlocked(); }
+                return _ilValue;
+            }
         }
 
 	}

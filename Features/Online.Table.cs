@@ -101,7 +101,11 @@ namespace SR_UCH.Tweaks {
         private static ulong _pendingSteamId; // Steam 平台要加入的房间号（LobbyListInfo.UnityMatchID）
         private static float _dragWatchdog;             // 拖拽兜底：太久没有鼠标事件就复位（不用 Input.GetMouseButton）
         private static int _clickFrame = -1;            //表头单击一帧只处理一次
-        private static readonly SRApi.TableArgs _tableArgs = new SRApi.TableArgs(); //统一入口参数（复用，避免每帧分配）
+        private static readonly SRApi.TableArgs _tableArgs = new SRApi.TableArgs();
+        // 复用同一个委托：从 _tableArgs.mp 读鼠标位置，避免闭包分配。
+        private static readonly System.Action<int, Rect, int> _pinDrawCached = delegate(int row, Rect r, int visible) {
+            DrawJoinButton(row, r, _tableArgs != null ? _tableArgs.mp : Vector2.zero);
+        }; //统一入口参数（复用，避免每帧分配）
 
         private static readonly SRApi.TableSource<Matchmaker.LobbyListInfo> _lobbySource =
             new SRApi.TableSource<Matchmaker.LobbyListInfo>();
@@ -224,7 +228,8 @@ namespace SR_UCH.Tweaks {
             _tableArgs.rowRects = _rowRectsPage; _tableArgs.rowRows = _rowRows;
             _tableArgs.pinRects = _joinRectsPage; _tableArgs.pinRows = _joinRows;
             // 钉住列按钮：位置/裁剪由核心算好，本页只负责画按钮内容。
-            _tableArgs.pinDraw = delegate(int row, Rect r, int visible) { DrawJoinButton(row, r, mp); };
+            // 静态委托（不捕获 mp）：mp 已经存在 _tableArgs.mp 里，避免每帧新建闭包/委托。
+            _tableArgs.pinDraw = _pinDrawCached;
             _tableArgs.emptyHint = delegate { return SRApi.T("（没有符合筛选的房间）", "(no lobbies match the filters)"); };
             _hiddenColsBeforeTable = _hiddenCols.Count;
             SRApi.TableDraw(_tableArgs);

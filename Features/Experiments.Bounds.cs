@@ -254,17 +254,15 @@ public partial class Experiments : ITweak
 			_wallScanTries++;
 			bool any = false;
 			try {
-				GameObject[] all = UnityEngine.Object.FindObjectsOfType<GameObject>();
-				for (int i = 0; i < all.Length; i++) {
-					GameObject g = all[i];
+				// 墙名是已知常量：直接按名查找，避免 FindObjectsOfType<GameObject>() 的
+				// "全场景数组分配 + 数千对象遍历"（进关卡卡顿尖峰的主要来源）。
+				// GameObject.Find 与 FindObjectsOfType 一样只返回 active 对象，语义一致。
+				for (int k = 0; k < SolidWallNames.Length; k++) {
+					if (_wallCol[k] != null) continue;
+					GameObject g = GameObject.Find(SolidWallNames[k]);
 					if (g == null) continue;
-					for (int k = 0; k < SolidWallNames.Length; k++) {
-						if (_wallCol[k] != null) continue;
-						if (g.name == SolidWallNames[k]) {
-							BoxCollider2D bc = g.GetComponent<BoxCollider2D>();
-							if (bc != null) { _wallCol[k] = bc; any = true; }
-						}
-					}
+					BoxCollider2D bc = g.GetComponent<BoxCollider2D>();
+					if (bc != null) { _wallCol[k] = bc; any = true; }
 				}
 			} catch { }
 			if (!any) { /* 扫不到留待下次：场景可能未加载完，或本关卡没有这三面墙 */ }
