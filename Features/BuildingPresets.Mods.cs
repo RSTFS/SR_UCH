@@ -626,13 +626,25 @@ namespace SR_UCH.Tweaks {
             try {
                 LobbyManager lm = LobbyManager.instance;
                 if (lm == null) { SRApi.Notify(SRApi.T("不在大厅里，打不开规则书", "Not in a lobby; the rulebook cannot be opened")); return; }
-                LevelSelectController lsc = lm.CurrentLevelSelectController;
+                LevelSelectController lsc = lm.CurrentLevelSelectController;   // 关卡里可能为 null，后面有兜底
                 // 房主才把预设内容灌进游戏；房客只是查看（游戏本身会拦下修改）
                 if (p != null && !p.IsLocal && SRApi.CanDoHost()) PushPresetDataToGame(p);
                 _bookKey = p != null && !p.IsLocal ? p.Key : null;
                 _bookSeenOpen = false;
                 _bookPollAt = 0f;
                 SRApi.CloseMenu();            // 先收起本面板，否则输入被冻结、界面点不动
+                // 诊断：把三条路线需要的东西是否在场记一次，关卡内打不开时看这行就知道缺什么。
+                try {
+                    Tablet __diagT = FindTablet();
+                    GameRuleProp __diagP = FindRuleProp();
+                    LevelSelectController __diagL = lsc;
+                    int __screens = 0;
+                    if (__diagT != null && __diagT.tabletScreens != null) __screens = __diagT.tabletScreens.Count;
+                    string __scene = "?";
+                    try { __scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name; } catch (Exception) { }
+                    SRApi.LogInfo("[布局预设][数据界面] 场景=" + __scene + " Tablet=" + (__diagT != null ? ("有(" + __screens + "屏)") : "无")
+                        + " 规则书道具=" + (__diagP != null ? "有" : "无") + " 关卡选择控制器=" + (__diagL != null ? "有" : "无"));
+                } catch (Exception __dg) { SRApi.Guard.Log("布局预设/数据界面诊断", __dg); }
                 // 路线 0（首选）：平板界面 Tablet —— 里面有"规则 / 积分 / 模块 / 修改器"的整块页面。
                 Tablet tablet = FindTablet();
                 LobbyPlayer local = FindLocalLobbyPlayer(lm);
@@ -641,7 +653,22 @@ namespace SR_UCH.Tweaks {
                         PickCursor cur = local != null ? local.CursorInstance as PickCursor : null;
                         if (cur == null) cur = UnityEngine.Object.FindObjectOfType(typeof(PickCursor)) as PickCursor;
                         tablet.OnShowTablet();
-                        tablet.OpenLegacyRuleScreen(cur);
+                        // 先回到平板主界面，再切到"规则"那块屏幕（TabletRulesScreen）——它才是规则/积分/模块/修改器的上一级页面。
+                        bool jumped = false;
+                        try {
+                            // resetToMain 是私有的：走 SRApi.Ref（会登记反射豁免）
+                            MethodInfo __rtm = SRApi.Ref.Method(typeof(Tablet), "resetToMain", "布局预设/平板回到主界面");
+                            if (__rtm != null) __rtm.Invoke(tablet, null);
+                            TabletScreen rules = null;
+                            System.Collections.IEnumerable all = tablet.tabletScreens as System.Collections.IEnumerable;
+                            if (all != null) {
+                                foreach (object o in all) {
+                                    if (o is TabletRulesScreen) { rules = (TabletScreen)o; break; }
+                                }
+                            }
+                            if (rules != null) { tablet.GotoScreen(rules); jumped = true; }
+                        } catch (Exception __rs) { SRApi.Guard.Log("布局预设/平板主界面", __rs); }
+                        if (!jumped) tablet.OpenLegacyRuleScreen(cur);
                         bool shown = tablet.CurrentlyShown;   // Tablet.CurrentlyShown 是 bool：界面是否已显示
                         if (shown) {
                             _bookSeenOpen = true;
@@ -898,8 +925,10 @@ namespace SR_UCH.Tweaks {
         }
 
 
-        // ---------- 「数据」列的悬浮预览：把这条预设的自定义内容逐行列出来 ----------
-        private static void UpdateDataCellTip() {
+        // ---------- 行内单元格交互 ----------
+        // 数据列：悬浮预览 / 左键切换 预设-自定义-关闭 / 右键打开数据界面
+        // 名称列：右键重命名（操作列不再放重命名按钮）
+        private static void HandlePresetCells() {
             try {
                 Event e = Event.current;
                 if (e == null || _args == null || _args.rowRects == null || _args.vis == null || _args.colW == null) return;
@@ -911,28 +940,35 @@ namespace SR_UCH.Tweaks {
                     if (_args.rowRects[i].Contains(mp)) { row = _args.rowRows[i]; break; }
                 }
                 if (row < 0) return;
-                // 数据列在可视列里的横向区间（与核心 DrawTableCells 同一套排布：从 box.x - scrollX 起逐列累加）。
-                float x = _args.box.x - _args.scrollX;
-                float w = 0f;
-                bool found = false;
+                int col = ColumnAtX(mp.x);
+                if (col < 0) return;
+                PresetInfo p = _currentVisibleRow(row);
+                if (p == null) return;
+                if (col == ColMods) {
+                    string tip = DataPreviewTip(p);
+                    if (!string.IsNullOrEmpty(tip)) GUI.tooltip = tip;
+                    if (e.type == EventType.MouseUp && e.button == 0) { CycleDataMode(p); e.Use(); return; }
+                    if (e.type == EventType.MouseDown && e.button == 1) { OpenGameRulebook(p); e.Use(); return; }
+                }
+                if (col == ColName && e.type == EventType.MouseDown && e.button == 1) {
+                    if (!p.IsLocal) { ClearPending(); _renameKey = p.Key; _renameText = p.Name; e.Use(); }
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/行内单元格", __ex); }
+        }
+
+        // 鼠标 x 落在可视列的哪一列（与核心 DrawTableCells 同一套排布）。
+        private static int ColumnAtX(float x) {
+            try {
+                float left = _args.box.x - _args.scrollX;
                 for (int k = 0; k < _args.vis.Count; k++) {
                     int ci = _args.vis[k];
                     if (ci == _args.pinCol) continue;
                     float cw = SRApi.Ctl.Sc(_args.colW[ci]);
-                    if (ci == ColMods) { w = cw; found = true; break; }
-                    x += cw;
+                    if (x >= left && x <= left + cw) return ci;
+                    left += cw;
                 }
-                if (!found || w <= 0f) return;
-                if (mp.x < x || mp.x > x + w) return;
-                PresetInfo p = _currentVisibleRow(row);
-                string tip = DataPreviewTip(p);
-                if (!string.IsNullOrEmpty(tip)) GUI.tooltip = tip;
-                // 左键抬起切换三态（按下与抬起都在同一格内，避免拖动误触）
-                if (e.type == EventType.MouseUp && e.button == 0) {
-                    CycleDataMode(p);
-                    e.Use();
-                }
-            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/数据列悬浮", __ex); }
+            } catch { /* 静默：布局未就绪时当作没命中 */ }
+            return -1;
         }
 
         // 可见行 -> 预设（行号是 visible 列表的下标，与 RowCells 用的是同一份）。

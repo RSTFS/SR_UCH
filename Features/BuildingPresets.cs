@@ -37,18 +37,17 @@ namespace SR_UCH.Tweaks {
         private const int ColCount = 6;
         // 列宽（设计单位）默认值与允许范围；顺序与 Col* 一致。
         // 操作列的实际默认宽由 DefaultActionColW() 按当前语言按钮文字实时计算（DefColW[ColAction] 仅作兜底）。
-        private static readonly float[] DefColW = new float[] { 150f, 84f, 64f, 76f, 96f, 200f };
+        private static readonly float[] DefColW = new float[] { 150f, 84f, 64f, 38f, 48f, 200f };
         private const float ColWidthMin = 40f;
         private const float ColWidthMax = 600f;
         private const string ColWidthsKey = "Preset Widths";
         private const string ColOrderKey = "Preset Order";
         private const string ColHiddenKey = "Preset Hidden";
-        // 操作列按钮种类：0=加载 1=修改器 2=重命名 3=导出 4=删除。
+        // 操作列按钮种类：0=加载 1=数据 2=导出 3=删除（重命名改为右键名称列）。
         private const int ActLoad = 0;
         private const int ActMods = 1;
-        private const int ActRename = 2;
-        private const int ActExport = 3;
-        private const int ActDelete = 4;
+        private const int ActExport = 2;
+        private const int ActDelete = 3;
         // 从剪贴板导入的上限：方块数 / XML 字符数。超出直接拒绝，避免一次性重建拖垮帧率或整段解析爆内存。
         private const int MaxImportBlocks = 3000;
         private const int MaxImportChars = 2000000;
@@ -124,7 +123,6 @@ namespace SR_UCH.Tweaks {
         private static readonly SRApi.TableAction[] _actActions = new SRApi.TableAction[] {
             new SRApi.TableAction { OnClick = DoActLoad },
             new SRApi.TableAction { OnClick = DoActMods },
-            new SRApi.TableAction { OnClick = DoActRename },
             new SRApi.TableAction { OnClick = DoActExport },
             new SRApi.TableAction { OnClick = DoActDelete }
         };
@@ -136,6 +134,7 @@ namespace SR_UCH.Tweaks {
         private static SRApi.TableArgs _args;
         private static Vector2 _scrollRows;
         private static Vector2 _scrollCols;
+        private static bool _wheelLoggedFrame;   // 诊断：每帧只记一次滚轮事件
         private static Rect _tableBox;     // 表格在屏幕上的矩形（页面级滚轮钩子按它判断是否滚表格）
         private static float _maxScrollX;
         private static float _maxScrollY;
@@ -243,6 +242,16 @@ namespace SR_UCH.Tweaks {
                 "列表排序方式\n0=时间（新→旧），1=名称（A→Z）\n由列表页的排序下拉维护，不在配置区重复显示",
                 "preset list sort mode\n0 = time (newest first), 1 = name (A-Z)\nmaintained by the sort dropdown on the list page and not repeated in the settings area");
             // 换场景后下次打开面板重新扫盘（手动放入/删除的 XML、其它存档的改动都能看到）。
+            // 页面级滚轮钩子：在窗口建立滚动区【之前】拿到滚轮，鼠标在预设表格上就滚表格。
+            // （页面内部拿到的事件已被滚动区处理过，所以必须在这一层接。）
+            try {
+                SRApi.RegisterPageWheel(delegate(Vector2 __mp, float __w) {
+                    if (_tableBox.width <= 1f || _maxScrollY <= 0f) return false;
+                    if (!_tableBox.Contains(__mp)) return false;
+                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + __w * SRApi.Ctl.Sc(40f), 0f, _maxScrollY);
+                    return true;
+                });
+            } catch (Exception __pwr) { SRApi.Guard.Log("布局预设/注册滚轮钩子", __pwr); }
             // 规则书关闭后自动回收数据（每 0.25 秒一次的轻量轮询，未在编辑时立刻返回）。
             try { SRApi.RegisterTick("布局预设/规则书回收", TickRulebook); }
             catch (Exception __tk) { SRApi.Guard.Log("布局预设/注册规则书轮询", __tk); }
@@ -370,6 +379,7 @@ namespace SR_UCH.Tweaks {
                 // 本帧开始前的二次确认状态：只有"之前已确认、本帧又没点中操作按钮"才在空白处取消，
                 // 避免把本帧其它按钮（保存/导入）刚点出来的二次确认立刻清掉。
                 string pendingBefore = _pendingKey;
+                if (Event.current != null && Event.current.type == EventType.Layout) _wheelLoggedFrame = false;
                 // 页面滚动保持可用（滚动条已统一隐藏）：表格内部滚轮失效时也能靠页面滚动看到全部内容。
                 Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
                 if (Event.current != null && Event.current.type == EventType.Layout) { _pageTopY = topProbe.y; }
@@ -714,8 +724,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 if (_args == null) _args = new SRApi.TableArgs();
                 float pinW = SRApi.Ctl.Sc(_colW[ColAction]);
                 // 有纵向溢出时，在数据区与钉住列之间预留滚动条宽度（与联机列表一致）。
-                bool __overflowY = visible.Count * rowH > rowsH + 0.5f;
-                float __sbW = __overflowY ? SRApi.Ctl.TableScrollbarW() : 0f;
+                // 滚动条已全局隐藏（SR.Table.HideTableScrollbars），这里也不再为它留宽度：
+                // 数据区直接吃满到钉住列，右侧不再空一条。
+                float __sbW = 0f;
                 float stripW = Mathf.Max(SRApi.Ctl.Sc(80), box.width - pinW - __sbW);
                 float totalW = 0f;
                 for (int i = 0; i < _order.Length; i++) {
@@ -770,7 +781,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 _args.hidden = _hiddenCols;
                 _args.hideable = true;
                 _args.resetAll = delegate { ResetTable(); };
-                _args.defaultColW = null;
+                _args.defaultColW = DefColW;   // 交给核心：Shift+右键时列宽一并还原到默认值
                 _args.click = delegate(int ci) {
                     if (ci != ColLevel) return;
                     _levelShowCode = !_levelShowCode;
@@ -792,7 +803,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 _hiddenBeforeTable = _hiddenCols.Count;
                 _tableBox = box;      // 供页面级滚轮钩子命中判定
                 SRApi.TableDraw(_args);
-                UpdateDataCellTip();   // 鼠标悬浮「数据」列单元格 -> 列出该预设的自定义数据
+                HandlePresetCells();   // 数据列：悬浮预览 / 左键切三态 / 右键开界面；名称列：右键重命名
                 // 底边拖拽条（核心统一绘制 + 拖动 + 持久化）。
                 SRApi.Ctl.TableHeightGripBar(_tableHEntry, (box.height + SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
                 // 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
@@ -807,6 +818,13 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     // 拖拽兜底复位（拖列宽 / 换列位由核心处理，这里只接住状态与落盘回调）。
                     SRApi.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _args.moveCol, ref _args.moveDx,
                         ref _args.dragCol, ref _dragH, SaveCols, null, null);
+                    if (e.type == EventType.ScrollWheel && !_wheelLoggedFrame) {
+                        _wheelLoggedFrame = true;
+                        try {
+                            SRApi.LogInfo("[布局预设][滚轮] 到达页面层 type=" + e.type + " delta=" + e.delta.x + "," + e.delta.y
+                                + " inBox=" + box.Contains(mp) + " maxY=" + _maxScrollY + " sb=" + _sbHandled);
+                        } catch (Exception) { }
+                    }
                     if (!_sbHandled)
                         SRApi.TableWheelInput(e, box, mp, _maxScrollX, _maxScrollY, ref _scrollCols, ref _scrollRows);
                     // 临时诊断日志：点表头时记录核心是否认到拖动/列宽拖动（构建后看 BepInEx 日志即可定位拖拽问题）。
@@ -840,9 +858,11 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             } catch { return fallback; }
         }
 
-        // Shift+右键表头：核心清空隐藏列后回调这里，落盘并提示。
+        // Shift+右键表头：核心还原列宽并清空隐藏列后回调这里，再补一次"列序 + 列宽 + 隐藏"的整表还原并落盘。
         private static void ResetTable() {
             try {
+                if (_tableCols != null) _tableCols.ResetAll();   // 列序 / 隐藏 / 列宽一起回默认（核心统一实现）
+                for (int i = 0; i < ColCount; i++) _colW[i] = DefColW[i];
                 _hiddenCols.Clear();
                 SaveCols();
                 SRApi.LogInfo("[布局预设] " + SRApi.T("已恢复显示全部列", "All columns are shown again"));
@@ -873,7 +893,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     case ColMods: return SRApi.T("这条预设带的自定义数据\n默认 = 全部用预设自带；自定义 = 修改器/规则/积分/模块概率按你的设定\n鼠标停在该列格子上可预览具体内容",
                         "custom data carried by this preset\nDefault = use whatever the preset has; Custom = your own modifiers/rules/points/block odds\nhover a cell in this column to preview the details");
                     case ColTime: return SRApi.T("保存时间（本地时间）", "save time (local time)");
-                    case ColAction: return SRApi.T("加载 / 修改器 / 重命名 / 导出到剪贴板 / 删除；删除需点两次确认", "load / modifiers / rename / export to clipboard / delete; delete needs a second click");
+                    case ColAction: return SRApi.T("加载 / 数据 / 导出到剪贴板 / 删除；删除需点两次确认\n重命名：右键「名称」列；自定义数据：右键「数据」列", "load / data / export to clipboard / delete; delete needs a second click\nrename: right-click the Name column; custom data: right-click the Data column");
                     default: return null;
                 }
             } catch { return null; }
@@ -901,7 +921,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             catch { return null; }
         }
 
-        // 钉住操作列：每行 5 个按钮（加载 / 改器 / 重命名 / 导出 / 删除），删除在二次确认窗口内显示「确认」。
+        // 钉住操作列：每行 4 个按钮（加载 / 数据 / 导出 / 删除），删除在二次确认窗口内显示「确认」；重命名走右键名称列。
         // 按钮布局、命中、悬浮全部由核心统一控件处理；本页只填按钮描述，点击由 DoAct* 分发。
         private static void DrawActionButtons(List<PresetInfo> visible, int row, Rect r) {
             try {
@@ -920,7 +940,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 _actActions[ActLoad].Label = replacePending ? SRApi.T("确认", "Confirm") : SRApi.T("加载", "Load");
                 _actActions[ActMods].Label = SRApi.T("数据", "Data");
                 _actActions[ActMods].Tip = SRApi.T("把这条预设的规则 / 积分 / 模块概率 / 修改器灌进游戏并打开游戏自己的界面\n改完关掉会自动读回来保存", "loads this preset's rules / points / block odds / modifiers into the game and opens the game's own UI\nthe data is read back and saved when you close it");
-                _actActions[ActRename].Label = SRApi.T("重命名", "Rename");
                 _actActions[ActExport].Label = SRApi.T("导出", "Export");
                 _actActions[ActDelete].Label = delPending ? SRApi.T("确认", "Confirm") : SRApi.T("删除", "Delete");
                 int hit = SRApi.TableActionButtons(r, _actActions, null, ref hover);
@@ -983,7 +1002,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             }
         }
 
-        // 操作列默认宽 = 5 个按钮的自适应文字宽 + 按钮间距 + 钉住列左右边距（设计单位）。
+        // 操作列默认宽 = 4 个按钮的自适应文字宽 + 按钮间距 + 钉住列左右边距（设计单位）。
         // 每行按钮由核心按 BtnClip.CalcSize(label).x + 11px 计算，这里用同一公式取最宽标签（含二次确认的「确认」），
         // 保证中文 / 英文、普通态 / 确认态都不会被截断；DefColW[ColAction] 仅作样式不可用时的兜底。
         private static float DefaultActionColW() {
@@ -994,8 +1013,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 if (scale <= 0f) scale = 1f;
                 string[][] labels = new string[][] {
                     new string[] { SRApi.T("加载", "Load"), SRApi.T("确认", "Confirm") },
-                    new string[] { SRApi.T("改器", "Mods") },
-                    new string[] { SRApi.T("重命名", "Rename") },
+                    new string[] { SRApi.T("数据", "Data") },
                     new string[] { SRApi.T("导出", "Export") },
                     new string[] { SRApi.T("删除", "Delete"), SRApi.T("确认", "Confirm") }
                 };

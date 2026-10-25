@@ -166,8 +166,8 @@ namespace SR_UCH.Tweaks {
             float rowH = SRApi.Ctl.TableRowH(), headerH = SRApi.Ctl.TableHeaderH();
             float rowsH = Mathf.Max(SRApi.Ctl.Sc(20), box.height - headerH);
             float contentH = _shownLobbies.Count * rowH;
-            bool overflow = contentH > rowsH + 0.5f;                    //只有真的超出才画滚动条
-            float sbW = overflow ? SRApi.Ctl.TableScrollbarW() : 0f;
+            // 滚动条已全局隐藏，不再为它预留宽度（数据区吃满到钉住列）。
+            float sbW = 0f;
             float viewW = Mathf.Max(SRApi.Ctl.Sc(60), box.width - sbW);
             // 操作列钉在表格右边缘，不参与横向滚动，加入按钮始终可见可点。
             float joinW = SRApi.Ctl.Sc(_cw[JoinCol]);

@@ -260,24 +260,44 @@ public partial class Experiments : ITweak
             if (!SRApi.CanControlLocally) { SRApi.Notify(SRApi.T("仅房主可开始关卡", "Host only")); return; }
             LevelPortal[] portals = lsc.portals;
             if (portals == null || portals.Length == 0) { SRApi.Notify(SRApi.T("未找到可用关卡门", "No level portal available")); return; }
-            // 房主选哪个就开哪个：找房主自己的角色，再找它投过票的门。
+            // 1) 优先"房主自己投过票的那扇门"：先按本地玩家拿角色，再退化到任意 hasAuthority 角色。
             Character hostChar = null;
             try {
-                Character[] chars = SRApi.FrameObjects<Character>();
-                for (int i = 0; i < chars.Length; i++) {
-                    Character c = chars[i];
-                    if (c != null && c.hasAuthority) { hostChar = c; break; }
+                LobbyManager lm = LobbyManager.instance;
+                if (lm != null) {
+                    foreach (LobbyPlayer lp in lm.GetLobbyPlayers()) {
+                        if (lp == null || !lp.isLocalPlayer) continue;
+                        Character lc = lp.CharacterInstance;
+                        if (lc != null) { hostChar = lc; break; }
+                    }
                 }
-            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+            } catch (Exception __hw) { SRApi.Guard.Log("立即开始/找本地角色", __hw); }
             if (hostChar == null) {
-                SRApi.Notify(SRApi.T("未选择关卡", "No level selected"));
-                return;
+                try {
+                    Character[] chars = SRApi.FrameObjects<Character>();
+                    for (int i = 0; i < chars.Length; i++) {
+                        Character c = chars[i];
+                        if (c != null && c.hasAuthority) { hostChar = c; break; }
+                    }
+                } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             }
             LevelPortal pick = null;
-            for (int i = 0; i < portals.Length; i++) {
-                LevelPortal p = portals[i];
-                if (p == null || p.Votes == null) continue;
-                if (p.Votes.ContainsKey(hostChar)) { pick = p; break; }
+            if (hostChar != null) {
+                for (int i = 0; i < portals.Length; i++) {
+                    LevelPortal p = portals[i];
+                    if (p == null || p.Votes == null) continue;
+                    if (p.Votes.ContainsKey(hostChar)) { pick = p; break; }
+                }
+            }
+            // 2) 兜底（与提示文案一致）：自动选票数最高的那扇门；全都没票才报"未选择关卡"。
+            if (pick == null) {
+                int best = 0;
+                for (int i = 0; i < portals.Length; i++) {
+                    LevelPortal p = portals[i];
+                    if (p == null || p.Votes == null) continue;
+                    if (p.Votes.Count > best) { best = p.Votes.Count; pick = p; }
+                }
+                if (pick != null) SRApi.LogInfo("[立即开始] 没找到本机角色的投票，改用票数最高的门（" + best + " 票）");
             }
             if (pick == null) {
                 SRApi.Notify(SRApi.T("未选择关卡", "No level selected"));
