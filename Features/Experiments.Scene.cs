@@ -260,18 +260,30 @@ public partial class Experiments : ITweak
             if (!SRApi.CanControlLocally) { SRApi.Notify(SRApi.T("仅房主可开始关卡", "Host only")); return; }
             LevelPortal[] portals = lsc.portals;
             if (portals == null || portals.Length == 0) { SRApi.Notify(SRApi.T("未找到可用关卡门", "No level portal available")); return; }
-            int best = -1, bestV = -1;
-            for (int i = 0; i < portals.Length; i++) {
-                if (portals[i] == null) continue;
-                int v = portals[i].Votes != null ? portals[i].Votes.Count : 0;
-                if (v > bestV) { bestV = v; best = i; }
-            }
-            // 零票视为未选定关卡，不启动。
-            if (best < 0 || bestV <= 0 || portals[best] == null) {
-                SRApi.Notify(SRApi.T("尚未选定关卡，请先投票", "No level selected yet - vote first"));
+            // 房主选哪个就开哪个：找房主自己的角色，再找它投过票的门。
+            Character hostChar = null;
+            try {
+                Character[] chars = UnityEngine.Object.FindObjectsOfType<Character>();
+                for (int i = 0; i < chars.Length; i++) {
+                    Character c = chars[i];
+                    if (c != null && c.hasAuthority) { hostChar = c; break; }
+                }
+            } catch { }
+            if (hostChar == null) {
+                SRApi.Notify(SRApi.T("未找到房主角色，无法判断所选关卡", "Host character not found"));
                 return;
             }
-            lsc.LaunchLevel(portals[best]);
+            LevelPortal pick = null;
+            for (int i = 0; i < portals.Length; i++) {
+                LevelPortal p = portals[i];
+                if (p == null || p.Votes == null) continue;
+                if (p.Votes.ContainsKey(hostChar)) { pick = p; break; }
+            }
+            if (pick == null) {
+                SRApi.Notify(SRApi.T("房主尚未投票，请先选一个关卡", "Host has not voted yet - pick a level first"));
+                return;
+            }
+            lsc.LaunchLevel(pick);
             SRApi.Notify(SRApi.T("关卡已开始", "Level started"));
         }
 
