@@ -669,7 +669,7 @@ public partial class SR {
         private static string[] _tipLines = new string[0];
         private static readonly GUIContent _tipContent = new GUIContent();
         private static readonly GUIContent _tipLineContent = new GUIContent();
-        private static float _tipW, _tipH;
+        private static float _tipW, _tipH, _tipInnerW;
         private static bool _tipWrap;
         private static GUIContent TipLineContent(string s) { _tipLineContent.text = s; return _tipLineContent; }
         // 关闭界面时清空提示缓存，避免 tooltip 文本跨帧残留（表头提示延迟消失）。
@@ -691,29 +691,32 @@ public partial class SR {
             if (tip != _tipShownKey) { _tipShownKey = tip; _tipShownAt = Time.unscaledTime; }
             // 不做延迟：悬停即显示（淡入仍保留一帧内的轻微过渡）。
             float __alpha = 1f;
+            // 测量与绘制统一用 _labelWrap（同一个字体/内边距），否则宽高会与绘制不一致导致裁字。
             if (tip != _tipKey) {
                 _tipKey = tip;
                 _tipContent.text = tip;
                 _tipLines = tip.Split('\n');
-                float limit = Mathf.Min(560f, Screen.width * 0.8f);
+                float limit = Mathf.Min(Sc(600f), Screen.width * 0.62f);
                 float maxLine = 0f;
                 for (int i = 0; i < _tipLines.Length; i++) {
-                    float lw = _tooltip.CalcSize(TipLineContent(_tipLines[i])).x;
+                    float lw = _labelWrap.CalcSize(new GUIContent(_tipLines[i])).x;
                     if (lw > maxLine) maxLine = lw;
                 }
-                _tipWrap = maxLine + 20f > limit;
-                _tooltip.wordWrap = _tipWrap;
-                if (_tipWrap) { _tipW = limit; _tipH = _tooltip.CalcHeight(_tipContent, _tipW); }
-                else { _tipW = maxLine + 18f; _tipH = _tooltip.CalcSize(_tipContent).y; }
+                float innerW = Mathf.Min(limit, maxLine + Sc(6f));
+                float h = 0f;
+                for (int i = 0; i < _tipLines.Length; i++)
+                    h += _labelWrap.CalcHeight(new GUIContent(_tipLines[i]), innerW);
+                _tipInnerW = innerW;
+                _tipW = innerW + Sc(14f);                 // 左右内边距
+                _tipH = h + Sc(10f);                      // 上下内边距
             }
-            _tooltip.wordWrap = _tipWrap;   //样式是全局共享的，每帧都要设回本条 tooltip 的模式
-            float x = Mathf.Clamp(mp.x + 16, 2f, Mathf.Max(2f, Screen.width - _tipW - 6));
-            float y = Mathf.Clamp(mp.y + 16, 2f, Mathf.Max(2f, Screen.height - _tipH - 10));
+            float x = Mathf.Clamp(mp.x + 16f, 2f, Mathf.Max(2f, Screen.width - _tipW - 6f));
+            float y = Mathf.Clamp(mp.y + 16f, 2f, Mathf.Max(2f, Screen.height - _tipH - 10f));
             Color __oldTipColor = GUI.color;
             GUI.color = new Color(1f, 1f, 1f, __alpha);
-            Rect __tipRect = new Rect(x, y, _tipW, _tipH + 8);
+            Rect __tipRect = new Rect(x, y, _tipW, _tipH);
             DrawRounded(__tipRect, new Color(0.08f, 0.08f, 0.09f, 0.96f), Sc(6f));
-            GUI.Label(new Rect(__tipRect.x + Sc(6f), __tipRect.y + Sc(4f), __tipRect.width - Sc(12f), __tipRect.height - Sc(8f)), _tipContent, _labelWrap);
+            GUI.Label(new Rect(__tipRect.x + Sc(7f), __tipRect.y + Sc(5f), _tipInnerW, _tipH - Sc(10f)), _tipContent, _labelWrap);
             GUI.color = __oldTipColor;
         }
 // 分区：RowHooks（功能对通用条目行的扩展点）

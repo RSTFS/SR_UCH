@@ -93,7 +93,7 @@ public partial class Experiments : ITweak
 		private static readonly Dictionary<Placeable, bool> _igWas = new Dictionary<Placeable, bool>();
 		private static readonly HashSet<Placeable> _aliveBuf = new HashSet<Placeable>();
 		private static int _igScans;                       // 本场景全场扫描次数（达到上限后只靠事件打标）
-		private const int IgScanMaxTries = 20;              // 20 × 30 帧 ≈ 10 秒覆盖加载后生成的物件
+		private const int IgScanMaxTries = 3;               // 开启/换场景后只补扫 3 次（≈1.5 秒）；新方块由放置事件处理
 		private static readonly List<Placeable> _deadBuf = new List<Placeable>();
 		private static System.Reflection.FieldInfo _fiBoundary;
 		private static System.Reflection.FieldInfo _fiFrame;
@@ -517,7 +517,7 @@ public partial class Experiments : ITweak
 		}
 
 		// 缓存
-		private const int CursorRefreshEvery = 60;
+		private const int CursorRefreshEvery = 120;   // 2 秒：只用于捕捉中途加入的玩家
 		private static PiecePlacementCursor[] Cursors() {
 			int f = Time.frameCount;
 			if (f - _cursorsAt < CursorRefreshEvery) return _cursors;
@@ -530,7 +530,7 @@ public partial class Experiments : ITweak
 		}
 		private static global::Level[] Levels() {
 			int f = Time.frameCount;
-			if (f - _lvCacheAt < 30 && _lvCache != null) return _lvCache;
+			if (f - _lvCacheAt < 600 && _lvCache != null) return _lvCache;
 			_lvCacheAt = f;
 			try {
 				global::Level[] a = UnityEngine.Object.FindObjectsOfType<global::Level>();
@@ -545,7 +545,7 @@ public partial class Experiments : ITweak
 		}
 		private static ZoomCamera Zc() {
 			int f = Time.frameCount;
-			if (f - _zcAt < 60 && _zc != null) return _zc;
+			if (f - _zcAt < 600 && _zc != null) return _zc;   // 10 秒兜底；换场景会重置
 			_zcAt = f;
 			try {
 				ZoomCamera a = UnityEngine.Object.FindObjectOfType<ZoomCamera>();
@@ -555,7 +555,7 @@ public partial class Experiments : ITweak
 		}
 		private static FixCameraToBoundaries[] Fixers() {
 			int f = Time.frameCount;
-			if (f - _fixersAt < 60) return _fixers;
+			if (f - _fixersAt < 600) return _fixers;
 			_fixersAt = f;
 			try {
 				FixCameraToBoundaries[] a = UnityEngine.Object.FindObjectsOfType<FixCameraToBoundaries>();
@@ -679,6 +679,9 @@ public partial class Experiments : ITweak
 
 		// 换场景：Level / 相机 / 光标 / 方块均为新对象，旧原值字典整体作废。
 		private static void Reset() {
+			_igScans = 0;
+			_cursorsAt = -9999; _lvCacheAt = -9999; _zcAt = -9999; _fixersAt = -9999;
+
 			_igScans = 0;
 
 			_colOrig.Clear();
