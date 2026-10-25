@@ -25,3 +25,4 @@
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 /r:"bin\Release\SR_UCH.dll"
 Features\BuildingPresets.cs
+Features\BuildingPresets.Mods.cs

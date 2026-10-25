@@ -17,7 +17,7 @@ using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
     [SrFeature("sr.buildingpresets", "BuildingPresets", "1.0")]
-    public class BuildingPresets : ITweak {
+    public partial class BuildingPresets : ITweak {
         // 配置段名：导航栏目名 / LocSec / Config.Bind 三处必须完全一致。
         private const string Section = "Building Presets";
         private const string IndexFileName = "index.json";
@@ -27,26 +27,28 @@ namespace SR_UCH.Tweaks {
         // 排序方式：0=时间（新→旧），1=名称（A→Z）。旧配置里的 2/3 已弃用，读取时夹到 0。
         private const int SortModeMin = 0;
         private const int SortModeMax = 1;
-        // 表格列索引（与 TableArgs.colW 顺序一致）：名称 / 关卡 / 模式 / 时间 / 操作（操作列钉在右侧）。
+        // 表格列索引（与 TableArgs.colW 顺序一致）：名称 / 关卡 / 模式 / 修改器 / 时间 / 操作（操作列钉在右侧）。
         private const int ColName = 0;
         private const int ColLevel = 1;
         private const int ColMode = 2;
-        private const int ColTime = 3;
-        private const int ColAction = 4;
-        private const int ColCount = 5;
+        private const int ColMods = 3;
+        private const int ColTime = 4;
+        private const int ColAction = 5;
+        private const int ColCount = 6;
         // 列宽（设计单位）默认值与允许范围；顺序与 Col* 一致。
         // 操作列的实际默认宽由 DefaultActionColW() 按当前语言按钮文字实时计算（DefColW[ColAction] 仅作兜底）。
-        private static readonly float[] DefColW = new float[] { 150f, 84f, 64f, 96f, 200f };
+        private static readonly float[] DefColW = new float[] { 150f, 84f, 64f, 76f, 96f, 200f };
         private const float ColWidthMin = 40f;
         private const float ColWidthMax = 600f;
         private const string ColWidthsKey = "Preset Widths";
         private const string ColOrderKey = "Preset Order";
         private const string ColHiddenKey = "Preset Hidden";
-        // 操作列按钮种类：0=加载 1=重命名 2=导出 3=删除。
+        // 操作列按钮种类：0=加载 1=修改器 2=重命名 3=导出 4=删除。
         private const int ActLoad = 0;
-        private const int ActRename = 1;
-        private const int ActExport = 2;
-        private const int ActDelete = 3;
+        private const int ActMods = 1;
+        private const int ActRename = 2;
+        private const int ActExport = 3;
+        private const int ActDelete = 4;
         // 从剪贴板导入的上限：方块数 / XML 字符数。超出直接拒绝，避免一次性重建拖垮帧率或整段解析爆内存。
         private const int MaxImportBlocks = 3000;
         private const int MaxImportChars = 2000000;
@@ -121,6 +123,7 @@ namespace SR_UCH.Tweaks {
         private static PresetInfo _actPreset;
         private static readonly SRApi.TableAction[] _actActions = new SRApi.TableAction[] {
             new SRApi.TableAction { OnClick = DoActLoad },
+            new SRApi.TableAction { OnClick = DoActMods },
             new SRApi.TableAction { OnClick = DoActRename },
             new SRApi.TableAction { OnClick = DoActExport },
             new SRApi.TableAction { OnClick = DoActDelete }
@@ -159,6 +162,9 @@ namespace SR_UCH.Tweaks {
             public int Blocks = -1;  // -1 = 索引里没有，需要从 XML 现算
             public DateTime TimeUtc = DateTime.MinValue;
             public bool Ok;          // XML 可解析且方块数 > 0（存 index.json；缺字段按 false，扫描时自愈）
+            // 修改器策略："" = 继承预设自带（默认）；"off" = 全部还原默认；"custom" = 用 ModsVals 覆盖。
+            public string ModsMode = "";
+            public Dictionary<string, string> ModsVals;   // 仅 custom 时有值：<mods> 属性名 -> 值
             // 来源：false = 本功能 presets 目录里的预设；true = 游戏本地保存的自定义关卡（.snapshot，只读）。
             public bool IsLocal;
             public string LocalRelative = ""; // 本地条目在 snapshots 目录里的相对文件名（key 用 "local:"+相对路径）
@@ -475,6 +481,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     GUILayout.EndHorizontal();
                 }
                 if (!string.IsNullOrEmpty(_renameKey)) RenderRenameBar();
+                // 修改器编辑器打开时接管本页剩余区域（不再画表格），返回即结束本帧。
+                if (RenderModsEditorIfOpen()) return;
                 GUILayout.Space(W(2));
                 // 高度：核心统一公式（页面顶部已用高度 + 表格高度 = 底栏之上可用高度），窗口变化实时跟随。
                 Rect last = GUILayoutUtility.GetLastRect();
@@ -835,6 +843,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 case ColName: return SRApi.T("名称", "Name");
                 case ColLevel: return _levelShowCode ? SRApi.T("关卡代码", "Level code") : SRApi.T("关卡", "Level");
                 case ColMode: return SRApi.T("模式", "Mode");
+                case ColMods: return SRApi.T("修改器", "Mods");
                 case ColTime: return SRApi.T("时间", "Time");
                 case ColAction: return SRApi.T("操作", "Actions");
                 default: return "";
@@ -848,8 +857,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     case ColLevel: return SRApi.T("预设所属关卡；单击「关卡」表头可在关卡名称 / 关卡代码之间切换（代码缺失显示 -）",
                         "the level this preset belongs to; click the Level header to toggle between level name and level code (code shows - when unavailable)");
                     case ColMode: return SRApi.T("保存时所在的游戏模式", "game mode the preset was saved in");
+                    case ColMods: return SRApi.T("加载这条预设时怎么处理关卡修改器\n继承 = 用预设自带的（默认）\n关 = 全部还原默认；改 = 用你设定的值（点操作列的「改器」编辑）",
+                        "how the level modifiers are handled when this preset loads\nInherit = use the preset's own (default)\nOff = reset all to defaults; Set = use your custom values (edit with the Mods button)");
                     case ColTime: return SRApi.T("保存时间（本地时间）", "save time (local time)");
-                    case ColAction: return SRApi.T("加载 / 重命名 / 导出到剪贴板 / 删除；删除需点两次确认", "load / rename / export to clipboard / delete; delete needs a second click");
+                    case ColAction: return SRApi.T("加载 / 修改器 / 重命名 / 导出到剪贴板 / 删除；删除需点两次确认", "load / modifiers / rename / export to clipboard / delete; delete needs a second click");
                     default: return null;
                 }
             } catch { return null; }
@@ -866,6 +877,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 : (p.Name ?? "");
             _cells[ColLevel] = _levelShowCode ? LevelCodeText(p) : LevelText(p);
             _cells[ColMode] = ModeText(p.Mode);
+            _cells[ColMods] = ModsLabel(p);
             _cells[ColTime] = TimeText(p);
             _cells[ColAction] = "";
             return _cells;
@@ -876,7 +888,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             catch { return null; }
         }
 
-        // 钉住操作列：每行 4 个按钮（加载 / 重命名 / 导出 / 删除），删除在二次确认窗口内显示「确认」。
+        // 钉住操作列：每行 5 个按钮（加载 / 改器 / 重命名 / 导出 / 删除），删除在二次确认窗口内显示「确认」。
         // 按钮布局、命中、悬浮全部由核心统一控件处理；本页只填按钮描述，点击由 DoAct* 分发。
         private static void DrawActionButtons(List<PresetInfo> visible, int row, Rect r) {
             try {
@@ -893,6 +905,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 }
                 bool delPending = IsPending("del:" + p.Key);
                 _actActions[ActLoad].Label = replacePending ? SRApi.T("确认", "Confirm") : SRApi.T("加载", "Load");
+                _actActions[ActMods].Label = SRApi.T("改器", "Mods");
+                _actActions[ActMods].Tip = SRApi.T("这条预设的关卡修改器：继承 / 关闭 / 自定义", "level modifiers of this preset: inherit / off / custom");
                 _actActions[ActRename].Label = SRApi.T("重命名", "Rename");
                 _actActions[ActExport].Label = SRApi.T("导出", "Export");
                 _actActions[ActDelete].Label = delPending ? SRApi.T("确认", "Confirm") : SRApi.T("删除", "Delete");
@@ -907,6 +921,11 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
         private static void DoActLoad() {
             PresetInfo p = _actPreset;
             if (p != null) LoadPreset(p);
+        }
+
+        private static void DoActMods() {
+            PresetInfo p = _actPreset;
+            if (p != null && !p.IsLocal) OpenModsEditor(p);
         }
 
         private static void DoActRename() {
@@ -951,7 +970,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             }
         }
 
-        // 操作列默认宽 = 4 个按钮的自适应文字宽 + 按钮间距 + 钉住列左右边距（设计单位）。
+        // 操作列默认宽 = 5 个按钮的自适应文字宽 + 按钮间距 + 钉住列左右边距（设计单位）。
         // 每行按钮由核心按 BtnClip.CalcSize(label).x + 11px 计算，这里用同一公式取最宽标签（含二次确认的「确认」），
         // 保证中文 / 英文、普通态 / 确认态都不会被截断；DefColW[ColAction] 仅作样式不可用时的兜底。
         private static float DefaultActionColW() {
@@ -962,6 +981,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 if (scale <= 0f) scale = 1f;
                 string[][] labels = new string[][] {
                     new string[] { SRApi.T("加载", "Load"), SRApi.T("确认", "Confirm") },
+                    new string[] { SRApi.T("改器", "Mods") },
                     new string[] { SRApi.T("重命名", "Rename") },
                     new string[] { SRApi.T("导出", "Export") },
                     new string[] { SRApi.T("删除", "Delete"), SRApi.T("确认", "Confirm") }
@@ -1005,7 +1025,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 
         // 列序归一化：只允许前 4 列换位，操作列强制固定在最后；非法/缺列时补回默认相对顺序。
         private static int[] NormalizeOrder(int[] src) {
-            int[] def = new int[] { 0, 1, 2, 3, 4 };
+            int[] def = new int[ColCount];
+            for (int i = 0; i < ColCount; i++) def[i] = i;
             try {
                 if (src == null || src.Length != ColCount) return def;
                 bool[] seen = new bool[ColCount];
@@ -2161,6 +2182,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                             pi.LevelCode = JsonStr(line, "levelCode");
                             if (pi.LevelCode == null) pi.LevelCode = "";
                             pi.Ok = JsonBool(line, "ok");
+                            pi.ModsMode = JsonStr(line, "modsMode") ?? "";
+                            ParseModsVals(pi, JsonStr(line, "modsVals"));
                             // 字段缺失判定：老索引（v1-v3）没有 level / levelName / levelCode / ok -> 默认 false/0，扫描时自愈。
                             bool complete = line.IndexOf("\"level\":", StringComparison.Ordinal) >= 0
                                 && line.IndexOf("\"levelName\":", StringComparison.Ordinal) >= 0
@@ -2354,7 +2377,14 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
         }
 
         // 统一读取入口：预设读 .xml 文本；本地关卡解压 .snapshot（仍走同一套大小/方块上限）。
+        // 加载前按该预设的修改器策略改写 <mods>（继承时原样返回）。
         private static string ReadPresetXml(PresetInfo p) {
+            string xml = ReadPresetXmlRaw(p);
+            return string.IsNullOrEmpty(xml) ? xml : ApplyModsPolicy(xml, p);
+        }
+
+        // 原样读取（不带修改器策略）：编辑器打开时用它读取预设自带的修改器值做草稿。
+        private static string ReadPresetXmlRaw(PresetInfo p) {
             try {
                 if (p == null) return null;
                 if (!p.IsLocal) return ReadAllText(p.FilePath);
@@ -2397,7 +2427,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                         .Append("\",\"levelCode\":\"").Append(JsonEsc(p.LevelCode))
                         .Append("\",\"blocks\":").Append(Mathf.Max(0, p.Blocks))
                         .Append(",\"time\":\"").Append(JsonEsc(TimeIso(p.TimeUtc)))
-                        .Append("\",\"ok\":").Append(p.Ok ? "true" : "false").Append("}");
+                        .Append("\",\"ok\":").Append(p.Ok ? "true" : "false")
+                        .Append(",\"modsMode\":\"").Append(JsonEsc(p.ModsMode ?? ""))
+                        .Append("\",\"modsVals\":\"").Append(JsonEsc(ModsValsToText(p))).Append("\"}");
                 }
                 if (!first) sb.Append('\n');
                 sb.Append("  ]\n}\n");
