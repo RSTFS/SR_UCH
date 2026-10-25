@@ -208,6 +208,23 @@ function Check-CsEncoding {
     else { Ok '编码规范通过（.cs/.csproj = UTF-8 无 BOM+LF；.ps1 = UTF-8 BOM）' }
 }
 
+
+# P1-6 第一步：裸 catch 计数（只报告，不阻塞构建）。后续按文件分批补注释/接 Guard。
+function Check-BareCatch {
+    $files = Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.cs' -File |
+        Where-Object { ($_.FullName -replace '\\', '/') -notmatch '/bin/|/obj/|\.git/' }
+    $total = 0
+    $rows = @()
+    foreach ($f in $files) {
+        $txt = [System.IO.File]::ReadAllText($f.FullName)
+        $n = ([regex]::Matches($txt, 'catch\s*\{\s*\}')).Count
+        if ($n -gt 0) { $total += $n; $rows += [pscustomobject]@{ Name = $f.Name; N = $n } }
+    }
+    if ($total -eq 0) { Write-Host '  [ 统计 ] 裸 catch { }：0 处' ; return }
+    $top = ($rows | Sort-Object N -Descending | Select-Object -First 6 | ForEach-Object { $_.Name + '=' + $_.N }) -join ', '
+    Write-Host ('  [ 统计 ] 裸 catch { }：' + $total + ' 处（' + $rows.Count + ' 个文件；最多：' + $top + '）')
+}
+
 Write-Host '== SR_UCH 文本类守卫（不需要游戏 / 不需要 csc）=='
 Check-ApiSurface
 Check-ContractBoundary
@@ -216,6 +233,7 @@ Check-RspCoverage
 Check-Encoding
 Check-DescFormat
 Check-CsEncoding
+Check-BareCatch
 if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); exit 1 }
 Write-Host '== 文本类守卫全部通过 ✅ =='
 exit 0

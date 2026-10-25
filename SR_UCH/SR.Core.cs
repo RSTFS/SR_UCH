@@ -703,11 +703,9 @@ public partial class SR : ITweak {
                 bool ok = false;
                 for (int i = 0; i < OverrideAllowedAssemblies.Length; i++)
                     if (string.Equals(who, OverrideAllowedAssemblies[i], StringComparison.OrdinalIgnoreCase)) { ok = true; break; }
+                // 只记录来源供设置页展示，不写日志（静默）。
                 string line = kind + " <- " + (string.IsNullOrEmpty(who) ? "unknown" : who) + (ok ? "" : " (已拒绝：不在白名单)");
-                if (!OverrideSources.Contains(line)) {
-                    OverrideSources.Add(line);
-                    Guard.Log("门控豁免" + (ok ? "登记: " : "被拒绝: ") + line, null);
-                }
+                if (!OverrideSources.Contains(line)) OverrideSources.Add(line);
                 return ok;
             } catch { return false; }
         }
