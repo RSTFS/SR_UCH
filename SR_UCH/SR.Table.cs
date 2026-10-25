@@ -457,6 +457,9 @@ public partial class SR {
 
     //竖向滚动条的拖拽 / 点轨道跳转 -> 返回 true 表示本事件已处理（状态以 ref 传入）
     // 竖向滚动条统一绘制（ImGui ScrollbarBg / Grab / GrabHovered / GrabActive 配色）。
+    // 列表滚动条统一不显示（用户要求）：几何与命中照旧计算，只是不画 —— 滚轮与拖动仍然可用。
+    public static bool HideTableScrollbars = true;
+
     public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb, bool visible = true, float alpha = 1f) {
         thumb = default(Rect);
         try {
@@ -465,8 +468,8 @@ public partial class SR {
             float maxScroll = Mathf.Max(0f, contentH - viewH);
             float k2 = maxScroll > 0.01f ? Mathf.Clamp01(scrollY / maxScroll) : 0f;
             thumb = new Rect(track.x, track.y + (track.height - th) * k2, track.width, th);
-            // visible=false / alpha<=0：只算几何不绘制（默认隐藏时完全不产生绘制调用）。
-            if (!visible || alpha <= 0.01f) return;
+            // visible=false / alpha<=0 / 全局隐藏：只算几何不绘制（默认隐藏时完全不产生绘制调用）。
+            if (!visible || alpha <= 0.01f || HideTableScrollbars) return;
             float a = Mathf.Clamp01(alpha);
             DrawFill(track, new Color(0.06f, 0.06f, 0.07f, 0.94f * a));
             bool hover = Event.current != null && thumb.Contains(Event.current.mousePosition);

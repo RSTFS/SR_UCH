@@ -137,7 +137,6 @@ namespace SR_UCH.Tweaks {
         private static Vector2 _scrollRows;
         private static Vector2 _scrollCols;
         private static Rect _tableBox;     // 表格在屏幕上的矩形（页面级滚轮钩子按它判断是否滚表格）
-        private static bool _tableShown;   // 本帧是否画了表格
         private static float _maxScrollX;
         private static float _maxScrollY;
         private static bool _sbDragging;
@@ -244,15 +243,6 @@ namespace SR_UCH.Tweaks {
                 "列表排序方式\n0=时间（新→旧），1=名称（A→Z）\n由列表页的排序下拉维护，不在配置区重复显示",
                 "preset list sort mode\n0 = time (newest first), 1 = name (A-Z)\nmaintained by the sort dropdown on the list page and not repeated in the settings area");
             // 换场景后下次打开面板重新扫盘（手动放入/删除的 XML、其它存档的改动都能看到）。
-            // 页面级滚轮：鼠标在预设表格上就滚表格（本页关掉了页面滚动，嵌套滚动区收不到滚轮）。
-            try {
-                SRApi.RegisterPageWheel(delegate(Vector2 __mp, float __w) {
-                    if (!_tableShown || _maxScrollY <= 0f) return false;
-                    if (!_tableBox.Contains(__mp)) return false;
-                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + __w * SRApi.Ctl.Sc(40f), 0f, _maxScrollY);
-                    return true;
-                });
-            } catch (Exception __pwr) { SRApi.Guard.Log("布局预设/注册滚轮钩子", __pwr); }
             // 规则书关闭后自动回收数据（每 0.25 秒一次的轻量轮询，未在编辑时立刻返回）。
             try { SRApi.RegisterTick("布局预设/规则书回收", TickRulebook); }
             catch (Exception __tk) { SRApi.Guard.Log("布局预设/注册规则书轮询", __tk); }
@@ -380,12 +370,7 @@ namespace SR_UCH.Tweaks {
                 // 本帧开始前的二次确认状态：只有"之前已确认、本帧又没点中操作按钮"才在空白处取消，
                 // 避免把本帧其它按钮（保存/导入）刚点出来的二次确认立刻清掉。
                 string pendingBefore = _pendingKey;
-                _tableShown = false;   // 每帧重置：只有真的画了表格，滚轮钩子才生效
-                // 页面级滚动关闭：内容按视口高度布局，滚轮只在预设表格内部滚动。
-                try {
-                    SRApi.NoPageScrollBars = true;
-                    SRApi.PageScroll = Vector2.zero;
-                } catch (Exception __ex) { SRApi.Guard.Log("布局预设/关闭页面滚动", __ex); }
+                // 页面滚动保持可用（滚动条已统一隐藏）：表格内部滚轮失效时也能靠页面滚动看到全部内容。
                 Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
                 if (Event.current != null && Event.current.type == EventType.Layout) { _pageTopY = topProbe.y; }
 
@@ -806,14 +791,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 };
                 _hiddenBeforeTable = _hiddenCols.Count;
                 _tableBox = box;      // 供页面级滚轮钩子命中判定
-                _tableShown = true;
                 SRApi.TableDraw(_args);
                 UpdateDataCellTip();   // 鼠标悬浮「数据」列单元格 -> 列出该预设的自定义数据
-                // 表格滚轮：本页自己接管（页面级滚动被 NoPageScrollBars 关掉了，嵌套滚动区收不到滚轮）。
-                try {
-                    if (SRApi.TableWheelInput(Event.current, box, mp, _maxScrollX, _maxScrollY, ref _scrollCols, ref _scrollRows))
-                        SRApi.MarkWheelUsed();
-                } catch (Exception __wh) { SRApi.Guard.Log("布局预设/表格滚轮", __wh); }
                 // 底边拖拽条（核心统一绘制 + 拖动 + 持久化）。
                 SRApi.Ctl.TableHeightGripBar(_tableHEntry, (box.height + SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
                 // 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
@@ -2240,10 +2219,14 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 for (int i = 0; i < dirs.Length; i++) {
                     string dir = dirs[i];
                     string mode = Path.GetFileName(dir);
+                    // rulesets 是规则/积分/模块概率的侧车目录，不是预设；exporse 同理。
+                    if (string.Equals(mode, "rulesets", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.Equals(mode, "exports", StringComparison.OrdinalIgnoreCase)) continue;
                     string[] files = Directory.GetFiles(dir, "*.xml");
                     for (int j = 0; j < files.Length; j++) {
                         string fp = files[j];
                         string file = Path.GetFileName(fp);
+                        if (file.EndsWith(".ruleset.xml", StringComparison.OrdinalIgnoreCase)) continue;   // 旧版侧车
                         string key = mode + "/" + file;
                         PresetInfo pi;
                         bool complete = false;

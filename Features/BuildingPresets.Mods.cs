@@ -212,8 +212,30 @@ namespace SR_UCH.Tweaks {
         private static string ModsLabel(PresetInfo p) {
             try {
                 if (p == null || p.IsLocal) return "-";
-                return IsCustomData(p) ? SRApi.T("自定义", "Custom") : SRApi.T("默认", "Default");
+                string m = p.ModsMode ?? ModsInherit;
+                if (string.Equals(m, ModsCustom, StringComparison.Ordinal)) return SRApi.T("自定义", "Custom");
+                if (string.Equals(m, ModsOff, StringComparison.Ordinal)) return SRApi.T("关闭", "Off");
+                return SRApi.T("预设", "Preset");
             } catch { return "-"; }
+        }
+
+        // 三态切换：预设 -> 自定义 -> 关闭 -> 预设（左键点「数据」列的格子）。
+        private static void CycleDataMode(PresetInfo p) {
+            try {
+                if (p == null || p.IsLocal) return;
+                string m = p.ModsMode ?? ModsInherit;
+                string next;
+                if (string.Equals(m, ModsCustom, StringComparison.Ordinal)) next = ModsOff;
+                else if (string.Equals(m, ModsOff, StringComparison.Ordinal)) next = ModsInherit;
+                else next = ModsCustom;
+                p.ModsMode = next;
+                if (string.Equals(next, ModsInherit, StringComparison.Ordinal)) {
+                    p.ApplyRules = p.ApplyPoints = p.ApplyBlocks = false;
+                }
+                SaveIndex();
+                SRApi.Notify(SRApi.T("数据：", "Data: ") + ModsLabel(p) + " · " + (p.Name ?? ""));
+                SRApi.LogInfo("[布局预设] 数据模式切换: " + (p.Name ?? "") + " -> " + ModsLabel(p));
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/切换数据模式", __ex); }
         }
 
         // 这条预设是否**真的**带自定义数据：光有开关不算，必须有实打实存下来的内容。
@@ -520,12 +542,21 @@ namespace SR_UCH.Tweaks {
         // 保存预设时把当前规则集写成 sidecar（<预设>.xml.ruleset.xml），加载时按三个开关选择性应用。
         // 用游戏自己的入口：GameRulePreset.GetRulesetFromCurrentRules / GetRulesetXmlString（读），
         // LoadRulesetFromXML + GameSettings.ApplyTemporaryRuleset（写；mods 由修改器策略单独处理，这里传 false）。
+        // 侧车放在 <预设根>/rulesets/<模式>/<预设文件名> —— 单独子目录，绝不混进预设列表。
         private static string RulesetSidecarPath(PresetInfo p) {
             try {
                 if (p == null || p.IsLocal || string.IsNullOrEmpty(p.FilePath)) return null;
-                return p.FilePath + ".ruleset.xml";
+                string dir = Path.GetDirectoryName(p.FilePath) ?? "";
+                string mode = Path.GetFileName(dir);
+                string root = PresetsRoot();
+                if (string.IsNullOrEmpty(root)) return null;
+                string target = Path.Combine(Path.Combine(root, RulesetsDirName), mode);
+                Directory.CreateDirectory(target);
+                return Path.Combine(target, Path.GetFileName(p.FilePath));
             } catch { return null; }
         }
+
+        private const string RulesetsDirName = "rulesets";
 
         private static void SaveRulesetSidecar(string presetPath) {
             try {
@@ -538,7 +569,7 @@ namespace SR_UCH.Tweaks {
                     SRApi.LogWarn("[布局预设] 规则集过大，跳过写入 (len=" + xml.Length + ")");
                     return;
                 }
-                File.WriteAllText(presetPath + ".ruleset.xml", xml, new UTF8Encoding(false));
+                File.WriteAllText(RulesetSidecarPathForFile(presetPath), xml, new UTF8Encoding(false));
                 SRApi.LogInfo("[布局预设] 已写入规则集 sidecar (" + xml.Length + " 字符)");
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/写规则集", __ex); }
         }
@@ -574,6 +605,18 @@ namespace SR_UCH.Tweaks {
         private static bool _bookSeenOpen;
         private static float _bookPollAt;
 
+        // 由预设文件路径推出侧车路径（保存时用，此时 PresetInfo 可能还没建好）。
+        private static string RulesetSidecarPathForFile(string presetPath) {
+            try {
+                if (string.IsNullOrEmpty(presetPath)) return null;
+                string dir = Path.GetDirectoryName(presetPath) ?? "";
+                string mode = Path.GetFileName(dir);
+                string target = Path.Combine(Path.Combine(PresetsRoot(), RulesetsDirName), mode);
+                Directory.CreateDirectory(target);
+                return Path.Combine(target, Path.GetFileName(presetPath));
+            } catch { return null; }
+        }
+
         // 打开游戏自己的规则书（InventoryBook）：
         //   1) 若传了预设，先把它的规则/积分/模块/修改器灌进游戏，打开后看到的就是这条预设的数据；
         //   2) GameRuleBook 可能还没生成 —— 先 SpawnRuleBook（私有，反射），初始化回调里 Show(true) + 定位页面；
@@ -594,12 +637,20 @@ namespace SR_UCH.Tweaks {
                 LobbyPlayer local = FindLocalLobbyPlayer(lm);
                 if (tablet != null) {
                     try {
+                        PickCursor cur = local != null ? local.CursorInstance as PickCursor : null;
+                        if (cur == null) cur = UnityEngine.Object.FindObjectOfType(typeof(PickCursor)) as PickCursor;
                         tablet.OnShowTablet();
-                        tablet.OpenLegacyRuleScreen(local != null ? local.CursorInstance as PickCursor : null);
-                        _bookSeenOpen = true;
-                        SRApi.LogInfo("[布局预设] 已打开平板规则/修改器界面（Tablet.OpenLegacyRuleScreen）");
-                        return;
+                        tablet.OpenLegacyRuleScreen(cur);
+                        bool shown = tablet.CurrentlyShown;   // Tablet.CurrentlyShown 是 bool：界面是否已显示
+                        if (shown) {
+                            _bookSeenOpen = true;
+                            SRApi.LogInfo("[布局预设] 已打开平板规则/修改器界面（Tablet.OpenLegacyRuleScreen）");
+                            return;
+                        }
+                        SRApi.LogWarn("[布局预设] 平板没切到规则页（cursor=" + (cur != null ? "有" : "空") + "），继续尝试账本路线");
                     } catch (Exception __tb) { SRApi.Guard.Log("布局预设/平板规则界面", __tb); }
+                } else {
+                    SRApi.LogWarn("[布局预设] 场景里没有 Tablet，尝试账本路线");
                 }
                 // 路线 1（次选）：场景里已有规则书道具 GameRuleProp，直接走它的 Use。
                 GameRuleProp prop = FindRuleProp();
@@ -872,8 +923,14 @@ namespace SR_UCH.Tweaks {
                 }
                 if (!found || w <= 0f) return;
                 if (mp.x < x || mp.x > x + w) return;
-                string tip = DataPreviewTip(_currentVisibleRow(row));
+                PresetInfo p = _currentVisibleRow(row);
+                string tip = DataPreviewTip(p);
                 if (!string.IsNullOrEmpty(tip)) GUI.tooltip = tip;
+                // 左键抬起切换三态（按下与抬起都在同一格内，避免拖动误触）
+                if (e.type == EventType.MouseUp && e.button == 0) {
+                    CycleDataMode(p);
+                    e.Use();
+                }
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/数据列悬浮", __ex); }
         }
 
@@ -890,8 +947,13 @@ namespace SR_UCH.Tweaks {
         private static string DataPreviewTip(PresetInfo p) {
             try {
                 if (p == null) return null;
-                if (!IsCustomData(p)) return SRApi.T("默认：加载时用预设自带的修改器，不动规则/积分/模块概率\n点操作列「改器」可改成自定义",
-                    "Default: uses the preset's own modifiers and leaves rules/points/block odds alone\nuse the Mods button in the actions column to customise");
+                string mode = p.ModsMode ?? ModsInherit;
+                if (string.Equals(mode, ModsInherit, StringComparison.Ordinal))
+                    return SRApi.T("预设：加载时原样使用预设自带的数据，不做任何改写\n左键点这一格可在 预设 / 自定义 / 关闭 之间切换",
+                        "Preset: load-time data is left untouched\nleft-click this cell to cycle Preset / Custom / Off");
+                if (string.Equals(mode, ModsOff, StringComparison.Ordinal))
+                    return SRApi.T("关闭：加载时把修改器写成默认值，且不应用规则/积分/模块概率\n左键点这一格可切换",
+                        "Off: modifiers are reset to defaults and rules/points/block odds are not applied\nleft-click this cell to cycle");
                 StringBuilder sb = new StringBuilder();
                 sb.Append(SRApi.T("自定义数据", "Custom data"));
                 if (string.Equals(p.ModsMode, ModsCustom, StringComparison.Ordinal)) {
