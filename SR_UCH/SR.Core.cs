@@ -1261,52 +1261,15 @@ public partial class SR : ITweak {
         }
 
 // 分区：Guard（可观测性：统一带日志的 try / catch 包装）
-// 同一条 what 5 秒内只记一次，故每帧路径上的 catch 也能安全接入；反射探测型 catch 不接入。
+// 实现只有一份，在契约层 SRApi.Guard（去重窗口 / 计数 / LastWhat）；这里只做转发，
+// 避免两套去重表与两套计数同时存在导致日志与统计不一致。
         public static class Guard {
-            // 执行一个动作；异常时记 Warning（带 what 标识），不抛出。
-            public static void Try(string what, Action action) {
-                try { action(); }
-                catch (Exception ex) { Warn(what, ex); }
-            }
-
-            // 执行一个取值动作；异常时记 Warning 并返回 fallback。
-            public static T Try<T>(string what, Func<T> action, T fallback) {
-                try { return action(); }
-                catch (Exception ex) { Warn(what, ex); return fallback; }
-            }
-
-            // 供 catch (Exception __ex) { Guard.Log("...", __ex); } 形式使用（不改动原有 try 结构）。
-            public static void Log(string what, Exception ex) { Warn(what, ex); }
-
-            // 去重时间窗（秒）
-            private const float RepeatWindowSeconds = 5f;
-            private static readonly Dictionary<string, float> _lastWarn = new Dictionary<string, float>();
-
-            // 单独小方法读 Unity 时间：原生调用不可用时失败发生在本方法的 JIT 期，只有调用方的 try 抓得住
-            // （直接在 Warn 里调会让 Warn 自身成为抛点）。
-            private static float NowUnscaled() { try { return Time.unscaledTime; } catch { return 0f; } }
-
-            // 最近一次被 Guard 记录的失败：便于离线自检 / 问题上报（纯记录）。
-            public static string LastWhat, LastError;
-            public static int WarnCount;
-
-            private static void Warn(string what, Exception ex) {
-                try {
-                    float now = NowUnscaled();
-                    float last;
-                    // now <= 0（时间读不到）时不做去重，否则 last 恒为 0 会把后续日志全部吞掉
-                    if (now > 0f && what != null && _lastWarn.TryGetValue(what, out last) && now - last < RepeatWindowSeconds) return;
-                    if (now > 0f && what != null) _lastWarn[what] = now;
-                    LastWhat = what;
-                    LastError = ex != null ? (ex.GetType().Name + ": " + ex.Message) : "未知错误";
-                    WarnCount++;
-                    if (MainPlugin.ModLogger != null)
-                        SR.LogWarn("[Guard] " + what + " 失败: " + (ex != null ? ex.Message : "未知错误"));
-                } catch (Exception __ex) {
-                    // 这里不回掉 Warn：Guard.Log 的实现就是 Warn，递归调用会 StackOverflow。只记 LastError 供离线自检。
-                    try { LastWhat = what; LastError = "Warn 自身失败: " + __ex.GetType().Name; } catch { }
-                }
-            }
+            public static void Try(string what, Action action) { SRApi.Guard.Try(what, action); }
+            public static T Try<T>(string what, Func<T> action, T fallback) { return SRApi.Guard.Try(what, action, fallback); }
+            public static void Log(string what, Exception ex) { SRApi.Guard.Log(what, ex); }
+            public static string LastWhat { get { return SRApi.Guard.LastWhat; } }
+            public static string LastError { get { return SRApi.Guard.LastError; } }
+            public static int WarnCount { get { return SRApi.Guard.WarnCount; } }
         }
 
 	}
