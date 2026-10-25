@@ -86,15 +86,6 @@ public class QuickAdjust : ITweak {
             GUILayout.Label(nslide + "%", SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(56)), GUILayout.Height(SRApi.Ctl.Sc(26)));
         }
         GUILayout.Space(SRApi.Ctl.Sc(10));
-        // 「更多数值」开关放在滑块右边同一行。
-        ConfigEntryBase more = SRApi.Ctl.FindEntry("Quick Adjust", "More Handicap Values");
-        if (more != null) {
-            SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("更多数值", "More values"),
-                SRApi.T("自由输入模式开关\n开启后评分百分比由整十滑块改为输入框\n范围 10 到 100 任意整数。",
-                        "free input mode switch\nturns the tens slider into an input box\nany integer from 10 to 100")),
-                more, SRApi.Ctl.Sc(110), SRApi.Ctl.Sc(26));
-            SRApi.Ctl.RenderControl(more);
-        }
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(2));
@@ -105,6 +96,16 @@ public class QuickAdjust : ITweak {
         GUILayout.Space(SRApi.Ctl.Sc(8));
         if (SRApi.Ctl.HotkeyButton("qa.restore_discount", SRApi.T("还原折扣", "Restore"), SRApi.T("把评分百分比恢复为 100%（不折扣）.\n等价于滑块拖到 100 再应用.\n只影响自己那一行.", "Restore your score percentage to 100% (no discount).\nSame as setting the slider to 100 and applying.\nAffects only your own row."), QuickAdjust.RestoreScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
             QuickAdjust.RestoreScoreDiscount();
+        }
+        // 「更多数值」开关：紧接在「还原折扣」右边同一行（不再占滑块那一行）。
+        GUILayout.Space(SRApi.Ctl.Sc(10));
+        ConfigEntryBase more = SRApi.Ctl.FindEntry("Quick Adjust", "More Handicap Values");
+        if (more != null) {
+            SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("更多数值", "More values"),
+                SRApi.T("自由输入模式开关\n开启后评分百分比由整十滑块改为输入框\n范围 10 到 100 任意整数。",
+                        "free input mode switch\nturns the tens slider into an input box\nany integer from 10 to 100")),
+                more, SRApi.Ctl.Sc(110), SRApi.Ctl.Sc(26));
+            SRApi.Ctl.RenderControl(more);
         }
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();

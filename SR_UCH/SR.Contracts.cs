@@ -779,6 +779,14 @@ namespace SR_UCH {
             public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey) { Action<GUIContent, ConfigEntryBase, float, float, ConfigEntry<KeyCode>> f = _restoreLabel; if (f != null) f(content, entry, w, h, hotkey); }
             public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h) { RestoreLabel(content, entry, w, h, null); }
             public static void RenderControl(ConfigEntryBase entry) { Action<ConfigEntryBase> f = _renderControl; if (f != null) f(entry); }
+            // 统一复选框（绝对矩形，设置页同款外观 + 勾选贴图）：功能层与 EX 一律走这里，
+            // 不要再自己拿 CheckOn/CheckOff 拼 "✓" 按钮，否则勾选外观会与设置页不一致。
+            private static Func<Rect, bool, string, bool> _checkboxAt;
+            public static void SetCheckboxSink(Func<Rect, bool, string, bool> checkboxAt) { _checkboxAt = checkboxAt; }
+            public static bool Checkbox(Rect r, bool value, string tip) {
+                Func<Rect, bool, string, bool> f = _checkboxAt;
+                return f != null && f(r, value, tip);
+            }
             public static void RenderEntryRow(ConfigEntryBase entry, bool isInternal, float colWidth) { Action<ConfigEntryBase, bool, float> f = _renderEntryRow; if (f != null) f(entry, isInternal, colWidth); }
             public static ConfigEntryBase FindEntry(string section, string key) { Func<string, string, ConfigEntryBase> f = _findEntry; return f != null ? f(section, key) : null; }
             public static List<ConfigEntryBase> SectionEntries(string section) { Func<string, List<ConfigEntryBase>> f = _sectionEntries; return f != null ? f(section) : null; }

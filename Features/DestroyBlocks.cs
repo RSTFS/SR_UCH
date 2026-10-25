@@ -1,5 +1,5 @@
 // 方块破坏：列出现场方块、按玩家归属筛选、远程销毁。
-// 槽位：对外 DestroyBlocks.IsPlayerPlaced / PlayerPlacedBlocks / AttributeToHost，向内取 Blocks.AllowClientsOn。
+// 槽位（对外 Provide）：DestroyBlocks.IsPlayerPlaced / PlayerPlacedBlocks / AttributeToHost；不依赖任何外部模块，仅房主可删。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -234,7 +234,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
             SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除键\n删除当前选中的方块\n滚轮可在候选方块之间切换", "delete key\ndeletes the currently selected block\nthe mouse wheel cycles through candidate blocks");
             SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
-            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n决定本页功能是否生效\n仅房主能删除。", "master switch for block destruction\nenables or disables the feature on this page\nhost only; client-side deletion needs the EX module permission");
+            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n决定本页功能是否生效\n仅房主能删除。", "master switch for block destruction\nenables or disables the feature on this page\nhost only (no client-side deletion)");
             SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
             SRApi.LocDesc("Destroy Blocks", "Select Mode", "候选方块排序方式\n距离＝按离自己的距离由近到远；放置顺序＝最后放置的优先\n只影响选择顺序，不影响列表内容。", "candidate ordering\nDistance = nearest to you first; Placement = most recently placed first\naffects selection order only, not the list contents");
             SRApi.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
@@ -315,10 +315,18 @@ namespace SR_UCH.Tweaks {
             SceneManager.activeSceneChanged += OnSceneChanged;
 
             // 归属登记同样走槽位，避免与关卡功能产生编译期引用（拆分编译会 CS0103）。
+            // 三个槽位必须在这里 Provide：Level.Snapshot 经 Slots.Require 取 AttributeToHost，
+            // 少了这一行快照方块不会登记房主（列表里看不到、清场也带不走）。
+            Slots.Provide(SlotIsPlayerPlaced, (Func<Placeable, bool>)IsPlayerPlaced);
+            Slots.Provide(SlotPlayerPlacedBlocks, (Func<List<Placeable>>)PlayerPlacedBlocks);
+            Slots.Provide(SlotAttributeToHost, (Action<List<Placeable>>)AttributeToHost);
         }
 
         // 槽位名：与调用方的唯一约定是“名字 + 委托签名”，刻意用 private const，调用方另写自己的常量以免编译期依赖。
         // 名字一经发布不再更改（改需两边同步）。
+        private const string SlotIsPlayerPlaced = "DestroyBlocks.IsPlayerPlaced";
+        private const string SlotPlayerPlacedBlocks = "DestroyBlocks.PlayerPlacedBlocks";
+        private const string SlotAttributeToHost = "DestroyBlocks.AttributeToHost";
 
         private static void OnSceneChanged(Scene a, Scene b) {
             _placements.Clear();

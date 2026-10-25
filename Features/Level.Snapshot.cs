@@ -26,9 +26,7 @@ namespace SR_UCH.Tweaks {
         }
 
         // 生成房主当前快照并经 CompressAndSendSnapshotBytes 广播，全员按房主视角重建；不重载场景，分数保留；仅房主可调用。
-        // SR 自己发起的快照加载标记，与 AfterLoadSnapshot 的门闩配对。
-        // 客户端进程拿不到该静态字段，故房主发送时在 XML 根节点写 srSnapshot="1"，判据为门闩 || XML 标记。
-        private static bool _srSnapshotLoad;
+        // 快照来源判定：房主发送时在 XML 根节点写 srSnapshot="1"，客户端按该标记识别（不依赖进程内静态门闩）。
 
         // 给快照 XML 根节点加 srSnapshot="1"（幂等；解析失败原样返回）
         internal static string MarkSnapshotXml(string xml) {
@@ -46,46 +44,13 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 该快照是否由 SR 发起：房主看静态门闩，客户端看 XML 标记。
+        // 该快照是否由 SR 发起：只看 XML 标记（房主与房客同一判据）。
         private static bool IsSrSnapshot(System.Xml.XmlDocument doc) {
-            if (_srSnapshotLoad) return true;
             try {
                 if (doc != null && doc.DocumentElement != null
                     && doc.DocumentElement.GetAttribute("srSnapshot") == "1") return true;
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return false;
-        }
-
-        // 把快照 XML 广播给全员：房主压缩 -> RPC -> 各端 LoadSnapshotFromXmlDocument 重建（广播快照与按 XML 构建共用）。
-        private static void SendSnapshotXml(GameControl gc, string xml, string feature)
-        {
-            // 打 srSnapshot 标记：客户端据此只在 SR 的快照上补发阶段事件，不碰游戏自己的开局/重载路径。
-            xml = MarkSnapshotXml(xml);
-            if (xml.Length > 1500000) SRApi.Notify(SRApi.T("快照较大（" + (xml.Length / 1000) + " KB），应用时可能卡顿", "Large snapshot (" + (xml.Length / 1000) + " KB); may hitch"));
-            System.Diagnostics.Stopwatch _sw = new System.Diagnostics.Stopwatch(); _sw.Start();
-            byte[] xmlBytes = Encoding.UTF8.GetBytes(xml);
-            _sw.Stop();
-            SRApi.LogInfo("[快照] 序列化耗时 " + _sw.ElapsedMilliseconds + "ms");
-            SRApi.Notify(feature + SRApi.T("：广播快照（", ": broadcasting (") + xmlBytes.Length + SRApi.T(" 字节），全员按房主状态重建", " bytes), everyone rebuilds from the host's state"));
-            gc.CompressAndSendSnapshotBytes(xmlBytes, delegate {
-                SRApi.Notify(feature + SRApi.T("：方块已重建，分数保留", ": blocks rebuilt, scores kept"));
-            });
-            // CompressAndSendSnapshotBytes 走 ClientRpc，不在房主本地执行，故这里补一次本地应用。
-            try {
-                QuickSaver selfQs = gc.GetComponent<QuickSaver>();
-                if (selfQs != null) {
-                    System.Xml.XmlDocument selfDoc = new System.Xml.XmlDocument();
-                    selfDoc = ParseXmlSafe(xml);
-                    // 按原生流程先 QuickClear(true)：原生清场并恢复关卡自带件，缺这一步可移动/可变化道具要等下次建造阶段才会动。
-                    try { selfQs.QuickClear(true); } catch (Exception __qcx) { SRApi.Guard.Log("清场.QuickClear", __qcx); }
-                    // 门闩必须用 try/finally 复位，否则泄漏后游戏自己的开局也会被补发阶段事件。
-                    _srSnapshotLoad = true;
-                    try {
-                        if (!selfQs.LoadSnapshotFromXmlDocument(selfDoc))
-                            SRApi.Notify(SRApi.T("本地应用快照失败", "Failed to apply the snapshot locally"));
-                    } finally { _srSnapshotLoad = false; }
-                }
-            } catch (Exception __ex) { SRApi.Guard.Log("本地应用快照", __ex); }
         }
 
         // 广播快照的前置检查（总开关 -> 模式 -> 房主 -> 对局 -> 控制器 -> 快照组件 -> 重载锁）；返回 false 时已提示原因。
@@ -227,24 +192,6 @@ namespace SR_UCH.Tweaks {
                     }
                 } catch (Exception __ahx) { SRApi.Guard.Log("构建归属房主", __ahx); }
             } catch (Exception __ex) { SRApi.Guard.Log("快照后补发阶段事件", __ex); }
-        }
-
-        private static string StripDestroyedNodes(string xml) {
-            try {
-                if (string.IsNullOrEmpty(xml)) return xml;
-                System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
-                doc = ParseXmlSafe(xml);
-                System.Xml.XmlElement root = doc.DocumentElement;
-                if (root == null) return xml;
-                List<System.Xml.XmlNode> bad = new List<System.Xml.XmlNode>();
-                foreach (System.Xml.XmlNode n in root.ChildNodes) {
-                    if (n.NodeType == System.Xml.XmlNodeType.Element && n.Name == "destroyed") bad.Add(n);
-                }
-                int n2 = bad.Count;
-                for (int i = 0; i < n2; i++) root.RemoveChild(bad[i]);
-                if (n2 > 0) SRApi.LogInfo("[快照] 已剥掉快照内 <destroyed> 节点: " + n2 + " 个");
-                return doc.OuterXml;
-            } catch (Exception __ex) { SRApi.Guard.Log("剥离 destroyed", __ex); return xml; }
         }
 
         // 兜底清场：快照 <destroyed> 路径不可用时退回逐块 DestroySelf（仍走游戏原生网络销毁信号）。

@@ -173,10 +173,7 @@ public partial class SR {
         public static float FooterHeight;
         private static readonly Dictionary<string, float> _pageFooterH = new Dictionary<string, float>();
         private static float _pageUsedTop;   // 上一帧量到的页头/页签底部 Y（Layout 帧兜底用）   // 各栏目页面外框按钮高度（切换栏目不跳）
-        // 底栏注册按钮的悬停过渡与命中矩形（按 id 缓存）
-        private static readonly Dictionary<string, float> _footerBtnHover = new Dictionary<string, float>();
-        private static readonly Dictionary<string, Rect> _footerBtnRects = new Dictionary<string, Rect>();
-        private static int _footerClickFrame = -1;
+        private static int _footerClickFrame = -1;   // 底栏按钮同帧去重
 
         // 页面滚动位置：自绘页用它抵消控件变化导致的滚动区跳动
         public static Vector2 PageScroll { get { return _scroll; } set { _scroll = value; } }
@@ -409,8 +406,10 @@ public partial class SR {
             GUILayout.BeginArea(new Rect(winRect.x + Sc(4), winRect.y + Sc(4), winRect.width - Sc(8), winRect.height - Sc(8)));
             float barH = DrawTitleBar(winRect.width - Sc(8));
             GUILayout.Space(barH + Sc(2));
-            // 内容行固定高度 = 区域高 - 标题栏 - 底栏(28)：这样底栏是真正的布局底栏，右栏/左栏都在它上方结束。
-            float __bodyH = Mathf.Max(Sc(80f), (winRect.height - Sc(8)) - (barH + Sc(2)) - Sc(28f));
+            // 底栏是绝对定位的固定高条（区域坐标系）：内容行高度必须扣掉它，右栏/左栏都在它上方结束。
+            float __footH = Sc(28f);
+            float __areaInnerH = winRect.height - Sc(8);
+            float __bodyH = Mathf.Max(Sc(80f), __areaInnerH - (barH + Sc(2)) - __footH - Sc(2f));
             GUILayout.BeginHorizontal();
             float sbw = SidebarWidth();
             // 右栏内容区（屏幕坐标）：自绘页用它把控件铺满窗口
@@ -512,7 +511,7 @@ public partial class SR {
             Vector2 pageBefore = _scroll;
             // 真实页面视口 = 内容区高 - 已用页头高 - 底栏保留高：显式限制滚动区高度，
             // 否则滚动区会吃满剩余空间、底栏压住最后几行（预设/联机列表“最后一项显示不全”的根因）。
-            float __areaH = winRect.height - Sc(8);
+            float __areaH = __areaInnerH;
             // Layout 阶段 GetLastRect 可能还是 0（布局尚未计算完）：用上一帧量到的页头高度，
             // 否则 Layout 帧会把“视口”算成满高，滚动区把底栏顶出可视区（底栏只剩上边一点）。
             float __usedTop = _pageUsedTop;
@@ -611,20 +610,20 @@ public partial class SR {
                 if (_mode == Mode.Internal && !string.IsNullOrEmpty(_selectedInternalSection)) _pageFooterH[_selectedInternalSection] = __pfH;
             } catch (Exception __pm) { Guard.Log("页面外框高度测量", __pm); }
 
-            // ---------- 底栏（真正的布局底栏：在内容行之后，按 GUILayout 排布） ----------
+            // ---------- 底栏（绝对定位：内容行之后不参与 GUILayout，永不因内容溢出而漂移） ----------
             GUILayout.EndVertical();     // 右栏
             GUILayout.EndHorizontal();   // 左栏 + 右栏
-            GUILayout.Space(Sc(2f));
-            // 底栏：先占位并画圆角背景，再把按钮放进这个矩形（圆角 + 悬停过渡）。
-            Rect __footRect = GUILayoutUtility.GetRect(0f, Sc(28f), GUILayout.ExpandWidth(true));
+            // 底栏矩形按区域高反推：区域坐标系里的最后 __footH 像素。GUILayout 溢出（内容过高）时底栏位置不变，
+            // 之前用 GetRect 排版会把整条底栏顶到标题栏、并把右端模式标签挤出可视区。
+            float __areaW = winRect.width - Sc(8);
+            Rect __footRect = new Rect(Sc(2f), Mathf.Max(0f, __areaInnerH - __footH), Mathf.Max(Sc(60f), __areaW - Sc(4f)), __footH);
             SR.DrawRounded(__footRect, SRApi.Ctl.ThemeFooterBg, SRApi.Ctl.ThemeRadius);
-            GUILayout.BeginArea(new Rect(__footRect.x + Sc(4f), __footRect.y + Sc(3f), Mathf.Max(Sc(60f), __footRect.width - Sc(8f)), Sc(23f)));
-            GUILayout.BeginHorizontal();
-            // 设置
+            Rect __footIn = new Rect(__footRect.x + Sc(4f), __footRect.y + Sc(3f), Mathf.Max(Sc(40f), __footRect.width - Sc(8f)), Sc(22f));
+            float __bx = __footIn.x;
             // 设置按钮：先算矩形（用于悬停过渡），再在矩形内画按钮。
             string __setLbl = T("设置", "Settings");
             float __setW = _btn.CalcSize(new GUIContent(__setLbl)).x + Sc(18f);
-            Rect __setRect = GUILayoutUtility.GetRect(__setW, Sc(22f), GUILayout.Width(__setW), GUILayout.Height(Sc(22f)));
+            Rect __setRect = new Rect(__bx, __footIn.y, __setW, Sc(22f));
             bool __setHover = __setRect.Contains(Event.current != null ? Event.current.mousePosition : Vector2.zero);
             Color __setBg = GUI.backgroundColor;
             GUI.backgroundColor = Color.Lerp(__setBg, new Color(0.78f, 0.84f, 0.98f, 1f), __setHover ? SRApi.Ctl.ThemeHoverFade * 2.9f : 0f);
@@ -638,14 +637,21 @@ public partial class SR {
                 _capturing = null;
                 BlockWindowDrag = true;
             }
-            // 功能注册的底栏按钮（自适应宽度）
+            __bx += __setW + Sc(4f);
+            // 功能注册的底栏按钮：从设置按钮右侧依次排开，右端留出模式标签的宽度（放不下就不画，宁缺不叠）。
+            string __mlText = ModeLabel() ?? "";
+            float __mlW = Mathf.Min(__footIn.width * 0.55f, _label.CalcSize(new GUIContent(__mlText)).x + Sc(8f));
+            float __bxMax = __footIn.xMax - __mlW - Sc(6f);
             for (int fbi = 0; fbi < SRApi.FooterButtons.Count; fbi++) {
                 SRApi.FooterButton fb = SRApi.FooterButtons[fbi];
                 if (fb == null || string.IsNullOrEmpty(fb.Id)) continue;
                 string fbLabel = T(fb.LabelZh, fb.LabelEn);
                 if (string.IsNullOrEmpty(fbLabel)) continue;
+                GUIContent fbContent = new GUIContent(fbLabel, T("打开", "Open ") + fbLabel);
+                float fbW = _btn.CalcSize(new GUIContent(fbLabel)).x + Sc(16f);
+                if (__bx + fbW > __bxMax) break;
                 bool fbSel = _mode == Mode.Internal && _selectedInternalSection == fb.Id;
-                if (GUILayout.Button(new GUIContent(fbLabel, T("打开", "Open ") + fbLabel), fbSel ? _selItem : _btn, GUILayout.Height(Sc(22f)))) {
+                if (GUI.Button(new Rect(__bx, __footIn.y, fbW, Sc(22f)), fbContent, fbSel ? _selItem : _btn)) {
                     if (_footerClickFrame != Time.frameCount) {
                         _footerClickFrame = Time.frameCount;
                         BlockWindowDrag = true;
@@ -658,12 +664,11 @@ public partial class SR {
                         _capturing = null;
                     }
                 }
+                __bx += fbW + Sc(4f);
             }
-            GUILayout.FlexibleSpace();
-            GUILayout.Label(ModeLabel() ?? "", _label, GUILayout.Height(Sc(22f)));
-            GUILayout.EndHorizontal();
-            GUILayout.EndArea();
-            FooterHeight = Sc(28f);
+            // 右小角：模式 · 关卡（始终贴底栏右端，不受左侧按钮数量影响）
+            GUI.Label(new Rect(__footIn.xMax - __mlW, __footIn.y, __mlW, Sc(22f)), __mlText, _label);
+            FooterHeight = __footH;
             GUILayout.EndArea();
 
             DrawResizeGripAndCursor(winRect, mouse, gripRect);

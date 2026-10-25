@@ -97,17 +97,23 @@ namespace SR_UCH {
         // 契约层 API 门面的全部 sink：漏注入会让对应功能静默失效。
         private void InjectApiSinks() {
             // 契约层 API 门面的日志出口：接到本插件的日志系统。
-            try {
+            SinkStep("Log", delegate () {
                 SRApi.SetLogSinks(
                     delegate (string __m) { SR.LogInfo(__m); },
                     delegate (string __m) { SR.LogWarn(__m); },
                     delegate (string __m) { SR.LogError(__m); });
+            });
+            SinkStep("Notify", delegate () {
                 SRApi.SetNotifySink(delegate (string __t) { SR.Notify(__t); });
+            });
+            SinkStep("Ref", delegate () {
                 SRApi.Ref.SetSinks(
                     delegate (Type __o, string __n, string __f) { return SR.RefField(__o, __n, __f); },
                     delegate (Type __o, string __n, string __f) { return SR.RefMethod(__o, __n, __f); },
                     delegate (Type __o, string __n, Type[] __p, string __f) { return SR.RefMethod(__o, __n, __p, __f); },
                     delegate (string __m, string __f) { SR.RefOverride(__m, __f); });
+            });
+            SinkStep("Ext", delegate () {
                 SRApi.SetExtSinks(
                     delegate (string __s, int __r) { SR.Nav(__s, __r); },
                     delegate (string __s) { SR.NavHide(__s); },
@@ -116,6 +122,8 @@ namespace SR_UCH {
                     delegate (Action __a) { SR.RegisterDismissHook(__a); },
                     delegate (Func<float, bool> __w) { SR.RegisterWheelHook(__w); },
                     delegate (string __i, string __l, Action __a) { SR.HotkeyAction(__i, __l, __a); });
+            });
+            SinkStep("State", delegate () {
                 SRApi.SetStateSinks(
                     delegate { return SR.HasServer; },
                     delegate { return SR.GateMaster; },
@@ -133,6 +141,8 @@ namespace SR_UCH {
                     delegate (string __s) { return SR.SelectedPageId(__s); },
                     delegate (bool __v) { SR.BlockWindowDrag = __v; },
                     delegate (int __v) { SR.WheelFrame = __v; });
+            });
+            SinkStep("Lang", delegate () {
                 SRApi.SetLangSinks(
                     delegate (string __z, string __e) { return SR.T(__z, __e); },
                     delegate (string __s, string __z) { SR.LocSec(__s, __z); },
@@ -143,6 +153,8 @@ namespace SR_UCH {
                     delegate { return SR.CurrentLanguageId; },
                     delegate { return SR.LangVer; },
                     delegate (string __z, string __e, object[] __a) { SR.NotifyT(__z, __e, __a); });
+            });
+            SinkStep("Ctl", delegate () {
                 SRApi.Ctl.SetSinks(
                     delegate (float __v) { return SR.Ctl.Sc(__v); },
                     delegate (GUIContent __c, ConfigEntryBase __e, float __w, float __h, ConfigEntry<KeyCode> __k) { SR.Ctl.RestoreLabel(__c, __e, __w, __h, __k); },
@@ -178,6 +190,10 @@ namespace SR_UCH {
                     delegate (ConfigFile __c) { SR.Ctl.MarkConfigDirty(__c); },
                     delegate { return SR.Ctl.LangEn; },
                     delegate { return SR.Ctl.EditOpen; });
+                // 统一复选框：EX 与功能层的勾选控件都走核心实现（外观与设置页一致）。
+                SRApi.Ctl.SetCheckboxSink(delegate (Rect __r, bool __v, string __tip) { return SR.Ctl.CheckboxAt(__r, __v, __tip); });
+            });
+            SinkStep("Ui", delegate () {
                 SRApi.SetUiSinks(
                     delegate { return SR.ContentArea; }, delegate (Rect __v) { SR.ContentArea = __v; },
                     delegate { return SR.FooterHeight; }, delegate (float __v) { SR.FooterHeight = __v; },
@@ -196,10 +212,14 @@ namespace SR_UCH {
                     delegate (string __s) { return SR.SectionEntries(__s); },
                     delegate { return SR.TableLineStrong; },
                     delegate (Rect __r, Color __c) { SR.DrawFill(__r, __c); });
+            });
+            SinkStep("Gate", delegate () {
                 SRApi.SetGateSinks(
                     delegate (int __m) { return SR.GateModeAllows((SR.ModeMask)__m); },
                     delegate { return SR.Env.SceneName; },
                     delegate { return SR.Env.InTreehouse; });
+            });
+            SinkStep("Misc", delegate () {
                 SRApi.SetMiscSinks(
                     delegate (ConfigEntryBase __e) { return (int)SR.KeyComboMod(__e); },
                     delegate (ConfigEntryBase __e, int __m) { SR.SetDefaultCombo(__e, (SR.ComboMod)__m); },
@@ -208,14 +228,20 @@ namespace SR_UCH {
                     },
                     delegate (string __s, Action __a) { SR.RegisterPage(__s, __a.Invoke); },
                     delegate (string __s, string __p, string __zh, string __en, int __o, Action __a) { SR.RegisterPage(__s, __p, __zh, __en, __o, __a.Invoke); });
+            });
+            SinkStep("Table", delegate () {
                 SRApi.SetTableSinks(
                     delegate (SRApi.TableArgs __a) { SR.TableDraw(__a); },
                     delegate (Event __e, ref float __w, ref bool __sb, ref int __mc, ref float __md, ref int __dc, ref bool __dh, Action __sw, Action __sh, Action __rj) { SR.TableDragWatchdog(__e, ref __w, ref __sb, ref __mc, ref __md, ref __dc, ref __dh, __sw, __sh, __rj); },
                     delegate (Event __e, Rect __box, Vector2 __mp, float __mx, float __my, ref Vector2 __sc, ref Vector2 __sr) { return SR.TableWheelInput(__e, __box, __mp, __mx, __my, ref __sc, ref __sr); },
                     delegate (Event __e, Vector2 __mp, Rect __tr, Rect __th, float __sm, ref bool __dr, ref float __gy, ref float __sy) { return SR.TableScrollbarInput(__e, __mp, __tr, __th, __sm, ref __dr, ref __gy, ref __sy); });
+            });
+            SinkStep("Migration", delegate () {
                 SRApi.Migration.SetSinks(
                     delegate (string __s, string[] __k) { ConfigMigration.Remove(__s, __k); },
                     delegate (string __f, string __t3, string __k) { ConfigMigration.Move(__f, __t3, __k); });
+            });
+            SinkStep("Ex", delegate () {
                 SRApi.SetExSinks(
                     delegate { return SR.AllEnabled; },
                     delegate (bool __v) { SR.AllEnabled = __v; },
@@ -230,11 +256,27 @@ namespace SR_UCH {
                     delegate (Func<bool> __f) { SR.RegisterHostOverride(__f); },
                     delegate (Func<bool> __f) { SR.RegisterPauseProvider(__f); },
                     delegate (string __s, Action __d) { SR.RegisterTabPrefix(__s, __d); });
+            });
                 // P0-1：API 通道自检 —— 漏注入的 sink 会让对应功能静默失效，这里必须报错。
                 string[] __miss = SRApi.MissingSinks();
                 if (__miss.Length > 0) ModLogger.LogError("[SR.Api] 未注入的 API 通道 (" + __miss.Length + "): " + string.Join(", ", __miss));
-            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+            if (ApiSinkFailures.Count > 0) ModLogger.LogError("[SR.Api] sink 注入失败的分组 (" + ApiSinkFailures.Count + "): " + string.Join(", ", ApiSinkFailures.ToArray()));
         }
+
+        // sink 注入失败的分组名：一组失败不影响其它组，结论同时进 [SR.SelfTest]。
+        internal static readonly List<string> ApiSinkFailures = new List<string>();
+
+        // 逐分组注入：任何一组抛异常只记录并继续（旧实现用一个 try 包住全部 sink，
+        // 中途抛出则后面的 sink 全部静默不注入、只留一行 error，故障无法定位）。
+        private static void SinkStep(string what, Action inject) {
+            try { inject(); }
+            catch (Exception __sx) {
+                ApiSinkFailures.Add(what);
+                try { SR.LogError("[SR.Api] sink 注入失败 " + what + ": " + __sx.Message); }
+                catch { /* 静默：日志通道可能尚未就绪，失败可直接忽略 */ }
+            }
+        }
+
 
         // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
         private void InitializeTweaks() {
@@ -262,11 +304,8 @@ namespace SR_UCH {
         }
 
         // 功能清单登记 + 启动自检 + 自检日志。
+        // 装配（LoadExModule / LoadExternal）只由 Awake 按固定顺序调一次：这里不再重复调用。
         private void RebuildFeatureManifest() {
-            LoadExModule();
-            // 外部功能 DLL / 语言包 DLL：一个 DLL 一个功能（ITweak）或一门语言（ILanguagePack）；
-            // 放在本程序集扫描与 EX 之后（EX 的硬编码路径不受影响）。
-            LoadExternal();
             // 功能清单（SMAPI 的 manifest 等价物）：内置 / 外部 / EX 的 ITweak 全部就位后统一登记，校验依赖与契约版本。
             try { Features.Rebuild(); if (Features.ProblemCount > 0) ModLogger.LogInfo(Features.Describe()); } catch (Exception __ft) { try { ModLogger.LogWarning("[SR.Feat] 功能清单登记失败: " + __ft.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
             // 启动自检（补丁目标 / 反射成员）：必须在全部功能与 EX 都挂完之后，结论进日志。
@@ -275,12 +314,13 @@ namespace SR_UCH {
             try {
                 try { ModLogger.LogInfo("[SR] 游戏版本=" + UnityEngine.Application.version + " | 契约=v" + SRContract.Version); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 string[] __miss = SRApi.MissingSinks();
+                int __bad = ApiSinkFailures.Count;
                 string __gv = "?";
                 try { __gv = UnityEngine.Application.version; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-                if (__miss.Length == 0 && Features.ProblemCount == 0)
+                if (__miss.Length == 0 && __bad == 0 && Features.ProblemCount == 0)
                     ModLogger.LogInfo("[SR.SelfTest] OK 游戏版本=" + __gv + " 契约=v" + SRContract.Version + " 补丁=" + SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " 反射=" + SR.AuditRefOk + "/" + SR.AuditRefTotal + " 功能=" + Features.Count + " API=" + SRApi.SinkCount() + "/" + SRApi.SinkTotal());
                 else
-                    ModLogger.LogError("[SR.SelfTest] FAIL 游戏版本=" + __gv + " API通道缺失=" + __miss.Length + " 功能表问题=" + Features.ProblemCount + " 缺失=" + string.Join(",", __miss));
+                    ModLogger.LogError("[SR.SelfTest] FAIL 游戏版本=" + __gv + " API通道缺失=" + __miss.Length + " 注入失败=" + __bad + " 功能表问题=" + Features.ProblemCount + " 缺失=" + string.Join(",", __miss) + (__bad > 0 ? " 失败分组=" + string.Join(",", ApiSinkFailures.ToArray()) : ""));
             } catch (Exception __st) { try { ModLogger.LogError("[SR.SelfTest] FAIL 自检异常: " + __st.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         }
 

@@ -913,16 +913,6 @@ namespace SR_UCH.Tweaks {
             } catch { return null; }
         }
 
-        // 当前投票最多的关卡（没有票数就返回 null）。
-        private static string FindLeadingVote(LobbyManager lm) {
-            try {
-                int votes;
-                LevelPortal best = FindLeadingPortal(lm, out votes);
-                if (best == null) return null;
-                return SRApi.T("投票：", "Vote: ") + PortalName(best);
-            } catch { return null; }
-        }
-
         private static string PortalName(LevelPortal p) {
             try {
                 CustomLevelPortal cp = p as CustomLevelPortal;

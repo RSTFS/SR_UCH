@@ -2308,17 +2308,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             } catch { return fileName ?? ""; }
         }
 
-        // 本地关卡模式：快照 XML 本身不存 GameMode；只能从文件名后缀推断关卡类型（.c=挑战 / .v=对战），
-        // 其它情况留空（列表显示 -），避免瞎猜。
-        private static string LocalModeFromFilename(string fileName) {
-            try {
-                string n = fileName ?? "";
-                if (n.EndsWith(".c.snapshot", StringComparison.OrdinalIgnoreCase)) return GameState.GameMode.CHALLENGE.ToString();
-                if (n.EndsWith(".v.snapshot", StringComparison.OrdinalIgnoreCase)) return GameState.GameMode.PARTY.ToString();
-            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-            return "";
-        }
-
         // 扫描 snapshots 目录，把本地保存的自定义关卡追加进 _presets（IsLocal=true，key="local:"+文件名）。
         private static void LoadLocalSnapshots() {
             try {

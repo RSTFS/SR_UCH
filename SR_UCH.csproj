@@ -26,11 +26,19 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>bin\MSBuild\</OutputPath>
 
-    <!-- 本机游戏路径：可在命令行覆盖，如
-         dotnet build -p:UchManagedDir="D:\Steam\...\UltimateChickenHorse_Data\Managed" -->
-    <UchManagedDir Condition="'$(UchManagedDir)' == ''">D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\UltimateChickenHorse_Data\Managed</UchManagedDir>
-    <BepInExCoreDir Condition="'$(BepInExCoreDir)' == ''">D:\EF\Steam\steamapps\common\Ultimate Chicken Horse\BepInEx\core</BepInExCoreDir>
+    <!-- 游戏根目录的单一真值：优先环境变量 UCH_DIR，未设置时用下面的回退值。
+         换机器只需 setx UCH_DIR "E:\...\Ultimate Chicken Horse"，或
+         dotnet build -p:UCH_DIR="E:\...\Ultimate Chicken Horse"（也可直接 -p:UchManagedDir=...）。 -->
+    <UCH_DIR Condition="'$(UCH_DIR)' == ''">D:\EF\Steam\steamapps\common\Ultimate Chicken Horse</UCH_DIR>
+    <UchManagedDir Condition="'$(UchManagedDir)' == ''">$(UCH_DIR)\UltimateChickenHorse_Data\Managed</UchManagedDir>
+    <BepInExCoreDir Condition="'$(BepInExCoreDir)' == ''">$(UCH_DIR)\BepInEx\core</BepInExCoreDir>
   </PropertyGroup>
+
+  <!-- 路径探测失败给出明确报错：旧版写死作者本机路径，换机器只会看到一堆 CS0006。 -->
+  <Target Name="CheckUchDir" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(UchManagedDir)\Assembly-CSharp.dll')"
+           Text="找不到游戏程序集：$(UchManagedDir)&#10;请设置环境变量 UCH_DIR（游戏根目录），或 dotnet build -p:UCH_DIR=... / -p:UchManagedDir=..." />
+  </Target>
 
   <ItemGroup>
     <Compile Include="MainPlugin.cs" />

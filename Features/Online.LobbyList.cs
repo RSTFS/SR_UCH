@@ -91,15 +91,6 @@ namespace SR_UCH.Tweaks {
             return "";
         }
 
-        // 术语表查不到时 I2 会原样返回 key，这里过滤掉。
-        private static string ZhTerm(string key, string zh) {
-            try {
-                string s = I2.Loc.LocalizationManager.GetTranslation(key);
-                if (!string.IsNullOrEmpty(s) && s.IndexOf("Network/") < 0 && s.IndexOf("region_") < 0 && s.IndexOf('/') < 0) return s;
-            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-            return zh;
-        }
-
         // 区域归一化：把代码、“亚太/欧盟/美国”、region_shortname_xx、英文名统一归到 AP/EU/US。
         // 筛选与显示都走这一套，避免“存的是代码、比较的是本地化名”导致筛选失效。
         private static string NormRegion(string s) {

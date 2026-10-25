@@ -2,9 +2,10 @@
 # SR_UCH 一键构建脚本
 # 用法：
 #   .\build\build.ps1                          合并模式（默认，部署用）：核心 + 全部功能 → 单个 SR_UCH.dll
-#   & '.\_tools\build_sr_uch.ps1 -Split'     拆分模式：核心 SR_Manager.dll + 每个功能一个 SR_UCH_<功能>.dll
-#   & '.\_tools\build_sr_uch.ps1 -All'       合并模式 + 再编译 EX 与 Others 下的独立插件
-#   （-Split 与 -All 可组合）
+#   .\build\build.ps1 -Split                   拆分模式：核心 SR_Manager.dll + 每个功能一个 SR_UCH_<功能>.dll
+#   .\build\build.ps1 -All                     合并模式 + 再编译 EX 与 Others 下的独立插件
+#   .\build\build.ps1 -Separate                先编契约程序集 SR.Contracts.dll，再按上面的模式构建
+#   （-Split / -All / -Separate 可组合；全部参数与 _tools 构建链一致）
 # 架构说明：核心 SR_UCH.dll 只提供 UI/控件/注册表/门控，不认识任何功能；
 #   功能源码在 SR_UCH\Features\<功能>.cs，靠 SR_UCH.ITweak + SR 的注册 API 自挂。
 #   → 合并模式把功能一起编进 SR_UCH.dll（当前发布形态，配置与部署都最简单）；
@@ -81,7 +82,9 @@ if (-not $csc) {
 if (-not $csc) { Write-Host '找不到 csc：需要 dotnet SDK（含 Roslyn），或把 roslyn_toolset 放回 _tools\'; exit 1 }
 Write-Host "csc: $csc"
 $rspDir = Join-Path $PSScriptRoot '.cache'
-if ($Separate) { Write-Host '本仓库构建链不含 -Separate（契约程序集分离）：请改用本机 _tools 构建链（_tools\build_sr_uch.ps1 -Separate）'; exit 2 }
+# -Separate：契约层（SR.Contracts.cs）单独编成一个程序集（SR.Contracts.dll），功能与 EX 只依赖它。
+# 仓库内不存在 _tools 构建链，这里直接用同一份 sr_uch_contracts.rsp（守卫 1 用的也是它）。
+if ($Separate) { Write-Host '== 分离模式：先编译契约程序集（SR.Contracts.dll）==' }
 $rspMain = Join-Path $rspDir 'sr_uch.rsp'          # 合并模式：核心 + 全部功能
 $rspCore = Join-Path $rspDir 'sr_uch_core.rsp'     # 拆分模式：仅核心
 
@@ -366,7 +369,7 @@ if ($Check) {
 }
 
 if ($Separate) {
-    $rspContracts = Join-Path (Join-Path $Root '_tools\rsp') 'sr_uch_contracts.rsp'
+    $rspContracts = Join-Path $rspDir 'sr_uch_contracts.rsp'
     Invoke-Build $rspContracts 'SR.Contracts.dll'
 }
 if (-not $Split) {
@@ -475,7 +478,7 @@ if ($Deploy) {
 }
 if ($Separate -and $Deploy) {
     # 阶段B1：分离模式下契约程序集作为依赖放进 BepInEx\core（BepInEx 会先加载 core 里的程序集）
-    $coreDir = Join-Path (Join-Path 'D:\EF\Steam\steamapps\common\Ultimate Chicken Horse' 'BepInEx') 'core'
+    $coreDir = Join-Path (Join-Path $GameDir 'BepInEx') 'core'
     $srcC = Join-Path $Root 'bin\Release\SR.Contracts.dll'
     if (Test-Path -LiteralPath $srcC) {
         if (-not (Test-Path -LiteralPath $coreDir)) { New-Item -ItemType Directory -Force -Path $coreDir | Out-Null }

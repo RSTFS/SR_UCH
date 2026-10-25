@@ -482,8 +482,10 @@ public partial class SR {
         }
 
         private static void SetHueFromRect(State s, Rect r, Vector2 mp) {
+            // 不能对归一化色相用 Mathf.Repeat：拖到底（t=1，或拖出条外被夹到 1）会被折成 0，
+            // 表现为滑块从底部瞬移到顶部。上限留一个极小余量，视觉仍是 360°（= 红），但不会回绕。
             float t = Mathf.Clamp01((mp.y - r.y) / Mathf.Max(1f, r.height));
-            s.H = Mathf.Repeat(t, 1f);
+            s.H = Mathf.Min(t, 0.99999f);
         }
 
         // 24 色网格，点击即应用；当前色用黑白双描边高亮。
