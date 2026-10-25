@@ -37,7 +37,7 @@ namespace SR_UCH.Tweaks {
         private const int ColCount = 6;
         // 列宽（设计单位）默认值与允许范围；顺序与 Col* 一致。
         // 操作列的实际默认宽由 DefaultActionColW() 按当前语言按钮文字实时计算（DefColW[ColAction] 仅作兜底）。
-        private static readonly float[] DefColW = new float[] { 150f, 84f, 64f, 38f, 48f, 200f };
+        private static readonly float[] DefColW = new float[] { 150f, 56f, 64f, 38f, 48f, 200f };
         private const float ColWidthMin = 40f;
         private const float ColWidthMax = 600f;
         private const string ColWidthsKey = "Preset Widths";
@@ -1434,6 +1434,13 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 if (!ActionAllowed()) return;
                 try {
                     if (File.Exists(p.FilePath)) File.Delete(p.FilePath);
+                    // 侧车（规则/积分/模块概率）跟着删：留着会让以后同名的预设捡到旧数据。
+                    try {
+                        string side = RulesetSidecarPath(p);
+                        if (!string.IsNullOrEmpty(side) && File.Exists(side)) File.Delete(side);
+                        string legacy = p.FilePath + ".ruleset.xml";
+                        if (File.Exists(legacy)) File.Delete(legacy);
+                    } catch (Exception __sd) { SRApi.Guard.Log("布局预设/删除侧车", __sd); }
                 } catch (Exception __ex) {
                     SRApi.Guard.Log("布局预设/删除文件", __ex);
                     SRApi.Notify(SRApi.T("删除预设文件失败", "Failed to delete the preset file"));
