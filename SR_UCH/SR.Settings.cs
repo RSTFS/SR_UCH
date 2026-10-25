@@ -684,6 +684,9 @@ public partial class SR {
                     return e;
                 }
             }
+            // 未命中也缓存（null）：否则拼错/已删除的键会每帧 O(n) 全表扫描。
+            // 条目表变化时 ClearEntryCache 会整体失效，不会读到过期结果。
+            _entryCache[k] = null;
             return null;
         }
 

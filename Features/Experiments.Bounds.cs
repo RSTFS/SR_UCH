@@ -90,11 +90,15 @@ public partial class Experiments : ITweak
 		// 光标边界原值：只记 boundary（Bounds），不使用 SetBounds(Collider2D) 重载。
 		private static readonly Dictionary<PiecePlacementCursor, Bounds> _curOrig = new Dictionary<PiecePlacementCursor, Bounds>();
 		private static readonly Dictionary<Placeable, bool> _igWas = new Dictionary<Placeable, bool>();
+		private static readonly HashSet<Placeable> _aliveBuf = new HashSet<Placeable>();
+		private static readonly List<Placeable> _deadBuf = new List<Placeable>();
 		private static System.Reflection.FieldInfo _fiBoundary;
 		private static System.Reflection.FieldInfo _fiFrame;
 		private static bool _fiTried;
 		private static string _hardNote;
-		private static string _hardNoteKey = "";   // _hardNote 的脏标记
+		private static int _hardNoteR = int.MinValue;
+		private static int _hardNoteN = -1;
+		private static string _hardNoteCam;
 		// _zcOrig/_zcHas 为相机边界快照，供 Restore 还原。
 		private static Bounds _zcOrig = new Bounds(Vector3.zero, Vector3.zero);
 		private static bool _zcHas;
@@ -346,8 +350,9 @@ public partial class Experiments : ITweak
 				bool on = PieceIgnoreOn;
 				Placeable[] all = UnityEngine.Object.FindObjectsOfType<Placeable>();
 				// _igWas 为强引用字典，且游戏销毁方块时不派发事件；以本轮扫描到的集合为权威，剔除已销毁的键。
+				// 复用静态缓冲：每 30 帧一次全场景扫描，不再每轮新建 HashSet（满图 500+ 方块时是明显 GC 尖峰）。
 				HashSet<Placeable> alive = null;
-				if (_igWas.Count > 0) alive = new HashSet<Placeable>();
+				if (_igWas.Count > 0) { _aliveBuf.Clear(); alive = _aliveBuf; }
 				for (int i = 0; i < all.Length; i++) {
 					Placeable p = all[i];
 					if (p == null) continue;
@@ -356,11 +361,11 @@ public partial class Experiments : ITweak
 					if (p.IgnoreBounds != on) p.IgnoreBounds = on;
 				}
 				if (alive != null) {
-					List<Placeable> dead = null;
+					_deadBuf.Clear();
+					List<Placeable> dead = _deadBuf;
 					foreach (Placeable k in _igWas.Keys) {
 						if (alive.Contains(k)) continue;
-						if (dead == null) dead = new List<Placeable>();
-						dead.Add(k);
+							dead.Add(k);
 					}
 					if (dead != null) for (int i = 0; i < dead.Count; i++) _igWas.Remove(dead[i]);
 				}
@@ -480,10 +485,9 @@ public partial class Experiments : ITweak
 						cam = "相机=不动";
 					}
 				}
-				// 每帧调用，脏标记只在值变化时重建该字符串。
-			string hardKey = ((int)r) + "|" + n + "|" + cam;
-			if (hardKey != _hardNoteKey) {
-				_hardNoteKey = hardKey;
+				// 每帧调用：直接比较三个值，避免每帧拼字符串（脏标记只在变化时重建文案）。
+			if ((int)r != _hardNoteR || n != _hardNoteN || !string.Equals(cam, _hardNoteCam, StringComparison.Ordinal)) {
+				_hardNoteR = (int)r; _hardNoteN = n; _hardNoteCam = cam;
 				_hardNote = "硬解除 r=" + (int)r + " 光标×" + n + " " + cam;
 			}
 			} catch (Exception __ex) { _hardNote = "硬解除失败:" + __ex.Message; SRApi.Guard.Log("关卡边界-硬解除", __ex); }

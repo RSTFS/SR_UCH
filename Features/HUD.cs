@@ -1417,9 +1417,11 @@ namespace SR_UCH.Tweaks {
 			y = Mathf.Clamp(y, 0f, Mathf.Max(0f, sh - h));
 		}
 
+		// 复用同一个 GUIContent：每帧最多 40 次测量，避免逐次分配（IMGUI 标准做法）。
+		private static readonly GUIContent _measureContent = new GUIContent();
 		private static float Measure(string text, GUIStyle style) {
 			if (string.IsNullOrEmpty(text) || style == null) return 0f;
-			try { return style.CalcSize(new GUIContent(text)).x; } catch { return 0f; }
+			try { _measureContent.text = text; return style.CalcSize(_measureContent).x; } catch { return 0f; }
 		}
 
 		// 拖动：仅在"设置窗口打开 + Layout=自定义"时允许；只更新运行期位置，不写配置。
