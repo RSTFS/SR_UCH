@@ -34,6 +34,7 @@ UiOpen
 WheelFrame
 
 # ---- 三、提示 / 日志 / 本地化 ----
+CloseMenu
 Diag
 LocDesc
 LocEnum

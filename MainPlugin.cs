@@ -103,6 +103,9 @@ namespace SR_UCH {
                     delegate (string __m) { SR.LogWarn(__m); },
                     delegate (string __m) { SR.LogError(__m); });
             });
+            SinkStep("CloseMenu", delegate () {
+                SRApi.SetCloseMenuSink(delegate { SR.CloseMenuExternal(); });
+            });
             SinkStep("Notify", delegate () {
                 SRApi.SetNotifySink(delegate (string __t) { SR.Notify(__t); });
             });

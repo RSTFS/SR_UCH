@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using System.Xml;
 using UnityEngine;
@@ -279,6 +280,27 @@ namespace SR_UCH.Tweaks {
                 } finally {
                     GUILayout.EndHorizontal();
                 }
+                // 借用游戏自己的界面：打开规则书（规则 / 积分 / 模块 / 修改器都在里面），
+                // 玩家改完后回来点「读取游戏当前」，把结果写进这条预设。
+                GUILayout.BeginHorizontal();
+                try {
+                    SRApi.Ctl.LabelAuto(SRApi.T("借用游戏界面", "Game UI"));
+                    if (GUILayout.Button(new GUIContent(SRApi.T("打开规则书", "Open rulebook"),
+                            SRApi.T("先收起本面板，再打开游戏自己的规则书（规则 / 积分 / 模块概率 / 修改器都在里面）\n需在树屋或关卡里、由房主操作",
+                                "closes this panel and opens the game's own rulebook (rules / points / block odds / modifiers)\nhost only, in the treehouse or a level")),
+                        SRApi.Ctl.Btn, GUILayout.Width(W(110)), GUILayout.Height(W(24)))) OpenGameRulebook();
+                    if (GUILayout.Button(new GUIContent(SRApi.T("读取游戏当前", "Read current"),
+                            SRApi.T("把游戏当前的规则 / 积分 / 模块概率 / 修改器读进来，写到这条预设（三个开关自动打勾）",
+                                "read the game's current rules / points / block odds / modifiers into this preset (the three toggles are turned on)")),
+                        SRApi.Ctl.Btn, GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ReadAllFromGame(p);
+                    if (GUILayout.Button(new GUIContent(SRApi.T("只读修改器", "Mods only"),
+                            SRApi.T("只把游戏当前的 24 项修改器读进下面的自定义值，不动规则/积分/模块",
+                                "only pull the game's 24 current modifiers into the custom values below")),
+                        SRApi.Ctl.Btn, GUILayout.Width(W(96)), GUILayout.Height(W(24)))) ReadModsFromGame();
+                    GUILayout.FlexibleSpace();
+                } finally {
+                    GUILayout.EndHorizontal();
+                }
                 if (_modsMode != ModsCustom) {
                     GUILayout.Space(W(4));
                     LabelWrapText(_modsMode == ModsOff
@@ -474,6 +496,108 @@ namespace SR_UCH.Tweaks {
                 gs.ApplyTemporaryRuleset(preset, p.ApplyRules, p.ApplyPoints, p.ApplyBlocks, false);
                 SRApi.LogInfo("[布局预设] 已应用规则集 规则=" + p.ApplyRules + " 积分=" + p.ApplyPoints + " 模块=" + p.ApplyBlocks);
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/应用规则集", __ex); }
+        }
+
+
+        // ---------- 借用游戏自己的界面 ----------
+        // 打开游戏规则书（TabletRulesScreen 那一套）：规则 / 积分 / 模块概率 / 修改器都在里面，
+        // 玩家改完关掉，再回本页点「读取游戏当前」。必须先把本面板收起来，否则输入被冻结、游戏界面点不动。
+        private static void OpenGameRulebook() {
+            try {
+                LobbyManager lm = LobbyManager.instance;
+                if (lm == null) { SRApi.Notify(SRApi.T("不在大厅里，打不开规则书", "Not in a lobby; the rulebook cannot be opened")); return; }
+                LevelSelectController lsc = lm.CurrentLevelSelectController;
+                if (lsc == null) { SRApi.Notify(SRApi.T("当前没有关卡选择控制器（进树屋或关卡后再试）", "No level-select controller right now (enter the treehouse or a level)")); return; }
+                SRApi.CloseMenu();          // 先收起本面板
+                lsc.OpenLegacyRulebook(false);
+                SRApi.LogInfo("[布局预设] 已请求打开游戏规则书");
+            } catch (Exception __ex) {
+                SRApi.Guard.Log("布局预设/打开游戏规则书", __ex);
+                SRApi.Notify(SRApi.T("打开游戏规则书失败", "Failed to open the game rulebook"));
+            }
+        }
+
+        // 读游戏当前的规则集 -> 写进这条预设的 sidecar，并把三个开关打开。
+        private static void ReadRulesFromGame(PresetInfo p) {
+            try {
+                if (p == null || p.IsLocal) return;
+                GameRulePreset cur = GameRulePreset.GetRulesetFromCurrentRules();
+                if (cur == null) { SRApi.Notify(SRApi.T("取不到当前规则集", "Current ruleset unavailable")); return; }
+                string xml = cur.GetRulesetXmlString();
+                string path = RulesetSidecarPath(p);
+                if (string.IsNullOrEmpty(xml) || string.IsNullOrEmpty(path)) return;
+                File.WriteAllText(path, xml, new UTF8Encoding(false));
+                p.ApplyRules = true; p.ApplyPoints = true; p.ApplyBlocks = true;
+                _modsApplyRules = true; _modsApplyPoints = true; _modsApplyBlocks = true;
+                SaveIndex();
+                SRApi.LogInfo("[布局预设] 已读取游戏当前规则集 (" + xml.Length + " 字符) -> " + (p.Name ?? ""));
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取游戏规则集", __ex); }
+        }
+
+        // 读游戏当前的 24 项修改器 -> 填进草稿（自动切到"自定义"，否则草稿不会被采用）。
+        private static void ReadModsFromGame() {
+            try {
+                Modifiers m = Modifiers.GetInstance();
+                if (m == null) { SRApi.Notify(SRApi.T("取不到修改器实例", "Modifier instance unavailable")); return; }
+                int n = 0;
+                for (int i = 0; i < Mods.Length; i++) {
+                    ModDef d = Mods[i];
+                    string field = ModFieldName(d.Attr);
+                    if (string.IsNullOrEmpty(field)) continue;
+                    try {
+                        FieldInfo fi = SRApi.Ref.Field(typeof(Modifiers), field, "布局预设/读取修改器");
+                        if (fi == null) continue;
+                        object v = fi.GetValue(m);
+                        if (v == null) continue;
+                        if (d.IsBool) _modsDraft[d.Attr] = ((bool)v) ? "True" : "False";
+                        else _modsDraft[d.Attr] = Convert.ToInt32(v, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
+                        n++;
+                    } catch { /* 静默：单个字段读不到就跳过，其余照读 */ }
+                }
+                _modsMode = ModsCustom;
+                SRApi.LogInfo("[布局预设] 已从游戏读取 " + n + "/" + Mods.Length + " 项修改器到自定义值");
+                SRApi.Notify(SRApi.T("已读取修改器项：", "Modifiers read: ") + n + "/" + Mods.Length);
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取游戏修改器", __ex); }
+        }
+
+        // 一次把规则/积分/模块概率 + 修改器都读进来。
+        private static void ReadAllFromGame(PresetInfo p) {
+            try {
+                ReadRulesFromGame(p);
+                ReadModsFromGame();
+                SRApi.Notify(SRApi.T("已读取游戏当前设置到这条预设", "Current game settings read into this preset"));
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取游戏当前", __ex); }
+        }
+
+        // 快照属性名 -> Modifiers 里的字段名（部分字段是 camelCase），读不到返回 null。
+        private static string ModFieldName(string attr) {
+            switch (attr) {
+                case "GravityMode": return "GravityMode";
+                case "JumpSpeedMode": return "JumpSpeedMode";
+                case "SprintSpeedMode": return "SprintSpeedMode";
+                case "GameSpeedMode": return "GameSpeedMode";
+                case "InvisibilityMode": return "invisibilityMode";
+                case "PlatformSpeedMode": return "PlatformSpeedMode";
+                case "RateOfFireMode": return "RateOfFireMode";
+                case "MultiJumpMode": return "MultiJumpMode";
+                case "ProjectileExplosionMode": return "ProjectileExplosionMode";
+                case "CharacterSizeMode": return "CharacterSizeMode";
+                case "PostDeathBehaviorMode": return "PostDeathBehaviorMode";
+                case "CameraFlipMode": return "CameraFlipMode";
+                case "DoomsdayMeteorsMode": return "DoomsdayMeteorsMode";
+                case "DoomsdayLavaMode": return "DoomsdayLavaMode";
+                case "ProjectileSpeedMode": return "ProjectileSpeedMode";
+                case "JetpackMode": return "jetpackMode";
+                case "WallJumpsDisabled": return "wallJumpsDisabled";
+                case "WallSlidesDisabled": return "wallSlidesDisabled";
+                case "DanceInvincibility": return "danceInvincibility";
+                case "MirrorControls": return "mirrorControls";
+                case "PlayerPlayerCollisions": return "playerPlayerCollisions";
+                case "PreviewModsInTreehouse": return "modsPreview";
+                case "ForceLobbyModifiers": return "forceLobbyModifiers";
+                case "Frictionless": return "frictionless";
+                default: return null;
+            }
         }
 
         // 选中态标记（契约层不暴露 SelItem 样式，用文字前缀即可）。

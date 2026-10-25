@@ -1041,6 +1041,9 @@ public partial class SR : ITweak {
             }
         }
 
+        // 供契约层转发（SRApi.CloseMenu）：功能页要打开游戏自己的界面时先收起本面板。
+        public static void CloseMenuExternal() { CloseMenu(); }
+
         private static void CloseMenu() {
             _visible = false;
             _capturing = null;
