@@ -37,6 +37,8 @@ SR_UCH\SR.Plugins.cs
 SR_UCH\SR.Input.cs
 SR_UCH\SR.CmAttributes.cs
 SR_UCH\SR.ConfigMigration.cs
+SR_UCH\SR.Ext.cs
+SR_UCH\SR.Notify.cs
 Features\PlayerTracker.cs
 Features\QuickAdjust.cs
 Features\BuildingTools.cs
