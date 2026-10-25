@@ -446,7 +446,7 @@ namespace SR_UCH.Tweaks {
             _localPosFrame = Time.frameCount;
             _localPosCache = Vector3.zero;
             try {
-                foreach (Character c in UnityEngine.Object.FindObjectsOfType<Character>()) {
+                foreach (Character c in SRApi.FrameObjects<Character>()) {
                     if (c != null && c.hasAuthority) { _localPosCache = c.transform.position; break; }
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("获取本地角色位置", __ex); }
@@ -550,7 +550,7 @@ namespace SR_UCH.Tweaks {
         private static bool EnsureInfoTag() {
             if (_infoTag != null) return true;
             if (_infoTagTried) return false;
-            foreach (Character c in UnityEngine.Object.FindObjectsOfType<Character>()) {
+            foreach (Character c in SRApi.FrameObjects<Character>()) {
                 if (c == null) continue;
                 GamePlayer gp = c.AssociatedGamePlayer;
                 if (gp == null || gp.CursorInstance == null || gp.CursorInstance.nameTag == null) continue;

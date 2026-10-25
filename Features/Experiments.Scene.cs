@@ -263,7 +263,7 @@ public partial class Experiments : ITweak
             // 房主选哪个就开哪个：找房主自己的角色，再找它投过票的门。
             Character hostChar = null;
             try {
-                Character[] chars = UnityEngine.Object.FindObjectsOfType<Character>();
+                Character[] chars = SRApi.FrameObjects<Character>();
                 for (int i = 0; i < chars.Length; i++) {
                     Character c = chars[i];
                     if (c != null && c.hasAuthority) { hostChar = c; break; }

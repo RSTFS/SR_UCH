@@ -100,3 +100,4 @@ TableHeightGripBar
 Diag
 TableSource
 TableState
+FrameObjects

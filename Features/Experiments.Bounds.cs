@@ -546,7 +546,7 @@ public partial class Experiments : ITweak
 			if (f - _zcAt < 600 && _zc != null) return _zc;   // 10 秒兜底；换场景会重置
 			_zcAt = f;
 			try {
-				ZoomCamera a = UnityEngine.Object.FindObjectOfType<ZoomCamera>();
+				ZoomCamera a = null; ZoomCamera[] zs = SRApi.FrameObjects<ZoomCamera>(); if (zs != null) for (int zi = 0; zi < zs.Length; zi++) { if (zs[zi] != null) { a = zs[zi]; break; } }
 				if (a != null) _zc = a;
 			} catch { }
 			return _zc;

@@ -573,9 +573,22 @@ public partial class SR {
             GUILayout.EndVertical();     // 右栏
             GUILayout.EndHorizontal();   // 左栏 + 右栏
             GUILayout.Space(Sc(2f));
-            GUILayout.BeginHorizontal(_footer, GUILayout.Height(Sc(26f)));
+            // 底栏：先占位并画圆角背景，再把按钮放进这个矩形（圆角 + 悬停过渡）。
+            Rect __footRect = GUILayoutUtility.GetRect(0f, Sc(28f), GUILayout.ExpandWidth(true));
+            SR.DrawRounded(__footRect, new Color(0.10f, 0.11f, 0.13f, 0.96f), Sc(6f));
+            GUILayout.BeginArea(new Rect(__footRect.x + Sc(4f), __footRect.y + Sc(3f), Mathf.Max(Sc(60f), __footRect.width - Sc(8f)), Sc(23f)));
+            GUILayout.BeginHorizontal();
             // 设置
-            if (GUILayout.Button(T("设置", "Settings"), _mode == Mode.Settings ? _selItem : _btn, GUILayout.Height(Sc(22f)))) {
+            // 设置按钮：先算矩形（用于悬停过渡），再在矩形内画按钮。
+            string __setLbl = T("设置", "Settings");
+            float __setW = _btn.CalcSize(new GUIContent(__setLbl)).x + Sc(18f);
+            Rect __setRect = GUILayoutUtility.GetRect(__setW, Sc(22f), GUILayout.Width(__setW), GUILayout.Height(Sc(22f)));
+            bool __setHover = __setRect.Contains(Event.current != null ? Event.current.mousePosition : Vector2.zero);
+            Color __setBg = GUI.backgroundColor;
+            GUI.backgroundColor = Color.Lerp(__setBg, new Color(0.78f, 0.84f, 0.98f, 1f), __setHover ? 0.35f : 0f);
+            bool __setClicked = GUI.Button(__setRect, __setLbl, _mode == Mode.Settings ? _selItem : _btn);
+            GUI.backgroundColor = __setBg;
+            if (__setClicked) {
                 _mode = Mode.Settings;
                 NoPageScrollBars = false;
                 _editText.Clear();
@@ -607,7 +620,8 @@ public partial class SR {
             GUILayout.FlexibleSpace();
             GUILayout.Label(ModeLabel() ?? "", _label, GUILayout.Height(Sc(22f)));
             GUILayout.EndHorizontal();
-            FooterHeight = GUILayoutUtility.GetLastRect().height;
+            GUILayout.EndArea();
+            FooterHeight = Sc(28f);
             GUILayout.EndArea();
 
             // 整数对齐 + 尺寸与贴图一致（消除锯齿）；颜色按 ImGui ResizeGrip 三态（accent，0.25 / 0.7 / 0.95）。

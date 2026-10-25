@@ -181,7 +181,7 @@ public partial class Experiments : ITweak
                     return;
                 }
                 ZoomCamera zc = null;
-                try { zc = UnityEngine.Object.FindObjectOfType<ZoomCamera>(); } catch { }
+                try { ZoomCamera[] zs = SRApi.FrameObjects<ZoomCamera>(); zc = zs != null && zs.Length > 0 ? zs[0] : null; } catch { }
                 if (zc == null) return;
                 if (_followZc != zc) { _followZc = zc; _followOrig = -1f; }   // 相机换了就重取原值
                 if (_followOrig < 0f) _followOrig = zc.MaxFollowSpeed;
