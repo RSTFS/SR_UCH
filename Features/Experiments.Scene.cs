@@ -270,7 +270,7 @@ public partial class Experiments : ITweak
                 }
             } catch { }
             if (hostChar == null) {
-                SRApi.Notify(SRApi.T("未找到房主角色，无法判断所选关卡", "Host character not found"));
+                SRApi.Notify(SRApi.T("未选择关卡", "No level selected"));
                 return;
             }
             LevelPortal pick = null;
@@ -280,7 +280,7 @@ public partial class Experiments : ITweak
                 if (p.Votes.ContainsKey(hostChar)) { pick = p; break; }
             }
             if (pick == null) {
-                SRApi.Notify(SRApi.T("房主尚未投票，请先选一个关卡", "Host has not voted yet - pick a level first"));
+                SRApi.Notify(SRApi.T("未选择关卡", "No level selected"));
                 return;
             }
             lsc.LaunchLevel(pick);
