@@ -75,6 +75,7 @@ namespace SR_UCH {
     // 契约版本（对应 SMAPI 的 minimumApiVersion）：核心只增不改地推进这个数字；
     // 功能用 [SrFeature] 的 MinContract 声明所需版本，核心低于它时记录"契约不兼容"。
     public static class SRContract {
+        // Version：功能清单契约（ITweak/IFeatureHost/Slots）的版本；与 SR.ApiVersion（EX 接口版本）独立演进。
         public const int Version = 2;
     }
 

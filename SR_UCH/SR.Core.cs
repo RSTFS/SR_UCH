@@ -677,32 +677,47 @@ public partial class SR : ITweak {
 
         // 豁免来源登记：谁在提权必须可见（设置页显示 + 首次登记写日志）。
         public static readonly List<string> OverrideSources = new List<string>();
-        private static void NoteOverrideSource(string kind) {
+        // 只允许白名单程序集登记豁免；其它来源一律拒绝并记录（防止任意插件静默提权）。
+        private static readonly string[] OverrideAllowedAssemblies = new string[] { "", "SR_UCH_EX" };   // "" = 核心自身调用
+        // 找"真正发起登记的程序集"：跳过核心自身（含契约层 SRApi）的栈帧，
+        // 这样经 SRApi 转发的 EX 调用才能识别为 SR_UCH_EX，而不是误判成 SR_UCH。
+        private static string CallerAssembly() {
             try {
-                string who = "unknown";
+                string mine = typeof(SR).Assembly.GetName().Name;
                 var st = new System.Diagnostics.StackTrace();
-                for (int i = 1; i < st.FrameCount; i++) {
+                for (int i = 2; i < st.FrameCount; i++) {
                     var m = st.GetFrame(i).GetMethod();
                     if (m == null) continue;
                     Type dt = m.DeclaringType;
-                    if (dt == null || dt == typeof(SR)) continue;
-                    who = dt.Assembly.GetName().Name;
-                    break;
-                }
-                string line = kind + " <- " + who;
-                if (!OverrideSources.Contains(line)) {
-                    OverrideSources.Add(line);
-                    Guard.Log("门控豁免登记: " + line, null);
+                    if (dt == null) continue;
+                    string an = dt.Assembly.GetName().Name;
+                    if (string.Equals(an, mine, StringComparison.OrdinalIgnoreCase)) continue;
+                    return an;
                 }
             } catch { }
+            return "";
+        }
+        private static bool NoteOverrideSource(string kind) {
+            try {
+                string who = CallerAssembly();
+                bool ok = false;
+                for (int i = 0; i < OverrideAllowedAssemblies.Length; i++)
+                    if (string.Equals(who, OverrideAllowedAssemblies[i], StringComparison.OrdinalIgnoreCase)) { ok = true; break; }
+                string line = kind + " <- " + (string.IsNullOrEmpty(who) ? "unknown" : who) + (ok ? "" : " (已拒绝：不在白名单)");
+                if (!OverrideSources.Contains(line)) {
+                    OverrideSources.Add(line);
+                    Guard.Log("门控豁免" + (ok ? "登记: " : "被拒绝: ") + line, null);
+                }
+                return ok;
+            } catch { return false; }
         }
         // 登记"无视模式限制"豁免
         public static void RegisterModeOverride(Func<bool> f) {
-            if (f != null && !_modeOverrides.Contains(f)) { _modeOverrides.Add(f); NoteOverrideSource("模式限制"); }
+            if (f != null && !_modeOverrides.Contains(f) && NoteOverrideSource("模式限制")) _modeOverrides.Add(f);
         }
         // 登记"无视房主限制"豁免
         public static void RegisterHostOverride(Func<bool> f) {
-            if (f != null && !_hostOverrides.Contains(f)) { _hostOverrides.Add(f); NoteOverrideSource("房主限制"); }
+            if (f != null && !_hostOverrides.Contains(f) && NoteOverrideSource("房主限制")) _hostOverrides.Add(f);
         }
         // 登记"冻结角色"求值（打开面板 / 地图时冻结自己的角色）
         public static void RegisterPauseProvider(Func<bool> f) {
