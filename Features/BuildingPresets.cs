@@ -494,8 +494,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     GUILayout.EndHorizontal();
                 }
                 if (!string.IsNullOrEmpty(_renameKey)) RenderRenameBar();
-                // 修改器编辑器打开时接管本页剩余区域（不再画表格），返回即结束本帧。
-                if (RenderModsEditorIfOpen()) return;
+                // 自建的修改器编辑页已下线：修改器/规则/积分/模块一律用游戏自己的界面（操作列的「游戏界面」）。
                 GUILayout.Space(W(2));
                 // 高度：核心统一公式（页面顶部已用高度 + 表格高度 = 底栏之上可用高度），窗口变化实时跟随。
                 Rect last = GUILayoutUtility.GetLastRect();
@@ -529,7 +528,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 string[] labels = new string[vals.Count];
                 for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
                 bool open = _levelFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open);
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open, ComboW());
                 _levelFilterOpen = open;
                 if (sel >= 0 && sel < vals.Count) _levelFilter = vals[sel];
             } catch (Exception __ex) {
@@ -569,7 +568,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 string[] labels = new string[vals.Count];
                 for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
                 bool open = _modeFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open);
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open, ComboW());
                 _modeFilterOpen = open;
                 if (sel >= 0 && sel < vals.Count) _modeFilter = vals[sel];
             } catch (Exception __ex) {
@@ -613,7 +612,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 运行期状态被外部改坏时回退到默认「预设」（与下拉索引 1 对应）。
                 if (!string.Equals(vals[cur], _typeFilter, StringComparison.OrdinalIgnoreCase)) _typeFilter = "preset";
                 bool open = _typeFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(90));
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, ComboW());
                 _typeFilterOpen = open;
                 if (sel >= 0 && sel < vals.Length) _typeFilter = vals[sel];
             } catch (Exception __ex) {
@@ -623,6 +622,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 
         // 加载模式下拉：默认 + 游戏四模式（派对 / 创意 / 挑战 / 自由）。运行期状态，不落配置。
         // 值为 "" 或 GameState.GameMode 的 ToString；显示名复用 ModeText（游戏本地化 / 中文回退）。
+        // 本页所有下拉 / 输入框的统一下限宽度：保证三行控件的左边界与宽度一致。
+        private static float ComboW() { return Mathf.Max(W(150), SRApi.Ctl.Sc(150f)); }
+
         private static void RenderLoadModeCombo() {
             try {
                 string[] vals = new string[] { "", "PARTY", "CREATIVE", "CHALLENGE", "FREEPLAY" };
@@ -636,7 +638,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 labels[0] = SRApi.T("默认", "Default");
                 for (int i = 1; i < vals.Length; i++) labels[i] = ModeText(vals[i]);
                 bool open = _loadModeOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open);
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, ComboW());
                 _loadModeOpen = open;
                 if (sel >= 0 && sel < vals.Length) _loadMode = vals[sel];
             } catch (Exception __ex) {
@@ -795,6 +797,11 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 _hiddenBeforeTable = _hiddenCols.Count;
                 SRApi.TableDraw(_args);
                 UpdateDataCellTip();   // 鼠标悬浮「数据」列单元格 -> 列出该预设的自定义数据
+                // 表格滚轮：本页自己接管（页面级滚动被 NoPageScrollBars 关掉了，嵌套滚动区收不到滚轮）。
+                try {
+                    if (SRApi.TableWheelInput(Event.current, box, mp, _maxScrollX, _maxScrollY, ref _scrollCols, ref _scrollRows))
+                        SRApi.MarkWheelUsed();
+                } catch (Exception __wh) { SRApi.Guard.Log("布局预设/表格滚轮", __wh); }
                 // 底边拖拽条（核心统一绘制 + 拖动 + 持久化）。
                 SRApi.Ctl.TableHeightGripBar(_tableHEntry, (box.height + SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
                 // 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
@@ -920,8 +927,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 }
                 bool delPending = IsPending("del:" + p.Key);
                 _actActions[ActLoad].Label = replacePending ? SRApi.T("确认", "Confirm") : SRApi.T("加载", "Load");
-                _actActions[ActMods].Label = SRApi.T("改器", "Mods");
-                _actActions[ActMods].Tip = SRApi.T("这条预设的关卡修改器：继承 / 关闭 / 自定义", "level modifiers of this preset: inherit / off / custom");
+                _actActions[ActMods].Label = SRApi.T("游戏界面", "Game UI");
+                _actActions[ActMods].Tip = SRApi.T("把这条预设的规则 / 积分 / 模块概率 / 修改器灌进游戏并打开游戏自己的界面\n改完关掉会自动读回来保存", "loads this preset's rules / points / block odds / modifiers into the game and opens the game's own UI\nthe data is read back and saved when you close it");
                 _actActions[ActRename].Label = SRApi.T("重命名", "Rename");
                 _actActions[ActExport].Label = SRApi.T("导出", "Export");
                 _actActions[ActDelete].Label = delPending ? SRApi.T("确认", "Confirm") : SRApi.T("删除", "Delete");
@@ -940,7 +947,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 
         private static void DoActMods() {
             PresetInfo p = _actPreset;
-            if (p != null && !p.IsLocal) OpenModsEditor(p);
+            if (p != null && !p.IsLocal) OpenGameRulebook(p);
         }
 
         private static void DoActRename() {
