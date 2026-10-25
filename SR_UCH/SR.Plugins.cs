@@ -17,6 +17,7 @@ public partial class SR {
             public string name;
             public ConfigFile config;
             public BaseUnityPlugin instance;
+            public string path;   // 程序集路径：外部 DLL 来源必须可见
         }
 
         //外部插件的禁用状态（持久化在配置项 DisabledPlugins 中）。
@@ -164,6 +165,12 @@ public partial class SR {
         }
 
         //设置页顶部的插件清单：每行 = 启用/禁用按钮 + 插件名（悬停显示 GUID）。
+        // 外部插件程序集路径（来源可见性：设置页悬停显示）。
+        private static string SafeAssemblyPath(BaseUnityPlugin p) {
+            try { return p != null && p.GetType().Assembly != null ? p.GetType().Assembly.Location : ""; }
+            catch { return ""; }
+        }
+
         private static void RenderPluginList() {
             try {
                 if (_externalPlugins.Count == 0) return;
@@ -184,7 +191,8 @@ public partial class SR {
                     Color prev = GUI.color;
                     try {
                     if (dis) GUI.color = new Color(1f, 1f, 1f, 0.55f);   //禁用项用半透明标记
-                    GUILayout.Label(new GUIContent((dis ? "* " : "") + p.name, p.guid + "\n" + (dis ? T("已禁用", "disabled") : T("已启用", "enabled"))),
+                    GUILayout.Label(new GUIContent((dis ? "* " : "") + p.name,
+                        p.guid + "\n" + (string.IsNullOrEmpty(p.path) ? "?" : p.path) + "\n" + (dis ? T("已禁用", "disabled") : T("已启用", "enabled"))),
                         _labelClip, GUILayout.Width(w - Sc(70)), GUILayout.Height(Sc(24)));
                     } finally { GUI.color = prev; }
                     GUILayout.FlexibleSpace();

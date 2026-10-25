@@ -1289,7 +1289,13 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 				string p = null;
 				try { p = Path.Combine(Paths.BepInExRootPath, input); if (File.Exists(p)) return p; } catch { }
 				try { p = Path.Combine(Paths.ConfigPath, input); if (File.Exists(p)) return p; } catch { }
-				try { p = Path.Combine(PresetsRoot(), input); if (File.Exists(p)) return p; } catch { }
+				try {
+                // 先净化文件名，再取全路径并确认仍在预设根目录内（防目录穿越）。
+                string safe = SafeFileName(input);
+                string root2 = Path.GetFullPath(PresetsRoot());
+                string full = Path.GetFullPath(Path.Combine(root2, safe));
+                if (full.StartsWith(root2, StringComparison.OrdinalIgnoreCase) && File.Exists(full)) return full;
+            } catch { }
 			} catch (Exception __ex) {
 				SRApi.Guard.Log("布局预设/解析导入路径", __ex);
 			}

@@ -675,13 +675,34 @@ public partial class SR : ITweak {
         private static readonly List<Func<bool>> _hostOverrides = new List<Func<bool>>();
         private static readonly List<Func<bool>> _pauseProviders = new List<Func<bool>>();
 
+        // 豁免来源登记：谁在提权必须可见（设置页显示 + 首次登记写日志）。
+        public static readonly List<string> OverrideSources = new List<string>();
+        private static void NoteOverrideSource(string kind) {
+            try {
+                string who = "unknown";
+                var st = new System.Diagnostics.StackTrace();
+                for (int i = 1; i < st.FrameCount; i++) {
+                    var m = st.GetFrame(i).GetMethod();
+                    if (m == null) continue;
+                    Type dt = m.DeclaringType;
+                    if (dt == null || dt == typeof(SR)) continue;
+                    who = dt.Assembly.GetName().Name;
+                    break;
+                }
+                string line = kind + " <- " + who;
+                if (!OverrideSources.Contains(line)) {
+                    OverrideSources.Add(line);
+                    Guard.Log("门控豁免登记: " + line, null);
+                }
+            } catch { }
+        }
         // 登记"无视模式限制"豁免
         public static void RegisterModeOverride(Func<bool> f) {
-            if (f != null && !_modeOverrides.Contains(f)) _modeOverrides.Add(f);
+            if (f != null && !_modeOverrides.Contains(f)) { _modeOverrides.Add(f); NoteOverrideSource("模式限制"); }
         }
         // 登记"无视房主限制"豁免
         public static void RegisterHostOverride(Func<bool> f) {
-            if (f != null && !_hostOverrides.Contains(f)) _hostOverrides.Add(f);
+            if (f != null && !_hostOverrides.Contains(f)) { _hostOverrides.Add(f); NoteOverrideSource("房主限制"); }
         }
         // 登记"冻结角色"求值（打开面板 / 地图时冻结自己的角色）
         public static void RegisterPauseProvider(Func<bool> f) {
@@ -1098,7 +1119,8 @@ public partial class SR : ITweak {
                     guid = kv.Key,
                     name = info.Metadata != null && info.Metadata.Name != null ? info.Metadata.Name : kv.Key,
                     config = info.Instance.Config,
-                    instance = info.Instance
+                    instance = info.Instance,
+                    path = SafeAssemblyPath(info.Instance)
                 };
                 // 用 MainPlugin 的编译期常量：与 [BepInPlugin] 同源，改名漏改会编译报错。
                 if (kv.Key == MainPlugin.PluginGuid) {
