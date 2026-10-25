@@ -70,6 +70,7 @@ public partial class Experiments : ITweak
 
 		internal static string Status = "（尚未探测：打开上面的开关后约 1 秒出现结果）";
 		// 方块越界放置并入主开关：Placeable.IgnoreBounds 是纯 bool，CanPlaceCheck 直接读，不经物理回调。
+		// 新方块由 PiecePlacedEvent 即时打标（见 PieceIgnoreListener），全场扫描只在开启/换场景后做有限次。
 		// 关闭时一律走 Restore() 逐项还原（按 _colOrig/_fixWas/_igWas/_curOrig 等记录的原值写回）。
 		private static bool WallsOn { get { return _on != null && _on.Value; } }
 		private static bool CursorOn { get { return _on != null && _on.Value; } }
@@ -91,6 +92,8 @@ public partial class Experiments : ITweak
 		private static readonly Dictionary<PiecePlacementCursor, Bounds> _curOrig = new Dictionary<PiecePlacementCursor, Bounds>();
 		private static readonly Dictionary<Placeable, bool> _igWas = new Dictionary<Placeable, bool>();
 		private static readonly HashSet<Placeable> _aliveBuf = new HashSet<Placeable>();
+		private static int _igScans;                       // 本场景全场扫描次数（达到上限后只靠事件打标）
+		private const int IgScanMaxTries = 20;              // 20 × 30 帧 ≈ 10 秒覆盖加载后生成的物件
 		private static readonly List<Placeable> _deadBuf = new List<Placeable>();
 		private static System.Reflection.FieldInfo _fiBoundary;
 		private static System.Reflection.FieldInfo _fiFrame;
@@ -140,6 +143,20 @@ public partial class Experiments : ITweak
 			SRApi.LocDesc("Experiments", "Level Bounds Radius", "硬解除半径：光标与相机可到关卡外的距离\n值越大可走得越远，不限范围；填 1 即贴着光标\n仅在主开关开启时生效", "hard unlock radius: how far the cursor and camera can reach outside the level\nlarger values reach farther with no upper limit; 1 keeps it right at the cursor\nonly applies while the main switch is on");
 		}
 
+		// 新放置的方块：立即设置 IgnoreBounds（只处理这一个对象，不做全场景扫描）。
+		private class PieceIgnoreListener : GameEvent.IGameEventListener {
+			public void handleEvent(GameEvent.GameEvent e) {
+				try {
+					GameEvent.PiecePlacedEvent ppe = e as GameEvent.PiecePlacedEvent;
+					if (ppe == null || ppe.PlacedBlock == null) return;
+					if (_on == null || !_on.Value || !SRApi.GateMaster) return;
+					Placeable p = ppe.PlacedBlock;
+					if (!_igWas.ContainsKey(p)) _igWas[p] = p.IgnoreBounds;
+					if (!p.IgnoreBounds) p.IgnoreBounds = true;
+				} catch (Exception __ex) { SRApi.Guard.Log("边界/新方块打标", __ex); }
+			}
+		}
+
 		public void Initialize(IFeatureHost plugin) {
 			try {
 				SelfReg();
@@ -165,6 +182,8 @@ public partial class Experiments : ITweak
 				// 半径不挂 SettingChanged，Tick 每帧会调 ApplyHardBounds，改完下一帧自然生效。
 				// 旧的子项键已无任何 Config.Bind，统一由 SR.ConfigMigration 的 RemoveKeys 清理。
 				SRApi.RegisterTick("关卡边界-应用", Tick);
+				try { GameEvent.GameEventManager.ChangeListener<GameEvent.PiecePlacedEvent>(new PieceIgnoreListener(), true); }
+				catch (Exception __ex) { SRApi.Guard.Log("边界/事件监听", __ex); }
 				SRApi.RegisterSceneHook(Reset);
 				SRApi.RegisterDismissHook(Dismiss);
 				// 总开关关闭时核心触发 RegisterDismissHook -> Dismiss() -> Restore()。
@@ -175,6 +194,7 @@ public partial class Experiments : ITweak
 		private static void Reeval() {
 			try {
 				if (_on == null) return;
+				_igScans = 0;   // 重新开启：允许再做一轮有限次全场扫描
 				bool on = _on.Value && SRApi.GateMaster;
 				if (on) {
 					_applied = true;
@@ -218,7 +238,7 @@ public partial class Experiments : ITweak
 		// 三面实体墙：只在引用缺失时扫场景；两道闸限制扫描次数 —— 换场景清零、单场景累计上限 WallScanMaxTries 后放弃。
 		private static int _wallScanTries;
 		private static int _wallScanScene = -1;
-		private const int WallScanMaxTries = 60;
+		private const int WallScanMaxTries = 20;   // 20 × 5 帧 ≈ 1.7 秒内没找到就放弃（多数关卡没有这三面墙）
 
 		private static void EnsureWalls() {
 			bool miss = false;
@@ -349,6 +369,9 @@ public partial class Experiments : ITweak
 			try {
 				bool on = PieceIgnoreOn;
 				Placeable[] all = UnityEngine.Object.FindObjectsOfType<Placeable>();
+				// 本场景最多扫 IgScanMaxTries 次（覆盖加载后生成的物件）；此后新方块由放置事件即时处理。
+				if (_igScans >= IgScanMaxTries) return;
+				_igScans++;
 				// _igWas 为强引用字典，且游戏销毁方块时不派发事件；以本轮扫描到的集合为权威，剔除已销毁的键。
 				// 复用静态缓冲：每 30 帧一次全场景扫描，不再每轮新建 HashSet（满图 500+ 方块时是明显 GC 尖峰）。
 				HashSet<Placeable> alive = null;
@@ -494,7 +517,7 @@ public partial class Experiments : ITweak
 		}
 
 		// 缓存
-		private const int CursorRefreshEvery = 30;
+		private const int CursorRefreshEvery = 60;
 		private static PiecePlacementCursor[] Cursors() {
 			int f = Time.frameCount;
 			if (f - _cursorsAt < CursorRefreshEvery) return _cursors;
@@ -522,7 +545,7 @@ public partial class Experiments : ITweak
 		}
 		private static ZoomCamera Zc() {
 			int f = Time.frameCount;
-			if (f - _zcAt < 30 && _zc != null) return _zc;
+			if (f - _zcAt < 60 && _zc != null) return _zc;
 			_zcAt = f;
 			try {
 				ZoomCamera a = UnityEngine.Object.FindObjectOfType<ZoomCamera>();
@@ -532,7 +555,7 @@ public partial class Experiments : ITweak
 		}
 		private static FixCameraToBoundaries[] Fixers() {
 			int f = Time.frameCount;
-			if (f - _fixersAt < 30) return _fixers;
+			if (f - _fixersAt < 60) return _fixers;
 			_fixersAt = f;
 			try {
 				FixCameraToBoundaries[] a = UnityEngine.Object.FindObjectsOfType<FixCameraToBoundaries>();
@@ -656,6 +679,8 @@ public partial class Experiments : ITweak
 
 		// 换场景：Level / 相机 / 光标 / 方块均为新对象，旧原值字典整体作废。
 		private static void Reset() {
+			_igScans = 0;
+
 			_colOrig.Clear();
 			_fixWas.Clear();
 			_curOrig.Clear();
@@ -741,6 +766,8 @@ public partial class Experiments : ITweak
 					n++;
 				}
 				_hitCount = n;
+				// 命中即停止后续全场景复查（新遮罩由场景切换重置后重新扫描）。
+				if (n > 0) _ui3ScanTries = Ui3ScanMaxTries;
 				Note = n > 0 ? ("已解除 UI3 覆盖：停画 " + n + " 个 Renderer")
 							 : "未找到 UI3 层上的 Renderer（本关卡可能没有）";
 			} catch (Exception __ex) { SRApi.Guard.Log("应用UI3解除", __ex); }
