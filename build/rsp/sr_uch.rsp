@@ -27,6 +27,7 @@ MainPlugin.cs
 SR_UCH\SR.Contracts.cs
 SR_UCH\SR.Core.cs
 SR_UCH\SR.Ctl.cs
+SR_UCH\SR.ColorPicker.cs
 SR_UCH\SR.Window.cs
 SR_UCH\SR.Gate.cs
 SR_UCH\SR.Settings.cs
