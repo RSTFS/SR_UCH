@@ -939,175 +939,209 @@ public partial class SR {
     private static float _rowLastClickTime = -999f;
 
     //统一入口：表头 + 行命中 + 行单元格 + 钉住列命中（滚动条/输入由调用方按需要另调）
+    //统一入口：表头 + 行命中 + 行单元格 + 钉住列命中（滚动条/输入由调用方按需要另调）
+    // 分段：PrepareArgs -> HeaderAndDispatch -> RowHit/Selection -> HeaderInteractions -> DragGhost
+    //       -> Pinned -> EmptyHint -> Rows -> ColumnHide -> FinishResize -> DispatchRowClick。
+    // 相位顺序即原有的绘制/命中顺序，改动任何一段的先后都会影响 IMGUI 叠层与事件消费。
     public static void TableDraw(SRApi.TableArgs a) {
         if (a == null || a.colW == null || a.vis == null) return;
         try {
-            // vis 由 order + hidden 自行推导：TableColMove 换位后只更新 order，调用方无需再维护 vis。
-            DeriveVisibleCols(a);
-            float headerH = a.headerH > 0f ? a.headerH : Sc(24);
-            if (a.vertical) headerH = (a.headerH > 0f ? a.headerH : Sc(22)) * Mathf.Max(1, a.vis != null ? a.vis.Count : 0); // 纵向时表头高 = 单格高 × 列数
-            float rowH = a.rowH > 0f ? a.rowH : Sc(26);
-            // order 是换列算法的必需输入；调用方未赋时这里兜底成恒等序。
-            if (a.drawHeader && (a.order == null || a.order.Length != a.colW.Length)) {
-                int[] ident = new int[a.colW.Length];
-                for (int i = 0; i < ident.Length; i++) ident[i] = i;
-                a.order = ident;
-            }
-            if (a.drawHeader) {
-                DrawTableHeader(a.vis, a.pinCol, a.colW, a.scrollX, a.box, a.stripW, headerH, a.mp, a.title, a.moveCol,
-                    a.pinW, a.pinX, a.pinTitle, a.headerCells, a.headerCols, a.vertical, a.scrollY, a.headerLeft, out a.pinHeader);
-                // 表头下的横线：只在核心自己画表头时画一条（drawHeader=false 时由调用方自己画）。
-                DrawLine(new Rect(a.box.x, a.box.y + headerH - 1f, a.stripW, 1f), CurStyle.LineStrong);
-            }
+            float headerH, rowH;
+            TablePrepareArgs(a, out headerH, out rowH);
+            if (a.drawHeader) TableHeaderAndShiftClick(a, headerH);
             TableRowRects(a.rowCount, rowH, a.scrollY, a.rowsH, a.box.y, headerH, a.rowsClip, a.box.x, a.stripW, a.rowRects, a.rowRows);
-            // 表头 Shift+左键：交给页面处理列头专属开关（如联机列表的“质量系数”）。
-            // 必须用 MouseDown 判定：IMGUI 到 MouseUp 时修饰键可能已丢。
-            try {
-                Event __he = Event.current;
-                if (__he != null && __he.type == EventType.MouseDown && __he.button == 0 && __he.shift
-                    && a.headerShiftClick != null && a.headerCells.Count > 0) {
-                    for (int __hk = 0; __hk < a.headerCells.Count && __hk < a.headerCols.Count; __hk++) {
-                        if (!a.headerCells[__hk].Contains(__he.mousePosition)) continue;
-                        a.headerShiftClick(a.headerCols[__hk]);
-                        __he.Use();
-                        break;
-                    }
-                }
-            } catch (Exception __ex) { Guard.Log("表头Shift点击派发", __ex); }
-            // 行命中：用 rowRects 每帧回填 rowHover（只在行区裁剪内，且不算钉住列区域）。
-            try {
-                Event __re = Event.current;
-                int __hov = -1;
-                if (__re != null && a.rowsClip.width > 0f && a.rowsClip.height > 0f && a.rowsClip.Contains(__re.mousePosition)) {
-                    Vector2 __rmp = __re.mousePosition;
-                    bool __inPin = a.pinW > 0f && __rmp.x >= a.pinX;
-                    if (!__inPin) {
-                        for (int k = 0; k < a.rowRects.Count && k < a.rowRows.Count; k++) {
-                            if (a.rowRects[k].Contains(__rmp)) { __hov = a.rowRows[k]; break; }
-                        }
-                    }
-                }
-                a.rowHover = __hov;
-            } catch (Exception __ex) { Guard.Log("表格行命中", __ex); }
-            // 行选中高亮：rowSelected 指定的行由核心画整行高亮。
-            if (a.rowSelected != null && a.rowRects != null && a.rowRects.Count > 0) {
-                try {
-                    for (int __i = 0; __i < a.rowRects.Count; __i++) {
-                        if (!a.rowSelected(a.rowRows[__i])) continue;
-                        Color __oc = GUI.color;
-                        try { GUI.color = new Color(0.55f, 0.78f, 1f, 0.22f); GUI.DrawTexture(a.rowRects[__i], Px()); }
-                        finally { GUI.color = __oc; }
-                    }
-                } catch (Exception __ex) { Guard.Log("行选中高亮", __ex); }
-            }
-            //表头分隔线拖列宽 + 悬停换 <-> 光标（与房间列表完全同一实现）
-            if (a.headerCells.Count > 0 && !a.vertical) { // 纵向不做列宽/行高拖动
-                bool inBox = a.box.Contains(a.mp);
-                for (int k = 0; k < a.headerCells.Count; k++) {
-                    Rect cell = a.headerCells[k];
-                    int ci = k < a.headerCols.Count ? a.headerCols[k] : k;
-                    //列头悬停提示（与房间列表一致：悬停在表头格上显示该列说明）
-                    if (a.tip != null && inBox && cell.Contains(a.mp)) {
-                        string tip = null;
-                        try { tip = a.tip(ci); } catch { tip = null; }
-                        if (!string.IsNullOrEmpty(tip)) GUI.tooltip = tip;
-                    }
-                    // 排序方向指示（给了 sortCol 才画）。
-                    if (a.sortCol >= 0 && ci == a.sortCol) {
-                        SR.Ctl.SecHeaderCenter.Draw(new Rect(cell.xMax - Sc(14), cell.y, Sc(12), cell.height),
-                            new GUIContent(a.sortAsc ? "\u25B2" : "\u25BC"), false, false, false, false);
-                    }
-                    if (!a.resizable) continue;
-                    Rect sep = new Rect(cell.xMax - Sc(3), cell.y, Sc(7), cell.height);
-                    if (inBox && sep.Contains(a.mp)) CursorResize = true;
-                    TableColResize(Event.current, cell, ci, a.mp, inBox, a.colW,
-                        ref a.dragCol, ref a.dragX0, ref a.dragW0, ref a.scrollColsTmp, ref a.scrollColsAtDragTmp);
-                }
-                //列头拖动换位（与房间列表同一实现；需要调用方给出 order/回调）
-                if (a.reorderable && a.order != null) {
-                    if (a.allCols.Count != a.colW.Length) { a.allCols.Clear(); for (int i = 0; i < a.colW.Length; i++) a.allCols.Add(i); }
-                    // 列序长度与该表列数不一致时按本表列数重建，否则拖动看不出变化。
-                    if (a.order != null && a.colW != null && a.colW.Length > 0 && a.order.Length != a.colW.Length) {
-                        int[] __ord = new int[a.colW.Length];
-                        for (int i = 0; i < __ord.Length; i++) __ord[i] = i;
-                        a.order = __ord;
-                    }
-                    // 拖动中只把“按下时的那一列”交给 TableColMove，保证松开时 moveCol == ci。
-                    int __dragK = -1;
-                    if (a.moveCol >= 0) {
-                        for (int k = 0; k < a.headerCells.Count; k++) {
-                            int __c2 = (a.headerCols.Count > k) ? a.headerCols[k] : k;
-                            if (__c2 == a.moveCol) { __dragK = k; break; }
-                        }
-                        if (__dragK < 0 && a.moveCol < a.headerCells.Count) __dragK = a.moveCol;   //兜底：按下时记录的就是本表列下标
-                    }
-                    // 落点列列表用 headerCols（显示位 -> 数据列），不能用 allCols（自然序）。
-                    List<int> __cols = (a.headerCols != null && a.headerCols.Count > 0) ? a.headerCols : a.allCols;
-                    for (int k = 0; k < a.headerCells.Count; k++) {
-                        if (__dragK >= 0 && k != __dragK) continue; // 拖动中：只处理拖动的那一列
-                        int ci = k < a.headerCols.Count ? a.headerCols[k] : k;
-                        TableColMove(Event.current, a.headerCells[k], ci, k, __cols, a.mp, inBox, a.headerCells, a.order,
-                            a.applyOrder, a.saveOrder, a.click, ref a.moveCol, ref a.moveX0, ref a.moveDx,
-                            ref a.scrollColsTmp, ref a.scrollColsAtDragTmp, a.vertical);
-                    }
-                    // 兜底：拖动中逐格循环未命中且本帧为 MouseUp 时就地完成换位。
-                    if (a.moveCol >= 0 && Event.current != null && Event.current.type == EventType.MouseUp && Event.current.button == 0) {
-                        int __mv = a.moveCol; int __k = -1;
-                        for (int k = 0; k < a.headerCells.Count; k++) { int __c3 = (a.headerCols.Count > k) ? a.headerCols[k] : k; if (__c3 == __mv) { __k = k; break; } }
-                        if (__k < 0 && __mv < a.headerCells.Count) __k = __mv;
-                        if (__k >= 0) {
-                            TableColMove(Event.current, a.headerCells[__k], __mv, __k, __cols, a.mp, a.box.Contains(a.mp), a.headerCells, a.order,
-                                a.applyOrder, a.saveOrder, a.click, ref a.moveCol, ref a.moveX0, ref a.moveDx,
-                                ref a.scrollColsTmp, ref a.scrollColsAtDragTmp, a.vertical);
-                        } else { a.moveCol = -1; a.moveDx = 0f; }
-                    }
-                }
-            }
-            // 列头拖拽动画（仅 Repaint）：跟手浮动块 + 插入指示线，纯绘制不改数据。
-            if (a.moveCol >= 0 && Event.current != null && Event.current.type == EventType.Repaint) {
-                try {
-                    int __mk = -1;
-                    for (int k = 0; k < a.headerCells.Count; k++) { int __c = (a.headerCols.Count > k) ? a.headerCols[k] : k; if (__c == a.moveCol) { __mk = k; break; } }
-                    if (__mk < 0 && a.moveCol < a.headerCells.Count) __mk = a.moveCol;
-                    if (__mk >= 0) {
-                        Rect __src = a.headerCells[__mk];
-                        int __tgt = __mk;
-                        for (int j = 0; j < a.headerCells.Count; j++) { if (a.mp.x < a.headerCells[j].xMax) { __tgt = j; break; } __tgt = a.headerCells.Count - 1; }
-                        Color __old = GUI.color;
-                        try {
-                            //插入指示线：仅当落点不同、且落点不在"钉住列"（pinCol）区域时才画，避免末尾多余色块
-                            if (__tgt != __mk && !(a.pinCol > 0 && a.headerCells[__tgt].x >= a.pinX)) {
-                                GUI.color = new Color(1f, 0.85f, 0.25f, 0.95f);
-                                GUI.Box(new Rect(a.headerCells[__tgt].xMax - Sc(1), __src.y, Sc(2), __src.height), GUIContent.none);
-                            }
-                            //跟手"幽灵"：实心半透明块（与房间列表观感一致）
-                            GUI.color = new Color(1f, 1f, 1f, 0.45f);
-                            GUI.Box(new Rect(a.mp.x - __src.width * 0.5f, __src.y - Sc(2), __src.width, __src.height), GUIContent.none);
-                        } finally { GUI.color = __old; }
-                    }
-                } catch (Exception __ex) { Guard.Log("SR.Ctl", __ex); }
-            }
+            TableRowHitAndSelection(a);
+            TableHeaderInteractions(a);
+            TableDrawDragGhost(a);
             TablePinnedRects(a.rowCount, rowH, a.scrollY, a.rowsH, a.box.y, headerH, a.pinX, a.pinW, a.pinRects, a.pinRows);
-            //钉住列按钮：由调用方提供内容（房间列表的加入、方块/EX 的操作），本控件负责定位与命中
-            if (a.pinW > 0f && a.pinDraw != null) {
-                for (int k = 0; k < a.pinRects.Count && k < a.pinRows.Count; k++) {
-                    try { a.pinDraw(a.pinRows[k], a.pinRects[k], k); } catch (Exception __pd) { Guard.Log("钉住列按钮", __pd); }
+            TableDrawPinned(a);
+            TableDrawEmptyHint(a, rowH);
+            TableDrawRows(a, headerH, rowH);
+            TableHandleColumnHide(a);
+            TableFinishResize(a);
+            TableDispatchRowClick(a);
+        } catch (Exception __ex) { Guard.Log("表格绘制", __ex); }
+    }
+
+    // 相位 1：推导可见列、兜底 order、确定表头高与行高（后续各相位共用）。
+    private static void TablePrepareArgs(SRApi.TableArgs a, out float headerH, out float rowH) {
+        // vis 由 order + hidden 自行推导：TableColMove 换位后只更新 order，调用方无需再维护 vis。
+        DeriveVisibleCols(a);
+        headerH = a.headerH > 0f ? a.headerH : Sc(24);
+        if (a.vertical) headerH = (a.headerH > 0f ? a.headerH : Sc(22)) * Mathf.Max(1, a.vis != null ? a.vis.Count : 0); // 纵向时表头高 = 单格高 × 列数
+        rowH = a.rowH > 0f ? a.rowH : Sc(26);
+        // order 是换列算法的必需输入；调用方未赋时这里兜底成恒等序。
+        if (a.drawHeader && (a.order == null || a.order.Length != a.colW.Length)) {
+            int[] ident = new int[a.colW.Length];
+            for (int i = 0; i < ident.Length; i++) ident[i] = i;
+            a.order = ident;
+        }
+    }
+
+    // 相位 2：画表头 + 表头下横线 + 派发表头 Shift+左键（页面自管列头开关）。
+    private static void TableHeaderAndShiftClick(SRApi.TableArgs a, float headerH) {
+        DrawTableHeader(a.vis, a.pinCol, a.colW, a.scrollX, a.box, a.stripW, headerH, a.mp, a.title, a.moveCol,
+            a.pinW, a.pinX, a.pinTitle, a.headerCells, a.headerCols, a.vertical, a.scrollY, a.headerLeft, out a.pinHeader);
+        // 表头下的横线：只在核心自己画表头时画一条（drawHeader=false 时由调用方自己画）。
+        DrawLine(new Rect(a.box.x, a.box.y + headerH - 1f, a.stripW, 1f), CurStyle.LineStrong);
+        // 表头 Shift+左键：交给页面处理列头专属开关（如联机列表的“质量系数”）。
+        // 必须用 MouseDown 判定：IMGUI 到 MouseUp 时修饰键可能已丢。
+        try {
+            Event __he = Event.current;
+            if (__he != null && __he.type == EventType.MouseDown && __he.button == 0 && __he.shift
+                && a.headerShiftClick != null && a.headerCells.Count > 0) {
+                for (int __hk = 0; __hk < a.headerCells.Count && __hk < a.headerCols.Count; __hk++) {
+                    if (!a.headerCells[__hk].Contains(__he.mousePosition)) continue;
+                    a.headerShiftClick(a.headerCols[__hk]);
+                    __he.Use();
+                    break;
                 }
             }
-            //空列表提示：调用方给文本，本控件负责居中（三处列表同一观感）
-            if (a.rowCount == 0 && a.emptyHint != null && _emptyHintFrame != Time.frameCount) {
-                _emptyHintFrame = Time.frameCount;   // 同一帧只画一次（防止页面/核心重复绘制出现两条提示）
-                string eh = null;
-                try { eh = a.emptyHint(); } catch { eh = null; }
-                if (!string.IsNullOrEmpty(eh)) {
-                    Rect rc = a.rowsClip;
-                    SR.Ctl.LabelClipCenter.Draw(new Rect(rc.x, rc.y + Mathf.Max(0f, (a.rowsH - rowH * 2f) * 0.5f), Mathf.Max(Sc(60), a.stripW), rowH * 2f),
-                        new GUIContent(eh), false, false, false, false);
+        } catch (Exception __ex) { Guard.Log("表头Shift点击派发", __ex); }
+    }
+
+    // 相位 3：行命中回填 rowHover（只在行区裁剪内，且不算钉住列区域）+ 行选中高亮。
+    private static void TableRowHitAndSelection(SRApi.TableArgs a) {
+        try {
+            Event __re = Event.current;
+            int __hov = -1;
+            if (__re != null && a.rowsClip.width > 0f && a.rowsClip.height > 0f && a.rowsClip.Contains(__re.mousePosition)) {
+                Vector2 __rmp = __re.mousePosition;
+                bool __inPin = a.pinW > 0f && __rmp.x >= a.pinX;
+                if (!__inPin) {
+                    for (int k = 0; k < a.rowRects.Count && k < a.rowRows.Count; k++) {
+                        if (a.rowRects[k].Contains(__rmp)) { __hov = a.rowRows[k]; break; }
+                    }
                 }
             }
-            Color clipSavedColor = GUI.color; // 异常时也要还原（GUI.color 泄漏会污染游戏界面）
-            GUI.BeginClip(new Rect(a.box.x, a.box.y + headerH, a.stripW, a.rowsH));
+            a.rowHover = __hov;
+        } catch (Exception __ex) { Guard.Log("表格行命中", __ex); }
+        // 行选中高亮：rowSelected 指定的行由核心画整行高亮。
+        if (a.rowSelected == null || a.rowRects == null || a.rowRects.Count <= 0) return;
+        try {
+            for (int __i = 0; __i < a.rowRects.Count; __i++) {
+                if (!a.rowSelected(a.rowRows[__i])) continue;
+                Color __oc = GUI.color;
+                try { GUI.color = new Color(0.55f, 0.78f, 1f, 0.22f); GUI.DrawTexture(a.rowRects[__i], Px()); }
+                finally { GUI.color = __oc; }
+            }
+        } catch (Exception __ex) { Guard.Log("行选中高亮", __ex); }
+    }
+
+    // 相位 4：表头列宽拖动 / 换位 / 列头悬停提示 / 排序箭头（纵向表头不做列宽与换位）。
+    private static void TableHeaderInteractions(SRApi.TableArgs a) {
+        if (a.headerCells.Count <= 0 || a.vertical) return; // 纵向不做列宽/行高拖动
+        bool inBox = a.box.Contains(a.mp);
+        for (int k = 0; k < a.headerCells.Count; k++) {
+            Rect cell = a.headerCells[k];
+            int ci = k < a.headerCols.Count ? a.headerCols[k] : k;
+            //列头悬停提示（与房间列表一致：悬停在表头格上显示该列说明）
+            if (a.tip != null && inBox && cell.Contains(a.mp)) {
+                string tip = null;
+                try { tip = a.tip(ci); } catch { tip = null; }
+                if (!string.IsNullOrEmpty(tip)) GUI.tooltip = tip;
+            }
+            // 排序方向指示（给了 sortCol 才画）。
+            if (a.sortCol >= 0 && ci == a.sortCol) {
+                SR.Ctl.SecHeaderCenter.Draw(new Rect(cell.xMax - Sc(14), cell.y, Sc(12), cell.height),
+                    new GUIContent(a.sortAsc ? "\u25B2" : "\u25BC"), false, false, false, false);
+            }
+            if (!a.resizable) continue;
+            Rect sep = new Rect(cell.xMax - Sc(3), cell.y, Sc(7), cell.height);
+            if (inBox && sep.Contains(a.mp)) CursorResize = true;
+            TableColResize(Event.current, cell, ci, a.mp, inBox, a.colW,
+                ref a.dragCol, ref a.dragX0, ref a.dragW0, ref a.scrollColsTmp, ref a.scrollColsAtDragTmp);
+        }
+        //列头拖动换位（与房间列表同一实现；需要调用方给出 order/回调）
+        if (!a.reorderable || a.order == null) return;
+        if (a.allCols.Count != a.colW.Length) { a.allCols.Clear(); for (int i = 0; i < a.colW.Length; i++) a.allCols.Add(i); }
+        // 列序长度与该表列数不一致时按本表列数重建，否则拖动看不出变化。
+        if (a.colW != null && a.colW.Length > 0 && a.order.Length != a.colW.Length) {
+            int[] __ord = new int[a.colW.Length];
+            for (int i = 0; i < __ord.Length; i++) __ord[i] = i;
+            a.order = __ord;
+        }
+        // 拖动中只把“按下时的那一列”交给 TableColMove，保证松开时 moveCol == ci。
+        int __dragK = -1;
+        if (a.moveCol >= 0) {
+            for (int k = 0; k < a.headerCells.Count; k++) {
+                int __c2 = (a.headerCols.Count > k) ? a.headerCols[k] : k;
+                if (__c2 == a.moveCol) { __dragK = k; break; }
+            }
+            if (__dragK < 0 && a.moveCol < a.headerCells.Count) __dragK = a.moveCol;   //兜底：按下时记录的就是本表列下标
+        }
+        // 落点列列表用 headerCols（显示位 -> 数据列），不能用 allCols（自然序）。
+        List<int> __cols = (a.headerCols != null && a.headerCols.Count > 0) ? a.headerCols : a.allCols;
+        for (int k = 0; k < a.headerCells.Count; k++) {
+            if (__dragK >= 0 && k != __dragK) continue; // 拖动中：只处理拖动的那一列
+            int ci = k < a.headerCols.Count ? a.headerCols[k] : k;
+            TableColMove(Event.current, a.headerCells[k], ci, k, __cols, a.mp, inBox, a.headerCells, a.order,
+                a.applyOrder, a.saveOrder, a.click, ref a.moveCol, ref a.moveX0, ref a.moveDx,
+                ref a.scrollColsTmp, ref a.scrollColsAtDragTmp, a.vertical);
+        }
+        // 兜底：拖动中逐格循环未命中且本帧为 MouseUp 时就地完成换位。
+        if (a.moveCol >= 0 && Event.current != null && Event.current.type == EventType.MouseUp && Event.current.button == 0) {
+            int __mv = a.moveCol; int __k = -1;
+            for (int k = 0; k < a.headerCells.Count; k++) { int __c3 = (a.headerCols.Count > k) ? a.headerCols[k] : k; if (__c3 == __mv) { __k = k; break; } }
+            if (__k < 0 && __mv < a.headerCells.Count) __k = __mv;
+            if (__k >= 0) {
+                TableColMove(Event.current, a.headerCells[__k], __mv, __k, __cols, a.mp, a.box.Contains(a.mp), a.headerCells, a.order,
+                    a.applyOrder, a.saveOrder, a.click, ref a.moveCol, ref a.moveX0, ref a.moveDx,
+                    ref a.scrollColsTmp, ref a.scrollColsAtDragTmp, a.vertical);
+            } else { a.moveCol = -1; a.moveDx = 0f; }
+        }
+    }
+
+    // 相位 5：列头拖拽动画（仅 Repaint）：跟手浮动块 + 插入指示线，纯绘制不改数据。
+    private static void TableDrawDragGhost(SRApi.TableArgs a) {
+        if (a.moveCol < 0 || Event.current == null || Event.current.type != EventType.Repaint) return;
+        try {
+            int __mk = -1;
+            for (int k = 0; k < a.headerCells.Count; k++) { int __c = (a.headerCols.Count > k) ? a.headerCols[k] : k; if (__c == a.moveCol) { __mk = k; break; } }
+            if (__mk < 0 && a.moveCol < a.headerCells.Count) __mk = a.moveCol;
+            if (__mk < 0) return;
+            Rect __src = a.headerCells[__mk];
+            int __tgt = __mk;
+            for (int j = 0; j < a.headerCells.Count; j++) { if (a.mp.x < a.headerCells[j].xMax) { __tgt = j; break; } __tgt = a.headerCells.Count - 1; }
+            Color __old = GUI.color;
             try {
+                //插入指示线：仅当落点不同、且落点不在"钉住列"（pinCol）区域时才画，避免末尾多余色块
+                if (__tgt != __mk && !(a.pinCol > 0 && a.headerCells[__tgt].x >= a.pinX)) {
+                    GUI.color = new Color(1f, 0.85f, 0.25f, 0.95f);
+                    GUI.Box(new Rect(a.headerCells[__tgt].xMax - Sc(1), __src.y, Sc(2), __src.height), GUIContent.none);
+                }
+                //跟手"幽灵"：实心半透明块（与房间列表观感一致）
+                GUI.color = new Color(1f, 1f, 1f, 0.45f);
+                GUI.Box(new Rect(a.mp.x - __src.width * 0.5f, __src.y - Sc(2), __src.width, __src.height), GUIContent.none);
+            } finally { GUI.color = __old; }
+        } catch (Exception __ex) { Guard.Log("SR.Ctl", __ex); }
+    }
+
+    // 相位 6：钉住列的按钮定位与派发（按钮内容由调用方给，本控件只负责矩形与命中）。
+    private static void TableDrawPinned(SRApi.TableArgs a) {
+        if (a.pinW <= 0f || a.pinDraw == null) return;
+        for (int k = 0; k < a.pinRects.Count && k < a.pinRows.Count; k++) {
+            try { a.pinDraw(a.pinRows[k], a.pinRects[k], k); } catch (Exception __pd) { Guard.Log("钉住列按钮", __pd); }
+        }
+    }
+
+    // 相位 7：空列表提示（调用方给文本，本控件负责居中；三处列表同一观感）。
+    private static void TableDrawEmptyHint(SRApi.TableArgs a, float rowH) {
+        if (a.rowCount != 0 || a.emptyHint == null || _emptyHintFrame == Time.frameCount) return;
+        _emptyHintFrame = Time.frameCount;   // 同一帧只画一次（防止页面/核心重复绘制出现两条提示）
+        string eh = null;
+        try { eh = a.emptyHint(); } catch { eh = null; }
+        if (string.IsNullOrEmpty(eh)) return;
+        Rect rc = a.rowsClip;
+        SR.Ctl.LabelClipCenter.Draw(new Rect(rc.x, rc.y + Mathf.Max(0f, (a.rowsH - rowH * 2f) * 0.5f), Mathf.Max(Sc(60), a.stripW), rowH * 2f),
+            new GUIContent(eh), false, false, false, false);
+    }
+
+    // 相位 8：行区绘制（裁剪内只遍历可见行：O(可见行数) 而不是 O(总行数)）。
+    private static void TableDrawRows(SRApi.TableArgs a, float headerH, float rowH) {
+        Color clipSavedColor = GUI.color; // 异常时也要还原（GUI.color 泄漏会污染游戏界面）
+        GUI.BeginClip(new Rect(a.box.x, a.box.y + headerH, a.stripW, a.rowsH));
+        try {
             // 只遍历可见行：O(可见行数) 而不是 O(总行数)，大列表滚动时显著省 CPU。
             int __firstRow = Mathf.Max(0, Mathf.FloorToInt(a.scrollY / Mathf.Max(1f, rowH)));
             int __lastRow = Mathf.Min(a.rowCount - 1, Mathf.CeilToInt((a.scrollY + a.rowsH) / Mathf.Max(1f, rowH)));
@@ -1134,66 +1168,71 @@ public partial class SR {
                 GUI.color = prev;
                 DrawLine(new Rect(0f, y + rowH - 1f, a.stripW, 1f), CurStyle.LineLight);
             }
-            } finally { GUI.EndClip(); GUI.color = clipSavedColor; }
-            //右键隐藏列 / Shift+右键恢复全部；表头右端+N一键恢复（与房间列表同一套行为）
-            if (a.hideable && a.hidden != null && Event.current != null && a.box.Contains(a.mp)) {
-                Event e = Event.current;
-                if (e.type == EventType.MouseDown && e.button == 1) {
-                    if (e.shift) {
-                        if (a.hidden != null && a.hidden.Count > 0) a.hidden.Clear();
+        } finally { GUI.EndClip(); GUI.color = clipSavedColor; }
+    }
+
+    // 相位 9：右键隐藏列 / Shift+右键恢复全部（含列宽还原）。
+    private static void TableHandleColumnHide(SRApi.TableArgs a) {
+        //右键隐藏列 / Shift+右键恢复全部；表头右端+N一键恢复（与房间列表同一套行为）
+        if (!a.hideable || a.hidden == null || Event.current == null || !a.box.Contains(a.mp)) return;
+        Event e = Event.current;
+        if (e.type != EventType.MouseDown || e.button != 1) return;
+        if (e.shift) {
+            if (a.hidden != null && a.hidden.Count > 0) a.hidden.Clear();
             // Shift+右键还原时列宽也一并还原到默认值。
             if (a.defaultColW != null && a.colW != null && a.defaultColW.Length == a.colW.Length) {
                 for (int __i = 0; __i < a.colW.Length; __i++) a.colW[__i] = a.defaultColW[__i];
             }
-                        if (a.resetAll != null) { try { a.resetAll(); } catch (Exception __exr) { Guard.Log("表格还原全部", __exr); } }
-                        e.Use();
+            if (a.resetAll != null) { try { a.resetAll(); } catch (Exception __exr) { Guard.Log("表格还原全部", __exr); } }
+            e.Use();
+            return;
+        }
+        for (int k = 0; k < a.headerCells.Count; k++) {
+            if (!a.headerCells[k].Contains(a.mp)) continue;
+            int ci = k < a.headerCols.Count ? a.headerCols[k] : k;
+            if (a.colW.Length - a.hidden.Count > 1) a.hidden.Add(ci); //至少留一列
+            e.Use();
+            break;
+        }
+    }
+
+    // 相位 10：列宽拖动收尾（TableColResize 只处理 MouseDown/MouseDrag，这里清状态并回调落盘）。
+    private static void TableFinishResize(SRApi.TableArgs a) {
+        if (a.dragCol < 0 || Event.current == null || Event.current.type != EventType.MouseUp) return;
+        a.dragCol = -1;
+        BlockWindowDrag = false;
+        if (a.saveWidths != null) { try { a.saveWidths(); } catch (Exception __sw) { Guard.Log("表格列宽保存", __sw); } }
+    }
+
+    // 相位 11：行点击/双击/右键派发（左键从同一行按下再松开才触发；已消费的事件不会进到这里）。
+    private static void TableDispatchRowClick(SRApi.TableArgs a) {
+        try {
+            Event __ce = Event.current;
+            if (__ce == null) return;
+            if (__ce.type == EventType.MouseDown && __ce.button == 0) {
+                _rowDownRow = a.rowHover;
+            } else if (__ce.type == EventType.MouseUp && __ce.button == 1) {
+                // 行右键（核心统一派发；钉住操作列区域不算行命中）。
+                int __rr = a.rowHover;
+                if (__rr >= 0 && a.rowRightClick != null) {
+                    try { a.rowRightClick(__rr); } catch (Exception __rc2) { Guard.Log("表格行右键", __rc2); }
+                    __ce.Use();
+                }
+            } else if (__ce.type == EventType.MouseUp && __ce.button == 0) {
+                int __clicked = (a.rowHover >= 0 && a.rowHover == _rowDownRow) ? a.rowHover : -1;
+                _rowDownRow = -1;
+                if (__clicked >= 0) {
+                    if (a.rowClick != null) { try { a.rowClick(__clicked); } catch (Exception __rc) { Guard.Log("表格行点击", __rc); } }
+                    float __now = Time.unscaledTime;
+                    if (_rowLastClickRow == __clicked && __now - _rowLastClickTime <= 0.35f) {
+                        _rowLastClickRow = -1; _rowLastClickTime = -999f;
+                        if (a.rowDoubleClick != null) { try { a.rowDoubleClick(__clicked); } catch (Exception __rd) { Guard.Log("表格行双击", __rd); } }
                     } else {
-                        for (int k = 0; k < a.headerCells.Count; k++) {
-                            if (!a.headerCells[k].Contains(a.mp)) continue;
-                            int ci = k < a.headerCols.Count ? a.headerCols[k] : k;
-                            if (a.colW.Length - a.hidden.Count > 1) a.hidden.Add(ci); //至少留一列
-                            e.Use();
-                            break;
-                        }
+                        _rowLastClickRow = __clicked; _rowLastClickTime = __now;
                     }
                 }
             }
-            // 列宽拖动收尾：TableColResize 只处理 MouseDown/MouseDrag，这里清状态并回调落盘。
-            if (a.dragCol >= 0 && Event.current != null && Event.current.type == EventType.MouseUp) {
-                a.dragCol = -1;
-                BlockWindowDrag = false;
-                if (a.saveWidths != null) { try { a.saveWidths(); } catch (Exception __sw) { Guard.Log("表格列宽保存", __sw); } }
-            }
-            // 行点击/双击：左键从同一行按下再松开才派发；已被其它交互消费的事件（type=Used）不会进到这里。
-            try {
-                Event __ce = Event.current;
-                if (__ce != null) {
-                    if (__ce.type == EventType.MouseDown && __ce.button == 0) {
-                        _rowDownRow = a.rowHover;
-                    } else if (__ce.type == EventType.MouseUp && __ce.button == 1) {
-                        // 行右键（核心统一派发；钉住操作列区域不算行命中）。
-                        int __rr = a.rowHover;
-                        if (__rr >= 0 && a.rowRightClick != null) {
-                            try { a.rowRightClick(__rr); } catch (Exception __rc2) { Guard.Log("表格行右键", __rc2); }
-                            __ce.Use();
-                        }
-                    } else if (__ce.type == EventType.MouseUp && __ce.button == 0) {
-                        int __clicked = (a.rowHover >= 0 && a.rowHover == _rowDownRow) ? a.rowHover : -1;
-                        _rowDownRow = -1;
-                        if (__clicked >= 0) {
-                            if (a.rowClick != null) { try { a.rowClick(__clicked); } catch (Exception __rc) { Guard.Log("表格行点击", __rc); } }
-                            float __now = Time.unscaledTime;
-                            if (_rowLastClickRow == __clicked && __now - _rowLastClickTime <= 0.35f) {
-                                _rowLastClickRow = -1; _rowLastClickTime = -999f;
-                                if (a.rowDoubleClick != null) { try { a.rowDoubleClick(__clicked); } catch (Exception __rd) { Guard.Log("表格行双击", __rd); } }
-                            } else {
-                                _rowLastClickRow = __clicked; _rowLastClickTime = __now;
-                            }
-                        }
-                    }
-                }
-            } catch (Exception __ex) { Guard.Log("表格行点击派发", __ex); }
-        } catch (Exception __ex) { Guard.Log("表格绘制", __ex); }
+        } catch (Exception __ex) { Guard.Log("表格行点击派发", __ex); }
     }
 
     // 从 order + hidden 推导可见列（三处表格共用同一规则）：调用方只维护 order/hidden，无需再维护 vis 副本。
