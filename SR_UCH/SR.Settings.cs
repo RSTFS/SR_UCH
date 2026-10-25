@@ -746,7 +746,9 @@ public partial class SR {
             float textW = NameTextWidth(entry, name);
             float cap = Mathf.Max(Sc(50), avail - reserve);
             float nameW = Mathf.Min(Mathf.Max(colWidth, Sc(50)), cap);
-            float nameTw = Mathf.Min(textW, nameW);   //绘制宽度 = 文字宽（夹在上限内）
+            // 标签列统一宽度（不再按每行文字宽自适应）：同一栏目里所有行的控件左边缘因此严格对齐，
+            // 长标签在列内截断/换行，短标签右侧补白。RowCells 里"紧贴标签"的旧约定随之作废。
+            float nameTw = nameW;
             //名称列包在垂直组内才能获得完整高度，否则 CJK 字形下沉 / 换行会被裁。
             //Begin/End 必须成对：中途抛异常而未闭合分组会让后续控件全部落错分组。
             GUILayout.BeginHorizontal();

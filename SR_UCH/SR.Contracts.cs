@@ -198,6 +198,20 @@ namespace SR_UCH {
         private static Action _closeMenu;
         public static void SetCloseMenuSink(Action closeMenu) { _closeMenu = closeMenu; }
         public static void CloseMenu() { Action a = _closeMenu; if (a != null) a(); }
+        // 页面级滚轮钩子：页面在窗口建立滚动区【之前】先拿一次滚轮（mouse, wheel；返回 true = 已消费）。
+        // 自绘的固定高度列表（表格 / 网格）都靠它滚动 —— 嵌套滚动区在本面板里收不到滚轮事件。
+        private static readonly List<Func<Vector2, float, bool>> _pageWheel = new List<Func<Vector2, float, bool>>();
+        public static void RegisterPageWheel(Func<Vector2, float, bool> hook) {
+            if (hook != null && !_pageWheel.Contains(hook)) _pageWheel.Add(hook);
+        }
+        public static bool DispatchPageWheel(Vector2 mouse, float wheel) {
+            for (int i = 0; i < _pageWheel.Count; i++) {
+                try { if (_pageWheel[i](mouse, wheel)) return true; }
+                catch { /* 静默：单个页面的滚轮钩子出错不影响其它页面 */ }
+            }
+            return false;
+        }
+
         // 打开管理器（从游戏自己的界面回来时自动弹回）。
         private static Action _openMenu;
         public static void SetOpenMenuSink(Action openMenu) { _openMenu = openMenu; }

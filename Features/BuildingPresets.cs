@@ -136,6 +136,8 @@ namespace SR_UCH.Tweaks {
         private static SRApi.TableArgs _args;
         private static Vector2 _scrollRows;
         private static Vector2 _scrollCols;
+        private static Rect _tableBox;     // 表格在屏幕上的矩形（页面级滚轮钩子按它判断是否滚表格）
+        private static bool _tableShown;   // 本帧是否画了表格
         private static float _maxScrollX;
         private static float _maxScrollY;
         private static bool _sbDragging;
@@ -242,6 +244,15 @@ namespace SR_UCH.Tweaks {
                 "列表排序方式\n0=时间（新→旧），1=名称（A→Z）\n由列表页的排序下拉维护，不在配置区重复显示",
                 "preset list sort mode\n0 = time (newest first), 1 = name (A-Z)\nmaintained by the sort dropdown on the list page and not repeated in the settings area");
             // 换场景后下次打开面板重新扫盘（手动放入/删除的 XML、其它存档的改动都能看到）。
+            // 页面级滚轮：鼠标在预设表格上就滚表格（本页关掉了页面滚动，嵌套滚动区收不到滚轮）。
+            try {
+                SRApi.RegisterPageWheel(delegate(Vector2 __mp, float __w) {
+                    if (!_tableShown || _maxScrollY <= 0f) return false;
+                    if (!_tableBox.Contains(__mp)) return false;
+                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + __w * SRApi.Ctl.Sc(40f), 0f, _maxScrollY);
+                    return true;
+                });
+            } catch (Exception __pwr) { SRApi.Guard.Log("布局预设/注册滚轮钩子", __pwr); }
             // 规则书关闭后自动回收数据（每 0.25 秒一次的轻量轮询，未在编辑时立刻返回）。
             try { SRApi.RegisterTick("布局预设/规则书回收", TickRulebook); }
             catch (Exception __tk) { SRApi.Guard.Log("布局预设/注册规则书轮询", __tk); }
@@ -369,6 +380,7 @@ namespace SR_UCH.Tweaks {
                 // 本帧开始前的二次确认状态：只有"之前已确认、本帧又没点中操作按钮"才在空白处取消，
                 // 避免把本帧其它按钮（保存/导入）刚点出来的二次确认立刻清掉。
                 string pendingBefore = _pendingKey;
+                _tableShown = false;   // 每帧重置：只有真的画了表格，滚轮钩子才生效
                 // 页面级滚动关闭：内容按视口高度布局，滚轮只在预设表格内部滚动。
                 try {
                     SRApi.NoPageScrollBars = true;
@@ -465,10 +477,11 @@ namespace SR_UCH.Tweaks {
                     RenderLoadModeCombo();
                     GUILayout.Space(W(8));
                     // 右侧：直接打开游戏自己的界面（规则 / 积分 / 模块概率 / 修改器都在里面），改完回来点「读取游戏当前」。
-                    if (GUILayout.Button(new GUIContent(SRApi.T("游戏界面", "Game UI"),
-                            SRApi.T("打开游戏自己的规则书界面\n规则、积分设置、模块概率、修改器都在里面\n本面板会自动收起；需在树屋里由房主操作",
-                                "opens the game's own rulebook UI\nrules, points, block odds and modifiers all live there\nthis panel closes itself; host only, in the treehouse")),
-                        SRApi.Ctl.Btn, GUILayout.Width(W(96)), GUILayout.Height(W(24)))) OpenGameRulebook(null);
+                    // 统一按钮（自动快捷键按钮）：左键打开游戏自己的规则/修改器界面，右键可直接绑热键。
+                    if (SRApi.Ctl.HotkeyButton("presets.gameui", SRApi.T("数据", "Data"),
+                            SRApi.T("打开游戏自己的规则/修改器界面\n规则、积分设置、模块概率、修改器都在里面\n本面板会自动收起；右键可绑快捷键",
+                                "opens the game's own rules/modifiers UI\nrules, points, block odds and modifiers all live there\nthis panel closes itself; right-click to bind a hotkey"),
+                            delegate { OpenGameRulebook(null); }, W(96), W(24))) OpenGameRulebook(null);
                     GUILayout.FlexibleSpace();
                 } finally {
                     GUILayout.EndHorizontal();
@@ -528,7 +541,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 string[] labels = new string[vals.Count];
                 for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
                 bool open = _levelFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open, ComboW());
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open);
                 _levelFilterOpen = open;
                 if (sel >= 0 && sel < vals.Count) _levelFilter = vals[sel];
             } catch (Exception __ex) {
@@ -568,7 +581,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 string[] labels = new string[vals.Count];
                 for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
                 bool open = _modeFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open, ComboW());
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open);
                 _modeFilterOpen = open;
                 if (sel >= 0 && sel < vals.Count) _modeFilter = vals[sel];
             } catch (Exception __ex) {
@@ -612,7 +625,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 运行期状态被外部改坏时回退到默认「预设」（与下拉索引 1 对应）。
                 if (!string.Equals(vals[cur], _typeFilter, StringComparison.OrdinalIgnoreCase)) _typeFilter = "preset";
                 bool open = _typeFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, ComboW());
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(90));
                 _typeFilterOpen = open;
                 if (sel >= 0 && sel < vals.Length) _typeFilter = vals[sel];
             } catch (Exception __ex) {
@@ -622,9 +635,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 
         // 加载模式下拉：默认 + 游戏四模式（派对 / 创意 / 挑战 / 自由）。运行期状态，不落配置。
         // 值为 "" 或 GameState.GameMode 的 ToString；显示名复用 ModeText（游戏本地化 / 中文回退）。
-        // 本页所有下拉 / 输入框的统一下限宽度：保证三行控件的左边界与宽度一致。
-        private static float ComboW() { return Mathf.Max(W(150), SRApi.Ctl.Sc(150f)); }
-
         private static void RenderLoadModeCombo() {
             try {
                 string[] vals = new string[] { "", "PARTY", "CREATIVE", "CHALLENGE", "FREEPLAY" };
@@ -638,7 +648,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 labels[0] = SRApi.T("默认", "Default");
                 for (int i = 1; i < vals.Length; i++) labels[i] = ModeText(vals[i]);
                 bool open = _loadModeOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, ComboW());
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(90));
                 _loadModeOpen = open;
                 if (sel >= 0 && sel < vals.Length) _loadMode = vals[sel];
             } catch (Exception __ex) {
@@ -795,6 +805,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                         : SRApi.T("没有匹配当前搜索的预设。", "No presets match the current search.");
                 };
                 _hiddenBeforeTable = _hiddenCols.Count;
+                _tableBox = box;      // 供页面级滚轮钩子命中判定
+                _tableShown = true;
                 SRApi.TableDraw(_args);
                 UpdateDataCellTip();   // 鼠标悬浮「数据」列单元格 -> 列出该预设的自定义数据
                 // 表格滚轮：本页自己接管（页面级滚动被 NoPageScrollBars 关掉了，嵌套滚动区收不到滚轮）。
@@ -927,7 +939,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 }
                 bool delPending = IsPending("del:" + p.Key);
                 _actActions[ActLoad].Label = replacePending ? SRApi.T("确认", "Confirm") : SRApi.T("加载", "Load");
-                _actActions[ActMods].Label = SRApi.T("游戏界面", "Game UI");
+                _actActions[ActMods].Label = SRApi.T("数据", "Data");
                 _actActions[ActMods].Tip = SRApi.T("把这条预设的规则 / 积分 / 模块概率 / 修改器灌进游戏并打开游戏自己的界面\n改完关掉会自动读回来保存", "loads this preset's rules / points / block odds / modifiers into the game and opens the game's own UI\nthe data is read back and saved when you close it");
                 _actActions[ActRename].Label = SRApi.T("重命名", "Rename");
                 _actActions[ActExport].Label = SRApi.T("导出", "Export");

@@ -588,8 +588,20 @@ namespace SR_UCH.Tweaks {
                 _bookKey = p != null && !p.IsLocal ? p.Key : null;
                 _bookSeenOpen = false;
                 _bookPollAt = 0f;
-                SRApi.CloseMenu();            // 先收起本面板，否则输入被冻结、规则书点不动
-                // 路线 1（最贴近游戏本身）：场景里已有规则书道具 GameRuleProp，直接走它的 Use。
+                SRApi.CloseMenu();            // 先收起本面板，否则输入被冻结、界面点不动
+                // 路线 0（首选）：平板界面 Tablet —— 里面有"规则 / 积分 / 模块 / 修改器"的整块页面。
+                Tablet tablet = FindTablet();
+                LobbyPlayer local = FindLocalLobbyPlayer(lm);
+                if (tablet != null) {
+                    try {
+                        tablet.OnShowTablet();
+                        tablet.OpenLegacyRuleScreen(local != null ? local.CursorInstance as PickCursor : null);
+                        _bookSeenOpen = true;
+                        SRApi.LogInfo("[布局预设] 已打开平板规则/修改器界面（Tablet.OpenLegacyRuleScreen）");
+                        return;
+                    } catch (Exception __tb) { SRApi.Guard.Log("布局预设/平板规则界面", __tb); }
+                }
+                // 路线 1（次选）：场景里已有规则书道具 GameRuleProp，直接走它的 Use。
                 GameRuleProp prop = FindRuleProp();
                 if (prop != null) {
                     LobbyPlayer lp = FindLocalLobbyPlayer(lm);
@@ -613,6 +625,12 @@ namespace SR_UCH.Tweaks {
                 SRApi.Guard.Log("布局预设/打开游戏规则书", __ex);
                 SRApi.Notify(SRApi.T("打开游戏规则书失败", "Failed to open the game rulebook"));
             }
+        }
+
+        // 场景里的平板（规则/修改器界面的载体）。
+        private static Tablet FindTablet() {
+            try { return UnityEngine.Object.FindObjectOfType(typeof(Tablet)) as Tablet; }
+            catch { return null; }
         }
 
         // 场景里的规则书道具（树屋里的那本）。关卡里通常没有 -> 返回 null。

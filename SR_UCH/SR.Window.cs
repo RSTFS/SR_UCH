@@ -536,6 +536,15 @@ public partial class SR {
             SRApi.Diag("mode=" + _mode + " section=" + _selectedInternalSection);
             SRApi.Diag("areaH=" + __areaH.ToString("0.0") + " usedTop=" + __usedTop.ToString("0.0") + " barH=" + __barH.ToString("0.0"));
             SRApi.Diag("viewport=" + SRApi.PageViewportHeight.ToString("0.0") + " footerTop=" + (__areaH - __barH).ToString("0.0") + " scrollY=" + _scroll.y.ToString("0.0"));
+            // 页面级滚轮：页面可以在滚动区之前抢走滚轮（自绘固定高度列表靠这个滚动）。
+            if (__wasWheel) {
+                try {
+                    float __pw = -(Mathf.Abs(__we.delta.y) > 0.001f ? __we.delta.y : __we.delta.x);
+                    if (SRApi.DispatchPageWheel(__wheelMouse, __pw)) {
+                        __we.Use(); __we.type = EventType.Used; WheelShieldHit = true; SR.MarkWheelUsed();
+                    }
+                } catch (Exception __pwx) { Guard.Log("页面级滚轮", __pwx); }
+            }
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
             _scroll = __noScroll
