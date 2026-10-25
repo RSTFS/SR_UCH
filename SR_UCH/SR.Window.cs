@@ -13,6 +13,24 @@ public partial class SR {
 
 // 分区：Window（主窗口框架：Tick 主循环 / 标题栏 / DrawGUI / 窗口拖动缩放）
 
+        // 缩放把手 + 自绘光标（从 DrawGUI 提取，保持原有绘制顺序与状态）。
+        private static void DrawResizeGripAndCursor(Rect winRect, Vector2 mouse, Rect gripRect) {
+            // 整数对齐 + 尺寸与贴图一致（消除锯齿）；颜色按 ImGui ResizeGrip 三态（accent，0.25 / 0.7 / 0.95）。
+            {
+                int gs = Mathf.Max(8, Mathf.RoundToInt(Sc(21)));   // 与贴图一致
+                float galpha = _resizing ? 0.95f : (CursorResize && gripRect.Contains(mouse) ? 0.7f : 0.25f);
+                Color oldC = GUI.color;
+                GUI.color = new Color(0.30f, 0.49f, 1f, galpha);   // ImGui 主题的 accent_color
+                GUI.DrawTexture(new Rect(Mathf.Round(winRect.xMax - gs), Mathf.Round(winRect.yMax - gs), gs, gs), _gripTex);
+                GUI.color = oldC;
+            }
+            // 自绘光标（游戏隐藏了系统光标）；悬停栏目分隔线时换成左右调整形状
+            Texture2D curTex = CursorResize && _cursorResizeTex != null ? _cursorResizeTex
+                : (CursorMove && _cursorMoveTex != null ? _cursorMoveTex : _cursorTex);
+            if (curTex != null) GUI.DrawTexture(new Rect(mouse.x - Sc(7), mouse.y - Sc(7), Sc(15), Sc(15)), curTex);
+        }
+
+
         private static void Tick() {
             // 门控快照：每帧刷新一次（所有限制读同一份 -> 同帧一致）
             RefreshGate();
@@ -624,19 +642,7 @@ public partial class SR {
             FooterHeight = Sc(28f);
             GUILayout.EndArea();
 
-            // 整数对齐 + 尺寸与贴图一致（消除锯齿）；颜色按 ImGui ResizeGrip 三态（accent，0.25 / 0.7 / 0.95）。
-            {
-                int gs = Mathf.Max(8, Mathf.RoundToInt(Sc(21)));   // 与贴图一致
-                float galpha = _resizing ? 0.95f : (CursorResize && gripRect.Contains(mouse) ? 0.7f : 0.25f);
-                Color oldC = GUI.color;
-                GUI.color = new Color(0.30f, 0.49f, 1f, galpha);   // ImGui 主题的 accent_color
-                GUI.DrawTexture(new Rect(Mathf.Round(winRect.xMax - gs), Mathf.Round(winRect.yMax - gs), gs, gs), _gripTex);
-                GUI.color = oldC;
-            }
-            // 自绘光标（游戏隐藏了系统光标）；悬停栏目分隔线时换成左右调整形状
-            Texture2D curTex = CursorResize && _cursorResizeTex != null ? _cursorResizeTex
-                : (CursorMove && _cursorMoveTex != null ? _cursorMoveTex : _cursorTex);
-            if (curTex != null) GUI.DrawTexture(new Rect(mouse.x - Sc(7), mouse.y - Sc(7), Sc(15), Sc(15)), curTex);
+            DrawResizeGripAndCursor(winRect, mouse, gripRect);
             // F9：诊断浮层
             try {
                 if (SR.DiagEnabled && SRApi.DiagLines.Count > 0) {
