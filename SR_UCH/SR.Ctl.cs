@@ -687,9 +687,7 @@ public partial class SR {
         private static string _tipKey;
         private static string[] _tipLines = new string[0];
         private static readonly GUIContent _tipContent = new GUIContent();
-        private static readonly GUIContent _tipLineContent = new GUIContent();
         private static float _tipW, _tipH, _tipInnerW;
-        private static GUIContent TipLineContent(string s) { _tipLineContent.text = s; return _tipLineContent; }
         // 关闭界面时清空提示缓存，避免 tooltip 文本跨帧残留（表头提示延迟消失）。
         public static void ClearTip() {
             try { _tipKey = null; _tipLines = new string[0]; _tipContent.text = ""; } catch { /* 静默：非关键路径，失败可直接忽略 */ }

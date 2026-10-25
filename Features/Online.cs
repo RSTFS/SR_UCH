@@ -766,7 +766,6 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<string> _colOrder, _hiddenColsEntry;
         // 行裁剪框 / 表头裁剪框 / 滚动条矩形
         private static Rect _rowsClipPage, _joinHeaderPage;
-        private static Rect _sbTrackPage = new Rect(0f, 0f, 0f, 0f), _sbThumbPage = new Rect(0f, 0f, 0f, 0f);
 
         // 可见列（order + hidden -> 显示顺序）现由核心 TableDraw 自行推导，本页不再维护副本。
 

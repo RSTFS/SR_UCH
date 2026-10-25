@@ -367,7 +367,7 @@ namespace SR_UCH.Tweaks {
 
         // ---------- 页面渲染（单页：保存与导入 + 搜索/排序 + 预设列表） ----------
 
-        // 同一页按 SectionTitle 分保存 / 导入导出 / 搜索排序筛选 / 预设列表四个区；页面本身不滚动（NoPageScrollBars + 表格高度按视口计算），
+        // 同一页按 SectionTitle 分保存 / 导入导出 / 搜索排序筛选 / 预设列表四个区；页面滚动保留，表格另有一套自己的滚轮（页面级钩子 + 表格内处理）。
         // 预设列表在固定高度区域内用自己的滚轮滚动。
         // 页面内容在布局空间里的起点 y（零高度探针），用于计算表格上方已用高度（同联机列表）。
         private static float _pageTopY;
@@ -958,14 +958,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
         private static void DoActMods() {
             PresetInfo p = _actPreset;
             if (p != null && !p.IsLocal) OpenGameRulebook(p);
-        }
-
-        private static void DoActRename() {
-            PresetInfo p = _actPreset;
-            if (p == null || p.IsLocal) return;
-            ClearPending();
-            _renameKey = p.Key;
-            _renameText = p.Name;
         }
 
         private static void DoActExport() {

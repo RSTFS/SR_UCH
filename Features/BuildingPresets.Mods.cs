@@ -542,15 +542,6 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取游戏修改器", __ex); }
         }
 
-        // 一次把规则/积分/模块概率 + 修改器都读进来。
-        private static void ReadAllFromGame(PresetInfo p) {
-            try {
-                ReadRulesFromGame(p);
-                ReadModsFromGame();
-                SRApi.Notify(SRApi.T("已读取游戏当前设置到这条预设", "Current game settings read into this preset"));
-            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取游戏当前", __ex); }
-        }
-
         // 快照属性名 -> Modifiers 里的字段名（部分字段是 camelCase），读不到返回 null。
         private static string ModFieldName(string attr) {
             switch (attr) {
