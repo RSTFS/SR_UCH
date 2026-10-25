@@ -164,6 +164,8 @@ namespace SR_UCH.Tweaks {
             public bool Ok;          // XML 可解析且方块数 > 0（存 index.json；缺字段按 false，扫描时自愈）
             // 修改器策略："" = 继承预设自带（默认）；"off" = 全部还原默认；"custom" = 用 ModsVals 覆盖。
             public string ModsMode = "";
+            // 加载该预设时是否一并应用 游戏规则 / 积分设置 / 模块概率（保存时写入 sidecar）。
+            public bool ApplyRules, ApplyPoints, ApplyBlocks;
             public Dictionary<string, string> ModsVals;   // 仅 custom 时有值：<mods> 属性名 -> 值
             // 来源：false = 本功能 presets 目录里的预设；true = 游戏本地保存的自定义关卡（.snapshot，只读）。
             public bool IsLocal;
@@ -1168,6 +1170,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 } catch (Exception __nx) { SRApi.Guard.Log("布局预设/写入显示名", __nx); }
                 Directory.CreateDirectory(dir);
                 File.WriteAllText(path, xml, new UTF8Encoding(false));
+                SaveRulesetSidecar(path);   // 规则 / 积分 / 模块概率：与预设同名的 sidecar
                 PresetInfo p = FindPreset(key);
                 if (p == null) {
                     p = new PresetInfo();
@@ -1485,6 +1488,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     return;
                 }
                 if (ReloadBlocked()) return;
+                ApplyRulesetForPreset(p);   // 先按预设的勾选应用 规则 / 积分 / 模块概率
                 string xml = ReadPresetXml(p);
                 if (string.IsNullOrEmpty(xml)) {
                     SRApi.Notify(SRApi.T("读取预设文件失败", "Failed to read the preset file"));
@@ -2183,6 +2187,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                             if (pi.LevelCode == null) pi.LevelCode = "";
                             pi.Ok = JsonBool(line, "ok");
                             pi.ModsMode = JsonStr(line, "modsMode") ?? "";
+                            pi.ApplyRules = JsonBool(line, "applyRules");
+                            pi.ApplyPoints = JsonBool(line, "applyPoints");
+                            pi.ApplyBlocks = JsonBool(line, "applyBlocks");
                             ParseModsVals(pi, JsonStr(line, "modsVals"));
                             // 字段缺失判定：老索引（v1-v3）没有 level / levelName / levelCode / ok -> 默认 false/0，扫描时自愈。
                             bool complete = line.IndexOf("\"level\":", StringComparison.Ordinal) >= 0
@@ -2428,6 +2435,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                         .Append("\",\"blocks\":").Append(Mathf.Max(0, p.Blocks))
                         .Append(",\"time\":\"").Append(JsonEsc(TimeIso(p.TimeUtc)))
                         .Append("\",\"ok\":").Append(p.Ok ? "true" : "false")
+                        .Append(",\"applyRules\":").Append(p.ApplyRules ? "true" : "false")
+                        .Append(",\"applyPoints\":").Append(p.ApplyPoints ? "true" : "false")
+                        .Append(",\"applyBlocks\":").Append(p.ApplyBlocks ? "true" : "false")
                         .Append(",\"modsMode\":\"").Append(JsonEsc(p.ModsMode ?? ""))
                         .Append("\",\"modsVals\":\"").Append(JsonEsc(ModsValsToText(p))).Append("\"}");
                 }

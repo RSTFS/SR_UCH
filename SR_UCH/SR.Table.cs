@@ -262,6 +262,7 @@ public partial class SR {
                 for (int __i = 0; __i < a.colW.Length; __i++) a.colW[__i] = a.defaultColW[__i];
             }
             if (a.resetAll != null) { try { a.resetAll(); } catch (Exception __exr) { Guard.Log("表格还原全部", __exr); } }
+            try { SR.LogInfo("[表格] Shift+右键：已还原列宽/列序并取消全部隐藏列"); } catch { /* 静默：日志不可用时忽略 */ }
             e.Use();
             return;
         }

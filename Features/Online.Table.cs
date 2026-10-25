@@ -316,6 +316,14 @@ namespace SR_UCH.Tweaks {
             if (inBox && !_sbDragging && _joinHeaderPage.width > 0f && _joinHeaderPage.Contains(mp)) {
                 GUI.tooltip = SRApi.T(TitleTips[JoinCol], TitleTipsEn[JoinCol]);
             }
+            // Shift+右键 = 还原全部：核心通常已经处理过（事件变 Used），这里再兜一层，
+            // 保证核心因任何原因没吃到事件时页面自己也能还原（ResetTable 幂等）。
+            if (e.button == 1 && e.shift && inBox
+                && (e.type == EventType.MouseDown || e.type == EventType.Used)) {
+                ResetTable();
+                e.Use();
+                return;
+            }
             // 右键：表头 = 隐藏该列（核心已处理，本页只负责落盘与提示）；Shift+右键 = 还原全部（核心清列并回调
             // resetAll）；房间行 = 隐藏该房间（本功能自己的状态，无核心 API）。
             if (e.type == EventType.MouseDown && e.button == 1 && inBox) {
