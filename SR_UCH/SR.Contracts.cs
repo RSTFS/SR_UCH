@@ -659,6 +659,14 @@ namespace SR_UCH {
             public void Invalidate() { Stamp = long.MinValue; }
         }
 
+        // 列模板：列表只声明"标题 / 提示 / 宽度策略 / 对齐"，核心据此生成表头与默认列宽。
+        public sealed class TableColumn {
+            public string TitleZh, TitleEn, TipZh, TipEn;
+            public float MinW = 40f;      // 设计单位下限
+            public float PadW = 22f;      // 在文字宽度上追加的余量
+            public bool AlignLeft;        // 是否靠左
+        }
+
         public static class Ctl {
             public delegate int ComboBoxFn(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width);
             private static Func<float, float> _sc;
@@ -710,6 +718,24 @@ namespace SR_UCH {
             public static float TableAutoHeight(float usedAbove, float minH) { return SRApi.TableAutoHeight(usedAbove, minH); }
             // 表格尺寸令牌（随 UI 缩放；页面不再写死 26/24/13 等字面量）。
             public static float TableRowH() { return Sc(26f); }
+            // UI 主题令牌（功能层统一入口）。
+            public static float ThemeRadius { get { return Sc(6f); } }
+            public static float ThemeHoverFade { get { return 0.12f; } }
+            public static Color ThemeFooterBg { get { return new Color(0.10f, 0.11f, 0.13f, 0.96f); } }
+            public static Color ThemePanelBg { get { return new Color(0.08f, 0.08f, 0.09f, 0.96f); } }
+            // 按列模板与表头文字算默认列宽。
+            public static float[] TableColumnWidths(TableColumn[] cols) {
+                if (cols == null) return null;
+                float[] w = new float[cols.Length];
+                for (int i = 0; i < cols.Length; i++) {
+                    TableColumn c = cols[i];
+                    if (c == null) { w[i] = Sc(60f); continue; }
+                    float tw = 0f;
+                    try { tw = Label.CalcSize(new GUIContent(T(c.TitleZh, c.TitleEn))).x; } catch { }
+                    w[i] = Mathf.Max(Sc(c.MinW), tw + Sc(c.PadW));
+                }
+                return w;
+            }
             public static float TableHeaderH() { return Sc(24f); }
             public static float TableGripH() { return Sc(4f); }
             public static float TableGripGap() { return Sc(2f); }

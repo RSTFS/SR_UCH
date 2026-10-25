@@ -575,7 +575,7 @@ public partial class SR {
             GUILayout.Space(Sc(2f));
             // 底栏：先占位并画圆角背景，再把按钮放进这个矩形（圆角 + 悬停过渡）。
             Rect __footRect = GUILayoutUtility.GetRect(0f, Sc(28f), GUILayout.ExpandWidth(true));
-            SR.DrawRounded(__footRect, new Color(0.10f, 0.11f, 0.13f, 0.96f), Sc(6f));
+            SR.DrawRounded(__footRect, SRApi.Ctl.ThemeFooterBg, SRApi.Ctl.ThemeRadius);
             GUILayout.BeginArea(new Rect(__footRect.x + Sc(4f), __footRect.y + Sc(3f), Mathf.Max(Sc(60f), __footRect.width - Sc(8f)), Sc(23f)));
             GUILayout.BeginHorizontal();
             // 设置
@@ -585,7 +585,7 @@ public partial class SR {
             Rect __setRect = GUILayoutUtility.GetRect(__setW, Sc(22f), GUILayout.Width(__setW), GUILayout.Height(Sc(22f)));
             bool __setHover = __setRect.Contains(Event.current != null ? Event.current.mousePosition : Vector2.zero);
             Color __setBg = GUI.backgroundColor;
-            GUI.backgroundColor = Color.Lerp(__setBg, new Color(0.78f, 0.84f, 0.98f, 1f), __setHover ? 0.35f : 0f);
+            GUI.backgroundColor = Color.Lerp(__setBg, new Color(0.78f, 0.84f, 0.98f, 1f), __setHover ? SRApi.Ctl.ThemeHoverFade * 2.9f : 0f);
             bool __setClicked = GUI.Button(__setRect, __setLbl, _mode == Mode.Settings ? _selItem : _btn);
             GUI.backgroundColor = __setBg;
             if (__setClicked) {
@@ -648,7 +648,7 @@ public partial class SR {
                     for (int i = 0; i < SRApi.DiagLines.Count; i++)
                         __total += _labelWrap.CalcHeight(new GUIContent(SRApi.DiagLines[i]), __innerW);
                     Rect box = new Rect(Sc(8f), Sc(34f), w, Mathf.Min(__total + Sc(10f), Screen.height * 0.5f));
-                    SR.DrawRounded(box, new Color(0f, 0f, 0f, 0.78f), Sc(6f));
+                    SR.DrawRounded(box, new Color(0f, 0f, 0f, 0.78f), SRApi.Ctl.ThemeRadius);
                     GUI.Label(new Rect(box.x + Sc(6f), box.y + Sc(2f), __innerW, _label.CalcHeight(new GUIContent("SR DIAG"), __innerW)), "SR DIAG", _label);
                     __y += _label.CalcHeight(new GUIContent("SR DIAG"), __innerW) + Sc(2f);
                     for (int i = 0; i < SRApi.DiagLines.Count; i++) {

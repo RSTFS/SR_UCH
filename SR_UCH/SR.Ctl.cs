@@ -22,8 +22,27 @@ public partial class SR {
         public static float Sc(float v) { return SR.Sc(v); }
 
         // 统一控件高度：按钮 / 输入框 / 下拉框 / 复选框同高（默认 26，按 UI 缩放；功能可用 ControlHeight 覆盖）。
+        // UI 主题令牌：圆角、过渡时长、底栏/面板底色（各页面统一引用，避免散落魔数）。
+        public static float ThemeRadius { get { return Sc(6f); } }
+        public static float ThemeHoverFade { get { return 0.12f; } }
+        public static Color ThemeFooterBg { get { return new Color(0.10f, 0.11f, 0.13f, 0.96f); } }
+        public static Color ThemePanelBg { get { return new Color(0.08f, 0.08f, 0.09f, 0.96f); } }
         public static float ControlH() { return SR.ControlH(); }
         // 表格尺寸令牌：行高/表头高/拖拽条/滚动条宽/最小高度（全部随 UI 缩放，页面不再写死字面量）。
+        // 依据列模板与当前语言表头文字计算默认列宽（只增不减的下限），供列表首次布局使用。
+        public static float[] TableColumnWidths(SRApi.TableColumn[] cols) {
+            if (cols == null) return null;
+            float[] w = new float[cols.Length];
+            for (int i = 0; i < cols.Length; i++) {
+                SRApi.TableColumn c = cols[i];
+                if (c == null) { w[i] = Sc(60f); continue; }
+                string title = SRApi.T(c.TitleZh, c.TitleEn);
+                float tw = 0f;
+                try { tw = Label.CalcSize(new GUIContent(title)).x; } catch { }
+                w[i] = Mathf.Max(Sc(c.MinW), tw + Sc(c.PadW));
+            }
+            return w;
+        }
         public static float TableRowH() { return Sc(26f); }
         public static float TableHeaderH() { return Sc(24f); }
         public static float TableGripH() { return Sc(4f); }
@@ -726,7 +745,7 @@ public partial class SR {
             Color __oldTipColor = GUI.color;
             GUI.color = new Color(1f, 1f, 1f, __alpha);
             Rect __tipRect = new Rect(x, y, _tipW, _tipH);
-            DrawRounded(__tipRect, new Color(0.08f, 0.08f, 0.09f, 0.96f), Sc(6f));
+            DrawRounded(__tipRect, SRApi.Ctl.ThemePanelBg, SRApi.Ctl.ThemeRadius);
             GUI.Label(new Rect(__tipRect.x + Sc(6f), __tipRect.y + Sc(4f), _tipInnerW, _tipH - Sc(8f)), _tipContent, TipTextStyle());
             GUI.color = __oldTipColor;
         }
