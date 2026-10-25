@@ -34,11 +34,11 @@ public partial class Level {
         GUILayout.Space(SRApi.Ctl.Sc(4));
     }
 
-		// 重载关卡模式：保留方块与分数 / 仅保留方块（分数重置）。
-		public enum ReloadMode {
-			KeepScore,
-			KeepBlocksOnly
-		}
+        // 重载关卡模式：保留方块与分数 / 仅保留方块（分数重置）。
+        public enum ReloadMode {
+            KeepScore,
+            KeepBlocksOnly
+        }
 
     public static void MarkPreserveScores() {
         _preserveScoresOnReload = true;

@@ -202,5 +202,5 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("外部插件清单渲染", __ex); }
         }
 
-	}
+    }
 }

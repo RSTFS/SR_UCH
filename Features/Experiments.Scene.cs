@@ -10,38 +10,38 @@ using UnityEngine;
 
 namespace SR_UCH.Tweaks {
 public partial class Experiments : ITweak
-	{
-		// 场景页：树屋 / 加载与切场景
-		public static void RenderPage3() {
-			try {
-				// 树屋：立即开始
-			GUILayout.Space(SRApi.Ctl.Sc(6));
-			SRApi.Ctl.SectionTitle("- " + SRApi.T("树屋", "Treehouse") + " -", SRApi.T("在树屋大厅里直接开始关卡.",
-					   "Start the level immediately from the treehouse."));
-			SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
-				return e.Definition.Key.StartsWith("Lobby ");
-			});
-				if (LobbyTools.Note != null && LobbyTools.Note.Length > 0) {
-					GUILayout.Space(SRApi.Ctl.Sc(2));
-					DrawStatus(LobbyTools.Note);
-				}
+    {
+        // 场景页：树屋 / 加载与切场景
+        public static void RenderPage3() {
+            try {
+                // 树屋：立即开始
+            GUILayout.Space(SRApi.Ctl.Sc(6));
+            SRApi.Ctl.SectionTitle("- " + SRApi.T("树屋", "Treehouse") + " -", SRApi.T("在树屋大厅里直接开始关卡.",
+                       "Start the level immediately from the treehouse."));
+            SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
+                return e.Definition.Key.StartsWith("Lobby ");
+            });
+                if (LobbyTools.Note != null && LobbyTools.Note.Length > 0) {
+                    GUILayout.Space(SRApi.Ctl.Sc(2));
+                    DrawStatus(LobbyTools.Note);
+                }
 
-				// 加载与切场景
-				GUILayout.Space(SRApi.Ctl.Sc(6));
-				SRApi.Ctl.SectionTitle("- " + SRApi.T("加载与切场景", "Loading and scene switch") + " -", SRApi.T("跳过加载动画. 温柔加载在切换场景时先卸载再回收.",
-						 "Skip the loading animation. Gentle load unloads and collects before switching."));
-				SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
-					return e.Definition.Key.StartsWith("Splash ") || e.Definition.Key == "Gentle Load";
-				});
-				if (SplashTools.Note != null && SplashTools.Note.Length > 0) {
-					GUILayout.Space(SRApi.Ctl.Sc(2));
-					DrawStatus(SplashTools.Note);
-				}
-				GUILayout.Space(SRApi.Ctl.Sc(6));
-			} catch (Exception __ex) { SRApi.Guard.Log("场景页 渲染", __ex); }
-		}
+                // 加载与切场景
+                GUILayout.Space(SRApi.Ctl.Sc(6));
+                SRApi.Ctl.SectionTitle("- " + SRApi.T("加载与切场景", "Loading and scene switch") + " -", SRApi.T("跳过加载动画. 温柔加载在切换场景时先卸载再回收.",
+                         "Skip the loading animation. Gentle load unloads and collects before switching."));
+                SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
+                    return e.Definition.Key.StartsWith("Splash ") || e.Definition.Key == "Gentle Load";
+                });
+                if (SplashTools.Note != null && SplashTools.Note.Length > 0) {
+                    GUILayout.Space(SRApi.Ctl.Sc(2));
+                    DrawStatus(SplashTools.Note);
+                }
+                GUILayout.Space(SRApi.Ctl.Sc(6));
+            } catch (Exception __ex) { SRApi.Guard.Log("场景页 渲染", __ex); }
+        }
 
-		
+        
 }
 
 

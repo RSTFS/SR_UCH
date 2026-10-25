@@ -1270,6 +1270,6 @@ public partial class SR : ITweak {
             public static int WarnCount { get { return SRApi.Guard.WarnCount; } }
         }
 
-	}
+    }
 
 }

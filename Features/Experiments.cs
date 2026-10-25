@@ -6,32 +6,32 @@ using UnityEngine;
 
 namespace SR_UCH.Tweaks {
 public partial class Experiments : ITweak
-	{
-		// 栏目注册：本地化文案、侧栏顺序、三页页签。
-		private static void SelfReg() {
-			SRApi.LocSec("Experiments", "实验", null);
+    {
+        // 栏目注册：本地化文案、侧栏顺序、三页页签。
+        private static void SelfReg() {
+            SRApi.LocSec("Experiments", "实验", null);
             SRApi.Nav("Experiments", 100); //侧栏栏目顺序 100
             // 本栏目自绘，共三页。页签顺序由 Order 决定：p3 场景(10) / p1 关卡边界(20) / p2 其它(30)，id 与文件对应关系固定。
-			SRApi.RegisterPage("Experiments", "p1", "关卡边界", "Bounds", 20, Render);
-			SRApi.RegisterPage("Experiments", "p2", "其它", "Misc", 30, RenderPage2);
-			SRApi.RegisterPage("Experiments", "p3", "场景", "Scene", 10, RenderPage3);
-		}
+            SRApi.RegisterPage("Experiments", "p1", "关卡边界", "Bounds", 20, Render);
+            SRApi.RegisterPage("Experiments", "p2", "其它", "Misc", 30, RenderPage2);
+            SRApi.RegisterPage("Experiments", "p3", "场景", "Scene", 10, RenderPage3);
+        }
 
-		// 状态行：只读、可复制。
-		// 高度必须取 SRApi.Ctl.TextHeight(text, w)：中文有字形下沉，固定高度会裁字；该函数内部已含下沉余量并带缓存。
-		private static void DrawStatus(string text) {
-			try {
-				if (string.IsNullOrEmpty(text)) return;
-				float w = Mathf.Max(SRApi.Ctl.Sc(160), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40));
-				float h = SRApi.Ctl.TextHeight(text, w);
-				GUILayout.Label(text, SRApi.Ctl.LabelWrap, GUILayout.Width(w), GUILayout.Height(h));
-			} catch (Exception __ex) { SRApi.Guard.Log("状态行", __ex); }
-		}
+        // 状态行：只读、可复制。
+        // 高度必须取 SRApi.Ctl.TextHeight(text, w)：中文有字形下沉，固定高度会裁字；该函数内部已含下沉余量并带缓存。
+        private static void DrawStatus(string text) {
+            try {
+                if (string.IsNullOrEmpty(text)) return;
+                float w = Mathf.Max(SRApi.Ctl.Sc(160), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40));
+                float h = SRApi.Ctl.TextHeight(text, w);
+                GUILayout.Label(text, SRApi.Ctl.LabelWrap, GUILayout.Width(w), GUILayout.Height(h));
+            } catch (Exception __ex) { SRApi.Guard.Log("状态行", __ex); }
+        }
 
-		public void Initialize(IFeatureHost plugin)
-		{
-			SelfReg();
-			InitCleanup(plugin);
-		}
+        public void Initialize(IFeatureHost plugin)
+        {
+            SelfReg();
+            InitCleanup(plugin);
+        }
 }
 }

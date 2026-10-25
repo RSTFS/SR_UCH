@@ -225,6 +225,20 @@ function Check-BareCatch {
     Bad ('裸 catch { } 未注释：' + $total + ' 处（' + $rows.Count + ' 个文件；最多：' + $top + '）')
 }
 
+
+# P1-4：缩进统一（.cs 只允许空格缩进，禁止行首 Tab）。
+function Check-Indent {
+    $bad = @()
+    $files = Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.cs' -File |
+        Where-Object { ($_.FullName -replace '\\', '/') -notmatch '/bin/|/obj/|\.git/' }
+    foreach ($f in $files) {
+        $txt = [System.IO.File]::ReadAllText($f.FullName)
+        if ([regex]::IsMatch($txt, '(?m)^\t')) { $bad += $f.Name }
+    }
+    if ($bad.Count -gt 0) { Bad ('行首使用 Tab 缩进: ' + (($bad | Select-Object -First 6) -join ', ')) }
+    else { Ok '缩进统一（仅空格）' }
+}
+
 Write-Host '== SR_UCH 文本类守卫（不需要游戏 / 不需要 csc）=='
 Check-ApiSurface
 Check-ContractBoundary
@@ -234,6 +248,7 @@ Check-Encoding
 Check-DescFormat
 Check-CsEncoding
 Check-BareCatch
+Check-Indent
 if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); exit 1 }
 Write-Host '== 文本类守卫全部通过 ✅ =='
 exit 0

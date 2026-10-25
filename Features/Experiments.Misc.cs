@@ -9,82 +9,82 @@ using UnityEngine;
 
 namespace SR_UCH.Tweaks {
 public partial class Experiments : ITweak
-	{
-		// 其它页：自由相机 / 加载后清理
-		public static void RenderPage2() {
-			try {
-				// 自由相机
-				SRApi.Ctl.SectionTitle("- " + SRApi.T("自由相机", "Free camera") + " -", SRApi.T("开启后可以用滚轮自由缩放视野. 关闭后完全恢复游戏默认相机. 只在自由模式有效.",
-					 "While on, the wheel zooms the view freely. Off = fully restores the default camera. Freeplay only."));
-				SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
-					// 相机移动速度归入自由相机分区（只对自由相机生效）。
-					return e.Definition.Key == "Free Camera" || e.Definition.Key == "Free Camera FOV"
-						|| e.Definition.Key == "Free Camera Speed";
-				});
-				if (FreeCam.SpeedNote != null && FreeCam.SpeedNote.Length > 0) {
-					GUILayout.Space(SRApi.Ctl.Sc(2));
-					DrawStatus(FreeCam.SpeedNote);
-				}
+    {
+        // 其它页：自由相机 / 加载后清理
+        public static void RenderPage2() {
+            try {
+                // 自由相机
+                SRApi.Ctl.SectionTitle("- " + SRApi.T("自由相机", "Free camera") + " -", SRApi.T("开启后可以用滚轮自由缩放视野. 关闭后完全恢复游戏默认相机. 只在自由模式有效.",
+                     "While on, the wheel zooms the view freely. Off = fully restores the default camera. Freeplay only."));
+                SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
+                    // 相机移动速度归入自由相机分区（只对自由相机生效）。
+                    return e.Definition.Key == "Free Camera" || e.Definition.Key == "Free Camera FOV"
+                        || e.Definition.Key == "Free Camera Speed";
+                });
+                if (FreeCam.SpeedNote != null && FreeCam.SpeedNote.Length > 0) {
+                    GUILayout.Space(SRApi.Ctl.Sc(2));
+                    DrawStatus(FreeCam.SpeedNote);
+                }
 
-				// 加载后清理
-				GUILayout.Space(SRApi.Ctl.Sc(6));
-				SRApi.Ctl.SectionTitle("- " + SRApi.T("加载后清理", "Cleanup after load") + " -", SRApi.T("进关卡时执行一次垃圾回收和资源卸载. 减少对局内卡顿. 不影响结算速度.",
-					 "Runs GC and asset unload once on level load, reducing in-match stutter. Does not affect scoring."));
-				SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
-					return e.Definition.Key == "GC After Load";
-				});
-				GUILayout.Space(SRApi.Ctl.Sc(6));
-			} catch (Exception __ex) { SRApi.Guard.Log("其它页 渲染", __ex); }
-		}
-		// 加载后清理的初始化：配置 + 每帧钩子 + 补丁注册（UI 在上面的加载后清理分区）。
-		internal static void InitCleanup(IFeatureHost plugin) {
-			SRApi.LocKey("Experiments", "GC After Load", "加载后清理", "GC after load");
-			SRApi.LocDesc("Experiments", "GC After Load", "加载后清理开关\n首次进入关卡时执行一次 GC 与资源卸载，减少对局内卡顿\n同一关卡的回合切换不重复执行，不影响结算速度。", "post-load cleanup switch\nruns GC and asset unload once on level load to reduce in-match stutter\nskipped on round changes within the same level; settlement speed unaffected");
-			_gcAfterLoadEntry = plugin.Config.Bind<bool>("Experiments", "GC After Load", false, "进关卡/换关卡时执行一次 GC 回收 + 资源卸载，减少对局内卡顿。同关卡回合切换不清理（场景名不变自动跳过），不影响结算速度。");
-			SRApi.RegisterTick("加载后清理", TickCleanup); // 每帧钩子（加载完成 1 秒后执行一次 GC）
-			// CreateAndPatchAll 不会自动发现带 [HarmonyPatch] 的类型，必须显式注册一次。
-			try { Harmony.CreateAndPatchAll(typeof(Experiments), (string)null); }
-			catch (Exception e) { SRApi.LogError("实验页(加载后清理) 补丁注册失败: " + e.Message); }
-		}
+                // 加载后清理
+                GUILayout.Space(SRApi.Ctl.Sc(6));
+                SRApi.Ctl.SectionTitle("- " + SRApi.T("加载后清理", "Cleanup after load") + " -", SRApi.T("进关卡时执行一次垃圾回收和资源卸载. 减少对局内卡顿. 不影响结算速度.",
+                     "Runs GC and asset unload once on level load, reducing in-match stutter. Does not affect scoring."));
+                SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
+                    return e.Definition.Key == "GC After Load";
+                });
+                GUILayout.Space(SRApi.Ctl.Sc(6));
+            } catch (Exception __ex) { SRApi.Guard.Log("其它页 渲染", __ex); }
+        }
+        // 加载后清理的初始化：配置 + 每帧钩子 + 补丁注册（UI 在上面的加载后清理分区）。
+        internal static void InitCleanup(IFeatureHost plugin) {
+            SRApi.LocKey("Experiments", "GC After Load", "加载后清理", "GC after load");
+            SRApi.LocDesc("Experiments", "GC After Load", "加载后清理开关\n首次进入关卡时执行一次 GC 与资源卸载，减少对局内卡顿\n同一关卡的回合切换不重复执行，不影响结算速度。", "post-load cleanup switch\nruns GC and asset unload once on level load to reduce in-match stutter\nskipped on round changes within the same level; settlement speed unaffected");
+            _gcAfterLoadEntry = plugin.Config.Bind<bool>("Experiments", "GC After Load", false, "进关卡/换关卡时执行一次 GC 回收 + 资源卸载，减少对局内卡顿。同关卡回合切换不清理（场景名不变自动跳过），不影响结算速度。");
+            SRApi.RegisterTick("加载后清理", TickCleanup); // 每帧钩子（加载完成 1 秒后执行一次 GC）
+            // CreateAndPatchAll 不会自动发现带 [HarmonyPatch] 的类型，必须显式注册一次。
+            try { Harmony.CreateAndPatchAll(typeof(Experiments), (string)null); }
+            catch (Exception e) { SRApi.LogError("实验页(加载后清理) 补丁注册失败: " + e.Message); }
+        }
 
-		// 分区：加载后清理（UI 在本页，配置与实现同在本文件）。
-		private static ConfigEntry<bool> _gcAfterLoadEntry;
-		// 加载完成时回收垃圾，减少进入对局后的卡顿；同场景（回合切换）跳过。
-		// 延迟 1 秒执行，避免 GC 的同步阻塞卡住淡出过渡。
-		private static string _lastCleanedScene = "";
-		private static float _pendingCleanupAt = -1f;
-		private static string _pendingCleanupScene = "";
-		// 加载后清理的实际执行（SR 每帧钩子 每帧钩子）：FadeOut 后延迟 1 秒再 GC。
-		internal static void TickCleanup()
-		{
-			// 与记录处对称：总开关关闭时不执行。
-			if (!SRApi.GateMaster) return;
-			if (_pendingCleanupAt < 0f || Time.unscaledTime < _pendingCleanupAt) return;
-			_pendingCleanupAt = -1f;
-			try
-			{
-				_lastCleanedScene = _pendingCleanupScene;
-				System.GC.Collect();
-				Resources.UnloadUnusedAssets();
-			}
-			catch (Exception __ex) { SRApi.Guard.Log("加载后清理(GC)", __ex); }
-		}
-		// 加载过渡结束（FadeOut 后缀）：记录待清理场景与 1 秒后的执行时刻。
-		[HarmonyPatch(typeof(LoadingInterstitialSplash), "FadeOut")]
-		[HarmonyPostfix]
-		static void OnLoadEndRecordCleanup()
-		{
-			if (!SRApi.GateMaster) return;
-			if (_gcAfterLoadEntry == null || !_gcAfterLoadEntry.Value) return;
-			try
-			{
-				string sc = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-				if (sc == _lastCleanedScene) return; // 同场景（回合切换重载）不清理
-				_pendingCleanupScene = sc;
-				_pendingCleanupAt = Time.unscaledTime + 1f;
-			}
-			catch (Exception __ex) { SRApi.Guard.Log("记录加载后清理场景", __ex); }
-		}
+        // 分区：加载后清理（UI 在本页，配置与实现同在本文件）。
+        private static ConfigEntry<bool> _gcAfterLoadEntry;
+        // 加载完成时回收垃圾，减少进入对局后的卡顿；同场景（回合切换）跳过。
+        // 延迟 1 秒执行，避免 GC 的同步阻塞卡住淡出过渡。
+        private static string _lastCleanedScene = "";
+        private static float _pendingCleanupAt = -1f;
+        private static string _pendingCleanupScene = "";
+        // 加载后清理的实际执行（SR 每帧钩子 每帧钩子）：FadeOut 后延迟 1 秒再 GC。
+        internal static void TickCleanup()
+        {
+            // 与记录处对称：总开关关闭时不执行。
+            if (!SRApi.GateMaster) return;
+            if (_pendingCleanupAt < 0f || Time.unscaledTime < _pendingCleanupAt) return;
+            _pendingCleanupAt = -1f;
+            try
+            {
+                _lastCleanedScene = _pendingCleanupScene;
+                System.GC.Collect();
+                Resources.UnloadUnusedAssets();
+            }
+            catch (Exception __ex) { SRApi.Guard.Log("加载后清理(GC)", __ex); }
+        }
+        // 加载过渡结束（FadeOut 后缀）：记录待清理场景与 1 秒后的执行时刻。
+        [HarmonyPatch(typeof(LoadingInterstitialSplash), "FadeOut")]
+        [HarmonyPostfix]
+        static void OnLoadEndRecordCleanup()
+        {
+            if (!SRApi.GateMaster) return;
+            if (_gcAfterLoadEntry == null || !_gcAfterLoadEntry.Value) return;
+            try
+            {
+                string sc = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+                if (sc == _lastCleanedScene) return; // 同场景（回合切换重载）不清理
+                _pendingCleanupScene = sc;
+                _pendingCleanupAt = Time.unscaledTime + 1f;
+            }
+            catch (Exception __ex) { SRApi.Guard.Log("记录加载后清理场景", __ex); }
+        }
 }
     // 自由相机（实验）：经游戏自己的 ZoomCamera 生效，不直接写 Camera.fieldOfView（会被每帧覆盖）。
     // 默认键 F3，滚轮调 FOV（1-32，每格 0.5）；仅开启时消费滚轮，每次启用从相机当前 FOV 起算，关闭时还原。
