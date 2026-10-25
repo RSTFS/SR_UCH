@@ -34,10 +34,30 @@ namespace SR_UCH {
         public void Awake() {
             // ModLogger 必须是本方法第一条语句：下面的步骤与其 catch 内的日志都依赖它。
             ModLogger = Logger;
+            PatchOwnConfigFile();
+            SetupStandaloneConfig();
+            MigrateLegacyConfigNames();
+            // 程序集解析：外部功能 / 语言包 DLL 只引用 SR_UCH.dll（不引用 BepInEx），全局注册一次。
+            AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
+            InjectApiSinks();
+            InitializeTweaks();
+            LoadExModule();
+            // 外部功能 DLL / 语言包 DLL：一个 DLL 一个功能（ITweak）或一门语言（ILanguagePack）；
+            // 放在本程序集扫描与 EX 之后（EX 的硬编码路径不受影响）。
+            LoadExternal();
+            RebuildFeatureManifest();   // 含功能清单登记 + 启动自检 + 自检日志
+        }
+
+        // 配置外置补丁：需显式注册（CreateAndPatchAll 不递归发现独立类型），失败只记日志。
+        private void PatchOwnConfigFile() {
             // PatchOwnConfigFile 需显式注册（CreateAndPatchAll 不递归发现独立类型），失败只记日志。
             try { HarmonyLib.Harmony.CreateAndPatchAll(typeof(PatchOwnConfigFile)); }
             catch (Exception __pf) { try { ModLogger.LogWarning("配置外置补丁(PatchOwnConfigFile)注册失败: " + __pf.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
 
+        }
+
+        // 独立配置文件（旧 cfg 自动迁移）+ 插件 Config 后备字段指向它。
+        private void SetupStandaloneConfig() {
             // 独立配置文件（旧 cfg 自动迁移）
             try {
                 string __dir = BepInEx.Paths.ConfigPath;
@@ -58,6 +78,10 @@ namespace SR_UCH {
                 } catch (Exception __cfx) { try { ModLogger.LogWarning("配置外置(后备字段)失败: " + __cfx.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
             } catch (Exception __de) { try { ModLogger.LogWarning("配置外置失败: " + __de.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
 
+        }
+
+        // 在任何 Bind 之前把旧 GUID 的 cfg 复制成新名字（GUID 改名导致文件名变化）。
+        private void MigrateLegacyConfigNames() {
             // 在任何 Bind 之前把旧 GUID 的 cfg 复制成新名字（GUID 改名导致文件名变化）。
             try {
                 string __cfgDir = BepInEx.Paths.ConfigPath;
@@ -68,8 +92,10 @@ namespace SR_UCH {
                     ModLogger.LogInfo("[配置] 已从旧 GUID 配置迁移: com.gamingbeast.SR_UCH.cfg -> com.rs.SR_UCH.cfg");
                 }
             } catch (Exception __mig) { try { ModLogger.LogWarning("配置迁移失败: " + __mig.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
-            // 程序集解析：外部功能 / 语言包 DLL 只引用 SR_UCH.dll（不引用 BepInEx），全局注册一次。
-            AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
+        }
+
+        // 契约层 API 门面的全部 sink：漏注入会让对应功能静默失效。
+        private void InjectApiSinks() {
             // 契约层 API 门面的日志出口：接到本插件的日志系统。
             try {
                 SRApi.SetLogSinks(
@@ -208,6 +234,10 @@ namespace SR_UCH {
                 string[] __miss = SRApi.MissingSinks();
                 if (__miss.Length > 0) ModLogger.LogError("[SR.Api] 未注入的 API 通道 (" + __miss.Length + "): " + string.Join(", ", __miss));
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+        }
+
+        // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
+        private void InitializeTweaks() {
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。
             List<Type> __tweaks = new List<Type>();
@@ -229,6 +259,10 @@ namespace SR_UCH {
                     ModLogger.LogError("Failed to initialize " + type.Name + ": " + e);
                 }
             }
+        }
+
+        // 功能清单登记 + 启动自检 + 自检日志。
+        private void RebuildFeatureManifest() {
             LoadExModule();
             // 外部功能 DLL / 语言包 DLL：一个 DLL 一个功能（ITweak）或一门语言（ILanguagePack）；
             // 放在本程序集扫描与 EX 之后（EX 的硬编码路径不受影响）。
