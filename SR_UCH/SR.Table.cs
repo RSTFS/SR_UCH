@@ -328,7 +328,7 @@ public partial class SR {
         }
     }
 
-    //表头绘制（联机房间列表同款）：可滚动列 + 钉住右列；输出每格屏幕矩形（命中用）与钉住列表头矩形。
+    //表头绘制：可滚动列 + 钉住右列；输出每格屏幕矩形（命中用）与钉住列表头矩形。
     public static void DrawTableHeader(List<int> vis, int pinCol, float[] colW, float scrollX, Rect box, float stripW, float headerH,
         Vector2 mp, System.Func<int, string> title, int moveCol, float pinW, float pinX, string pinTitle,
         List<Rect> cells, List<int> cellCols, bool vertical, float scrollY, bool headerLeft, out Rect pinHeader) {

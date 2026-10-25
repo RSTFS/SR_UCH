@@ -105,6 +105,7 @@ namespace SR_UCH {
             });
             SinkStep("CloseMenu", delegate () {
                 SRApi.SetCloseMenuSink(delegate { SR.CloseMenuExternal(); });
+                SRApi.SetOpenMenuSink(delegate { SR.OpenMenuExternal(); });
             });
             SinkStep("Notify", delegate () {
                 SRApi.SetNotifySink(delegate (string __t) { SR.Notify(__t); });

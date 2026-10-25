@@ -737,7 +737,8 @@ public partial class SR {
                 float h = st.CalcHeight(_tipContent, innerW);
                 _tipInnerW = innerW;
                 _tipW = innerW + Sc(12f);
-                _tipH = h + Sc(8f);
+                // +1px 缓冲：末行中文的字形下沿常被 CalcHeight 少算，差 1px 就会裁掉最后一笔。
+                _tipH = h + Sc(8f) + 1f;
             }
             float x = Mathf.Clamp(mp.x + 16f, 2f, Mathf.Max(2f, Screen.width - _tipW - 6f));
             float y = Mathf.Clamp(mp.y + 16f, 2f, Mathf.Max(2f, Screen.height - _tipH - 10f));

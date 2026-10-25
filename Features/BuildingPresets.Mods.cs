@@ -292,7 +292,7 @@ namespace SR_UCH.Tweaks {
                     if (GUILayout.Button(new GUIContent(SRApi.T("打开游戏界面", "Open game UI"),
                             SRApi.T("先收起本面板，再打开游戏自己的规则书（规则 / 积分 / 模块概率 / 修改器都在里面）\n需在树屋或关卡里、由房主操作",
                                 "closes this panel and opens the game's own rulebook (rules / points / block odds / modifiers)\nhost only, in the treehouse or a level")),
-                        SRApi.Ctl.Btn, GUILayout.Width(W(110)), GUILayout.Height(W(24)))) OpenGameRulebook();
+                        SRApi.Ctl.Btn, GUILayout.Width(W(110)), GUILayout.Height(W(24)))) OpenGameRulebook(p);
                     if (GUILayout.Button(new GUIContent(SRApi.T("读取游戏当前", "Read current"),
                             SRApi.T("把游戏当前的规则 / 积分 / 模块概率 / 修改器读进来，写到这条预设（三个开关自动打勾）",
                                 "read the game's current rules / points / block odds / modifiers into this preset (the three toggles are turned on)")),
@@ -325,7 +325,11 @@ namespace SR_UCH.Tweaks {
             float labelW = W(104);
             float ctrlW = W(150);
             float rowH2 = W(26);
-            float gridH = Mathf.Min(perCol * rowH2 + W(8), W(300));
+            // 高度自适应：这里已是页面内当前 y，可用高度 = 页面视口 - 已用高度（与列表同一套算法）。
+            float __usedY = 0f;
+            try { __usedY = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none).y; } catch { __usedY = 0f; }
+            float __avail = Mathf.Max(W(140), SRApi.PageViewportHeight - __usedY - W(16));
+            float gridH = Mathf.Min(perCol * rowH2 + W(8), __avail);
             _modsScroll = GUILayout.BeginScrollView(_modsScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.Height(gridH));
             try {
                 for (int row = 0; row < perCol; row++) {
@@ -362,9 +366,6 @@ namespace SR_UCH.Tweaks {
             } finally {
                 GUILayout.EndScrollView();
             }
-            GUILayout.Space(W(2));
-            LabelWrapText(SRApi.T("数值项的 0 表示默认；自定义只影响加载，不改写预设文件本身。滚轮可上下滚动列表。",
-                "0 means default for numeric entries; custom values only affect loading, the preset file stays untouched. Scroll the wheel to move through the list."));
         }
 
 
@@ -545,19 +546,127 @@ namespace SR_UCH.Tweaks {
         // ---------- 借用游戏自己的界面 ----------
         // 打开游戏规则书（TabletRulesScreen 那一套）：规则 / 积分 / 模块概率 / 修改器都在里面，
         // 玩家改完关掉，再回本页点「读取游戏当前」。必须先把本面板收起来，否则输入被冻结、游戏界面点不动。
-        private static void OpenGameRulebook() {
+        // 正在游戏规则书里编辑的预设 Key（null = 没在编辑）；_bookSeenOpen = 已确认打开过一次（用来识别"已关闭"）
+        private static string _bookKey;
+        private static bool _bookSeenOpen;
+        private static float _bookPollAt;
+
+        // 打开游戏自己的规则书（InventoryBook）：
+        //   1) 若传了预设，先把它的规则/积分/模块/修改器灌进游戏，打开后看到的就是这条预设的数据；
+        //   2) GameRuleBook 可能还没生成 —— 先 SpawnRuleBook（私有，反射），初始化回调里 Show(true) + 定位页面；
+        //   3) 玩家关掉规则书后由 TickRulebook 回收：读回数据 -> 写进预设 -> 自动勾选"自定义" -> 自动弹回本面板。
+        private static void OpenGameRulebook(PresetInfo p) {
             try {
                 LobbyManager lm = LobbyManager.instance;
                 if (lm == null) { SRApi.Notify(SRApi.T("不在大厅里，打不开规则书", "Not in a lobby; the rulebook cannot be opened")); return; }
                 LevelSelectController lsc = lm.CurrentLevelSelectController;
                 if (lsc == null) { SRApi.Notify(SRApi.T("当前没有关卡选择控制器（进树屋或关卡后再试）", "No level-select controller right now (enter the treehouse or a level)")); return; }
-                SRApi.CloseMenu();          // 先收起本面板
-                lsc.OpenLegacyRulebook(false);
-                SRApi.LogInfo("[布局预设] 已请求打开游戏规则书");
+                // 房主才灌数据；房客只是查看（游戏本身会拦下修改）
+                if (p != null && !p.IsLocal && SRApi.CanDoHost()) PushPresetDataToGame(p);
+                _bookKey = p != null && !p.IsLocal ? p.Key : null;
+                _bookSeenOpen = false;
+                _bookPollAt = 0f;
+                SRApi.CloseMenu();          // 先收起本面板，否则输入被冻结、规则书点不动
+                LevelSelectController __lsc = lsc;
+                __lsc.ExecuteOnRuleBookInitialized(delegate {
+                    try {
+                        if (__lsc.GameRuleBook == null) SpawnRuleBook(__lsc);
+                        if (__lsc.GameRuleBook == null) {
+                            SRApi.LogWarn("[布局预设] 规则书对象为空，未能打开");
+                            SRApi.Notify(SRApi.T("规则书没能生成（试试在树屋里再点一次）", "The rulebook could not be spawned (try again in the treehouse)"));
+                            return;
+                        }
+                        __lsc.GameRuleBook.Show(true);
+                        __lsc.OpenLegacyRulebook(false);
+                        _bookSeenOpen = true;
+                        SRApi.LogInfo("[布局预设] 已打开游戏规则书");
+                    } catch (Exception __ex2) { SRApi.Guard.Log("布局预设/显示规则书", __ex2); }
+                });
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/打开游戏规则书", __ex);
                 SRApi.Notify(SRApi.T("打开游戏规则书失败", "Failed to open the game rulebook"));
             }
+        }
+
+        // 生成规则书对象（SpawnRuleBook 是私有方法，走反射；失败只影响这一次打开）。
+        private static void SpawnRuleBook(LevelSelectController lsc) {
+            try {
+                MethodInfo m = SRApi.Ref.Method(typeof(LevelSelectController), "SpawnRuleBook", "布局预设/生成规则书");
+                if (m != null) m.Invoke(lsc, null);
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/生成规则书", __ex); }
+        }
+
+        // 把预设内容灌进游戏（打开规则书前调用）：规则/积分/模块按勾选应用，修改器一律按预设值写。
+        private static void PushPresetDataToGame(PresetInfo p) {
+            try {
+                if (p == null) return;
+                string path = RulesetSidecarPath(p);
+                string xml = (!string.IsNullOrEmpty(path) && File.Exists(path)) ? File.ReadAllText(path) : null;
+                // 修改器：把自定义值合进规则集 XML，再整份应用（loadModifiers=true）
+                if (string.Equals(p.ModsMode, ModsCustom, StringComparison.Ordinal)) {
+                    if (string.IsNullOrEmpty(xml)) xml = GameRulePreset.GetRulesetFromCurrentRules() != null
+                        ? GameRulePreset.GetRulesetFromCurrentRules().GetRulesetXmlString() : null;
+                    xml = ApplyModsPolicy(xml, p);
+                }
+                if (string.IsNullOrEmpty(xml)) {
+                    SRApi.LogInfo("[布局预设] 该预设没有规则集，打开规则书只显示游戏当前内容");
+                    return;
+                }
+                XmlDocument doc = ParseXmlSafe(xml);
+                if (doc == null) return;
+                GameRulePreset preset = ScriptableObject.CreateInstance<GameRulePreset>();
+                if (preset == null) return;
+                preset.LoadRulesetFromXML(doc);
+                GameSettings gs = GameSettings.GetInstance();
+                if (gs == null) return;
+                bool loadMods = string.Equals(p.ModsMode, ModsCustom, StringComparison.Ordinal);
+                gs.ApplyTemporaryRuleset(preset, p.ApplyRules || p.ApplyPoints || p.ApplyBlocks ? p.ApplyRules : true,
+                    p.ApplyPoints, p.ApplyBlocks, loadMods);
+                SRApi.LogInfo("[布局预设] 已把预设内容灌入游戏（规则/积分/模块/修改器）以便在规则书里查看");
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/灌入预设内容", __ex); }
+        }
+
+        // 每 0.25 秒看一次：规则书从"打开"变"关闭"就回收数据。
+        private static void TickRulebook() {
+            if (string.IsNullOrEmpty(_bookKey)) return;
+            if (Time.unscaledTime < _bookPollAt) return;
+            _bookPollAt = Time.unscaledTime + 0.25f;
+            try {
+                LobbyManager lm = LobbyManager.instance;
+                LevelSelectController lsc = lm != null ? lm.CurrentLevelSelectController : null;
+                if (lsc == null) return;
+                InventoryBook book = lsc.GameRuleBook;
+                bool open = book != null && book.gameObject != null && book.gameObject.activeInHierarchy && book.inInventory;
+                if (open) { _bookSeenOpen = true; return; }
+                if (!_bookSeenOpen) return;    // 还没真正打开过，继续等
+                FinishRulebookEdit();
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/规则书轮询", __ex); }
+        }
+
+        // 规则书已关闭：把游戏当前内容读回这条预设，自动设为"自定义"，再自动弹回本面板。
+        private static void FinishRulebookEdit() {
+            try {
+                string key = _bookKey;
+                _bookKey = null;
+                _bookSeenOpen = false;
+                PresetInfo p = FindPreset(key);
+                if (p == null) return;
+                ReadRulesFromGame(p);      // 规则 / 积分 / 模块概率 -> sidecar + 三个开关
+                ReadModsFromGame();        // 24 项修改器 -> 草稿
+                p.ModsMode = ModsCustom;
+                if (p.ModsVals == null) p.ModsVals = new Dictionary<string, string>();
+                p.ModsVals.Clear();
+                for (int i = 0; i < Mods.Length; i++) {
+                    string v;
+                    if (!_modsDraft.TryGetValue(Mods[i].Attr, out v) || string.IsNullOrEmpty(v)) v = ModDefault(Mods[i]);
+                    p.ModsVals[Mods[i].Attr] = v;
+                }
+                SaveIndex();
+                _modsKey = p.Key;          // 回来后直接停在该预设的编辑器上
+                SRApi.OpenMenu();          // 自动弹回管理器
+                SRApi.Notify(SRApi.T("规则书已关闭，已保存到预设并设为自定义：", "Rulebook closed; saved to the preset as custom: ") + (p.Name ?? ""));
+                SRApi.LogInfo("[布局预设] 规则书关闭：已回收数据并把 " + (p.Name ?? "") + " 设为自定义");
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/规则书回收", __ex); }
         }
 
         // 读游戏当前的规则集 -> 写进这条预设的 sidecar，并把三个开关打开。

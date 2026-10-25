@@ -242,6 +242,9 @@ namespace SR_UCH.Tweaks {
                 "列表排序方式\n0=时间（新→旧），1=名称（A→Z）\n由列表页的排序下拉维护，不在配置区重复显示",
                 "preset list sort mode\n0 = time (newest first), 1 = name (A-Z)\nmaintained by the sort dropdown on the list page and not repeated in the settings area");
             // 换场景后下次打开面板重新扫盘（手动放入/删除的 XML、其它存档的改动都能看到）。
+            // 规则书关闭后自动回收数据（每 0.25 秒一次的轻量轮询，未在编辑时立刻返回）。
+            try { SRApi.RegisterTick("布局预设/规则书回收", TickRulebook); }
+            catch (Exception __tk) { SRApi.Guard.Log("布局预设/注册规则书轮询", __tk); }
             try { SRApi.RegisterSceneHook(delegate { _loaded = false; }); }
             catch (Exception __sh) { SRApi.Guard.Log("布局预设/注册场景钩子", __sh); }
             // 返回树屋：注册动作并允许右键绑键（悬浮提示里不写绑定说明）。
@@ -465,7 +468,7 @@ namespace SR_UCH.Tweaks {
                     if (GUILayout.Button(new GUIContent(SRApi.T("游戏界面", "Game UI"),
                             SRApi.T("打开游戏自己的规则书界面\n规则、积分设置、模块概率、修改器都在里面\n本面板会自动收起；需在树屋里由房主操作",
                                 "opens the game's own rulebook UI\nrules, points, block odds and modifiers all live there\nthis panel closes itself; host only, in the treehouse")),
-                        SRApi.Ctl.Btn, GUILayout.Width(W(96)), GUILayout.Height(W(24)))) OpenGameRulebook();
+                        SRApi.Ctl.Btn, GUILayout.Width(W(96)), GUILayout.Height(W(24)))) OpenGameRulebook(null);
                     GUILayout.FlexibleSpace();
                 } finally {
                     GUILayout.EndHorizontal();

@@ -198,6 +198,10 @@ namespace SR_UCH {
         private static Action _closeMenu;
         public static void SetCloseMenuSink(Action closeMenu) { _closeMenu = closeMenu; }
         public static void CloseMenu() { Action a = _closeMenu; if (a != null) a(); }
+        // 打开管理器（从游戏自己的界面回来时自动弹回）。
+        private static Action _openMenu;
+        public static void SetOpenMenuSink(Action openMenu) { _openMenu = openMenu; }
+        public static void OpenMenu() { Action a = _openMenu; if (a != null) a(); }
         internal static void Warn(string msg) { try { Action<string> w = _warn; if (w != null) w(msg); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         private static string Str(object m) { try { return m == null ? "" : m.ToString(); } catch { return "<ToString 失败>"; } }
         public static void LogInfo(object m) { try { Action<string> a = _info; if (a != null) a(Str(m)); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
