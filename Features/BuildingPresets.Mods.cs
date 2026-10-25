@@ -546,13 +546,18 @@ namespace SR_UCH.Tweaks {
         private static string RulesetSidecarPath(PresetInfo p) {
             try {
                 if (p == null || p.IsLocal || string.IsNullOrEmpty(p.FilePath)) return null;
+                string main = RulesetSidecarPathForFile(p.FilePath);   // <预设>.xml.ruleset.xml（与预设同目录）
+                if (!string.IsNullOrEmpty(main) && File.Exists(main)) return main;
+                // 兼容上一版写到 rulesets/<模式>/ 的旧侧车
                 string dir = Path.GetDirectoryName(p.FilePath) ?? "";
                 string mode = Path.GetFileName(dir);
-                string root = PresetsRoot();
-                if (string.IsNullOrEmpty(root)) return null;
-                string target = Path.Combine(Path.Combine(root, RulesetsDirName), mode);
-                Directory.CreateDirectory(target);
-                return Path.Combine(target, Path.GetFileName(p.FilePath));
+                string dirRoot = PresetsRoot();
+                if (!string.IsNullOrEmpty(dirRoot)) {
+                    string legacy = Path.Combine(Path.Combine(dirRoot, RulesetsDirName), mode);
+                    legacy = Path.Combine(legacy, Path.GetFileName(p.FilePath));
+                    if (File.Exists(legacy)) return legacy;
+                }
+                return main;
             } catch { return null; }
         }
 
@@ -609,11 +614,7 @@ namespace SR_UCH.Tweaks {
         private static string RulesetSidecarPathForFile(string presetPath) {
             try {
                 if (string.IsNullOrEmpty(presetPath)) return null;
-                string dir = Path.GetDirectoryName(presetPath) ?? "";
-                string mode = Path.GetFileName(dir);
-                string target = Path.Combine(Path.Combine(PresetsRoot(), RulesetsDirName), mode);
-                Directory.CreateDirectory(target);
-                return Path.Combine(target, Path.GetFileName(presetPath));
+                return presetPath + ".ruleset.xml";
             } catch { return null; }
         }
 
