@@ -45,6 +45,9 @@ namespace SR_UCH {
             // 外部功能 DLL / 语言包 DLL：一个 DLL 一个功能（ITweak）或一门语言（ILanguagePack）；
             // 放在本程序集扫描与 EX 之后（EX 的硬编码路径不受影响）。
             LoadExternal();
+            // 装配完成后补扫一轮 ITweak（audit P0-1）：EX / 外部 DLL 若漏在 ExLoader 的反射路径之外，
+            // 还能被主扫描发现并初始化；EX 自己做了幂等，两条路都走也只初始化一次。
+            InitializeTweaks(true);
             RebuildFeatureManifest();   // 含功能清单登记 + 启动自检 + 自检日志
         }
 
@@ -287,12 +290,39 @@ namespace SR_UCH {
 
 
         // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
-        private void InitializeTweaks() {
+        // 已初始化过的 ITweak 类型：第二轮扫描（EX / 外部 DLL 加载之后）只补新出现的，避免重复初始化。
+        private static readonly HashSet<Type> _initedTweaks = new HashSet<Type>();
+
+        // 补扫用：只取名字以 SR_UCH 开头的已加载程序集（核心自身 + EX + 拆分模式的各功能 DLL）。
+        private static Assembly[] PickUchAssemblies() {
+            try {
+                List<Assembly> keep = new List<Assembly>();
+                Assembly[] all = AppDomain.CurrentDomain.GetAssemblies();
+                for (int i = 0; i < all.Length; i++) {
+                    try {
+                        string n = all[i].GetName().Name ?? "";
+                        if (n.StartsWith("SR_UCH", StringComparison.OrdinalIgnoreCase)) keep.Add(all[i]);
+                    } catch { /* 静默：取不到名字的程序集跳过 */ }
+                }
+                return keep.ToArray();
+            } catch (Exception __ex) { SR.LogWarn("枚举程序集失败: " + __ex.Message); return new Assembly[0]; }
+        }
+
+        // latePass = true 时表示"装配完成后补扫"（audit P0-1）：EX 若没被 ExLoader 拉起，
+        // 仍能在这里被 ITweak 扫描发现并初始化；已初始化过的类型直接跳过。
+        private void InitializeTweaks(bool latePass = false) {
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。
             List<Type> __tweaks = new List<Type>();
-            foreach (Type __t in GetTypesSafe(Assembly.GetExecutingAssembly())) {
-                if (typeof(ITweak).IsAssignableFrom(__t) && !__t.IsInterface && !__t.IsAbstract) __tweaks.Add(__t);
+            // 补扫只覆盖 SR_UCH* 程序集（EX = SR_UCH_EX；外部功能 DLL 由 LoadExternal 自己初始化）：
+            // 扫全部 AppDomain 会把游戏程序集也展开一遍，启动白白多花上百毫秒。
+            Assembly[] __asms = latePass ? PickUchAssemblies() : new Assembly[] { Assembly.GetExecutingAssembly() };
+            for (int __ai = 0; __ai < __asms.Length; __ai++) {
+                foreach (Type __t in GetTypesSafe(__asms[__ai])) {
+                    if (!typeof(ITweak).IsAssignableFrom(__t) || __t.IsInterface || __t.IsAbstract) continue;
+                    if (_initedTweaks.Contains(__t)) continue;
+                    __tweaks.Add(__t);
+                }
             }
             __tweaks.Sort(delegate(Type a, Type b) {
                 int ra = a == typeof(SR_UCH.Tweaks.SR) ? 0 : 1;
@@ -302,6 +332,7 @@ namespace SR_UCH {
             });
             foreach (Type type in __tweaks) {
                 // 实例化也放进 try：单个功能构造失败不能中断后续的 LoadExModule / LoadExternal。
+                _initedTweaks.Add(type);
                 try {
                     var tweak = (ITweak)Activator.CreateInstance(type);
                     tweak.Initialize(this);
