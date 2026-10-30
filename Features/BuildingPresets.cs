@@ -985,34 +985,13 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
         // 操作列默认宽 = 4 个按钮的自适应文字宽 + 按钮间距 + 钉住列左右边距（设计单位）。
         // 每行按钮由核心按 BtnClip.CalcSize(label).x + 11px 计算，这里用同一公式取最宽标签（含二次确认的「确认」），
         // 保证中文 / 英文、普通态 / 确认态都不会被截断；DefColW[ColAction] 仅作样式不可用时的兜底。
+        // 操作列默认宽：交给核心按当前语言的按钮文字实测（数据按钮删掉后不再固定 200，右侧不留空）。
         private static float DefaultActionColW() {
             try {
-                GUIStyle st = SRApi.Ctl.BtnClip;
-                if (st == null) return DefColW[ColAction];
-                float scale = SRApi.Ctl.Sc(1f);
-                if (scale <= 0f) scale = 1f;
-                string[][] labels = new string[][] {
-                    new string[] { SRApi.T("加载", "Load"), SRApi.T("确认", "Confirm") },
-                    new string[] { SRApi.T("数据", "Data") },
-                    new string[] { SRApi.T("导出", "Export") },
-                    new string[] { SRApi.T("删除", "Delete"), SRApi.T("确认", "Confirm") }
-                };
-                // 6px = 钉住列左右各 2px + 行内左 2px；间距 2px/个（与核心 TableActionButtons 一致）。
-                float total = SRApi.Ctl.Sc(6f);
-                for (int i = 0; i < labels.Length; i++) {
-                    float bw = 0f;
-                    for (int j = 0; j < labels[i].Length; j++) {
-                        bw = Mathf.Max(bw, st.CalcSize(new GUIContent(labels[i][j])).x);
-                    }
-                    total += bw + SRApi.Ctl.Sc(11f);
-                    if (i > 0) total += SRApi.Ctl.Sc(2f);
-                }
-                float design = Mathf.Ceil(total / scale);
-                return Mathf.Clamp(design, ColWidthMin, ColWidthMax);
-            } catch (Exception __ex) {
-                SRApi.Guard.Log("布局预设/计算操作列宽", __ex);
-                return DefColW[ColAction];
-            }
+                float w = SRApi.TableActionColumnWidth(_actActions);
+                if (w > 0f) return Mathf.Clamp(w, ColWidthMin, ColWidthMax);
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/操作列宽", __ex); }
+            return DefColW[ColAction];
         }
 
         // 表格列设置落盘/日志用的小工具（逗号分隔，便于对照 cfg）。

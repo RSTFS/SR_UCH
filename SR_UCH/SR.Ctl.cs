@@ -131,6 +131,29 @@ public partial class SR {
         // 统一操作列按钮：在行矩形里依次画 BtnClip 按钮，返回本帧左键 MouseUp 命中并已执行回调的下标。
         // widths 为 null、长度不足或某项 <=0 时，该按钮宽度 = BtnClip.CalcSize(label).x + 11px（自适应文字）；
         // 多个按钮总宽超出行宽时按可用宽度统一收缩，绝不横向溢出。Enabled=false 的按钮画灰且不响应。
+        // 操作列需要的宽度（核心化）：按按钮文字实测 + 每个按钮 11px 内边距 + 2px 间距 + 左右 2px。
+        // 表格方把它当作"操作列"的默认宽即可自适应；返回设计单位（未乘 UI 缩放）。
+        public static float TableActionColumnWidth(SRApi.TableAction[] actions) {
+            try {
+                if (actions == null || actions.Length == 0) return 0f;
+                GUIStyle st = BtnClip;
+                float scale = Sc(1f);
+                if (scale <= 0f) scale = 1f;
+                float total = Sc(2f) * 2f;
+                int valid = 0;
+                for (int i = 0; i < actions.Length; i++) {
+                    SRApi.TableAction a = actions[i];
+                    if (a == null) continue;
+                    float w = (st != null ? st.CalcSize(new GUIContent(a.Label ?? "")).x : Sc(30f)) + Sc(11f);
+                    if (valid > 0) total += Sc(2f);
+                    total += w;
+                    valid++;
+                }
+                if (valid == 0) return 0f;
+                return Mathf.Ceil(total / scale);
+            } catch (Exception __ex) { Guard.Log("操作列宽计算", __ex); return 0f; }
+        }
+
         public static int TableActionButtons(Rect rowRect, SRApi.TableAction[] actions, float[] widths, ref int hoverIndex) {
             hoverIndex = -1;
             if (actions == null || actions.Length == 0) return -1;

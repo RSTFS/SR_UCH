@@ -421,6 +421,11 @@ namespace SR_UCH {
             return Mathf.Max(minH, avail - usedAbove - Ctl.Sc(2f));
         }
         // 操作列按钮统一控件：布局 / 命中 / 悬浮由实现层负责；未注入时返回 -1（不响应）。
+        // 操作列自适应宽度（核心计算）：按当前语言按钮文字实测，表格方直接用作操作列默认宽。
+        private static Func<TableAction[], float> _tableActionColW;
+        public static void SetTableActionColumnWidthSink(Func<TableAction[], float> f) { _tableActionColW = f; }
+        public static float TableActionColumnWidth(TableAction[] actions) { Func<TableAction[], float> f = _tableActionColW; return f != null ? f(actions) : 0f; }
+
         public static void SetTableActionButtonsSink(TableActionButtonsFn tableActionButtons) { _tableActionButtons = tableActionButtons; }
         public static int TableActionButtons(Rect rowRect, TableAction[] actions, float[] widths, ref int hoverIndex) {
             TableActionButtonsFn f = _tableActionButtons as TableActionButtonsFn;

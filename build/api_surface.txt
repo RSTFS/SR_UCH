@@ -82,6 +82,7 @@ HotkeyButtonNoHint
 # ---- 六、表格（表头/行/滚动条/动作列/高度自适应与列偏好） ----
 TableAction
 TableActionButtons
+TableActionColumnWidth
 TableAfterDraw
 TableArgs
 TableAutoFit
