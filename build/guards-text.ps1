@@ -302,7 +302,7 @@ function Check-SilentCatch {
     if ($bad.Count -gt 0) {
         Bad ('静默 catch 变多：' + (($bad | Select-Object -First 5) -join '; ') + '（基线见 build/silent-catch.txt）')
     } else {
-        Ok ('静默 catch 未新增（基线 ' + $base.Count + ' 个文件 / $total 处已计入）')
+        Ok ('静默 catch 未新增（基线 ' + $base.Count + ' 个文件 / 当前 ' + $total + ' 处）')
     }
 }
 
