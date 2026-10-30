@@ -36,19 +36,19 @@ public class QuickAdjust : ITweak {
         SRApi.Nav("Quick Adjust", 30); // 侧栏栏目顺序 30
         SRApi.RegisterPage("Quick Adjust", Render);   // 本功能页自绘
         SRApi.LocKey("Quick Adjust", "Quick Switch", "快速切换", null);
-        SRApi.LocDesc("Quick Adjust", "Quick Switch", "快速切换开关\n自由模式下长按切换键在行动与建造之间切换\n仅自由模式生效，对局中开关立即生效。", "quick switch toggle\nin freeplay, hold the switch key to swap between Action and Build\nfreeplay only; the toggle applies immediately in-game");
+        SRApi.LocDesc("Quick Adjust", "Quick Switch", "快速切换\n自由模式下长按切换键在行动与建造间切换\n仅自由模式生效", "Quick switch\nin freeplay, hold the key to swap action and build\nfreeplay only");
         SRApi.LocKey("Quick Adjust", "Quick Switch Hold", "等待秒数", null);
-        SRApi.LocDesc("Quick Adjust", "Quick Switch Hold", "快速切换长按时间\n设置长按多少秒触发切换\n范围 0 到 2，0 为立即切换", "quick switch hold time\nsets how long the key must be held to trigger the swap\nrange 0-2, 0 = instant");
+        SRApi.LocDesc("Quick Adjust", "Quick Switch Hold", "快速切换长按时间\n长按多少秒触发切换\n范围 0-2，0 为立即", "Quick switch hold\nseconds to hold before switching\nrange 0-2; 0 = instant");
         SRApi.LocKey("Quick Adjust", "Quick Retry", "死后自动重试", null);
-        SRApi.LocDesc("Quick Adjust", "Quick Retry", "死后自动重试开关\n挑战模式死亡后自动重开关卡，无需长按\n仅挑战模式生效", "auto retry toggle\nin challenge mode, restarts the run automatically after death without holding a key\nchallenge mode only");
+        SRApi.LocDesc("Quick Adjust", "Quick Retry", "死后自动重试\n挑战模式死亡后自动重开关卡\n仅挑战模式生效", "Auto retry\nrestarts the run automatically after death in challenge mode\nchallenge mode only");
         SRApi.LocKey("Quick Adjust", "Quick Retry Fast", "快速重试", null);
-        SRApi.LocDesc("Quick Adjust", "Quick Retry Fast", "快速重试开关\n挑战模式死亡后长按重试键到设定秒数自动重试\n仅挑战模式生效，长按时间在下方设置。", "quick retry toggle\nin challenge mode, hold the retry key for the set time after death to retry\nchallenge mode only; the hold time is set below");
+        SRApi.LocDesc("Quick Adjust", "Quick Retry Fast", "快速重试\n死亡后长按重试键到设定秒数触发重试\n仅挑战模式；长按时间见下一项", "Quick retry\nhold the retry key for the set time after death\nchallenge mode only; hold time below");
         SRApi.LocKey("Quick Adjust", "Quick Retry Hold", "等待秒数", null);
-        SRApi.LocDesc("Quick Adjust", "Quick Retry Hold", "快速重试长按时间\n设置死亡后长按多久触发重试\n范围 0 到 2，0 为立即重试", "quick retry hold time\nsets how long to hold after death before retrying\nrange 0-2, 0 = instant");
+        SRApi.LocDesc("Quick Adjust", "Quick Retry Hold", "快速重试长按时间\n死亡后长按多久触发重试\n范围 0-2，0 为立即", "Quick retry hold\nseconds to hold after death\nrange 0-2; 0 = instant");
         SRApi.LocKey("Quick Adjust", "Handicap", "评分百分比", null);
-        SRApi.LocDesc("Quick Adjust", "Handicap", "当前评分百分比\n直接设置自己那行的评分百分比（10-100，整十）\n等效折扣 = 100 减该数值，100 即不折扣。", "current score percentage\nsets your own score percentage directly (10-100 in tens)\nequivalent discount = 100 minus this value, 100 = no discount");
+        SRApi.LocDesc("Quick Adjust", "Handicap", "评分百分比\n直接设置自己那行的评分百分比\n范围 10-100 整十；100 即不折扣", "Score percentage\nsets your own row's score percentage\n10-100 in tens; 100 = no discount");
         SRApi.LocKey("Quick Adjust", "More Handicap Values", "更多数值", null);
-        SRApi.LocDesc("Quick Adjust", "More Handicap Values", "自由输入模式开关\n开启后 handicap 由整十滑块改为输入框\n范围 10 到 100 任意整数。", "free input mode switch\nturns the tens slider into an input box\nany integer from 10 to 100");
+        SRApi.LocDesc("Quick Adjust", "More Handicap Values", "自由输入百分比\n评分百分比改为输入框而非整十滑块\n范围 10-100 任意整数", "Free percentage input\nreplaces the tens slider with an input box\nany integer 10-100");
         // 预登记本页自动快捷键。
         SRApi.HotkeyAction("qa.apply_discount", "应用折扣", () => QuickAdjust.ApplyScoreDiscount());
         SRApi.HotkeyAction("qa.restore_discount", "还原折扣", () => QuickAdjust.RestoreScoreDiscount());

@@ -1,84 +1,81 @@
---- SR.Core.cs:1108  [Chat] Log Limit
-    zh(3): 聊天记录保留条数 | 超过上限时丢弃最旧的消息 | 仅影响本模组的聊天记录面板
-    en(3): Chat log size | older messages are dropped beyond the limit | affects this mod chat log panel only
---- SR.Core.cs:1109  [Level] Party Bomb
-    zh(3): 派对盒炸弹开关 | 开箱后按概率生成炸弹 | 需要房主权限，仅派对盒阶段。
-    en(3): Party box bomb | spawns a bomb by chance when the box opens | host only; party-box phase only
---- SR.Core.cs:1110  [Level] Party Bomb Type
-    zh(3): 派对盒炸弹类型 | 选择生成的炸弹种类 | 取值与游戏内炸弹类型一致
-    en(3): Party box bomb type | selects which bomb is spawned | matches the game bomb types
---- SR.Core.cs:1111  [Level] Refresh Party Box Key
-    zh(3): 刷新派对盒快捷键 | 按下重走派对盒流程，按权重重新开箱 | 不绑键则不生效
-    en(3): Reroll party box key | press to reroll and reopen the box | inactive while unbound
---- SR.Core.cs:1112  [Level] Close Party Box Key
-    zh(3): 关闭派对盒快捷键 | 按下结束选择，进入游玩阶段 | 不绑键则不生效
-    en(3): Close party box key | press to end picking and enter play | inactive while unbound
---- SR.Core.cs:1113  [Online] Filter Region
-    zh(3): 区域筛选 | 只显示指定区域的房间 | 从下拉选择；留空表示不过滤。
-    en(3): Region filter | shows lobbies from the selected region only | pick from the dropdown; empty means no filter
---- SR.Core.cs:1114  [Online] Filter Mode
-    zh(3): 模式筛选 | 只显示指定模式的房间 | 留空表示不过滤
-    en(3): Mode filter | shows lobbies of the selected game mode only | empty means no filter
---- SR.Core.cs:1115  [Online] Filter Tag
-    zh(3): 标签筛选 | 只显示含指定标签的房间 | 留空表示不过滤
-    en(3): Tag filter | shows lobbies with the selected tag only | empty means no filter
---- SR.Core.cs:1116  [Online] Filter State
-    zh(3): 状态筛选 | 按房间状态过滤 | 留空全部，join 可加入，full 已满，playing 进行中
-    en(3): State filter | filters lobbies by state | empty = all, join = joinable, full = full, playing = in match
---- SR.Core.cs:1117  [Online] Search Timeout
-    zh(3): 搜索超时秒数 | 超过该时间后停止等待房间列表 | 仅作为兜底，通常不必修改。
-    en(3): Search timeout | stops waiting for the lobby list after this many seconds | fallback only; usually no need to change
---- SR.Core.cs:1118  [Online] Sort Column
-    zh(3): 排序列索引 | 指定房间列表按哪一列排序 | 一般由表头操作维护，不建议手改。
-    en(3): Sort column index | selects the column used to sort the lobby list | normally maintained by the header; avoid editing manually
---- SR.Core.cs:1119  [Online] Sort Descending
-    zh(3): 排序方向 | 开启为从大到小，关闭为从小到大 | 与排序列配合使用
-    en(3): Sort direction | descending when on, ascending when off | used together with the sort column
---- SR.Core.cs:1120  [Chat Window] Key Defaults v2
-    zh(3): 内部标记：快捷键默认值已迁移 | 仅用于配置迁移，不需要修改 | 修改它不会产生任何效果
-    en(3): Internal flag: key defaults migrated | used for config migration only | changing it has no effect
---- SR.Core.cs:1121  [Chat Window] Defaults v3
-    zh(3): 内部标记：字号默认值已迁移 | 仅用于配置迁移，不需要修改 | 修改它不会产生任何效果
-    en(3): Internal flag: font defaults migrated | used for config migration only | changing it has no effect
---- DestroyBlocks.cs:238  [Destroy Blocks] Toggle Key
-    zh(3): 删除模式切换键 | 按住进入删除模式并高亮最近放置的方块，松手退出 | 点键框后按新键改绑，支持组合键。
-    en(3): delete-mode key | hold to enter delete mode and highlight the most recently placed block; release to exit | click the key box and press a new key to rebind (combos supported)
---- DestroyBlocks.cs:240  [Destroy Blocks] Delete Key
-    zh(3): 删除键 | 删除当前选中的方块 | 滚轮可在候选方块之间切换
-    en(3): delete key | deletes the currently selected block | the mouse wheel cycles through candidate blocks
---- DestroyBlocks.cs:242  [Destroy Blocks] Enabled
-    zh(3): 方块破坏总开关 | 决定本页功能是否生效 | 关闭后本页所有操作停止。
-    en(3): master switch for block destruction | enables or disables the feature on this page | when off, every action on this page stops
---- DestroyBlocks.cs:244  [Destroy Blocks] Select Mode
-    zh(3): 候选方块排序方式 | 距离＝按离自己的距离由近到远；放置顺序＝最后放置的优先 | 只影响选择顺序，不影响列表内容。
-    en(3): candidate ordering | Distance = nearest to you first; Placement = most recently placed first | affects selection order only, not the list contents
---- DestroyBlocks.cs:246  [Destroy Blocks] List Mode
-    zh(3): 列表模式 | 普通＝只列玩家亲手放置的方块；进阶＝场上所有方块单独列出 | 普通模式排除炸弹等临时物件。
-    en(3): list mode | Normal = only blocks placed by players; Advanced = every block listed individually | Normal excludes temporary items such as bombs
---- DestroyBlocks.cs:248  [Destroy Blocks] Track Player
-    zh(3): 按玩家号过滤 | 不追踪＝所有玩家的方块；1 到 4＝只看对应玩家号 | 仅影响列表，需配合列表模式。
-    en(3): player filter | NoTrack = all players; 1-4 = only blocks placed by that player number | affects the list only; used with list mode
---- DestroyBlocks.cs:252  [Destroy Blocks] Refresh Mode
-    zh(3): 候选列表刷新方式 | 实时＝按住切换键期间持续更新；暂存＝按下时重建一次 | 实时模式已节流，仅在按住时有开销。
-    en(3): refresh mode for the candidate list | Realtime = keeps updating while the toggle key is held; Snapshot = rebuilt once on press | Realtime is throttled and only costs while held
---- DestroyBlocks.cs:254  [Destroy Blocks] Use Smoke
-    zh(3): 破坏动画开关 | 删除方块时是否播放烟雾/破碎动画 | 关闭时方块直接消失。
-    en(3): destruction animation | whether to play the smoke/break animation when deleting a block | when off the block just disappears
---- BuildingTools.cs:40  [build] Collision Override
-    zh(3): 无视碰撞放置开关 | 放开放置规则，方块可重叠、悬空或相互穿插 | 仅影响放置判定，不改变物理与玩法。
-    en(3): ignore-collision placement switch | pieces may overlap, float or intersect anything | placement rules only; physics and gameplay are unchanged
---- BuildingTools.cs:42  [build] Collision Toggle Key
-    zh(3): 无视碰撞快捷键 | 游戏中临时开关无视碰撞放置 | 可改绑，支持组合键
-    en(3): ignore-collision key | temporarily toggles ignore-collision placement in-game | rebindable, combos supported
---- BuildingTools.cs:44  [build] Grid Override
-    zh(3): 自由放置开关 | 吸附精度由 1 格改为 0.01 格，可微调位置 | 仅影响放置取整，只在建造阶段生效；关闭立即回到整格吸附。
-    en(3): free placement switch | changes grid snapping from 1 unit to 0.01 units for fine-tuning | placement rounding only, build phase only; turning it off restores 1-unit snapping immediately
---- BuildingTools.cs:46  [build] Grid Toggle Key
-    zh(3): 自由放置快捷键 | 游戏中临时开关自由放置 | 可改绑，支持组合键
-    en(3): free placement key | temporarily toggles free placement in-game | rebindable, combos supported
---- BuildingTools.cs:267  [build] Lift Build Cap
-    zh(3): 满度上限解除开关 | 把关卡满度上限从原版 500 提升到设定值 | 用于树屋保存/发布；关闭后恢复原版 500。
-    en(3): build cap unlock switch | raises the level fullness cap from the vanilla 500 to the configured value | applies to treehouse save/publish; turning it off restores the vanilla 500
---- BuildingTools.cs:269  [build] Build Cap Value
-    zh(3): 满度上限数值 | 设置解除后的满度上限 | 范围 500 到 10000000，改完立即生效
-    en(3): build cap value | sets the fullness cap used when the unlock is on | range 500-10000000, applies immediately
+--- Chat.Window.cs:86  (Sec , "Enabled")
+    zh(3): 本页功能总开关 | 决定聊天窗口增强是否应用 | 关闭后本页所有修改都不再生效，窗口回到游戏原版行为。
+    en(3): master switch for this page | enables or disables all chat-window enhancements on this page | when off, no change from this page applies and the window behaves like vanilla
+--- Chat.Window.cs:88  (Sec , "No Auto Show")
+    zh(3): 自动弹出开关（取反） | 开启后新消息不再自动弹出聊天窗口 | 按住显示键仍可查看，按 Enter 输入也会弹出。
+    en(3): auto-show switch (inverted) | new messages no longer pop the chat window open | the show key still reveals it, and pressing Enter to type still opens it
+--- Chat.Window.cs:90  (Sec , "No Fade")
+    zh(3): 淡入淡出开关（取反） | 开启后窗口出现与消失直接瞬切 | 关闭时沿用游戏自身淡入淡出速度；与自动弹出互不影响。
+    en(3): fade switch (inverted) | the window appears and disappears instantly | when off, the game own fade speed is used; independent of auto-show
+--- Chat.Window.cs:92  (Sec , "Window Key")
+    zh(3): 聊天窗口显示键 | 按下该键显示聊天窗口，行为由显示方式决定 | 点右侧键框后按新键即可改绑，支持鼠标键，Esc 取消。
+    en(3): show key for the chat window | shows the chat window; behavior follows the window mode option | click the key box, then press a new key to rebind (mouse buttons supported); Esc cancels
+--- Chat.Window.cs:94  (Sec , "Window Mode")
+    zh(3): 显示键的工作方式 | 按住＝按住期间显示；切换＝按一下在常驻显示与交还原版之间切换 | 需配合窗口显示键使用。
+    en(3): behavior of the show key | Hold = visible while held; Toggle = tap to switch between pinned-on and vanilla | used together with the show key option
+--- Chat.Window.cs:96  (Sec , "Box Scale")
+    zh(3): 聊天框整体缩放比例 | 按比例缩放消息区，文字、玩家名与头像一起 | 范围 0.5–2；可按住缩放键滚动滚轮实时调整，每格 0.05。
+    en(3): overall chat box scale | scales the message area, including text, player names and portraits | range 0.5-2; hold the scale key and scroll the wheel to adjust live (0.05 per notch)
+--- Chat.Window.cs:98  (Sec , "Box Scale Key")
+    zh(3): 缩放调节键 | 按住它滚动滚轮调整聊天框缩放，每格 0.05 | 改绑方式同显示键；字号请用字号调节键。
+    en(3): scale modifier key | hold it and scroll the wheel to adjust chat box scale (0.05 per notch) | rebind like the show key; use the font key for font size
+--- Chat.Window.cs:100  (Sec , "Font Size")
+    zh(3): 聊天文字字号 | 设置消息文字、玩家名与头像的尺寸 | 范围 1–50；输入框字号不受影响；可按住字号键滚动滚轮调整，每格 1。
+    en(3): chat font size | sets the size of message text, player names and portraits | range 1-50; the input field is not affected; hold the font key and scroll to adjust (1 per notch)
+--- Chat.Window.cs:102  (Sec , "Font Key")
+    zh(3): 字号调节键 | 按住它滚动滚轮调整字号，每格 1 | 改绑方式同显示键。
+    en(3): font size modifier key | hold it and scroll the wheel to adjust the font size (1 per notch) | rebind like the show key
+--- Chat.Window.cs:104  (Sec , "Crisp Text")
+    zh(3): 文字清晰度开关 | 将聊天画布设为像素对齐，减少模糊 | 切换时会重建消息文字一次。
+    en(3): text crispness switch | sets the chat canvas pixel-perfect to reduce blur | message texts are rebuilt once when toggled
+--- Chat.Window.cs:106  (Sec , "Pos Enabled")
+    zh(3): 位置调整总开关 | 决定是否应用下方的 X/Y 偏移 | 关闭时会撤销已加偏移一次，位置完全交还游戏。
+    en(3): master switch for position tweaks | applies or removes the X/Y offsets below | when turned off, the applied offset is removed once and the game controls the position again
+--- Chat.Window.cs:108  (Sec , "Pos X")
+    zh(3): 水平偏移量，像素 | 正值把聊天框向右移 | 仅在位置调整开启时生效；范围 0 到屏幕宽度。
+    en(3): horizontal offset in pixels | positive values move the chat box right | only applies while position tweaks are on; range 0 to screen width
+--- Chat.Window.cs:110  (Sec , "Pos Y")
+    zh(3): 垂直偏移量，像素 | 负值把聊天框向下移 | 仅在位置调整开启时生效；范围负屏高到 0。
+    en(3): vertical offset in pixels | negative values move the chat box down | only applies while position tweaks are on; range -screen height to 0
+--- PlayerTracker.cs:135  ("Player Tracker" , "Tracking Length")
+    zh(3): 轨迹保留长度 | 记录多少格的历史移动轨迹 | 范围 10 到 3000 格，60 格约 1 秒。
+    en(3): trail length | how many ticks of movement history are recorded | range 10-3000; 60 ticks is about 1 second
+--- PlayerTracker.cs:137  ("Player Tracker" , "Skip Frames")
+    zh(3): 采样间隔 | 每跳过 N 帧记录一个位置点 | 范围 0 到 60，数值越大轨迹越稀疏。
+    en(3): sampling interval | records one position point every N frames | range 0-60; higher values make the trail sparser
+--- PlayerTracker.cs:139  ("Player Tracker" , "Line Start Width")
+    zh(3): 轨迹起点线宽 | 控制靠近当前位置一端的粗细 | 范围 0.01 到 2
+    en(3): trail start width | thickness at the end nearest the current position | range 0.01-2
+--- PlayerTracker.cs:141  ("Player Tracker" , "Line End Width")
+    zh(3): 轨迹终点线宽 | 控制最旧位置一端的粗细 | 范围 0.01 到 2
+    en(3): trail end width | thickness at the oldest position | range 0.01-2
+--- PlayerTracker.cs:143  ("Player Tracker" , "Teleport Threshold")
+    zh(3): 瞬移判定距离 | 单帧移动超过该距离即清空轨迹重画，避免拖出贯穿全图的长线 | 范围 1 到 500
+    en(3): teleport threshold | clears and restarts the trail when a character moves farther than this in one frame, avoiding a line across the map | range 1-500
+--- PlayerTracker.cs:145  ("Player Tracker" , "Enabled")
+    zh(3): 玩家轨迹总开关 | 在画面上绘制其他玩家的移动轨迹 | 仅显示，不影响游戏判定。
+    en(3): master switch for player trails | draws other players movement trails on screen | display only; does not affect gameplay
+--- PlayerTracker.cs:200  ("Player Tracker" , "Trail Alpha")
+    zh(3): 轨迹透明度 | 控制轨迹可见度，调低可减少遮挡 | 范围 0.05 到 1；数值越低越透明，越不遮挡画面。
+    en(3): trail opacity | controls visibility; lower values reduce obstruction | range 0.05-1; lower values are more transparent and obstruct less
+--- QuickAdjust.cs:39  ("Quick Adjust" , "Quick Switch")
+    zh(3): 快速切换开关 | 自由模式下长按切换键在行动与建造之间切换 | 仅自由模式生效，对局中开关立即生效。
+    en(3): quick switch toggle | in freeplay, hold the switch key to swap between Action and Build | freeplay only; the toggle applies immediately in-game
+--- QuickAdjust.cs:41  ("Quick Adjust" , "Quick Switch Hold")
+    zh(3): 快速切换长按时间 | 设置长按多少秒触发切换 | 范围 0 到 2，0 为立即切换
+    en(3): quick switch hold time | sets how long the key must be held to trigger the swap | range 0-2, 0 = instant
+--- QuickAdjust.cs:43  ("Quick Adjust" , "Quick Retry")
+    zh(3): 死后自动重试开关 | 挑战模式死亡后自动重开关卡，无需长按 | 仅挑战模式生效
+    en(3): auto retry toggle | in challenge mode, restarts the run automatically after death without holding a key | challenge mode only
+--- QuickAdjust.cs:45  ("Quick Adjust" , "Quick Retry Fast")
+    zh(3): 快速重试开关 | 挑战模式死亡后长按重试键到设定秒数自动重试 | 仅挑战模式生效，长按时间在下方设置。
+    en(3): quick retry toggle | in challenge mode, hold the retry key for the set time after death to retry | challenge mode only; the hold time is set below
+--- QuickAdjust.cs:47  ("Quick Adjust" , "Quick Retry Hold")
+    zh(3): 快速重试长按时间 | 设置死亡后长按多久触发重试 | 范围 0 到 2，0 为立即重试
+    en(3): quick retry hold time | sets how long to hold after death before retrying | range 0-2, 0 = instant
+--- QuickAdjust.cs:49  ("Quick Adjust" , "Handicap")
+    zh(3): 当前评分百分比 | 直接设置自己那行的评分百分比（10-100，整十） | 等效折扣 = 100 减该数值，100 即不折扣。
+    en(3): current score percentage | sets your own score percentage directly (10-100 in tens) | equivalent discount = 100 minus this value, 100 = no discount
+--- QuickAdjust.cs:51  ("Quick Adjust" , "More Handicap Values")
+    zh(3): 自由输入模式开关 | 开启后 handicap 由整十滑块改为输入框 | 范围 10 到 100 任意整数。
+    en(3): free input mode switch | turns the tens slider into an input box | any integer from 10 to 100

@@ -111,9 +111,9 @@ public partial class Chat : ITweak {
             SRApi.RegisterPageChrome("Chat", RenderToolbar, RenderInputRow);
             // 两个开关的本地化文案（配置在本文件 Bind 到 Chat 段）。
             SRApi.LocKey("Chat", "Filter Quick Msgs", "过滤快捷消息", null);
-            SRApi.LocDesc("Chat", "Filter Quick Msgs", "快捷消息过滤开关\n从聊天记录中隐藏表情与预设消息，只保留玩家输入\n仅影响聊天记录显示，不改变游戏聊天内容。", "quick-message filter\nhides emotes and preset messages from the chat log, keeping player-typed text only\ndisplay only; the game chat content is unchanged");
+            SRApi.LocDesc("Chat", "Filter Quick Msgs", "快捷消息过滤\n记录里隐藏表情与预设消息\n只影响本模组记录页", "Quick message filter\nhides emotes and preset messages from the log\nthis mod's log page only");
             SRApi.LocKey("Chat", "Show Time", "显示时间", null);
-            SRApi.LocDesc("Chat", "Show Time", "时间戳显示开关\n在每条聊天记录前显示时间\n仅作用于本模组的聊天记录面板", "timestamp switch\nshows the time before each message in the chat log\napplies to this mod chat log panel only");
+            SRApi.LocDesc("Chat", "Show Time", "时间戳\n每条记录前显示时间\n只影响本模组记录页", "Timestamps\nshows the time before each message\nthis mod's log page only");
             // 预登记本页自动快捷键：不预登记则重启后在首次打开本页前按键无效。
             SRApi.HotkeyAction("chat.clear", "清空", () => { Clear(); _chatTextCache = null; _chatBuilt = false; });
             SRApi.HotkeyAction("chat.copy", "复制", () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (System.Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); } });
