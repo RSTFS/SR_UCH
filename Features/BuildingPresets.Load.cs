@@ -30,7 +30,6 @@ namespace SR_UCH.Tweaks {
         // 坑位与 Level 保持一致：失败必须清 levelPortalXml、锁 45 秒自愈、25 秒未消费兜底清 XML。
         private static void LoadPreset(PresetInfo p) {
             if (p == null) return;
-            bool coroutineStarted = false;
             try {
                 if (!ActionAllowed()) return;
                 // GateHost 会放行开了"无视房主限制"的房客，但 WriteSyncVar / ReloadScene 在客户端不执行，会假成功。
@@ -125,36 +124,37 @@ namespace SR_UCH.Tweaks {
                         return;
                     }
                     ClearPending();
-                    SetReloadBusy(true, "直接替换关卡");
+                    // P0-8：锁 / levelPortalXml / 失败兜底收敛到 ReloadGuard —— 不论是正常 return、
+                    // 提前 return 还是抛异常，finally 里都会把「没交给协程」的那把锁放掉。
+                    ReloadGuard guard = ReloadGuard.Begin("直接替换关卡");
                     try {
-                        // 单人/无远程客户端，或勾选了「跳过树屋流程」：直接在当前对局内切场景。
+                        // 单人/无远程客户端：直接在当前对局内切场景。
                         // 否则退回树屋方案，因为游戏没有在“对局内”更新房客 SelectedLevel 的 RPC/消息。
-                        bool __directOk = (!hasRemoteClients || skipTreehouse) && StartDirectReplace(p, xml, targetLevel, targetMode);
+                        bool __directOk = !hasRemoteClients && StartDirectReplace(p, xml, targetLevel, targetMode);
                         if (__directOk) {
-                            coroutineStarted = true;
+                            guard.Handoff();
                             SRApi.LogInfo("[布局预设] 直接替换关卡并加载预设：" + p.Name
                                 + " → " + (customPreset ? (string.IsNullOrEmpty(p.LevelName) ? SRApi.T("自定义关卡", "Custom level") : p.LevelName) : LevelDisplayNameForScene(presetScene))
                                 + (skipTreehouse && hasRemoteClients ? SRApi.T("（已跳过树屋流程，房客关卡状态可能不同步）", " (treehouse flow skipped; clients' level state may be out of sync)") : ""));
                         } else if (customPreset) {
-                            // 失败：不把 coroutineStarted 置真 —— 否则函数末尾的兜底分支（清 levelPortalXml + 放锁）
-                            // 永远不执行；StartDirectReplace 内部虽然清过 XML，但兜底要保留成最后一道保险。
+                            // 失败：不动 guard（finally 会清 XML + 放锁）。
                             SRApi.Notify(SRApi.T("替换自定义关卡失败（详见日志）", "Failed to replace into the custom level (see the log)"));
                         } else {
                             lm.StartCoroutine(ReplaceLevelRoutine(p.Name, xml, presetScene, targetLevel, targetMode));
-                            coroutineStarted = true;
+                            guard.Handoff();
                             SRApi.LogInfo("[布局预设] 正在替换关卡并加载预设：" + p.Name
                                 + SRApi.T("（会先回树屋再进入 ", " (returns to the treehouse first, then enters ") + LevelDisplayNameForScene(presetScene) + "）");
                         }
                     } catch (Exception __rx) {
                         SRApi.Guard.Log("布局预设/开始替换关卡", __rx);
-                        try { QuickSaver.levelPortalXml = null; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-                        SetReloadBusy(false);
                         SRApi.Notify(SRApi.T("加载预设失败：无法开始替换关卡", "Failed to load the preset: could not start the level replacement"));
+                    } finally {
+                        guard.Settle();   // 没交给协程 -> 清 XML + 放锁；已交给协程 -> 什么都不做
                     }
                     return;
                 }
                 ClearPending();
-                SetReloadBusy(true, "重载加载预设");
+                ReloadGuard reloadGuard = ReloadGuard.Begin("重载加载预设");
                 try {
                     // 一次性静态字段：游戏在 OnSetupStartLevel 里读取后立即置 null 并原生广播给全员。
                     QuickSaver.levelPortalXml = xml;
@@ -172,21 +172,18 @@ namespace SR_UCH.Tweaks {
                     }
                     // 成败提示在协程内真正执行完才发出；锁由协程末尾复位。
                     lm.StartCoroutine(LoadPresetRoutine(p.Name, xml, toMode));
-                    coroutineStarted = true;
+                    reloadGuard.Handoff();
                     SRApi.LogInfo("[布局预设] " + SRApi.T("加载预设：", "Loading preset: ") + p.Name
                         + "（" + LevelText(p) + "）"
                         + SRApi.T("，全员重载中（分数会重置）", "; everyone is reloading (scores will reset)"));
                 } catch (Exception __ex) {
                     SRApi.Guard.Log("布局预设/开始加载", __ex);
                     SRApi.Notify(SRApi.T("加载预设失败", "Failed to load the preset"));
+                } finally {
+                    reloadGuard.Settle();
                 }
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/加载", __ex);
-            }
-            // 协程没启动成功时必须立即清 levelPortalXml 并放锁，否则下一次原生重载会误用这份预设。
-            if (!coroutineStarted) {
-                try { QuickSaver.levelPortalXml = null; } catch (Exception __ex) { SRApi.Guard.Log("布局预设/清理预设XML", __ex); }
-                SetReloadBusy(false);
             }
         }
 
@@ -690,6 +687,26 @@ namespace SR_UCH.Tweaks {
                 SRApi.Notify(SRApi.T("重载进行中，请稍候", "Reload in progress"));
                 return true;
             } catch { return false; }
+        }
+
+        // 重载锁的成对管理（audit P0-8）：Begin 加锁，
+        //   交给协程 -> Handoff()（协程末尾自己放锁）；
+        //   没交给协程 -> Settle()（清 levelPortalXml + 放锁）。
+        // 调用点一律写在 try/finally 里：任何异常或提前 return 都不会留下悬着的锁。
+        private sealed class ReloadGuard {
+            private bool _handed;
+            private ReloadGuard() { }
+            public static ReloadGuard Begin(string why) {
+                SetReloadBusy(true, why);
+                return new ReloadGuard();
+            }
+            public void Handoff() { _handed = true; }
+            public void Settle() {
+                if (_handed) return;
+                try { QuickSaver.levelPortalXml = null; }
+                catch (Exception __cx) { SRApi.Guard.Log("布局预设/清理预设XML", __cx); }
+                SetReloadBusy(false);
+            }
         }
 
         // 锁的单一入口：记录"谁加的锁"，方便自愈时在日志里指出漏放锁的路径（audit P0-8）。
