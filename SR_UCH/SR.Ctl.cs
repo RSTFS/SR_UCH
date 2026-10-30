@@ -577,7 +577,14 @@ public partial class SR {
             if (keyEntry != null) {
                 string actTip = string.IsNullOrEmpty(tooltip) ? label : label + "\n" + tooltip;
                 actTip += KeyTip(keyEntry);
-                tooltip = bindable ? actTip + "\n" + T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey") : actTip;
+                // 拼接不能无条件加换行（actTip 为空时会出现"第一行空行"，用户反馈 11 同类问题）。
+                if (bindable) {
+                    string hintTxt = T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey");
+                    tooltip = string.IsNullOrEmpty(actTip) ? hintTxt : actTip + "\n" + hintTxt;
+                } else {
+                    tooltip = actTip;
+                }
+                tooltip = SRApi.Ctl.CleanTip(tooltip);
             }
             float w = width > 0f ? width : Sc(150);
             Event e = Event.current;
