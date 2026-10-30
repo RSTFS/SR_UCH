@@ -138,9 +138,9 @@ public partial class Experiments : ITweak
             SRApi.Ref.Override("Cursor.boundary", "解除关卡边界：放置光标边界快照");
             SRApi.Ref.Override("ZoomCamera.frame", "解除关卡边界：相机取景框");
             SRApi.LocKey("Experiments", "Level Bounds", "解除关卡边界", null);
-            SRApi.LocDesc("Experiments", "Level Bounds", "解除关卡边界：放开关卡四周的空间限制\n开启后实体墙、放置光标、相机取景、界外黑幕与方块越界放置同时解除；关闭即逐项还原\n只影响本地，不修改关卡存档与联机同步状态", "unlocks the level's spatial bounds\nremoves the solid walls, placement-cursor bounds, camera framing, the out-of-bounds overlay and out-of-bounds placement at once; turning it off restores each one\nlocal only; does not modify the level save or network sync state");
+            SRApi.LocDesc("Experiments", "Level Bounds", "解锁关卡边界\n同时解除实体墙、光标、相机、界外黑幕与越界放置\n只影响本地，不改存档与联机状态", "Unlock level bounds\nremoves walls, cursor, camera and out-of-bounds limits at once\nlocal only; save and network state untouched");
             SRApi.LocKey("Experiments", "Level Bounds Radius", "硬解除半径", "Hard radius");
-            SRApi.LocDesc("Experiments", "Level Bounds Radius", "硬解除半径：光标与相机可到关卡外的距离\n值越大可走得越远，不限范围；填 1 即贴着光标\n仅在主开关开启时生效", "hard unlock radius: how far the cursor and camera can reach outside the level\nlarger values reach farther with no upper limit; 1 keeps it right at the cursor\nonly applies while the main switch is on");
+            SRApi.LocDesc("Experiments", "Level Bounds Radius", "硬解锁半径\n光标与相机能到关卡外多远\n不限上限；1＝贴着光标；仅主开关开启时生效", "Hard unlock radius\nhow far the cursor and camera reach outside the level\nno upper limit; 1 = at the cursor; main switch only");
         }
 
         // 新放置的方块：立即设置 IgnoreBounds（只处理这一个对象，不做全场景扫描）。

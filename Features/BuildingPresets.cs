@@ -236,16 +236,16 @@ namespace SR_UCH.Tweaks {
             catch (Exception __mx) { SRApi.Guard.Log("布局预设/注册淘汰键", __mx); }
             SRApi.LocKey(Section, "Enabled", "布局预设总开关", "Layout presets");
             SRApi.LocDesc(Section, "Enabled",
-                "布局预设总开关\n开启后可保存和加载方块布局预设\n关闭后本页仍可查看已有预设，但所有操作都不生效；与模组总开关相互独立。",
-                "master switch for layout presets\nwhen on, block layout presets can be saved and loaded on this page\nwhen off, existing presets are still listed but every action is inactive; independent from the mod-wide master switch");
+                "布局预设总开关\n开启后可保存与加载方块布局\n关闭后仍可查看列表，但操作全部无效",
+                "Layout preset master switch\nsave and load block layouts while on\noff still lists presets but disables every action");
             SRApi.LocKey(Section, "Max Presets", "预设数量上限", "Max presets");
             SRApi.LocDesc(Section, "Max Presets",
-                "预设数量上限\n列表最多保留多少个预设，达到上限后必须先删除旧预设才能保存新布局\n范围 1 到 100；只限制新保存，不会删除磁盘上已有的预设文件。",
-                "maximum number of presets\ncaps how many presets the list keeps; when reached, delete an old preset before saving a new layout\nrange 1-100; only limits new saves and never deletes existing preset files");
+                "预设数量上限\n列表最多保留多少条预设\n范围 1-100；只限制新保存，不删磁盘文件",
+                "Preset count limit\nhow many presets the list keeps\n1-100; limits new saves only, never deletes files");
             SRApi.LocKey(Section, "Sort Mode", "列表排序", "Sort mode");
             SRApi.LocDesc(Section, "Sort Mode",
-                "列表排序方式\n0=时间（新→旧），1=名称（A→Z）\n由列表页的排序下拉维护，不在配置区重复显示",
-                "preset list sort mode\n0 = time (newest first), 1 = name (A-Z)\nmaintained by the sort dropdown on the list page and not repeated in the settings area");
+                "列表排序方式\n0＝按时间（新到旧），1＝按名称\n由列表页的排序下拉维护",
+                "List sort mode\n0 = newest first, 1 = by name\nmaintained by the list page dropdown");
             // 换场景后下次打开面板重新扫盘（手动放入/删除的 XML、其它存档的改动都能看到）。
             // 页面级滚轮钩子：在窗口建立滚动区【之前】拿到滚轮，鼠标在预设表格上就滚表格。
             // （页面内部拿到的事件已被滚动区处理过，所以必须在这一层接。）
@@ -267,20 +267,20 @@ namespace SR_UCH.Tweaks {
             catch (Exception __hk) { SRApi.Guard.Log("布局预设/注册返回树屋快捷键", __hk); }
             SRApi.LocKey(Section, "Skip Treehouse", "跳过树屋流程", "Skip treehouse");
             SRApi.LocDesc(Section, "Skip Treehouse",
-                "跳过树屋流程\n勾选后联机替换关卡时不再先回树屋，而是直接替换场景进入目标关卡\n房客的关卡选择状态可能不同步（按关卡读取的岩浆/统计等次要设置可能不一致）",
-                "skip the treehouse flow\nwhen on, online level replacement switches the scene directly instead of returning to the treehouse first\nclients' selected-level state may be out of sync (minor per-level settings like lava/stats may differ)");
+                "跳过树屋流程\n直接切换场景进入目标关卡，不先回树屋\n仅单人生效；联机时强制走树屋",
+                "Skip treehouse\nswitches scene straight into the target level\nsingle-player only; forced on online");
             SRApi.LocKey(Section, ColWidthsKey, "列表列宽（内部）", "Preset widths (internal)");
             SRApi.LocDesc(Section, ColWidthsKey,
-                "预设列表列宽\n由列表表头拖动自动写入，逗号分隔的设计单位\n一般无需手动修改；非法值会回退默认列宽",
-                "preset list column widths\nwritten automatically when the list header is dragged; comma-separated design units\nnormally no need to edit; invalid values fall back to the default widths");
+                "预设列表列宽\n拖动表头后自动写入\n一般无需手改；非法值回退默认",
+                "Preset column widths\nwritten automatically after dragging the header\nrarely needs editing; invalid values fall back");
             SRApi.LocKey(Section, ColOrderKey, "列表列序（内部）", "Preset order (internal)");
             SRApi.LocDesc(Section, ColOrderKey,
-                "预设列表列顺序\n由列表表头拖动换位自动写入，逗号分隔的列索引\n一般无需手动修改；非法值会回退默认列序",
-                "preset list column order\nwritten automatically when the list header is dragged; comma-separated column indices\nnormally no need to edit; invalid values fall back to the default order");
+                "预设列表列序\n拖动表头换位后自动写入\n一般无需手改；非法值回退默认",
+                "Preset column order\nwritten automatically after reordering the header\nrarely needs editing; invalid values fall back");
             SRApi.LocKey(Section, ColHiddenKey, "隐藏列（内部）", "Preset hidden (internal)");
             SRApi.LocDesc(Section, ColHiddenKey,
-                "预设列表隐藏列\n右键表头隐藏列后自动写入，逗号分隔的列索引\nShift+右键表头可恢复显示全部列；非法索引会被忽略",
-                "preset list hidden columns\nwritten automatically after hiding a column with a header right-click; comma-separated column indices\nShift+right-click the header to show all columns again; invalid indices are ignored");
+                "预设列表隐藏列\n右键表头隐藏后自动写入\nShift+右键表头可恢复全部",
+                "Preset hidden columns\nwritten after hiding with a header right-click\nShift+right-click the header restores all");
         }
 
         // ---------- 配置读取 ----------

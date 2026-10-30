@@ -136,7 +136,7 @@ namespace SR_UCH.Tweaks {
                 if (_sortCol < 0 || _sortCol >= ColCount || _sortCol == JoinCol) _sortCol = -1;
             } catch { _sortCol = -1; _sortDesc = false; }
             SRApi.LocKey(SecOnline, "Show Quality Coeff", "显示技能匹配质量", null);
-            SRApi.LocDesc(SecOnline, "Show Quality Coeff", "技能匹配质量系数显示开关\n在房间列表质量列后附带 0 到 1 的匹配系数\n也可按住 Shift 点击该列列头切换。", "skill-match quality coefficient toggle\nappends a 0-1 match coefficient to the quality column\ncan also be toggled with Shift + click on the column header");
+            SRApi.LocDesc(SecOnline, "Show Quality Coeff", "匹配系数显示\n在质量列后附带 0-1 的技能匹配系数\n也可 Shift+点击该列列头切换", "Match coefficient\nappends a 0-1 skill-match coefficient to the quality column\nalso toggled by Shift+clicking that header");
         }
 
         // 清空房间列表与表格几何缓存（返回主界面 / 房主解散时调用）；不动列宽 / 列序 / 隐藏列偏好。
