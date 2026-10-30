@@ -235,23 +235,23 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec("Destroy Blocks", "方块破坏", null);
             SRApi.Nav("Destroy Blocks", 60); // 侧栏栏目顺序
             SRApi.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);
-            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "删除模式切换键\n按住进入删除模式并高亮最近放置的方块，松手退出\n点键框后按新键改绑，支持组合键。", "delete-mode key\nhold to enter delete mode and highlight the most recently placed block; release to exit\nclick the key box and press a new key to rebind (combos supported)");
+            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "删除模式按键\n按住进入删除模式并高亮候选方块\n可改绑，支持组合键", "Delete-mode key\nhold to enter delete mode and highlight candidates\nrebindable, combos supported");
             SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
-            SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除键\n删除当前选中的方块\n滚轮可在候选方块之间切换", "delete key\ndeletes the currently selected block\nthe mouse wheel cycles through candidate blocks");
+            SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除按键\n删除当前选中的方块\n滚轮在候选方块之间切换", "Delete key\ndeletes the selected block\nmouse wheel cycles the candidates");
             SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
-            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n决定本页功能是否生效\n关闭后本页所有操作停止。", "master switch for block destruction\nenables or disables the feature on this page\nwhen off, every action on this page stops");
+            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n开启后本页功能才生效\n关闭后本页所有操作停止", "Block breaking master switch\nthe page works only while this is on\nwhen off, every action here stops");
             SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
-            SRApi.LocDesc("Destroy Blocks", "Select Mode", "候选方块排序方式\n距离＝按离自己的距离由近到远；放置顺序＝最后放置的优先\n只影响选择顺序，不影响列表内容。", "candidate ordering\nDistance = nearest to you first; Placement = most recently placed first\naffects selection order only, not the list contents");
+            SRApi.LocDesc("Destroy Blocks", "Select Mode", "候选排序方式\n距离＝离你近的优先；放置顺序＝新放的优先\n只影响选择顺序", "Candidate ordering\ndistance = nearest first; placement = newest first\nselection order only");
             SRApi.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
-            SRApi.LocDesc("Destroy Blocks", "List Mode", "列表模式\n普通＝只列玩家亲手放置的方块；进阶＝场上所有方块单独列出\n普通模式排除炸弹等临时物件。", "list mode\nNormal = only blocks placed by players; Advanced = every block listed individually\nNormal excludes temporary items such as bombs");
+            SRApi.LocDesc("Destroy Blocks", "List Mode", "列表模式\n普通＝只列玩家放置的方块；进阶＝场上所有方块\n普通模式排除炸弹等临时物件", "List mode\nnormal = player-placed blocks only; advanced = every block\nnormal excludes temporary items such as bombs");
             SRApi.LocKey("Destroy Blocks", "Track Player", "追踪玩家", null);
-            SRApi.LocDesc("Destroy Blocks", "Track Player", "按玩家号过滤\n不追踪＝所有玩家的方块；1 到 4＝只看对应玩家号\n仅影响列表，需配合列表模式。", "player filter\nNoTrack = all players; 1-4 = only blocks placed by that player number\naffects the list only; used with list mode");
+            SRApi.LocDesc("Destroy Blocks", "Track Player", "按玩家号过滤\n不追踪＝全部；1-4＝只看该玩家\n只影响列表，需配合列表模式", "Player filter\nno-track = everyone; 1-4 = that player only\nlist only; works with list mode");
             SRApi.LocEnum("Realtime", "实时");
             SRApi.LocEnum("Snapshot", "暂存");
             SRApi.LocKey("Destroy Blocks", "Refresh Mode", "列表刷新", null);
-            SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "候选列表刷新方式\n实时＝按住切换键期间持续更新；暂存＝按下时重建一次\n实时模式已节流，仅在按住时有开销。", "refresh mode for the candidate list\nRealtime = keeps updating while the toggle key is held; Snapshot = rebuilt once on press\nRealtime is throttled and only costs while held");
+            SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "候选列表刷新方式\n实时＝按住时持续更新；暂存＝按下时重建一次\n实时已节流，只在按住时有开销", "Candidate refresh\nrealtime = updates while held; snapshot = built once on press\nrealtime is throttled and only costs while held");
             SRApi.LocKey("Destroy Blocks", "Use Smoke", "破坏动画", null);
-            SRApi.LocDesc("Destroy Blocks", "Use Smoke", "破坏动画开关\n删除方块时是否播放烟雾/破碎动画\n关闭时方块直接消失。", "destruction animation\nwhether to play the smoke/break animation when deleting a block\nwhen off the block just disappears");
+            SRApi.LocDesc("Destroy Blocks", "Use Smoke", "破坏动画\n删除方块时播放烟雾与破碎效果\n关闭后方块直接消失", "Break effect\nplays the smoke/break effect when a block is deleted\noff = the block just disappears");
         }
 
         // 是否走实时列表（默认实时）

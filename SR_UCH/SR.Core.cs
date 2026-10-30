@@ -1105,20 +1105,20 @@ public partial class SR : ITweak {
             SR.RegisterPage("Home", RenderHomePage); // 首页也走自绘页注册表（SR.Window 不做 if-else 分派）
             SR.LocKey(Keys.Settings, Keys.UiScale, "界面缩放", null);
             // 统一登记：功能页里没有自带 LocDesc 的可见条目（3 行：是什么 / 怎么用 / 注意；默认值由核心追加）。
-            SR.LocDesc("Chat", "Log Limit", "聊天记录保留条数\n超过上限时丢弃最旧的消息\n仅影响本模组的聊天记录面板", "Chat log size\nolder messages are dropped beyond the limit\naffects this mod chat log panel only");
-            SR.LocDesc("Level", "Party Bomb", "派对盒炸弹开关\n开箱后按概率生成炸弹\n需要房主权限，仅派对盒阶段。", "Party box bomb\nspawns a bomb by chance when the box opens\nhost only; party-box phase only");
-            SR.LocDesc("Level", "Party Bomb Type", "派对盒炸弹类型\n选择生成的炸弹种类\n取值与游戏内炸弹类型一致", "Party box bomb type\nselects which bomb is spawned\nmatches the game bomb types");
-            SR.LocDesc("Level", "Refresh Party Box Key", "刷新派对盒快捷键\n按下重走派对盒流程，按权重重新开箱\n不绑键则不生效", "Reroll party box key\npress to reroll and reopen the box\ninactive while unbound");
-            SR.LocDesc("Level", "Close Party Box Key", "关闭派对盒快捷键\n按下结束选择，进入游玩阶段\n不绑键则不生效", "Close party box key\npress to end picking and enter play\ninactive while unbound");
-            SR.LocDesc("Online", "Filter Region", "区域筛选\n只显示指定区域的房间\n从下拉选择；留空表示不过滤。", "Region filter\nshows lobbies from the selected region only\npick from the dropdown; empty means no filter");
-            SR.LocDesc("Online", "Filter Mode", "模式筛选\n只显示指定模式的房间\n留空表示不过滤", "Mode filter\nshows lobbies of the selected game mode only\nempty means no filter");
-            SR.LocDesc("Online", "Filter Tag", "标签筛选\n只显示含指定标签的房间\n留空表示不过滤", "Tag filter\nshows lobbies with the selected tag only\nempty means no filter");
-            SR.LocDesc("Online", "Filter State", "状态筛选\n按房间状态过滤\n留空全部，join 可加入，full 已满，playing 进行中", "State filter\nfilters lobbies by state\nempty = all, join = joinable, full = full, playing = in match");
-            SR.LocDesc("Online", "Search Timeout", "搜索超时秒数\n超过该时间后停止等待房间列表\n仅作为兜底，通常不必修改。", "Search timeout\nstops waiting for the lobby list after this many seconds\nfallback only; usually no need to change");
-            SR.LocDesc("Online", "Sort Column", "排序列索引\n指定房间列表按哪一列排序\n一般由表头操作维护，不建议手改。", "Sort column index\nselects the column used to sort the lobby list\nnormally maintained by the header; avoid editing manually");
-            SR.LocDesc("Online", "Sort Descending", "排序方向\n开启为从大到小，关闭为从小到大\n与排序列配合使用", "Sort direction\ndescending when on, ascending when off\nused together with the sort column");
-            SR.LocDesc("Chat Window", "Key Defaults v2", "内部标记：快捷键默认值已迁移\n仅用于配置迁移，不需要修改\n修改它不会产生任何效果", "Internal flag: key defaults migrated\nused for config migration only\nchanging it has no effect");
-            SR.LocDesc("Chat Window", "Defaults v3", "内部标记：字号默认值已迁移\n仅用于配置迁移，不需要修改\n修改它不会产生任何效果", "Internal flag: font defaults migrated\nused for config migration only\nchanging it has no effect");
+            SR.LocDesc("Chat", "Log Limit", "聊天记录条数\n最多保留多少条聊天消息\n超出后丢弃最旧的；仅本模组记录页", "Chat log limit\nhow many chat messages to keep\noldest dropped first; this mod's log page only");
+            SR.LocDesc("Level", "Party Bomb", "派对盒炸弹\n开派对盒时按概率生成炸弹\n需要房主权限；仅派对盒阶段", "Party box bomb\nchance to spawn a bomb when a party box opens\nhost only; party-box phase only");
+            SR.LocDesc("Level", "Party Bomb Type", "派对盒炸弹种类\n决定生成哪一种炸弹\n与游戏内炸弹类型一一对应", "Party box bomb type\nwhich bomb the party box spawns\nmatches the game's bomb types");
+            SR.LocDesc("Level", "Refresh Party Box Key", "刷新派对盒按键\n按下重开派对盒并重新抽选\n未绑定时不生效", "Reroll party box key\npress to reopen the party box and reroll\nno effect while unbound");
+            SR.LocDesc("Level", "Close Party Box Key", "关闭派对盒按键\n按下结束选择并进入游玩阶段\n未绑定时不生效", "Close party box key\npress to end picking and start playing\nno effect while unbound");
+            SR.LocDesc("Online", "Filter Region", "区域筛选\n只列出指定区域的房间\n留空表示不限区域", "Region filter\nonly lobbies in the selected region are listed\nempty means any region");
+            SR.LocDesc("Online", "Filter Mode", "模式筛选\n只列出指定模式的房间\n留空表示不限模式", "Mode filter\nonly lobbies of the selected mode are listed\nempty means any mode");
+            SR.LocDesc("Online", "Filter Tag", "标签筛选\n只列出带指定标签的房间\n留空表示不限标签", "Tag filter\nonly lobbies with the selected tag are listed\nempty means any tag");
+            SR.LocDesc("Online", "Filter State", "状态筛选\n按可加入状态过滤房间\n留空不限；join 可加入，full 已满，playing 对局中", "State filter\nfilters lobbies by joinability\nempty = any; join = open, full = full, playing = in a match");
+            SR.LocDesc("Online", "Search Timeout", "搜索超时秒数\n等待房间列表的上限时间\n仅兜底用，一般不需要改", "Search timeout\nhow long to wait for the lobby list\nfallback only; normally no need to change");
+            SR.LocDesc("Online", "Sort Column", "排序列索引\n房间列表按哪一列排序\n由表头操作维护，不建议手改", "Sort column index\nwhich column sorts the lobby list\nmaintained by the table header; avoid editing");
+            SR.LocDesc("Online", "Sort Descending", "排序方向\n开启从大到小，关闭从小到大\n与排序列一起生效", "Sort direction\non = descending, off = ascending\nworks together with the sort column");
+            SR.LocDesc("Chat Window", "Key Defaults v2", "内部标记：键位默认值已迁移\n仅配置迁移使用\n改动不会产生任何效果", "Internal flag: key defaults migrated\nconfig migration only\nchanging it has no effect");
+            SR.LocDesc("Chat Window", "Defaults v3", "内部标记：字号默认值已迁移\n仅配置迁移使用\n改动不会产生任何效果", "Internal flag: font defaults migrated\nconfig migration only\nchanging it has no effect");
             SR.LocDesc(Keys.Settings, Keys.UiScale, "界面缩放\n整个界面按比例放大，1.0 为原始大小\n范围 0.5 到 2；字太小可适当调大", "UI scale\nscales the whole interface; 1.0 is the original size\nrange 0.5-2; increase it if the text is too small");
             // 核心自己的设置项也走"行扩展点"：设置页因此只有一份滑块绘制代码，语言下拉不按 section/key 硬编码。
             SRApi.RowSliders.Add(SettingsSliderRange);
