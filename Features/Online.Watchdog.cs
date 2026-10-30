@@ -77,10 +77,12 @@ namespace SR_UCH.Tweaks {
                 ClearLobbyList();
                 try { SRApi.ForceResetUiState(); } catch (Exception __ex) { SRApi.Guard.Log("房主解散：重置界面状态", __ex); }
                 NudgeSplash();
-                ArmWatchdog();
+                // 只武装"软"看门狗：8 秒内还没回到主界面才切场景，
+                // 全程不碰 LobbyManager（硬看门狗的 Disconnect + Destroy 会打断游戏自己的收尾流程）。
+                ArmWatchdogSoft();
                 if (wasPending) Notes("房主已解散房间，已取消加入", "Host disbanded; join cancelled");
                 else Notes("房主已解散房间", "Host disbanded");
-                SRApi.LogInfo("[联机] 收到 HostEndedGame：已清待加入队列并解除看门狗");
+                SRApi.LogInfo("[联机] 收到 HostEndedGame：已清待加入队列，改挂软看门狗（8 秒后仍未回主界面才切场景）");
             } catch (Exception __ex) { SRApi.Guard.Log("处理房主解散", __ex); }
         }
     }

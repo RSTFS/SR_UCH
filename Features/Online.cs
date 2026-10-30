@@ -156,6 +156,16 @@ namespace SR_UCH.Tweaks {
             SRApi.Notify(SRApi.T(zh, en));
         }
 
+        // 软看门狗（房主解散专用）：只做"最后还是没回主界面就切场景"这一级兜底，
+        // 不动 LobbyManager、不发 Disconnect。房主解散时游戏自己会走正常收尾，
+        // 这时再让硬看门狗去销毁 LobbyManager 会把游戏的清理流程打断（audit P0-20/21）。
+        private static void ArmWatchdogSoft() {
+            float t = Time.unscaledTime;
+            _abortDeadline = 0f;
+            _forceDeadline = 0f;
+            _forceRawDeadline = t + 8f;
+        }
+
         private static void ArmWatchdog() {
             float t = Time.unscaledTime;
             // 三级时限必须全部重置：残留的 _forceRawDeadline 会在改主意加入别的房间后仍把场景硬切走。

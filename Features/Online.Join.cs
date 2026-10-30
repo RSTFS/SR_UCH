@@ -87,9 +87,20 @@ namespace SR_UCH.Tweaks {
 
         public static void JoinLobby(string id, bool useCode) { JoinLobbyInternal(id, useCode, false); }
 
+        // 正在加入的抑制窗口：JoinFlow 是一次性协程，重复点击会并发两条流程（audit P0-22/23）。
+        // 用时间窗而不是 bool：协程异常/被销毁时也会自然过期，不会把入口永久锁死。
+        private static float _joinGuardUntil;
+        private const float JoinGuardSeconds = 4f;
+
         private static void JoinLobbyInternal(string id, bool useCode, bool keepSteamId) {
             if (!keepSteamId) _pendingSteamId = 0;
             if (string.IsNullOrEmpty(id)) return;
+            // 连点/双击：窗口内只认第一次，第二次给一句提示（不然会并发两条加入流程）。
+            if (Time.unscaledTime < _joinGuardUntil) {
+                Notes("正在加入，请稍候", "Already joining; please wait");
+                return;
+            }
+            _joinGuardUntil = Time.unscaledTime + JoinGuardSeconds;
             // 玩家点加入即放弃"回主界面"：看门狗必须在这里解除，调用方的两条路径都要覆盖。
             DisarmWatchdog();
             if (InSession() || Matchmaker.CurrentMatchmakingLobby != null) {
@@ -141,6 +152,7 @@ namespace SR_UCH.Tweaks {
                     Notes("联机功能未初始化，请先进入一次游戏的联机界面", "Online is not initialised; open the in-game online screen once");
                     _pendingJoin = "";
                     _pendingSteamId = 0;   // 这条加入意图作废，房号不能留到下一次
+                    _joinGuardUntil = 0f;
                     return;
                 }
                 Notes(useCode ? "正在按房间码加入" : "正在加入房间", useCode ? "Joining by code" : "Joining the session");
@@ -167,6 +179,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception e) {
                 SRApi.LogWarn("加入房间失败: " + e.Message);
                 _pendingJoin = "";
+                _joinGuardUntil = 0f;
             }
         }
 
@@ -177,6 +190,7 @@ namespace SR_UCH.Tweaks {
                 float now = Time.unscaledTime;
                 if (now > _pendingGiveUpAt) {
                     _pendingJoin = "";
+                    _joinGuardUntil = 0f;   // 超时取消：立刻允许重新点
                     Notes("加入超时，已取消", "Join timed out and was cancelled");
                     return;
                 }
