@@ -212,29 +212,38 @@ namespace SR_UCH.Tweaks {
             {
                 SRApi.LogWarn((object)("重载场景失败: " + ex.Message));
             }
-            if (ok)
+            // D-P1-7：收尾（清 levelPortalXml + 放 busy 锁）必须走 finally。
+            // 以前 Notify / ClearPortalXml 任何一个抛异常，SetReloadBusy(false) 就永远执行不到，
+            // 这把与"广播快照"共用的锁会一直锁着，直到 45 秒自愈或用户重开面板。
+            try
             {
-                SRApi.Notify(feature + SRApi.T("：重载中，方块保留，", ": reloading, blocks kept, ") +
-                    (ReloadKeepsScore ? SRApi.T("分数保留", "scores kept") : SRApi.T("分数重置", "scores reset")));
-            }
-            else
-            {
-                SRApi.Notify(feature + SRApi.T("：重载失败", ": reload failed"));
-            }
-            _reloadStartedAt = Time.unscaledTime;
-            _reloadLoadedAt = -1f; // 等待 LoadingInterstitialSplash.FadeOut 置位
-            // 新场景加载完成后再等 2 秒才清 levelPortalXml 并复位 busy；FadeOut 不触发时用 25 秒硬上限兜底。
-            if (ok)
-            {
-                while (_reloadBusy)
+                if (ok)
                 {
-                    if (_reloadLoadedAt >= 0f && Time.unscaledTime - _reloadLoadedAt >= 2f) break;
-                    if (Time.unscaledTime - _reloadStartedAt >= SrTimeouts.PresetConsumeTimeoutSeconds) break;
-                    yield return null;
+                    SRApi.Notify(feature + SRApi.T("：重载中，方块保留，", ": reloading, blocks kept, ") +
+                        (ReloadKeepsScore ? SRApi.T("分数保留", "scores kept") : SRApi.T("分数重置", "scores reset")));
+                }
+                else
+                {
+                    SRApi.Notify(feature + SRApi.T("：重载失败", ": reload failed"));
+                }
+                _reloadStartedAt = Time.unscaledTime;
+                _reloadLoadedAt = -1f; // 等待 LoadingInterstitialSplash.FadeOut 置位
+                // 新场景加载完成后再等 2 秒才清 levelPortalXml 并复位 busy；FadeOut 不触发时用 25 秒硬上限兜底。
+                if (ok)
+                {
+                    while (_reloadBusy)
+                    {
+                        if (_reloadLoadedAt >= 0f && Time.unscaledTime - _reloadLoadedAt >= 2f) break;
+                        if (Time.unscaledTime - _reloadStartedAt >= SrTimeouts.PresetConsumeTimeoutSeconds) break;
+                        yield return null;
+                    }
                 }
             }
-            ClearPortalXml();
-            SetReloadBusy(false);
+            finally
+            {
+                try { ClearPortalXml(); } catch (Exception __cx) { SRApi.Guard.Log("重载收尾/清理预设XML", __cx); }
+                SetReloadBusy(false);
+            }
         }
 
         // 重载场景加载完成（FadeOut，由 SR 重载钩子.OnLoadEnd 调用）：记录时刻供 ReloadSceneRoutine 决定何时清 levelPortalXml。
