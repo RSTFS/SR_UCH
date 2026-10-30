@@ -103,10 +103,17 @@ namespace SR_UCH.Tweaks {
                     GameState.GameMode targetMode = ResolveLoadMode(p, st.GameMode);
                     bool skipTreehouse = _skipTreehouse != null && _skipTreehouse.Value;
                     bool hasRemoteClients = HasRemoteClients();
-                    // 自定义关卡在联机时只能走「跳过树屋流程」直接替换；未勾选时只提示，不执行。
-                    if (customPreset && hasRemoteClients && !skipTreehouse) {
-                        SRApi.Notify(SRApi.T("联机替换自定义关卡需要先勾选『跳过树屋流程』", "Replacing a custom level online requires enabling 'Skip treehouse' first"));
-                        return;
+                    // 联机时强制走树屋：游戏只在树屋的 LevelSelectController 上通过 RpcSetNextLevel 同步
+                    // SelectedLevel，对局场景内没有这条通道（audit P0-13）。以前允许"跳过树屋直接替换"，
+                    // 房客的 SelectedLevel 必然不同步 → 关卡判定 / 快照码 / 方块重建都可能分歧。
+                    if (hasRemoteClients && skipTreehouse) {
+                        skipTreehouse = false;
+                        if (!_warnedSkipTreehouseOnline) {
+                            _warnedSkipTreehouseOnline = true;
+                            SRApi.Notify(SRApi.T("联机时已忽略「跳过树屋流程」：房客关卡状态无法同步，改走树屋流程",
+                                "Skip-treehouse ignored online: clients cannot sync the selected level, using the treehouse flow"));
+                            SRApi.LogWarn("[布局预设] 联机时忽略「跳过树屋流程」（房客 SelectedLevel 无法同步）");
+                        }
                     }
                     if (!ConfirmOrArm("replace:" + p.Key)) {
                         _status = SRApi.T("将替换关卡：", "Level will be replaced: ") + LevelDisplayNameForScene(activeScene)

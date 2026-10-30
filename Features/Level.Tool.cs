@@ -303,7 +303,10 @@ public partial class Level {
                         PlayerNumber = queue[sent].Key, PointType = queue[sent].Value, AlwaysAward = true
                     });
                 } catch (Exception ex) {
-                    SRApi.LogWarn("[补分] 发送失败: " + ex.Message);
+                    // 中途失败必须中止：继续发会让计分板一半新一半旧（audit P0-10）。
+                    // 记清"已发多少 / 共多少"，方便按日志核对分数差。
+                    SRApi.LogWarn("[补分] 发送失败，已中止：已发 " + sent + "/" + queue.Count + " 条，" + ex.Message);
+                    yield break;
                 }
                 sent++;
             }

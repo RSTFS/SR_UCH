@@ -67,7 +67,11 @@ namespace SR_UCH.Tweaks {
 
         // 追踪玩家仅在列表模式 = 普通时显示。
         public static bool TrackPlayerVisible { get { return _listMode == null || _listMode.Value == ListMode.Normal; } }
+        // 以 Placeable 为键（Unity 对象作字典键）：对象被 OnDisable/Destroy 掉却没走 DestroyPieceEvent 时会永久留在表里，
+        // 既拖住 GC，又让 PlayerPlacedBlocks 返回「假存活」的对象（audit P0-17）。这里加周期修剪。
         private static Dictionary<Placeable, PlacementInfo> _placements = new Dictionary<Placeable, PlacementInfo>();
+        private static float _placementsPrunedAt = -999f;
+        private const float PlacementsPruneInterval = 30f;
         // 把快照加载出来的方块登记为房主（1 号）放置；由关卡功能经 DestroyBlocks.AttributeToHost 槽位调用。
         public static void AttributeToHost(List<Placeable> blocks) {
             try {
@@ -357,6 +361,7 @@ namespace SR_UCH.Tweaks {
         [HarmonyPatch(typeof(GameControl), "Update")]
         [HarmonyPrefix]
         static void Controls(GameControl __instance) {
+            try { PrunePlacementsIfDue(); } catch (Exception __pp) { SRApi.Guard.Log("方块破坏/归属表修剪", __pp); }
             if (!SRApi.GateMaster) return;
             if (!Enabled) return;
             if (SRApi.UiOpen && SRApi.BlockInput) return; 
@@ -601,6 +606,30 @@ namespace SR_UCH.Tweaks {
         // 供外部模块调用：是否为玩家放置的道具（关卡自带布局与系统件不算）。
         public static bool IsPlayerPlaced(Placeable p) {
             try { return ResolveInfo(p) != null; } catch { return false; }
+        }
+
+        // 周期修剪归属表：清掉已销毁（== null 对 Unity 对象成立）或已标记销毁的键。
+        // 30 秒一次、只在字典非空时遍历，开销可忽略；不在每帧做是为了不干扰按住删除的热路径。
+        private static void PrunePlacementsIfDue() {
+            float now = Time.unscaledTime;
+            if (now - _placementsPrunedAt < PlacementsPruneInterval) return;
+            _placementsPrunedAt = now;
+            if (_placements.Count == 0) return;
+            List<Placeable> dead = null;
+            foreach (KeyValuePair<Placeable, PlacementInfo> kv in _placements) {
+                Placeable k = kv.Key;
+                bool gone = false;
+                try { gone = k == null || k.MarkedForDestruction; } catch { gone = true; }
+                if (!gone) continue;
+                if (dead == null) dead = new List<Placeable>();
+                dead.Add(kv.Key);
+            }
+            if (dead == null) return;
+            for (int i = 0; i < dead.Count; i++) {
+                try { _placements.Remove(dead[i]); } catch (Exception __rm) { SRApi.Guard.Log("方块破坏/修剪归属键", __rm); }
+            }
+            try { SRApi.LogInfo("[方块破坏] 归属表修剪 " + dead.Count + " 条（当前 " + _placements.Count + " 条）"); }
+            catch (Exception __lg) { SRApi.Guard.Log("方块破坏/修剪日志", __lg); }
         }
 
         // 玩家放置的方块清单（不销毁），供清场功能使用。
