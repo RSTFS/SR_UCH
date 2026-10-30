@@ -1,0 +1,59 @@
+# SR 分区越界字段登记（棘轮：只减不增）
+# 背景：SR 是 17 个 partial 拼成的大静态类，"分区"原先只是注释约定。
+# 规则：某分部文件声明的 private static 字段，如果被其它分部文件使用，必须在本文件登记。
+# 目标：逐步把这里的条目改成 public/internal 访问器（或搬进独立静态类 SRGate/SRCtl/SRNav），
+#       登记表只允许变短；新增越界会被 build\guards-text.ps1 的 Check-RegionFields 拦下。
+
+_allEnabledEntry
+_allSections
+_appliedDisabled
+_blockInputEntry
+_captureStartFrame
+_capturing
+_checkTex
+_comboSeenFrame
+_cursorMoveTex
+_cursorResizeTex
+_cursorTex
+_dirty
+_dirtyConfig
+_disabledPluginsEntry
+_entryVersion
+_externalPlugins
+_font
+_forceZh
+_gatedEventSystem
+_gripTex
+_internalConfig
+_internalSections
+_langEn
+_langEntry
+_langVer
+_leftScroll
+_mode
+_nameWCached
+_nameWKey
+_openKey
+_pluginKey
+_prevBoxed
+_prevFont
+_recHeld
+_recSeq
+_rmbConsumedFrame
+_scaled
+_scroll
+_selectedInternalSection
+_sidebarOrderEntry
+_sidebarResizing
+_sidebarW
+_sidebarWEntry
+_styleList
+_stylesReady
+_uiAlpha
+_uiScaleEntry
+_userHiddenSections
+_visible
+_winHeight
+_winWidth
+_winX
+_winY

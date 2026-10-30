@@ -17,6 +17,11 @@ public partial class SR : ITweak {
 
 // 分区：Core（核心状态 / 初始化 / 插件扫描）
 // 约定：静态字段集中在此；新功能实现 ITweak 即被自动发现，新分区需在 sr_uch.rsp 注册。
+// 分区分界（item 10）：SR 由 17 个 partial 拼成一个静态类，编译器不会拦"跨分区写别人私有字段"。
+//   约定：自己分区的 private static 字段只在本文件用；确实要跨分区读写就改成 internal + 访问器。
+//   机器检查：build\guards-text.ps1 的 Check-RegionFields 会拦下"新增的跨分区私有字段"，
+//   历史遗留 53 个登记在 build\region-access.txt（棘轮：只减不增）。目标是逐步收敛到 0，
+//   必要时再把 Gate / Ctl / Nav 提成独立静态类。
 
         private static ConfigEntry<KeyCode> _openKey;
         private static ConfigEntry<bool> _blockInputEntry;

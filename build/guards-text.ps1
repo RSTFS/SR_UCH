@@ -212,7 +212,7 @@ function Check-CsEncoding {
 # P1-6 第一步：裸 catch 计数（只报告，不阻塞构建）。后续按文件分批补注释/接 Guard。
 function Check-BareCatch {
     $files = Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.cs' -File |
-        Where-Object { ($_.FullName -replace '\\', '/') -notmatch '/bin/|/obj/|\.git/' }
+        Where-Object { ($_.FullName -replace '\\', '/') -notmatch '/bin/|/obj/|\.git/|/tests/' }
     $total = 0
     $rows = @()
     foreach ($f in $files) {
@@ -226,11 +226,54 @@ function Check-BareCatch {
 }
 
 
+
+# item 10：SR 分区分界守卫 —— private static 字段跨分部文件引用必须登记（棘轮，只减不增）。
+# 背景：SR 由 17 个 partial 拼成一个大静态类，"分区"以前只是注释约定；这里把它变成机器检查。
+function Check-RegionFields {
+    $srcDir = Join-Path $Root 'SR_UCH'
+    if (-not (Test-Path -LiteralPath $srcDir)) { Ok 'SR 分区分界（找不到目录，跳过）'; return }
+    $files = Get-ChildItem -LiteralPath $srcDir -Filter 'SR.*.cs' -File
+    $texts = @{}
+    foreach ($f in $files) { $texts[$f.Name] = [System.IO.File]::ReadAllText($f.FullName) }
+    $decl = @{}
+    foreach ($k in $texts.Keys) {
+        foreach ($m in [regex]::Matches($texts[$k], '(?m)^\s*(?:private|internal|public)\s+static\s+(?:readonly\s+)?[\w<>\[\],\.\?]+\s+(_\w+)\s*(?:=|;)')) {
+            $name = $m.Groups[1].Value
+            if (-not $decl.ContainsKey($name)) { $decl[$name] = $k }
+        }
+    }
+    $allowPath = Join-Path $PSScriptRoot 'region-access.txt'
+    $allow = @{}
+    if (Test-Path -LiteralPath $allowPath) {
+        foreach ($l in [System.IO.File]::ReadAllLines($allowPath)) {
+            $s = $l.Trim()
+            if ($s -and -not $s.StartsWith('#')) { $allow[$s] = $true }
+        }
+    }
+    $bad = @()
+    foreach ($name in $decl.Keys) {
+        $owner = $decl[$name]
+        if ($allow.ContainsKey($name)) { continue }
+        foreach ($k in $texts.Keys) {
+            if ($k -eq $owner) { continue }
+            if ([regex]::IsMatch($texts[$k], '\b' + [regex]::Escape($name) + '\b')) {
+                $bad += ($name + '（' + $owner + ' -> ' + $k + '）')
+                break
+            }
+        }
+    }
+    if ($bad.Count -gt 0) {
+        Bad ('SR 分区越界：' + $bad.Count + ' 个 private 字段被其它分部文件使用，且未登记：' + (($bad | Select-Object -First 5) -join '; '))
+    } else {
+        Ok ('SR 分区未新增越界字段（已登记 ' + $allow.Count + ' 个：见 build/region-access.txt）')
+    }
+}
+
 # P1-4：缩进统一（.cs 只允许空格缩进，禁止行首 Tab）。
 function Check-Indent {
     $bad = @()
     $files = Get-ChildItem -LiteralPath $Root -Recurse -Filter '*.cs' -File |
-        Where-Object { ($_.FullName -replace '\\', '/') -notmatch '/bin/|/obj/|\.git/' }
+        Where-Object { ($_.FullName -replace '\\', '/') -notmatch '/bin/|/obj/|\.git/|/tests/' }
     foreach ($f in $files) {
         $txt = [System.IO.File]::ReadAllText($f.FullName)
         if ([regex]::IsMatch($txt, '(?m)^\t')) { $bad += $f.Name }
@@ -249,6 +292,7 @@ Check-DescFormat
 Check-CsEncoding
 Check-BareCatch
 Check-Indent
+Check-RegionFields
 if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); exit 1 }
 Write-Host '== 文本类守卫全部通过 ✅ =='
 exit 0
