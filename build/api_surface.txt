@@ -65,6 +65,7 @@ RegisterTick
 RegisterTypingProvider
 RegisterWheelHook
 RenderSectionEntries
+RowCompact
 RowCompanions
 RowExtras
 RowFilters

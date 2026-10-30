@@ -73,6 +73,10 @@ public partial class Chat : ITweak {
             SRApi.LocEnum("Hold", "按住显示");
             SRApi.LocEnum("Toggle", "切换常驻");
             SRApi.RowFilters.Add(RowVisibleFilter);
+            // 会话页：控件紧贴标签（该页标签长短差异大，统一标签列会把控件推到很远）。
+            SRApi.RowCompact.Add(delegate(ConfigEntryBase e) {
+                return e != null && (e.Definition.Section == Sec || e.Definition.Section == "Chat");
+            });
             SRApi.RowExtras.Add(RowExtraFor);
             SRApi.RowSliders.Add(BoxScaleSlider);
             SRApi.RowSliders.Add(FontSizeSlider);

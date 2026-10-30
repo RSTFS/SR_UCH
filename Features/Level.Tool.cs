@@ -214,15 +214,15 @@ public partial class Level {
                 SRApi.LogWarn("[保分] 重载时无可备份的分块（history+new+外部加分均为空）");
                 return;
             }
-            _scoreBackupBlocks = new Dictionary<int, List<PointBlock>>();
+            _scoreBackupBlocks = new Dictionary<int, List<PointBlock.pointBlockType>>();
             foreach (PointBlock pb in blocks) {
                 if (pb == null) continue;
-                List<PointBlock> list;
+                List<PointBlock.pointBlockType> list;
                 if (!_scoreBackupBlocks.TryGetValue(pb.playerNumber, out list)) {
-                    list = new List<PointBlock>();
+                    list = new List<PointBlock.pointBlockType>();
                     _scoreBackupBlocks[pb.playerNumber] = list;
                 }
-                list.Add(pb);
+                list.Add(pb.type);   // 只存类型快照，不持对象引用
             }
             SRApi.LogInfo("[保分] 重载备份分块 " + blocks.Count + " 条，涉及 " + _scoreBackupBlocks.Count + " 名玩家");
         } catch (Exception ex) {
@@ -257,7 +257,7 @@ public partial class Level {
         if (_scoreBackupBlocks == null || _scoreBackupBlocks.Count == 0) return;
         // 只以服务器权威把关（SRApi.HasServer），不用 UI 总开关，否则关掉总开关会让分数补不回来。
         if (!SRApi.HasServer) return;
-        Dictionary<int, List<PointBlock>> backup = _scoreBackupBlocks;
+        Dictionary<int, List<PointBlock.pointBlockType>> backup = _scoreBackupBlocks;
         _scoreBackupBlocks = null;
         try {
             // 必须走 NetworkServer.SendToAll（服务器 -> 全员）；lm.client.Send 是 client->server 方向，房客的 ScoreKeeper 收不到。
@@ -266,19 +266,16 @@ public partial class Level {
             List<KeyValuePair<int, PointBlock.pointBlockType>> queue = new List<KeyValuePair<int, PointBlock.pointBlockType>>();
             // 备份含跨回合累积的 historyPointBlocks，长局易超上限；截断时必须告警丢了多少。
             int total = 0;
-            foreach (KeyValuePair<int, List<PointBlock>> kv in backup) {
-                List<PointBlock> list = kv.Value;
-                if (list == null) continue;
-                for (int i = 0; i < list.Count; i++) if (list[i] != null) total++;
+            foreach (KeyValuePair<int, List<PointBlock.pointBlockType>> kv in backup) {
+                if (kv.Value != null) total += kv.Value.Count;
             }
             bool capped = false;
-            foreach (KeyValuePair<int, List<PointBlock>> kv in backup) {
-                List<PointBlock> list = kv.Value;
+            foreach (KeyValuePair<int, List<PointBlock.pointBlockType>> kv in backup) {
+                List<PointBlock.pointBlockType> list = kv.Value;
                 if (list == null || list.Count == 0) continue;
-                foreach (PointBlock pb in list) {
-                    if (pb == null) continue;
+                for (int i = 0; i < list.Count; i++) {
                     if (queue.Count >= FillTotalCap) { capped = true; break; } // 全局上限
-                    queue.Add(new KeyValuePair<int, PointBlock.pointBlockType>(kv.Key, pb.type));
+                    queue.Add(new KeyValuePair<int, PointBlock.pointBlockType>(kv.Key, list[i]));
                 }
                 if (capped) break; // 已达上限，外层同步停止
             }

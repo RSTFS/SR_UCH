@@ -29,6 +29,10 @@ namespace SR_UCH.Tweaks {
             SRApi.Ref.Override("PiecePlacementCursor.heldPositionOffset", "自由放置（关闭网格吸附）");
             SRApi.RowCompanions.Add(BuilderCompanion); // 通用条目行扩展点：覆盖项与快捷键同行显示
             SRApi.RowFilters.Add(BuilderRowVisible);   // 两个开关键位不单独成行
+            // 建造页：控件紧贴标签（同上，标签从"自由放置"到"世界边界" 长度差很大）。
+            SRApi.RowCompact.Add(delegate(ConfigEntryBase e) {
+                return e != null && e.Definition.Section == "build";
+            });
             SRApi.RegisterPage("build", RenderPage); // 本功能页自绘（含建造上限分区）
             SRApi.LocSec("build", "建造", "Build");
             SRApi.Nav("build", 50); // 侧栏栏目顺序 50

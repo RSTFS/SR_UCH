@@ -717,6 +717,18 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("渲染栏目设置(" + section + ")", __ex); }
         }
 
+
+        // 紧凑行判定：任一注册的 RowCompact 钩子命中即算（单钩子异常走 Guard.Log，5 秒去重不刷屏）。
+        private static bool CompactRow(ConfigEntryBase entry) {
+            List<Func<ConfigEntryBase, bool>> hooks = SRApi.RowCompact;
+            if (hooks == null || hooks.Count == 0) return false;
+            for (int i = 0; i < hooks.Count; i++) {
+                try { if (hooks[i] != null && hooks[i](entry)) return true; }
+                catch (Exception __ex) { Guard.Log("紧凑行判定", __ex); }
+            }
+            return false;
+        }
+
         private static void RenderEntryRow(ConfigEntryBase entry, bool isInternal, float colWidth) {
             //条目可能因功能未初始化 / 键改名而取不到，为 null 时直接返回。
             if (entry == null) return;
@@ -746,9 +758,9 @@ public partial class SR {
             float textW = NameTextWidth(entry, name);
             float cap = Mathf.Max(Sc(50), avail - reserve);
             float nameW = Mathf.Min(Mathf.Max(colWidth, Sc(50)), cap);
-            // 标签列统一宽度（不再按每行文字宽自适应）：同一栏目里所有行的控件左边缘因此严格对齐，
-            // 长标签在列内截断/换行，短标签右侧补白。RowCells 里"紧贴标签"的旧约定随之作废。
-            float nameTw = nameW;
+            // 标签列默认统一宽度（同栏目内控件左边缘对齐）；命中 RowCompact 的行例外：
+            // 标签宽 = 文字宽（+小间距），控件紧贴标签 —— 会话 / 建造页要的就是这种观感。
+            float nameTw = CompactRow(entry) ? Mathf.Min(textW, nameW) : nameW;
             //名称列包在垂直组内才能获得完整高度，否则 CJK 字形下沉 / 换行会被裁。
             //Begin/End 必须成对：中途抛异常而未闭合分组会让后续控件全部落错分组。
             GUILayout.BeginHorizontal();

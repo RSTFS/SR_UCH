@@ -539,7 +539,11 @@ namespace SR_UCH {
         public delegate bool RowFilterFn(ConfigEntryBase entry);
         public delegate string RowCompanionFn(ConfigEntryBase entry);
         public delegate bool RowSliderFn(ConfigEntryBase entry, out float min, out float max, out string fmt);
-        public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
+                // 行级"紧凑模式"：命中即让控件紧贴标签（标签列宽 = 文字宽），不参与整列对齐。
+        // 用于会话 / 建造这类"每行标签长度差异大、控件离标签太远"的页面。
+        public static readonly List<Func<ConfigEntryBase, bool>> RowCompact = new List<Func<ConfigEntryBase, bool>>();
+
+public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static readonly List<RowCompanionFn> RowCompanions = new List<RowCompanionFn>();
         public static readonly List<RowCompanionFn> RowExtras = new List<RowCompanionFn>();
         public static readonly List<RowSliderFn> RowSliders = new List<RowSliderFn>();

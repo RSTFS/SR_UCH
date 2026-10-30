@@ -274,7 +274,9 @@ namespace SR_UCH.Tweaks {
     // 不恢复 playerTotal（ScoreKeeper.Setup() 会清空 playerTotal 与分块）。
     private static bool _preserveScoresOnReload = false;
     // 备份：networkNumber -> 分块列表（含类型）
-    private static Dictionary<int, List<PointBlock>> _scoreBackupBlocks = null;
+    // 值是分块类型的**快照**（不是 PointBlock 引用）：PointBlock 在 tally 后可能被复用/回收，
+    // 持引用补分时会读到被改写的 type（audit P0-11）。
+    private static Dictionary<int, List<PointBlock.pointBlockType>> _scoreBackupBlocks = null;
     // 补分重放后置位：下次结算的 ClearNewPointBlocks 跳过清除，保证重放分块正常显示与 tally。
     private static bool _refillPending = false;
     // 补分标志的置位时刻（-1 = 未置位）：给 ClearNewPointBlocks 前缀做墙钟自愈用（audit P0-7）。
