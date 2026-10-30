@@ -1,0 +1,39 @@
+# 静默 catch 棘轮基线（build\guards-text.ps1 的 Check-SilentCatch 读这一份）
+# 背景：全仓大量 catch { /* 静默：非关键路径… */ }，失败不可见（audit item 8）。
+# 规则：这里的 per-file 计数只允许变小。新增静默 catch 要么改成 SRApi.Guard.Log，
+#       要么真的无害时同步更新本数字（更新即代表"确认这是有意静默"）。
+# 格式：文件名=数量
+
+BuildingPresets.Io.cs=7
+BuildingPresets.Load.cs=5
+BuildingPresets.Mods.cs=3
+BuildingPresets.Util.cs=4
+BuildingPresets.cs=1
+Chat.Log.cs=2
+Chat.Window.cs=1
+DestroyBlocks.cs=1
+Experiments.Bounds.cs=22
+Experiments.Misc.cs=5
+Experiments.Scene.cs=3
+HUD.cs=2
+Level.PartyBox.cs=1
+Level.Snapshot.cs=2
+Online.Join.cs=6
+Online.LobbyList.cs=6
+Online.Table.cs=5
+Online.cs=4
+PlayerTracker.cs=1
+QuickAdjust.cs=5
+MainPlugin.cs=14
+SR.ColorPicker.cs=11
+SR.ConfigMigration.cs=4
+SR.Contracts.cs=20
+SR.Core.cs=3
+SR.Ctl.cs=3
+SR.Gate.cs=1
+SR.Input.cs=2
+SR.Notify.cs=4
+SR.Settings.cs=1
+SR.Styles.cs=1
+SR.Table.cs=1
+SR.Window.cs=3

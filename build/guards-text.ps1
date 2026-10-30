@@ -269,6 +269,43 @@ function Check-RegionFields {
     }
 }
 
+
+# audit item 8：静默 catch 棘轮 —— 带注释的 catch { /* 静默 … */ } 每文件计数只允许变小。
+# 新增静默 catch 会被拦下：要么改成 SRApi.Guard.Log / SR.Guard.Log，要么同步更新基线数字。
+function Check-SilentCatch {
+    $basePath = Join-Path $PSScriptRoot 'silent-catch.txt'
+    if (-not (Test-Path -LiteralPath $basePath)) { Ok '静默 catch 棘轮（缺基线文件，跳过）'; return }
+    $base = @{}
+    foreach ($l in [System.IO.File]::ReadAllLines($basePath)) {
+        $s = $l.Trim()
+        if (-not $s -or $s.StartsWith('#')) { continue }
+        $i = $s.IndexOf('=')
+        if ($i -gt 0) { $base[$s.Substring(0, $i)] = [int]$s.Substring($i + 1) }
+    }
+    $dirs = @((Join-Path $Root 'SR_UCH'), (Join-Path (Split-Path $Root -Parent) 'SR_UCH_EX'))
+    $bad = @()
+    $total = 0
+    foreach ($d in $dirs) {
+        if (-not (Test-Path -LiteralPath $d)) { continue }
+        $files = Get-ChildItem -LiteralPath $d -Recurse -Filter '*.cs' -File |
+            Where-Object { ($_.FullName -replace '\\', '/') -notmatch '/bin/|/obj/|/tests/' }
+        foreach ($f in $files) {
+            $txt = [System.IO.File]::ReadAllText($f.FullName)
+            $n = ([regex]::Matches($txt, 'catch\s*\{\s*/\*\s*静默')).Count
+            if ($n -eq 0) { continue }
+            $total += $n
+            $limit = 0
+            if ($base.ContainsKey($f.Name)) { $limit = $base[$f.Name] }
+            if ($n -gt $limit) { $bad += ($f.Name + ' ' + $limit + '->' + $n) }
+        }
+    }
+    if ($bad.Count -gt 0) {
+        Bad ('静默 catch 变多：' + (($bad | Select-Object -First 5) -join '; ') + '（基线见 build/silent-catch.txt）')
+    } else {
+        Ok ('静默 catch 未新增（基线 ' + $base.Count + ' 个文件 / $total 处已计入）')
+    }
+}
+
 # P1-4：缩进统一（.cs 只允许空格缩进，禁止行首 Tab）。
 function Check-Indent {
     $bad = @()
@@ -293,6 +330,7 @@ Check-CsEncoding
 Check-BareCatch
 Check-Indent
 Check-RegionFields
+Check-SilentCatch
 if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); exit 1 }
 Write-Host '== 文本类守卫全部通过 ✅ =='
 exit 0
