@@ -6,17 +6,21 @@ $here = $PSScriptRoot
 $root = Split-Path -Parent $here
 if (-not $Out) { $Out = Join-Path $here 'silent-catch.txt' }
 
-$dirs = @((Join-Path $root 'SR_UCH'), (Join-Path (Split-Path $root -Parent) 'SR_UCH_EX'))
+$dirs = @((Join-Path $root 'SR_UCH'),
+          (Join-Path $root 'Features'),
+          (Join-Path (Split-Path $root -Parent) 'SR_UCH_EX'))
+$rootFiles = @(Get-ChildItem -LiteralPath $root -Filter '*.cs' -File)
 $rows = @()
 $total = 0
 foreach ($d in $dirs) {
     if (-not (Test-Path -LiteralPath $d)) { continue }
-    $files = Get-ChildItem -LiteralPath $d -Recurse -Filter '*.cs' -File |
-        Where-Object { ($_.FullName -replace '\\', '/') -notmatch '/bin/|/obj/|/tests/' }
-    foreach ($f in $files) {
+    $files = @(Get-ChildItem -LiteralPath $d -Recurse -Filter '*.cs' -File |
+        Where-Object { ($_.FullName -replace '\\', '/') -notmatch '/bin/|/obj/|/tests/' })
+    if ($d -eq $root) { $files = @() }
+    foreach ($f in ($files + $(if ($d -eq $root) { $rootFiles } else { @() }))) {
         $txt = [System.IO.File]::ReadAllText($f.FullName)
         $n = ([regex]::Matches($txt, 'catch\s*\{\s*/\*\s*静默')).Count
-        if ($n -gt 0) { $rows += [pscustomobject]@{ Name = $f.Name; N = $n }; $total += $n }
+        if ($n -gt 0) { $rows += [pscustomobject]@{ Name = ($f.FullName.Substring($root.Length) -replace '\\','/').TrimStart('/'); N = $n }; $total += $n }
     }
 }
 

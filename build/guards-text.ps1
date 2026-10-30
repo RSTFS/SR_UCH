@@ -282,7 +282,11 @@ function Check-SilentCatch {
         $i = $s.IndexOf('=')
         if ($i -gt 0) { $base[$s.Substring(0, $i)] = [int]$s.Substring($i + 1) }
     }
-    $dirs = @((Join-Path $Root 'SR_UCH'), (Join-Path (Split-Path $Root -Parent) 'SR_UCH_EX'))
+    # 覆盖范围：核心分片 + 功能层 + 仓库根（MainPlugin.cs 等）+ EX。以前漏了 Features 与根目录，
+    # 导致 99/153 处静默 catch 脱离棘轮（评审 B-2）。
+    $dirs = @((Join-Path $Root 'SR_UCH'),
+              (Join-Path $Root 'Features'),
+              (Join-Path (Split-Path $Root -Parent) 'SR_UCH_EX'))
     $bad = @()
     $total = 0
     foreach ($d in $dirs) {
@@ -295,8 +299,10 @@ function Check-SilentCatch {
             if ($n -eq 0) { continue }
             $total += $n
             $limit = 0
-            if ($base.ContainsKey($f.Name)) { $limit = $base[$f.Name] }
-            if ($n -gt $limit) { $bad += ($f.Name + ' ' + $limit + '->' + $n) }
+            # 基线键用"相对仓库根的路径"：同名文件（如 Level.cs 在核心与功能层各有一份）不会互相覆盖。
+            $rel = ($f.FullName.Substring($Root.Length) -replace '\\', '/').TrimStart('/')
+            if ($base.ContainsKey($rel)) { $limit = $base[$rel] }
+            if ($n -gt $limit) { $bad += ($rel + ' ' + $limit + '->' + $n) }
         }
     }
     if ($bad.Count -gt 0) {

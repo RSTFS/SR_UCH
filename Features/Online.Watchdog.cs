@@ -17,9 +17,12 @@ namespace SR_UCH.Tweaks {
         private static void TickWatchdog() {
             float now = Time.unscaledTime;
             // 已回到主界面：清掉时限，避免残留时限让"再点一次返回主界面"误触发强制返回。
-            if ((_abortDeadline > 0f || _forceDeadline > 0f || _forceRawDeadline > 0f)
+            if ((_abortDeadline > 0f || _forceDeadline > 0f || _forceRawDeadline > 0f || _returnAttemptedAt > 0f)
                 && SceneManager.GetActiveScene().name == "MainMenu") {
                 _abortDeadline = 0f; _forceDeadline = 0f; _forceRawDeadline = 0f;
+                // 必须一并清零：否则"上次返回未完成"会永久成立，之后每次「退出/解散」都直接走
+                // ForceMainMenu，跳过 GoMainMenu 的 HostEndedGame 广播（评审 B-1）。
+                _returnAttemptedAt = 0f;
             }
             if (_abortDeadline > 0f && now >= _abortDeadline) {
                 _abortDeadline = 0f;

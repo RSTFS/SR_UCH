@@ -51,6 +51,7 @@ namespace SR_UCH.Tweaks {
         private static string _openCombo = "";              //同时只允许一个下拉框展开
         private static float _abortDeadline, _forceDeadline, _forceRawDeadline;   //回家看门狗的三级时限
         private static float _returnAttemptedAt;   // 上次发起"返回主界面"的时刻（0 = 没发起过）
+        private static HostEndedListener _hostEndedListener;   // 房主解散监听（幂等注册）
         private static float[] _cw;                         //当前列宽
         private static bool _widthsLoaded;                  // 列宽是否已初始化
         // 对局内点加入：先退出当前房间，退出后立刻加入。
@@ -104,8 +105,16 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ro) { SRApi.Guard.Log("联机反射登记", __ro); }
 
             // 房主解散感知：订阅游戏的网络消息事件总线；房主返回主界面会 SendToAll(HostEndedGame)。
-            try { GameEventManager.ChangeListener<NetworkMessageReceivedEvent>(new HostEndedListener(), true); }
-            catch (Exception __he) { SRApi.Guard.Log("联机.房主解散监听", __he); }
+            // 幂等：这个订阅是长期存活的全局监听，重复 Initialize（热重载 / 场景重建）会叠成 N 份回调。
+            try {
+                if (_hostEndedListener == null) {
+                    _hostEndedListener = new HostEndedListener();
+                    GameEventManager.ChangeListener<NetworkMessageReceivedEvent>(_hostEndedListener, true);
+                }
+            } catch (Exception __he) {
+                _hostEndedListener = null;
+                SRApi.Guard.Log("联机.房主解散监听", __he);
+            }
 
 
             _fRegion = plugin.Config.Bind(SecOnline, "Filter Region", "", "按区域挑房间, 从下拉里选一个.");

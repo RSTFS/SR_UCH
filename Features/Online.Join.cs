@@ -39,7 +39,12 @@ namespace SR_UCH.Tweaks {
             // 类型必须是运行时类型：Steam 与 Unity 的匹配器是两条独立继承链，字段声明在各自的链上。
             System.Reflection.FieldInfo inLobby = SRApi.Ref.Field(mm.GetType(), "inPlatformLobbyNoRelay",
                 "联机：判断客户端是否已在平台房间里（加入前必须先退出）");
-            bool InLobby() { try { return inLobby != null && (bool)inLobby.GetValue(mm); } catch { return false; } }
+            // 这里不能静默：反射一退化就返回 false，会跳过"先退旧房"整段逻辑，而通用 JoinLobby
+            // 在仍处于平台房间时必定失败 —— 现象是"加入没反应且日志一片空白"（评审 R-2）。
+            bool InLobby() {
+                try { return inLobby != null && (bool)inLobby.GetValue(mm); }
+                catch (Exception __il) { SRApi.Guard.Log("联机/读取平台房间状态", __il); return false; }
+            }
             if (InLobby()) {
                 try { SRApi.LogInfo("[联机] 已在房间中，先离开..."); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 try {

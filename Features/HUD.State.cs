@@ -1,4 +1,4 @@
-// HUD 状态更新分片（Layout: HUD.cs = 配置/注册/设置页；HUD.State.cs = 每帧状态；HUD.Draw.cs = 绘制）
+// HUD 状态更新分片（HUD.cs = 配置/注册/设置页；本文件 = 每帧状态与回合/关卡读数；绘制仍在 HUD.cs 的 DrawHud）
 using System;
 using System.Collections.Generic;
 using System.Reflection;

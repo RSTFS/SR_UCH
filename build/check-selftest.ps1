@@ -92,7 +92,24 @@ foreach ($k in $order) {
     $got = $cur[$k]
     if (-not $want) {
         Write-Host ("  [ ? ] {0,-10} 基线缺字段，当前 {1}" -f $k, $got) -ForegroundColor Yellow
-    } elseif ($want -eq $got) {
+        continue
+    }
+    # game 只记录不比对：游戏升级会让它必然变化，强行比对只会被 -Update 无脑覆盖，回归价值归零（评审 R-1）。
+    if ($k -eq 'game') {
+        if ($want -eq $got) { Write-Host ("  [ OK ] {0,-10} {1}" -f $k, $got) -ForegroundColor Green }
+        else { Write-Host ("  [INFO] {0,-10} 基线 {1}，当前 {2}（仅记录，不判定）" -f $k, $want, $got) -ForegroundColor Yellow }
+        continue
+    }
+    # features 用"不低于基线"语义：装了 EX / 外部功能 DLL 时数量会变多，不是回归。
+    if ($k -eq 'features') {
+        $wi = 0; $gi = 0
+        if ([int]::TryParse($want, [ref]$wi) -and [int]::TryParse($got, [ref]$gi)) {
+            if ($gi -ge $wi) { Write-Host ("  [ OK ] {0,-10} {1}（基线 {2}）" -f $k, $got, $want) -ForegroundColor Green }
+            else { Write-Host ("  [FAIL] {0,-10} 基线 {1} -> 当前 {2}（功能变少）" -f $k, $want, $got) -ForegroundColor Red; $bad = $bad + 1 }
+            continue
+        }
+    }
+    if ($want -eq $got) {
         Write-Host ("  [ OK ] {0,-10} {1}" -f $k, $got) -ForegroundColor Green
     } else {
         Write-Host ("  [FAIL] {0,-10} 基线 {1} -> 当前 {2}" -f $k, $want, $got) -ForegroundColor Red
