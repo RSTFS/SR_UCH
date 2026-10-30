@@ -38,6 +38,9 @@ namespace SR_UCH.Tweaks {
         // 统一的安全 XML 解析入口：禁 DTD（即禁外部实体 / XXE）+ 不解析外部引用。
         // 预设 XML 是玩家之间分享的不可信输入（剪贴板 / 论坛下载），所有解析必须走这里。
         private static XmlDocument ParseXmlSafe(string xml) {
+            // 上限与导入同一套：内部辅助调用（改名 / 修改器策略 / 侧车）也走这里，
+            // 超大输入直接拒绝，避免把主线程卡在 DOM 构建上（audit A-1）。
+            if (string.IsNullOrEmpty(xml) || xml.Length > MaxImportChars) return null;
             XmlDocument doc = new XmlDocument();
             XmlReaderSettings s = new XmlReaderSettings();
             s.DtdProcessing = DtdProcessing.Prohibit;

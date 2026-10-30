@@ -226,7 +226,7 @@ public partial class SR {
             float mx = barRect.width - Sc(32) - Sc(4) - mw;
             // 提示标签宽度必须止于总开关左边，窗口不够宽时从左对齐方向裁掉，不被总开关压住。
             GUI.Label(new Rect(Sc(124), tY, Mathf.Max(Sc(40), mx - Sc(124) - Sc(6)), Sc(26)),
-                T("INS开关界面&悬停条目查看说明", "INS: manager · hover entries for tooltips"), _titleMid);
+                TitleHint(), _titleMid);
             if (GUI.Button(new Rect(mx, tY, mw, Sc(26)),
                 new GUIContent(AllEnabled ? T("总开关：开", "Master ON") : T("总开关：关", "Master OFF"),
                     T("本 Mod 总开关：关闭时所有内部功能运行时失效，各功能开关值保持不变", "Mod master switch: off disables all internal features at runtime")),
@@ -239,6 +239,17 @@ public partial class SR {
             }
             if (GUI.Button(new Rect(barRect.width - Sc(26), tY, Sc(26), Sc(26)), "X", _btn)) CloseMenu();
             return barH;
+        }
+
+        // 标题栏提示：开关键名动态取自当前绑定（以前硬编码 INS，改绑后提示是错的 —— audit F-6）。
+        // 标题栏提示：开关键名动态取自当前绑定（以前硬编码 INS，改绑后提示是错的 —— audit F-6）。
+        private static string TitleHint() {
+            try {
+                string key = _openKey != null ? KeyText(_openKey) : "INS";
+                if (string.IsNullOrEmpty(key)) key = "INS";
+                if (UseEn) return key + ": manager - hover entries for tooltips";
+                return key + ": 开关界面 / 悬停条目看说明";
+            } catch { return T("INS: 开关界面 / 悬停条目看说明", "INS: manager - hover entries for tooltips"); }
         }
 
         private static void DrawGUI() {

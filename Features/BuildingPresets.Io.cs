@@ -39,7 +39,7 @@ namespace SR_UCH.Tweaks {
                 // 名称留空：默认用「关卡名 + 时间」，避免每次手工起名。
                 if (name.Length == 0) {
                     string baseName = string.IsNullOrEmpty(level) ? SRApi.T("布局", "Layout") : level;
-                    name = baseName + " " + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+                    name = baseName + " " + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture);
                 }
                 if (name.Length > 40) name = name.Substring(0, 40);
                 SaveXml(doc.OuterXml, name, mode, blocks, level, levelName, levelCode);
@@ -143,6 +143,15 @@ namespace SR_UCH.Tweaks {
                     return;
                 }
                 string path = ResolveImportPath(input);
+                if (!string.IsNullOrEmpty(path)) {
+                    // 只接受预设支持的两类扩展名：这两类都是 XML/压缩快照，其它文件读进来只会白解析。
+                    string ext = Path.GetExtension(path) ?? "";
+                    if (!ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)
+                        && !ext.Equals(".snapshot", StringComparison.OrdinalIgnoreCase)) {
+                        SRApi.Notify(SRApi.T("只能导入 .xml 或 .snapshot 文件", "Only .xml or .snapshot files can be imported"));
+                        return;
+                    }
+                }
                 if (string.IsNullOrEmpty(path)) {
                     SRApi.Notify(SRApi.T("找不到 XML 文件：", "XML file not found: ") + input);
                     return;
@@ -211,7 +220,7 @@ namespace SR_UCH.Tweaks {
                 StripDestroyed(doc);
                 string name = (_newName ?? "").Trim();
                 if (name.Length == 0 && !string.IsNullOrEmpty(defaultBaseName)) name = defaultBaseName.Trim();
-                if (name.Length == 0) name = SRApi.T("导入 ", "Imported ") + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+                if (name.Length == 0) name = SRApi.T("导入 ", "Imported ") + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture);
                 if (name.Length > 40) name = name.Substring(0, 40);
                 string mode = "IMPORTED";
                 try {

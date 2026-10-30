@@ -79,7 +79,8 @@ public partial class Chat : ITweak {
             if (string.IsNullOrEmpty(text)) return;
             try {
                 int num = LocalNetworkNumber();
-                if (num < 0) return; 
+                // num < 0（还没分配到玩家号）时不要直接 return：那条分支连"回到底部"都跳过了，
+                // 自己发的消息会停在回看态（audit B-5）。取不到号就按 -1 交给聊天系统，滚动照做。
                 if (GameState.ChatSystem != null) {
                     GameState.ChatSystem.NewChatMessage(text, EmoteMeanings.CHAT_Text, num);
                     // 自己刚发的消息：即使正在回看也直接回到底部；仅在对话内容页可见时动页面滚动，
@@ -333,7 +334,8 @@ public partial class Chat : ITweak {
             GUILayout.BeginHorizontal();
             // Enter / 小键盘 Enter 必须在 TextField 绘制前拦截并 Use()：IMGUI 单行 TextField 会消费
             // KeyDown Return 导致提交并失焦；空文本不发送。
-            if (Event.current.type == EventType.KeyDown
+            // 判空：IMGUI 之外（如 Update 路径 / 编辑器事件回调）Event.current 可能为 null（audit B-7）。
+            if (Event.current != null && Event.current.type == EventType.KeyDown
                 && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter)
                 && _chatInputText.Length > 0) {
                 SendChatText(_chatInputText);
