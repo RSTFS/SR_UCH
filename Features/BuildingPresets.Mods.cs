@@ -523,6 +523,7 @@ namespace SR_UCH.Tweaks {
                 Modifiers m = Modifiers.GetInstance();
                 if (m == null) { SRApi.Notify(SRApi.T("取不到修改器实例", "Modifier instance unavailable")); return; }
                 int n = 0;
+                int fail = 0;
                 for (int i = 0; i < Mods.Length; i++) {
                     ModDef d = Mods[i];
                     string field = ModFieldName(d.Attr);
@@ -535,10 +536,19 @@ namespace SR_UCH.Tweaks {
                         if (d.IsBool) _modsDraft[d.Attr] = ((bool)v) ? "True" : "False";
                         else _modsDraft[d.Attr] = Convert.ToInt32(v, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
                         n++;
-                    } catch { /* 静默：单个字段读不到就跳过，其余照读 */ }
+                    } catch (Exception __rf) {
+                        fail++;
+                        SRApi.Guard.Log("布局预设/读取修改器字段 " + d.Attr, __rf);
+                    }
                 }
-                SRApi.LogInfo("[布局预设] 已从游戏读取 " + n + "/" + Mods.Length + " 项修改器到自定义值");
-                SRApi.Notify(SRApi.T("已读取修改器项：", "Modifiers read: ") + n + "/" + Mods.Length);
+                SRApi.LogInfo("[布局预设] 已从游戏读取 " + n + "/" + Mods.Length + " 项修改器到自定义值（失败 " + fail + "）");
+                if (n == 0) {
+                    // 一项都没读到 = 这次"读取"实际什么都没拿到：必须明确失败，不能显示成成功（audit A-5）。
+                    SRApi.Notify(SRApi.T("没能从游戏读到任何修改器（详见日志）", "Could not read any modifier from the game (see the log)"));
+                    return;
+                }
+                SRApi.Notify(SRApi.T("已读取修改器项：", "Modifiers read: ") + n + "/" + Mods.Length
+                    + (fail > 0 ? SRApi.T("（部分失败）", " (partial)") : ""));
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取游戏修改器", __ex); }
         }
 

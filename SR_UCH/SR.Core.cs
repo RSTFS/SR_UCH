@@ -250,10 +250,14 @@ public partial class SR : ITweak {
             try {
                 if (args != null && args.Length > 0) return AccessTools.Method(decl, name, args) != null;
                 // 没给参数类型：按名字找（容忍重载）
+                // 没给参数类型时只能按名字找：若同名方法有多个重载，"存在"这个结论就不可靠
+                // （游戏新增同名重载会让自检形同虚设）。这里数一下重载数，多于 1 就记一条告警（audit F-7）。
                 MethodInfo[] ms = decl.GetMethods(BindingFlags.Public | BindingFlags.NonPublic |
                                                   BindingFlags.Static | BindingFlags.Instance);
-                for (int i = 0; i < ms.Length; i++) if (ms[i].Name == name) return true;
-                return false;
+                int hits = 0;
+                for (int i = 0; i < ms.Length; i++) if (ms[i].Name == name) hits++;
+                if (hits > 1) AuditWarn("[补丁自检] " + decl.Name + "." + name + " 有 " + hits + " 个同名重载，按名字匹配无法确认补丁目标");
+                return hits > 0;
             } catch { return false; }
         }
 

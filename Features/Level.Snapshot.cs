@@ -161,9 +161,10 @@ namespace SR_UCH.Tweaks {
                 }
                 // 只补发一次当前真实阶段（伪造 PLACE/PLAY 边沿会让客户端与服务器状态机错位）；快照方块无需照抄 WaitForPlacement 的 isKinematic/layer=9：prefab 默认已 Kinematic，而 layer 9(Placed) 与自身及 Fixed 都不碰撞。
                 // 快照路径真正缺的只有放置计数 GameState.IncrementPieceCount 与一次 Tint()。
+                // 关卡自带件集合算一次就够（同一方法内两次反射遍历纯属重复开销 —— audit C-10）。
+                System.Collections.Generic.HashSet<Placeable> initFix = InitialLevelPieces(__instance);
                 try {
                     int nFix = 0;
-                    System.Collections.Generic.HashSet<Placeable> initFix = InitialLevelPieces(__instance);
                     GameState gsFix = null;
                     try { gsFix = GameState.GetInstance(); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     foreach (Placeable fp in Placeable.AllPlaceables) {
@@ -181,7 +182,7 @@ namespace SR_UCH.Tweaks {
                 } catch (Exception __fx) { SRApi.Guard.Log("快照方块收尾", __fx); }
                 // 归属登记必须在加载之后：方块是加载时创建的，加载前集合为空。
                 try {
-                    System.Collections.Generic.HashSet<Placeable> initPcs = InitialLevelPieces(__instance);   // O2：与上方不属同一方法，保持独立调用
+                    System.Collections.Generic.HashSet<Placeable> initPcs = initFix;   // 与上方共用同一份（同一次调用内）
                     List<Placeable> built = new List<Placeable>();
                     foreach (Placeable bp in Placeable.AllPlaceables) {
                         // 必须过滤 MarkedForDestruction：上一轮残留的死方块（destroyMarkedPieces 未回收）会被误算进 built。

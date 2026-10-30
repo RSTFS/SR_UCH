@@ -471,7 +471,9 @@ public class QuickAdjust : ITweak {
                 int target = Mathf.Clamp(HandicapValue, 10, 100);
                 if (ApplyOwnHandicap(target))
                 {
-                    _keepHandicap = target == 100 ? 0 : target;
+                    // 100 也要记住：100% = 不折扣，但它是当前生效值。以前把它归零等于放弃保持，
+                    // 角色重建/重生后可能被大厅里的旧值盖回去（audit C-9）。
+                    _keepHandicap = target;
                     SRApi.Notify(SRApi.T("评分百分比：", "Score percentage: ") + target + "%");
                 }
                 else

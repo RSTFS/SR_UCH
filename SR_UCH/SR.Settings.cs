@@ -60,6 +60,7 @@ public partial class SR {
 
         //枚举下拉选项缓存：键为 entry 而非 Type —— RowEnumAllowed 的过滤结果依赖 entry，按 Type 缓存会串台。
         private static readonly Dictionary<ConfigEntryBase, object[]> _enumOptions = new Dictionary<ConfigEntryBase, object[]>();
+        private static int _enumOptionsVersion = -1;   // 上次清空时的 _entryVersion
 
         private static void SetValue(ConfigEntryBase entry, object value) {
             try {
@@ -972,7 +973,12 @@ public partial class SR {
             } else if (val is Enum) {
                 Type et = val.GetType();
                 string cur = EnumDisplayName(val.ToString());
-                //枚举选项按 entry 缓存（值不变，显示名每帧现算）
+                //枚举选项按 entry 缓存（值不变，显示名每帧现算）。
+                //条目重建（新 Bind / 配置重读）后旧键会留下陈旧数组 —— 用 _entryVersion 做一次整体失效（audit E-2）。
+                if (_enumOptionsVersion != _entryVersion) {
+                    _enumOptionsVersion = _entryVersion;
+                    _enumOptions.Clear();
+                }
                 object[] cachedVals;
                 if (!_enumOptions.TryGetValue(entry, out cachedVals)) {
                     string[] names = Enum.GetNames(et);
