@@ -208,7 +208,7 @@ namespace SR_UCH.Tweaks {
 
         // 返回树屋 watchdog：等树屋/大厅就绪或超时后释放重载锁。
         private static IEnumerator TreehouseReturnWatchdog() {
-            float deadline = Time.unscaledTime + 25f;
+            float deadline = Time.unscaledTime + PresetConsumeTimeout;
             while (Time.unscaledTime < deadline) {
                 try {
                     LobbyManager cur = LobbyManager.instance;

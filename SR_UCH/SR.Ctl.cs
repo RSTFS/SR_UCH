@@ -105,12 +105,12 @@ public partial class SR {
             float tx = a.pinW > 0f ? a.pinX + a.pinW : a.box.x + a.stripW;
             Rect track = new Rect(tx, a.box.y + a.headerH, sw, a.rowsH);
             Rect thumb;
-            // 滚动条只有“隐藏 / 显示”两态：默认隐藏，不会因为鼠标悬停自动出现。
-            // 列表滚动统一走滚轮 / Ctrl+滚轮；若以后要显示，把 __show 改成 true 即可。
-            bool __show = false;
+            // 唯一开关：SR.Table.HideTableScrollbars（默认 true = 不显示、也不占位）。
+            // 隐藏时同样"不接受点击/拖动"——避免看不见却能点的隐形热区；列表统一走滚轮。
+            // 要恢复可见滚动条，只改 HideTableScrollbars 一处即可（绘制与命中会一起恢复）。
+            bool __show = !HideTableScrollbars;
             a.scrollbarAlpha = __show ? 1f : 0f;
             TableScrollbar(track, contentH, a.rowsH, scrollY, dragging, out thumb, __show, a.scrollbarAlpha);
-            // 不可见时不接受点击/拖动，避免“看不见却能点”的隐形热区。
             if (!__show) return false;
             if (e == null) return false;
             return SRApi.TableScrollbarInput(e, e.mousePosition, track, thumb, maxScroll, ref dragging, ref grabY, ref scrollY);

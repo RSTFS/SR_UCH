@@ -457,7 +457,8 @@ public partial class SR {
 
     //竖向滚动条的拖拽 / 点轨道跳转 -> 返回 true 表示本事件已处理（状态以 ref 传入）
     // 竖向滚动条统一绘制（ImGui ScrollbarBg / Grab / GrabHovered / GrabActive 配色）。
-    // 列表滚动条统一不显示（用户要求）：几何与命中照旧计算，只是不画 —— 滚轮与拖动仍然可用。
+    // 列表滚动条统一不显示（用户要求）：只算几何、不绘制；隐藏期间也不接受点击/拖动（避免隐形热区）。
+    // 唯一开关就是下面这一行；TableScrollbarFor 也读它，恢复可见即同时恢复绘制与命中。
     public static bool HideTableScrollbars = true;
 
     public static void TableScrollbar(Rect track, float contentH, float viewH, float scrollY, bool dragging, out Rect thumb, bool visible = true, float alpha = 1f) {

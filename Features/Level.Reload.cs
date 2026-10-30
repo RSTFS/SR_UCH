@@ -26,7 +26,8 @@ namespace SR_UCH.Tweaks {
         // 锁残留自愈：协程被销毁时无人复位，超过 45 秒仍锁着即视为残留。
         private static bool ReloadLockStuck()
         {
-            return _reloadBusy && _reloadBusyAt >= 0f && Time.unscaledTime - _reloadBusyAt > 45f;
+            // 45s：与契约层 SrTimeouts.ReloadLockStaleSeconds 同源（预设页的重载锁用同一个值）
+        return _reloadBusy && _reloadBusyAt >= 0f && Time.unscaledTime - _reloadBusyAt > SrTimeouts.ReloadLockStaleSeconds;
         }
 
         // 两个入口共用的防重入判定：重载中提示并拦下，锁残留则放锁放行本次操作。
@@ -228,7 +229,7 @@ namespace SR_UCH.Tweaks {
                 while (_reloadBusy)
                 {
                     if (_reloadLoadedAt >= 0f && Time.unscaledTime - _reloadLoadedAt >= 2f) break;
-                    if (Time.unscaledTime - _reloadStartedAt >= 25f) break;
+                    if (Time.unscaledTime - _reloadStartedAt >= SrTimeouts.PresetConsumeTimeoutSeconds) break;
                     yield return null;
                 }
             }

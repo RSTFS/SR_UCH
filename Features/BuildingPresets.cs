@@ -57,9 +57,9 @@ namespace SR_UCH.Tweaks {
         // 二次确认窗口（秒）：超时后按钮自动恢复第一次点击前的文案。
         private const float ConfirmWindow = 5f;
         // 重载锁自愈阈值（秒）：与功能 Level 的 45 秒保持一致。
-        private const float ReloadLockStale = 45f;
+        private const float ReloadLockStale = SrTimeouts.ReloadLockStaleSeconds;   // 单一真值：契约层 SrTimeouts
         // 等游戏消费 levelPortalXml 的硬上限（秒）：与功能 Level 的 25 秒兜底一致。
-        private const float PresetConsumeTimeout = 25f;
+        private const float PresetConsumeTimeout = SrTimeouts.PresetConsumeTimeoutSeconds;   // 单一真值：契约层 SrTimeouts
 
         private static ConfigEntry<bool> _enabled;
         private static ConfigEntry<int> _maxPresets;
@@ -105,7 +105,9 @@ namespace SR_UCH.Tweaks {
 
         // 标准表格（核心 TableDraw）状态：列宽 / 列序 / 隐藏列 / 可见列 / 命中矩形缓存 / 滚动 / 拖拽。
         private static readonly float[] _colW = new float[ColCount];
-        private static int[] _order = new int[] { 0, 1, 2, 3, 4 };
+        // 初值必须与 ColCount 同长（曾经写成 5 项：DeriveVisibleCols 会因长度不符直接 return，表格一列不画）。
+        // EnsureCols 里还会用 NormalizeOrder 归一再兜一层，但声明处就该是对的。
+        private static int[] _order = new int[] { 0, 1, 2, 3, 4, 5 };
         private static readonly HashSet<int> _hiddenCols = new HashSet<int>();
         private static SRApi.TableState _tableCols;   // 列宽/列序/隐藏列（核心统一持久化）
         private static bool _colsLoaded;
@@ -1073,6 +1075,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
         private static void SaveCols() {
             try {
                 EnsureCols();
+                // 兜底：长度不符就别写盘（写进去会被 NormalizeOrder 永久降级成默认列序）
+                if (_order == null || _order.Length != ColCount) _order = NormalizeOrder(_order);
                 if (_tableCols == null) return;
                 for (int i = 0; i < ColCount && i < _tableCols.Widths.Length; i++) _tableCols.Widths[i] = _colW[i];
                 _tableCols.Order = _order;

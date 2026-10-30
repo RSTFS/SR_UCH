@@ -110,6 +110,13 @@ namespace SR_UCH {
         public const int Version = 2;
     }
 
+    // 跨功能共享的时间常量（audit P2⑧）：以前 45s / 25s 在 Level.* 与 BuildingPresets 各写一份，
+    // 只靠注释互相提醒"与对方保持一致"。放在契约层后两边引用同一个值，改一处即同步。
+    public static class SrTimeouts {
+        public const float ReloadLockStaleSeconds = 45f;      // 关卡重载锁自愈阈值
+        public const float PresetConsumeTimeoutSeconds = 25f; // 预设写进 levelPortalXml 后等游戏消费的硬上限
+    }
+
     // 功能清单（对应 SMAPI 的 manifest.json）：写在 ITweak 实现类上。
     // 核心据此生成功能表、检查依赖与槽位冲突、排序侧栏；未声明的旧式功能用类型全名兜底。
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
@@ -249,6 +256,17 @@ namespace SR_UCH {
         private static Action _closeMenu;
         public static void SetCloseMenuSink(Action closeMenu) { _closeMenu = closeMenu; }
         public static void CloseMenu() { Action a = _closeMenu; if (a != null) a(); }
+        // ── 滚轮该走哪条路（audit P2④：三条通道的优先级说明）─────────────────────────────
+        // 1) RegisterPageWheel（首选，给"自绘固定高度列表"）：在窗口建立滚动区之前回调，
+        //    页面自己判断鼠标是否在自己那块矩形里，命中就改滚动值并返回 true。
+        //    适用：预设列表这种"页面关掉滚动、列表自己滚"的布局（页面内部的滚轮事件已被滚动区处理过）。
+        // 2) SRApi.TableWheelInput（次选）：页面内部调用，把滚轮换算成表格的横向/纵向滚动。
+        //    适用：页面本身允许滚动、只需要表格额外响应的场景（联机列表）。
+        // 3) RegisterWheelHook + SR.PostGuiWheel（最后）：帧级收口，GUI 画完之后统一分发，
+        //    给"不依附任何控件"的功能用（地图缩放 / 自由相机缩放）。
+        // 优先级：控件自己（下拉框/滑块）> 1) 页面级钩子 > 2) 表格内部 > 3) 帧级钩子；
+        //         任何一层返回 true / 调 MarkWheelUsed() 后，后面的层本帧拿到的是已被消费的事件。
+        // 新增列表时：先问"这个列表在页面滚动区内吗"——是→2)，不是（页面关滚动）→1)。
         // 页面级滚轮钩子：页面在窗口建立滚动区【之前】先拿一次滚轮（mouse, wheel；返回 true = 已消费）。
         // 自绘的固定高度列表（表格 / 网格）都靠它滚动 —— 嵌套滚动区在本面板里收不到滚轮事件。
         private static readonly List<Func<Vector2, float, bool>> _pageWheel = new List<Func<Vector2, float, bool>>();
@@ -1157,8 +1175,13 @@ namespace SR_UCH {
             return n;
         }
 
+        // 故意不注入的通道白名单：当前为空（所有 delegate 字段都会被 MainPlugin 注入，自检里是 114/114）。
+        // 将来若新增"合法恒为 null"的通道，把 "Owner.Field" 形式的全名加进来即可（历史注释提到的
+        // Ref.TypeFn 早已不存在，注释已同步删除）。
+        private static readonly HashSet<string> _optionalSinks = new HashSet<string>(StringComparer.Ordinal);
+
         // 自检：反射遍历全部注入点，返回尚未注入的 API 通道名（漏注入会让对应功能静默失效）。
-        // 运行时由 MainPlugin 在注入完成后调用；Ref.TypeFn 恒为 null（核心私有，功能层用不到），列入白名单。
+        // 运行时由 MainPlugin 在注入完成后调用。
         public static string[] MissingSinks() {
             List<string> miss = new List<string>();
             try {
@@ -1170,8 +1193,8 @@ namespace SR_UCH {
                         if (!typeof(Delegate).IsAssignableFrom(f.FieldType)) continue;
                         if (f.GetValue(null) != null) continue;
                         string name = owners[i].Name + "." + f.Name;
-                        bool optional = false;
-                        if (!optional) miss.Add(name);
+                        if (_optionalSinks.Contains(name)) continue;   // 白名单：确认"不注入是正常状态"
+                        miss.Add(name);
                     }
                 }
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
