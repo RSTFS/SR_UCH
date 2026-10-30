@@ -919,6 +919,16 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             }
             public static bool HotkeyButtonNoHint(string id, string label, string tooltip, Action action) { return HotkeyButtonNoHint(id, label, tooltip, action, 0f, 0f); }
             private static GUIStyle Style(string name) { Func<string, GUIStyle> f = _style; return f != null ? f(name) : null; }
+            // 强制中文渲染（独立程序集 X 页用：这些页面不走语言切换）。以前 EX 直接摸 SR.Ctl.ForceZh，
+            // 那是实现层；现在收敛到契约层（需求 12 统一控件）。
+            private static Func<bool> _getForceZh;
+            private static Action<bool> _setForceZh;
+            public static void SetForceZhSink(Func<bool> get, Action<bool> set) { _getForceZh = get; _setForceZh = set; }
+            public static bool ForceZh {
+                get { Func<bool> f = _getForceZh; return f != null && f(); }
+                set { Action<bool> f = _setForceZh; if (f != null) f(value); }
+            }
+
             public static GUIStyle Label { get { return Style("Label"); } }
             public static GUIStyle LabelWrap { get { return Style("LabelWrap"); } }
         // 自适应标签：按文本实测宽高绘制（宽度=文本宽+2，高度=CalcHeight），避免固定高度把文字下半截裁掉。

@@ -744,6 +744,9 @@ public partial class SR : ITweak {
             catch (Exception __ex) { Guard.Log("注入表格高度助手", __ex); }
             // 统一操作列按钮：绘制/命中/悬浮都在实现层，契约层只转发（功能页在 Initialize 之后才会渲染）。
             try {
+                SRApi.Ctl.SetForceZhSink(delegate () { return SR.Ctl.ForceZh; }, delegate (bool v) { SR.Ctl.ForceZh = v; });
+            } catch (Exception __fz) { Guard.Log("强制中文 sink", __fz); }
+            try {
                 SRApi.SetTableActionButtonsSink(delegate (Rect __r, SRApi.TableAction[] __a, float[] __w, ref int __h) { return SR.Ctl.TableActionButtons(__r, __a, __w, ref __h); });
                 SRApi.SetTableActionColumnWidthSink(delegate (SRApi.TableAction[] __a) { return SR.Ctl.TableActionColumnWidth(__a); });
             } catch (Exception __ex) { Guard.Log("注入统一操作列按钮", __ex); }
