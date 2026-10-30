@@ -325,7 +325,10 @@ namespace SR_UCH.Tweaks {
             try {
                 if (Time.unscaledTime > _autoEnterDeadline) { _autoEnterMainMenu = false; return; }
                 if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "MainMenu") return;
-                Matchmaker mm = Matchmaker.Instance;
+                // Matchmaker.Instance 是惰性创建：玩家没开过联机界面就访问会顺带 new 一个（Steam 侧副作用）。
+            // 统一走 MatchmakerOrNull()，未实例化时直接放弃。
+            Matchmaker mm = MatchmakerOrNull();
+            if (mm == null) return;
                 if (mm == null || !mm.WaitingForController) return;
                 bool hasPlayer = false;
                 foreach (Player p in PlayerManager.GetInstance()) { if (p != null) { hasPlayer = true; break; } }

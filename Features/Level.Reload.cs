@@ -277,6 +277,8 @@ namespace SR_UCH.Tweaks {
     private static Dictionary<int, List<PointBlock>> _scoreBackupBlocks = null;
     // 补分重放后置位：下次结算的 ClearNewPointBlocks 跳过清除，保证重放分块正常显示与 tally。
     private static bool _refillPending = false;
+    // 补分标志的置位时刻（-1 = 未置位）：给 ClearNewPointBlocks 前缀做墙钟自愈用（audit P0-7）。
+    private static float _refillAt = -1f;
     // 外部加分（MsgPointAwarded.AlwaysAward=true）的分块标记：被清除时缓存，重载备份时补回。
     private static HashSet<int> _externAwardedKeys = new HashSet<int>();
     // 结算时被 Clear 的外部加分分块，重载备份时合并进 _scoreBackupBlocks

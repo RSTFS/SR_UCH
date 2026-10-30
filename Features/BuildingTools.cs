@@ -152,9 +152,10 @@ namespace SR_UCH.Tweaks {
                 "Key to toggle free placement (grid override) in-game");
             SRApi.RegisterKey("建造增强-自由放置开关", _toggleGridKey, "toggle");
 
-            // 嵌套类的 CreateAndPatchAll 不递归，需显式注册；单个失败不影响其他。
+            // 注意：Harmony 的 CreateAndPatchAll(外层类型) 会连**嵌套类型**一起打补丁（FreePlacementPatch 是嵌套类），
+            // 再显式注册一次会让它的 Prefix/Postfix 每帧执行两遍（位置写入两次、反射翻倍）。
+            // 所以这里只调一次外层；FreePlacementPatch 若哪天提成顶层类，再把下面那行显式注册放回来。
             try { Harmony.CreateAndPatchAll(typeof(BuildingTools)); } catch (Exception e) { SRApi.LogWarn("BuildingTools 补丁失败: " + e.Message); }
-            try { Harmony.CreateAndPatchAll(typeof(FreePlacementPatch)); } catch (Exception e) { SRApi.LogError("自由放置补丁注册失败: " + e.Message); }
         }
 
         [HarmonyPatch(typeof(GameState), "Update")]

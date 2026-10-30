@@ -358,6 +358,19 @@ namespace SR_UCH.Tweaks {
                 }
                 if (name.Length > 40) name = name.Substring(0, 40);
                 p.Name = name;
+                // 回写 XML 的 srName：XML 是权威数据源，只改索引的话，换场景重扫（LoadFromDisk 从 XML 回填）
+                // 会把名字退回旧的 —— 这是"重命名后名字自己变回去"的根因。
+                try {
+                    string xmlPath = p.FilePath;
+                    if (!string.IsNullOrEmpty(xmlPath) && File.Exists(xmlPath)) {
+                        string text = File.ReadAllText(xmlPath);
+                        XmlDocument doc = ParseXmlSafe(text);
+                        if (doc != null && doc.DocumentElement != null) {
+                            doc.DocumentElement.SetAttribute("srName", name);
+                            WriteFileAtomic(xmlPath, doc.OuterXml);
+                        }
+                    }
+                } catch (Exception __wx) { SRApi.Guard.Log("布局预设/重命名回写XML", __wx); }
                 _renameKey = null;
                 _renameText = null;
                 SaveIndex();
@@ -366,6 +379,22 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/重命名", __ex);
             }
+        }
+
+
+        // 原子写文本文件：同目录写 .tmp，成功后替换目标；失败时保留原文件（绝不留下半截文件）。
+        private static void WriteFileAtomic(string path, string text) {
+            try {
+                if (string.IsNullOrEmpty(path)) return;
+                string tmp = path + ".tmp";
+                File.WriteAllText(tmp, text ?? "", new UTF8Encoding(false));
+                if (File.Exists(path)) {
+                    try { File.Replace(tmp, path, null); return; }
+                    catch (Exception __rp) { SRApi.Guard.Log("布局预设/原子替换", __rp); }
+                }
+                File.Copy(tmp, path, true);
+                try { File.Delete(tmp); } catch (Exception __dt) { SRApi.Guard.Log("布局预设/删除临时文件", __dt); }
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/原子写", __ex); }
         }
 
         // ---------- 快照获取 ----------
@@ -728,7 +757,9 @@ namespace SR_UCH.Tweaks {
                 }
                 if (!first) sb.Append('\n');
                 sb.Append("  ]\n}\n");
-                File.WriteAllText(Path.Combine(root, IndexFileName), sb.ToString(), new UTF8Encoding(false));
+                // 原子写：先写 .tmp 再替换。直接 WriteAllText 是"截断+写入"，中途崩溃/磁盘满会留下半截 JSON，
+                // 下次启动就只剩流式扫描的元数据（modsVals / applyRules 等自定义数据全丢）。
+                WriteFileAtomic(Path.Combine(root, IndexFileName), sb.ToString());
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/写索引", __ex);
             }

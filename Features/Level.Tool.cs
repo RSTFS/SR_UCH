@@ -52,6 +52,7 @@ public partial class Level {
             // 收到 PrepareToReloadScene 只重置补分保护，不置补分标志，否则外部工具发起的重载会再补一份导致分数翻倍。
             if (e is GameEvent.NetworkMessageReceivedEvent nm && nm.Message.msgType == NetMsgTypes.PrepareToReloadScene) {
                 _refillPending = false;
+                _refillAt = -1f;
                 // 折扣备份与补分模式无关；恢复仅房主执行，房客端备份无副作用。
                 BackupHandicaps();
             }
@@ -106,6 +107,14 @@ public partial class Level {
     [HarmonyPrefix]
     static bool ClearNewPointBlocksPrefix(ScoreKeeper __instance) {
         try {
+            // 自愈：补分标志本该在"补分重放后的下一次结算"被消费掉；若那次 tally 抛异常/被跳过，
+            // 标志会永远为真 -> 之后每次都跳过清除 -> 分块无限累积 -> 下次重载备份合并成双倍分。
+            // 这里给它一个墙钟上限，超时按普通结算处理并记一条日志。
+            if (_refillPending && _refillAt >= 0f && Time.unscaledTime - _refillAt > PreserveStaleAfter) {
+                SRApi.LogWarn("[保分] 补分标志超过 " + (int)PreserveStaleAfter + " 秒未被消费，强制按普通结算处理");
+                _refillPending = false;
+                _refillAt = -1f;
+            }
             if (_refillPending) {
                 // 跳过清除分支同样要缓存（去重后合并），否则同一批 AlwaysAward 分块会在下次重载备份时被补回两次。
                 try {
@@ -143,8 +152,10 @@ public partial class Level {
     }
 
     // 分块标记键：(playerNumber << 8) | (int)type
-    private static int Key(PointBlock pb) { return (pb.playerNumber << 8) | (int)pb.type; }
-    private static int Key(int playerNumber, PointBlock.pointBlockType type) { return (playerNumber << 8) | (int)type; }
+    // 去重键：以前是 (playerNumber << 8) | type —— 类型编号 >= 256 或玩家号 >= 256 就会撞键，
+    // 撞键会让缓存的分块整批错位（重载备份补回错分块 = 分数错乱）。改成 *1024 + type 后两名互不重叠。
+    private static int Key(PointBlock pb) { return (pb.playerNumber * 1024) + (int)pb.type; }
+    private static int Key(int playerNumber, PointBlock.pointBlockType type) { return (playerNumber * 1024) + (int)type; }
 
     // 标记外部加分分块：外部模块加分与补分重放都发 AlwaysAward=true，原生名次分等为 false。
     [HarmonyPatch(typeof(ScoreKeeper), "handleEvent")]
@@ -231,6 +242,7 @@ public partial class Level {
                         + " 秒没被结算），本次按普通开局处理");
                 }
                 _refillPending = fresh;
+                _refillAt = fresh ? Time.unscaledTime : -1f;
                 // 只清标志，不恢复分块（分块图标由 FillScoresIfPending 的补分广播恢复）
                 _preserveScoresOnReload = false;
                 _preserveMarkedAt = -1f;

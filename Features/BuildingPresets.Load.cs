@@ -129,9 +129,9 @@ namespace SR_UCH.Tweaks {
                                 + " → " + (customPreset ? (string.IsNullOrEmpty(p.LevelName) ? SRApi.T("自定义关卡", "Custom level") : p.LevelName) : LevelDisplayNameForScene(presetScene))
                                 + (skipTreehouse && hasRemoteClients ? SRApi.T("（已跳过树屋流程，房客关卡状态可能不同步）", " (treehouse flow skipped; clients' level state may be out of sync)") : ""));
                         } else if (customPreset) {
-                            SetReloadBusy(false);   // 失败必须释放锁（否则后续所有加载都被拦）
+                            // 失败：不把 coroutineStarted 置真 —— 否则函数末尾的兜底分支（清 levelPortalXml + 放锁）
+                            // 永远不执行；StartDirectReplace 内部虽然清过 XML，但兜底要保留成最后一道保险。
                             SRApi.Notify(SRApi.T("替换自定义关卡失败（详见日志）", "Failed to replace into the custom level (see the log)"));
-                            coroutineStarted = true;   // XML 已在 StartDirectReplace 内部清理
                         } else {
                             lm.StartCoroutine(ReplaceLevelRoutine(p.Name, xml, presetScene, targetLevel, targetMode));
                             coroutineStarted = true;
@@ -253,7 +253,19 @@ namespace SR_UCH.Tweaks {
             try {
                 if (!NetworkServer.active) return false;
                 if (NetworkServer.connections == null) return true;
-                return NetworkServer.connections.Count > 1;
+                // UNET 的 connections 按连接 ID 索引，断开的客户端会留下 null 槽（游戏自己的循环也都判 null），
+                // 所以不能直接看 Count：单人局也可能 > 1 → 误判联机后错误拦截/放行。
+                int remote = 0;
+                for (int i = 0; i < NetworkServer.connections.Count; i++) {
+                    UnityEngine.Networking.NetworkConnection c = NetworkServer.connections[i];
+                    if (c == null) continue;
+                    try {
+                        if (!c.isConnected) continue;
+                        if (c.connectionId == 0) continue;   // 0 = 本机（房主自己）
+                    } catch { continue; }
+                    remote++;
+                }
+                return remote > 0;
             } catch { return true; }
         }
 

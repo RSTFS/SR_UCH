@@ -134,6 +134,7 @@ namespace SR_UCH.Tweaks {
                 if (li.error || !li.InfoReceived) return false;
                 if (li.matchProgress != 0) return false; // 进度 != 0 = 已开局，进去会卡加载
                 if (li.isAFK) return false;
+                if (li.Players <= 0) return false;   // 0 人房不可加入（以前只判满员，空房被算成可加入）
                 if (IsFull(li)) return false;
                 return true;
             } catch { return false; }
