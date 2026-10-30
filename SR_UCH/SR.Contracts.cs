@@ -491,6 +491,20 @@ namespace SR_UCH {
             public bool hoverHighlight = true;              //rowHover >= 0 时核心在行矩形上叠一层很淡的高亮
             }
         public static void TableDraw(TableArgs a) { Action<TableArgs> f = _tableDraw; if (f != null) f(a); }
+        // 表头拖动换位（核心化）：独立程序集不再直接调 SR.TableColMove。
+        public delegate bool TableColMoveFn(Event e, Rect cell, int ci, int k, List<int> cols, Vector2 mp, bool inBox,
+            List<Rect> headerCells, int[] order, Action<int[]> applyOrder, Action save, Action<int> click,
+            ref int moveCol, ref float moveX0, ref float moveDx, ref Vector2 scrollCols, ref Vector2 scrollColsAtDrag, bool vertical);
+        private static TableColMoveFn _tableColMove;
+        public static void SetTableColMoveSink(TableColMoveFn f) { _tableColMove = f; }
+        public static bool TableColMove(Event e, Rect cell, int ci, int k, List<int> cols, Vector2 mp, bool inBox,
+            List<Rect> headerCells, int[] order, Action<int[]> applyOrder, Action save, Action<int> click,
+            ref int moveCol, ref float moveX0, ref float moveDx, ref Vector2 scrollCols, ref Vector2 scrollColsAtDrag, bool vertical = false) {
+            TableColMoveFn f = _tableColMove;
+            return f != null && f(e, cell, ci, k, cols, mp, inBox, headerCells, order, applyOrder, save, click,
+                ref moveCol, ref moveX0, ref moveDx, ref scrollCols, ref scrollColsAtDrag, vertical);
+        }
+
         public static void TableDragWatchdog(Event e, ref float watchdog, ref bool sbDragging, ref int moveCol,
             ref float moveDx, ref int dragCol, ref bool dragH, Action saveWidths, Action saveTableH, Action resetJoinDown) {
             TableDragWatchdogFn f = _tableDragWatchdog;
@@ -919,6 +933,26 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             }
             public static bool HotkeyButtonNoHint(string id, string label, string tooltip, Action action) { return HotkeyButtonNoHint(id, label, tooltip, action, 0f, 0f); }
             private static GUIStyle Style(string name) { Func<string, GUIStyle> f = _style; return f != null ? f(name) : null; }
+            // 自动开关按钮（带勾选框样式 + 右键绑键）：独立程序集用它，避免直接调 SR.Ctl（需求 12）。
+            public delegate bool SelfToggleButtonFn(string label, string tooltip, bool on, ConfigEntry<KeyCode> keyEntry, float width, bool bindable);
+            private static SelfToggleButtonFn _selfToggleButton;
+            public static void SetSelfToggleButtonSink(SelfToggleButtonFn f) { _selfToggleButton = f; }
+            public static bool SelfToggleButton(string label, string tooltip, bool on, ConfigEntry<KeyCode> keyEntry, float width = 0f, bool bindable = false) {
+                SelfToggleButtonFn f = _selfToggleButton;
+                return f != null && f(label, tooltip, on, keyEntry, width, bindable);
+            }
+
+            // 选中态按钮样式（EX 的总开关等自绘按钮用）：与侧栏选中项同款。
+            private static Func<GUIStyle> _getSelItem;
+            public static void SetSelItemSink(Func<GUIStyle> f) { _getSelItem = f; }
+            public static GUIStyle SelItem { get { Func<GUIStyle> f = _getSelItem; return f != null ? f() : null; } }
+
+            // 勾选样式（自绘行 / 表格钉住列用）：与设置页完全同款。
+            private static Func<GUIStyle> _getCheckOn, _getCheckOff;
+            public static void SetCheckStylesSink(Func<GUIStyle> on, Func<GUIStyle> off) { _getCheckOn = on; _getCheckOff = off; }
+            public static GUIStyle CheckOn { get { Func<GUIStyle> f = _getCheckOn; return f != null ? f() : null; } }
+            public static GUIStyle CheckOff { get { Func<GUIStyle> f = _getCheckOff; return f != null ? f() : null; } }
+
             // 强制中文渲染（独立程序集 X 页用：这些页面不走语言切换）。以前 EX 直接摸 SR.Ctl.ForceZh，
             // 那是实现层；现在收敛到契约层（需求 12 统一控件）。
             private static Func<bool> _getForceZh;
@@ -1052,6 +1086,12 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
 
         // 颜色文本工具（纯 BCL/引擎实现，无实现层依赖）：功能层解析/格式化 "#RRGGBB" 统一走这里，
         // 不要在功能页里重复写一套 hex 解析。往返不变：hex → Color → hex 经过同一套 Color32 量化。
+        // 行级扩展点注册表（契约层持有实例）：功能/独立程序集在这里 Add，核心遍历。
+        public delegate float RowComboWidthHook(ConfigEntryBase entry);
+        public delegate bool RowEnumFilterHook(ConfigEntryBase entry, string enumName, int value);
+        public static readonly List<RowComboWidthHook> RowComboWidths = new List<RowComboWidthHook>();
+        public static readonly List<RowEnumFilterHook> RowEnumFilters = new List<RowEnumFilterHook>();
+
         public static class ColorHex {
             public static bool ParseHex(string hex, out Color c) {
                 c = Color.white;

@@ -794,8 +794,6 @@ public partial class SR {
     public delegate bool RowComboOptionsFn(ConfigEntryBase entry, out string[] values, out string[] displayNames);
     public delegate void PageRenderFn();
 
-    public static readonly List<RowComboWidthFn> RowComboWidths = new List<RowComboWidthFn>();
-    public static readonly List<RowEnumFilterFn> RowEnumFilters = new List<RowEnumFilterFn>();
     public static readonly List<RowComboOptionsFn> RowComboOptions = new List<RowComboOptionsFn>();
 
     // 该条目当前是否显示（任一过滤器返回 false 即不显示）
@@ -850,8 +848,8 @@ public partial class SR {
 
     // 下拉框宽度（0 = 用默认宽度）
     public static float RowComboWidth(ConfigEntryBase entry) {
-        for (int i = 0; i < RowComboWidths.Count; i++) {
-            try { float w = RowComboWidths[i](entry); if (w > 0f) return w; } catch (Exception __ex) { Guard.Log("下拉框宽度", __ex); }
+        for (int i = 0; i < SRApi.RowComboWidths.Count; i++) {
+            try { float w = SRApi.RowComboWidths[i](entry); if (w > 0f) return w; } catch (Exception __ex) { Guard.Log("下拉框宽度", __ex); }
         }
         return 0f;
     }
@@ -872,8 +870,8 @@ public partial class SR {
 
     // 枚举选项是否保留（任一过滤器返回 false 即从下拉框里过滤掉）
     public static bool RowEnumAllowed(ConfigEntryBase entry, string enumName, int value) {
-        for (int i = 0; i < RowEnumFilters.Count; i++) {
-            try { if (!RowEnumFilters[i](entry, enumName, value)) return false; } catch (Exception __ex) { Guard.Log("枚举过滤", __ex); }
+        for (int i = 0; i < SRApi.RowEnumFilters.Count; i++) {
+            try { if (!SRApi.RowEnumFilters[i](entry, enumName, value)) return false; } catch (Exception __ex) { Guard.Log("枚举过滤", __ex); }
         }
         return true;
     }

@@ -744,6 +744,19 @@ public partial class SR : ITweak {
             catch (Exception __ex) { Guard.Log("注入表格高度助手", __ex); }
             // 统一操作列按钮：绘制/命中/悬浮都在实现层，契约层只转发（功能页在 Initialize 之后才会渲染）。
             try {
+                SRApi.Ctl.SetSelfToggleButtonSink(delegate (string __l, string __t, bool __o, ConfigEntry<KeyCode> __k, float __w, bool __b) {
+                    return SR.Ctl.SelfToggleButton(__l, __t, __o, __k, __w, __b);
+                });
+                SRApi.Ctl.SetSelItemSink(delegate () { return SR.Ctl.SelItem; });
+                SRApi.Ctl.SetCheckStylesSink(delegate () { return SR.Ctl.CheckOn; }, delegate () { return SR.Ctl.CheckOff; });
+                SRApi.SetTableColMoveSink(delegate (Event __e, Rect __c, int __ci, int __k, List<int> __cols, Vector2 __mp, bool __in,
+                    List<Rect> __hc, int[] __ord, Action<int[]> __ao, Action __sv, Action<int> __ck,
+                    ref int __mc, ref float __mx, ref float __mdx, ref Vector2 __sc, ref Vector2 __scd, bool __v) {
+                    return SR.TableColMove(__e, __c, __ci, __k, __cols, __mp, __in, __hc, __ord, __ao, __sv, __ck,
+                        ref __mc, ref __mx, ref __mdx, ref __sc, ref __scd, __v);
+                });
+            } catch (Exception __sk) { Guard.Log("控件 sink 注册", __sk); }
+            try {
                 SRApi.Ctl.SetForceZhSink(delegate () { return SR.Ctl.ForceZh; }, delegate (bool v) { SR.Ctl.ForceZh = v; });
             } catch (Exception __fz) { Guard.Log("强制中文 sink", __fz); }
             try {
