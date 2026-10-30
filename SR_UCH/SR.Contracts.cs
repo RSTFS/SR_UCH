@@ -948,12 +948,33 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             // GUIContent 是 class（每帧 new 就是每帧一次堆分配）。这里按 (文本|提示) 缓存实例：
             // 文案不变时零分配；语言切换/文案变化时 key 变化，自动重建。上限 512 条，超了整体清空。
             private static readonly Dictionary<string, GUIContent> _contentCache = new Dictionary<string, GUIContent>(64);
+            // 悬浮条目文本的兜底规范化：去掉首尾空行、折叠连续空行。
+            // 功能页自建的 GUIContent 不经过核心的 ComposeTip，这里再兜一层，
+            // 避免"第一行是空行导致悬浮框顶部多出一条空行"（用户反馈 A）。
+            public static string CleanTip(string tip) {
+                if (string.IsNullOrEmpty(tip)) return tip;
+                try {
+                    string[] lines = tip.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+                    int a = 0, b = lines.Length - 1;
+                    while (a <= b && (lines[a] == null || lines[a].Trim().Length == 0)) a++;
+                    while (b >= a && (lines[b] == null || lines[b].Trim().Length == 0)) b--;
+                    if (a == 0 && b == lines.Length - 1) return tip;
+                    System.Text.StringBuilder sb = new System.Text.StringBuilder(tip.Length);
+                    for (int i = a; i <= b; i++) {
+                        if (sb.Length > 0) sb.Append('\n');
+                        sb.Append(lines[i] ?? "");
+                    }
+                    return sb.ToString();
+                } catch { return tip; }
+            }
+
             public static GUIContent Content(string text, string tip) {
                 MainThread.Assert("Ctl.Content");
                 string key = text ?? "";
                 if (!string.IsNullOrEmpty(tip)) key = key + "\u0001" + tip;
                 GUIContent c;
                 if (_contentCache.TryGetValue(key, out c)) return c;
+                tip = CleanTip(tip);
                 if (_contentCache.Count >= 512) _contentCache.Clear();
                 c = new GUIContent(text ?? "", tip);
                 _contentCache[key] = c;

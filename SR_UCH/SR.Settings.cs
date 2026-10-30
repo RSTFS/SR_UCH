@@ -265,15 +265,10 @@ public partial class SR {
                 string tip = content.tooltip != null ? content.tooltip : "";
                 //第 4 行：已绑键时显示“按键：X”，否则显示“默认：X”；都没有则不追加。
                 //右键提示并入同一行，保证悬浮提示仍为 3 + 1 行。
-                string extra = "";
-                if (entry != null) {
-                    if (hk != null) extra = KeyTipSuffix(hk);
-                    if (string.IsNullOrEmpty(extra)) extra = DefaultSuffix(entry);
-                }
-                if (!string.IsNullOrEmpty(extra)) {
-                    if (hk != null) extra += T("（右键绑定/删除）", " (right-click to bind/remove)");
-                    tip += (tip.Length > 0 ? "\n" : "") + extra;
-                }
+                // 统一组装（用户要求）：是什么 → 做什么 → 注意事项 → 默认值 → 按键。
+                // 以前第 4 行是「默认值 或 按键」二选一，且未绑定时整行消失；现在默认值固定第 4 行，
+                // 支持右键绑定的条目再补第 5 行（未绑定时提示「右键设置/删除快捷键」）。
+                tip = ComposeTip(entry, tip, hk);
                 if (hk != null) {
                     //绑定的键（录制中为 [...]）跟在标签后，宽度按需放宽
                     string txt = content.text + KeySuffix(hk);
@@ -715,6 +710,8 @@ public partial class SR {
                     if (filter != null && !filter(list[i])) continue;   //排除属于其它子页的条目
                     RenderEntryRow(list[i], true, colWidth);
                 }
+                //分区底部额外留 2px：紧邻下一个分区标题时不贴边（用户要求）。
+                GUILayout.Space(Sc(2));
             } catch (Exception __ex) { Guard.Log("渲染栏目设置(" + section + ")", __ex); }
         }
 

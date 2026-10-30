@@ -159,11 +159,48 @@ public partial class SR {
             NameCacheSync();
             string cached;
             if (_rowTipCache.TryGetValue(entry, out cached)) return cached;
-            string tip = desc != null ? desc : "";
-            string dft = DefaultSuffix(entry);
-            if (!string.IsNullOrEmpty(dft)) tip += (tip.Length > 0 ? "\n" : "") + dft;
+            string tip = ComposeTip(entry, desc, null);
             _rowTipCache[entry] = tip;
             return tip;
+        }
+
+        // 悬浮条目统一组装（用户要求：是什么 → 做什么 → 注意事项 → 默认值 → 按键）：
+        //   desc 是本模组登记的 3 行说明（LocDesc），默认值与按键由核心按 entry 自动补，
+        //   所以 174 条说明不需要各写一遍默认值，顺序也永远一致。
+        internal static string ComposeTip(ConfigEntryBase entry, string desc, ConfigEntry<KeyCode> hk) {
+            StringBuilder sb = new StringBuilder(160);
+            string body = NormalizeTip(desc);
+            if (body.Length > 0) sb.Append(body);
+            if (entry != null) {
+                string dft = DefaultSuffix(entry);
+                if (!string.IsNullOrEmpty(dft)) { if (sb.Length > 0) sb.Append('\n'); sb.Append(dft); }
+            }
+            if (hk != null) { if (sb.Length > 0) sb.Append('\n'); sb.Append(KeyTipLine(hk)); }
+            return sb.ToString();
+        }
+
+        // 去掉首尾空行、折叠连续空行（修「第一行空行却换行显示」：说明里带前导 \n 时不再留白）。
+        internal static string NormalizeTip(string s) {
+            if (string.IsNullOrEmpty(s)) return "";
+            string[] lines = s.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            List<string> keep = new List<string>(lines.Length);
+            for (int i = 0; i < lines.Length; i++) {
+                string l = lines[i] != null ? lines[i].TrimEnd() : "";
+                bool blank = l.Trim().Length == 0;
+                if (blank && (keep.Count == 0 || keep[keep.Count - 1].Trim().Length == 0)) continue;  // 首行/连续空行丢弃
+                keep.Add(l);
+            }
+            while (keep.Count > 0 && keep[keep.Count - 1].Trim().Length == 0) keep.RemoveAt(keep.Count - 1);
+            return string.Join("\n", keep.ToArray());
+        }
+
+        // 按键行（第 5 行）：未绑定时给出"右键设置/删除"的指引，绑定了就显示实际按键。
+        internal static string KeyTipLine(ConfigEntry<KeyCode> hk) {
+            if (hk == null) return "";
+            KeyCode v = KeyCode.None;
+            try { v = hk.Value; } catch (Exception __ex) { Guard.Log("按键提示行", __ex); return ""; }
+            if (v == KeyCode.None) return T("按键：右键设置/删除快捷键", "Key: right-click to set/remove");
+            return T("按键：" + ComboKeyDisplay(hk, v), "Key: " + ComboKeyDisplay(hk, v));
         }
 
         //键位显示名：按语言返回中文名或 KeyCode 原名。
