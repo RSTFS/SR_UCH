@@ -579,6 +579,34 @@ namespace SR_UCH.Tweaks {
             }
         }
 
+        // 从预设 XML 的 <mods> 取"非默认项"，格式「中文名=值」，供数据格悬浮预览（最多 10 项）。
+        private static string ModsSummaryFromXml(PresetInfo p, int maxItems) {
+            try {
+                if (p == null || p.IsLocal) return "";
+                string path = p.FilePath;
+                if (string.IsNullOrEmpty(path) || !File.Exists(path)) return "";
+                XmlDocument doc = ParseXmlSafe(ReadAllText(path));
+                if (doc == null || doc.DocumentElement == null) return "";
+                XmlElement mods = doc.DocumentElement.SelectSingleNode("mods") as XmlElement;
+                if (mods == null) return "";
+                StringBuilder sb = new StringBuilder();
+                int shown = 0;
+                for (int i = 0; i < Mods.Length && shown < maxItems; i++) {
+                    ModDef d = Mods[i];
+                    string v = mods.GetAttribute(d.Attr);
+                    if (string.IsNullOrEmpty(v)) continue;
+                    if (string.Equals(v, ModDefault(d), StringComparison.OrdinalIgnoreCase)) continue;   // 只列非默认
+                    if (shown > 0) sb.Append(SRApi.T(" · ", " · "));
+                    sb.Append(SRApi.T(d.Zh, d.En)).Append('=').Append(v);
+                    shown++;
+                }
+                return sb.ToString();
+            } catch (Exception __ex) {
+                SRApi.Guard.Log("布局预设/修改器预览", __ex);
+                return "";
+            }
+        }
+
         // 从预设 XML 的 <mods> 读回 24 项（用于"清空"后回显 / 数据列统计）。
         private static int ModsCountInXml(PresetInfo p) {
             try {
@@ -703,6 +731,11 @@ namespace SR_UCH.Tweaks {
                     head = SRApi.T("关闭：加载时把修改器写成默认值（等于不用它保存的修改器）\n左键点这一格切回「预设」",
                         "Off: modifiers are reset to defaults at load time\nleft-click this cell to go back to Preset");
                 StringBuilder sb = new StringBuilder(head);
+                // 预设态悬浮即可预览这套修改器（只列非默认项，最多 10 条）。
+                if (!string.Equals(p.ModsMode ?? ModsInherit, ModsOff, StringComparison.Ordinal)) {
+                    string summary = ModsSummaryFromXml(p, 10);
+                    if (!string.IsNullOrEmpty(summary)) sb.Append("\n").Append(summary);
+                }
                 if (p.ApplyRules) sb.Append("\n").Append(SRApi.T("游戏规则：随预设应用", "Rules: applied with the preset"));
                 if (p.ApplyPoints) sb.Append("\n").Append(SRApi.T("积分设置：随预设应用", "Point settings: applied with the preset"));
                 if (p.ApplyBlocks) sb.Append("\n").Append(SRApi.T("模块概率：随预设应用", "Block odds: applied with the preset"));

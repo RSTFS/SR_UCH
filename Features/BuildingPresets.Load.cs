@@ -102,17 +102,10 @@ namespace SR_UCH.Tweaks {
                     GameState.GameMode targetMode = ResolveLoadMode(p, st.GameMode);
                     bool skipTreehouse = _skipTreehouse != null && _skipTreehouse.Value;
                     bool hasRemoteClients = HasRemoteClients();
-                    // 联机时强制走树屋：游戏只在树屋的 LevelSelectController 上通过 RpcSetNextLevel 同步
-                    // SelectedLevel，对局场景内没有这条通道（audit P0-13）。以前允许"跳过树屋直接替换"，
-                    // 房客的 SelectedLevel 必然不同步 → 关卡判定 / 快照码 / 方块重建都可能分歧。
+                    // 单人：始终直接替换（没有房客，无需回树屋）。
+                    // 联机：只有勾选「跳过树屋流程」才直接替换，否则回树屋走游戏的 RpcSetNextLevel 同步。
                     if (hasRemoteClients && skipTreehouse) {
-                        skipTreehouse = false;
-                        if (!_warnedSkipTreehouseOnline) {
-                            _warnedSkipTreehouseOnline = true;
-                            SRApi.Notify(SRApi.T("联机时已忽略「跳过树屋流程」：房客关卡状态无法同步，改走树屋流程",
-                                "Skip-treehouse ignored online: clients cannot sync the selected level, using the treehouse flow"));
-                            SRApi.LogWarn("[布局预设] 联机时忽略「跳过树屋流程」（房客 SelectedLevel 无法同步）");
-                        }
+                        SRApi.LogWarn("[布局预设] 联机直接替换（已勾选跳过树屋）：房客 SelectedLevel 可能不同步");
                     }
                     if (!ConfirmOrArm("replace:" + p.Key)) {
                         _status = SRApi.T("将替换关卡：", "Level will be replaced: ") + LevelDisplayNameForScene(activeScene)
@@ -130,7 +123,7 @@ namespace SR_UCH.Tweaks {
                     try {
                         // 单人/无远程客户端：直接在当前对局内切场景。
                         // 否则退回树屋方案，因为游戏没有在“对局内”更新房客 SelectedLevel 的 RPC/消息。
-                        bool __directOk = !hasRemoteClients && StartDirectReplace(p, xml, targetLevel, targetMode);
+                        bool __directOk = (!hasRemoteClients || skipTreehouse) && StartDirectReplace(p, xml, targetLevel, targetMode);
                         if (__directOk) {
                             guard.Handoff();
                             SRApi.LogInfo("[布局预设] 直接替换关卡并加载预设：" + p.Name

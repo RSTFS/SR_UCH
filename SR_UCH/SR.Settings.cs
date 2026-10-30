@@ -710,8 +710,6 @@ public partial class SR {
                     if (filter != null && !filter(list[i])) continue;   //排除属于其它子页的条目
                     RenderEntryRow(list[i], true, colWidth);
                 }
-                //分区底部额外留 2px：紧邻下一个分区标题时不贴边（用户要求）。
-                GUILayout.Space(Sc(2));
             } catch (Exception __ex) { Guard.Log("渲染栏目设置(" + section + ")", __ex); }
         }
 

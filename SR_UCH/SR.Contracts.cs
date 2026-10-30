@@ -939,6 +939,8 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             try {
                 GUIContent c = new GUIContent(title, tip);
                 GUILayout.Label(c, SecHeader, GUILayout.Width(SecHeader.CalcSize(c).x));
+                // 标题下方 2px 缓冲：标题与下方条目不再顶在一起（只加在标题上，不加在分区底部）。
+                GUILayout.Space(Sc(2));
             } catch { try { GUILayout.Label(title, SecHeader); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         }
             public static GUIStyle Btn { get { return Style("Btn"); } }

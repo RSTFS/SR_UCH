@@ -250,7 +250,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static DisplayMode DisplayModeValue() {
-            try { return _displayMode != null ? _displayMode.Value : DisplayMode.Stack; } catch { return DisplayMode.Stack; }
+            try { return _displayMode != null ? _displayMode.Value : DisplayMode.Inline; } catch { return DisplayMode.Inline; }
         }
 
         private static bool RoundNoticeOn() {
@@ -487,7 +487,7 @@ namespace SR_UCH.Tweaks {
                 _blink = cfg.Bind(Sec, "Blink", false, "闪烁提醒：最后 5 秒倒计时文字闪烁。");
                 _roundNotice = cfg.Bind(Sec, "Round Notice", true, "回合提示：回合数变化时以放大闪烁动画显示当前回合。");
                 // 第二页：显示方案 + 显示内容 + 颜色。
-                _displayMode = cfg.Bind(Sec, "Display Mode", DisplayMode.Stack, "显示方案：堆叠（每项一行）/ 平铺（小段横向排列，自动换行）。");
+                _displayMode = cfg.Bind(Sec, "Display Mode", DisplayMode.Inline, "显示方案：平铺（小段横向排列，自动换行，默认）/ 堆叠（每项一行）。");
                 _showPhase = cfg.Bind(Sec, "Show Phase", false, "显示阶段名（默认关闭）。");
                 _colPhase = cfg.Bind(Sec, "Color Phase", "#FFFFFF", "阶段名文字颜色（#RRGGBB）。");
                 _showCountdown = cfg.Bind(Sec, "Show Countdown", false, "显示倒计时（默认关闭）。");

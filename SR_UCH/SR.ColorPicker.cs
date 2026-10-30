@@ -160,7 +160,9 @@ public partial class SR {
                 c = Quant(c);
                 float h, sat, v;
                 Color.RGBToHSV(c, out h, out sat, out v);
-                if (!keepHueIfGray || (sat > 0.0001f && v > 0.0001f)) s.H = Mathf.Repeat(h, 1f);
+                // 注意不能用 Mathf.Repeat(h, 1f)：h 正好为 1 时会被折成 0，表现为色相条拖到最右端后
+            // 颜色直接跳回红色（用户反馈 4）。这里把 1 夹成 0.99999，色相连续。
+            if (!keepHueIfGray || (sat > 0.0001f && v > 0.0001f)) s.H = h >= 1f ? 0.99999f : (h <= 0f ? 0f : h);
                 s.S = Mathf.Clamp01(sat);
                 s.V = Mathf.Clamp01(v);
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -530,7 +532,7 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("调色板滑块", __ex); }
             GUILayout.EndHorizontal();
             if (Mathf.Abs(nv - cur) < 0.0001f) return;
-            if (which == 0) s.H = Mathf.Clamp01(nv / 360f);
+            if (which == 0) s.H = Mathf.Clamp(nv / 360f, 0f, 0.99999f);   // 360 度不能存成 1.0，否则回读会被折回 0
             else if (which == 1) s.S = Mathf.Clamp01(nv / 100f);
             else s.V = Mathf.Clamp01(nv / 100f);
             s.Dirty = true;

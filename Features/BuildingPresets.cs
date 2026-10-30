@@ -37,17 +37,17 @@ namespace SR_UCH.Tweaks {
         private const int ColCount = 6;
         // 列宽（设计单位）默认值与允许范围；顺序与 Col* 一致。
         // 操作列的实际默认宽由 DefaultActionColW() 按当前语言按钮文字实时计算（DefColW[ColAction] 仅作兜底）。
-        private static readonly float[] DefColW = new float[] { 150f, 56f, 64f, 38f, 48f, 200f };
+        // 名称 / 关卡 / 模式 / 数据 / 时间 / 操作。数据与时间宽度翻倍、关卡 ×1.5（用户要求）。
+        private static readonly float[] DefColW = new float[] { 150f, 84f, 64f, 76f, 96f, 200f };
         private const float ColWidthMin = 40f;
         private const float ColWidthMax = 600f;
         private const string ColWidthsKey = "Preset Widths";
         private const string ColOrderKey = "Preset Order";
         private const string ColHiddenKey = "Preset Hidden";
-        // 操作列按钮种类：0=加载 1=数据 2=导出 3=删除（重命名改为右键名称列）。
+        // 操作列按钮种类：0=加载 1=导出 2=删除（重命名改为右键名称列；「数据」按钮已按用户要求删除）。
         private const int ActLoad = 0;
-        private const int ActMods = 1;
-        private const int ActExport = 2;
-        private const int ActDelete = 3;
+        private const int ActExport = 1;
+        private const int ActDelete = 2;
         // 从剪贴板导入的上限：方块数 / XML 字符数。超出直接拒绝，避免一次性重建拖垮帧率或整段解析爆内存。
         private const int MaxImportBlocks = 3000;
         private const int MaxImportChars = 2000000;
@@ -122,9 +122,9 @@ namespace SR_UCH.Tweaks {
         // 操作列按钮描述（复用对象，避免逐行分配）：布局 / 命中 / 悬浮统一交给核心 SRApi.TableActionButtons。
         // 不传固定宽度（widths = null）：核心按当前语言文字宽自适应，避免英文标签被截断。
         private static PresetInfo _actPreset;
+        // 用户要求：删掉「数据」按钮 —— 它打开的是游戏原生规则书界面，与预设列表的「预设 / 关闭」两态重复。
         private static readonly SRApi.TableAction[] _actActions = new SRApi.TableAction[] {
             new SRApi.TableAction { OnClick = DoActLoad },
-            new SRApi.TableAction { OnClick = DoActMods },
             new SRApi.TableAction { OnClick = DoActExport },
             new SRApi.TableAction { OnClick = DoActDelete }
         };
@@ -151,7 +151,6 @@ namespace SR_UCH.Tweaks {
         // 加载预设时的重载锁（本功能自己的，和 Level 的锁互相不可见）。
         private static string _reloadBusyReason;   // 锁的来源（日志用）
         private static float _otherBusySince = -1f;   // 对方重载锁开始等待的时刻（-1 = 没在等）
-        private static bool _warnedSkipTreehouseOnline;   // 联机忽略「跳过树屋流程」只提示一次
         private static bool _reloadBusy;
         private static float _reloadBusyAt = -1f;
 
@@ -943,8 +942,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 }
                 bool delPending = IsPending("del:" + p.Key);
                 _actActions[ActLoad].Label = replacePending ? SRApi.T("确认", "Confirm") : SRApi.T("加载", "Load");
-                _actActions[ActMods].Label = SRApi.T("数据", "Data");
-                _actActions[ActMods].Tip = SRApi.T("把这条预设的规则 / 积分 / 模块概率 / 修改器灌进游戏并打开游戏自己的界面\n改完关掉会自动读回来保存", "loads this preset's rules / points / block odds / modifiers into the game and opens the game's own UI\nthe data is read back and saved when you close it");
                 _actActions[ActExport].Label = SRApi.T("导出", "Export");
                 _actActions[ActDelete].Label = delPending ? SRApi.T("确认", "Confirm") : SRApi.T("删除", "Delete");
                 int hit = SRApi.TableActionButtons(r, _actActions, null, ref hover);
@@ -958,11 +955,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
         private static void DoActLoad() {
             PresetInfo p = _actPreset;
             if (p != null) LoadPreset(p);
-        }
-
-        private static void DoActMods() {
-            PresetInfo p = _actPreset;
-            if (p != null && !p.IsLocal) OpenGameRulebook(p);
         }
 
         private static void DoActExport() {
