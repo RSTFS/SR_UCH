@@ -142,16 +142,6 @@ public partial class SR {
             return cached;
         }
 
-        //按键后缀（"按键：X" / "Key: X"），未绑定（KeyCode.None）时返回 ""。
-        //只用于悬浮提示的第 4 行；标签旁的紧凑键位后缀仍走 SR.KeySuffix。
-        internal static string KeyTipSuffix(ConfigEntry<KeyCode> key) {
-            if (key == null) return "";
-            KeyCode v = KeyCode.None;
-            try { v = key.Value; } catch (Exception __ex) { Guard.Log("按键提示后缀", __ex); return ""; }
-            if (v == KeyCode.None) return "";
-            string txt = ComboKeyDisplay(key, v);
-            return T("按键：" + txt, "Key: " + txt);
-        }
 
         //名称列悬浮说明 = 说明本身（固定 3 行）+ 核心追加的第 4 行（默认值 / 按键）。
         //说明文案不再自带默认值；无默认值时只显示 3 行。

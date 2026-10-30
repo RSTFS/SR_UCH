@@ -319,6 +319,27 @@ function Check-Indent {
     else { Ok '缩进统一（仅空格）' }
 }
 
+
+# ---------- 13) 悬浮条目组装不得绕过统一入口 ----------
+# 用户要求的顺序：是什么 -> 做什么 -> 注意事项 -> 默认值 -> 按键。
+# 默认值与按键由 SR.Localization.ComposeTip 统一追加；任何地方自己拼默认值都会破坏顺序。
+function Check-TipComposer {
+    $loc = Join-Path $Root 'SR_UCH\SR.Localization.cs'
+    $set = Join-Path $Root 'SR_UCH\SR.Settings.cs'
+    foreach ($f in @($loc, $set)) {
+        if (-not (Test-Path -LiteralPath $f)) { Bad ('找不到 ' + (Split-Path $f -Leaf)); return }
+    }
+    $bad = @()
+    $locTxt = Read-Text $loc
+    $setTxt = Read-Text $set
+    if ($locTxt -notmatch 'internal static string ComposeTip') { $bad += 'Localization 缺少 ComposeTip' }
+    if ($locTxt -notmatch 'ComposeTip\(entry, desc, null\)') { $bad += 'RowTip 未走 ComposeTip' }
+    if ($setTxt -notmatch 'ComposeTip\(entry, tip, hk\)') { $bad += 'RestoreLabel 未走 ComposeTip' }
+    if ($setTxt -match 'DefaultSuffix\(') { $bad += 'RestoreLabel 仍自行追加默认值' }
+    if ($bad.Count -gt 0) { Bad ('悬浮条目组装被绕过：' + ($bad -join '；')); return }
+    Ok '悬浮条目组装统一（描述 -> 默认值 -> 按键 均由 ComposeTip 追加）'
+}
+
 Write-Host '== SR_UCH 文本类守卫（不需要游戏 / 不需要 csc）=='
 Check-ApiSurface
 Check-ContractBoundary
@@ -331,6 +352,7 @@ Check-BareCatch
 Check-Indent
 Check-RegionFields
 Check-SilentCatch
+Check-TipComposer
 if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); exit 1 }
 Write-Host '== 文本类守卫全部通过 ✅ =='
 exit 0
