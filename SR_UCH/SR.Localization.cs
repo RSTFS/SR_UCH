@@ -227,7 +227,32 @@ public partial class SR {
         }
 
         //页脚状态：当前游戏模式 · 当前关卡（模式/关卡名都跟随游戏本地化语言）。
+        // 每帧都算一次太重：I2 查表 + Enum 全表遍历 + 字符串拼接（audit E-9）。
+        // 这里按 (场景, 模式, 快照名, 语言版本) 做记忆化——底栏每帧调它也只是一次字符串比较。
+        private static string _modeLabelKey;
+        private static string _modeLabelVal;
         private static string ModeLabel() {
+            string key = null;
+            try {
+                string sc = "";
+                try { sc = SceneManager.GetActiveScene().name; } catch (Exception __sc) { Guard.Log("ModeLabel 场景名(缓存键)", __sc); }
+                string snap = "";
+                try {
+                    LevelSelectController.PlayedSnapshotInfo info = GameState.GetInstance().currentSnapshotInfo;
+                    // PlayedSnapshotInfo 是 struct：没有 null 可判，直接看字段。
+                    if (!string.IsNullOrEmpty(info.snapshotName)) snap = info.snapshotName;
+                } catch (Exception __si) { Guard.Log("ModeLabel 快照名(缓存键)", __si); }
+                GameState.GameMode gmKey = GameState.GameMode.CREATIVE;
+                try { gmKey = GameSettings.GetInstance().GameMode; } catch (Exception __gk) { Guard.Log("ModeLabel 模式(缓存键)", __gk); }
+                key = sc + "|" + (int)gmKey + "|" + snap + "|" + LangVer + "|" + (_forceZh ? 1 : 0) + "|" + (UseEn ? 1 : 0);
+                if (key == _modeLabelKey && _modeLabelVal != null) return _modeLabelVal;
+            } catch { LogWarn("ModeLabel 缓存键失败，退回直算"); }
+            string computed = ModeLabelRaw();
+            if (!string.IsNullOrEmpty(key)) { _modeLabelKey = key; _modeLabelVal = computed; }
+            return computed;
+        }
+
+        private static string ModeLabelRaw() {
             string mode = T("未知", "Unknown");
             try {
                 GameState.GameMode gm = GameSettings.GetInstance().GameMode;

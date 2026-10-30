@@ -124,22 +124,36 @@ namespace SR_UCH.Tweaks {
 
         // 可视行的单元格文本数组：按房间跨帧复用同一份数组，仅在首次出现时分配。
         // 房间对象每次刷新都会重建，故设上限兜底：超过 CellStoreMax 时整体清空。
-        private static readonly System.Collections.Generic.Dictionary<Matchmaker.LobbyListInfo, string[]> _cellStore =
-            new System.Collections.Generic.Dictionary<Matchmaker.LobbyListInfo, string[]>();
+        // 键用 sLobbyID 而不是 LobbyListInfo 对象引用：房间列表每次刷新都会重建对象，
+        // 引用作键会让缓存持续失效（命中率掉到 0），并周期性触发整表清空（audit B-10）。
+        private static readonly System.Collections.Generic.Dictionary<string, string[]> _cellStore =
+            new System.Collections.Generic.Dictionary<string, string[]>();
         private const int CellStoreMax = 256;
         // 按帧缓存每个房间的单元格文本：IMGUI 一帧有 Layout+Repaint+多个输入事件，避免重复计算。
         private static readonly System.Collections.Generic.Dictionary<Matchmaker.LobbyListInfo, string[]> _cellCache =
             new System.Collections.Generic.Dictionary<Matchmaker.LobbyListInfo, string[]>();
         private static int _cellCacheFrame = -1;
+        // 房间稳定键：优先平台房间 id，其次 UnityMatchID，最后退回房主名（保证非空时总能命中缓存）。
+        private static string CellKey(Matchmaker.LobbyListInfo li) {
+            try {
+                if (li == null) return null;
+                if (!string.IsNullOrEmpty(li.sLobbyID)) return li.sLobbyID;
+                // UnityMatchID 是 ulong：0 = 该列表不是 Steam 大厅数据，非 0 才当键用。
+                if (li.UnityMatchID != 0UL) return li.UnityMatchID.ToString(CultureInfo.InvariantCulture);
+                return li.LobbyOwner ?? "";
+            } catch { return null; }
+        }
+
         private static string[] CellTexts(Matchmaker.LobbyListInfo li) {
             if (_cellCacheFrame != Time.frameCount) { _cellCacheFrame = Time.frameCount; _cellCache.Clear(); }
             string[] hit;
             if (_cellCache.TryGetValue(li, out hit)) return hit;
+            string key = CellKey(li);
             string[] buf;
-            if (!_cellStore.TryGetValue(li, out buf) || buf == null || buf.Length != ColCount) {
+            if (string.IsNullOrEmpty(key) || !_cellStore.TryGetValue(key, out buf) || buf == null || buf.Length != ColCount) {
                 if (_cellStore.Count >= CellStoreMax) _cellStore.Clear();
                 buf = new string[ColCount];
-                _cellStore[li] = buf;
+                if (!string.IsNullOrEmpty(key)) _cellStore[key] = buf;
             }
             buf[0] = RegionShort(li);
             buf[1] = li.Players + "/4";

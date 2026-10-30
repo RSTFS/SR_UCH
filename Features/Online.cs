@@ -50,6 +50,7 @@ namespace SR_UCH.Tweaks {
         private static Vector2 _scrollRows, _scrollCols;
         private static string _openCombo = "";              //同时只允许一个下拉框展开
         private static float _abortDeadline, _forceDeadline, _forceRawDeadline;   //回家看门狗的三级时限
+        private static float _returnAttemptedAt;   // 上次发起"返回主界面"的时刻（0 = 没发起过）
         private static float[] _cw;                         //当前列宽
         private static bool _widthsLoaded;                  // 列宽是否已初始化
         // 对局内点加入：先退出当前房间，退出后立刻加入。
@@ -195,6 +196,15 @@ namespace SR_UCH.Tweaks {
         public static void DisbandOrLeave() {
             // 已在返回倒计时中：再点一次即强制立即返回，不等游戏自己的加载流程。
             if (_abortDeadline > 0f || _forceDeadline > 0f || _forceRawDeadline > 0f) { ForceMainMenu(); return; }
+            // 看门狗已经超时（三个 deadline 都归零）但还没回到主界面：第二次点击同样按"强制返回"处理，
+            // 否则会再走一遍 GoMainMenu，把游戏自己的收尾流程又触发一次（audit B-1）。
+            try {
+                if (_returnAttemptedAt > 0f && SceneManager.GetActiveScene().name != "MainMenu") {
+                    SRApi.LogWarn("[联机] 上次返回未完成，本次点击按强制返回处理");
+                    ForceMainMenu();
+                    return;
+                }
+            } catch (Exception __b1) { SRApi.Guard.Log("联机/返回状态检查", __b1); }
             try {
                 LobbyManager lm = LobbyManager.instance;
                 bool host = false;
@@ -203,6 +213,7 @@ namespace SR_UCH.Tweaks {
                 Notes(host ? "正在解散房间" : "正在退出房间", host ? "Disbanding the session" : "Leaving the session");
             } catch (Exception __ex) { SRApi.Guard.Log("退出联机提示", __ex); }
             // 房主：ReturnToMainMenu 先广播 HostEndedGame，全员一起回主界面；房客：同一条路只退自己。
+            _returnAttemptedAt = Time.unscaledTime;
             GoMainMenu();
         }
 
