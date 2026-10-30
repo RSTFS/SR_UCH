@@ -149,6 +149,7 @@ namespace SR_UCH.Tweaks {
         private static bool _levelShowCode;
 
         // 加载预设时的重载锁（本功能自己的，和 Level 的锁互相不可见）。
+        private static float _otherBusySince = -1f;   // 对方重载锁开始等待的时刻（-1 = 没在等）
         private static bool _warnedSkipTreehouseOnline;   // 联机忽略「跳过树屋流程」只提示一次
         private static bool _reloadBusy;
         private static float _reloadBusyAt = -1f;

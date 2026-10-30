@@ -277,7 +277,9 @@ public partial class Chat : ITweak {
                 if (cg == null) return;
                 // 总开关关闭：把改动过的游戏字号 / 文字尺寸 / 缩放 / 像素对齐 / 位置偏移一次性还原，之后不再介入。
                 if (!EnabledOn) {
-                    if (_touched) RestoreVanilla(__instance, holder, cg);
+                    // 只要还有"被本模组改过"的痕迹就还原（以前只看 _touched：首次启用前关掉时不会还原）。
+                // 还原后 _origFontSize/_origGameFontSize 归零，后续帧不会重复做。
+                if (_touched || _posApplied || _origFontSize > 0 || _origGameFontSize > 0) RestoreVanilla(__instance, holder, cg);
                     return;
                 }
                 _touched = true;
@@ -452,6 +454,8 @@ public partial class Chat : ITweak {
                 _lastClarity = -1f; // 下次打开时重建字库
             } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口还原原版", __ex); }
             _posApplied = false; _posHaveBase = false;
+            // 归零"原值"记录：下一次启用时重新采样，也避免每帧重复还原（audit B-2）。
+            _origFontSize = 0; _origGameFontSize = 0;
             _touched = false;
         }
 

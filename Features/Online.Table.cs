@@ -160,6 +160,9 @@ namespace SR_UCH.Tweaks {
         private static int _hiddenColsBeforeTable;                                // 本帧核心处理右键隐藏前的列数
 
         private static void TableDraw(Rect box) {
+            // _cw 未就绪（EnsureWidths 曾失败/被跳过）时直接跳过本帧绘制，避免 NullReference（audit B-9）。
+            if (_cw == null || _cw.Length <= JoinCol) { try { EnsureWidths(); } catch (Exception __ew) { SRApi.Guard.Log("联机表格/列宽初始化", __ew); } }
+            if (_cw == null || _cw.Length <= JoinCol) return;
             Event e = Event.current;
             Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
             CollectShown();

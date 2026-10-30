@@ -596,6 +596,8 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             _renderSectionEntries = renderSectionEntries; _sectionEntries2 = sectionEntries;
             _tableLineStrong = tableLineStrong; _drawFill = drawFill;
         }
+        // 注意：ContentArea 是「右栏内容区」的整块矩形，**不扣标题栏与底栏**；自绘页要铺满可视区请用
+        // PageViewportHeight / PageContentBottomY（audit F-8）。
         public static Rect ContentArea { get { Func<Rect> f = _contentArea; return f != null ? f() : default(Rect); } set { Action<Rect> a = _setContentArea; if (a != null) a(value); } }
         // 页面可视高度（滚动区真实视口，已扣除窗口标题/页头/底栏）：功能页的表格高度应以它为准。
         public static float PageViewportHeight;

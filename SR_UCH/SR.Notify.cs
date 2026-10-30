@@ -40,6 +40,7 @@ public partial class SR {
         // 已知不可用时只写日志、不再逐帧抛异常；场景一换自动重试恢复。
         private static bool _tipDown;
         private static string _tipDownScene;
+        private static float _tipRetryAt;   // 降级后的下次重试时刻（60 秒一次）
 
         private static void NotifyImpl(string text, string tag) {
             try { ShowUserMessage(text); } catch (Exception __ex) { Guard.Log("提示(UserMessage)", __ex); }
@@ -51,7 +52,12 @@ public partial class SR {
             if (string.IsNullOrEmpty(text)) return;
             string scene = "";
             try { scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-            if (_tipDown && scene == _tipDownScene) return;   // 本场景已知不可用：跳过（日志照常）
+            // 本场景已知不可用：跳过（日志照常）。但每 60 秒允许重试一次 ——
+            // 以前只在换场景时恢复，长局里消息 UI 恢复可用后仍会一直静默（audit E-13）。
+            if (_tipDown && scene == _tipDownScene) {
+                if (Time.unscaledTime < _tipRetryAt) return;
+                _tipRetryAt = Time.unscaledTime + 60f;
+            }
             string show = text;
             try {
                 float now = Time.unscaledTime;

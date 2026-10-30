@@ -246,7 +246,14 @@ namespace SR_UCH.Tweaks {
                 GameState.GameMode presetMode;
                 if (p != null && IsConcreteMode(p.Mode) && TryParseMode(p.Mode, out presetMode)) mode = presetMode;
                 GameState.GameMode forcedMode;
-                if (TryParseMode(_loadMode, out forcedMode)) mode = forcedMode;
+                if (TryParseMode(_loadMode, out forcedMode)) {
+                    if (forcedMode != mode) {
+                        // 页面选了「加载模式」就覆盖预设自身模式：这是预期行为，但必须留痕（audit A-7）。
+                        SRApi.LogInfo("[布局预设] 加载模式覆盖：预设=" + mode + " → 选择=" + forcedMode
+                            + "（预设 " + (p != null ? (p.Name ?? "") : "") + "）");
+                    }
+                    mode = forcedMode;
+                }
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/解析加载模式", __ex);
             }
@@ -662,9 +669,17 @@ namespace SR_UCH.Tweaks {
                 try {
                     Func<bool> other = Slots.Require<Func<bool>>("level.reloadBusy");
                     if (other != null && other()) {
+                        // 对方锁有自己的自愈；如果它一直不放，至少让日志说明"卡在谁身上"（audit A-9）。
+                        _otherBusySince = _otherBusySince < 0f ? Time.unscaledTime : _otherBusySince;
+                        if (Time.unscaledTime - _otherBusySince > 60f) {
+                            SRApi.LogWarn("[布局预设] 关卡重载锁已持续 " + (int)(Time.unscaledTime - _otherBusySince)
+                                + " 秒未释放（level.reloadBusy=true），预设加载被拦住");
+                            _otherBusySince = Time.unscaledTime;   // 每 60 秒提醒一次
+                        }
                         SRApi.Notify(SRApi.T("关卡正在重载，请稍候", "Level reload in progress; please wait"));
                         return true;
                     }
+                    _otherBusySince = -1f;
                 } catch (Exception __ex) { SRApi.Guard.Log("预设/重载互斥检查", __ex); }
                 if (!_reloadBusy) return false;
                 if (_reloadBusyAt >= 0f && Time.unscaledTime - _reloadBusyAt > ReloadLockStale) {
