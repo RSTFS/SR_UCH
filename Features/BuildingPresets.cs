@@ -416,7 +416,7 @@ namespace SR_UCH.Tweaks {
                         GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ImportFromPath();
                     if (GUILayout.Button(SRApi.T("从剪贴板导入", "Import clipboard"), SRApi.Ctl.Btn,
                         GUILayout.Width(W(120)), GUILayout.Height(W(24)))) ImportFromClipboard();
-                    if (GUILayout.Button(new GUIContent(SRApi.T("全部导出到目录", "Export all to folder"),
+                    if (GUILayout.Button(SRApi.Ctl.Content(SRApi.T("全部导出到目录", "Export all to folder"),
                         SRApi.T("把所有预设 XML 复制到 预设目录/exports/<时间>/ 下（按模式分子目录），并复制一份 index.json",
                             "copies every preset XML into presets/exports/<time>/ (grouped by mode) and copies index.json as well")),
                         SRApi.Ctl.Btn, GUILayout.Width(W(140)), GUILayout.Height(W(24)))) ExportAllToDirectory();
@@ -450,10 +450,10 @@ namespace SR_UCH.Tweaks {
                     SRApi.Ctl.LabelAuto(SRApi.T("排序", "Sort"));
                     RenderSortCombo();
                     GUILayout.Space(W(7));
-                    if (GUILayout.Button(new GUIContent(SRApi.T("刷新", "Refresh"),
+                    if (GUILayout.Button(SRApi.Ctl.Content(SRApi.T("刷新", "Refresh"),
                             SRApi.T("重新扫描预设目录（手动放入/删除了 XML 时用），也用于重建索引",
                                 "rescan the presets folder (after manually adding/removing XML files) and rebuild the index")),
-                        SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Btn.CalcSize(new GUIContent(SRApi.T("刷新", "Refresh"))).x + SRApi.Ctl.Sc(18)), GUILayout.Height(W(24)))) {
+                        SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Btn.CalcSize(SRApi.Ctl.Content(SRApi.T("刷新", "Refresh"))).x + SRApi.Ctl.Sc(18)), GUILayout.Height(W(24)))) {
                         try { _loaded = false; LoadFromDisk(true); } catch (Exception __rx) { SRApi.Guard.Log("布局预设/刷新列表", __rx); }
                     }
                     GUILayout.FlexibleSpace();
@@ -487,7 +487,7 @@ namespace SR_UCH.Tweaks {
                 try {
                     if (_skipTreehouse != null) {
                         // 标准配置行 = 可点击标签（点名称还原默认）+ 核心开关控件
-                        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("跳过树屋流程", "Skip treehouse"),
+                        SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("跳过树屋流程", "Skip treehouse"),
                             SRApi.T("跳过树屋流程\n联机替换关卡时直接替换场景，不先回树屋\n房客的关卡状态可能不同步（风险自负）",
                                 "skip the treehouse flow\nreplaces the level scene directly online instead of returning to the treehouse first\nclients' level state may be out of sync (at your own risk)")),
                             _skipTreehouse, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(26));

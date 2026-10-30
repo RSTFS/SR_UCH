@@ -107,6 +107,10 @@ namespace SR_UCH {
                 SRApi.SetCloseMenuSink(delegate { SR.CloseMenuExternal(); });
                 SRApi.SetOpenMenuSink(delegate { SR.OpenMenuExternal(); });
             });
+            // 线程契约检查：只有诊断模式打开时才启用（默认零成本），越线程访问静态集合会记一次警告。
+            SinkStep("MainThread", delegate () {
+                SR_UCH.MainThread.Enable(SR.DiagEnabled);
+            });
             SinkStep("Notify", delegate () {
                 SRApi.SetNotifySink(delegate (string __t) { SR.Notify(__t); });
             });

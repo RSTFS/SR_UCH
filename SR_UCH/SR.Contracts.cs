@@ -34,9 +34,38 @@ namespace SR_UCH {
         //未收录的 key 按 FallbackId 回退，可增量补全。
         IDictionary<string, string> Map { get; }
     }
+    // 线程契约（audit item 12）：本文件里的静态集合（Slots._map / _frameObjCache / Ctl._contentCache）与
+    // SR.* 分部里的静态缓存（_heightCache 等）全部"只允许主线程访问"。
+    // 现状：所有读写都发生在 Unity 主线程（Awake / Update / OnGUI / 事件回调），因此无锁也正确；
+    // 约定：任何异步线程（Task / 线程池 / 协程之外的计时器）都不得直接碰这些集合，
+    //       需要跨线程时先 Marshal 回主线程，或把这些集合换成 ConcurrentDictionary。
+    // 检查：打开 SetThreadCheck(true)（诊断模式）后，越线程访问会记一次警告，见 MainThreadCheck。
+    public static class MainThread {
+        private static int _mainId = -1;
+        private static bool _on;
+        private static int _warned;
+        public static void Enable(bool on) {
+            _on = on;
+            if (_mainId < 0) { try { _mainId = System.Threading.Thread.CurrentThread.ManagedThreadId; } catch { _mainId = -1; } }
+        }
+        // 只在开启时比较一次线程 id；越线程时每类 what 只记一次，避免刷屏。
+        public static void Assert(string what) {
+            if (!_on || _mainId < 0) return;
+            int id;
+            try { id = System.Threading.Thread.CurrentThread.ManagedThreadId; } catch { return; }
+            if (id == _mainId) return;
+            if (_warned > 64) return;
+            _warned++;
+            // LogWarn 的实现本身就是 Guard 包裹（不会抛），这里不再额外 try/catch，
+            // 免得又引入一处静默 catch（棘轮守卫会拦）。
+            SRApi.LogWarn("[SR.Thread] 非主线程访问静态集合: " + what + "（线程 " + id + "，主线程 " + _mainId + "）");
+        }
+    }
+
     // 槽位总线：功能间通信只认 "名字 + 委托签名"，不认识双方类型；Require 返回 null 表示无人提供，调用方须自行降级。
     // Provide 为覆盖语义；硬约定：反射游戏私有成员须走 SR.RefField / SR.RefMethod 并经 SR.RefOverride 登记。
     public static class Slots {
+        // 仅主线程访问（见文件头线程契约）；Provide/Require 都会 Assert 一次。
         private static readonly Dictionary<string, object> _map = new Dictionary<string, object>();
         //记录无人提供或类型不符的槽位名（最多 64 条，只记不同的名字），供自检界面显示。
         private static readonly Dictionary<string, int> _misses = new Dictionary<string, int>();
@@ -53,9 +82,11 @@ namespace SR_UCH {
         }
 
         public static void Provide(string slot, object impl) {
+            MainThread.Assert("Slots.Provide");
             if (impl != null && !string.IsNullOrEmpty(slot)) { _map[slot] = impl; _misses.Remove(slot); }
         }
         public static T Require<T>(string slot) where T : class {
+            MainThread.Assert("Slots.Require");
             if (string.IsNullOrEmpty(slot)) return null;
             object o;
             if (_map.TryGetValue(slot, out o)) {
@@ -894,6 +925,7 @@ namespace SR_UCH {
             // 文案不变时零分配；语言切换/文案变化时 key 变化，自动重建。上限 512 条，超了整体清空。
             private static readonly Dictionary<string, GUIContent> _contentCache = new Dictionary<string, GUIContent>(64);
             public static GUIContent Content(string text, string tip) {
+                MainThread.Assert("Ctl.Content");
                 string key = text ?? "";
                 if (!string.IsNullOrEmpty(tip)) key = key + "\u0001" + tip;
                 GUIContent c;
