@@ -938,9 +938,11 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static void SectionTitle(string title, string tip = null) {
             try {
                 GUIContent c = new GUIContent(title, tip);
-                GUILayout.Label(c, SecHeader, GUILayout.Width(SecHeader.CalcSize(c).x));
-                // 标题下方 2px 缓冲：标题与下方条目不再顶在一起（只加在标题上，不加在分区底部）。
-                GUILayout.Space(Sc(2));
+                GUIStyle st = SecHeader;
+                Vector2 sz = st.CalcSize(c);
+                // 缓冲做进标题自身高度（以前用 GUILayout.Space 追加，紧邻的条目会把这点间距吃掉，
+                // 观感上看不到 —— 用户反馈 10）。这里高度 = 文字高 + 3px，缓冲一定占位。
+                GUILayout.Label(c, st, GUILayout.Width(sz.x), GUILayout.Height(sz.y + Sc(3)));
             } catch { try { GUILayout.Label(title, SecHeader); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         }
             public static GUIStyle Btn { get { return Style("Btn"); } }

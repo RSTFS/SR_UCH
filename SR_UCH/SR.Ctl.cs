@@ -592,9 +592,11 @@ public partial class SR {
             ConfigEntry<KeyCode> key = SR.Hotkey(id);
             bool capturing = key != null && _capturing == key;
             // 快捷键框只显示按键本身；动作名放进悬浮提示。
-            string tip = "";
-            if (!string.IsNullOrEmpty(tooltip)) tip += "\n" + tooltip;
-            tip += "\n" + T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey");
+            // 注意：以前是 tip = "\n" + tooltip，导致悬浮框第一行永远是一条空行（用户反馈 11）。
+            string tip = tooltip ?? "";
+            string hint = T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey");
+            tip = tip.Length > 0 ? tip + "\n" + hint : hint;
+            tip = SRApi.Ctl.CleanTip(tip);
             Event e = Event.current;
             int evBtn = e != null ? e.button : 0;
             float bw = width > 0f ? width : Sc(150);
@@ -611,8 +613,8 @@ public partial class SR {
             SR.HotkeyAction(id, label, action);
             ConfigEntry<KeyCode> key = SR.Hotkey(id);
             bool capturing = key != null && _capturing == key;
-            string tip = "";
-            if (!string.IsNullOrEmpty(tooltip)) tip += "\n" + tooltip;
+            // 同 HotkeyButton：不能再以换行开头（否则第一行是空行）。
+            string tip = SRApi.Ctl.CleanTip(tooltip ?? "");
             Event e = Event.current;
             int evBtn = e != null ? e.button : 0;
             float bw = width > 0f ? width : Sc(150);
@@ -735,8 +737,8 @@ public partial class SR {
                 float h = st.CalcHeight(_tipContent, innerW);
                 _tipInnerW = innerW;
                 _tipW = innerW + Sc(12f);
-                // +2px 缓冲：末行中文字形下沿常被 CalcHeight 少算，缓冲留足才不裁最后一笔。
-                _tipH = h + Sc(8f) + 2f;
+                // +3px 缓冲：末行中文字形下沿常被 CalcHeight 少算，缓冲留足才不裁最后一笔。
+                _tipH = h + Sc(8f) + 3f;
             }
             float x = Mathf.Clamp(mp.x + 16f, 2f, Mathf.Max(2f, Screen.width - _tipW - 6f));
             float y = Mathf.Clamp(mp.y + 16f, 2f, Mathf.Max(2f, Screen.height - _tipH - 10f));

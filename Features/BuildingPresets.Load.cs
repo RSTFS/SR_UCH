@@ -63,7 +63,6 @@ namespace SR_UCH.Tweaks {
                     return;
                 }
                 if (ReloadBlocked()) return;
-                ApplyRulesetForPreset(p);   // 先按预设的勾选应用 规则 / 积分 / 模块概率
                 string xml = ReadPresetXml(p);
                 if (string.IsNullOrEmpty(xml)) {
                     SRApi.Notify(SRApi.T("读取预设文件失败", "Failed to read the preset file"));

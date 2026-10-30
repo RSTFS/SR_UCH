@@ -256,9 +256,6 @@ namespace SR_UCH.Tweaks {
                     return true;
                 });
             } catch (Exception __pwr) { SRApi.Guard.Log("布局预设/注册滚轮钩子", __pwr); }
-            // 规则书关闭后自动回收数据（每 0.25 秒一次的轻量轮询，未在编辑时立刻返回）。
-            try { SRApi.RegisterTick("布局预设/规则书回收", TickRulebook); }
-            catch (Exception __tk) { SRApi.Guard.Log("布局预设/注册规则书轮询", __tk); }
             try { SRApi.RegisterSceneHook(delegate { _loaded = false; }); }
             catch (Exception __sh) { SRApi.Guard.Log("布局预设/注册场景钩子", __sh); }
             // 返回树屋：注册动作并允许右键绑键（悬浮提示里不写绑定说明）。
@@ -474,13 +471,7 @@ namespace SR_UCH.Tweaks {
                     GUILayout.Space(W(8));
                     SRApi.Ctl.LabelAuto(SRApi.T("加载模式", "Load mode"));
                     RenderLoadModeCombo();
-                    GUILayout.Space(W(8));
-                    // 右侧：直接打开游戏自己的界面（规则 / 积分 / 模块概率 / 修改器都在里面），改完回来点「读取游戏当前」。
-                    // 统一按钮（自动快捷键按钮）：左键打开游戏自己的规则/修改器界面，右键可直接绑热键。
-                    if (SRApi.Ctl.HotkeyButton("presets.gameui", SRApi.T("数据", "Data"),
-                            SRApi.T("打开游戏自己的规则/修改器界面\n规则、积分设置、模块概率、修改器都在里面\n本面板会自动收起；右键可绑快捷键",
-                                "opens the game's own rules/modifiers UI\nrules, points, block odds and modifiers all live there\nthis panel closes itself; right-click to bind a hotkey"),
-                            delegate { OpenGameRulebook(null); }, W(96), W(24))) OpenGameRulebook(null);
+                    // 用户要求：删掉「加载模式」右侧的数据按钮（它打开的是游戏原生规则书界面）。
                     GUILayout.FlexibleSpace();
                 } finally {
                     GUILayout.EndHorizontal();

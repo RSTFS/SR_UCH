@@ -90,7 +90,6 @@ namespace SR_UCH.Tweaks {
                 } catch (Exception __nx) { SRApi.Guard.Log("布局预设/写入显示名", __nx); }
                 Directory.CreateDirectory(dir);
                 File.WriteAllText(path, xml, new UTF8Encoding(false));
-                SaveRulesetSidecar(path);   // 规则 / 积分 / 模块概率：与预设同名的 sidecar
                 PresetInfo p = FindPreset(key);
                 if (p == null) {
                     p = new PresetInfo();
@@ -332,24 +331,7 @@ namespace SR_UCH.Tweaks {
                 if (p == null) return;
                 if (p.IsLocal) return; // 游戏本地存档不允许从这里删除
                 if (!ActionAllowed()) return;
-                try {
-                    if (File.Exists(p.FilePath)) File.Delete(p.FilePath);
-                    // 侧车（规则/积分/模块概率）跟着删：留着会让以后同名的预设捡到旧数据。
-                    try {
-                        string side = RulesetSidecarPath(p);
-                        if (!string.IsNullOrEmpty(side) && File.Exists(side)) File.Delete(side);
-                        string legacy = p.FilePath + ".ruleset.xml";
-                        if (File.Exists(legacy)) File.Delete(legacy);
-                    } catch (Exception __sd) { SRApi.Guard.Log("布局预设/删除侧车", __sd); }
-                } catch (Exception __ex) {
-                    SRApi.Guard.Log("布局预设/删除文件", __ex);
-                    SRApi.Notify(SRApi.T("删除预设文件失败", "Failed to delete the preset file"));
-                    return;
-                }
-                _presets.Remove(p);
-                SaveIndex();
-                _status = SRApi.T("已删除预设：", "Deleted preset: ") + p.Name;
-                SRApi.LogInfo("[布局预设] " + _status);
+                if (File.Exists(p.FilePath)) File.Delete(p.FilePath);
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/删除", __ex);
             }
