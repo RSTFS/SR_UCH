@@ -64,4 +64,7 @@ Features\Experiments.Misc.cs
 Features\Experiments.Scene.cs
 Features\BuildingPresets.cs
 Features\BuildingPresets.Mods.cs
+Features\BuildingPresets.Load.cs
+Features\BuildingPresets.Io.cs
+Features\BuildingPresets.Util.cs
 Features\HUD.cs

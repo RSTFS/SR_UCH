@@ -26,3 +26,6 @@
 /r:"bin\Release\SR_UCH.dll"
 Features\BuildingPresets.cs
 Features\BuildingPresets.Mods.cs
+Features\BuildingPresets.Load.cs
+Features\BuildingPresets.Io.cs
+Features\BuildingPresets.Util.cs
