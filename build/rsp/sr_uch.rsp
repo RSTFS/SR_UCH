@@ -1,4 +1,4 @@
-/nologo
+﻿/nologo
 /target:library
 /out:bin\Release\SR_UCH.dll
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\mscorlib.dll"
@@ -68,3 +68,4 @@ Features\BuildingPresets.Load.cs
 Features\BuildingPresets.Io.cs
 Features\BuildingPresets.Util.cs
 Features\HUD.cs
+Features\HUD.State.cs
