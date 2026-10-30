@@ -142,29 +142,22 @@ namespace SR_UCH.Tweaks {
             try {
                 if (p == null || p.IsLocal) return "-";
                 string m = p.ModsMode ?? ModsInherit;
-                if (string.Equals(m, ModsCustom, StringComparison.Ordinal)) return SRApi.T("自定义", "Custom");
                 if (string.Equals(m, ModsOff, StringComparison.Ordinal)) return SRApi.T("关闭", "Off");
+                // 历史数据里的 ModsCustom 一律按"预设"显示：真值已迁回 XML 的 <mods>。
                 return SRApi.T("预设", "Preset");
             } catch { return "-"; }
         }
 
-        // 三态切换：预设 -> 自定义 -> 关闭 -> 预设（左键点「数据」列的格子）。
+        // 两态切换（用户要求取消旁车，XML 的 <mods> 是唯一真值）：
+        //   预设 = 加载时用 XML 里的 <mods>；关闭 = 加载时把修改器写成默认值（等于不用这套修改器）。
         private static void CycleDataMode(PresetInfo p) {
             try {
                 if (p == null || p.IsLocal) return;
                 string m = p.ModsMode ?? ModsInherit;
-                string next;
-                if (string.Equals(m, ModsCustom, StringComparison.Ordinal)) next = ModsOff;
-                else if (string.Equals(m, ModsOff, StringComparison.Ordinal)) next = ModsInherit;
-                else next = ModsCustom;
+                string next = string.Equals(m, ModsOff, StringComparison.Ordinal) ? ModsInherit : ModsOff;
                 p.ModsMode = next;
-                if (string.Equals(next, ModsCustom, StringComparison.Ordinal) && !IsCustomData(p)) {
-                    SRApi.Notify(SRApi.T("这条预设还没有自定义数据：右键「数据」列（或点「数据」按钮）先在游戏界面里设置再读取",
-                        "This preset has no custom data yet: right-click the Data column (or the Data button) to set it up in the game UI first"));
-                }
-                if (string.Equals(next, ModsInherit, StringComparison.Ordinal)) {
-                    p.ApplyRules = p.ApplyPoints = p.ApplyBlocks = false;
-                }
+                // 兼容旧数据：进入"预设"态时把遗留的索引自定义值丢掉（真值已回到 XML）。
+                if (string.Equals(next, ModsInherit, StringComparison.Ordinal)) p.ModsVals = null;
                 SaveIndex();
                 SRApi.Notify(SRApi.T("数据：", "Data: ") + ModsLabel(p) + " · " + (p.Name ?? ""));
                 SRApi.LogInfo("[布局预设] 数据模式切换: " + (p.Name ?? "") + " -> " + ModsLabel(p));
@@ -485,21 +478,12 @@ namespace SR_UCH.Tweaks {
                 _bookSeenOpen = false;
                 PresetInfo p = FindPreset(key);
                 if (p == null) return;
-                ReadRulesFromGame(p);      // 规则 / 积分 / 模块概率 -> sidecar + 三个开关
-                ReadModsFromGame();        // 24 项修改器 -> 草稿
-                p.ModsMode = ModsCustom;
-                if (p.ModsVals == null) p.ModsVals = new Dictionary<string, string>();
-                p.ModsVals.Clear();
-                for (int i = 0; i < Mods.Length; i++) {
-                    string v;
-                    if (!_modsDraft.TryGetValue(Mods[i].Attr, out v) || string.IsNullOrEmpty(v)) v = ModDefault(Mods[i]);
-                    p.ModsVals[Mods[i].Attr] = v;
-                }
-                SaveIndex();
-                _modsKey = p.Key;          // 回来后直接停在该预设的编辑器上
-                SRApi.OpenMenu();          // 自动弹回管理器
-                SRApi.Notify(SRApi.T("规则书已关闭，已保存到预设并设为自定义：", "Rulebook closed; saved to the preset as custom: ") + (p.Name ?? ""));
-                SRApi.LogInfo("[布局预设] 规则书关闭：已回收数据并把 " + (p.Name ?? "") + " 设为自定义");
+                ReadRulesFromGame(p);        // 规则 / 积分 / 模块概率 -> sidecar + 三个开关
+                ReadModsFromGame(p);         // 24 项修改器 -> 直接写回该预设 XML 的 <mods>
+                _modsKey = p.Key;            // 回来后直接停在该预设的编辑器上
+                SRApi.OpenMenu();            // 自动弹回管理器
+                SRApi.Notify(SRApi.T("规则书已关闭，已保存到预设：", "Rulebook closed; saved to the preset: ") + (p.Name ?? ""));
+                SRApi.LogInfo("[布局预设] 规则书关闭：规则进旁车、修改器写回 XML");
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/规则书回收", __ex); }
         }
 
@@ -519,8 +503,8 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取游戏规则集", __ex); }
         }
 
-        // 读游戏当前的 24 项修改器 -> 填进草稿（自动切到"自定义"，否则草稿不会被采用）。
-        private static void ReadModsFromGame() {
+        // 读游戏当前的 24 项修改器 -> 直接写回该预设 XML 的 <mods>（不再经过旁车 / 自定义草稿）。
+        private static void ReadModsFromGame(PresetInfo preset) {
             try {
                 Modifiers m = Modifiers.GetInstance();
                 if (m == null) { SRApi.Notify(SRApi.T("取不到修改器实例", "Modifier instance unavailable")); return; }
@@ -549,9 +533,63 @@ namespace SR_UCH.Tweaks {
                     SRApi.Notify(SRApi.T("没能从游戏读到任何修改器（详见日志）", "Could not read any modifier from the game (see the log)"));
                     return;
                 }
+                // 只有真的读到东西才改文件：部分失败时用草稿里已有的值补齐（缺的保持原样）。
+                if (preset != null && !preset.IsLocal) {
+                    if (WriteModsToPresetXml(preset)) {
+                        preset.ModsMode = ModsInherit;   // XML 已是真值，不再需要"自定义"态
+                        preset.ModsVals = null;          // 旧的自定义值随之作废
+                        SaveIndex();
+                    }
+                }
                 SRApi.Notify(SRApi.T("已读取修改器项：", "Modifiers read: ") + n + "/" + Mods.Length
                     + (fail > 0 ? SRApi.T("（部分失败）", " (partial)") : ""));
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取游戏修改器", __ex); }
+        }
+
+        // 把草稿里的 24 项修改器写进预设 XML 的 <mods> 节点（XML 是唯一真值，不再写旁车 / 索引）。
+        private static bool WriteModsToPresetXml(PresetInfo p) {
+            try {
+                if (p == null || p.IsLocal) return false;
+                string path = p.FilePath;
+                if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
+                XmlDocument doc = ParseXmlSafe(File.ReadAllText(path));
+                if (doc == null || doc.DocumentElement == null) return false;
+                XmlElement mods = doc.DocumentElement.SelectSingleNode("mods") as XmlElement;
+                if (mods == null) {
+                    mods = doc.CreateElement("mods");
+                    doc.DocumentElement.PrependChild(mods);
+                }
+                for (int i = 0; i < Mods.Length; i++) {
+                    ModDef d = Mods[i];
+                    string v;
+                    if (!_modsDraft.TryGetValue(d.Attr, out v) || string.IsNullOrEmpty(v)) {
+                        // 没读到的项保留文件里的原值；文件里也没有就写默认值。
+                        v = mods.GetAttribute(d.Attr);
+                        if (string.IsNullOrEmpty(v)) v = ModDefault(d);
+                    }
+                    mods.SetAttribute(d.Attr, v);
+                }
+                WriteFileAtomic(path, doc.OuterXml);
+                p.Blocks = CountBlocks(doc);
+                SRApi.LogInfo("[布局预设] 已把 24 项修改器写回 XML：" + (p.Name ?? ""));
+                return true;
+            } catch (Exception __ex) {
+                SRApi.Guard.Log("布局预设/写回修改器到XML", __ex);
+                return false;
+            }
+        }
+
+        // 从预设 XML 的 <mods> 读回 24 项（用于"清空"后回显 / 数据列统计）。
+        private static int ModsCountInXml(PresetInfo p) {
+            try {
+                if (p == null || p.IsLocal) return 0;
+                string path = p.FilePath;
+                if (string.IsNullOrEmpty(path) || !File.Exists(path)) return 0;
+                XmlDocument doc = ParseXmlSafe(ReadAllText(path));
+                if (doc == null || doc.DocumentElement == null) return 0;
+                XmlElement mods = doc.DocumentElement.SelectSingleNode("mods") as XmlElement;
+                return mods == null ? 0 : mods.Attributes.Count;
+            } catch { return 0; }
         }
 
         // 快照属性名 -> Modifiers 里的字段名（部分字段是 camelCase），读不到返回 null。
@@ -650,40 +688,26 @@ namespace SR_UCH.Tweaks {
             } catch { return null; }
         }
 
-        // 多行预览：模式 + 各项非默认修改器 + 规则/积分/模块概率开关。
+        // 数据格悬浮（两态）：预设 = 用 XML 里的 <mods>；关闭 = 加载时改成默认值。
+        // 真值只看 XML：这里顺带报出该文件里实际存了几项修改器，避免"界面说有、文件里没有"。
         private static string DataPreviewTip(PresetInfo p) {
             try {
                 if (p == null) return null;
-                string mode = p.ModsMode ?? ModsInherit;
-                if (string.Equals(mode, ModsInherit, StringComparison.Ordinal))
-                    return SRApi.T("预设：加载时原样使用预设自带的数据，不做任何改写\n左键点这一格可在 预设 / 自定义 / 关闭 之间切换",
-                        "Preset: load-time data is left untouched\nleft-click this cell to cycle Preset / Custom / Off");
-                if (string.Equals(mode, ModsOff, StringComparison.Ordinal))
-                    return SRApi.T("关闭：加载时把修改器写成默认值，且不应用规则/积分/模块概率\n左键点这一格可切换",
-                        "Off: modifiers are reset to defaults and rules/points/block odds are not applied\nleft-click this cell to cycle");
-                StringBuilder sb = new StringBuilder();
-                sb.Append(SRApi.T("自定义数据", "Custom data"));
-                if (string.Equals(p.ModsMode, ModsCustom, StringComparison.Ordinal)) {
-                    sb.Append("\n").Append(SRApi.T("修改器：", "Modifiers: "));
-                    int shown = 0;
-                    for (int i = 0; i < Mods.Length && shown < 12; i++) {
-                        ModDef d = Mods[i];
-                        string v;
-                        if (p.ModsVals == null || !p.ModsVals.TryGetValue(d.Attr, out v)) continue;
-                        if (string.IsNullOrEmpty(v) || v == ModDefault(d)) continue;   // 只列非默认项
-                        if (shown > 0) sb.Append(" · ");
-                        sb.Append(SRApi.T(d.Zh, d.En)).Append('=').Append(v);
-                        shown++;
-                    }
-                    if (shown == 0) sb.Append(SRApi.T("（全部默认）", "(all default)"));
-                } else if (string.Equals(p.ModsMode, ModsOff, StringComparison.Ordinal)) {
-                    sb.Append("\n").Append(SRApi.T("修改器：全部写成默认值", "Modifiers: reset to defaults"));
-                }
+                int n = ModsCountInXml(p);
+                string head = n > 0
+                    ? SRApi.T("预设：加载时应用该 XML 里的 " + n + " 项修改器\n左键点这一格切换「预设 / 关闭」",
+                              "Preset: applies the " + n + " modifiers stored in this XML\nleft-click this cell to toggle Preset / Off")
+                    : SRApi.T("预设：这个 XML 里没有 <mods>，加载时按游戏当前修改器\n左键点这一格切换「预设 / 关闭」",
+                              "Preset: this XML has no <mods>; the game's current modifiers are used\nleft-click this cell to toggle Preset / Off");
+                if (string.Equals(p.ModsMode ?? ModsInherit, ModsOff, StringComparison.Ordinal))
+                    head = SRApi.T("关闭：加载时把修改器写成默认值（等于不用它保存的修改器）\n左键点这一格切回「预设」",
+                        "Off: modifiers are reset to defaults at load time\nleft-click this cell to go back to Preset");
+                StringBuilder sb = new StringBuilder(head);
                 if (p.ApplyRules) sb.Append("\n").Append(SRApi.T("游戏规则：随预设应用", "Rules: applied with the preset"));
-                if (p.ApplyPoints) sb.Append("\n").Append(SRApi.T("积分设置：随预设应用", "Points: applied with the preset"));
+                if (p.ApplyPoints) sb.Append("\n").Append(SRApi.T("积分设置：随预设应用", "Point settings: applied with the preset"));
                 if (p.ApplyBlocks) sb.Append("\n").Append(SRApi.T("模块概率：随预设应用", "Block odds: applied with the preset"));
                 return sb.ToString();
-            } catch { return null; }
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/数据格提示", __ex); return null; }
         }
 
 
