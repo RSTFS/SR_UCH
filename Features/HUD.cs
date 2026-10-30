@@ -45,44 +45,44 @@ namespace SR_UCH.Tweaks {
             new ContentDef {
                 Key = "Show Phase", ColorKey = "Color Phase",
                 LabelZh = "阶段名", LabelEn = "Phase name",
-                DescZh = "显示阶段名\n在 HUD 中显示当前阶段（建造/游玩/决胜等）\n关闭后不显示该行",
-                DescEn = "show phase name\nshows the current phase in the HUD (build/play/sudden death, etc.)\nwhen off this line is hidden"
+                DescZh = "阶段名\n在 HUD 显示当前阶段（建造、游玩、决胜）\n关闭后隐藏该行",
+                DescEn = "Phase name\nshows the current phase in the HUD (build, play, sudden death)\nhidden when off"
             },
             new ContentDef {
                 Key = "Show Countdown", ColorKey = "Color Countdown",
                 LabelZh = "倒计时", LabelEn = "Countdown",
-                DescZh = "显示倒计时\n显示阶段倒计时，读不到时长时显示已用时间\n关闭后不显示该行",
-                DescEn = "show countdown\nshows the phase countdown, or elapsed time when no duration is available\nwhen off this line is hidden"
+                DescZh = "倒计时\n显示阶段倒计时，读不到时长时显示已用时间\n关闭后隐藏该行",
+                DescEn = "Countdown\nphase countdown, or elapsed time when no duration is known\nhidden when off"
             },
             new ContentDef {
                 Key = "Show Round", ColorKey = "Color Round",
                 LabelZh = "回合进度", LabelEn = "Round progress",
-                DescZh = "显示回合/重试进度\n普通模式显示「回合：当前/最大」，最大回合取游戏设置；挑战模式显示「重试：N」且无上限\n取不到回合信息时隐藏该行",
-                DescEn = "show round progress\ndisplays \"Round: current/max\", with max taken from game settings\nhidden when round info is unavailable"
+                DescZh = "回合进度\n普通模式显示「回合：当前/最大」，挑战模式显示「重试：N」\n取不到回合信息时隐藏该行",
+                DescEn = "Round progress\nround current/max, or retry count in challenge mode\nhidden when round info is unavailable"
             },
             new ContentDef {
                 Key = "Show Level", ColorKey = "Color Level",
                 LabelZh = "关卡/模式", LabelEn = "Level / mode",
-                DescZh = "显示关卡/模式\n显示「关卡名 · 模式」，不带前缀\n取不到时隐藏该行",
-                DescEn = "show level/mode\nshows \"level name · mode\" without a prefix\nhidden when unavailable"
+                DescZh = "关卡/模式\n显示「关卡名 · 模式」，不带前缀\n取不到时隐藏该行",
+                DescEn = "Level / mode\nshows level name and mode without a prefix\nhidden when unavailable"
             },
             new ContentDef {
                 Key = "Show Win Score", ColorKey = "Color Win Score",
                 LabelZh = "获胜", LabelEn = "Win",
-                DescZh = "显示获胜目标\n读取游戏设置的获胜目标分，读不到时显示 250\n关闭后不显示该行",
-                DescEn = "show win target\nreads the winning target score from game settings, falls back to 250\nwhen off this line is hidden"
+                DescZh = "获胜目标\n显示游戏设置里的获胜目标分\n读不到时显示 250；关闭后隐藏该行",
+                DescEn = "Win target\nwinning score from the game settings\nfalls back to 250; hidden when off"
             },
             new ContentDef {
                 Key = "Extra Line 1", ColorKey = "Color Extra 1",
                 LabelZh = "额外信息行 1", LabelEn = "Extra line 1",
-                DescZh = "额外信息行 1\n自定义文本，按原文显示（不做翻译）\n留空则不显示",
-                DescEn = "extra line 1\ncustom text shown as typed (not translated)\nempty = hidden"
+                DescZh = "额外信息行 1\n自定义文本，按原文显示（不翻译）\n留空则不显示",
+                DescEn = "Extra line 1\ncustom text shown as typed (not translated)\nhidden when empty"
             },
             new ContentDef {
                 Key = "Extra Line 2", ColorKey = "Color Extra 2",
                 LabelZh = "额外信息行 2", LabelEn = "Extra line 2",
-                DescZh = "额外信息行 2\n自定义文本，按原文显示（不做翻译）\n留空则不显示",
-                DescEn = "extra line 2\ncustom text shown as typed (not translated)\nempty = hidden"
+                DescZh = "额外信息行 2\n自定义文本，按原文显示（不翻译）\n留空则不显示",
+                DescEn = "Extra line 2\ncustom text shown as typed (not translated)\nhidden when empty"
             }
         };
 
@@ -339,8 +339,8 @@ namespace SR_UCH.Tweaks {
                 Loc(d.Key, d.LabelZh, d.LabelEn, d.DescZh, d.DescEn);
                 SRApi.LocKey(Sec, d.ColorKey, d.LabelZh + "颜色", d.LabelEn + " color");
                 SRApi.LocDesc(Sec, d.ColorKey,
-                    d.LabelZh + "的文字颜色\n十六进制颜色值，例如 #FFFFFF\n点色块开调色板（可复制/粘贴/还原默认）；点名称还原默认色",
-                    "text color for " + d.LabelEn.ToLowerInvariant() + "\nhex color value, for example #FFFFFF\nclick the swatch to open the picker (copy/paste/reset inside); click the name to reset to the default color");
+                    d.LabelZh + "的文字颜色\n十六进制颜色值，例如 #FFFFFF\n点色块开调色板；点名称还原默认色",
+                    "text color for " + d.LabelEn.ToLowerInvariant() + "\nhex color value, for example #FFFFFF\nclick the swatch to open the picker; click the name to reset");
             }
         }
 
