@@ -63,7 +63,7 @@ public class QuickAdjust : ITweak {
         ConfigEntryBase disc = SRApi.Ctl.FindEntry("Quick Adjust", "Handicap");
         int discVal = QuickAdjust.HandicapValue;
         // 悬浮说明：直接给标签挂 tooltip（本页自定义控件不走条目自动提示）。
-        GUIContent __dct = new GUIContent(SRApi.T("评分百分比", "Score percentage"),
+        GUIContent __dct = SRApi.Ctl.Content(SRApi.T("评分百分比", "Score percentage"),
             SRApi.T("当前评分百分比\n直接设置自己那行的评分百分比（10-100）\n等效折扣 = 100 减该数值，100 即不折扣。",
                 "current score percentage\nsets your own score percentage directly (10-100)\nequivalent discount = 100 minus this value, 100 = no discount"));
         float __dcw = Mathf.Max(SRApi.Ctl.Sc(84), SRApi.Ctl.LabelWrap.CalcSize(new GUIContent(__dct.text)).x + SRApi.Ctl.Sc(8));
@@ -101,7 +101,7 @@ public class QuickAdjust : ITweak {
         GUILayout.Space(SRApi.Ctl.Sc(10));
         ConfigEntryBase more = SRApi.Ctl.FindEntry("Quick Adjust", "More Handicap Values");
         if (more != null) {
-            SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("更多数值", "More values"),
+            SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("更多数值", "More values"),
                 SRApi.T("自由输入模式开关\n开启后评分百分比由整十滑块改为输入框\n范围 10 到 100 任意整数。",
                         "free input mode switch\nturns the tens slider into an input box\nany integer from 10 to 100")),
                 more, SRApi.Ctl.Sc(110), SRApi.Ctl.Sc(26));
@@ -115,7 +115,7 @@ public class QuickAdjust : ITweak {
         SRApi.Ctl.SectionTitle(SRApi.T("- 快速重试 -", "- Quick retry -"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase qr = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry");
-        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("死后自动重试", "Auto retry on death"), SRApi.T("仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n对局中开关立即生效。", "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nTakes effect immediately.")), qr, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
+        SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("死后自动重试", "Auto retry on death"), SRApi.T("仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n对局中开关立即生效。", "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nTakes effect immediately.")), qr, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
         if (qr != null) SRApi.Ctl.RenderControl(qr);
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
@@ -131,7 +131,7 @@ public class QuickAdjust : ITweak {
         ConfigEntryBase qrh = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Hold");
         // T(zh, en) 的两个实参都会被求值：先取局部变量，避免每帧算两次。
         string vanillaRetry = QuickAdjust.VanillaHoldBText(false);
-        GUILayout.Label(new GUIContent(SRApi.T("等待秒数", "Hold s"),
+        GUILayout.Label(SRApi.Ctl.Content(SRApi.T("等待秒数", "Hold s"),
             SRApi.T("长按 B 的等待阈值（Character.SuicideTime）：挑战模式重试游戏默认 " + vanillaRetry + "。",
               "Hold-B threshold (Character.SuicideTime): vanilla " + vanillaRetry + " for challenge retry.")),
             SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(84)), GUILayout.Height(SRApi.Ctl.Sc(26)));

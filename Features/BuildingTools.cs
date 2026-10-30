@@ -91,7 +91,7 @@ namespace SR_UCH.Tweaks {
             // 该行为手工排版：标签占名称列宽度 + 间隔 6 + 主控件列，与下方两行的编辑框左边缘对齐。
             GUILayout.BeginHorizontal();
             // GUILayout.Label 不会像 RestoreLabel 那样收缩到文字宽度，宽度需按文字实测。
-            float lw = SRApi.Ctl.Label.CalcSize(new GUIContent(SRApi.T("当前上限", "Current limit"))).x + SRApi.Ctl.Sc(12);
+            float lw = SRApi.Ctl.Label.CalcSize(SRApi.Ctl.Content(SRApi.T("当前上限", "Current limit"))).x + SRApi.Ctl.Sc(12);
             GUILayout.Label(new GUIContent(SRApi.T("当前上限", "Current limit"),
                 SRApi.T("当前生效的满度上限；游戏原版为 500", "The current effective fullness cap; vanilla is 500")),
                 SRApi.Ctl.Label, GUILayout.Width(Mathf.Max(SRApi.Ctl.Sc(60), lw)), GUILayout.Height(SRApi.Ctl.Sc(26)));

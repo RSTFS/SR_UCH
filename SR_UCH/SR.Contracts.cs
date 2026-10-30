@@ -889,6 +889,21 @@ namespace SR_UCH {
             public static GUIStyle Btn { get { return Style("Btn"); } }
             public static GUIStyle BtnClip { get { return Style("BtnClip"); } }
             public static GUIStyle SearchBox { get { return Style("SearchBox"); } }
+
+            // GUIContent 是 class（每帧 new 就是每帧一次堆分配）。这里按 (文本|提示) 缓存实例：
+            // 文案不变时零分配；语言切换/文案变化时 key 变化，自动重建。上限 512 条，超了整体清空。
+            private static readonly Dictionary<string, GUIContent> _contentCache = new Dictionary<string, GUIContent>(64);
+            public static GUIContent Content(string text, string tip) {
+                string key = text ?? "";
+                if (!string.IsNullOrEmpty(tip)) key = key + "\u0001" + tip;
+                GUIContent c;
+                if (_contentCache.TryGetValue(key, out c)) return c;
+                if (_contentCache.Count >= 512) _contentCache.Clear();
+                c = new GUIContent(text ?? "", tip);
+                _contentCache[key] = c;
+                return c;
+            }
+            public static GUIContent Content(string text) { return Content(text, null); }
             public static GUIStyle Footer { get { return Style("Footer"); } }
             public static bool LangEn { get { Func<bool> f = _langEn; return f != null && f(); } }
             public static Dictionary<ConfigEntryBase, bool> EditOpen { get { Func<Dictionary<ConfigEntryBase, bool>> f = _editOpen; return f != null ? f() : null; } }
