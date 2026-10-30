@@ -151,8 +151,14 @@ namespace SR_UCH.Tweaks {
                 if (gc == null) return;
                 // GameControl.Phase / GameEvent.StartPhaseEvent / GameEventManager.SendEvent 均为 public，直接调用，无需反射。
                 GameControl.GamePhase phv = gc.Phase;
-                GameEvent.GameEventManager.SendEvent(new GameEvent.StartPhaseEvent(phv));
-                SRApi.LogInfo("[快照] 加载后补发阶段事件: " + phv);
+                // 相位边沿由服务器经 RpcStartPhase 权威下发；客户端自己再补发 StartPhaseEvent 会让
+                // 客户端状态机多收一次"凭空"的阶段开始（与服务器错位）。所以只在服务器补发。
+                if (UnityEngine.Networking.NetworkServer.active) {
+                    GameEvent.GameEventManager.SendEvent(new GameEvent.StartPhaseEvent(phv));
+                    SRApi.LogInfo("[快照] 加载后补发阶段事件: " + phv);
+                } else {
+                    SRApi.LogInfo("[快照] 客户端：不补发阶段事件（相位由服务器权威下发）: " + phv);
+                }
                 // 只补发一次当前真实阶段（伪造 PLACE/PLAY 边沿会让客户端与服务器状态机错位）；快照方块无需照抄 WaitForPlacement 的 isKinematic/layer=9：prefab 默认已 Kinematic，而 layer 9(Placed) 与自身及 Fixed 都不碰撞。
                 // 快照路径真正缺的只有放置计数 GameState.IncrementPieceCount 与一次 Tint()。
                 try {

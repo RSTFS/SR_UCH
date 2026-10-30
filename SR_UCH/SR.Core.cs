@@ -761,10 +761,23 @@ public partial class SR : ITweak {
             // 必须在任何 Config.Bind 之前把旧 cfg 的中文 section / key 改写成英文；
             // 改写后要重新读盘，否则内存里仍是旧键，新建条目拿默认值且下次写盘又写回中文。
             try {
-                if (ConfigMigration.Migrate(plugin.Config.ConfigFilePath)) {
-                    plugin.Config.Reload();
+                // 迁移必须覆盖两处文件：
+                //   1) plugin.Config 指向的插件自带 cfg；
+                //   2) MainPlugin.Data（外置 SR_UCH_data.cfg）—— 核心与功能的条目实际都 Bind 在它上面。
+                // 只迁 1) 时，外置文件里的中文旧段名永不改写，老用户升级后设置项表现为"消失"（读默认值）。
+                bool migratedAny = false;
+                string pluginPath = plugin.Config.ConfigFilePath;
+                if (ConfigMigration.Migrate(pluginPath)) migratedAny = true;
+                string internalPath = _internalConfig != null ? _internalConfig.ConfigFilePath : null;
+                if (!string.IsNullOrEmpty(internalPath)
+                    && !string.Equals(internalPath, pluginPath, StringComparison.OrdinalIgnoreCase)) {
+                    if (ConfigMigration.Migrate(internalPath)) migratedAny = true;
+                }
+                if (migratedAny) {
+                    try { plugin.Config.Reload(); } catch (Exception __rp) { Guard.Log("配置迁移/重载插件 cfg", __rp); }
+                    try { if (_internalConfig != null) _internalConfig.Reload(); } catch (Exception __ri) { Guard.Log("配置迁移/重载外置 cfg", __ri); }
                     ClearEntryCache();   // 键被改名 / 删掉了：条目缓存必须失效
-                    SR.LogInfo("[T1] 已迁移旧版 cfg（section/key -> 英文）并重新读盘");
+                    SR.LogInfo("[T1] 已迁移旧版 cfg（插件 cfg + 外置 cfg）并重新读盘");
                 }
             } catch (Exception __ex) { Guard.Log("T1 cfg 迁移/重读", __ex); }
             // 反射探针只做启动自检（RefAudit 逐条解析登记的成员并报可用 / 失效）。

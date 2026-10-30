@@ -260,7 +260,9 @@ public partial class Chat : ITweak {
                     if (newMsg) { _hasNew = true; if (_newCount < 1) _newCount = 1; }
                     bool reached;
                     if (reenter) reached = false; //刚回到本页：滚动值是别的页面留下的，不据此恢复跟随
-                    else if (bottom >= 0f) reached = y >= bottom - 1.5f;
+    // 容差 4px：bottom 由"底 + 内容高 - 视口高 + 提示条高"推算，缩放/提示条/布局趟三种误差
+                // 叠加能超过 1.5px，会让用户滚到底也恢复不了跟随（提示条一直亮）。
+                else if (bottom >= 0f) reached = y >= bottom - 4f;
                     else reached = wheel && !_wheelUp && !dropped && !layoutChanged; //兜底：向下滚但位置不动 = 已在底部
                     if (reached) {
                         _autoScroll = true;
