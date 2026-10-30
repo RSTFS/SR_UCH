@@ -16,7 +16,7 @@ using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
-    [SrFeature("sr.buildingpresets", "BuildingPresets", "1.0")]
+    [SrFeature("sr.buildingpresets", "BuildingPresets", "1.0", Provides = new string[] { "presets.reloadBusy" })]
     public partial class BuildingPresets : ITweak {
         // 配置段名：导航栏目名 / LocSec / Config.Bind 三处必须完全一致。
         private const string Section = "Building Presets";

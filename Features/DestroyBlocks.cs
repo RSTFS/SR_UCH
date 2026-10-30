@@ -10,7 +10,8 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace SR_UCH.Tweaks {
-    [SrFeature("sr.destroyblocks", "DestroyBlocks", "1.0")]
+    [SrFeature("sr.destroyblocks", "DestroyBlocks", "1.0", Provides = new string[] {
+        "DestroyBlocks.IsPlayerPlaced", "DestroyBlocks.PlayerPlacedBlocks", "DestroyBlocks.AttributeToHost" })]
     public class DestroyBlocks : ITweak {
         private static IFeatureHost _mp; // 仅用于读 Config（契约类型）
         private static int _index;

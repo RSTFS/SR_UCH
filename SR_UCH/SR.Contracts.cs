@@ -104,11 +104,13 @@ namespace SR_UCH {
         public bool ManifestMissing;                  // true = 该类没有 [SrFeature]（旧式/第三方未声明）
         public bool ContractTooNew;                   // true = MinContract > 当前契约版本
         public readonly List<string> MissingDeps = new List<string>();
+        public readonly List<string> ConflictSlots = new List<string>();   // 同一槽位被多个功能声明 Provide
         public override string ToString() {
             string s = Id + " " + Version;
             if (ManifestMissing) s += "（未声明清单）";
             if (ContractTooNew) s += "（要求契约 v" + MinContract + "，当前 v" + SRContract.Version + "）";
             if (MissingDeps.Count > 0) s += "（缺依赖: " + string.Join(", ", MissingDeps.ToArray()) + "）";
+            if (ConflictSlots.Count > 0) s += "（槽位冲突: " + string.Join(", ", ConflictSlots.ToArray()) + "）";
             return s;
         }
     }
@@ -120,7 +122,7 @@ namespace SR_UCH {
         public static IList<FeatureInfo> All { get { return _all; } }
         public static int Count { get { return _all.Count; } }
         public static int ManifestMissingCount { get { int n = 0; for (int i = 0; i < _all.Count; i++) if (_all[i].ManifestMissing) n++; return n; } }
-        public static int ProblemCount { get { int n = 0; for (int i = 0; i < _all.Count; i++) if (_all[i].ContractTooNew || _all[i].MissingDeps.Count > 0) n++; return n; } }
+        public static int ProblemCount { get { int n = 0; for (int i = 0; i < _all.Count; i++) if (_all[i].ContractTooNew || _all[i].MissingDeps.Count > 0 || _all[i].ConflictSlots.Count > 0) n++; return n; } }
         public static FeatureInfo Find(string id) {
             if (string.IsNullOrEmpty(id)) return null;
             FeatureInfo fi; return _byId.TryGetValue(id, out fi) ? fi : null;
@@ -164,10 +166,28 @@ namespace SR_UCH {
                 }
             }
             for (int i = 0; i < _all.Count; i++) {
-                FeatureInfo fi = _all[i]; fi.MissingDeps.Clear();
+                FeatureInfo fi = _all[i]; fi.MissingDeps.Clear(); fi.ConflictSlots.Clear();
                 if (fi.DependsOn == null) continue;
                 for (int k = 0; k < fi.DependsOn.Length; k++)
                     if (!string.IsNullOrEmpty(fi.DependsOn[k]) && !_byId.ContainsKey(fi.DependsOn[k])) fi.MissingDeps.Add(fi.DependsOn[k]);
+            }
+            // Provides 冲突：同一个槽位被两个功能声明提供 -> 双方都算问题（以前只靠约定，冲突检测形同虚设）。
+            Dictionary<string, List<FeatureInfo>> owners = new Dictionary<string, List<FeatureInfo>>();
+            for (int i = 0; i < _all.Count; i++) {
+                FeatureInfo fi = _all[i];
+                if (fi.Provides == null) continue;
+                for (int k = 0; k < fi.Provides.Length; k++) {
+                    string slot = fi.Provides[k];
+                    if (string.IsNullOrEmpty(slot)) continue;
+                    List<FeatureInfo> list;
+                    if (!owners.TryGetValue(slot, out list)) { list = new List<FeatureInfo>(); owners[slot] = list; }
+                    if (!list.Contains(fi)) list.Add(fi);
+                }
+            }
+            foreach (KeyValuePair<string, List<FeatureInfo>> kv in owners) {
+                if (kv.Value.Count < 2) continue;
+                for (int i = 0; i < kv.Value.Count; i++)
+                    if (!kv.Value[i].ConflictSlots.Contains(kv.Key)) kv.Value[i].ConflictSlots.Add(kv.Key);
             }
         }
         // 一行摘要：合同 vN / 功能 M 个 / 问题 K 条，问题明细跟在后面
@@ -177,7 +197,7 @@ namespace SR_UCH {
             if (ProblemCount > 0) head += " · 有问题 " + ProblemCount + " 个";
             string detail = "";
             for (int i = 0; i < _all.Count; i++)
-                if (_all[i].ContractTooNew || _all[i].MissingDeps.Count > 0 || _all[i].ManifestMissing)
+                if (_all[i].ContractTooNew || _all[i].MissingDeps.Count > 0 || _all[i].ConflictSlots.Count > 0 || _all[i].ManifestMissing)
                     detail += "\n    - " + _all[i].ToString();
             return head + detail;
         }

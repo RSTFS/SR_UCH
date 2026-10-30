@@ -8,7 +8,7 @@ using BepInEx.Configuration;
 using HarmonyLib;
 namespace SR_UCH.Tweaks {
 // 两页共用一个 partial 类：页面渲染分别在 Level.PartyBox.cs / Level.Tool.cs。
-[SrFeature("sr.level", "Level", "1.0")]
+[SrFeature("sr.level", "Level", "1.0", Provides = new string[] { "level.reloadBusy", "Level.ClearPlacedBlocks" })]
 public partial class Level : ITweak {
 
     // 栏目注册：本地化文案、侧栏顺序、页签、快捷键。
