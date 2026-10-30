@@ -340,6 +340,41 @@ function Check-TipComposer {
     Ok '悬浮条目组装统一（描述 -> 默认值 -> 按键 均由 ComposeTip 追加）'
 }
 
+
+# ---------- 14) 单文件行数守卫（结构优化，防再次长成巨兽） ----------
+# 任何 .cs 超过 FileSizeLimit 行都要在 build\file-size.txt 里登记；登记值只允许变小。
+function Check-FileSize {
+    $limit = 900
+    $basePath = Join-Path $PSScriptRoot 'file-size.txt'
+    if (-not (Test-Path -LiteralPath $basePath)) { Ok '单文件行数（缺基线文件，跳过）'; return }
+    $base = @{}
+    foreach ($l in [System.IO.File]::ReadAllLines($basePath)) {
+        $s = $l.Trim()
+        if (-not $s -or $s.StartsWith('#')) { continue }
+        $i = $s.IndexOf('=')
+        if ($i -gt 0) { $base[$s.Substring(0, $i)] = [int]$s.Substring($i + 1) }
+    }
+    $dirs = @((Join-Path $Root 'SR_UCH'), (Join-Path $Root 'Features'), (Join-Path (Split-Path $Root -Parent) 'SR_UCH_EX\ExModule'))
+    $bad = @()
+    $count = 0
+    foreach ($d in $dirs) {
+        if (-not (Test-Path -LiteralPath $d)) { continue }
+        foreach ($f in (Get-ChildItem -LiteralPath $d -Filter '*.cs' -File)) {
+            $n = [System.IO.File]::ReadAllLines($f.FullName).Length
+            if ($n -le $limit) { continue }
+            $count++
+            $allowed = 0
+            if ($base.ContainsKey($f.Name)) { $allowed = $base[$f.Name] }
+            if ($n -gt $allowed) { $bad += ($f.Name + ' ' + $allowed + '->' + $n) }
+        }
+    }
+    if ($bad.Count -gt 0) {
+        Bad ('单文件行数超出登记值：' + (($bad | Select-Object -First 4) -join '; ') + '（基线见 build/file-size.txt）')
+    } else {
+        Ok ('单文件行数受控（超过 ' + $limit + ' 行的 ' + $count + ' 个文件均已登记，且未增长）')
+    }
+}
+
 Write-Host '== SR_UCH 文本类守卫（不需要游戏 / 不需要 csc）=='
 Check-ApiSurface
 Check-ContractBoundary
@@ -353,6 +388,7 @@ Check-Indent
 Check-RegionFields
 Check-SilentCatch
 Check-TipComposer
+Check-FileSize
 if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); exit 1 }
 Write-Host '== 文本类守卫全部通过 ✅ =='
 exit 0
