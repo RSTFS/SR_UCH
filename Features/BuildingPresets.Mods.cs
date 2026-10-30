@@ -460,6 +460,8 @@ namespace SR_UCH.Tweaks {
 
         // 每 0.25 秒看一次：规则书从"打开"变"关闭"就回收数据。
         private static void TickRulebook() {
+            // 顺手做重载锁自愈（每帧一次、只比较两个 float，成本可忽略）——不依赖用户再点一次加载。
+            TickReloadLock();
             if (string.IsNullOrEmpty(_bookKey)) return;
             if (Time.unscaledTime < _bookPollAt) return;
             _bookPollAt = Time.unscaledTime + 0.25f;

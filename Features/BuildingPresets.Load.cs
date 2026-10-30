@@ -125,7 +125,7 @@ namespace SR_UCH.Tweaks {
                         return;
                     }
                     ClearPending();
-                    SetReloadBusy(true);
+                    SetReloadBusy(true, "直接替换关卡");
                     try {
                         // 单人/无远程客户端，或勾选了「跳过树屋流程」：直接在当前对局内切场景。
                         // 否则退回树屋方案，因为游戏没有在“对局内”更新房客 SelectedLevel 的 RPC/消息。
@@ -154,7 +154,7 @@ namespace SR_UCH.Tweaks {
                     return;
                 }
                 ClearPending();
-                SetReloadBusy(true);
+                SetReloadBusy(true, "重载加载预设");
                 try {
                     // 一次性静态字段：游戏在 OnSetupStartLevel 里读取后立即置 null 并原生广播给全员。
                     QuickSaver.levelPortalXml = xml;
@@ -200,7 +200,7 @@ namespace SR_UCH.Tweaks {
                 LobbyManager lm = LobbyManager.instance;
                 GameControl gc = lm != null ? lm.CurrentGameController as GameControl : null;
                 if (gc == null) { SRApi.Notify(SRApi.T("当前不在对局中，无需返回树屋", "Not in a match; nothing to return from")); return; }
-                SetReloadBusy(true);
+                SetReloadBusy(true, "返回树屋");
                 gc.EndGame();
                 // EndGame 会切到树屋场景；锁必须由 watchdog 释放，否则后续所有加载都被"重载进行中"拦住。
                 try { lm.StartCoroutine(TreehouseReturnWatchdog()); }
@@ -692,9 +692,21 @@ namespace SR_UCH.Tweaks {
             } catch { return false; }
         }
 
-        private static void SetReloadBusy(bool busy) {
+        // 锁的单一入口：记录"谁加的锁"，方便自愈时在日志里指出漏放锁的路径（audit P0-8）。
+        private static void SetReloadBusy(bool busy, string reason = null) {
             _reloadBusy = busy;
             _reloadBusyAt = busy ? Time.unscaledTime : -1f;
+            _reloadBusyReason = busy ? (reason ?? "未标注") : null;
+        }
+
+        // 每帧自愈：以前只有"用户再点一次加载"才会发现残留锁；现在 tick 里就能释放并留日志。
+        private static void TickReloadLock() {
+            try {
+                if (!_reloadBusy || _reloadBusyAt < 0f) return;
+                if (Time.unscaledTime - _reloadBusyAt <= ReloadLockStale) return;
+                SRApi.LogWarn("[布局预设] 重载锁超时自动释放（来源：" + (_reloadBusyReason ?? "未标注") + "）");
+                SetReloadBusy(false);
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/重载锁自愈", __ex); }
         }
 
 

@@ -813,7 +813,12 @@ namespace SR_UCH.Tweaks {
                 StringBuilder sb = new StringBuilder(mode.Length);
                 for (int i = 0; i < mode.Length; i++) sb.Append(Array.IndexOf(bad, mode[i]) < 0 ? mode[i] : '_');
                 string s = sb.ToString().Trim();
-                return s.Length == 0 ? "UNKNOWN" : s;
+                if (s.Length == 0) return "UNKNOWN";
+                // 归一化：具体的 GameMode 名统一大写（PARTY/CREATIVE/...），其它（imported / unknown 等）
+                // 一律折成 UNKNOWN，避免 "IMPORTED" 与 "imported" 各自建一个目录（audit A-10）。
+                string upper = s.ToUpperInvariant();
+                if (upper == "PARTY" || upper == "CREATIVE" || upper == "CHALLENGE" || upper == "FREEPLAY") return upper;
+                return "UNKNOWN";
             } catch { return "UNKNOWN"; }
         }
 
