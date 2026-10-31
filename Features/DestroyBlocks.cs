@@ -24,6 +24,33 @@ namespace SR_UCH.Tweaks {
         private static Placeable _infoTarget;
         private static bool _infoTagTried;
         private static Placeable _tintedBlock; // 当前高亮方块
+        // 高亮作用域：多部件道具有 ParentPiece / ChildPieces 结构，只 tint 主体时子件不会被标记。
+        private static readonly List<Placeable> _tintedGroup = new List<Placeable>();
+
+        // 把主体和它的全部子件一起加/去高亮：ParentPiece/ChildPieces 是多部件道具的结构。
+        private static void TintGroup(Placeable root) {
+            CollectTint(root, 0);
+        }
+
+        private static void CollectTint(Placeable p, int depth) {
+            if (p == null || depth > 8) return;
+            try { p.AddBombTint(new Color(1f, 1f, 1f, 1f)); _tintedGroup.Add(p); }
+            catch (Exception __ex) { SRApi.Guard.Log("方块破坏/高亮子件", __ex); }
+            try {
+                List<Placeable> kids = p.ChildPieces;
+                if (kids != null) for (int i = 0; i < kids.Count; i++) CollectTint(kids[i], depth + 1);
+            } catch (Exception __ex) { SRApi.Guard.Log("方块破坏/遍历子件", __ex); }
+        }
+
+        private static void ClearTintGroup() {
+            for (int i = 0; i < _tintedGroup.Count; i++) {
+                Placeable p = _tintedGroup[i];
+                if (p == null) continue;
+                try { p.RemoveBombTint(); p.Tint(); }
+                catch (Exception __ex) { SRApi.Guard.Log("方块破坏/清除高亮", __ex); }
+            }
+            _tintedGroup.Clear();
+        }
         private static ConfigEntry<KeyCode> _toggleKey;
         private static ConfigEntry<KeyCode> _deleteKey;
         private static ConfigEntry<SelectMode> _selectMode;
@@ -450,11 +477,9 @@ namespace SR_UCH.Tweaks {
                 if (_index < 0) _index = Blocks.Count - 1;
                 _selected = Blocks[_index];
                 if (_selected != _tintedBlock) {
-                    if (_tintedBlock != null) {
-                        try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.GetAxis", __ex); }
-                    }
-                    // Color 的分量是 0..1 浮点而非 0..255 整数，此处按真实意图写不透明白色。
-                    try { _selected.AddBombTint(new Color(1f, 1f, 1f, 1f)); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.RemoveBombTint", __ex); }
+                    // 整组高亮：主体 + 全部子件（多部件道具以前只有主体被标记）。
+                    ClearTintGroup();
+                    TintGroup(_selected);
                     _tintedBlock = _selected;
                 }
                 try { _selected.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.AddBombTint", __ex); } // 每帧应用高亮色（bombTints > 0 -> 白色）
@@ -464,7 +489,7 @@ namespace SR_UCH.Tweaks {
             {
                 _altDown = false;
                 if (_tintedBlock != null) {
-                    try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.UpdateInfoTag", __ex); }
+                    ClearTintGroup();   // 整组清除（含子件）
                 }
                 _tintedBlock = null;
                 _selected = null;
@@ -561,7 +586,7 @@ namespace SR_UCH.Tweaks {
                 _index = 0;
                 _selected = null;
                 if (_tintedBlock != null) {
-                    try { _tintedBlock.RemoveBombTint(); _tintedBlock.Tint(); } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.清空高亮", __ex); }
+                    ClearTintGroup();   // 整组清除（含子件）
                     _tintedBlock = null;
                 }
                 return;
