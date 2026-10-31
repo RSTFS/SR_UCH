@@ -15,7 +15,7 @@
 | 9 | 04_主窗口框架 | P0-4 | 共享 skin 选择色/字体的还原依赖“SR 样式仍在内存” | `already-fixed` | EnsureFont 已不再写 GUI.skin（早前修复）；每帧 _prevFont 在任何写之前快照，还原走 OrigSkinFont() ?? _prevFont，不依赖样式对象存活 |
 | 10 | 05_键位与调色板 | P0-1 | 序列半完成状态跨帧残留，且可能在非 Layout/Repaint 事件上重入 | `ported` | 序列进度加 1.2 秒时效 + 成功后清空进度；字典超 256 条整体清空 |
 | 11 | 05_键位与调色板 | P0-2 | `_watchKeys` 无限增长且无失效覆盖，直接改 BoxedValue 时可能漏失效 | `todo` |  |
-| 12 | 05_键位与调色板 | P0-3 | `_pendingComboDefault` 迁移可能覆盖已持久化的“无修饰键”配置 | `ported` | 延迟默认判定改为看持久化字符串是否为空，不再用 _keyMods 判 |
+| 12 | 05_键位与调色板 | P0-3 | `_pendingComboDefault` 迁移可能覆盖已持久化的“无修饰键”配置 | `ported` | 延迟默认判定改为看持久化字符串是否为空 |
 | 13 | 05_键位与调色板 | P0-4 | `legacy.Value=""` 会在读回时把用户旧配置清空，且迁移判断忽略 extras | `todo` |  |
 | 14 | 05_键位与调色板 | P0-5 | 颜色选择器拖动中丢失 MouseUp 时 Dirty 永久存在，Tick 兜底不覆盖全部路径 | `ported` | Tick 里在 8 帧节流之前补判：Dirty 且鼠标全松 -> 立即 Commit |
 | 15 | 05_键位与调色板 | P0-6 | `Tick` 兜底跳过条件与“窗口不再绘制”互斥，关闭/切页可能永远不落盘 | `todo` |  |
