@@ -380,19 +380,19 @@ namespace SR_UCH.Tweaks {
         // 页面级滚轮：鼠标在表格矩形内就把滚轮换算成行滚动（与核心 TableWheelInput 同一套系数）。
         private static bool OnPresetWheel(Vector2 mouse, float wheel) {
             try {
-                // 诊断：每秒最多一条，记录命中判定与可滚范围（滚不动时靠这一行定位）。
+                // 命中框：_tableBox 是布局坐标、且 Layout 趟只有 1x1；无效时退回页面内容区。
+                Rect hitBox = _tableBox.width > 1f ? _tableBox
+                    : new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
+                // 诊断：每秒最多一条，记录命中判定与实时可滚范围（滚不动时靠这一行定位）。
                 if (Time.unscaledTime - _wheelDiagAt > 1f) {
                     _wheelDiagAt = Time.unscaledTime;
-                    SRApi.LogInfo("[布局预设] 滚轮 box=" + _tableBox + " mouse=" + mouse + " hit=" + _tableBox.Contains(mouse)
-                        + " maxY=" + _maxScrollY.ToString("0.0") + " rows=" + VisiblePresets().Count
-                        + " rowH=" + SRApi.Ctl.TableRowH().ToString("0.0"));
+                    float __rowsH = Mathf.Max(0f, hitBox.height - SRApi.Ctl.TableHeaderH()
+                                            - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));
+                    float __maxY = Mathf.Max(0f, VisiblePresets().Count * SRApi.Ctl.TableRowH() - __rowsH);
+                    SRApi.LogInfo("[布局预设] 滚轮 tableBox=" + _tableBox + " hitBox=" + hitBox + " mouse=" + mouse
+                        + " hit=" + hitBox.Contains(mouse) + " rowsH=" + __rowsH.ToString("0.0")
+                        + " maxY=" + __maxY.ToString("0.0") + " rows=" + VisiblePresets().Count);
                 }
-                // _tableBox 是布局坐标、且要等表格画完才有值；未量到时（首帧/异常帧）退回页面内容区判定，
-                // 否则命不中等于滚轮永远不生效。
-                Rect hitBox = _tableBox.width > 1f
-                    ? _tableBox
-                    : new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
-                if (!hitBox.Contains(mouse)) return false;
                 // 不依赖 RenderPresetTable 里算出的 _maxScrollY（那一帧可能还没跑或窗口刚变过），
                 // 直接用表格框的实时高度重算可滚动范围，避免"范围算成 0 就滚不动"。
                 float rowsH = Mathf.Max(0f, hitBox.height - SRApi.Ctl.TableHeaderH()
@@ -555,6 +555,13 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.Sc(140),
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
                 SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, true);   // 与联机列表一致（含拖拽条高度）
+            // 关键：把表格高度夹在"页面可视底"以内。页面关掉滚动后，表格若比可视区高，
+            // 超出的行既看不到、又因为 rowsH 被算大而 maxY=0，滚轮也就滚不到 —— 这就是"滚不动"。
+            try {
+                float __screenTop = SRApi.ContentArea.y + last.yMax;      // 布局 y 与 ContentArea 同一原点
+                float __visible = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(6f) - __screenTop;
+                if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableMinH(), __visible));
+            } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
                 _actionHitThisFrame = false;
                 List<PresetInfo> visible = VisiblePresets();
                 RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
