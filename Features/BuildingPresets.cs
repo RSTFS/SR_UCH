@@ -708,7 +708,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 if (tableH <= 0f) tableH = TableHeight();
                 // Render() 传入的 tableH 是「分区标题 + 表格」可用的总高度；分区标题本身也占高，
                 // 这里扣掉它的实测高度，否则表格底部会超出可视区、最后一行被底栏裁掉且滚不到。
-                tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH - titleH - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));   // 8px 给底边拖拽条
+                // 不再二次扣减：调用方给的 tableH 已经是"可用总高度"，而分区标题在 GetLastRect 里
+                // 也已经被算进 last.yMax（TableFitHeight 的 used）。再扣一次 titleH + 拖拽条，
+                // 表格就会比可用区域矮一截 —— 列表中下方那片空白的直接来源。
+                tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH);
                 float rowsH = Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH);
                 Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
                 EnsureCols();
