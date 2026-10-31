@@ -499,9 +499,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
                 // 表格高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
                 // 真正决定表格高度的是这里（渲染函数只在 tableH<=0 时才回退到 TableHeight）。
-            // TableFitHeight 会夹到已保存的表高配置，配置偏小就留一大片空白，所以直接用剩余可用高度。
-            float availH = SRApi.ContentArea.yMax - last.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(8);
-            float tableH = Mathf.Max(SRApi.Ctl.TableMinH(), availH > 0f ? availH : SRApi.Ctl.Sc(340));
+            // 与联机列表逐字一致：页布局顶 + 已用高度 -> 核心公式（PageViewportHeight − used）。
+            // 我上一版把 ContentArea（屏幕坐标）和 last.yMax（布局坐标）混算，结果反而更矮。
+            float tableH = SRApi.Ctl.TableFitHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.TableMinH());
                 _actionHitThisFrame = false;
                 List<PresetInfo> visible = VisiblePresets();
                 RenderPresetTable(tableH, visible);
