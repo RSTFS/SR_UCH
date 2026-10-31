@@ -495,7 +495,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 自建的修改器编辑页已下线：修改器/规则/积分/模块一律用游戏自己的界面（操作列的「游戏界面」）。
                 GUILayout.Space(W(2));
                 // 高度：核心统一公式（页面顶部已用高度 + 表格高度 = 底栏之上可用高度），窗口变化实时跟随。
-                Rect last = GUILayoutUtility.GetLastRect();
+                // 关键：GetLastRect() 在 Layout 趟里可能是退化矩形（诊断日志里 lastYMax=1.0），
+            // 用它算"已用高度"会得到 ~0，表格于是按整个视口取高、直接溢出页面底部。
+            // 这里放一个零高度探针，拿到当前布局游标的真实 y。
+            Rect last = GUILayoutUtility.GetRect(1f, 0f);
                 // 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
                 // 表格高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
                 // 真正决定表格高度的是这里（渲染函数只在 tableH<=0 时才回退到 TableHeight）。
