@@ -213,6 +213,14 @@ namespace SR_UCH.Tweaks {
             EnsureCapacity(8);
 
             GameEventManager.ChangeListener<GameEvent.LevelResetEvent>(new LevelResetListener(), true);
+            // 关机时销毁常驻对象与材质（功能关闭时也走同一条清理，避免 DontDestroyOnLoad 残留）。
+            SRApi.OnShutdown("移动轨迹", delegate {
+                try {
+                    if (_trackerRoot != null) { UnityEngine.Object.Destroy(_trackerRoot); _trackerRoot = null; }
+                    if (_lineMat != null) { UnityEngine.Object.Destroy(_lineMat); _lineMat = null; }
+                    SRApi.LogInfo("[移动轨迹] 已销毁常驻对象与材质");
+                } catch (Exception __sd) { SRApi.Guard.Log("移动轨迹/关机清理", __sd); }
+            });
           } catch (Exception __ex) { SRApi.Guard.Log("移动轨迹 初始化", __ex); }
         }
 

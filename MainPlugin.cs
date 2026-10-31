@@ -31,6 +31,13 @@ namespace SR_UCH {
         // ConfigurationManager 等配置浏览器就列不出 SR_UCH 的任何条目。
         public static BepInEx.Configuration.ConfigFile Data;
 
+        // 进程退出 / 模组被销毁：执行功能登记的关机回调（R2 的可选出口）。
+        // 不在这里 Unpatch：Harmony 的补丁表随程序集卸载，强行 UnpatchAll 反而可能打断
+        // 正在退出的游戏对象；回调负责的只是"我们自己创建的对象与订阅"。
+        private void OnDestroy() {
+            try { SR.RunShutdowns(); } catch (Exception __sd) { try { ModLogger.LogWarning("[SR] 关机回调执行失败: " + __sd.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
+        }
+
         public void Awake() {
             // ModLogger 必须是本方法第一条语句：下面的步骤与其 catch 内的日志都依赖它。
             ModLogger = Logger;
@@ -142,7 +149,8 @@ namespace SR_UCH {
                     delegate (Action __a) { SR.RegisterSceneHook(__a); },
                     delegate (Action __a) { SR.RegisterDismissHook(__a); },
                     delegate (Func<float, bool> __w) { SR.RegisterWheelHook(__w); },
-                    delegate (string __i, string __l, Action __a) { SR.HotkeyAction(__i, __l, __a); });
+                    delegate (string __i, string __l, Action __a) { SR.HotkeyAction(__i, __l, __a); },
+                    delegate (string __n, Action __a) { SR.RegisterShutdown(__n, __a); });
             });
             SinkStep("State", delegate () {
                 SRApi.SetStateSinks(

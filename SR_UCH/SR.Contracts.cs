@@ -1201,11 +1201,17 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         private static Action<Action> _sceneHook, _dismissHook;
         private static Action<Func<float, bool>> _wheelHook;
         private static Action<string, string, Action> _hotkey;
+        private static Action<string, Action> _shutdown;
         public static void SetExtSinks(Action<string, int> nav, Action<string> navHide, Action<string, Action> tick,
                                        Action<Action> sceneHook, Action<Action> dismissHook,
-                                       Action<Func<float, bool>> wheelHook, Action<string, string, Action> hotkey) {
+                                       Action<Func<float, bool>> wheelHook, Action<string, string, Action> hotkey,
+                                       Action<string, Action> shutdown) {
             _nav = nav; _navHide = navHide; _tick = tick; _sceneHook = sceneHook; _dismissHook = dismissHook; _wheelHook = wheelHook; _hotkey = hotkey;
+            _shutdown = shutdown;
         }
+        // 关机/卸载回调（R2）：ITweak 没有 Shutdown，功能可选地把"撤销注册"挂在这里。
+        // 进程退出或模组被销毁时由宿主反向调用；回调应幂等，失败只记日志。
+        public static void OnShutdown(string name, Action cleanup) { Action<string, Action> f = _shutdown; if (f != null) f(name, cleanup); }
         //侧栏栏目与顺序（rank 越小越靠前）
         public static void Nav(string sec, int rank) { Action<string, int> f = _nav; if (f != null) f(sec, rank); }
         //隐藏某个配置段对应的栏目

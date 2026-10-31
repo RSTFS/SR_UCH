@@ -694,6 +694,27 @@ public partial class SR : ITweak {
             list.Add(new TickHook { Name = n, Run = hook });
         }
 
+        // 关机回调登记表（R2）：与 tick 同一套"按名去重、后注册先执行"的语义。
+        private static readonly List<TickHook> _shutdownHooks = new List<TickHook>();
+
+        internal static void RegisterShutdown(string name, Action cleanup) {
+            if (cleanup == null) return;
+            AddOrReplaceHook(_shutdownHooks, name, cleanup);
+        }
+
+        // 反向执行关机回调（后注册先跑），每个独立 try；幂等：跑完清空。
+        internal static void RunShutdowns() {
+            try {
+                for (int i = _shutdownHooks.Count - 1; i >= 0; i--) {
+                    TickHook h = _shutdownHooks[i];
+                    if (h == null || h.Run == null) continue;
+                    try { h.Run(); } catch (Exception __ex) { Guard.Log("关机回调 " + h.Name, __ex); }
+                }
+                if (_shutdownHooks.Count > 0) LogInfo("[SR] 已执行 " + _shutdownHooks.Count + " 个关机回调");
+                _shutdownHooks.Clear();
+            } catch (Exception __ex) { Guard.Log("关机回调批处理", __ex); }
+        }
+
         public static void RegisterTick(string name, Action hook) {
             if (hook == null) return;
             AddOrReplaceHook(_tickHooks, name, hook);

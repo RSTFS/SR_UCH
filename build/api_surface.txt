@@ -54,6 +54,7 @@ HotkeyAction
 Nav
 NavHide
 RegisterCameraView
+OnShutdown
 RegisterDismissHook
 RegisterFooterButton
 RegisterInputGateHold
