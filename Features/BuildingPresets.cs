@@ -230,6 +230,10 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec(Section, "布局预设", "Layout Presets");
             SRApi.Nav(Section, 45); // 关卡(40) 之后、构建工具(50) 之前
             SRApi.RegisterPage(Section, Render);
+            // 重载锁自愈：TickReloadLock 写好了却从未注册，等于"超时兜底"根本不存在，
+            // 失败路径漏放锁只能等用户再点一次加载（audit 10-P0-2）。
+            try { SRApi.RegisterTick("布局预设-锁自愈", TickReloadLock); }
+            catch (Exception __tl) { SRApi.Guard.Log("布局预设/注册锁自愈", __tl); }
             // 已删除的配置键：Show Timestamps（时间列固定显示，不再提供开关）。
             // 用功能自注册的迁移规则清理旧 cfg，避免遗留孤儿键（只列真正不再 Bind 的键）。
             try { SRApi.Migration.Remove(Section, "Show Timestamps"); }

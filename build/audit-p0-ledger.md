@@ -33,8 +33,8 @@
 | 27 | 09_配置迁移 | P0-01 | 删除判定是"手工死键名单"，名单与活键脱节时会在 Bind 之前永久抹掉用户设置 | `ported` | 删除键登记 + 启动日志一次性汇总（迁移时尚未 Bind，无法判定活键；深度修法=post-bind 孤儿清理，记为 P1） |
 | 28 | 09_配置迁移 | P0-02 | `_xPending` 是无版本号布尔，"写盘失败仍复位"会让规则永久失效 | `already-fixed` | RunPending 仅在 WriteCfgAtomic 成功后清 _xPending，失败保留待重试 |
 | 29 | 09_配置迁移 | P0-03 | 写盘后若调用方未执行 `ConfigFile.Reload()`，迁移结果会与内存中的 ConfigEntry 值分叉 | `already-fixed` | RunPending 返回 true 后调用方 pe.config.Reload() + ClearEntryCache（SR.Core.cs:1154-1157） |
-| 30 | 10_布局预设核心 | P0-1 | Provide 只暴露只读锁状态，未见与 Level 功能的双向 Require | `todo` |  |
-| 31 | 10_布局预设核心 | P0-2 | 加载异常或失败路径可能永久持有本功能重载锁 | `todo` |  |
+| 30 | 10_布局预设核心 | P0-1 | Provide 只暴露只读锁状态，未见与 Level 功能的双向 Require | `todo` | 需要跨功能锁契约（Provide 只读状态、Level 无法 Require 等待），属设计改动 |
+| 31 | 10_布局预设核心 | P0-2 | 加载异常或失败路径可能永久持有本功能重载锁 | `ported` | TickReloadLock 之前从未注册：现在在 SelfReg 里注册，超时自愈真正生效 |
 | 32 | 11_预设IO与修改器 | P0-1 | ResolveImportPath 的目录穿越防护可被 `..` 与路径分隔符绕过 | `ported` | IsUnderRoot + 绝对路径根校验（提交 5e153fb） |
 | 33 | 11_预设IO与修改器 | P0-2 | SafeFileName 净化结果与用户意图脱节，造成"找不到文件"且越界读风险并存 | `ported` | SafeFileName 拒绝 .. 与两种分隔符（提交 5e153fb） |
 | 34 | 12_预设加载与工具 | P0-1 | 场景切换掐断挂载在 LobbyManager 上的加载协程，25 秒 XML 清理与放锁逻辑永久失效，仅能靠 45 秒自愈 | `todo` |  |
