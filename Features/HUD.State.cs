@@ -37,6 +37,7 @@ public partial class HUD {
         }
         private static void Tick() {
             try {
+                DiagTick();
                 if (!IsEnabled()) {
                     _hasGame = false;
                     _inLobby = false;
@@ -98,6 +99,24 @@ public partial class HUD {
                 UpdateVisible();
             } catch (Exception __ex) { SRApi.Guard.Log("HUD 状态更新", __ex); }
         }
+        // 临时诊断（定位闪烁/提示消失）：每秒一行，记录决定可见性与提示状态的所有输入。
+        private static float _diagAt;
+        private static void DiagTick() {
+            try {
+                float now = Time.unscaledTime;
+                if (now < _diagAt) return;
+                _diagAt = now + 1f;
+                SRApi.LogInfo("[SR.HUD] inLobby=" + (_inLobby ? 1 : 0)
+                    + " hasGame=" + (_hasGame ? 1 : 0)
+                    + " phase=" + _phase
+                    + " hudAlpha=" + _hudAlpha.ToString("0.00")
+                    + " round=" + _trueRound
+                    + " shown=" + _lastRound
+                    + " notice=" + (string.IsNullOrEmpty(_roundNoticeText) ? "-" : _roundNoticeText)
+                    + " noticeAge=" + (string.IsNullOrEmpty(_roundNoticeText) ? "-" : (now - _roundNoticeStart).ToString("0.00")));
+            } catch (Exception __dg) { SRApi.Guard.Log("HUD/诊断", __dg); }
+        }
+
         private static void UpdateVisible() {
             bool keyVis;
             try {
