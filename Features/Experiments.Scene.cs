@@ -33,24 +33,27 @@ public partial class Experiments : ITweak
                 SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
                     return e.Definition.Key.StartsWith("Splash ") || e.Definition.Key == "Gentle Load";
                 });
-                // 同位体：对当前房间再进一次（通用条目：可右键绑快捷键 + 悬浮说明）。
-                SRApi.Ctl.HotkeyButton("exp.alter_self", SRApi.T("同位体", "Alter self"),
-                    SRApi.T("再进一次当前房间\n游戏会再建一个本地角色，两个角色共用同一套输入\n只在房间/对局内有效",
-                        "rejoin the current lobby\nthe game spawns a second local character sharing the same input\nonly works inside a lobby or match"),
-                    delegate {
-                        bool ok = Online.ForceRejoinSelf();
-                        SRApi.Notify(ok ? SRApi.T("同位体：已对当前房间再发一次加入", "Alter self: rejoin request sent")
-                                         : SRApi.T("同位体：当前不在房间里", "Alter self: not in a lobby"));
-                    });
+                // 同位体：action 既注册给热键，也在按钮左键点击时执行（HotkeyButton 只画按钮，
+                // 点击必须由调用方按返回值触发 —— 之前漏了这一步，所以点了没反应）。
+                Action doAlterSelf = delegate {
+                    bool ok = Online.ForceRejoinSelf();
+                    SRApi.Notify(ok ? SRApi.T("同位体：已对当前房间再发一次加入", "Alter self: rejoin request sent")
+                                     : SRApi.T("同位体：当前不在房间里", "Alter self: not in a lobby"));
+                };
+                if (SRApi.Ctl.HotkeyButton("exp.alter_self", SRApi.T("同位体", "Alter self"),
+                        SRApi.T("再进一次当前房间\n游戏会再建一个本地角色，两个角色共用同一套输入\n只在房间/对局内有效",
+                            "rejoin the current lobby\nthe game spawns a second local character sharing the same input\nonly works inside a lobby or match"),
+                        doAlterSelf)) doAlterSelf();
 
-                // 关闭遮罩：只关当前这一块。
-                SRApi.Ctl.HotkeyButton("exp.close_mask", SRApi.T("关闭遮罩", "Close the mask"),
-                    SRApi.T("立刻关掉当前加载遮罩\n只关这一次，不改变「跳过加载动画」设置",
-                        "dismiss the current loading mask\none shot; does not change the skip-load-animation setting"),
-                    delegate {
-                        SplashTools.CloseMaskNow();
-                        SRApi.Notify(SplashTools.Note ?? SRApi.T("关闭遮罩：已执行一次", "Close the mask: executed once"));
-                    });
+                // 关闭遮罩：同样按返回值执行。
+                Action doCloseMask = delegate {
+                    SplashTools.CloseMaskNow();
+                    SRApi.Notify(SplashTools.Note ?? SRApi.T("关闭遮罩：已执行一次", "Close the mask: executed once"));
+                };
+                if (SRApi.Ctl.HotkeyButton("exp.close_mask", SRApi.T("关闭遮罩", "Close the mask"),
+                        SRApi.T("立刻关掉当前加载遮罩\n只关这一次，不改变「跳过加载动画」设置",
+                            "dismiss the current loading mask\none shot; does not change the skip-load-animation setting"),
+                        doCloseMask)) doCloseMask();
 
                 GUILayout.Space(SRApi.Ctl.Sc(6));
             } catch (Exception __ex) { SRApi.Guard.Log("场景页 渲染", __ex); }
