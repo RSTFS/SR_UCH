@@ -255,14 +255,14 @@ public partial class Experiments : ITweak
 
         private static void SelfReg() {
             SRApi.LocKey("Scene", "Lobby Launch Key", "立即开始键", "Launch now key");
-            SRApi.LocDesc("Scene", "Lobby Launch Key", "立即开始关卡\n按下立刻开始，自动选票数最高的门\n需要房主权限；未绑定时不生效", "Launch now\nstarts at once, picking the most-voted door\nhost only; no effect while unbound");
+            SRApi.LocDesc("Scene", "Lobby Launch Key", "立即开始关卡\n优先开始你投过票的那扇门，没投票时选票数最高的门\n仅房主或离线有效；没绑按键时不生效", "Launch the level now\nprefers the portal you voted for, otherwise the most-voted portal\nhost or offline only; does nothing while unbound");
 
         }
 
         public void Initialize(IFeatureHost plugin) {
             try {
                 SelfReg();
-                _launchKey = plugin.Config.Bind("Scene", "Lobby Launch Key", KeyCode.None, "按此键立即开始（None=不绑，需房主）。");
+                _launchKey = plugin.Config.Bind("Scene", "Lobby Launch Key", KeyCode.None, "按此键立即开始关卡（None = 不绑）。优先你投过票的门，否则票数最高的门；仅房主或离线有效。");
                 SRApi.RegisterTick("树屋工具", Tick);
                 SRApi.RegisterSceneHook(Reset);
             } catch (Exception __ex) { SRApi.Guard.Log("树屋工具 初始化", __ex); }
