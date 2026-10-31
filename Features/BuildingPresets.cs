@@ -250,14 +250,7 @@ namespace SR_UCH.Tweaks {
             // 换场景后下次打开面板重新扫盘（手动放入/删除的 XML、其它存档的改动都能看到）。
             // 页面级滚轮钩子：在窗口建立滚动区【之前】拿到滚轮，鼠标在预设表格上就滚表格。
             // （页面内部拿到的事件已被滚动区处理过，所以必须在这一层接。）
-            try {
-                SRApi.RegisterPageWheel(delegate(Vector2 __mp, float __w) {
-                    if (_tableBox.width <= 1f || _maxScrollY <= 0f) return false;
-                    if (!_tableBox.Contains(__mp)) return false;
-                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + __w * SRApi.Ctl.Sc(40f), 0f, _maxScrollY);
-                    return true;
-                });
-            } catch (Exception __pwr) { SRApi.Guard.Log("布局预设/注册滚轮钩子", __pwr); }
+            // 手轮/滚动条统一走核心 TableScrollbarFor（见表格绘制之后）。
             try { SRApi.RegisterSceneHook(delegate { _loaded = false; }); }
             catch (Exception __sh) { SRApi.Guard.Log("布局预设/注册场景钩子", __sh); }
             // 返回树屋：注册动作并允许右键绑键（悬浮提示里不写绑定说明）。
@@ -844,15 +837,13 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 
         // 表格高度：按页面视口高度扣掉上方固定行，尽量让整页不出现页面级滚动条；最小 140、最大 480 设计单位。
         // 预设列表本身在固定高度区域内用 TableWheelInput 滚动，所以页面不需要滚动。
-        private static float TableHeight() {
-            float fallback = SRApi.Ctl.Sc(340);
+private static float TableHeight() {
+            // 和联机列表同一条核心公式：页面视口 − 表格之前已用高度，再夹到 [min, 表高配置]。
+            // 以前这里固定扣 300px，表格下方留白、手轮落在留白上就变成滚页面。
             try {
-                float areaH = SRApi.ContentArea.height;
-                if (areaH <= 0f) return fallback;
-                float reserve = SRApi.Ctl.Sc(300);
-                float avail = areaH - SRApi.FooterHeight - reserve;
-                return Mathf.Clamp(avail, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(480));
-            } catch { return fallback; }
+                Rect last = GUILayoutUtility.GetLastRect();
+                return SRApi.Ctl.TableFitHeight(last.yMax, SRApi.ContentArea.y, _tableHEntry, SRApi.Ctl.Sc(140));
+            } catch (Exception __th) { SRApi.Guard.Log("预设/表格高度", __th); return SRApi.Ctl.Sc(340); }
         }
 
         // Shift+右键表头：核心还原列宽并清空隐藏列后回调这里，再补一次"列序 + 列宽 + 隐藏"的整表还原并落盘。
