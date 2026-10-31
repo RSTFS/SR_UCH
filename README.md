@@ -31,9 +31,15 @@ On first launch a config file `BepInEx\config\SR_UCH_data.cfg` is generated.
 | UI language | English by default; switch to Chinese on the Settings page |
 | Rebind keys | Click the key box in the panel: `Esc` clears, `Shift+Esc` cancels |
 
-At the bottom of the Settings page there is a **Self-check** block: it shows how many name-bound
-patch targets and reflection members are available, and lists any that failed, one by one.
-If a game update breaks part of the features, this is the first place to look.
+The **Settings** page has two tabs pinned at the top (**General** / **Self-check**); `Ctrl` + wheel
+switches between them, and **Reset defaults** sits at the right end of that bar (it deliberately
+leaves the window size/position and the sidebar width alone).
+
+The **Self-check** tab is a card-style health report: one verdict card (with **Rescan**, **Copy
+report**, **Write to log**), a *Targets & config* card that turns amber and lists the broken entries
+when a name-bound patch target or reflection member disappears, and a *Frame hooks* card for the
+per-hook cost. If a game update breaks part of the features, this is the first place to look. Hook
+profiling is off by default (its switch lives in that card) so it does not spam the log.
 
 ---
 
@@ -69,6 +75,8 @@ The panel has sections on the left and pages on the right. Listed by section bel
 - Press `Alt` to enter delete mode, scroll to switch the target, `Backspace` to delete.
 - When deleting, it shows **who placed** that block, so you can track a specific player.
 - There is also a list mode: it lists every block on the field; refresh and click to pick.
+- **Break effect** -- the game's own `DestroySelf(..., useSmoke, ...)` parameter is honoured, so
+  turning the effect off really makes the piece disappear without smoke.
 - You can optionally allow clients to delete too (requires the matching extension module).
 
 ### Chat
@@ -97,11 +105,14 @@ The panel has sections on the left and pages on the right. Listed by section bel
 - Presets live under `BepInEx/config/SR_UCH/presets/`; import from or export to the clipboard for sharing.
 - Loading reloads the level natively: whether scores are kept follows your reload-mode setting.
 
-### Round HUD
+### HUD
 
 - A small on-screen HUD shows the current phase, a phase countdown and round progress.
 - The countdown turns yellow in the last 10 seconds and red in the last 5; optional blinking and phase notices.
 - Local only: sends no network messages and never affects gameplay. Drag it to move; the position is saved.
+- Visibility defaults to **Toggle** (the HUD is on from the start; the key only hides/shows it).
+- The section used to be called *Round HUD*; an existing config is migrated to `[HUD]` automatically,
+  so every value is kept.
 
 ### Experiments
 
@@ -117,9 +128,30 @@ The panel has sections on the left and pages on the right. Listed by section bel
 
 **Misc** page
 
-- **Cleanup After Load** -- run a GC once after entering a level to reduce stutter.
 - **Free Camera** -- scroll to zoom the view; both the view size and the camera move speed are adjustable.
 - **Camera Follow** -- adjustable camera move speed.
+- **Cross-play** -- turns the game's own cross-platform matchmaking switch on or off (the value is
+  also written into the save file, so it survives a restart).
+
+---
+
+## Reliability
+
+The **2026-10 static audit** (286 findings) has been triaged: all **59 P0** items are handled and
+each one is recorded in [`build/audit-p0-ledger.md`](build/audit-p0-ledger.md) with its status
+(`ported` / `already-fixed` / `n-a`), the reason and the commit. Highlights:
+
+- Patches/reflection targets that disappear after a game update now report as **broken** instead of
+  silently "healthy"; contract-layer logs written before the log sinks are injected are buffered and
+  flushed instead of being dropped.
+- Config migration never blanks a legacy key it just copied, and every key it deletes is summarised
+  once in the startup log.
+- Settings "reset defaults" no longer moves/resizes the window or resets the sidebar width.
+- Long-running work that used to hang off scene objects (preset reload coroutines, join flow) now
+  runs on persistent hosts, and stale `levelPortalXml` / reload locks are cleared by registered
+  frame hooks.
+
+The text guards and unit tests below keep new regressions of the same shape out.
 
 ---
 
