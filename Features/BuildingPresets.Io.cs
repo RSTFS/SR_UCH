@@ -234,10 +234,30 @@ namespace SR_UCH.Tweaks {
         }
 
         // 路径解析：绝对路径直接使用；相对路径依次尝试 当前目录 / BepInEx 根目录 / 配置目录 / 预设目录。
+        // 判定 full 是否在 root 之内。前缀比较必须带尾部分隔符，否则 root=/presets 会误放 /presets_evil/x。
+        private static bool IsUnderRoot(string full, string root) {
+            try {
+                if (string.IsNullOrEmpty(full) || string.IsNullOrEmpty(root)) return false;
+                string r = root.TrimEnd('/', '\\');
+                if (string.Equals(full, r, StringComparison.OrdinalIgnoreCase)) return true;
+                if (full.StartsWith(r + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return true;
+                if (full.StartsWith(r + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return true;
+                return false;
+            } catch { return false; }
+        }
+
         private static string ResolveImportPath(string input) {
             try {
                 if (string.IsNullOrEmpty(input)) return null;
-                try { if (File.Exists(input)) return Path.GetFullPath(input); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                // 绝对路径快速通道必须做根校验：否则任意存在的路径都能被导入（任意文件读）。
+                try {
+                    if (File.Exists(input)) {
+                        string full0 = Path.GetFullPath(input);
+                        if (IsUnderRoot(full0, Path.GetFullPath(PresetsRoot()))) return full0;
+                        SRApi.LogWarn("[布局预设] 拒绝导入预设根目录之外的文件: " + full0);
+                        return null;
+                    }
+                } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 string p = null;
                 try { p = Path.Combine(Paths.BepInExRootPath, input); if (File.Exists(p)) return p; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 try { p = Path.Combine(Paths.ConfigPath, input); if (File.Exists(p)) return p; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -246,7 +266,7 @@ namespace SR_UCH.Tweaks {
                 string safe = SafeFileName(input);
                 string root2 = Path.GetFullPath(PresetsRoot());
                 string full = Path.GetFullPath(Path.Combine(root2, safe));
-                if (full.StartsWith(root2, StringComparison.OrdinalIgnoreCase) && File.Exists(full)) return full;
+                if (IsUnderRoot(full, root2) && File.Exists(full)) return full;
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/解析导入路径", __ex);
@@ -825,6 +845,8 @@ namespace SR_UCH.Tweaks {
                 StringBuilder sb = new StringBuilder(src.Length);
                 for (int i = 0; i < src.Length; i++) sb.Append(Array.IndexOf(bad, src[i]) < 0 ? src[i] : '_');
                 string s = sb.ToString().Trim().TrimEnd('.');
+            // 显式拒绝路径分隔符与 ..：某些平台 / 是合法文件名字符，会原样保留（audit 11-P0-1）。
+            s = s.Replace("..", "_").Replace('/', '_').Replace('\\', '_');
                 if (s.Length > 60) s = s.Substring(0, 60).Trim();
                 if (s.Length == 0) s = "preset_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
                 return s;
