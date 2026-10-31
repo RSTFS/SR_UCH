@@ -504,7 +504,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 核心化：高度 = min(可用, 表头 + 行数*行高 + 拖拽条)。行少 -> 收紧，行多 -> 填满并滚动。
             float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.TableMinH(),
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f);
+                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, true);   // 底部贴页面底：填满可用高度
                 _actionHitThisFrame = false;
                 List<PresetInfo> visible = VisiblePresets();
                 RenderPresetTable(tableH, visible);
