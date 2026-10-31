@@ -134,17 +134,24 @@ The panel has sections on the left and pages on the right. Listed by section bel
 
 The game folder is auto-detected from common Steam paths; set the UCH_DIR environment variable to override.
 
+If you launch the game through **Gale** (a Thunderstore mod manager), writing to `<game>/BepInEx/plugins`
+is not enough: Gale installs BepInEx into its own profile folder, and that is what the game loads. The
+build script detects Gale profiles and lists them; `-Deploy -Gale` copies the DLLs into every detected
+UCH profile as well (`GALE_DATA` can point at a custom Gale data directory):
+
+```powershell
+./_tools/build_sr_uch.ps1 -All -Deploy -Gale
+```
+
 ### Tests and guards
 
 Everything below runs **without the game installed** (contract layer is compiled against local
 `tests/UnityStubs.cs` + `tests/BepInExStubs.cs`), so it works on a fresh clone and in CI:
 
 ```powershell
-.uild
-un-tests.ps1 -NoGame    # contract layer must compile + 13 assertions (dotnet, net8.0)
-.uild
-un-tests.ps1            # same tests through csc against the real BepInEx when a game is present
-.uild\guards-text.ps1          # 13 text guards (API allow-list, layer boundaries, rsp coverage,
+./build/run-tests.ps1 -NoGame    # contract layer must compile + 13 assertions (dotnet, net8.0)
+./build/run-tests.ps1            # same tests through csc against the real BepInEx when a game is present
+./build/guards-text.ps1          # 13 text guards (API allow-list, layer boundaries, rsp coverage,
                                  # encoding, tooltip shapes, silent-catch and file-size ratchets)
 ```
 
@@ -155,8 +162,8 @@ The heavier checks (full build through the rsp chain, split-mode build, csproj b
 self-test comparison) need the game's reference assemblies and stay local:
 
 ```powershell
-.\..\_toolsuild_sr_uch.ps1 -All -Check     # mechanical guards incl. build + self-test baseline
-.uild\check-selftest.ps1                   # compare the last log's [SR.SelfTest] line with the baseline
+./_tools/build_sr_uch.ps1 -All -Check     # mechanical guards incl. build + self-test baseline
+./build/check-selftest.ps1                # compare the last log's [SR.SelfTest] line with the baseline
 ```
 
 ---
