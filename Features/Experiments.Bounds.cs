@@ -243,6 +243,8 @@ public partial class Experiments : ITweak
                 // 相机项开启时才压制 FixCameraToBoundaries（其 Update 会关闭 ZoomCamera 并按 boundaryCollider 重算）。
                 SuppressFixCamera(CameraOn);
                 if (_tick % 30 != 0) return;
+                // 解除UI3 并入本钩子：每 30 次边界重放（约 15 秒）扫一次。
+                try { RemoveUI3.Tick(); } catch (Exception __ui) { SRApi.Guard.Log("解除UI3/并入", __ui); }
                 ApplyAllPiecesIgnore();
                 BuildStatus();
             } catch (Exception __ex) { SRApi.Guard.Log("关卡边界 Tick", __ex); }
@@ -749,7 +751,7 @@ public partial class Experiments : ITweak
 
         public void Initialize(IFeatureHost plugin) {
             try {
-                SRApi.RegisterTick("解除UI3", Tick);
+                // 钩子已并入「关卡边界」：不再单独注册 tick（见 LevelBoundsUnlock.Tick）。
                 SRApi.RegisterSceneHook(Reset);
                 SRApi.RegisterDismissHook(Restore);
             } catch (Exception __ex) { SRApi.Guard.Log("解除UI3 初始化", __ex); }
@@ -761,7 +763,7 @@ public partial class Experiments : ITweak
         // 换场景必须清 _wasOn：其为强引用字典，旧 Renderer 已随场景销毁，原值无意义且会逐场累积。
         private static void Reset() { _hitCount = -1; _scanScene = null; _nextScanAt = 0f; _ui3ScanTries = 0; Note = ""; _wasOn.Clear(); }
 
-        private static void Tick() {
+        internal static void Tick() {
             try {
                 if (_frame == Time.frameCount) return;
                 _frame = Time.frameCount;
