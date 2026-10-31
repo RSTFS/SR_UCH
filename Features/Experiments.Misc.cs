@@ -27,16 +27,6 @@ public partial class Experiments : ITweak
                     DrawStatus(FreeCam.SpeedNote);
                 }
 
-                // 性能：解锁帧率 / 抗锯齿 / 帧率显示
-                GUILayout.Space(SRApi.Ctl.Sc(6));
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("性能", "Performance") + " -",
-                    SRApi.T("解锁帧率：关闭垂直同步并把上限设为不限制. 换场景/改分辨率后会自动重新应用. 抗锯齿与帧率显示也在这里.",
-                        "Unlock framerate: turns off vSync and removes the cap, re-applied after scene or resolution changes. Anti-aliasing and the FPS readout live here too."));
-                SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
-                    return e.Definition.Key == "Unlock Framerate" || e.Definition.Key == "Anti Aliasing"
-                        || e.Definition.Key == "Show Fps";
-                });
-
                 // 跨平台联机：直接改游戏自己的 CrossPlatformToggle（反射定位，不绑版本）。
                 GUILayout.Space(SRApi.Ctl.Sc(6));
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("跨平台联机", "Cross-play") + " -",
@@ -268,147 +258,6 @@ public partial class Experiments : ITweak
             _savedFov = -1f;
         }
     }
-    // 实验 · 解锁帧率：关掉 vSync 并把 targetFrameRate 设为 -1（不限制）。
-    // 游戏在换场景 / 改分辨率 / 切窗口后会把这两个值改回去，所以启用期间每 1 秒复查一次。
-    // 关闭时恢复启用前抓到的原值（抓不到就用 Unity 默认：vSync=1、targetFrameRate=-1）。
-    internal static class UnlockFps {
-        internal static string Note = "";
-        private static ConfigEntry<bool> _on;
-        private static ConfigEntry<int> _aa;
-        private static ConfigEntry<bool> _showFps;
-        private static int _origAa = int.MinValue;
-        private static bool _armed;
-        private static bool _applied;
-        private static float _nextAt;
-        private static int _origTarget = int.MinValue;
-        private static int _origVsync = int.MinValue;
-
-        internal static void Init(IFeatureHost plugin) {
-            try {
-                _aa = plugin.Config.Bind("Experiments", "Anti Aliasing", 0,
-                    new ConfigDescription("抗锯齿倍数（与解锁帧率一起应用；0 = 关闭，2/4/8 = MSAA）。",
-                        new AcceptableValueList<int>(0, 2, 4, 8)));
-                SRApi.LocKey("Experiments", "Anti Aliasing", "抗锯齿", "Anti-aliasing");
-                SRApi.LocDesc("Experiments", "Anti Aliasing",
-                    "抗锯齿\n0 = 关闭，2/4/8 = MSAA 倍数\n与解锁帧率一起应用，关闭解锁帧率时恢复原值",
-                    "anti-aliasing\n0 = off, 2/4/8 = MSAA samples\napplied together with the framerate unlock and restored when it is turned off");
-                _showFps = plugin.Config.Bind("Experiments", "Show Fps", false,
-                    "显示帧率。\n在屏幕左上角单独显示当前帧率（不属于 HUD）\n关闭后立即消失");
-                SRApi.LocKey("Experiments", "Show Fps", "显示帧率", "Show FPS");
-                SRApi.LocDesc("Experiments", "Show Fps",
-                    "显示帧率\n屏幕左上角独立显示帧率，不随面板开关\n关闭后立即消失",
-                    "show FPS\nan independent readout in the top-left corner, visible even with the panel closed\nhidden as soon as it is switched off");
-                _on = plugin.Config.Bind("Experiments", "Unlock Framerate", false,
-                    "解锁帧率。\n关闭垂直同步并把帧率上限设为不限制（-1）。\n换场景或改分辨率后会自动重新应用；关闭本项立即恢复原值。");
-                SRApi.LocKey("Experiments", "Unlock Framerate", "解锁帧率", "Unlock framerate");
-                SRApi.LocDesc("Experiments", "Unlock Framerate",
-                    "解锁帧率\n关掉垂直同步、取消帧率上限（-1）\n换场景或改分辨率后自动重新应用；关闭即恢复原值",
-                    "unlock framerate\nturns off vSync and removes the frame cap (-1)\nre-applied after scene or resolution changes; switching it off restores the previous values");
-                _armed = true;
-                SRApi.RegisterTick("解锁帧率", Tick);
-            } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率 初始化", __ex); }
-        }
-
-        private static void Tick() {
-            try {
-                if (!_armed) return;
-                // 帧率显示独立于"解锁帧率"开关：先更新叠加层，再判断要不要动帧率设置。
-                FpsOverlay.Update(_showFps != null && _showFps.Value);
-                bool want = SRApi.GateMaster && _on != null && _on.Value;
-                if (!want) {
-                    if (_applied) Restore();
-                    return;
-                }
-                float now = Time.unscaledTime;
-                if (_applied && now < _nextAt) return;
-                _nextAt = now + 1f;
-                if (!_applied) {
-                    try { _origTarget = Application.targetFrameRate; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/记 targetFrameRate", __ex); }
-                    try { _origVsync = QualitySettings.vSyncCount; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/记 vSyncCount", __ex); }
-                }
-                bool changed = false;
-                try {
-                    if (_origAa == int.MinValue) _origAa = QualitySettings.antiAliasing;
-                    int wantAa = _aa != null ? _aa.Value : 0;
-                    if (QualitySettings.antiAliasing != wantAa) { QualitySettings.antiAliasing = wantAa; changed = true; }
-                } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/抗锯齿", __ex); }
-                try { if (QualitySettings.vSyncCount != 0) { QualitySettings.vSyncCount = 0; changed = true; } } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/关 vSync", __ex); }
-                try { if (Application.targetFrameRate != -1) { Application.targetFrameRate = -1; changed = true; } } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/取消上限", __ex); }
-                if (!_applied) {
-                    _applied = true;
-                    Note = SRApi.T("已解锁帧率（vSync 关，帧率不限）", "Framerate unlocked (vSync off, no cap)");
-                    SRApi.LogInfo("[实验.性能] " + Note);
-                } else if (changed) {
-                    SRApi.LogInfo("[实验.性能] 检测到游戏改回帧率设置，已重新应用");
-                }
-            } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率 Tick", __ex); }
-        }
-
-        private static void Restore() {
-            try {
-                int t = _origTarget == int.MinValue ? -1 : _origTarget;
-                int v = _origVsync == int.MinValue ? 1 : _origVsync;
-                try { Application.targetFrameRate = t; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/还原 targetFrameRate", __ex); }
-                try { QualitySettings.vSyncCount = v; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/还原 vSync", __ex); }
-                try { if (_origAa != int.MinValue) QualitySettings.antiAliasing = _origAa; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/还原抗锯齿", __ex); }
-                _applied = false;
-                Note = SRApi.T("已恢复原帧率设置", "Framerate settings restored");
-                SRApi.LogInfo("[实验.性能] " + Note);
-            } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率 还原", __ex); }
-        }
-    }
-
-    // 帧率叠加层：独立于面板与 HUD，开就一直显示（左上角），关掉立即消失。
-    internal sealed class FpsOverlay : UnityEngine.MonoBehaviour {
-        private static FpsOverlay _host;
-        private static GUIStyle _style;
-        private static string _text;
-        private static float _accum, _nextAt;
-        private static int _frames;
-
-        internal static void Update(bool want) {
-            try {
-                if (!want) {
-                    _text = null;
-                    return;
-                }
-                EnsureHost();
-                float dt = Time.unscaledDeltaTime;
-                if (dt > 0f) { _accum += dt; _frames++; }
-                float now = Time.unscaledTime;
-                if (now < _nextAt) return;
-                if (_accum > 0.0001f && _frames > 0) {
-                    float fps = _frames / _accum;
-                    _text = "FPS " + fps.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
-                }
-                _accum = 0f; _frames = 0; _nextAt = now + 0.25f;
-            } catch (Exception __ex) { SRApi.Guard.Log("帧率叠加层", __ex); }
-        }
-
-        private static void EnsureHost() {
-            if (_host != null) return;
-            try {
-                GameObject go = new GameObject("SR_UCH.FpsOverlay");
-                UnityEngine.Object.DontDestroyOnLoad(go);
-                _host = go.AddComponent<FpsOverlay>();
-            } catch (Exception __ex) { SRApi.Guard.Log("帧率叠加层/创建", __ex); }
-        }
-
-        private void OnGUI() {
-            try {
-                string s = _text;
-                if (string.IsNullOrEmpty(s)) return;
-                if (_style == null) {
-                    _style = new GUIStyle(GUI.skin.label);
-                    _style.alignment = TextAnchor.UpperLeft;
-                    _style.fontSize = Mathf.Max(12, Mathf.RoundToInt(13f * SRApi.Ctl.Sc(1f)));
-                    _style.normal.textColor = new Color(1f, 1f, 1f, 0.85f);
-                }
-                GUI.Label(new Rect(SRApi.Ctl.Sc(10f), SRApi.Ctl.Sc(8f), SRApi.Ctl.Sc(160f), SRApi.Ctl.Sc(20f)), s, _style);
-            } catch (Exception __ex) { SRApi.Guard.Log("帧率叠加层/绘制", __ex); }
-        }
-    }
-
     // 实验 · 跨平台联机：反射定位游戏自己的 CrossPlatformToggle，读/写/尝试让游戏落盘。
     internal static class CrossPlay {
         private const string MemberName = "CrossPlatformToggle";
@@ -438,23 +287,34 @@ public partial class Experiments : ITweak
                     try { types = asm.GetTypes(); } catch (ReflectionTypeLoadException __tl) { types = __tl.Types; }
                     catch (Exception __t) { SRApi.Guard.Log("跨平台联机/取类型", __t); continue; }
                     if (types == null) continue;
-                    for (int t = 0; t < types.Length; t++) {
-                        Type ty = types[t];
-                        if (ty == null) continue;
-                        try {
-                            FieldInfo f = ty.GetField(MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
-                            if (f != null && (f.FieldType == typeof(bool))) {
-                                _member = f;
-                                _owner = f.IsStatic ? null : FindOwner(ty);
-                                break;
-                            }
-                            PropertyInfo pr = ty.GetProperty(MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
-                            if (pr != null && pr.PropertyType == typeof(bool) && pr.CanRead) {
-                                _member = pr;
-                                _owner = (pr.GetGetMethod(true) != null && pr.GetGetMethod(true).IsStatic) ? null : FindOwner(ty);
-                                break;
-                            }
-                        } catch (Exception __m) { SRApi.Guard.Log("跨平台联机/读成员 " + ty.Name, __m); }
+                    // 优先 GameSettings（真正的运行时设置对象），其次才任意类型；
+                    // 以前按 asm.GetTypes() 顺序取第一个，常常先命中 SaveFileData（没有 GetInstance），
+                    // 于是宿主永远解析不到 → "游戏还没初始化完" 一直出现。
+                    Type prefer = null;
+                    for (int ti = 0; ti < types.Length; ti++) {
+                        if (types[ti] != null && types[ti].FullName == "GameSettings") { prefer = types[ti]; break; }
+                    }
+                    int passCount = prefer != null ? 2 : 1;
+                    for (int pass = 0; pass < passCount && _member == null; pass++) {
+                        Type[] scan = pass == 0 && prefer != null ? new Type[] { prefer } : types;
+                        for (int t = 0; t < scan.Length; t++) {
+                            Type ty = scan[t];
+                            if (ty == null) continue;
+                            try {
+                                FieldInfo f = ty.GetField(MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+                                if (f != null && f.FieldType == typeof(bool)) {
+                                    object owner = f.IsStatic ? null : FindOwner(ty);
+                                    if (f.IsStatic || owner != null) { _member = f; _owner = owner; break; }
+                                }
+                                PropertyInfo pr = ty.GetProperty(MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+                                if (pr != null && pr.PropertyType == typeof(bool) && pr.CanRead) {
+                                    MethodInfo g = pr.GetGetMethod(true);
+                                    bool st = g != null && g.IsStatic;
+                                    object owner = st ? null : FindOwner(ty);
+                                    if (st || owner != null) { _member = pr; _owner = owner; break; }
+                                }
+                            } catch (Exception __m) { SRApi.Guard.Log("跨平台联机/读成员 " + ty.Name, __m); }
+                        }
                     }
                     if (_member != null) break;
                 }

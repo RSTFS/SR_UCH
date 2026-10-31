@@ -220,13 +220,19 @@ public partial class Experiments : ITweak
             try {
                 if (_on == null) return;
                 bool on = _on.Value && SRApi.GateMaster;
-                ApplyCursorPiece(on);
-                if (!on) { if (_applied) { Restore(); _applied = false; } return; }
-                _applied = true;
+                if (!on) {
+                    ApplyCursorPiece(false);
+                    if (_applied) { Restore(); _applied = false; }
+                    return;
+                }
+                // 门限放在最前面：以前 ApplyCursorPiece 在门限之前，每帧照样跑一遍
+                // （tick 剖析里 关卡边界-应用 一直报 2~4ms 就是它）。
                 float __now = Time.unscaledTime;
                 if (_tick > 0 && __now < _nextApplyAt) return;
-                _nextApplyAt = __now + 0.2f;
+                _nextApplyAt = __now + 0.5f;
                 _tick++;
+                _applied = true;
+                ApplyCursorPiece(true);
                 // 墙引用缺失时扫描一次。
                 if (WallsOn) EnsureWalls();
                 // 三面实体墙：size 置 0 = 碰撞面消失，这是能走出原关卡的前提；双向，关闭时写回原值。
