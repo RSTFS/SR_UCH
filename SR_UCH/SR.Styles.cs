@@ -24,6 +24,9 @@ public partial class SR {
         internal const int SectionGapTop = 8;
         internal const int SectionGapBottom = 6;
 
+        // Solid() 创建过的纹理（重建时统一销毁，audit 07-P0-4）
+        private static readonly System.Collections.Generic.List<Texture2D> _styleTex = new System.Collections.Generic.List<Texture2D>();
+
         private static Texture2D Solid(Color c) {
             Texture2D t = new Texture2D(1, 1);
             t.SetPixel(0, 0, c);

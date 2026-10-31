@@ -24,7 +24,7 @@
 | 18 | 07_表格与样式 | P0-1 | 控制台表格未接入滚轮输入，玩家列表无法滚动 | `already-fixed` | EX 控制台表格在 ExModule.Console.cs:261-276 自己处理 ScrollWheel（含 maxY=0 转横向），审计针对旧快照 |
 | 19 | 07_表格与样式 | P0-2 | 选中行高亮在非 Repaint 事件上逐行调用 DrawTexture | `ported` | 行选中高亮加 Repaint 门控，非 Repaint 不调 DrawTexture |
 | 20 | 07_表格与样式 | P0-3 | 字体回退路径会销毁当前正在使用的字体 | `ported` | 旧字体延迟销毁：先记 _retiredFont，下次重建且皮肤不再引用时才 Destroy |
-| 21 | 07_表格与样式 | P0-4 | 样式重建的纹理泄漏：未登记到 _styleList 的共享纹理被反复 new 并 DontDestroyOnLoad | `todo` |  |
+| 21 | 07_表格与样式 | P0-4 | 样式重建的纹理泄漏：未登记到 _styleList 的共享纹理被反复 new 并 DontDestroyOnLoad | `ported` | Solid() 纹理登记到 _styleTex，重建时统一 Destroy |
 | 22 | 07_表格与样式 | P0-5 | 表头裁剪块缺少 GUI.color 保护，且鼠标坐标语义可能跨裁剪原点错位 | `todo` |  |
 | 23 | 08_本地化与设置页 | P0-01 | SetValue 在编辑框自身提交帧跳过 `_editText` 清理，会回滚掉"1."之外的后续编辑 | `todo` |  |
 | 24 | 08_本地化与设置页 | P0-02 | ApplyCmOrder 用反射写 `<Description>k__BackingField`，BepInEx 5 实际字段名是 `description`（无编译器生成名） | `todo` |  |
