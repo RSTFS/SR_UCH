@@ -1,7 +1,6 @@
 // 方块破坏：列出现场方块、按玩家归属筛选、远程销毁。
 // 槽位（对外 Provide）：DestroyBlocks.IsPlayerPlaced / PlayerPlacedBlocks / AttributeToHost。
 // 权限模型：默认只有房主能真正删除；房客可以用同样的键高亮、选中、看信息条，按删除键不生效。
-// 扩展点：外部模组可通过槽位 Blocks.AllowClientsOn 提供 Func<bool>，返回 true 时房客也能删除（含网络同步）。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -420,7 +419,7 @@ namespace SR_UCH.Tweaks {
                 if (SRApi.ComboKeyDown(_deleteKey)) {
                     if (!canDestroy) {
                         SRApi.NotifyT("仅房主可破坏方块：", "Only the host can destroy blocks: ",
-                            SRApi.T("房客只能高亮标记（仅本机可见）", "guests can only highlight (local only)"));
+                            SRApi.T("房客只能高亮标记", "guests can only highlight"));
                     } else {
                         Placeable target = Blocks[_index];
                         if (target == null || target.MarkedForDestruction) {
