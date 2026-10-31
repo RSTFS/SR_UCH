@@ -108,7 +108,7 @@ The panel has sections on the left and pages on the right. Listed by section bel
 **Level Bounds** page
 
 - **Unlock Level Bounds** -- walk outside the original level bounds. How far each side extends is adjustable; "hard unlock" lets the cursor and camera go further, with an adjustable radius; out-of-bounds block placement is enabled along with it.
-- **Remove UI3 Overlay** -- removes the black screen that covers the view in a level.
+- **Remove UI3 Overlay** -- removes the black screen that covers the view in a level. It has no switch of its own; it follows **Unlock Level Bounds**.
 
 **Scene** page
 
@@ -140,8 +140,10 @@ Everything below runs **without the game installed** (contract layer is compiled
 `tests/UnityStubs.cs` + `tests/BepInExStubs.cs`), so it works on a fresh clone and in CI:
 
 ```powershell
-.uildun-tests.ps1 -NoGame    # contract layer must compile + 13 assertions (dotnet, net8.0)
-.uildun-tests.ps1            # same tests through csc against the real BepInEx when a game is present
+.uild
+un-tests.ps1 -NoGame    # contract layer must compile + 13 assertions (dotnet, net8.0)
+.uild
+un-tests.ps1            # same tests through csc against the real BepInEx when a game is present
 .uild\guards-text.ps1          # 13 text guards (API allow-list, layer boundaries, rsp coverage,
                                  # encoding, tooltip shapes, silent-catch and file-size ratchets)
 ```
