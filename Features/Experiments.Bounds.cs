@@ -716,7 +716,9 @@ public partial class Experiments : ITweak
             catch (Exception __ex) { SRApi.Guard.Log("关卡边界 收起", __ex); }
         }
     }
-    // 解除 UI 3 覆盖：BlankLevel 里 4 个纯黑 whiteSquare 位于 UI 3 层并盖住界外，停画它们及该层所有 Renderer。
+    // 解除 UI 3 覆盖（已并入「解除关卡边界」）：BlankLevel 里 4 个纯黑 whiteSquare 位于 UI 3 层并盖住界外，
+    // 停画它们及该层所有 Renderer。没有自己的开关，完全跟随「解除关卡边界」主开关；
+    // 保留 SrFeature 标记仅为功能清单登记与启动自检计数。
     [SrFeature("sr.removeui3", "RemoveUI3", "1.0")]
     public class RemoveUI3 : ITweak {
         private static readonly Dictionary<Renderer, bool> _wasOn = new Dictionary<Renderer, bool>();
@@ -728,31 +730,16 @@ public partial class Experiments : ITweak
         private static float _nextScanAt;    // 下次全扫时间
         private static string _scanScene;    // 上次扫描的场景名（换场景立即重扫）
 
-        // 自己的开关（评审 G8）：以前它只跟着「解除关卡边界」主开关走，作为独立功能却无法单独启用。
-        // 默认 false；打开边界主开关时行为与以前一致（两者是"或"关系）。
-        private static ConfigEntry<bool> _own;
-
         public void Initialize(IFeatureHost plugin) {
             try {
-                _own = plugin.Config.Bind("Experiments", "Remove UI 3 Overlay", false,
-                    "停画 UI 3 层上的纯黑遮罩 Renderer（BlankLevel 的界外黑幕）。\n"
-                    + "默认关；打开「解除关卡边界」时也会一并生效。\n"
-                    + "只影响渲染，不改关卡数据。");
                 SRApi.RegisterTick("解除UI3", Tick);
                 SRApi.RegisterSceneHook(Reset);
                 SRApi.RegisterDismissHook(Restore);
             } catch (Exception __ex) { SRApi.Guard.Log("解除UI3 初始化", __ex); }
         }
 
-        // 是否该停画 UI3：自己的开关 或 边界主开关（保持旧行为）。
-        private static bool WantOn {
-            get {
-                try {
-                    if (_own != null && _own.Value) return true;
-                    return LevelBoundsUnlock.MasterOn;
-                } catch { return false; }
-            }
-        }
+        // 是否该停画 UI3：跟随「解除关卡边界」主开关（含房主限制，与 Reeval/Tick 一致）。
+        private static bool WantOn { get { return LevelBoundsUnlock.MasterOn; } }
 
         // 换场景必须清 _wasOn：其为强引用字典，旧 Renderer 已随场景销毁，原值无意义且会逐场累积。
         private static void Reset() { _hitCount = -1; _scanScene = null; _nextScanAt = 0f; _ui3ScanTries = 0; Note = ""; _wasOn.Clear(); }

@@ -1,6 +1,7 @@
 // 方块破坏：列出现场方块、按玩家归属筛选、远程销毁。
 // 槽位（对外 Provide）：DestroyBlocks.IsPlayerPlaced / PlayerPlacedBlocks / AttributeToHost。
-// 权限模型：只有房主能真正删除；房客可以用同样的键高亮、选中、看信息条，按删除键不生效。
+// 权限模型：默认只有房主能真正删除；房客可以用同样的键高亮、选中、看信息条，按删除键不生效。
+// 扩展点：外部模组可通过槽位 Blocks.AllowClientsOn 提供 Func<bool>，返回 true 时房客也能删除（含网络同步）。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -240,7 +241,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
             SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除按键\n删除当前选中的方块（仅房主）\n房客按下只提示，不做删除；滚轮换目标", "Delete key\ndeletes the selected block (host only)\nguests only get a hint; the wheel cycles targets");
             SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
-            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n开启后本页功能才生效\n仅房主能真正删除；房客只能高亮标记", "Block breaking master switch\nthe page works only while this is on\nhost-only destruction; guests can only highlight");
+            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n开启后本页功能才生效\n默认仅房主可删；房客可高亮标记", "Block breaking master switch\nthe page works only while this is on\nhost-only by default; guests can highlight");
             SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
             SRApi.LocDesc("Destroy Blocks", "Select Mode", "候选排序方式\n距离＝离你近的优先；放置顺序＝新放的优先\n只影响选择顺序", "Candidate ordering\ndistance = nearest first; placement = newest first\nselection order only");
             SRApi.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
@@ -331,6 +332,18 @@ namespace SR_UCH.Tweaks {
 
         // 槽位名：与调用方的唯一约定是“名字 + 委托签名”，刻意用 private const，调用方另写自己的常量以免编译期依赖。
         // 名字一经发布不再更改（改需两边同步）。
+        // 房客删除放行槽位：外部模组提供 Func<bool>，true = 房客端也可以真正删除。
+        // 每次调用都 Require 一次（字典查找，代价可忽略）：放行方可能比本功能初始化更晚。
+        private const string SlotAllowClientsOn = "Blocks.AllowClientsOn";
+        private static bool AllowClientsOn {
+            get {
+                try {
+                    Func<bool> f = Slots.Require<Func<bool>>(SlotAllowClientsOn);
+                    return f != null && f();
+                } catch (Exception __ac) { SRApi.Guard.Log("方块破坏/读取房客放行槽位", __ac); return false; }
+            }
+        }
+
         private const string SlotIsPlayerPlaced = "DestroyBlocks.IsPlayerPlaced";
         private const string SlotPlayerPlacedBlocks = "DestroyBlocks.PlayerPlacedBlocks";
         private const string SlotAttributeToHost = "DestroyBlocks.AttributeToHost";
@@ -359,7 +372,7 @@ namespace SR_UCH.Tweaks {
             if (!SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay)) return;
             // 权限：只有房主能真正删除；房客照样可以按住切换键高亮、滚轮换目标、看信息条（只读）。
             // 房客按删除键时给一次明确提示，避免"按了没反应"的困惑。
-            bool canDestroy = SRApi.CanControlLocally;
+            bool canDestroy = SRApi.CanControlLocally || AllowClientsOn;
             if (SRApi.ComboKeyDown(_toggleKey)) {
                 _altDown = true;
                 RebuildList();
@@ -391,7 +404,7 @@ namespace SR_UCH.Tweaks {
                 if (SRApi.ComboKeyDown(_deleteKey)) {
                     if (!canDestroy) {
                         SRApi.NotifyT("仅房主可破坏方块：", "Only the host can destroy blocks: ",
-                            SRApi.T("房客只能高亮标记", "guests can only highlight"));
+                            SRApi.T("房客只能高亮标记（如已由扩展放行请确认其开关）", "guests can only highlight (check the extension's switch if it should allow you)"));
                     } else {
                         Placeable target = Blocks[_index];
                         if (target == null || target.MarkedForDestruction) {

@@ -300,7 +300,14 @@ function Check-SilentCatch {
             $total += $n
             $limit = 0
             # 基线键用"相对仓库根的路径"：同名文件（如 Level.cs 在核心与功能层各有一份）不会互相覆盖。
-            $rel = ($f.FullName.Substring($Root.Length) -replace '\\', '/').TrimStart('/')
+            $rel = if ($f.FullName.StartsWith($Root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+                    ($f.FullName.Substring($Root.Length) -replace '\\', '/').TrimStart('/')
+                } else {
+                    # 仓库外的文件（如 ../SR_UCH_EX）：用与仓库根的相对路径，避免切出半截目录名
+                    ('../' + ((Split-Path $Root -Parent) | ForEach-Object {
+                        $f.FullName.Substring($_.Length) -replace '\\', '/'
+                    }).TrimStart('/'))
+                }
             if ($base.ContainsKey($rel)) { $limit = $base[$rel] }
             if ($n -gt $limit) { $bad += ($rel + ' ' + $limit + '->' + $n) }
         }
@@ -371,7 +378,11 @@ function Check-FileSize {
             $count++
             $allowed = 0
             # 基线键 = 相对仓库根的路径（与 silent-catch 一致；同名文件不会互相覆盖）
-            $rel = ($f.FullName.Substring($Root.Length) -replace '\\', '/').TrimStart('/')
+            $rel = if ($f.FullName.StartsWith($Root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+                ($f.FullName.Substring($Root.Length) -replace '\\', '/').TrimStart('/')
+            } else {
+                ('../' + ((Split-Path $Root -Parent) | ForEach-Object { $f.FullName.Substring($_.Length) -replace '\\', '/' }).TrimStart('/'))
+            }
             if ($base.ContainsKey($rel)) { $allowed = $base[$rel] }
             if ($n -gt $allowed) { $bad += ($rel + ' ' + $allowed + '->' + $n) }
         }

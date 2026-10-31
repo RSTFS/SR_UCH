@@ -1,6 +1,17 @@
 ﻿# 重建 build\file-size.txt（与 Check-FileSize 完全同口径：ReadAllLines 行数 + 相对路径键）
 # 用在：拆分文件后、或确认某文件确实需要超过 900 行时。
 $ErrorActionPreference = 'Stop'
+
+# 基线键：相对仓库根的路径；仓库外的文件（SR_UCH_EX）用 ../ 前缀，
+# 且前缀判定必须带分隔符，否则 "SR_UCH" 会把 "SR_UCH_EX" 误判成子目录。
+function Get-RepoKey([System.IO.FileInfo]$f) {
+    $sep = [IO.Path]::DirectorySeparatorChar
+    if ($f.FullName.StartsWith($root + $sep, [StringComparison]::OrdinalIgnoreCase)) {
+        return ($f.FullName.Substring($root.Length) -replace '\\', '/').TrimStart('/')
+    }
+    $parent = (Split-Path $root -Parent)
+    return ('../' + ($f.FullName.Substring($parent.Length) -replace '\\', '/').TrimStart('/'))
+}
 $here = $PSScriptRoot
 $root = Split-Path -Parent $here
 $limit = 900
@@ -11,10 +22,10 @@ $dirs = @((Join-Path $root 'SR_UCH'),
 $rows = @()
 foreach ($d in $dirs) {
     if (-not (Test-Path -LiteralPath $d)) { continue }
-    foreach ($f in (Get-ChildItem -LiteralPath $d -Filter '*.cs' -File)) {
+    foreach ($f in (Get-ChildItem -LiteralPath $d -Recurse -Filter '*.cs' -File)) {
         $n = [System.IO.File]::ReadAllLines($f.FullName).Length
         if ($n -le $limit) { continue }
-        $rows += [pscustomobject]@{ Rel = ($f.FullName.Substring($root.Length) -replace '\\', '/').TrimStart('/'); N = $n }
+        $rows += [pscustomobject]@{ Rel = (Get-RepoKey $f); N = $n }
     }
 }
 foreach ($f in (Get-ChildItem -LiteralPath $root -Filter '*.cs' -File)) {
