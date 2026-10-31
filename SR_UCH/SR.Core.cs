@@ -675,6 +675,8 @@ public partial class SR : ITweak {
             // 性能剖析（F9 浮层 + 超阈值告警）：滑动平均耗时、上一帧耗时、累计调用与超限次数。
             public float AvgMs;
             public float LastMs;
+        // 单次最坏耗时：重钩子（2Hz / 0.5s）的平均值会被空闲帧摊平，只有峰值能反映真实的掉帧风险。
+        public float MaxMs;
             public long Calls;
             public long Overruns;
             public float WarnedAt = -999f;
@@ -759,12 +761,15 @@ public partial class SR : ITweak {
                 h.Calls++;
                 // 指数滑动平均（0.1 权重 ≈ 最近十帧），避免单帧噪声把排名抖来抖去。
                 h.AvgMs = h.Calls <= 1 ? ms : (h.AvgMs * 0.9f + ms * 0.1f);
+                if (ms > h.MaxMs) h.MaxMs = ms;
                 if (ms >= TickWarnMs) {
                     h.Overruns++;
                     if (now - h.WarnedAt > 10f) {
                         h.WarnedAt = now;
                         // 用 Warn 而不是 Guard.Log(..., null)：后者会拼上"失败: 未知错误"，把性能告警说成异常。
-                        LogWarn("[性能] 帧钩子耗时 " + h.Name + " " + ms.ToString("0.00") + "ms（阈值 "
+                        // 明确写"单次峰值"：这类钩子可能只在个别帧重，平均值看不出来。
+                        LogWarn("[性能] 帧钩子单次峰值 " + h.Name + " " + ms.ToString("0.00") + "ms"
+                            + "（峰值 " + h.MaxMs.ToString("0.00") + "ms / 平均 " + h.AvgMs.ToString("0.00") + "ms / 阈值 "
                             + TickWarnMs.ToString("0.00") + "ms，累计 " + h.Overruns + " 次超限）");
                     }
                 }
