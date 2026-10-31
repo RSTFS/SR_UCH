@@ -262,6 +262,12 @@ public partial class SR {
             }
             _scaled = Mathf.Clamp(_uiScaleEntry.Value, Ui.ScaleMin, Ui.ScaleMax);
             if (_visible || _uiAlpha > 0.01f) {
+            // 全局 GUI 状态（matrix / color / 字体 / 选择色）必须在**任何副作用之前**快照，
+            // 且 try 要从这里就起——以前 try 起在设置 matrix 之后，中间任何异常都会把
+            // GUI.matrix / skin.font 留在进程里，污染整个游戏的绘制。
+            Color prevColor = GUI.color;
+            Matrix4x4 prevMatrix = GUI.matrix;
+            try {
             EnsureScanned();
             EnsureStyles();
             EnsureFont();
@@ -407,14 +413,10 @@ public partial class SR {
             }
 
             // 淡入淡出 + 轻微缩放入场（布局本身已由 Sc() 缩放）
-            Color prevColor = GUI.color;
             GUI.color = new Color(1f, 1f, 1f, _uiAlpha);
             float pop = 1f + (1f - _uiAlpha) * 0.05f;
-            // 先保存旧矩阵再设缩放矩阵（顺序反了会让还原变成恢复成缩放矩阵）
-            Matrix4x4 prevMatrix = GUI.matrix;
+            // 矩阵还原靠上面 try 之外抓的 prevMatrix；这里只负责设新值（顺序不能反）。
             GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(pop, pop, 1f));
-            // 绘制体包进 try/finally：任何异常都必须还原 GUI.matrix / color / 字体，否则游戏 HUD 会残留缩放或半透明。
-            try {
 
             GUI.Box(winRect, GUIContent.none, _win);
             // 窗口区域内 rect 是区域局部坐标，鼠标事件是屏幕坐标：记下区域偏移供滚轮盾换算。
@@ -713,6 +715,12 @@ public partial class SR {
 // 分区：MonoBehaviour（ManagerUI：Update/LateUpdate/OnGUI 驱动入口）
 
         private class ManagerUI : MonoBehaviour {
+            // 失焦（Alt-Tab / 切窗口）时取消键位录制：IMGUI 事件会断流，录制态会一直挂着。
+            private void OnApplicationFocus(bool focused) {
+                try { if (!focused && SR.IsCapturingKey) SR.CancelCapture(); }
+                catch (Exception __fx) { SR.Guard.Log("失焦取消按键录制", __fx); }
+            }
+
             private bool _startup;
 
             private void OnEnable() {

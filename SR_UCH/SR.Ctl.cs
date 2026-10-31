@@ -586,6 +586,8 @@ public partial class SR {
         // 捕获开始时刻（Time.unscaledTime）：录制若因为事件被游戏吃掉而卡住，超时后自动放弃，
         // 否则 _capturing 一直非空 -> 所有快捷键轮询直接 return（表现为"改了键以后热键全失灵"）。
         internal static float CaptureStartedAt;
+        // 供窗口层判断是否正在录键（失焦/切场景时用它决定要不要取消）。
+        internal static bool IsCapturingKey { get { return _capturing != null; } }
         private const float CaptureTimeoutSeconds = 12f;
 
         /// 超时/异常时的兜底取消：清状态并丢弃未提交的录制序列。
