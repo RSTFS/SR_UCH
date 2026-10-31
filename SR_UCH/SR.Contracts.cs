@@ -85,6 +85,16 @@ namespace SR_UCH {
             MainThread.Assert("Slots.Provide");
             if (impl != null && !string.IsNullOrEmpty(slot)) { _map[slot] = impl; _misses.Remove(slot); }
         }
+        // 注销自己提供的槽位（R2：ITweak 没有卸载，功能在关机/禁用时用它回收）。
+        // 只删自己提供的那个实现，避免把别人后注册的槽位误删。
+        public static void Retract(string slot, object expected) {
+            MainThread.Assert("Slots.Retract");
+            if (string.IsNullOrEmpty(slot)) return;
+            object cur;
+            if (!_map.TryGetValue(slot, out cur)) return;
+            if (expected != null && !ReferenceEquals(cur, expected)) return;
+            _map.Remove(slot);
+        }
         public static T Require<T>(string slot) where T : class {
             MainThread.Assert("Slots.Require");
             if (string.IsNullOrEmpty(slot)) return null;

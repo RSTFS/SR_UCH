@@ -327,6 +327,15 @@ namespace SR_UCH.Tweaks {
             Slots.Provide(SlotIsPlayerPlaced, (Func<Placeable, bool>)IsPlayerPlaced);
             Slots.Provide(SlotPlayerPlacedBlocks, (Func<List<Placeable>>)PlayerPlacedBlocks);
             Slots.Provide(SlotAttributeToHost, (Action<List<Placeable>>)AttributeToHost);
+            // 关机时把自己提供的槽位摘掉：否则宿主代码仍能 Require 到已失效的实现。
+            SRApi.OnShutdown("方块破坏/槽位", delegate {
+                try {
+                    Slots.Retract(SlotIsPlayerPlaced, null);
+                    Slots.Retract(SlotPlayerPlacedBlocks, null);
+                    Slots.Retract(SlotAttributeToHost, null);
+                    SRApi.LogInfo("[方块破坏] 已注销 3 个对外槽位");
+                } catch (Exception __rt) { SRApi.Guard.Log("方块破坏/注销槽位", __rt); }
+            });
         }
 
 
