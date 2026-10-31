@@ -732,7 +732,8 @@ public partial class SR : ITweak {
                 _capturing = null;
                 _editText.Clear();
                 _editOpen.Clear();
-                _enumOptions.Clear();   // 与 _editText / _editOpen 同批失效：配置重读后条目对象会重建，旧键会留成陈旧项
+                _enumOptions.Clear();   // 条目对象会重建
+                SR.ColorPicker.ClearStates();   // 与 _editText / _editOpen 同批失效：配置重读后条目对象会重建，旧键会留成陈旧项
                 ApplyEventSystemGate(); // 重新启用游戏的 EventSystem
                 try { ResetWheelState(); } catch (Exception __ex) { Guard.Log("ForceResetUiState", __ex); }
             } catch (Exception __ex) { Guard.Log("对局开始处理", __ex); }
@@ -888,7 +889,8 @@ public partial class SR : ITweak {
                     _capturing = null;
                     _editText.Clear();
                     _editOpen.Clear();
-                    _enumOptions.Clear();   // 与 _editText / _editOpen 同批失效：配置重读后条目对象会重建，旧键会留成陈旧项
+                    _enumOptions.Clear();   // 条目对象会重建
+                SR.ColorPicker.ClearStates();   // 与 _editText / _editOpen 同批失效：配置重读后条目对象会重建，旧键会留成陈旧项
                     ApplyEventSystemGate(); // 重新启用游戏的 EventSystem
                 }
                 try { ResetWheelState(); } catch (Exception __ex) { Guard.Log("SR.Core", __ex); }   // 清掉滑块 / 滚轮盾的跨帧残留

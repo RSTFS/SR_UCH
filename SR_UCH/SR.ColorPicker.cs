@@ -46,6 +46,11 @@ public partial class SR {
             public int Drag;           // 0=无 1=S/V 方块 2=色相条
         }
 
+        // 配置重读 / 条目重建时清空调色板状态（与 _enumOptions / _editText 同批失效）。
+        internal static void ClearStates() {
+            try { _states.Clear(); } catch (Exception __ex) { Guard.Log("清空调色板状态", __ex); }
+        }
+
         private static readonly Dictionary<ConfigEntryBase, State> _states = new Dictionary<ConfigEntryBase, State>();
         private static ConfigEntryBase _open;   // 当前展开的条目（同一时间只展开一个）
         private static bool _tickHooked;
@@ -66,6 +71,9 @@ public partial class SR {
 
         private static State Get(ConfigEntryBase e) {
             State s;
+            // 容量上限：配置重读后条目对象会重建，旧键会留成僵尸（评审 G4）。
+            // 真正的一致失效由 ClearStates() 负责，这里只做兜底。
+            if (_states.Count > 128) _states.Clear();
             if (e != null && _states.TryGetValue(e, out s)) return s;
             s = new State();
             if (e != null) { Load(s, ReadColor(e)); _states[e] = s; }

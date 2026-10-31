@@ -750,18 +750,8 @@ namespace SR_UCH.Tweaks {
                 // cc.disband 与 cc.mainmenu 都映射到 online.disband（见 KeyMap），按“后写覆盖先写”只保留最后一条。
                 text = DedupeSectionKeys(text);
                 if (text == orig) return false;
-                // 配置文件是全部设置的唯一副本：写临时文件 -> 原子替换 -> 留 .bak；替换失败退回先备份再覆盖写。
-                string tmpPath = cfgPath + ".tmp";
-                File.WriteAllText(tmpPath, text, new UTF8Encoding(false));
-                try {
-                    File.Replace(tmpPath, cfgPath, cfgPath + ".bak");
-                } catch (Exception __rep) {
-                    try { File.Copy(cfgPath, cfgPath + ".bak", true); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-                    File.WriteAllText(cfgPath, text, new UTF8Encoding(false));
-                    try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-                    SR.LogWarn("[配置迁移] 原子替换失败，已退回备份加覆盖写: " + __rep.Message);
-                }
-                return true;
+                // 不再内联一份写盘逻辑：统一走 WriteCfgAtomic（评审 F1 P0-01：两份实现的失败路径不一致）。
+                return WriteCfgAtomic(cfgPath, text, "配置迁移·section/key");
             } catch (Exception __ex) { SR.Guard.Log("cfg section/key 迁移", __ex); return false; }
         }
     }

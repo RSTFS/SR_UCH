@@ -4,7 +4,7 @@
 # 格式：相对仓库根的路径=行数
 SR_UCH/SR.Contracts.cs=1333
 SR_UCH/SR.Settings.cs=1242
-SR_UCH/SR.Core.cs=1177
+SR_UCH/SR.Core.cs=1179
 SR_UCH/SR.Ctl.cs=1132
 Features/BuildingPresets.cs=1091
 Features/HUD.cs=1014
