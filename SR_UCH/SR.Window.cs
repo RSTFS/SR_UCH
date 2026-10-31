@@ -498,8 +498,10 @@ public partial class SR {
                 // 取用即清：Ctrl + 滚轮语义是切页，拿走后下拉框本帧取不到滚轮量。
                 float cw = WheelDeltaTake();
                 if (Mathf.Abs(cw) < 0.0001f) { try { cw = Input.GetAxis("Mouse ScrollWheel"); } catch { cw = 0f; } }
-                if (Mathf.Abs(cw) > 0.0001f && _mode == Mode.Internal) {
-                    CyclePage(_selectedInternalSection, cw > 0f ? -1 : 1);   // 向上滚 = 前一页
+                // 核心化：栏目页切页签，设置页切「通用/自检」两个页签，走同一条 Ctrl+滚轮。
+                if (Mathf.Abs(cw) > 0.0001f && (_mode == Mode.Internal || _mode == Mode.Settings)) {
+                    if (_mode == Mode.Settings) SR.SettingsTab = cw > 0f ? 0 : 1;
+                    else CyclePage(_selectedInternalSection, cw > 0f ? -1 : 1);   // 向上滚 = 前一页
                     if (__we != null) { __we.Use(); __we.type = EventType.Used; }
                     WheelShieldHit = true;   // 本帧页面不跟着滚
                     SR.MarkWheelUsed();

@@ -380,16 +380,22 @@ namespace SR_UCH.Tweaks {
         private static bool OnPresetWheel(Vector2 mouse, float wheel) {
             try {
                 if (_tableBox.width <= 0f || !_tableBox.Contains(mouse)) return false;
-                bool used = false;
-                if (_maxScrollY > 0f) {
-                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + wheel * SRApi.Ctl.Sc(40), 0f, _maxScrollY);
-                    used = true;
+                // 不依赖 RenderPresetTable 里算出的 _maxScrollY（那一帧可能还没跑或窗口刚变过），
+                // 直接用表格框的实时高度重算可滚动范围，避免"范围算成 0 就滚不动"。
+                float rowsH = Mathf.Max(0f, _tableBox.height - SRApi.Ctl.TableHeaderH()
+                                        - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));
+                int n = VisiblePresets().Count;
+                float maxY = Mathf.Max(0f, n * SRApi.Ctl.TableRowH() - rowsH);
+                if (maxY > 0f) {
+                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + wheel * SRApi.Ctl.Sc(40), 0f, maxY);
+                    _maxScrollY = maxY;
+                    return true;
                 }
-                if (_maxScrollX > 0f && !used) {
+                if (_maxScrollX > 0f) {
                     _scrollCols.x = Mathf.Clamp(_scrollCols.x + wheel * SRApi.Ctl.Sc(60), 0f, _maxScrollX);
-                    used = true;
+                    return true;
                 }
-                return used;
+                return false;
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/页面滚轮", __ex); return false; }
         }
 
