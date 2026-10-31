@@ -677,6 +677,8 @@ namespace SR_UCH.Tweaks {
                 text = RemoveKeys(text, "Reflection", new[] { "Last Game Version" });
             text = RemoveKeys(text, "Experiments", new[] { "Cross Platform", "Level Background" });
             text = RemoveKeys(text, "Online", new[] { "Hidden Columns" });
+            // 「破坏动画/烟雾」选项已删除（从未被读取）：清掉它的配置键。
+            text = RemoveKeys(text, "Destroy Blocks", new[] { "Use Smoke" });
             // EX 模块的遗留键（EX 在仓库外，无法自带清理规则）：已确认没有任何代码再读。
             text = RemoveKeys(text, "EX", new[] { "Clear Party Box Key", "Coin Amount" });
             // 快速自杀功能已删除：清理其遗留键。

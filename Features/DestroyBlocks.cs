@@ -31,7 +31,7 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<ListMode> _listMode;
         private static ConfigEntry<TrackMode> _trackMode;
         private static ConfigEntry<RefreshMode> _refreshMode;
-        private static ConfigEntry<bool> _useSmoke;
+
 
         public enum SelectMode {
             Placement,
@@ -252,8 +252,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocEnum("Snapshot", "暂存");
             SRApi.LocKey("Destroy Blocks", "Refresh Mode", "列表刷新", null);
             SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "候选列表刷新方式\n实时＝按住时持续更新；暂存＝按下时重建一次\n实时已节流，只在按住时有开销", "Candidate refresh\nrealtime = updates while held; snapshot = built once on press\nrealtime is throttled and only costs while held");
-            SRApi.LocKey("Destroy Blocks", "Use Smoke", "破坏动画", null);
-            SRApi.LocDesc("Destroy Blocks", "Use Smoke", "破坏动画\n删除方块时播放烟雾与破碎效果\n关闭后方块直接消失", "Break effect\nplays the smoke/break effect when a block is deleted\noff = the block just disappears");
+            // 「破坏动画/烟雾」选项已删除：它从未被读取（audit 19-P0-1），留着等于假开关。
         }
 
         // 是否走实时列表（默认实时）
@@ -306,7 +305,7 @@ namespace SR_UCH.Tweaks {
                 "Refresh Mode",
                 RefreshMode.Realtime,
                 "列表刷新：实时 = 按住切换键期间候选表持续保持最新（已节流，只在按住时有开销）；暂存 = 只在按下切换键那一刻重建一次。");
-            _useSmoke = _mp.Config.Bind("Destroy Blocks", "Use Smoke", true, "破坏动画：删除方块时是否播放破坏动画/烟雾（默认关闭）。");
+
             // 过滤条件变了：实时模式下候选表要重新过滤一次。
             _listMode.SettingChanged += (s, e) => _listDirty = true;
             _trackMode.SettingChanged += (s, e) => _listDirty = true;
