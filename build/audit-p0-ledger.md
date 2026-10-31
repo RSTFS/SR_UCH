@@ -4,11 +4,11 @@
 
 | # | 文档 | 编号 | 标题 | 状态 | 依据 |
 |---|---|---|---|---|---|
-| 1 | 01_SR.Core | P0-1 | PatchTargetExists 在重载歧义时仍返回 true，失效补丁不会被报告 | `todo` |  |
-| 2 | 02_SR.Contracts | P0-1 | 114 个门面通道未注入时全部静默丢弃，启动期与 SetLogSinks 之前的日志与用户提示彻底消失 | `todo` |  |
-| 3 | 02_SR.Contracts | P0-2 | Slots.Require 类型不符与新名字超过 64 条后静默丢弃，自检界面呈现"假干净" | `todo` |  |
-| 4 | 03_门控与扩展点 | P0-01 | `UserMessage(show, false)` 命中错误的二参重载，所有屏幕提示被绑定到当前场景 | `todo` |  |
-| 5 | 03_门控与扩展点 | P0-02 | `CanDo(Cap.HostOnly)` 判断 `HasServer`，与“仅房主可执行”的文案和名称不一致 | `todo` |  |
+| 1 | 01_SR.Core | P0-1 | PatchTargetExists 在重载歧义时仍返回 true，失效补丁不会被报告 | `ported` | 返回 hits==1；歧义按失效计 |
+| 2 | 02_SR.Contracts | P0-1 | 114 个门面通道未注入时全部静默丢弃，启动期与 SetLogSinks 之前的日志与用户提示彻底消失 | `ported` | 注入前 32 条环形缓冲 + Debug 兜底，SetLogSinks 补发 |
+| 3 | 02_SR.Contracts | P0-2 | Slots.Require 类型不符与新名字超过 64 条后静默丢弃，自检界面呈现"假干净" | `ported` | 超 64 条聚合计数 + LogWarn；MissingSinks 注入前 Debug.LogError |
+| 4 | 03_门控与扩展点 | P0-01 | `UserMessage(show, false)` 命中错误的二参重载，所有屏幕提示被绑定到当前场景 | `ported` | 改调四参 UserMessage(show,2f,lo,false) |
+| 5 | 03_门控与扩展点 | P0-02 | `CanDo(Cap.HostOnly)` 判断 `HasServer`，与“仅房主可执行”的文案和名称不一致 | `ported` | Cap.HostOnly 改判 Env.IsHost |
 | 6 | 04_主窗口框架 | P0-1 | `_dirtyConfig` 单槽覆盖会让先改的 ConfigFile 永不落盘 | `todo` |  |
 | 7 | 04_主窗口框架 | P0-2 | 录制超时与 CommitRecording 在同一帧并存，可能提交错误序列 | `todo` |  |
 | 8 | 04_主窗口框架 | P0-3 | DrawGUI 的 finally 不能保证 BeginArea / 滚动组对称闭合 | `todo` |  |

@@ -193,7 +193,9 @@ public partial class SR {
                     case Cap.Self:
                         return true;                       //只影响自己，不需要任何权限
                     case Cap.HostOnly:
-                        if (Env.HasServer) return true;    //本机在跑服务器 -> 可以广播
+                        // "仅房主"按"本机是否权威"判断，而不是"本机是否在跑服务器"：
+                        // 离线单机 / 本地派对里 HasServer 为 false，但本机就是权威（audit 03-P0-02）。
+                        if (Env.IsHost) return true;
                         why = T("仅房主可执行此操作",
                                 "Host only");
                         return false;

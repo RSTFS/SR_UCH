@@ -109,6 +109,13 @@ namespace UnityEngine {
         public static int frameCount { get { return 0; } }
     }
 
+    // 契约层的"注入前日志兜底"用 UnityEngine.Debug；测试工程要能编译到它。
+    public static class Debug {
+        public static void LogWarning(object m) { }
+        public static void LogError(object m) { }
+        public static void Log(object m) { }
+    }
+
     public static class GUILayoutUtility {
         public static Rect GetRect(float w, float h) { return new Rect(0f, 0f, w, h); }
         public static Rect GetRect(float w, float h, GUIStyle s) { return new Rect(0f, 0f, w, h); }

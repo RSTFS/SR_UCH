@@ -69,12 +69,22 @@ namespace SR_UCH {
         private static readonly Dictionary<string, object> _map = new Dictionary<string, object>();
         //记录无人提供或类型不符的槽位名（最多 64 条，只记不同的名字），供自检界面显示。
         private static readonly Dictionary<string, int> _misses = new Dictionary<string, int>();
+        private static int _missOverflow;   // 超过 64 条后的聚合计数（audit 02-P0-2）
         public static int MissCount { get { return _misses.Count; } }
         public static ICollection<string> MissNames { get { return _misses.Keys; } }
 
         private static void NoteMiss(string slot) {
             try {
-                if (_misses.Count >= 64 && !_misses.ContainsKey(slot)) return;
+                if (_misses.Count >= 64 && !_misses.ContainsKey(slot)) {
+                    // 超过 64 条不再静默丢弃：聚合成一条可见记录（audit 02-P0-2），
+                    // 否则自检页只看到前 64 个名字，后面的错误被完全隐藏。
+                    _missOverflow++;
+                    _misses["（另有 " + _missOverflow + " 个未列出的槽位）"] = _missOverflow;
+                    if (_missOverflow == 1) {
+                        try { SRApi.LogWarn("[Slots] 未提供/类型不符的槽位超过 64 条，多出的只做计数"); } catch { /* 日志失败不影响统计 */ }
+                    }
+                    return;
+                }
                 int c;
                 _misses.TryGetValue(slot, out c);
                 _misses[slot] = c + 1;
@@ -255,9 +265,33 @@ namespace SR_UCH {
     public static class SRApi {
         private static Action<string> _info, _warn, _error;
         private static Action<string> _notify;
+        // 注入前的日志缓冲（audit 02-P0-1）：SetLogSinks 自己也是门面通道，
+        // 在它之前调用的 LogInfo/LogWarn 会静默丢弃，于是"功能不工作但界面安静"。
+        // 这里用 32 条环形缓冲 + Debug 兜底，注入后一次性补发。
+        private static bool _sinksReady;
+        private static readonly string[] _preLog = new string[32];
+        private static int _preLogNext, _preLogCount;
+        private static void PreLog(string msg) {
+            try {
+                _preLog[_preLogNext] = msg;
+                _preLogNext = (_preLogNext + 1) % _preLog.Length;
+                if (_preLogCount < _preLog.Length) _preLogCount++;
+                UnityEngine.Debug.LogWarning("[SR]" + msg);
+            } catch { /* 兜底路径，失败就只能丢 */ }
+        }
         // 核心启动时注入：把契约层的日志/提示接到实现（无注入时静默丢弃，不影响功能）。
         public static void SetLogSinks(Action<string> info, Action<string> warn, Action<string> error) {
             _info = info; _warn = warn; _error = error;
+            _sinksReady = true;
+            try {
+                for (int i = 0; i < _preLogCount; i++) {
+                    int idx = (_preLogNext - _preLogCount + i + _preLog.Length) % _preLog.Length;
+                    string line = _preLog[idx];
+                    if (string.IsNullOrEmpty(line)) continue;
+                    try { if (_warn != null) _warn(line); } catch { /* 单条失败不影响其它 */ }
+                }
+            } catch { /* 补发失败不影响注入 */ }
+            _preLogCount = 0;
         }
         public static void SetNotifySink(Action<string> notify) { _notify = notify; }
 
@@ -297,11 +331,12 @@ namespace SR_UCH {
         public static void OpenMenu() { Action a = _openMenu; if (a != null) a(); }
         internal static void Warn(string msg) { try { Action<string> w = _warn; if (w != null) w(msg); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         private static string Str(object m) { try { return m == null ? "" : m.ToString(); } catch { return "<ToString 失败>"; } }
-        public static void LogInfo(object m) { try { Action<string> a = _info; if (a != null) a(Str(m)); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
-        public static void LogWarn(object m) { try { Action<string> a = _warn; if (a != null) a(Str(m)); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
-        public static void LogError(object m) { try { Action<string> a = _error; if (a != null) a(Str(m)); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
+        public static void LogInfo(object m) { try { Action<string> a = _info; if (a != null) a(Str(m)); else if (!_sinksReady) PreLog(Str(m)); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
+        public static void LogWarn(object m) { try { Action<string> a = _warn; if (a != null) a(Str(m)); else if (!_sinksReady) PreLog(Str(m)); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
+        public static void LogError(object m) { try { Action<string> a = _error; if (a != null) a(Str(m)); else if (!_sinksReady) PreLog(Str(m)); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         // 用户提示（右下角/系统消息）：实现层注入 ShowUserMessage（同时会写日志）。
-        public static void Notify(string text) { try { Action<string> n = _notify; if (n != null) n(text ?? ""); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
+        // 未注入时进缓冲（注入后补发），不再静默丢弃。
+        public static void Notify(string text) { try { Action<string> n = _notify; if (n != null) n(text ?? ""); else if (!_sinksReady) PreLog(Str(text)); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         public static void Notify(string text, params object[] args) {
             if (args == null || args.Length == 0) { Notify(text); return; }
             try { Notify(string.Format(text, args)); } catch { Notify(text); }
@@ -1323,6 +1358,12 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
                     }
                 }
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+            if (miss.Count > 0 && !_sinksReady) {
+                // 注入还没发生就查缺失：写 Debug，避免"启动期问题不可观测"（audit 02-P0-1）。
+                try {
+                    UnityEngine.Debug.LogError("[SR] 未注入的 API 通道 (" + miss.Count + "): " + string.Join(", ", miss.ToArray()));
+                } catch { /* 兜底失败即放弃 */ }
+            }
             return miss.ToArray();
         }
         // 已注入的 API 通道总数（自检用）

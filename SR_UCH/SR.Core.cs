@@ -256,8 +256,13 @@ public partial class SR : ITweak {
                                                   BindingFlags.Static | BindingFlags.Instance);
                 int hits = 0;
                 for (int i = 0; i < ms.Length; i++) if (ms[i].Name == name) hits++;
-                if (hits > 1) AuditWarn("[补丁自检] " + decl.Name + "." + name + " 有 " + hits + " 个同名重载，按名字匹配无法确认补丁目标");
-                return hits > 0;
+                if (hits > 1) {
+                    // 重载歧义不能当成"存在"：游戏新增同名重载后按名字匹配无法确认目标，
+                    // 报 true 会让自检显示健康、而对应行为其实早已失效（audit 01-P0-1）。
+                    AuditWarn("[补丁自检] " + decl.Name + "." + name + " 有 " + hits + " 个同名重载，按名字匹配无法确认补丁目标（按失效计）");
+                    return false;
+                }
+                return hits == 1;
             } catch { return false; }
         }
 

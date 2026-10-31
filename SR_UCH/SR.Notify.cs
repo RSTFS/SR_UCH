@@ -77,7 +77,9 @@ public partial class SR {
                 _tipBatchUntil = now + 0.35f;
             } catch { show = text; }   // 拿不到时间就退回单条
             try {
-                UserMessageManager.Instance.UserMessage(show, false);
+                // 显式走四参重载：二参 (string, bool) 会把提示绑到当前场景、固定 2 秒 / lo 优先级，
+                // 场景一换提示就消失（audit 03-P0-01）。这里固定 2 秒、lo、且不绑场景。
+                UserMessageManager.Instance.UserMessage(show, 2f, UserMessageManager.UserMsgPriority.lo, false);
                 if (_tipDown) { _tipDown = false; _tipDownScene = null; }   // 调通了说明已恢复
             } catch (Exception __ex) {
                 _tipDown = true; _tipDownScene = scene;
