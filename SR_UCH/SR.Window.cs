@@ -567,6 +567,11 @@ public partial class SR {
             }
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
+            // 设置页的页签画在滚动区**之外**：常驻顶部，不受滚动影响；
+            // 「恢复默认」跟着页签排在最右侧（只对通用页有意义，自检页隐藏）。
+            if (_mode == Mode.Settings) {
+                try { SR.RenderSettingsTabBar(); } catch (Exception __tb) { Guard.Log("设置页签", __tb); }
+            }
             _scroll = __noScroll
                 ? GUILayout.BeginScrollView(_scroll, false, false, GUIStyle.none, GUIStyle.none, GUIStyle.none, GUILayout.ExpandHeight(true))
                 : GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUIStyle.none, GUILayout.ExpandHeight(true));   // 弹性占满剩余高度

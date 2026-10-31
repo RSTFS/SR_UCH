@@ -105,6 +105,36 @@ public partial class SR {
             return null;
         }
 
+        // 恢复默认：把设置段里所有条目写回各自的默认值（不动「自检」页的诊断开关以外的内容）。
+        private static void ResetAllDefaults() {
+            try {
+                int n = 0;
+                foreach (ConfigEntryBase e in SettingsEntries()) {
+                    if (e == null || e.Definition == null) continue;
+                    if (e.Definition.Section != "Settings") continue;
+                    try { e.BoxedValue = e.DefaultValue; n++; } catch (Exception __one) { Guard.Log("恢复默认 " + e.Definition.Key, __one); }
+                }
+                SRApi.Notify(T("已恢复默认：" + n + " 项", "Defaults restored: " + n));
+                SRApi.LogInfo("[设置] 恢复默认 " + n + " 项");
+            } catch (Exception __ex) { Guard.Log("恢复默认", __ex); }
+        }
+
+        // 常驻页签栏（画在滚动区之外）：[通用] [自检] ……… [恢复默认]
+        internal static void RenderSettingsTabBar() {
+            try {
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button(T("通用", "General"), SettingsTab == 0 ? _selItem : _btn, GUILayout.Height(Sc(26)))) SettingsTab = 0;
+                if (GUILayout.Button(T("自检", "Self-check"), SettingsTab == 1 ? _selItem : _btn, GUILayout.Height(Sc(26)))) SettingsTab = 1;
+                GUILayout.FlexibleSpace();
+                // 恢复默认只在通用页出现（自检页没有可复位的配置）。
+                if (SettingsTab == 0) {
+                    if (GUILayout.Button(T("恢复默认", "Reset defaults"), _btn, GUILayout.Height(Sc(26)))) ResetAllDefaults();
+                }
+                GUILayout.EndHorizontal();
+                GUILayout.Space(Sc(4));
+            } catch (Exception __ex) { Guard.Log("设置页签栏", __ex); }
+        }
+
         internal static int SettingsTab;   // 0 = 通用，1 = 自检
         private static Vector2 _scrollIssues;   // 自检页表格的滚动位置
         private static Vector2 _scrollHooks;    // 自检页帧钩子表格的滚动位置
@@ -112,11 +142,6 @@ public partial class SR {
         // 设置页入口：顶部两个页签，下面按页签渲染。页面切换只改这个字段，不重建任何配置。
         internal static void RenderSettingsPage(float colWidth) {
             try {
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Button(T("通用", "General"), SettingsTab == 0 ? _selItem : _item, GUILayout.Height(Sc(26)))) SettingsTab = 0;
-                if (GUILayout.Button(T("自检", "Self-check"), SettingsTab == 1 ? _selItem : _item, GUILayout.Height(Sc(26)))) SettingsTab = 1;
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
                 // Ctrl+滚轮切页（与其它页签式界面一致；只在设置页生效）。
                 try {
                     Event __e = Event.current;
