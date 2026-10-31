@@ -24,6 +24,7 @@ public partial class SR : ITweak {
 //   必要时再把 Gate / Ctl / Nav 提成独立静态类。
 
         private static ConfigEntry<KeyCode> _openKey;
+        private static ConfigEntry<bool> _tickProf;   // 帧钩子剖析开关
         private static ConfigEntry<bool> _blockInputEntry;
         private static ConfigEntry<float> _uiScaleEntry;
         private static ConfigEntry<string> _disabledPluginsEntry;
@@ -768,7 +769,8 @@ public partial class SR : ITweak {
                         h.WarnedAt = now;
                         // 用 Warn 而不是 Guard.Log(..., null)：后者会拼上"失败: 未知错误"，把性能告警说成异常。
                         // 明确写"单次峰值"：这类钩子可能只在个别帧重，平均值看不出来。
-                        LogWarn("[性能] 帧钩子单次峰值 " + h.Name + " " + ms.ToString("0.00") + "ms"
+                        if (_tickProf != null && _tickProf.Value)
+                            LogWarn("[性能] 帧钩子单次峰值 " + h.Name + " " + ms.ToString("0.00") + "ms"
                             + "（峰值 " + h.MaxMs.ToString("0.00") + "ms / 平均 " + h.AvgMs.ToString("0.00") + "ms / 阈值 "
                             + TickWarnMs.ToString("0.00") + "ms，累计 " + h.Overruns + " 次超限）");
                     }
@@ -915,6 +917,9 @@ public partial class SR : ITweak {
             _uiScaleEntry = plugin.Config.Bind(Keys.Settings, Keys.UiScale, 1.3f, "整个界面放大多少, 1.0 到 1.8, 默认 1.3.");
             // 界面语言：中文 / English（运行时立即生效；外部模块页面始终中文）
             _langEntry = plugin.Config.Bind(Keys.Settings, Keys.Language, "English", "界面用哪种语言. 装了语言包 DLL 的话, 它也会自动出现在这个下拉里. 外部插件的页面始终是中文.");
+            // 帧钩子剖析开关：默认关闭，避免每 10 秒刷一条性能警告；排查卡顿时再打开。
+            _tickProf = plugin.Config.Bind(Keys.Settings, "Tick Profiling", false,
+                "把每个帧钩子的耗时写进日志（默认关，排查卡顿时打开）。");
             // 切语言 / 装语言包都走 ApplyLanguage：解析 id 并让显示名缓存失效
             _langEntry.SettingChanged += (s, e) => ApplyLanguage();
             ApplyLanguage();

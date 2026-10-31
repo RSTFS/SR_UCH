@@ -293,19 +293,6 @@ public partial class SR {
 
                 // ---- 性能卡 ----
                 string tickRep = SR.TickProfileReport();
-                Card(true, T("帧钩子", "Frame hooks"),
-                    T("按名字排序，超阈值才需要关注", "sorted by name; only over-threshold rows matter"),
-                    delegate {
-                        _scrollHooks = GUILayout.BeginScrollView(_scrollHooks, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
-                            GUIStyle.none, GUILayout.Height(Sc(190f)));
-                        if (string.IsNullOrEmpty(tickRep)) GUILayout.Label(T("（还没有采样）", "(no samples yet)"), _label);
-                        else {
-                            string[] rows = tickRep.Split('\n');
-                            for (int i = 0; i < rows.Length; i++) if (!string.IsNullOrEmpty(rows[i])) AuditLabel(rows[i]);
-                        }
-                        GUILayout.EndScrollView();
-                    });
-
                 // ---- 配置健康卡 ----
                 Card(SR.OrphanKeyCount == 0 && SR.FallbackSectionCount == 0, T("配置", "Config"),
                     T("孤儿键 " + SR.OrphanKeyCount + " · 无主段 " + SR.FallbackSectionCount + " · 运行时异常 " + SR.Guard.WarnCount,
@@ -316,6 +303,23 @@ public partial class SR {
                             AuditLabel(T("最近一次", "Last") + "：" + SR.Guard.LastWhat + " - " + (SR.Guard.LastError ?? ""));
                         try { AuditLabel(SR.AttributionReport()); } catch (Exception __at) { Guard.Log("自检/归因", __at); }
                     });
+                Card(true, T("帧钩子", "Frame hooks"),
+                    T("按名字排序，超阈值才需要关注", "sorted by name; only over-threshold rows matter"),
+                    delegate {
+                        // 剖析开关（默认关）：关掉后不再写性能日志，表格仍显示已采样的数据。
+                        SRApi.RenderSectionEntries(Keys.Settings, delegate (ConfigEntryBase e) {
+                            return e.Definition.Key == "Tick Profiling";
+                        });
+                        _scrollHooks = GUILayout.BeginScrollView(_scrollHooks, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
+                            GUIStyle.none, GUILayout.Height(Sc(190f)));
+                        if (string.IsNullOrEmpty(tickRep)) GUILayout.Label(T("（还没有采样）", "(no samples yet)"), _label);
+                        else {
+                            string[] rows = tickRep.Split('\n');
+                            for (int i = 0; i < rows.Length; i++) if (!string.IsNullOrEmpty(rows[i])) AuditLabel(rows[i]);
+                        }
+                        GUILayout.EndScrollView();
+                    });
+
             } catch (Exception __ex) { Guard.Log("渲染自检", __ex); }
         }
 
