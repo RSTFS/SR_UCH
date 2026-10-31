@@ -847,9 +847,12 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             try {
                 float areaH = SRApi.ContentArea.height;
                 if (areaH <= 0f) return fallback;
-                float reserve = SRApi.Ctl.Sc(300);
+                // 以前固定预留 300px，结果表格比可用区域矮一大截：页面下方留出大片空白，
+                // 手轮落在那片空白上就变成"滚页面"，而表格自己反而滚不动。
+                // 现在只扣掉页脚和一点边距，表格直接占满内容区 -> 手轮落在表上就是滚表。
+                float reserve = SRApi.Ctl.Sc(48);
                 float avail = areaH - SRApi.FooterHeight - reserve;
-                return Mathf.Clamp(avail, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(480));
+                return Mathf.Clamp(avail, SRApi.Ctl.Sc(200), SRApi.Ctl.Sc(900));
             } catch { return fallback; }
         }
 
