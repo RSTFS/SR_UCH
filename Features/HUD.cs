@@ -601,9 +601,7 @@ namespace SR_UCH.Tweaks {
             _roundText = null;
             _levelText = null;
             _winText = null;
-            _roundNoticeText = null;
             _roundNoticeStart = 0f;
-            _lastRound = 0;
             _vsPlaceSeen = false;
             _inLobby = false;
             
@@ -611,8 +609,6 @@ namespace SR_UCH.Tweaks {
             for (int i = 0; i < _hudHeights.Length; i++) _hudHeights[i] = 0f;
             for (int i = 0; i < _segWSmooth.Length; i++) _segWSmooth[i] = 0f;
             _heightFrame = -1;
-            _trueRound = 0;
-            _roundPending = 0;
             _roundTallySeen = false;
             _dragging = false;
         }
