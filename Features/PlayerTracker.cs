@@ -67,6 +67,8 @@ namespace SR_UCH.Tweaks {
         private static readonly Dictionary<int, GamePlayer> _gpByIndex = new Dictionary<int, GamePlayer>();
         private static readonly Dictionary<int, LobbyPlayer> _lpByIndex = new Dictionary<int, LobbyPlayer>();
 
+        private static GameEvent.IGameEventListener _levelResetListener;   // 关机时注销用
+
         private class LevelResetListener : GameEvent.IGameEventListener {
             public void handleEvent(GameEvent.GameEvent e) {
                 // 事件回调抛异常会冒到 GameEventManager 并影响同链其它监听器，故只记日志。
@@ -212,13 +214,22 @@ namespace SR_UCH.Tweaks {
             // 行池按需增长，支持超过 8 人。
             EnsureCapacity(8);
 
-            GameEventManager.ChangeListener<GameEvent.LevelResetEvent>(new LevelResetListener(), true);
+            // 保留监听器引用：关机时要注销，否则重载模组/重新 Initialize 会重复订阅（audit 21-P0-2）。
+            _levelResetListener = new LevelResetListener();
+            GameEventManager.ChangeListener<GameEvent.LevelResetEvent>(_levelResetListener, true);
             // 关机时销毁常驻对象与材质（功能关闭时也走同一条清理，避免 DontDestroyOnLoad 残留）。
             SRApi.OnShutdown("移动轨迹", delegate {
                 try {
                     if (_trackerRoot != null) { UnityEngine.Object.Destroy(_trackerRoot); _trackerRoot = null; }
                     if (_lineMat != null) { UnityEngine.Object.Destroy(_lineMat); _lineMat = null; }
-                    SRApi.LogInfo("[移动轨迹] 已销毁常驻对象与材质");
+                    // 注销事件监听（audit 21-P0-2）。
+                    try {
+                        if (_levelResetListener != null) {
+                            GameEventManager.ChangeListener<GameEvent.LevelResetEvent>(_levelResetListener, false);
+                            _levelResetListener = null;
+                        }
+                    } catch (Exception __ul) { SRApi.Guard.Log("移动轨迹/注销监听", __ul); }
+                    SRApi.LogInfo("[移动轨迹] 已销毁常驻对象与材质并注销监听");
                 } catch (Exception __sd) { SRApi.Guard.Log("移动轨迹/关机清理", __sd); }
             });
           } catch (Exception __ex) { SRApi.Guard.Log("移动轨迹 初始化", __ex); }

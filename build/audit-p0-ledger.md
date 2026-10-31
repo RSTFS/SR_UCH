@@ -16,7 +16,7 @@
 | 10 | 05_键位与调色板 | P0-1 | 序列半完成状态跨帧残留，且可能在非 Layout/Repaint 事件上重入 | `ported` | 序列进度加 1.2 秒时效 + 成功后清空进度；字典超 256 条整体清空 |
 | 11 | 05_键位与调色板 | P0-2 | `_watchKeys` 无限增长且无失效覆盖，直接改 BoxedValue 时可能漏失效 | `todo` |  |
 | 12 | 05_键位与调色板 | P0-3 | `_pendingComboDefault` 迁移可能覆盖已持久化的“无修饰键”配置 | `ported` | 延迟默认判定改为看持久化字符串是否为空 |
-| 13 | 05_键位与调色板 | P0-4 | `legacy.Value=""` 会在读回时把用户旧配置清空，且迁移判断忽略 extras | `todo` |  |
+| 13 | 05_键位与调色板 | P0-4 | `legacy.Value=""` 会在读回时把用户旧配置清空，且迁移判断忽略 extras | `ported` | 旧命名条目迁移后不再清空（8404d2e） |
 | 14 | 05_键位与调色板 | P0-5 | 颜色选择器拖动中丢失 MouseUp 时 Dirty 永久存在，Tick 兜底不覆盖全部路径 | `ported` | Tick 里在 8 帧节流之前补判：Dirty 且鼠标全松 -> 立即 Commit |
 | 15 | 05_键位与调色板 | P0-6 | `Tick` 兜底跳过条件与“窗口不再绘制”互斥，关闭/切页可能永远不落盘 | `ported` | 收起/换页时 RegisterDismissHook 显式落盘；Tick 异常不再静默；注册失败立即提交一次 |
 | 16 | 06_控件门面Ctl | P0-1 | 操作列 MouseDown 置位但 MouseUp 未命中时不复位 BlockWindowDrag | `ported` | 每帧鼠标全松时兜底清 BlockWindowDrag |
@@ -26,7 +26,7 @@
 | 20 | 07_表格与样式 | P0-3 | 字体回退路径会销毁当前正在使用的字体 | `ported` | 旧字体延迟销毁：先记 _retiredFont，下次重建且皮肤不再引用时才 Destroy |
 | 21 | 07_表格与样式 | P0-4 | 样式重建的纹理泄漏：未登记到 _styleList 的共享纹理被反复 new 并 DontDestroyOnLoad | `ported` | Solid() 纹理登记到 _styleTex，重建时统一 Destroy |
 | 22 | 07_表格与样式 | P0-5 | 表头裁剪块缺少 GUI.color 保护，且鼠标坐标语义可能跨裁剪原点错位 | `ported` | 表头与钉住列表头两个裁剪块都保存/还原 GUI.color |
-| 23 | 08_本地化与设置页 | P0-01 | SetValue 在编辑框自身提交帧跳过 `_editText` 清理，会回滚掉"1."之外的后续编辑 | `todo` |  |
+| 23 | 08_本地化与设置页 | P0-01 | SetValue 在编辑框自身提交帧跳过 `_editText` 清理，会回滚掉"1."之外的后续编辑 | `n-a` | IMGUI 文本框每事件只提交一次，同帧二次编辑不成立；现有 _editSelfFrame 保护是有意保留小数输入 |
 | 24 | 08_本地化与设置页 | P0-02 | ApplyCmOrder 用反射写 `<Description>k__BackingField`，BepInEx 5 实际字段名是 `description`（无编译器生成名） | `ported` | 改为按类型+名字含 escription 探测后备字段，探测失败 LogWarn（带 BepInEx 版本） |
 | 25 | 08_本地化与设置页 | P0-03 | ResetAllDefaults 只复位 `Section == "Settings"` 的条目，Sidebar/Internal 段与外部插件段被跳过且窗口几何被一并复位 | `ported` | 恢复默认跳过 WinWidth/WinHeight/WinX/WinY/SidebarWidth，Notify 说明几何未动 |
 | 26 | 08_本地化与设置页 | P0-04 | ModeLabel 缓存键用 `GameSettings.GetInstance().GameMode`，但 `gmKey` 声明在使用之后、且 catch 块吞掉异常后 `gmKey` 保持 `CREATIVE` 默认值 | `ported` | GameMode 读取失败时不写缓存键，直接 ModeLabelRaw（避免页脚模式文本闪烁+全量重算） |
@@ -59,7 +59,7 @@
 | 53 | 19_方块破坏 | P0-2 | `DestroySelf` 后紧接 `OnDestroy` 调用，可能触发重复销毁或状态不一致 | `ported` | 去掉手工 target.OnDestroy()，DestroySelf 自己已标记并收尾，避免二次销毁 |
 | 54 | 20_实验模块与派对盒 | P0-1 | `CrossPlay.TryPersist` 按方法名子串猜测并 Invoke 保存入口，可能触发破坏性方法 | `ported` | 保存入口改为白名单精确名 + 必须声明在目标类型自身，不再子串匹配继承链 |
 | 55 | 21_HUD状态与轨迹 | P0-1 | `DiagTick` 是未关闭的调试残留，会长期污染日志 | `ported` | 临时诊断 DiagTick 已删除（提交 97172cf） |
-| 56 | 21_HUD状态与轨迹 | P0-2 | `OnShutdown` 只销毁根对象，未注销 `LevelResetEvent` 监听器，重载模组会重复订阅 | `todo` |  |
+| 56 | 21_HUD状态与轨迹 | P0-2 | `OnShutdown` 只销毁根对象，未注销 `LevelResetEvent` 监听器，重载模组会重复订阅 | `ported` | 保留监听器引用，关机回调里 ChangeListener(false) 注销并置空 |
 | 57 | 21_HUD状态与轨迹 | P0-3 | `networkNumber` 与数组槽位下标耦合，索引不连续时会创建大量空 `LineRenderer` | `todo` |  |
 | 58 | 21_HUD状态与轨迹 | P0-4 | 挑战模式分支绕过"结算证据"门槛，回合提示会在一局内反复重播 | `todo` |  |
-| 59 | 21_HUD状态与轨迹 | P0-5 | `UpdateChallengeTimer` 中 `runTime`/`runStarted` 字段名未经游戏侧核实，反射取不到会静默退化 | `todo` |  |
+| 59 | 21_HUD状态与轨迹 | P0-5 | `UpdateChallengeTimer` 中 `runTime`/`runStarted` 字段名未经游戏侧核实，反射取不到会静默退化 | `already-fixed` | 已核实游戏 ChallengeControl 确有 private float runTime / private bool runStarted（decompiled 121889/121893），反射名正确 |
