@@ -57,7 +57,7 @@
 | 51 | 17_会话聊天 | P0-1 | 取不到本地玩家号时按 -1 发送，消息被服务端与所有客户端静默丢弃 | `ported` | 取不到本地玩家号时不再按 -1 发送（会被全体丢弃），改为 Notify 提示并返回 |
 | 52 | 19_方块破坏 | P0-1 | `_useSmoke` 配置项从未被读取，用户关闭后烟雾效果仍播放 | `ported` | 游戏 DestroySelf 就有 useSmoke 参数：开关传进去真正生效（上一版误删已回滚） |
 | 53 | 19_方块破坏 | P0-2 | `DestroySelf` 后紧接 `OnDestroy` 调用，可能触发重复销毁或状态不一致 | `ported` | 去掉手工 target.OnDestroy()，DestroySelf 自己已标记并收尾，避免二次销毁 |
-| 54 | 20_实验模块与派对盒 | P0-1 | `CrossPlay.TryPersist` 按方法名子串猜测并 Invoke 保存入口，可能触发破坏性方法 | `todo` |  |
+| 54 | 20_实验模块与派对盒 | P0-1 | `CrossPlay.TryPersist` 按方法名子串猜测并 Invoke 保存入口，可能触发破坏性方法 | `ported` | 保存入口改为白名单精确名 + 必须声明在目标类型自身，不再子串匹配继承链 |
 | 55 | 21_HUD状态与轨迹 | P0-1 | `DiagTick` 是未关闭的调试残留，会长期污染日志 | `ported` | 临时诊断 DiagTick 已删除（提交 97172cf） |
 | 56 | 21_HUD状态与轨迹 | P0-2 | `OnShutdown` 只销毁根对象，未注销 `LevelResetEvent` 监听器，重载模组会重复订阅 | `todo` |  |
 | 57 | 21_HUD状态与轨迹 | P0-3 | `networkNumber` 与数组槽位下标耦合，索引不连续时会创建大量空 `LineRenderer` | `todo` |  |

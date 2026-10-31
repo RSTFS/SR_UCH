@@ -470,7 +470,11 @@ public partial class Experiments : ITweak
                         MethodInfo m = ms[i];
                         if (m == null || m.IsAbstract || m.GetParameters().Length != 0) continue;
                         string n = m.Name;
-                        if (n.IndexOf(keys[k], StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        // 只接受"名字完全等于白名单项"且声明在目标类型自身上的方法：
+                        // 以前用"名字包含 save/write/flush"做子串匹配 + 继承链搜索，
+                        // 可能调到 SaveSettingsAndQuit 之类的破坏性方法（audit 20-P0-1）。
+                        if (!string.Equals(n, keys[k], StringComparison.Ordinal)) continue;
+                        if (m.DeclaringType != ty) continue;
                         if (m.ReturnType != typeof(void) && m.ReturnType != typeof(bool)) continue;
                         try {
                             object r = m.Invoke(m.IsStatic ? null : owner, null);
