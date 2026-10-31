@@ -598,6 +598,21 @@ public partial class SR {
             return clicked && !capturing; //左键（非捕捉）触发操作
         }
 
+        // 捕获开始时刻（Time.unscaledTime）：录制若因为事件被游戏吃掉而卡住，超时后自动放弃，
+        // 否则 _capturing 一直非空 -> 所有快捷键轮询直接 return（表现为"改了键以后热键全失灵"）。
+        internal static float CaptureStartedAt;
+        private const float CaptureTimeoutSeconds = 12f;
+
+        /// 超时/异常时的兜底取消：清状态并丢弃未提交的录制序列。
+        internal static void CancelCapture() {
+            try {
+                _capturing = null;
+                _recSeq.Clear();
+                _recHeld.Clear();
+                _dirty = true;
+            } catch (Exception __ex) { Guard.Log("取消按键录制", __ex); }
+        }
+
         // 右键处理：未捕捉 -> 进入捕捉；捕捉中再右键 -> 删除快捷键（Esc 也可清空）。
         private static void HandleHotkeyRightClick(ConfigEntry<KeyCode> keyEntry, bool capturing) {
             if (keyEntry == null) return;
@@ -610,6 +625,7 @@ public partial class SR {
                 _prevBoxed = keyEntry.BoxedValue;
                 _capturing = keyEntry;
                 _captureStartFrame = Time.frameCount; //右键进入捕捉：本次 MouseDown 不能被"按下即取消"清掉
+                CaptureStartedAt = Time.unscaledTime;  // 超时自愈用（见 SR.Window 捕获分支）
                 _recSeq.Clear();
                 _recHeld.Clear();
             }

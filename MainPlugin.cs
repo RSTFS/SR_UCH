@@ -34,21 +34,31 @@ namespace SR_UCH {
         public void Awake() {
             // ModLogger 必须是本方法第一条语句：下面的步骤与其 catch 内的日志都依赖它。
             ModLogger = Logger;
-            PatchOwnConfigFile();
-            SetupStandaloneConfig();
-            MigrateLegacyConfigNames();
-            // 程序集解析：外部功能 / 语言包 DLL 只引用 SR_UCH.dll（不引用 BepInEx），全局注册一次。
-            AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
-            InjectApiSinks();
-            InitializeTweaks();
-            LoadExModule();
-            // 外部功能 DLL / 语言包 DLL：一个 DLL 一个功能（ITweak）或一门语言（ILanguagePack）；
-            // 放在本程序集扫描与 EX 之后（EX 的硬编码路径不受影响）。
-            LoadExternal();
-            // 装配完成后补扫一轮 ITweak（audit P0-1）：EX / 外部 DLL 若漏在 ExLoader 的反射路径之外，
-            // 还能被主扫描发现并初始化；EX 自己做了幂等，两条路都走也只初始化一次。
-            InitializeTweaks(true);
-            RebuildFeatureManifest();   // 含功能清单登记 + 启动自检 + 自检日志
+            // 顶层兜底（评审 P0-E）：任何一步抛异常以前都会让整个模组"静默不启动"，而 BepInEx 仍显示已加载。
+            // 这里失败也必须留下一条 ERROR + 一条可 grep 的标记行，并把已完成的阶段记清楚。
+            string stage = "start";
+            try {
+                stage = "PatchOwnConfigFile"; PatchOwnConfigFile();
+                stage = "SetupStandaloneConfig"; SetupStandaloneConfig();
+                stage = "MigrateLegacyConfigNames"; MigrateLegacyConfigNames();
+                // 程序集解析：外部功能 / 语言包 DLL 只引用 SR_UCH.dll（不引用 BepInEx），全局注册一次。
+                stage = "AssemblyResolve"; AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
+                stage = "InjectApiSinks"; InjectApiSinks();
+                stage = "InitializeTweaks"; InitializeTweaks();
+                stage = "LoadExModule"; LoadExModule();
+                // 外部功能 DLL / 语言包 DLL：一个 DLL 一个功能（ITweak）或一门语言（ILanguagePack）；
+                // 放在本程序集扫描与 EX 之后（EX 的硬编码路径不受影响）。
+                stage = "LoadExternal"; LoadExternal();
+                // 装配完成后补扫一轮 ITweak（audit P0-1）：EX / 外部 DLL 若漏在 ExLoader 的反射路径之外，
+                // 还能被主扫描发现并初始化；EX 自己做了幂等，两条路都走也只初始化一次。
+                stage = "InitializeTweaks(late)"; InitializeTweaks(true);
+                stage = "RebuildFeatureManifest"; RebuildFeatureManifest();   // 含功能清单登记 + 启动自检 + 自检日志
+            } catch (Exception __aw) {
+                try {
+                    ModLogger.LogError("[SR.Boot] 启动失败于阶段 " + stage + "：" + __aw);
+                    ModLogger.LogError("[SR.SelfTest] FAIL 阶段=" + stage + " 原因=" + __aw.GetType().Name + ": " + __aw.Message);
+                } catch { /* 静默：日志通道自身不可用时只能放弃 */ }
+            }
         }
 
         // 配置外置补丁：需显式注册（CreateAndPatchAll 不递归发现独立类型），失败只记日志。
