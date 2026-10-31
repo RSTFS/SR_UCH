@@ -311,7 +311,7 @@ namespace SR_UCH.Tweaks {
                     return;
                 }
                 _lobbies.Clear();
-                _regionCodeCache.Clear();
+                ClearRegionCodeCache();
                 _lobbySearching = true;
                 _lobbyErr = false;          // 本次搜索开始，清掉上一次的错误提示
                 _lobbyMsg = SRApi.T("搜索中...", "Searching...");

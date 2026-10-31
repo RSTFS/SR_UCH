@@ -34,7 +34,14 @@ namespace SR_UCH.Tweaks {
         // 两级缓存：按区域对象的类型缓存成员信息；按房间 id 缓存解析结果（重新搜索时清空）。
         private sealed class RegionMember { public PropertyInfo Loc; public FieldInfo Short, Name, Id; }
         private static readonly Dictionary<Type, RegionMember> _regionMembers = new Dictionary<Type, RegionMember>();
+        // 键是房间 id：每次搜索都可能出现新房间，必须设上限，否则长会话里只增不减（评审 G4）。
         private static readonly Dictionary<string, string> _regionCodeCache = new Dictionary<string, string>();
+        private const int RegionCodeCacheMax = 512;
+
+        // 重新搜索时清掉按房间 id 的解析结果（区域对象可能已换一批）。
+        internal static void ClearRegionCodeCache() {
+            try { _regionCodeCache.Clear(); } catch (Exception __ex) { SRApi.Guard.Log("联机/清区域缓存", __ex); }
+        }
 
         private static RegionMember RegionMembers(Type t) {
             RegionMember m;
@@ -55,7 +62,10 @@ namespace SR_UCH.Tweaks {
             string cached;
             if (!string.IsNullOrEmpty(id) && _regionCodeCache.TryGetValue(id, out cached)) return cached;
             string code = RegionCodeUncached(li);
-            if (!string.IsNullOrEmpty(id)) _regionCodeCache[id] = code;
+            if (!string.IsNullOrEmpty(id)) {
+                if (_regionCodeCache.Count >= RegionCodeCacheMax) _regionCodeCache.Clear();   // 满了整体清：解析成本极低
+                _regionCodeCache[id] = code;
+            }
             return code;
         }
 
