@@ -55,8 +55,8 @@
 | 49 | 15_关卡重载与快照 | P0-4 | NetworkServer.active 在协程内可能翻转，补分阶段未再校验 | `todo` |  |
 | 50 | 16_回合HUD主实现 | P0-1 | 默认 `Show Mode = Hold` 使"开局即有 HUD"的修复完全失效，打开总开关后 HUD 不可见 | `todo` |  |
 | 51 | 17_会话聊天 | P0-1 | 取不到本地玩家号时按 -1 发送，消息被服务端与所有客户端静默丢弃 | `todo` |  |
-| 52 | 19_方块破坏 | P0-1 | `_useSmoke` 配置项从未被读取，用户关闭后烟雾效果仍播放 | `ported` | 选项从未被读取：删掉 Use Smoke 开关与配置键（含迁移清理），不再给玩家假开关 |
-| 53 | 19_方块破坏 | P0-2 | `DestroySelf` 后紧接 `OnDestroy` 调用，可能触发重复销毁或状态不一致 | `todo` |  |
+| 52 | 19_方块破坏 | P0-1 | `_useSmoke` 配置项从未被读取，用户关闭后烟雾效果仍播放 | `ported` | 游戏 DestroySelf 就有 useSmoke 参数：开关传进去真正生效（上一版误删已回滚） |
+| 53 | 19_方块破坏 | P0-2 | `DestroySelf` 后紧接 `OnDestroy` 调用，可能触发重复销毁或状态不一致 | `ported` | 去掉手工 target.OnDestroy()，DestroySelf 自己已标记并收尾，避免二次销毁 |
 | 54 | 20_实验模块与派对盒 | P0-1 | `CrossPlay.TryPersist` 按方法名子串猜测并 Invoke 保存入口，可能触发破坏性方法 | `todo` |  |
 | 55 | 21_HUD状态与轨迹 | P0-1 | `DiagTick` 是未关闭的调试残留，会长期污染日志 | `todo` |  |
 | 56 | 21_HUD状态与轨迹 | P0-2 | `OnShutdown` 只销毁根对象，未注销 `LevelResetEvent` 监听器，重载模组会重复订阅 | `todo` |  |

@@ -29,6 +29,7 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<KeyCode> _deleteKey;
         private static ConfigEntry<SelectMode> _selectMode;
         private static ConfigEntry<ListMode> _listMode;
+        private static ConfigEntry<bool> _useSmoke;   // 破坏动画（传给 DestroySelf 的 useSmoke）
         private static ConfigEntry<TrackMode> _trackMode;
         private static ConfigEntry<RefreshMode> _refreshMode;
 
@@ -140,9 +141,12 @@ namespace SR_UCH.Tweaks {
                 if (index < 0 || index >= Blocks.Count) return;
                 Placeable target = Blocks[index];
                 if (target == null) return;
-                // 与旧版一致的销毁路径：DestroySelf 自带网络同步；补一次 OnDestroy 立刻摘干净。
-                target.DestroySelf();
-                target.OnDestroy();
+                // DestroySelf 自带网络同步，并且它自己就有 useSmoke 参数（游戏侧签名
+                // DestroySelf(bool destroyChildren, bool useSmoke, bool sendNetworkSignal)），
+                // 所以"破坏动画"开关直接传进去即可（audit 19-P0-1）。
+                // 不再手动补 OnDestroy：DestroySelf 已标记销毁并走自己的收尾，重复调用可能二次销毁（audit 19-P0-2）。
+                bool __smoke = _useSmoke == null || _useSmoke.Value;
+                target.DestroySelf(false, __smoke, true);
                 _placements.Remove(target); // 本路径不发 DestroyPieceEvent，必须自己清记录，避免强引用已销毁对象
             } catch (Exception __ex) { SRApi.Guard.Log("方块破坏.原生销毁", __ex); }
         }
@@ -252,7 +256,9 @@ namespace SR_UCH.Tweaks {
             SRApi.LocEnum("Snapshot", "暂存");
             SRApi.LocKey("Destroy Blocks", "Refresh Mode", "列表刷新", null);
             SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "候选列表刷新方式\n实时＝按住时持续更新；暂存＝按下时重建一次\n实时已节流，只在按住时有开销", "Candidate refresh\nrealtime = updates while held; snapshot = built once on press\nrealtime is throttled and only costs while held");
-            // 「破坏动画/烟雾」选项已删除：它从未被读取（audit 19-P0-1），留着等于假开关。
+            SRApi.LocKey("Destroy Blocks", "Use Smoke", "破坏动画", null);
+            SRApi.LocDesc("Destroy Blocks", "Use Smoke", "破坏动画\n删除方块时播放烟雾与破碎效果\n关闭后方块直接消失",
+                "Break effect\nplays the smoke and shatter effect when a piece is removed\nwhen off the piece just disappears");
         }
 
         // 是否走实时列表（默认实时）
@@ -305,6 +311,8 @@ namespace SR_UCH.Tweaks {
                 "Refresh Mode",
                 RefreshMode.Realtime,
                 "列表刷新：实时 = 按住切换键期间候选表持续保持最新（已节流，只在按住时有开销）；暂存 = 只在按下切换键那一刻重建一次。");
+            _useSmoke = _mp.Config.Bind("Destroy Blocks", "Use Smoke", true,
+                "破坏动画：删除方块时播放烟雾与破碎效果；关闭后方块直接消失。");
 
             // 过滤条件变了：实时模式下候选表要重新过滤一次。
             _listMode.SettingChanged += (s, e) => _listDirty = true;
@@ -664,3 +672,5 @@ namespace SR_UCH.Tweaks {
         }
     }
 }
+
+
