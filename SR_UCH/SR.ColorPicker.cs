@@ -237,6 +237,12 @@ public partial class SR {
             try {
                 State s;
                 if (_open == null || !_states.TryGetValue(_open, out s)) return;
+                // 拖动中丢失 MouseUp（指针移出窗口后松开、或被别的控件吃掉事件）时，
+                // Dirty 会永久留着、预览色永不落盘（audit 05-P0-5）。
+                // 只要鼠标已经完全松开，就补一次提交 —— 这条必须在"8 帧内跳过"之前。
+                try {
+                    if (s.Dirty && !Input.GetMouseButton(0) && !Input.GetMouseButton(1)) Commit(_open, s);
+                } catch (Exception __dm) { Guard.Log("颜色兜底提交", __dm); }
                 if (s.Frame >= 0 && Time.frameCount - s.Frame <= 8) return;
                 Commit(_open, s);
                 if (s.TextPending) FlushText(_open, s);
