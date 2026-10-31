@@ -348,6 +348,7 @@ public partial class SR {
                             _hookArgs.colW = new float[] { 200f, 90f, 90f, 70f, 60f };
                             _hookArgs.order = new int[] { 0, 1, 2, 3, 4 };
                             _hookArgs.hidden = new HashSet<int>();
+                            _hookArgs.vis = new List<int>();   // 核心按 order+hidden 推导可见列
                             _hookArgs.resizable = true;
                             _hookArgs.title = delegate (int c) { return c == 0 ? T("钩子", "Hook") : c == 1 ? T("平均", "Avg") : c == 2 ? T("峰值", "Max") : c == 3 ? T("调用", "Calls") : T("超限", "Over"); };
                             _hookArgs.rowCells = delegate (int row) { return hrows[row]; };
@@ -387,8 +388,8 @@ public partial class SR {
                     GUILayout.Label(ok ? "●" : "▲", _label, GUILayout.Width(Sc(18)), GUILayout.Height(Sc(20)));
                 } finally { GUI.color = prev; }
                 // 标题自适应高度：长标题换行显示，不再被固定 20px 截断。
-                float __titleH = Mathf.Max(Sc(22), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)) + Sc(2));   // 底部多 2px：中文标题的下缘笔画以前会被裁
-                GUILayout.Label(title, _labelWrap, GUILayout.Width(Sc(120)), GUILayout.Height(__titleH));
+                float __titleH = Mathf.Max(Sc(24), _labelWrap.CalcHeight(new GUIContent(title), Sc(150)) + Sc(4));   // 宽度放宽到 150、底部多 4px：中文标题以前会被裁
+                GUILayout.Label(title, _labelWrap, GUILayout.Width(Sc(150)), GUILayout.Height(__titleH));
                 GUILayout.Label(summary, _label, GUILayout.Height(Sc(20)));
                 GUILayout.FlexibleSpace();
                 if (canExpand) {

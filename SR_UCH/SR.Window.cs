@@ -470,25 +470,8 @@ public partial class SR {
             GUILayout.EndVertical();
             GUILayout.Space(Sc(2));
             GUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.Height(__bodyH));
-            if (_mode == Mode.Settings) {
-                // 旧的"恢复默认"按钮已停用：统一由页签栏右侧那一个按钮负责（带悬浮说明）。
-                GUILayout.BeginHorizontal();
-                if (false && GUILayout.Button(T("恢复默认", "Defaults"), _btn, GUILayout.Width(Sc(84)))) {
-                    if (_internalConfig != null) {
-                        foreach (ConfigEntryBase ce in AllEntries(_internalConfig)) {
-                            Guard.Try("恢复默认值 " + ce.Definition.Key, () => ce.BoxedValue = ce.DefaultValue);
-                        }
-                        Guard.Try("写盘保存配置", () => _internalConfig.Save());
-                        // 恢复默认的收尾：编辑框 / 展开态 / 枚举下拉缓存都要清，并置键位脏
-                        // （否则下拉仍显示旧选项，带序列前键的快捷键也一直不触发）。
-                        _editText.Clear();
-                        _editOpen.Clear();
-                        _enumOptions.Clear();
-                        Guard.Try("重置键位监听", () => MarkKeyChanged());
-                    }
-                }
-                GUILayout.FlexibleSpace();
-            }
+            // 旧的"恢复默认"行已删除：它开了 BeginHorizontal 却从不 EndHorizontal，
+            // 布局组失衡会让设置页整页内容被画到 0,0（只有设置页异常，切栏目又正常）。
             float colWidth = EntryNameWidth();
             // 功能页外框部件（滚动区之外，功能自注册，仅在对应栏目被选中时调用）。
             // 页签必须画在页面外框（顶栏）之前，否则顶栏会压在上面。
