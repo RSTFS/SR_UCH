@@ -124,6 +124,9 @@ public partial class Experiments : ITweak
                 try { if (_fov.Value <= 0f || _fov.Value > 32f) _fov.Value = 10f; } catch (Exception __fv) { SRApi.Guard.Log("自由相机/修正FOV", __fv); }
                 SRApi.RegisterCameraView(ApplyToCamera);
                 SRApi.RegisterTick("自由相机-移动速度", ApplyFollowSpeed);
+            // 相机缓存只在换场景时失效：以前缓存为 null 就全场景 FindObjectsOfType，
+            // 那是 tick 剖析里 自由相机-移动速度 峰值 4ms 的来源。
+            SRApi.RegisterSceneHook(delegate { _followZc = null; });   // 自由相机/换场景清缓存
                 _on.SettingChanged += OnLockChanged;
                 // 不挂 SettingChanged：ApplyFollowSpeed 已作为 30 帧节流的 Tick，下一拍自然生效。
                 _followSpeed.SettingChanged += (s, e) => { _followAt = -9999; _followLastMul = -1f; };
