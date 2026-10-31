@@ -420,7 +420,7 @@ namespace SR_UCH.Tweaks {
                 if (SRApi.ComboKeyDown(_deleteKey)) {
                     if (!canDestroy) {
                         SRApi.NotifyT("仅房主可破坏方块：", "Only the host can destroy blocks: ",
-                            SRApi.T("房客只能高亮标记（如已由扩展放行请确认其开关）", "guests can only highlight (check the extension's switch if it should allow you)"));
+                            SRApi.T("房客只能高亮标记（仅本机可见）", "guests can only highlight (local only)"));
                     } else {
                         Placeable target = Blocks[_index];
                         if (target == null || target.MarkedForDestruction) {

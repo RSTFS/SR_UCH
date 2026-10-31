@@ -282,7 +282,7 @@ namespace SR_UCH.Tweaks {
             _limitEntry.SettingChanged += (s, e) => Apply();
             Apply(); // 启动时归位：关闭则保持原版 500
             // 启动时 GameSettings 可能尚未加载（GetInstance() 返回 null），故挂场景切换重试；
-            // 与 DestroyBlocks / Respawn / ExModule 等其它 tweak 的做法一致。
+            // 与 DestroyBlocks / Respawn 等其它 tweak 的做法一致。
             SceneManager.activeSceneChanged += (a, b) => Apply();
             // Apply() 的求值依赖 SRApi.GateMaster，总开关关闭时需要有人调用它。
             // DismissHook 负责关总开关，SceneHook 负责启动早期 GameSettings 未就绪时的重试。

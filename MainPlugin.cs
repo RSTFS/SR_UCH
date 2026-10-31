@@ -52,8 +52,7 @@ namespace SR_UCH {
                 stage = "AssemblyResolve"; AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
                 stage = "InjectApiSinks"; InjectApiSinks();
                 stage = "InitializeTweaks"; InitializeTweaks();
-                stage = "LoadExModule"; LoadExModule();
-                // 外部功能 DLL / 语言包 DLL：一个 DLL 一个功能（ITweak）或一门语言（ILanguagePack）；
+                    // 外部功能 DLL / 语言包 DLL：一个 DLL 一个功能（ITweak）或一门语言（ILanguagePack）；
                 // 放在本程序集扫描与 EX 之后（EX 的硬编码路径不受影响）。
                 stage = "LoadExternal"; LoadExternal();
                 // 装配完成后补扫一轮 ITweak（audit P0-1）：EX / 外部 DLL 若漏在 ExLoader 的反射路径之外，
@@ -332,7 +331,7 @@ namespace SR_UCH {
             // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
             // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。
             List<Type> __tweaks = new List<Type>();
-            // 补扫只覆盖 SR_UCH* 程序集（EX = SR_UCH_EX；外部功能 DLL 由 LoadExternal 自己初始化）：
+            // 补扫只覆盖 SR_UCH* 程序集（外部功能 DLL 由 LoadExternal 自己初始化）：
             // 扫全部 AppDomain 会把游戏程序集也展开一遍，启动白白多花上百毫秒。
             Assembly[] __asms = latePass ? PickUchAssemblies() : new Assembly[] { Assembly.GetExecutingAssembly() };
             for (int __ai = 0; __ai < __asms.Length; __ai++) {
@@ -349,7 +348,7 @@ namespace SR_UCH {
                 return string.Compare(a.FullName, b.FullName, StringComparison.Ordinal);
             });
             foreach (Type type in __tweaks) {
-                // 实例化也放进 try：单个功能构造失败不能中断后续的 LoadExModule / LoadExternal。
+                // 实例化也放进 try：单个功能构造失败不能中断后续的外部 DLL 装配。
                 _initedTweaks.Add(type);
                 try {
                     var tweak = (ITweak)Activator.CreateInstance(type);
@@ -361,7 +360,7 @@ namespace SR_UCH {
         }
 
         // 功能清单登记 + 启动自检 + 自检日志。
-        // 装配（LoadExModule / LoadExternal）只由 Awake 按固定顺序调一次：这里不再重复调用。
+        // 装配（LoadExternal）只由 Awake 按固定顺序调一次：这里不再重复调用。
         private void RebuildFeatureManifest() {
             // 功能清单（SMAPI 的 manifest 等价物）：内置 / 外部 / EX 的 ITweak 全部就位后统一登记，校验依赖与契约版本。
             try { Features.Rebuild(); if (Features.ProblemCount > 0) ModLogger.LogInfo(Features.Describe()); } catch (Exception __ft) { try { ModLogger.LogWarning("[SR.Feat] 功能清单登记失败: " + __ft.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
@@ -431,8 +430,8 @@ namespace SR_UCH {
         private void LoadOneExternal(string dll) {
             try {
                 string name = Path.GetFileNameWithoutExtension(dll);
-                // 跳过自己与附加模块；拆分模式下核心自己的文件名同样要跳过，否则会把"自己"再扫一遍。
-                if (name == "SR_UCH" || name == "SR_Manager" || name == "SR_UCH_Manager" || name == "SR_UCH_EX") return;
+                // 跳过自己与外部模块；拆分模式下核心自己的文件名同样要跳过，否则会把"自己"再扫一遍。
+                if (name == "SR_UCH" || name == "SR_Manager" || name == "SR_UCH_Manager") return;
                 // 已加载过则复用同一份程序集：LoadFile 会复制副本，typeof(SR) 不再是同一个 Type。
                 Assembly asm = null;
                 foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies()) {
@@ -469,6 +468,9 @@ namespace SR_UCH {
                         }
                     } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 }
+                // 通用模块入口：不带 [BepInPlugin] 的 DLL 若提供 public static Init(插件) 入口，
+                // 就调用一次（这样外部模块无需被核心按名字硬编码加载）。
+                if (!isBepInPlugin) TryInvokeModuleEntry(types, name);
                 for (int i = 0; i < types.Length; i++) {
                     Type t = types[i];
                     if (t == null || t.IsInterface || t.IsAbstract) continue;
@@ -501,6 +503,33 @@ namespace SR_UCH {
             }
         }
 
+        // 通用外部模块入口：找 public static <bool|void> Init(<本插件类型可赋值>) 并调用一次。
+        // 不针对任何具体模块名，模块是否存在完全由装了什么 DLL 决定。
+        private void TryInvokeModuleEntry(Type[] types, string file) {
+            try {
+                for (int i = 0; i < types.Length; i++) {
+                    Type t = types[i];
+                    if (t == null) continue;
+                    MethodInfo hit = null;
+                    MethodInfo[] ms = t.GetMethods(BindingFlags.Public | BindingFlags.Static);
+                    for (int k = 0; k < ms.Length; k++) {
+                        if (ms[k].Name != "Init") continue;
+                        ParameterInfo[] ps = ms[k].GetParameters();
+                        if (ps.Length != 1) continue;
+                        if (!ps[0].ParameterType.IsAssignableFrom(GetType())) continue;
+                        hit = ms[k];
+                        break;
+                    }
+                    if (hit == null) continue;
+                    object r = hit.Invoke(null, new object[] { this });
+                    bool ok = !(r is bool) || (bool)r;
+                    if (ok) ModLogger.LogInfo("[SR] 外部模块入口已调用: " + file + " -> " + t.FullName + ".Init");
+                    else ModLogger.LogWarning("[SR] 外部模块入口返回失败: " + file + " -> " + t.FullName + ".Init");
+                    return;
+                }
+            } catch (Exception e) { ModLogger.LogError("[SR] 外部模块入口调用失败 " + file + ": " + e.Message); }
+        }
+
         // GetTypes 遇"程序集引用了本机不存在的类型"会整体抛 ReflectionTypeLoadException：只取成功加载的类型。
         private static Type[] GetTypesSafe(Assembly asm) {
             try { return asm.GetTypes(); } catch (ReflectionTypeLoadException ex) {
@@ -513,30 +542,6 @@ namespace SR_UCH {
             } catch { return new Type[0]; }
         }
 
-        // 加载 SR_UCH_EX.dll：无 [BepInPlugin] 入口也不是 BaseUnityPlugin，BepInEx 会跳过 ->
-        // 只能 LoadFile + 反射调 ExLoader.Init，把附加功能挂进 EX 栏目；查找 plugins -> modules。
-        private void LoadExModule() {
-            try {
-                string dll = Path.Combine(Paths.PluginPath, "SR_UCH_EX.dll");
-                if (!File.Exists(dll)) {
-                    string alt = Path.Combine(Paths.BepInExRootPath, "modules", "SR_UCH_EX.dll");
-                    if (File.Exists(alt)) dll = alt;
-                }
-                if (!File.Exists(dll)) {
-                    ModLogger.LogInfo("附加模块未找到，跳过");
-                    return;
-                }
-                Assembly asm = Assembly.LoadFile(dll);
-                Type loader = asm.GetType("SR_UCH_EX.ExLoader");
-                if (loader == null) { ModLogger.LogError("附加模块缺少 ExLoader"); return; }
-                MethodInfo init = loader.GetMethod("Init", BindingFlags.Public | BindingFlags.Static);
-                if (init == null) { ModLogger.LogError("附加模块缺少 Init 入口"); return; }
-                bool ok = (bool)init.Invoke(null, new object[] { this });
-                if (!ok) ModLogger.LogWarning("附加模块加载失败");
-            } catch (Exception e) {
-                ModLogger.LogError("附加模块加载失败: " + e);
-            }
-        }
     }
         // 只针对本插件：plugin.Config 返回自己的 ConfigFile，于是所有 Bind 落到 SR_UCH_data.cfg。
         [HarmonyLib.HarmonyPatch(typeof(BepInEx.BaseUnityPlugin), "get_Config")]

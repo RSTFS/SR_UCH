@@ -30,7 +30,7 @@ public partial class SR : ITweak {
         private static ConfigEntry<string> _disabledPluginsEntry;
         private static ConfigEntry<bool> _allEnabledEntry;
         public static bool DiagEnabled { get { return false; } }
-        // 对外（附加模块 DLL）暴露的注册接口版本：外部模块初始化时比对自己的需求版本，不匹配就提示 / 降级。
+        // 对外（外部 DLL）暴露的注册接口版本：外部模块初始化时比对自己的需求版本，不匹配就提示 / 降级。
         // 用 static readonly 而非 const：const 会在编译外部模块时被内联，握手只能靠运行时读取生效。
         public static readonly int ApiVersion = 3;
         // Ui：窗口宽高 / 位置 / 侧栏宽 / 整体缩放的唯一真值（读入与拖动 / 缩放夹取都读它）。
@@ -292,12 +292,11 @@ public partial class SR : ITweak {
                     try {
                         if (asm == null || asm.IsDynamic) continue;
                         if (asm != self) {
-                            // 只审计 SR 自己与引用了 SR_UCH 的功能 DLL；其它插件由它们自己的日志负责
+                            // 只审计 SR 自己与引用了 SR_UCH 的功能 DLL；其它插件由它们自己的日志负责（不按具体模块名特判）
                             bool managed = false;
                             try {
                                 AssemblyName an = asm.GetName();
-                                if (an != null && an.Name == "SR_UCH_EX") managed = true;
-                                else foreach (AssemblyName rn in asm.GetReferencedAssemblies()) { if (rn.Name == "SR_UCH") { managed = true; break; } }
+                                foreach (AssemblyName rn in asm.GetReferencedAssemblies()) { if (rn.Name == "SR_UCH") { managed = true; break; } }
                             } catch (Exception __ex) { Guard.Log("PatchAudit", __ex); }
                             if (!managed) continue;
                         }
@@ -614,9 +613,9 @@ public partial class SR : ITweak {
         // 豁免来源登记：谁在提权必须可见（设置页显示 + 首次登记写日志）。
         public static readonly List<string> OverrideSources = new List<string>();
         // 只允许白名单程序集登记豁免；其它来源一律拒绝并记录（防止任意插件静默提权）。
-        private static readonly string[] OverrideAllowedAssemblies = new string[] { "", "SR_UCH_EX" };   // "" = 核心自身调用
+        private static readonly string[] OverrideAllowedAssemblies = new string[] { "" };   // "" = 核心自身调用
         // 找"真正发起登记的程序集"：跳过核心自身（含契约层 SRApi）的栈帧，
-        // 这样经 SRApi 转发的 EX 调用才能识别为 SR_UCH_EX，而不是误判成 SR_UCH。
+        // 这样经 SRApi 转发的外部调用才能识别为发起方，而不是误判成 SR_UCH。
         private static string CallerAssembly() {
             try {
                 string mine = typeof(SR).Assembly.GetName().Name;

@@ -379,7 +379,7 @@ namespace SR_UCH {
         public static void RegisterPage(string section, Action render) { Action<string, Action> f = _registerPageSimple; if (f != null) f(section, render); }
         public static void RegisterPage(string section, string pageId, string nameZh, string nameEn, int order, Action render) { Action<string, string, string, string, int, Action> f = _registerPageFull; if (f != null) f(section, pageId, nameZh, nameEn, order, render); }
 
-        // P2：EX 模块所需的其余 API（委托注入，行为不变）
+        // P2：外部 DLL 所需的其余 API（委托注入，行为不变）
         private static Func<bool> _allEnabled, _ignoreModeLimit;
         private static Action<bool> _setAllEnabled;
         private static Func<string, bool> _hasPage;

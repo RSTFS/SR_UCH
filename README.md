@@ -77,7 +77,7 @@ The panel has sections on the left and pages on the right. Listed by section bel
 - There is also a list mode: it lists every block on the field; refresh and click to pick.
 - **Break effect** -- the game's own `DestroySelf(..., useSmoke, ...)` parameter is honoured, so
   turning the effect off really makes the piece disappear without smoke.
-- You can optionally allow clients to delete too (requires the matching extension module).
+- You can optionally allow clients to delete too (only if an external DLL grants it through a slot).
 
 ### Chat
 

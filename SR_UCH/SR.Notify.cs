@@ -17,7 +17,7 @@ public partial class SR {
         public static void Notify(string text, params object[] args) { NotifyImpl(Cat(text, args), null); }
         public static void NotifyT(string zh, string en, params object[] args) { NotifyImpl(Cat(T(zh, en), args), null); }
 
-        // 值拼接：null 视作空串（避免出现 "null"），其余走 ToString；公开给扩展模块复用。
+        // 值拼接：null 视作空串（避免出现 "null"），其余走 ToString；公开给外部 DLL 复用。
         public static string Cat(string text, object[] args) {
             if (args == null || args.Length == 0) return text;
             StringBuilder sb = new StringBuilder(text != null ? text : "");
