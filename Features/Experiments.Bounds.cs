@@ -467,11 +467,18 @@ public partial class Experiments : ITweak
             if (nb > 0) SRApi.LogInfo("[关卡边界] " + why + "，已还原 " + nb + " 个光标");
         }
 
+        // 上次写入的硬解除半径：半径没变就不重复 SetBounds（评审 4.3：原来每帧都在写）。
+        private static float _hardRadiusApplied = float.NaN;
+
         private static void ApplyHardBounds() {
             try {
                 if (_on == null || !_on.Value) return;
                 float r = HardRadius();
+                // 半径没变且本场景已经写过：跳过（光标位置会变，所以只有半径同值还不行，
+                // 见下面仍按"光标/地图换了"判定的部分；这里只挡纯重复写）。
                 int n = 0;
+                // NaN（还没写过）也算变化
+                bool radiusChanged = float.IsNaN(_hardRadiusApplied) || Mathf.Abs(_hardRadiusApplied - r) >= 0.0001f;
                 if (CursorOn) {
                     PiecePlacementCursor[] curs = Cursors();
                     for (int i = 0; i < curs.Length; i++) {
@@ -481,7 +488,10 @@ public partial class Experiments : ITweak
                         if (ReadCursorBounds(c, out cb) && !_curOrig.ContainsKey(c)) _curOrig[c] = cb;
                         // 只用 SetBounds(Bounds)，它只写 boundary 字段；
                         // SetBounds(Collider2D) 会改写 boundingCollider（即 CheckColliding.CheckBounds 的来源），改错后再也放不下。
-                        try { c.SetBounds(Huge(c.transform.position)); n++; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                        // 半径没变且本帧光标边界已是 Huge：不重复写（省掉每帧一次 setter + 结构体构造）。
+                        Bounds want = Huge(c.transform.position);
+                        if (!radiusChanged && cb.size.x > 1e6f) continue;
+                        try { c.SetBounds(want); n++; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     }
                 } else {
                     // 子开关关闭：立刻写回原值。
