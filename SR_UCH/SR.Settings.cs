@@ -107,6 +107,7 @@ public partial class SR {
 
         internal static int SettingsTab;   // 0 = 通用，1 = 自检
         private static Vector2 _scrollIssues;   // 自检页表格的滚动位置
+        private static Vector2 _scrollHooks;    // 自检页帧钩子表格的滚动位置
 
         // 设置页入口：顶部两个页签，下面按页签渲染。页面切换只改这个字段，不重建任何配置。
         internal static void RenderSettingsPage(float colWidth) {
@@ -116,6 +117,14 @@ public partial class SR {
                 if (GUILayout.Button(T("自检", "Self-check"), SettingsTab == 1 ? _selItem : _item, GUILayout.Height(Sc(26)))) SettingsTab = 1;
                 GUILayout.FlexibleSpace();
                 GUILayout.EndHorizontal();
+                // Ctrl+滚轮切页（与其它页签式界面一致；只在设置页生效）。
+                try {
+                    Event __e = Event.current;
+                    if (__e != null && __e.type == EventType.ScrollWheel && (__e.control || __e.command)) {
+                        SettingsTab = __e.delta.y > 0f ? 1 : 0;
+                        __e.Use();
+                    }
+                } catch (Exception __sw) { Guard.Log("设置页/Ctrl 滚轮切页", __sw); }
                 GUILayout.Space(Sc(4));
                 if (SettingsTab == 1) RenderAuditBlock();
                 else RenderSettingsEntries(colWidth);
@@ -152,7 +161,6 @@ public partial class SR {
                 RenderPluginList();
             }
             if (!any) GUILayout.Label(T("（无匹配条目）", "(no matching entries)"), _label);
-            RenderAuditBlock();   //设置页底部的自检块
         }
 
         //自检块：显示启动自检结果（补丁目标 + 反射成员 + 扩展点 / 孤儿键 / 运行时异常）。
@@ -282,12 +290,23 @@ public partial class SR {
                 }
                 //显示运行期异常计数与最近一条，弥补启动自检只能看到静态失效的缺口。
                 // 帧钩子耗时（前 8 名）：卡顿归因直接看这里，不用先去翻日志。
+                GUILayout.Space(Sc(4));
+                AuditLabel(T("帧钩子耗时（滑动平均，固定高度表格）", "Frame hooks (moving average, fixed-height table)"));
                 string tickRep = SR.TickProfileReport();
-                if (!string.IsNullOrEmpty(tickRep)) {
-                    GUILayout.Space(Sc(4));
-                    AuditLabel(T("帧钩子耗时（滑动平均）", "Frame hooks (moving average)"));
-                    AuditLabel(tickRep);
+                _scrollHooks = GUILayout.BeginScrollView(_scrollHooks, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
+                    GUIStyle.none, GUILayout.Height(Sc(132f)));
+                if (string.IsNullOrEmpty(tickRep)) {
+                    GUILayout.Label(T("（还没有采样）", "(no samples yet)"), _label, GUILayout.Height(Sc(18f)));
+                } else {
+                    string[] rows = tickRep.Split('\n');
+                    for (int i = 0; i < rows.Length; i++) {
+                        string row = rows[i];
+                        if (string.IsNullOrEmpty(row)) continue;
+                        // 每行固定高度：内容（数字）变化不会让整页高度跳动。
+                        GUILayout.Label(row, _label, GUILayout.Height(Sc(18f)));
+                    }
                 }
+                GUILayout.EndScrollView();
                 // 补丁归因：谁还在改同一个方法（装了别的 mod 后行为变怪时先看这里）。
                 GUILayout.Space(Sc(4));
                 GUILayout.BeginHorizontal();

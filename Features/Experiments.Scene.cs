@@ -37,13 +37,20 @@ public partial class Experiments : ITweak
                 SRApi.Ctl.HotkeyButton("exp.alter_self", SRApi.T("同位体", "Alter self"),
                     SRApi.T("再进一次当前房间\n游戏会再建一个本地角色，两个角色共用同一套输入\n只在房间/对局内有效",
                         "rejoin the current lobby\nthe game spawns a second local character sharing the same input\nonly works inside a lobby or match"),
-                    delegate { Online.ForceRejoinSelf(); });
+                    delegate {
+                        bool ok = Online.ForceRejoinSelf();
+                        SRApi.Notify(ok ? SRApi.T("同位体：已对当前房间再发一次加入", "Alter self: rejoin request sent")
+                                         : SRApi.T("同位体：当前不在房间里", "Alter self: not in a lobby"));
+                    });
 
                 // 关闭遮罩：只关当前这一块。
                 SRApi.Ctl.HotkeyButton("exp.close_mask", SRApi.T("关闭遮罩", "Close the mask"),
                     SRApi.T("立刻关掉当前加载遮罩\n只关这一次，不改变「跳过加载动画」设置",
                         "dismiss the current loading mask\none shot; does not change the skip-load-animation setting"),
-                    delegate { SplashTools.CloseMaskNow(); });
+                    delegate {
+                        SplashTools.CloseMaskNow();
+                        SRApi.Notify(SplashTools.Note ?? SRApi.T("关闭遮罩：已执行一次", "Close the mask: executed once"));
+                    });
 
                 GUILayout.Space(SRApi.Ctl.Sc(6));
             } catch (Exception __ex) { SRApi.Guard.Log("场景页 渲染", __ex); }

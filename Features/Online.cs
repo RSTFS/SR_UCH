@@ -319,7 +319,6 @@ namespace SR_UCH.Tweaks {
                 _lobbyMsg = SRApi.T("搜索中...", "Searching...");
                 _lobbySearchAt = Time.unscaledTime;
                 _lobbyCbFirst = -1f; _lobbyCbLast = -1f; _lobbyCbCount = 0;
-                SRApi.LogInfo("[联机] 开始搜索房间（回调是否流式看 [联机] 列表回调日志）");
                 mm.FindLobbies(new Matchmaker.LobbyListingCallback(OnLobbyInfo));
             } catch (Exception e) {
                 _lobbySearching = false;
@@ -342,12 +341,10 @@ namespace SR_UCH.Tweaks {
                 float cbNow = Time.unscaledTime;
                 if (_lobbyCbFirst < 0f) {
                     _lobbyCbFirst = cbNow;
-                    SRApi.LogInfo("[联机] 列表回调：第 1 个房间，搜索后 " + (cbNow - _lobbySearchAt).ToString("0.00") + "s");
                 }
                 _lobbyCbLast = cbNow;
                 _lobbyCbCount++;
                 if (_lobbyCbCount % 5 == 0) {
-                    SRApi.LogInfo("[联机] 列表回调：已 " + _lobbyCbCount + " 个，" + (cbNow - _lobbySearchAt).ToString("0.00") + "s");
                 }
                 RegionCode(info);
                 // 只标记"变了"：排序与统计延迟到渲染时各做一次。
@@ -457,12 +454,7 @@ namespace SR_UCH.Tweaks {
                 try { if (Matchmaker.IsInstantiated) gameDone = !Matchmaker.Instance.Searching; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 if (gameDone || Time.unscaledTime - _lobbySearchAt > SearchTimeout()) {
                     _lobbySearching = false;
-                    try {
-                        float span = (_lobbyCbLast >= 0f && _lobbyCbFirst >= 0f) ? (_lobbyCbLast - _lobbyCbFirst) : 0f;
-                        SRApi.LogInfo("[联机] 搜索结束：共 " + _lobbyCbCount + " 个回调，回调跨度 " + span.ToString("0.00")
-                            + "s，总耗时 " + (Time.unscaledTime - _lobbySearchAt).ToString("0.00") + "s"
-                            + (span < 0.05f ? "（平台一次性回调）" : "（流式回调）"));
-                    } catch (Exception __lg) { SRApi.Guard.Log("联机/搜索统计日志", __lg); }
+
                         }
             }
             // 列表或可见性变化时重排并刷新统计，否则最多每 1 秒重排一次。
