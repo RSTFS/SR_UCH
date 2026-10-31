@@ -68,6 +68,8 @@ public partial class SR {
         //字体创建整轮失败后的退避：记录失败字号，3 秒内不再重试（否则每帧重查 7 个候选字体）。
         private static int _fontFailSize = -1;   //上次失败的目标字号（-1 = 无记录）
         private static float _fontNextTryAt;
+        // 已退役但可能仍被 GUI.skin 引用的字体（下一轮重建时再销毁）
+        private static Font _retiredFont;
 
         //字号随 UI 缩放，保证布局高度与文字实际高度一致。
         private static void EnsureFont() {
@@ -98,8 +100,16 @@ public partial class SR {
                 try {
                     if (_origSkinFont == null) _origSkinFont = GUI.skin.font;
                 } catch (Exception __ex) { Guard.Log("EnsureFont", __ex); }
-                //销毁旧字体，避免逐档泄漏
-                if (old != null && !ReferenceEquals(old, _font)) UnityEngine.Object.Destroy(old);
+                // 旧字体延迟销毁：此刻 GUI.skin.font 可能仍指向 old（窗口在本帧稍后才应用新字体），
+                // 立即 Destroy 会销毁正在使用的字体（audit 07-P0-3）。
+                // 记下来，等下一次重建时确认皮肤已经不用它了再销毁。
+                if (old != null && !ReferenceEquals(old, _font)) {
+                    if (_retiredFont != null && !ReferenceEquals(_retiredFont, GUI.skin.font)) {
+                        try { UnityEngine.Object.Destroy(_retiredFont); } catch (Exception __rf) { Guard.Log("销毁旧字体", __rf); }
+                        _retiredFont = null;
+                    }
+                    _retiredFont = old;
+                }
             }
         }
 

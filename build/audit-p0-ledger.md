@@ -21,9 +21,9 @@
 | 15 | 05_键位与调色板 | P0-6 | `Tick` 兜底跳过条件与“窗口不再绘制”互斥，关闭/切页可能永远不落盘 | `todo` |  |
 | 16 | 06_控件门面Ctl | P0-1 | 操作列 MouseDown 置位但 MouseUp 未命中时不复位 BlockWindowDrag | `ported` | 每帧鼠标全松时兜底清 BlockWindowDrag |
 | 17 | 06_控件门面Ctl | P0-2 | 表格高度拖拽中途 MouseUp 外泄，同样可能让窗口拖拽永久阻塞 | `ported` | 同上兜底覆盖表格高度拖拽外泄 |
-| 18 | 07_表格与样式 | P0-1 | 控制台表格未接入滚轮输入，玩家列表无法滚动 | `todo` |  |
-| 19 | 07_表格与样式 | P0-2 | 选中行高亮在非 Repaint 事件上逐行调用 DrawTexture | `todo` |  |
-| 20 | 07_表格与样式 | P0-3 | 字体回退路径会销毁当前正在使用的字体 | `todo` |  |
+| 18 | 07_表格与样式 | P0-1 | 控制台表格未接入滚轮输入，玩家列表无法滚动 | `already-fixed` | EX 控制台表格在 ExModule.Console.cs:261-276 自己处理 ScrollWheel（含 maxY=0 转横向），审计针对旧快照 |
+| 19 | 07_表格与样式 | P0-2 | 选中行高亮在非 Repaint 事件上逐行调用 DrawTexture | `ported` | 行选中高亮加 Repaint 门控，非 Repaint 不调 DrawTexture |
+| 20 | 07_表格与样式 | P0-3 | 字体回退路径会销毁当前正在使用的字体 | `ported` | 旧字体延迟销毁：先记 _retiredFont，下次重建且皮肤不再引用时才 Destroy |
 | 21 | 07_表格与样式 | P0-4 | 样式重建的纹理泄漏：未登记到 _styleList 的共享纹理被反复 new 并 DontDestroyOnLoad | `todo` |  |
 | 22 | 07_表格与样式 | P0-5 | 表头裁剪块缺少 GUI.color 保护，且鼠标坐标语义可能跨裁剪原点错位 | `todo` |  |
 | 23 | 08_本地化与设置页 | P0-01 | SetValue 在编辑框自身提交帧跳过 `_editText` 清理，会回滚掉"1."之外的后续编辑 | `todo` |  |

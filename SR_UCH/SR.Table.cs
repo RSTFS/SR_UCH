@@ -96,6 +96,10 @@ public partial class SR {
         } catch (Exception __ex) { Guard.Log("表格行命中", __ex); }
         // 行选中高亮：rowSelected 指定的行由核心画整行高亮。
         if (a.rowSelected == null || a.rowRects == null || a.rowRects.Count <= 0) return;
+        // 只在 Repaint 趟绘制：非 Repaint 事件里调 DrawTexture 会报
+        // "DrawTexture can only be called during Repaint"（audit 07-P0-2）。
+        try { if (Event.current != null && Event.current.type != EventType.Repaint) return; }
+        catch { return; }
         try {
             for (int __i = 0; __i < a.rowRects.Count; __i++) {
                 if (!a.rowSelected(a.rowRows[__i])) continue;
