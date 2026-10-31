@@ -634,9 +634,10 @@ public partial class SR : ITweak {
         private static bool NoteOverrideSource(string kind) {
             try {
                 string who = CallerAssembly();
-                bool ok = false;
-                for (int i = 0; i < OverrideAllowedAssemblies.Length; i++)
-                    if (string.Equals(who, OverrideAllowedAssemblies[i], StringComparison.OrdinalIgnoreCase)) { ok = true; break; }
+                // 豁免登记是对外契约 API：核心与任何外部 DLL 都应允许，
+                // 但来源必须落进 OverrideSources 供设置页查看（不再按具体模块名开白名单，
+                // 否则外部登记会全部被拒、开关变成不可达）。
+                bool ok = true;
                 // 只记录来源供设置页展示，不写日志（静默）。
                 string line = kind + " <- " + (string.IsNullOrEmpty(who) ? "unknown" : who) + (ok ? "" : " (已拒绝：不在白名单)");
                 if (!OverrideSources.Contains(line)) OverrideSources.Add(line);

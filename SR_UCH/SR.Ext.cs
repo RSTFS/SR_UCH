@@ -19,6 +19,7 @@ public partial class SR {
         // 2) 功能 UI 是否打开：SR 据此冻结输入 / 绘制覆盖层；未注册 = 没有任何功能 UI。
         // 总开关关闭时的收尾不能依赖这里：各功能必须在自己的每帧回调里判 SR.GateMaster 并还原。
         private static readonly List<Func<bool>> _uiBlockProviders = new List<Func<bool>>();
+        // 对外契约 API：外部 DLL 声明"我占用输入"用；目前无调用方属正常态。
         public static void RegisterUiBlockProvider(Func<bool> isOpen) {
             if (isOpen != null && !_uiBlockProviders.Contains(isOpen)) _uiBlockProviders.Add(isOpen);
         }
@@ -32,6 +33,7 @@ public partial class SR {
 
         // 3) 覆盖层绘制：SR 主体绘制完成后调用，各功能自己判断当前该不该画。
         private static readonly List<Action> _overlays = new List<Action>();
+        // 对外契约 API：外部 DLL 注册自己的覆盖层用；目前无调用方属正常态。
         public static void RegisterOverlay(Action draw) {
             if (draw != null && !_overlays.Contains(draw)) _overlays.Add(draw);
         }

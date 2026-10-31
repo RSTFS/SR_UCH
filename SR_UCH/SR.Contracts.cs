@@ -368,6 +368,7 @@ namespace SR_UCH {
             public FooterButton(string id, string zh, string en, Action onClick) { Id = id; LabelZh = zh; LabelEn = en; OnClick = onClick; }
         }
         public static readonly List<FooterButton> FooterButtons = new List<FooterButton>();
+        // 对外契约 API：目前没有第三方使用，零调用是正常态（不是死代码）。
         public static void RegisterFooterButton(string id, string zh, string en, Action onClick) {
             if (string.IsNullOrEmpty(id)) return;
             for (int i = 0; i < FooterButtons.Count; i++) {
@@ -969,7 +970,8 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             // 不要再自己拿 CheckOn/CheckOff 拼 "✓" 按钮，否则勾选外观会与设置页不一致。
             private static Func<Rect, bool, string, bool> _checkboxAt;
             public static void SetCheckboxSink(Func<Rect, bool, string, bool> checkboxAt) { _checkboxAt = checkboxAt; }
-            public static bool Checkbox(Rect r, bool value, string tip) {
+            // 对外契约 API：外部 DLL 自绘勾选框用；目前无调用方属正常态。
+        public static bool Checkbox(Rect r, bool value, string tip) {
                 Func<Rect, bool, string, bool> f = _checkboxAt;
                 return f != null && f(r, value, tip);
             }
