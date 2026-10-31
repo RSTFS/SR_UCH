@@ -228,8 +228,11 @@ namespace SR_UCH.Tweaks {
             // 看门狗已经超时（三个 deadline 都归零）但还没回到主界面：第二次点击同样按"强制返回"处理，
             // 否则会再走一遍 GoMainMenu，把游戏自己的收尾流程又触发一次（audit B-1）。
             try {
-                if (_returnAttemptedAt > 0f && SceneManager.GetActiveScene().name != "MainMenu") {
-                    SRApi.LogWarn("[联机] 上次返回未完成，本次点击按强制返回处理");
+                // 只在"上次返回已经卡了 3 秒以上"时才走强制：以前只要标记过就强杀，
+                // 玩家刚回主菜单又点一次就会打断游戏自己的收尾（audit 13-P0-01）。
+                if (_returnAttemptedAt > 0f && SceneManager.GetActiveScene().name != "MainMenu"
+                    && Time.unscaledTime - _returnAttemptedAt > 3f) {
+                    SRApi.LogWarn("[联机] 上次返回超过 3 秒仍未完成，本次点击按强制返回处理");
                     ForceMainMenu();
                     return;
                 }
@@ -262,18 +265,30 @@ namespace SR_UCH.Tweaks {
             _forceDeadline = 0f;
             SRApi.LogWarn("[联机] 强制返回主界面（手动）");
             NudgeSplash();
+            // 先走游戏自己的收尾（ReturnToMainMenu）：它会广播 HostEndedGame、清理玩家、销毁
+            // LobbyManager 并加载 MainMenu。直接 Disconnect+Destroy 会和这条链并发，导致
+            // 重复销毁 / 加载流程停住（audit 13-P0-02）。只有它拿不到时才手动兜底。
+            bool __native = false;
             try {
-                LobbyManager lm = LobbyManager.instance;
-                if (lm != null) {
-                    // 每一步独立 try、失败继续往下，但异常必须记录（Guard.Log 内部去重）。
-                    try { lm.Disconnect("SR_UCH force"); } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：断开连接", __ex); }
-                    try { UnityEngine.Object.Destroy(lm.gameObject); } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：销毁 LobbyManager", __ex); }
-                }
-            } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：收尾联机状态", __ex); }
+                Matchmaker.ReturnToMainMenu("SR_UCH force");   // 静态方法
+                __native = true;
+            } catch (Exception __rt) { SRApi.Guard.Log("强制返回主界面：ReturnToMainMenu", __rt); }
+            if (!__native) {
+                try {
+                    LobbyManager lm = LobbyManager.instance;
+                    if (lm != null) {
+                        // 每一步独立 try、失败继续往下，但异常必须记录（Guard.Log 内部去重）。
+                        try { lm.Disconnect("SR_UCH force"); } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：断开连接", __ex); }
+                        try { UnityEngine.Object.Destroy(lm.gameObject); } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：销毁 LobbyManager", __ex); }
+                    }
+                } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：收尾联机状态", __ex); }
+            }
             try { SRApi.ForceResetUiState(); } catch (Exception __ex) { SRApi.Guard.Log("强制返回主界面：重置界面状态", __ex); }
+            // 先记 deadline 再发起加载：LoadScene 是异步的、不会抛异常，
+            // 若先加载后设时限，加载卡住期间看门狗到点会再切一次（audit 13-P0-03）。
+            _forceRawDeadline = Time.unscaledTime + 2f;   //5) 二级兜底
             try { SceneManagerWrapper.LoadScene("MainMenu"); }
             catch (Exception e) { SRApi.LogWarn("强制加载主界面失败: " + e.Message); }
-            _forceRawDeadline = Time.unscaledTime + 2f;   //5) 二级兜底
         }
 
         private static void SetShow(UISplashScreen s) {

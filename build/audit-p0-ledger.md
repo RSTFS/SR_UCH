@@ -41,9 +41,9 @@
 | 35 | 12_预设加载与工具 | P0-2 | `levelPortalXml` 是 static 字段，协程被掐后脏 XML 残留，下一次原生开局会误加载旧快照 | `ported` | 写入统一走 SetLevelPortalXml，超过 25 秒未被消费则清空，脏 XML 不再污染下一局 |
 | 36 | 12_预设加载与工具 | P0-3 | 联机直接替换关卡时房客 `SelectedLevel` 不同步，且失败后无任何回退机制 | `ported` | 直接替换后调 LevelSelectController.CallRpcSetNextLevel 同步房客 SelectedLevel（失败已落 treehouse 回退路径） |
 | 37 | 12_预设加载与工具 | P0-4 | `TryReadPresetMeta` 遇自闭合 `<scene .../>` 直接返回 false，该预设元数据全丢失 | `ported` | 自闭合 <scene/> 空预设按成功返回，根元素属性不再丢弃 |
-| 38 | 13_联机主流程 | P0-01 | `DisbandOrLeave` 二次点击捷径会在"刚进主菜单又点一次"时误触发 | `todo` |  |
-| 39 | 13_联机主流程 | P0-02 | `ForceMainMenu` 直接 `Destroy(LobbyManager.gameObject)` 可能打断游戏自己的收尾 | `todo` |  |
-| 40 | 13_联机主流程 | P0-03 | `ForceMainMenu` 先 `LoadScene("MainMenu")` 后设 `_forceRawDeadline`，在场景切换失败时会永久不硬切 | `todo` |  |
+| 38 | 13_联机主流程 | P0-01 | `DisbandOrLeave` 二次点击捷径会在"刚进主菜单又点一次"时误触发 | `ported` | 二次点击强杀加 3 秒最短间隔，刚回主菜单再点不会打断收尾 |
+| 39 | 13_联机主流程 | P0-02 | `ForceMainMenu` 直接 `Destroy(LobbyManager.gameObject)` 可能打断游戏自己的收尾 | `ported` | ForceMainMenu 先调 Matchmaker.ReturnToMainMenu（静态），失败才 Disconnect+Destroy 兜底 |
+| 40 | 13_联机主流程 | P0-03 | `ForceMainMenu` 先 `LoadScene("MainMenu")` 后设 `_forceRawDeadline`，在场景切换失败时会永久不硬切 | `ported` | 先设 _forceRawDeadline 再 LoadScene，避免加载中被看门狗重复切场景 |
 | 41 | 13_联机主流程 | P0-04 | `GoMainMenu` 与 `ForceMainMenu` 的 `ClearPendingJoin` 时机不一致，可能让"退出后立刻加入"重复触发 | `todo` |  |
 | 42 | 13_联机主流程 | P0-05 | `HostEndedListener` 幂等哨兵依赖"不重复 Initialize"，热重载会叠成 N 份回调（未验证） | `todo` |  |
 | 43 | 14_联机加入与列表 | P0-1 | 加入协程挂在 Matchmaker 上，切场景/离房即被销毁，加入请求永不发出 | `todo` |  |
