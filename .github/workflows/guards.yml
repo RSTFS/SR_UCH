@@ -1,8 +1,10 @@
 name: guards
 
-# 只跑"不需要游戏 DLL / 不需要 csc"的文本类守卫：
-# API 棘轮白名单、契约层边界、功能层边界、rsp 覆盖一致性、编码合法性。
-# 编译类守卫（契约层独立编译 / csproj 构建 / 拆分构建）需要游戏 Managed 程序集，在本地 build\build.ps1 -Check 里跑。
+# 两道门禁（都不需要游戏安装）：
+#  1) text-guards：文本层守卫（API 棘轮 / 契约边界 / 功能层边界 / rsp 覆盖 / 编码 / 悬浮文案 / 单文件行数 …）
+#  2) unit-tests  ：编译契约层 + 跑单元测试（tests/SR_UCH.Tests.csproj，BepInEx 与 UnityEngine 都用桩）
+#     这一步同时充当"契约层必须能编译"的最小编译门禁 —— 编译不过的 PR 在 CI 里就会红。
+# 需要游戏 Managed DLL 的守卫（csproj 构建 / 拆分构建 / 运行时自检）仍只在本地 build\build.ps1 -Check 里跑。
 
 on:
   push:
@@ -18,3 +20,14 @@ jobs:
       - name: 运行文本类守卫
         shell: pwsh
         run: ./build/guards-text.ps1
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: 契约层编译 + 单元测试（无游戏）
+        shell: pwsh
+        run: ./build/run-tests.ps1 -NoGame

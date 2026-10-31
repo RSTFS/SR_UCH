@@ -1,9 +1,15 @@
 ﻿# SR_UCH 最小单元测试（item 5）
-# 只测纯逻辑：编译「契约层 SR.Contracts.cs + tests\Tests.cs」成一个控制台程序，直接运行。
-# 依赖只有 mscorlib / System / System.Core / BepInEx + UnityEngine.CoreModule（Color 类型）。
-# 用法：.\build\run-tests.ps1          跑全部测试；退出码 0 = 全通过，1 = 有失败，2 = 编译失败
+# 只测纯逻辑：编译「契约层 SR.Contracts.cs + tests\Tests.cs + 两个桩文件」成控制台程序，直接运行。
+# 依赖：mscorlib / System / System.Core / BepInEx（ConfigEntry 等）；UnityEngine 由 tests\UnityStubs.cs 提供，
+#       不引用游戏里的 UnityEngine.*.dll（脱离 Unity 运行时加载会 TypeLoadException）。
+# 两条路径：
+#   A) 有游戏目录（UCH_DIR / csproj 的 UCH_DIR / -GameDir）：用 csc 直接编，引用真实 BepInEx.dll（最快）
+#   B) 没有游戏 / 没有 csc / 加 -NoGame：改用 tests\SR_UCH.Tests.csproj（dotnet run），
+#      BepInEx 类型走 tests\BepInExStubs.cs —— CI 与"没装游戏的贡献者"也能跑。
+# 用法：.\build\run-tests.ps1 [-NoGame]   退出码 0 = 全通过，1 = 有失败，2 = 编译/环境失败
 param(
-    [string]$GameDir = ''
+    [string]$GameDir = '',
+    [switch]$NoGame
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,9 +24,21 @@ if (-not $GameDir) {
         if ($m.Success) { $GameDir = $m.Groups[1].Value.Trim() }
     } catch { $GameDir = '' }
 }
+# 无游戏（CI / 新贡献者）：走 tests 工程的 dotnet 路径，BepInEx 用桩。
+function Invoke-DotnetTests {
+    $proj = Join-Path (Join-Path $root 'tests') 'SR_UCH.Tests.csproj'
+    if (-not (Test-Path -LiteralPath $proj)) { Write-Host ('缺少测试工程：' + $proj) -ForegroundColor Red; exit 2 }
+    $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+    if (-not $dotnet) { Write-Host '既没有游戏目录，也没有 dotnet SDK：无法运行测试' -ForegroundColor Red; exit 2 }
+    Write-Host '== 单元测试（无游戏模式：dotnet + BepInEx 桩）==' -ForegroundColor DarkGray
+    & $dotnet.Source run --project $proj -v:q --nologo
+    exit $LASTEXITCODE
+}
+
+if ($NoGame) { Invoke-DotnetTests }
 if (-not $GameDir -or -not (Test-Path -LiteralPath $GameDir)) {
-    Write-Host '找不到游戏目录：请设置 UCH_DIR 或用 -GameDir 指定' -ForegroundColor Red
-    exit 2
+    Write-Host '找不到游戏目录：改用 tests\SR_UCH.Tests.csproj（dotnet + BepInEx 桩）' -ForegroundColor Yellow
+    Invoke-DotnetTests
 }
 
 # 找 csc：优先 dotnet SDK 里的 Roslyn

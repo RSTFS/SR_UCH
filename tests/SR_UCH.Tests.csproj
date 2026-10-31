@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 无游戏的单元测试工程：只编 SR.Contracts.cs + 两个桩文件 + Tests.cs。
+       目的是让 CI（ubuntu / 无游戏 DLL）也能执行 "契约层必须能编译 + 单测必须过" 这道门禁。
+       有游戏时仍走 build\run-tests.ps1 的 csc 路径（引用真实 BepInEx.dll）。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>SR_UCH_Tests</AssemblyName>
+    <RootNamespace>SR_UCH.Tests</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>CS0414;CS0169;CS0649;CS8981;CS0162;CS0219;CS8632</NoWarn>
+    <StartupObject>SR_UCH.Tests.Program</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\SR_UCH\SR.Contracts.cs" />
+    <Compile Include="UnityStubs.cs" />
+    <Compile Include="BepInExStubs.cs" />
+    <Compile Include="Tests.cs" />
+  </ItemGroup>
+
+</Project>
