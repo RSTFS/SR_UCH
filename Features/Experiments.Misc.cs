@@ -152,12 +152,12 @@ public partial class Experiments : ITweak
         // 相机速度的独立状态行（写入 FreeCam.Note 会串到其它页）。
         internal static string SpeedNote = "";
         // 每帧钩子：30 帧节流；文案只在倍数变化时更新。
-        private static int _followAt = -9999;
+        private static float _followAt = -9999f;
         private static float _followLastMul = -1f;
         private static void ApplyFollowSpeed() {
             try {
-                if (Time.frameCount - _followAt < 30) return;   // 30 帧一次足够
-                _followAt = Time.frameCount;
+                if (Time.unscaledTime - _followAt < 0.5f) return;   // 0.5s 一次足够（原先 30 帧，实测仍偏重）
+                _followAt = Time.unscaledTime;
                 // 每帧回调需自行判 GateMaster：不满足时还原原值并清快照，下次开启重新取。
                 // 只受模组总开关限制，不受「自由相机」开关限制。
                 if (!SRApi.GateMaster) {
@@ -168,8 +168,11 @@ public partial class Experiments : ITweak
                     _followLastMul = -1f;   // 状态文案随之失效
                     return;
                 }
-                ZoomCamera zc = null;
-                try { ZoomCamera[] zs = SRApi.FrameObjects<ZoomCamera>(); zc = zs != null && zs.Length > 0 ? zs[0] : null; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                // 已知相机还活着就直接用，避免每 0.5s 一次全场景 FindObjectsOfType。
+                ZoomCamera zc = _followZc;
+                if (zc == null) {
+                    try { ZoomCamera[] zs = SRApi.FrameObjects<ZoomCamera>(); zc = zs != null && zs.Length > 0 ? zs[0] : null; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                }
                 if (zc == null) return;
                 if (_followZc != zc) { _followZc = zc; _followOrig = -1f; }   // 相机换了就重取原值
                 if (_followOrig < 0f) _followOrig = zc.MaxFollowSpeed;

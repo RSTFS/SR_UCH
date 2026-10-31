@@ -212,6 +212,10 @@ public partial class Experiments : ITweak
         }
 
         // 每帧总入口：所有分支双向幂等（开写目标值、关写回原值），可任意次切换。
+        // 重活（墙/光标/相机/边界）只按 5Hz 重放：这些都是幂等写值，人眼看不出 200ms 的差别，
+        // 但每帧跑一遍实测要 4ms+（tick 剖析里 关卡边界-应用 常年超限）。
+        private static float _nextApplyAt;
+
         internal static void Tick() {
             try {
                 if (_on == null) return;
@@ -219,6 +223,9 @@ public partial class Experiments : ITweak
                 ApplyCursorPiece(on);
                 if (!on) { if (_applied) { Restore(); _applied = false; } return; }
                 _applied = true;
+                float __now = Time.unscaledTime;
+                if (_tick > 0 && __now < _nextApplyAt) return;
+                _nextApplyAt = __now + 0.2f;
                 _tick++;
                 // 墙引用缺失时扫描一次。
                 if (WallsOn) EnsureWalls();
