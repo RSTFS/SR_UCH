@@ -161,7 +161,23 @@ namespace SR_UCH.Tweaks {
         private static readonly List<int> _visScratch = new List<int>(ColCount);   // 交给核心按 order+hidden 填充
         private static int _hiddenColsBeforeTable;                                // 本帧核心处理右键隐藏前的列数
 
-        private static void TableDraw(Rect box) {
+        // 页面级滚轮（页面关掉滚动后，表格必须自己吃滚轮；只有这个钩子能在滚动区建立之前拿到事件）。
+    internal static bool OnLobbyWheel(Vector2 mouse, float wheel) {
+        try {
+            if (_tableArgs == null || _tableArgs.box.width <= 0f || !_tableArgs.box.Contains(mouse)) return false;
+            if (_tableMaxY > 0f) {
+                _scrollRows.y = Mathf.Clamp(_scrollRows.y + wheel * SRApi.Ctl.Sc(40), 0f, _tableMaxY);
+                return true;
+            }
+            if (_tableMaxX > 0f) {
+                _scrollCols.x = Mathf.Clamp(_scrollCols.x + wheel * SRApi.Ctl.Sc(60), 0f, _tableMaxX);
+                return true;
+            }
+            return false;
+        } catch (Exception __ex) { SRApi.Guard.Log("联机列表/页面滚轮", __ex); return false; }
+    }
+
+    private static void TableDraw(Rect box) {
             // _cw 未就绪（EnsureWidths 曾失败/被跳过）时直接跳过本帧绘制，避免 NullReference（audit B-9）。
             if (_cw == null || _cw.Length <= JoinCol) { try { EnsureWidths(); } catch (Exception __ew) { SRApi.Guard.Log("联机表格/列宽初始化", __ew); } }
             if (_cw == null || _cw.Length <= JoinCol) return;

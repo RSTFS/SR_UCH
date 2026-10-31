@@ -96,6 +96,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec(SecOnline, "联机", "Online");
             SRApi.Nav(SecOnline, 90);   // 侧栏顺序 90：会话(80) 之后、实验(100) 之前
             SRApi.RegisterPage(SecOnline, RenderOnlinePage);
+            SRApi.RegisterPageWheel(OnLobbyWheel);   // 页面关滚动，房间列表自己吃滚轮
             SRApi.RegisterTick("联机看门狗", TickOnline); // 每帧：回家看门狗 + 延时加入
             SRApi.RegisterTick("联机自动进入主菜单", TickAutoEnterMainMenu); // 加入成功后替玩家按一次确认
             // 加入流程本身要用 EventSystem，禁用会卡在"正在进入"：登记门控挂起，让核心不禁用 EventSystem。

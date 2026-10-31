@@ -534,9 +534,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 核心化：高度 = min(可用, 表头 + 行数*行高 + 拖拽条)。行少 -> 收紧，行多 -> 填满并滚动。
             // 高度只按内容：传 null 忽略"表高配置"，否则以前拖过的高度会把表格抬到配置值、行下方留白。
             // 按内容收紧（不用填满模式）：填满会在最后一行下面留一大块空表框，看起来就是"列表下面的空白"。
-            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, null, SRApi.Ctl.TableMinH(),
+            // 与联机列表同一套高度语义：表高配置（0=自动）+ 可用高度夹取 + 填满。
+            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.Sc(140),
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-                0f, true);   // fillViewport=true：与联机页一致，表格占满剩余高度、内部滚动
+                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, true);   // 与联机列表一致（含拖拽条高度）
                 _actionHitThisFrame = false;
                 List<PresetInfo> visible = VisiblePresets();
                 RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
@@ -831,7 +832,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 SRApi.TableDraw(_args);
                 HandlePresetCells();   // 数据列：悬浮预览 / 左键切三态 / 右键开界面；名称列：右键重命名
                 // 底边拖拽条（核心统一绘制 + 拖动 + 持久化）。
-                // 高度按内容自适应，不再绘制底边拖拽条（拖了也不生效，反而误导）。
+                // 底边拖拽条（核心统一绘制 + 拖动 + 持久化）：与联机列表同款。
+                SRApi.Ctl.TableHeightGripBar(_tableHEntry, (box.height + SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
                 // 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
                 _sbHandled = SRApi.Ctl.TableScrollbarFor(_args, e, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);
                 if (_hiddenCols.Count > _hiddenBeforeTable) {
