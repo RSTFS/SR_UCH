@@ -27,7 +27,7 @@
 | 21 | 07_表格与样式 | P0-4 | 样式重建的纹理泄漏：未登记到 _styleList 的共享纹理被反复 new 并 DontDestroyOnLoad | `ported` | Solid() 纹理登记到 _styleTex，重建时统一 Destroy |
 | 22 | 07_表格与样式 | P0-5 | 表头裁剪块缺少 GUI.color 保护，且鼠标坐标语义可能跨裁剪原点错位 | `ported` | 表头与钉住列表头两个裁剪块都保存/还原 GUI.color |
 | 23 | 08_本地化与设置页 | P0-01 | SetValue 在编辑框自身提交帧跳过 `_editText` 清理，会回滚掉"1."之外的后续编辑 | `todo` |  |
-| 24 | 08_本地化与设置页 | P0-02 | ApplyCmOrder 用反射写 `<Description>k__BackingField`，BepInEx 5 实际字段名是 `description`（无编译器生成名） | `todo` |  |
+| 24 | 08_本地化与设置页 | P0-02 | ApplyCmOrder 用反射写 `<Description>k__BackingField`，BepInEx 5 实际字段名是 `description`（无编译器生成名） | `ported` | 改为按类型+名字含 escription 探测后备字段，探测失败 LogWarn（带 BepInEx 版本） |
 | 25 | 08_本地化与设置页 | P0-03 | ResetAllDefaults 只复位 `Section == "Settings"` 的条目，Sidebar/Internal 段与外部插件段被跳过且窗口几何被一并复位 | `todo` |  |
 | 26 | 08_本地化与设置页 | P0-04 | ModeLabel 缓存键用 `GameSettings.GetInstance().GameMode`，但 `gmKey` 声明在使用之后、且 catch 块吞掉异常后 `gmKey` 保持 `CREATIVE` 默认值 | `todo` |  |
 | 27 | 09_配置迁移 | P0-01 | 删除判定是"手工死键名单"，名单与活键脱节时会在 Bind 之前永久抹掉用户设置 | `ported` | 删除键登记 + 启动日志一次性汇总（迁移时尚未 Bind，无法判定活键；深度修法=post-bind 孤儿清理，记为 P1） |

@@ -16,9 +16,24 @@ public partial class SR {
         // 使 Configuration Manager 的条目顺序与 SR 界面一致：经反射替换 ConfigEntryBase.Description 的标签。
         // 顺序 = 侧栏栏目顺序（_internalSections），栏目内按条目绑定顺序；仅改标签，Value / AcceptableValues 保留。
         private static int _cmOrderVer = -1;   //上次应用排序时的条目版本
-        private static readonly FieldInfo _fEntryDesc =
-            typeof(ConfigEntryBase).GetField("<Description>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? typeof(ConfigEntryBase).GetField("Description", BindingFlags.Instance | BindingFlags.NonPublic);
+        // ConfigEntryBase 的 Description 后备字段名随 BepInEx 版本不同（有人是 <Description>k__BackingField，
+        // 有人是 description），硬编码两个猜测名会静默失效（audit 08-P0-02）。这里按"名字含 escription"探测。
+        private static readonly FieldInfo _fEntryDesc = ProbeEntryDescField();
+        private static FieldInfo ProbeEntryDescField() {
+            try {
+                FieldInfo[] fs = typeof(ConfigEntryBase).GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                for (int i = 0; i < fs.Length; i++) {
+                    if (fs[i].FieldType != typeof(ConfigDescription)) continue;
+                    if (fs[i].Name.IndexOf("escription", StringComparison.Ordinal) >= 0) return fs[i];
+                }
+                // 探测不到就明确报错（带 BepInEx 版本），不要静默跳过排序/隐藏。
+                string ver = "?";
+                try { ver = typeof(ConfigFile).Assembly.GetName().Version.ToString(); } catch { /* 版本号取不到就写 ? */ }
+                SR.LogWarn("[设置] 未找到 ConfigEntryBase 的 Description 后备字段（BepInEx " + ver
+                    + "），Configuration Manager 里的条目将不排序/不隐藏");
+            } catch (Exception __ex) { Guard.Log("探测 Description 字段", __ex); }
+            return null;
+        }
 
         internal static void ApplyCmOrder() {
             if (_internalConfig == null) return;
