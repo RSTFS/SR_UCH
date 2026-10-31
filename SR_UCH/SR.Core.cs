@@ -24,7 +24,9 @@ public partial class SR : ITweak {
 //   必要时再把 Gate / Ctl / Nav 提成独立静态类。
 
         private static ConfigEntry<KeyCode> _openKey;
-        private static ConfigEntry<bool> _tickProf;   // 帧钩子剖析开关
+        private static ConfigEntry<bool> _tickProf;
+        // 自检页「帧钩子」卡读取：剖析开关关闭时不做任何采样与刷新。
+        public static bool TickProfilingEnabled { get { return _tickProf != null && _tickProf.Value; } }   // 帧钩子剖析开关
         private static ConfigEntry<bool> _blockInputEntry;
         private static ConfigEntry<float> _uiScaleEntry;
         private static ConfigEntry<string> _disabledPluginsEntry;

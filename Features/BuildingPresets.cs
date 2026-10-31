@@ -503,6 +503,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 关键：GetLastRect() 在 Layout 趟里可能是退化矩形（诊断日志里 lastYMax=1.0），
             // 用它算"已用高度"会得到 ~0，表格于是按整个视口取高、直接溢出页面底部。
             // 这里放一个零高度探针，拿到当前布局游标的真实 y。
+                // 分区标题先画：它占的高度必须计入 last.yMax，否则表格底边会超出页面底部（下方留白/末行被裁）。
+                SRApi.Ctl.SectionTitle(SRApi.T("- 预设列表", "- Preset list") + " (" + VisiblePresets().Count + "/" + _presets.Count
+                    + SRApi.T("，上限 ", ", limit ") + MaxPresets + ")");
             Rect last = GUILayoutUtility.GetRect(1f, 0f);
                 // 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
                 // 表格高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
@@ -710,11 +713,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
         private static void RenderPresetTable(float tableH, List<PresetInfo> visible) {
             try {
                 _visibleCache = visible;   // 悬浮预览按行号取预设时用（与 RowCells 同一份列表）
-                string title = SRApi.T("- 预设列表", "- Preset list") + " (" + visible.Count + "/" + _presets.Count
-                    + SRApi.T("，上限 ", ", limit ") + MaxPresets + ")";
-                SRApi.Ctl.SectionTitle(title);
-                float titleH = 0f;
-                try { titleH = Mathf.Max(0f, GUILayoutUtility.GetLastRect().height); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 float rowH = SRApi.Ctl.TableRowH();
                 float headerH = SRApi.Ctl.TableHeaderH();
                 if (tableH <= 0f) tableH = TableHeight();

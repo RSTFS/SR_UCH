@@ -144,7 +144,7 @@ public partial class SR {
         // 常驻页签栏（画在滚动区之外）：[通用] [自检] ……… [恢复默认]
         internal static void RenderSettingsTabBar() {
             try {
-                GUILayout.BeginHorizontal();
+                GUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));
                 if (GUILayout.Button(T("通用", "General"), SettingsTab == 0 ? _selItem : _btn, GUILayout.Height(Sc(26)))) SettingsTab = 0;
                 if (GUILayout.Button(T("自检", "Self-check"), SettingsTab == 1 ? _selItem : _btn, GUILayout.Height(Sc(26)))) SettingsTab = 1;
                 GUILayout.FlexibleSpace();
@@ -176,6 +176,8 @@ public partial class SR {
                         __e.Use();
                     }
                 } catch (Exception __sw) { Guard.Log("设置页/Ctrl 滚轮切页", __sw); }
+                // 页签栏画在页面内容里：与其它页共用同一套布局/滚动，不会出现设置页独有的偏移。
+                RenderSettingsTabBar();
                 GUILayout.Space(Sc(4));
                 if (SettingsTab == 1) RenderAuditBlock();
                 else RenderSettingsEntries(colWidth);
@@ -188,7 +190,8 @@ public partial class SR {
             bool pluginListDrawn = false;
             foreach (ConfigEntryBase entry in SettingsEntries()) {
                 any = true;
-                // 诊断浮层开关属于"自检"页（与补丁/反射信息放一起），通用页不再重复显示。
+                // Tick Profiling 只在自检页的「帧钩子」卡里显示；通用页重复显示会让两个勾选框互相打架。
+                if (entry.Definition.Key == "Tick Profiling") continue;
                 //栏目宽度专用行：滑块 + [-]/[+] 步进
                 if (entry.Definition.Key == Keys.SidebarWidth) { RenderSidebarWidthRow(); continue; }
                 string g = SettingsGroup(entry.Definition.Key);
@@ -323,24 +326,22 @@ public partial class SR {
                     });
 
                 // ---- 性能卡 ----
-                string tickRep = SR.TickProfileReport();
-                // ---- 配置健康卡 ----
-                Card(SR.OrphanKeyCount == 0 && SR.FallbackSectionCount == 0, T("配置", "Config"),
-                    T("孤儿键 " + SR.OrphanKeyCount + " · 无主段 " + SR.FallbackSectionCount + " · 运行时异常 " + SR.Guard.WarnCount,
-                      "orphan keys " + SR.OrphanKeyCount + " · unowned sections " + SR.FallbackSectionCount + " · runtime errors " + SR.Guard.WarnCount),
-                    delegate {
-                        AuditLabel(T("运行时异常次数", "Runtime errors") + "：" + SR.Guard.WarnCount);
-                        if (!string.IsNullOrEmpty(SR.Guard.LastWhat))
-                            AuditLabel(T("最近一次", "Last") + "：" + SR.Guard.LastWhat + " - " + (SR.Guard.LastError ?? ""));
-                        try { AuditLabel(SR.AttributionReport()); } catch (Exception __at) { Guard.Log("自检/归因", __at); }
-                    });
+                // 开关关闭时不刷新：不读采样、不重算，卡片只显示一行提示（勾选框在卡片里）。
+                bool __profOn = false;
+                try { __profOn = SR.TickProfilingEnabled; } catch (Exception __tp) { Guard.Log("自检/读性能开关", __tp); }
+                string tickRep = __profOn ? SR.TickProfileReport() : null;
+                // 「配置」卡已删除：孤儿键/无主段/运行时异常已合并进「目标与配置」卡，不再重复。
                 Card(true, T("帧钩子", "Frame hooks"),
                     T("按名字排序，超阈值才需要关注", "sorted by name; only over-threshold rows matter"),
                     delegate {
-                        // 剖析开关（默认关）：关掉后不再写性能日志，表格仍显示已采样的数据。
+                        // 剖析开关（默认关）：关掉后既不写日志也不刷新下面的列表。
                         SRApi.RenderSectionEntries(Keys.Settings, delegate (ConfigEntryBase e) {
                             return e.Definition.Key == "Tick Profiling";
                         });
+                        if (!__profOn) {
+                            AuditLabel(T("（剖析已关闭：勾选上面的开关后开始采样）", "(profiling is off: tick the switch above to start sampling)"));
+                            return;
+                        }
                         _scrollHooks = GUILayout.BeginScrollView(_scrollHooks, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
                             GUIStyle.none, GUILayout.Height(Sc(190f)));
                         if (string.IsNullOrEmpty(tickRep)) GUILayout.Label(T("（还没有采样）", "(no samples yet)"), _label);
@@ -373,7 +374,7 @@ public partial class SR {
                     GUILayout.Label(ok ? "●" : "▲", _label, GUILayout.Width(Sc(18)), GUILayout.Height(Sc(20)));
                 } finally { GUI.color = prev; }
                 // 标题自适应高度：长标题换行显示，不再被固定 20px 截断。
-                float __titleH = Mathf.Max(Sc(20), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)));
+                float __titleH = Mathf.Max(Sc(22), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)) + Sc(2));   // 底部多 2px：中文标题的下缘笔画以前会被裁
                 GUILayout.Label(title, _labelWrap, GUILayout.Width(Sc(120)), GUILayout.Height(__titleH));
                 GUILayout.Label(summary, _label, GUILayout.Height(Sc(20)));
                 GUILayout.FlexibleSpace();
