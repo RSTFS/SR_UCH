@@ -12,7 +12,7 @@
 | 6 | 04_主窗口框架 | P0-1 | `_dirtyConfig` 单槽覆盖会让先改的 ConfigFile 永不落盘 | `ported` | _dirtyConfig 单槽改 HashSet，逐个保存成功才移除 |
 | 7 | 04_主窗口框架 | P0-2 | 录制超时与 CommitRecording 在同一帧并存，可能提交错误序列 | `already-fixed` | CancelCapture 原子清 _capturing/_recSeq/_recHeld；CommitRecording 已判 _recSeq.Count==0，仅补注释说明 |
 | 8 | 04_主窗口框架 | P0-3 | DrawGUI 的 finally 不能保证 BeginArea / 滚动组对称闭合 | `todo` |  |
-| 9 | 04_主窗口框架 | P0-4 | 共享 skin 选择色/字体的还原依赖“SR 样式仍在内存” | `todo` |  |
+| 9 | 04_主窗口框架 | P0-4 | 共享 skin 选择色/字体的还原依赖“SR 样式仍在内存” | `already-fixed` | EnsureFont 已不再写 GUI.skin（早前修复）；每帧 _prevFont 在任何写之前快照，还原走 OrigSkinFont() ?? _prevFont，不依赖样式对象存活 |
 | 10 | 05_键位与调色板 | P0-1 | 序列半完成状态跨帧残留，且可能在非 Layout/Repaint 事件上重入 | `todo` |  |
 | 11 | 05_键位与调色板 | P0-2 | `_watchKeys` 无限增长且无失效覆盖，直接改 BoxedValue 时可能漏失效 | `todo` |  |
 | 12 | 05_键位与调色板 | P0-3 | `_pendingComboDefault` 迁移可能覆盖已持久化的“无修饰键”配置 | `todo` |  |
