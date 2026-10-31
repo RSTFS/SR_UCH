@@ -134,15 +134,6 @@ The panel has sections on the left and pages on the right. Listed by section bel
 
 The game folder is auto-detected from common Steam paths; set the UCH_DIR environment variable to override.
 
-If you launch the game through **Gale** (a Thunderstore mod manager), writing to `<game>/BepInEx/plugins`
-is not enough: Gale installs BepInEx into its own profile folder, and that is what the game loads. The
-build script detects Gale profiles and lists them; `-Deploy -Gale` copies the DLLs into every detected
-UCH profile as well (`GALE_DATA` can point at a custom Gale data directory):
-
-```powershell
-./_tools/build_sr_uch.ps1 -All -Deploy -Gale
-```
-
 ### Tests and guards
 
 Everything below runs **without the game installed** (contract layer is compiled against local
