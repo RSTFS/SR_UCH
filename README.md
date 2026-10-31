@@ -134,6 +134,29 @@ The panel has sections on the left and pages on the right. Listed by section bel
 
 The game folder is auto-detected from common Steam paths; set the UCH_DIR environment variable to override.
 
+### Tests and guards
+
+Everything below runs **without the game installed** (contract layer is compiled against local
+`tests/UnityStubs.cs` + `tests/BepInExStubs.cs`), so it works on a fresh clone and in CI:
+
+```powershell
+.uildun-tests.ps1 -NoGame    # contract layer must compile + 13 assertions (dotnet, net8.0)
+.uildun-tests.ps1            # same tests through csc against the real BepInEx when a game is present
+.uild\guards-text.ps1          # 13 text guards (API allow-list, layer boundaries, rsp coverage,
+                                 # encoding, tooltip shapes, silent-catch and file-size ratchets)
+```
+
+CI runs both jobs (`.github/workflows/guards.yml`): `text-guards` and `unit-tests`, so a pull request
+that breaks the contract layer or a ratchet goes red before review.
+
+The heavier checks (full build through the rsp chain, split-mode build, csproj build, runtime
+self-test comparison) need the game's reference assemblies and stay local:
+
+```powershell
+.\..\_toolsuild_sr_uch.ps1 -All -Check     # mechanical guards incl. build + self-test baseline
+.uild\check-selftest.ps1                   # compare the last log's [SR.SelfTest] line with the baseline
+```
+
 ---
 
 ## Credits

@@ -26,9 +26,10 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>bin\MSBuild\</OutputPath>
 
-    <!-- 游戏根目录的单一真值：优先环境变量 UCH_DIR，未设置时用下面的回退值。
-         换机器只需 setx UCH_DIR "E:\...\Ultimate Chicken Horse"，或
-         dotnet build -p:UCH_DIR="E:\...\Ultimate Chicken Horse"（也可直接 -p:UchManagedDir=...）。 -->
+    <!-- 游戏根目录的单一真值：优先环境变量 UCH_DIR，未设置时用下面的回退值（**仅供作者本机**，评审 G2）。
+         换机器 / 新克隆请 setx UCH_DIR "E:\...\Ultimate Chicken Horse"，或
+         dotnet build -p:UCH_DIR="E:\...\Ultimate Chicken Horse"（也可直接 -p:UchManagedDir=...）。
+         回退值不匹配时 CheckUchDir 会给出可操作的报错，不会只丢一堆 CS0006。 -->
     <UCH_DIR Condition="'$(UCH_DIR)' == ''">D:\EF\Steam\steamapps\common\Ultimate Chicken Horse</UCH_DIR>
     <UchManagedDir Condition="'$(UchManagedDir)' == ''">$(UCH_DIR)\UltimateChickenHorse_Data\Managed</UchManagedDir>
     <BepInExCoreDir Condition="'$(BepInExCoreDir)' == ''">$(UCH_DIR)\BepInEx\core</BepInExCoreDir>
