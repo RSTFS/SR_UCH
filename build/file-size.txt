@@ -1,10 +1,10 @@
 # 单文件行数守卫基线（build\guards-text.ps1 的 Check-FileSize 读这一份）
 # 规则：任何 .cs 超过 900 行都必须在这里登记；登记的数字只允许变小（拆分后同步更新）。
-# 格式：文件名=行数
-SR.Contracts.cs=1334
-SR.Settings.cs=1243
-SR.Core.cs=1178
-SR.Ctl.cs=1117
-BuildingPresets.cs=1092
-HUD.cs=1015
-ExModule.Core.cs=912
+# 计数口径：与守卫一致（ReadAllLines 的行数）。触发脚本见 build\update-file-size.ps1。
+# 格式：相对仓库根的路径=行数
+SR_UCH/SR.Contracts.cs=1333
+SR_UCH/SR.Settings.cs=1242
+SR_UCH/SR.Core.cs=1177
+SR_UCH/SR.Ctl.cs=1116
+Features/BuildingPresets.cs=1091
+Features/HUD.cs=1014

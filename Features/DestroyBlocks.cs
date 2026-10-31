@@ -1,5 +1,6 @@
 // 方块破坏：列出现场方块、按玩家归属筛选、远程销毁。
-// 槽位（对外 Provide）：DestroyBlocks.IsPlayerPlaced / PlayerPlacedBlocks / AttributeToHost；不依赖任何外部模块，仅房主可删。
+// 槽位（对外 Provide）：DestroyBlocks.IsPlayerPlaced / PlayerPlacedBlocks / AttributeToHost。
+// 权限模型：只有房主能真正删除；房客可以用同样的键高亮、选中、看信息条，按删除键不生效。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -235,11 +236,11 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec("Destroy Blocks", "方块破坏", null);
             SRApi.Nav("Destroy Blocks", 60); // 侧栏栏目顺序
             SRApi.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);
-            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "删除模式按键\n按住进入删除模式并高亮候选方块\n可改绑，支持组合键", "Delete-mode key\nhold to enter delete mode and highlight candidates\nrebindable, combos supported");
+            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "删除模式按键\n按住高亮候选方块（房客同样可用）\n可改绑，支持组合键", "Delete-mode key\nhold to highlight candidates (guests can use it too)\nrebindable, combos supported");
             SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
-            SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除按键\n删除当前选中的方块\n滚轮在候选方块之间切换", "Delete key\ndeletes the selected block\nmouse wheel cycles the candidates");
+            SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除按键\n删除当前选中的方块（仅房主）\n房客按下只提示，不做删除；滚轮换目标", "Delete key\ndeletes the selected block (host only)\nguests only get a hint; the wheel cycles targets");
             SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
-            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n开启后本页功能才生效\n关闭后本页所有操作停止", "Block breaking master switch\nthe page works only while this is on\nwhen off, every action here stops");
+            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n开启后本页功能才生效\n仅房主能真正删除；房客只能高亮标记", "Block breaking master switch\nthe page works only while this is on\nhost-only destruction; guests can only highlight");
             SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
             SRApi.LocDesc("Destroy Blocks", "Select Mode", "候选排序方式\n距离＝离你近的优先；放置顺序＝新放的优先\n只影响选择顺序", "Candidate ordering\ndistance = nearest first; placement = newest first\nselection order only");
             SRApi.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
@@ -327,17 +328,6 @@ namespace SR_UCH.Tweaks {
             Slots.Provide(SlotAttributeToHost, (Action<List<Placeable>>)AttributeToHost);
         }
 
-        // 房客端删除的放行槽位（由 EX 提供：EX 总开关 && EX 的「方块破坏」）。未加载 EX 时恒为 false。
-        // 每次都 Require 一次（字典查找，代价可忽略）：EX 可能比本功能更晚初始化，缓存 null 会永久失效。
-        private const string SlotAllowClientsOn = "Blocks.AllowClientsOn";
-        private static bool AllowClientsOn {
-            get {
-                try {
-                    Func<bool> f = Slots.Require<Func<bool>>(SlotAllowClientsOn);
-                    return f != null && f();
-                } catch { return false; }
-            }
-        }
 
         // 槽位名：与调用方的唯一约定是“名字 + 委托签名”，刻意用 private const，调用方另写自己的常量以免编译期依赖。
         // 名字一经发布不再更改（改需两边同步）。
@@ -367,9 +357,9 @@ namespace SR_UCH.Tweaks {
             if (SRApi.UiOpen && SRApi.BlockInput) return; 
             // 仅派对 / 创意 / 自由建造模式；已接入 IgnoreModeLimit 豁免。
             if (!SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay)) return;
-            // 房主随时可删；房客端必须由外部模块（EX 的「方块破坏」开关）经槽位显式放行才允许，
-            // 没有 EX / EX 未开启 = 仅房主可删（各端按本机设置判定，不会互相越权）。
-            if (!SRApi.CanControlLocally && !AllowClientsOn) return;
+            // 权限：只有房主能真正删除；房客照样可以按住切换键高亮、滚轮换目标、看信息条（只读）。
+            // 房客按删除键时给一次明确提示，避免"按了没反应"的困惑。
+            bool canDestroy = SRApi.CanControlLocally;
             if (SRApi.ComboKeyDown(_toggleKey)) {
                 _altDown = true;
                 RebuildList();
@@ -397,23 +387,29 @@ namespace SR_UCH.Tweaks {
                     }
                 }
                 if (_index < 0 || _index >= Blocks.Count) _index = Blocks.Count - 1;
+                // 删除键只对房主生效；ComboKeyDown 是边沿触发，必须只调一次。
                 if (SRApi.ComboKeyDown(_deleteKey)) {
-                    Placeable target = Blocks[_index];
-                    if (target == null || target.MarkedForDestruction) {
-                        Blocks.RemoveAt(_index);
-                        if (_index >= Blocks.Count) _index = Blocks.Count - 1;
-                        _tintedBlock = null;
-                        return;
-                    }
+                    if (!canDestroy) {
+                        SRApi.NotifyT("仅房主可破坏方块：", "Only the host can destroy blocks: ",
+                            SRApi.T("房客只能高亮标记", "guests can only highlight"));
+                    } else {
+                        Placeable target = Blocks[_index];
+                        if (target == null || target.MarkedForDestruction) {
+                            Blocks.RemoveAt(_index);
+                            if (_index >= Blocks.Count) _index = Blocks.Count - 1;
+                            _tintedBlock = null;
+                            return;
+                        }
 
-                    // DestroySelf 自身会发 MsgPieceDestroyed，再显式广播会发两条（接收端报 "already marked"）。
-                    DestroyBlockNative(_index);
-                    Blocks.RemoveAt(_index);
-                    _index--;
-                    if (_index < 0) _index = 0;
-                    _selected = null;
-                    _tintedBlock = null; 
-                    if (Blocks.Count <= 0) return;
+                        // DestroySelf 自身会发 MsgPieceDestroyed，再显式广播会发两条（接收端报 "already marked"）。
+                        DestroyBlockNative(_index);
+                        Blocks.RemoveAt(_index);
+                        _index--;
+                        if (_index < 0) _index = 0;
+                        _selected = null;
+                        _tintedBlock = null;
+                        if (Blocks.Count <= 0) return;
+                    }
                 }
                 // 滚轮量必须取 SRApi.TakeWheelEvent()：Input.GetAxis("Mouse ScrollWheel") 在本环境恒为 0，滚轮切换永不生效。
                 // TakeWheelEvent 由每帧执行的 ManagerUI.OnGUI 从事件 delta 记录，面板关着也有效。

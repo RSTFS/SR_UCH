@@ -370,8 +370,10 @@ function Check-FileSize {
             if ($n -le $limit) { continue }
             $count++
             $allowed = 0
-            if ($base.ContainsKey($f.Name)) { $allowed = $base[$f.Name] }
-            if ($n -gt $allowed) { $bad += ($f.Name + ' ' + $allowed + '->' + $n) }
+            # 基线键 = 相对仓库根的路径（与 silent-catch 一致；同名文件不会互相覆盖）
+            $rel = ($f.FullName.Substring($Root.Length) -replace '\\', '/').TrimStart('/')
+            if ($base.ContainsKey($rel)) { $allowed = $base[$rel] }
+            if ($n -gt $allowed) { $bad += ($rel + ' ' + $allowed + '->' + $n) }
         }
     }
     if ($bad.Count -gt 0) {
