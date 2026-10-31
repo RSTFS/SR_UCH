@@ -49,10 +49,6 @@ public partial class Experiments : ITweak
                 }
                 GUILayout.FlexibleSpace();
                 GUILayout.EndHorizontal();
-                if (CrossPlay.Note != null && CrossPlay.Note.Length > 0) {
-                    GUILayout.Space(SRApi.Ctl.Sc(2));
-                    DrawStatus(CrossPlay.Note);
-                }
 
             } catch (Exception __ex) { SRApi.Guard.Log("其它页 渲染", __ex); }
         }

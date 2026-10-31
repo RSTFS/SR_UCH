@@ -95,62 +95,6 @@ namespace SR_UCH.Tweaks {
         // 正在加入的抑制窗口：JoinFlow 是一次性协程，重复点击会并发两条流程（audit P0-22/23）。
         // 用时间窗而不是 bool：协程异常/被销毁时也会自然过期，不会把入口永久锁死。
         private static float _joinGuardUntil;
-        // 同位体（本地版）：让**同一个控制器**多认领一个玩家号。
-        // 依据：Controller.Player 是位掩码（bit0=玩家1 … bit3=玩家4），Controller.AddPlayer(n)
-        // 只是把第 n-1 位置 1 —— 于是同一个输入同时驱动两个角色，不需要再进一次房间。
-        // 找不到合适的控制器 / 没有空位时返回 false，调用方再退回"重进房间"那条路。
-        internal static bool AddLocalAlterSelf() {
-            try {
-                Type ct = null;
-                foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies()) {
-                    try { if (asm.GetName().Name != "Assembly-CSharp") continue; ct = asm.GetType("Controller", false); }
-                    catch (Exception __a) { SRApi.Guard.Log("同位体/找 Controller 类型", __a); }
-                    if (ct != null) break;
-                }
-                if (ct == null) { SRApi.LogWarn("[同位体] 找不到 Controller 类型"); return false; }
-
-                System.Collections.IEnumerable all = null;
-                try {
-                    FieldInfo f = ct.GetField("allControllers", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (f != null) all = f.GetValue(null) as System.Collections.IEnumerable;
-                    if (all == null) {
-                        PropertyInfo pr = ct.GetProperty("allControllers", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                        if (pr != null) all = pr.GetValue(null, null) as System.Collections.IEnumerable;
-                    }
-                } catch (Exception __ac) { SRApi.Guard.Log("同位体/取控制器列表", __ac); }
-                if (all == null) { SRApi.LogWarn("[同位体] 拿不到控制器列表"); return false; }
-
-                FieldInfo fPlayer = ct.GetField("Player", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (fPlayer == null || fPlayer.FieldType != typeof(int)) { SRApi.LogWarn("[同位体] Controller.Player 不是 int"); return false; }
-                MethodInfo mAdd = ct.GetMethod("AddPlayer", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null, new Type[] { typeof(int) }, null);
-                if (mAdd == null) { SRApi.LogWarn("[同位体] 没有 Controller.AddPlayer(int)"); return false; }
-
-                object best = null; int bestMask = 0;
-                foreach (object c in all) {
-                    if (c == null) continue;
-                    int mask = (int)fPlayer.GetValue(c);
-                    if (mask == 0) continue;
-                    // 只认"已经在用"的控制器：位掩码里有玩家 1..4 的任意一位即可。
-                    if (mask > bestMask) { best = c; bestMask = mask; }
-                }
-                if (best == null) { SRApi.LogWarn("[同位体] 当前没有已连接的控制器"); return false; }
-
-                int free = 0;
-                for (int n = 1; n <= 4; n++) {
-                    if ((bestMask & (1 << (n - 1))) == 0) { free = n; break; }
-                }
-                if (free == 0) { SRApi.LogWarn("[同位体] 这个控制器已经占了 4 个玩家位"); return false; }
-
-                mAdd.Invoke(best, new object[] { free });
-                int after = (int)fPlayer.GetValue(best);
-                bool ok = (after & (1 << (free - 1))) != 0;
-                SRApi.LogInfo("[同位体] 控制器 " + best.GetType().Name + " 位掩码 " + bestMask + " -> " + after
-                    + "（" + (ok ? "已认领玩家 " + free : "认领失败") + "）");
-                if (ok) SRApi.Notify(SRApi.T("同位体：同一控制器现在控制玩家 " + free, "Alter self: this controller now also drives player " + free));
-                return ok;
-            } catch (Exception __ex) { SRApi.Guard.Log("同位体/本地", __ex); return false; }
-        }
 
 
         // 每帧维护加入状态：进房成功清"在途"；离开房间后清"已加入房号"（否则会一直挡住该房）。
