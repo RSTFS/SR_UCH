@@ -137,7 +137,6 @@ namespace SR_UCH.Tweaks {
         private static readonly string[] _cells = new string[ColCount];
         private static SRApi.TableArgs _args;
         private static Vector2 _scrollRows;
-        private static float _wheelDiagAt;   // 滚轮诊断日志节流
         private static Vector2 _scrollCols;   // 诊断：每帧只记一次滚轮事件
         private static Rect _tableBox;     // 表格在屏幕上的矩形（页面级滚轮钩子按它判断是否滚表格）
         private static float _maxScrollX;
@@ -383,16 +382,6 @@ namespace SR_UCH.Tweaks {
                 // 命中框：_tableBox 是布局坐标、且 Layout 趟只有 1x1；无效时退回页面内容区。
                 // 核心现在传屏幕坐标：直接用页面内容区判定（_tableBox 是布局坐标，Layout 趟只有 1x1）。
                 Rect hitBox = new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
-                // 诊断：每秒最多一条，记录命中判定与实时可滚范围（滚不动时靠这一行定位）。
-                if (Time.unscaledTime - _wheelDiagAt > 1f) {
-                    _wheelDiagAt = Time.unscaledTime;
-                    float __rowsH = Mathf.Max(0f, hitBox.height - SRApi.Ctl.TableHeaderH()
-                                            - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));
-                    float __maxY = Mathf.Max(0f, VisiblePresets().Count * SRApi.Ctl.TableRowH() - __rowsH);
-                    SRApi.LogInfo("[布局预设] 滚轮 tableBox=" + _tableBox + " hitBox=" + hitBox + " mouse=" + mouse
-                        + " hit=" + hitBox.Contains(mouse) + " rowsH=" + __rowsH.ToString("0.0")
-                        + " maxY=" + __maxY.ToString("0.0") + " rows=" + VisiblePresets().Count);
-                }
                 // 不依赖 RenderPresetTable 里算出的 _maxScrollY（那一帧可能还没跑或窗口刚变过），
                 // 直接用表格框的实时高度重算可滚动范围，避免"范围算成 0 就滚不动"。
                 float rowsH = Mathf.Max(0f, hitBox.height - SRApi.Ctl.TableHeaderH()
@@ -438,7 +427,7 @@ namespace SR_UCH.Tweaks {
                 try {
                     SRApi.Ctl.LabelAuto(SRApi.T("预设名称", "Preset name"));
                     string typed = SRApi.ClearableTextField(_newName ?? "", 40, SRApi.Ctl.SearchBox,
-                        GUILayout.Width(W(240)), GUILayout.Height(W(24)));
+                        GUILayout.Width(W(220)), GUILayout.Height(W(24)));
                     if (typed != null && typed != _newName) _newName = typed;
                     if (GUILayout.Button(SaveButtonText(), SRApi.Ctl.Btn, GUILayout.Width(W(120)), GUILayout.Height(W(24)))) SaveCurrent();
                     GUILayout.FlexibleSpace();
@@ -451,7 +440,7 @@ namespace SR_UCH.Tweaks {
                 try {
                     SRApi.Ctl.LabelAuto(SRApi.T("XML 路径", "XML path"));
                     string path = SRApi.ClearableTextField(_importPath ?? "", 260, SRApi.Ctl.SearchBox,
-                        GUILayout.Width(W(300)), GUILayout.Height(W(24)));
+                        GUILayout.Width(W(220)), GUILayout.Height(W(24)));
                     if (path != null && path != _importPath) _importPath = path;
                     GUILayout.FlexibleSpace();
                 } finally {
@@ -488,7 +477,7 @@ namespace SR_UCH.Tweaks {
                         evSearch.Use();
                     }
                     string q = SRApi.ClearableTextField(_search ?? "", 40, SRApi.Ctl.SearchBox,
-                        GUILayout.Width(W(120)), GUILayout.Height(W(24)));
+                        GUILayout.Width(W(110)), GUILayout.Height(W(24)));
                     if (q != null && q != _search) _search = q;
                     GUILayout.Space(W(8));
                     RowLabel(SRApi.T("排序", "Sort"));
@@ -560,7 +549,13 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 与联机列表同一套高度语义：表高配置（0=自动）+ 可用高度夹取 + 填满。
             float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.Sc(140),
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, true);   // 与联机列表一致（含拖拽条高度）
+                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, false);  // 按内容收紧：行少时不留空表体
+            // 行多时以可视高度为上限（此时 maxY>0，滚轮才滚得动）。
+            try {
+                float __screenTop = SRApi.ContentArea.y + last.yMax;
+                float __visible = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(6f) - __screenTop;
+                if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableMinH(), __visible));
+            } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
             // 关键：把表格高度夹在"页面可视底"以内。页面关掉滚动后，表格若比可视区高，
             // 超出的行既看不到、又因为 rowsH 被算大而 maxY=0，滚轮也就滚不到 —— 这就是"滚不动"。
             try {
@@ -595,7 +590,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 string[] labels = new string[vals.Count];
                 for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
                 bool open = _levelFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open);
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open, W(110));
                 _levelFilterOpen = open;
                 if (sel >= 0 && sel < vals.Count) _levelFilter = vals[sel];
             } catch (Exception __ex) {
@@ -635,7 +630,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 string[] labels = new string[vals.Count];
                 for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
                 bool open = _modeFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open);
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open, W(110));
                 _modeFilterOpen = open;
                 if (sel >= 0 && sel < vals.Count) _modeFilter = vals[sel];
             } catch (Exception __ex) {
@@ -679,7 +674,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 运行期状态被外部改坏时回退到默认「预设」（与下拉索引 1 对应）。
                 if (!string.Equals(vals[cur], _typeFilter, StringComparison.OrdinalIgnoreCase)) _typeFilter = "preset";
                 bool open = _typeFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(90));
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(110));
                 _typeFilterOpen = open;
                 if (sel >= 0 && sel < vals.Length) _typeFilter = vals[sel];
             } catch (Exception __ex) {
@@ -702,7 +697,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 labels[0] = SRApi.T("默认", "Default");
                 for (int i = 1; i < vals.Length; i++) labels[i] = ModeText(vals[i]);
                 bool open = _loadModeOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(90));
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(110));
                 _loadModeOpen = open;
                 if (sel >= 0 && sel < vals.Length) _loadMode = vals[sel];
             } catch (Exception __ex) {
@@ -719,7 +714,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 int cur = Mathf.Clamp(SortMode, 0, opts.Length - 1);
                 bool open;
                 if (e == null || !SRApi.Ctl.EditOpen.TryGetValue(e, out open)) open = false;
-                int sel = SRApi.Ctl.ComboBox(e, opts[cur], vals, opts, ref open);
+                int sel = SRApi.Ctl.ComboBox(e, opts[cur], vals, opts, ref open, W(110));
                 if (sel >= 0) {
                     if (e != null) SRApi.Ctl.SetValue(e, vals[sel]);
                     if (e != null) SRApi.Ctl.EditOpen[e] = false;
@@ -794,11 +789,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 _maxScrollX = Mathf.Max(0f, totalW - stripW);
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
                 _maxScrollY = Mathf.Max(0f, visible.Count * rowH - rowsH);
-                if (Time.unscaledTime - _wheelDiagAt > 2f) {
-                    _wheelDiagAt = Time.unscaledTime;
-                    SRApi.LogInfo("[布局预设] 表格 box=" + box + " rowsH=" + rowsH.ToString("0.0")
-                        + " maxY=" + _maxScrollY.ToString("0.0") + " rows=" + visible.Count + " scrollY=" + _scrollRows.y.ToString("0.0"));
-                }
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _maxScrollY);
                 Event e = Event.current;
                 Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
