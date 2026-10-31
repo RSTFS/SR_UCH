@@ -539,10 +539,8 @@ namespace SR_UCH.Tweaks {
         }
 
         // ================= 阶段事件 =================
-        [HarmonyPatch(typeof(GameControl), "handleEvent")]
-        [HarmonyPostfix]
-
-
+        // 补丁特性放在 HUD.State.cs 的 OnGameControlEvent() 上（这里原本是一段悬空特性，
+        // 后面没有任何声明，结果被 C# 归给了 ResetGameState —— 见 HUD模块漏洞分析.md P0）。
 
         // ================= 每帧状态 =================
 

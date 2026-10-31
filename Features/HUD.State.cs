@@ -10,6 +10,11 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
 public partial class HUD {
 
+        // 游戏全局事件入口：相位切换 / 记分板 / 方块事件都走这里。
+        // 之前这里没有特性（特性悬空在 HUD.cs 里落到了 ResetGameState 上），
+        // 导致真正的处理器从未被调用、而状态被每个事件清空。
+        [HarmonyPatch(typeof(GameControl), "handleEvent")]
+        [HarmonyPostfix]
         private static void OnGameControlEvent(GameControl __instance, global::GameEvent.GameEvent e) {
             try {
                 if (__instance == null || e == null) return;
