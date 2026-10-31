@@ -413,6 +413,11 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/页面滚轮", __ex); return false; }
         }
 
+        // 筛选行的标签统一宽度：两行控件的左边缘才能对齐成两列网格。
+        private static void RowLabel(string text) {
+            GUILayout.Label(text, SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(52f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+        }
+
         private static void Render() {
             try {
                 EnsureLoaded();
@@ -474,7 +479,7 @@ namespace SR_UCH.Tweaks {
                 GUILayout.BeginHorizontal();
                 try {
                     // 搜索标签：LabelAuto 绘制 + 命中区域判定，点击清空搜索框。
-                    SRApi.Ctl.LabelAuto(SRApi.T("搜索", "Search"));
+                    RowLabel(SRApi.T("搜索", "Search"));
                     Rect searchRect = GUILayoutUtility.GetLastRect();
                     Event evSearch = Event.current;
                     if (evSearch != null && evSearch.type == EventType.MouseDown && evSearch.button == 0
@@ -486,10 +491,10 @@ namespace SR_UCH.Tweaks {
                         GUILayout.Width(W(120)), GUILayout.Height(W(24)));
                     if (q != null && q != _search) _search = q;
                     GUILayout.Space(W(8));
-                    SRApi.Ctl.LabelAuto(SRApi.T("排序", "Sort"));
+                    RowLabel(SRApi.T("排序", "Sort"));
                     RenderSortCombo();
                     GUILayout.Space(W(8));
-                    SRApi.Ctl.LabelAuto(SRApi.T("加载", "Load"));
+                    RowLabel(SRApi.T("加载", "Load"));
                     RenderLoadModeCombo();
                     GUILayout.Space(W(7));
                     if (GUILayout.Button(SRApi.Ctl.Content(SRApi.T("刷新", "Refresh"),
@@ -504,13 +509,13 @@ namespace SR_UCH.Tweaks {
                 }
                 GUILayout.BeginHorizontal();
                 try {
-                    SRApi.Ctl.LabelAuto(SRApi.T("类型", "Type"));
+                    RowLabel(SRApi.T("类型", "Type"));
                     RenderTypeFilterCombo();
                     GUILayout.Space(W(8));
-                    SRApi.Ctl.LabelAuto(SRApi.T("关卡", "Level"));
+                    RowLabel(SRApi.T("关卡", "Level"));
                     RenderLevelFilterCombo();
                     GUILayout.Space(W(8));
-                    SRApi.Ctl.LabelAuto(SRApi.T("模式", "Mode"));
+                    RowLabel(SRApi.T("模式", "Mode"));
                     RenderModeFilterCombo();
                     GUILayout.FlexibleSpace();
                 } finally {
