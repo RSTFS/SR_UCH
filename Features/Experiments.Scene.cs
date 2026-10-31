@@ -39,7 +39,6 @@ public partial class Experiments : ITweak
                     // 先试"同一控制器多认领一个玩家号"（不需要再进一次房间）；
                     // 失败才退回"对当前房间再发一次加入"。
                     bool ok = Online.AddLocalAlterSelf();
-                    if (!ok) ok = Online.ForceRejoinSelf();
                     SRApi.Notify(ok ? SRApi.T("同位体：已对当前房间再发一次加入", "Alter self: rejoin request sent")
                                      : SRApi.T("同位体：当前不在房间里", "Alter self: not in a lobby"));
                 };
