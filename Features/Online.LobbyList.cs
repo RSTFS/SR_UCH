@@ -298,7 +298,6 @@ namespace SR_UCH.Tweaks {
             for (int i = 0; i < _lobbies.Count; i++) {
                 Matchmaker.LobbyListInfo li = _lobbies[i];
                 if (li == null || !PassFilter(li)) continue;
-                if (_hidden.Contains(li.sLobbyID)) continue;
                 n++;
             }
             return n;
@@ -310,7 +309,6 @@ namespace SR_UCH.Tweaks {
         private static bool PassLobbyFilter(Matchmaker.LobbyListInfo li) {
             try {
                 if (li == null) return false;
-                if (_hidden.Contains(li.sLobbyID)) return false;
                 return PassFilter(li);
             } catch { return false; }
         }
@@ -350,33 +348,6 @@ namespace SR_UCH.Tweaks {
                     return string.Compare(ta ?? "", tb ?? "", StringComparison.OrdinalIgnoreCase);
                 }
             }
-        }
-
-        // 已隐藏房间数：只数当前列表里仍存在的（_hidden 跨刷新累积，直接用其 Count 会偏大）。
-        private static int CountHidden() {
-            if (_hidden.Count == 0) return 0;   // 未隐藏过任何房间时不必每帧遍历列表
-            int n = 0;
-            try {
-                for (int i = 0; i < _lobbies.Count; i++) {
-                    Matchmaker.LobbyListInfo li = _lobbies[i];
-                    if (li != null && _hidden.Contains(li.sLobbyID)) n++;
-                }
-            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-            return n;
-        }
-
-        // _hidden 只增不减，长期挂机会累积；在搜索结束那一帧做一次交集裁剪，只保留当前列表里仍存在的 id。
-        // 用 IntersectWith 原地求交集（net472 的 HashSet 没有 RemoveWhere）。
-        private static void PruneHidden() {
-            if (_hidden.Count == 0) return;
-            try {
-                HashSet<string> alive = new HashSet<string>();
-                for (int i = 0; i < _lobbies.Count; i++) {
-                    Matchmaker.LobbyListInfo li = _lobbies[i];
-                    if (li != null && !string.IsNullOrEmpty(li.sLobbyID)) alive.Add(li.sLobbyID);
-                }
-                _hidden.IntersectWith(alive);
-            } catch (Exception __ex) { SRApi.Guard.Log("裁剪已隐藏房间集合", __ex); }
         }
 
         private static void UpdateLobbyMsg() {

@@ -38,7 +38,6 @@ namespace SR_UCH.Tweaks {
 
         // 运行时状态
         private static readonly List<Matchmaker.LobbyListInfo> _lobbies = new List<Matchmaker.LobbyListInfo>();
-        private static readonly HashSet<string> _hidden = new HashSet<string>();   //右键隐藏的房间 id
         private static int _lobbyCbCount;           // 本次搜索收到的回调数
         private static float _lobbyCbFirst = -1f;   // 首个回调时刻
         private static float _lobbyCbLast = -1f;    // 最近一次回调时刻
@@ -464,8 +463,7 @@ namespace SR_UCH.Tweaks {
                             + "s，总耗时 " + (Time.unscaledTime - _lobbySearchAt).ToString("0.00") + "s"
                             + (span < 0.05f ? "（平台一次性回调）" : "（流式回调）"));
                     } catch (Exception __lg) { SRApi.Guard.Log("联机/搜索统计日志", __lg); }
-                    PruneHidden();   // 搜索结束这一帧裁剪一次
-                }
+                        }
             }
             // 列表或可见性变化时重排并刷新统计，否则最多每 1 秒重排一次。
             if (_lobbiesDirty || Time.unscaledTime - _lobbySortAt >= 1f) {
@@ -475,13 +473,9 @@ namespace SR_UCH.Tweaks {
                 _lobbySortAt = Time.unscaledTime;
                 if (refreshMsg) UpdateLobbyMsg();
             }
-            string hint = SRApi.T("（点刷新列表查询）表头：左键点=按该列排序（升->降->默认），拖分隔线=调列宽（<->），拖表头=换列位置（+），Shift+点游戏质量=显示/隐藏匹配质量系数，右键=隐藏该列，Shift+右键=还原；右键某行=隐藏该房间；滚轮=上下，Ctrl+滚轮=左右；表格底边可拖高度",
-                               "(click 'Refresh' to query) Header: left-click = sort by that column (asc/desc/default), drag a separator = resize (<->), drag a header = reorder (+), Shift+click 'Quality' = show/hide the skill-match coefficient, right-click = hide that column, Shift+right-click = reset; right-click a row = hide that lobby; wheel = up/down, Ctrl+wheel = left/right; drag the table's bottom edge to resize height");
+            string hint = SRApi.T("（点刷新列表查询）表头：左键点=按该列排序（升->降->默认），拖分隔线=调列宽（<->），拖表头=换列位置（+），Shift+点游戏质量=显示/隐藏匹配质量系数，右键=隐藏该列，Shift+右键=还原；滚轮=上下，Ctrl+滚轮=左右；表格底边可拖高度",
+                               "(click 'Refresh' to query) Header: left-click = sort by that column (asc/desc/default), drag a separator = resize (<->), drag a header = reorder (+), Shift+click 'Quality' = show/hide the skill-match coefficient, right-click = hide that column, Shift+right-click = reset; wheel = up/down, Ctrl+wheel = left/right; drag the table's bottom edge to resize height");
             GUILayout.Label(string.IsNullOrEmpty(_lobbyMsg) ? hint : _lobbyMsg, SRApi.Ctl.Label);
-            int hiddenNow = CountHidden();   // 只数当前列表里还存在的
-            if (hiddenNow > 0) {
-                GUILayout.Label(string.Format(SRApi.T("已隐藏 {0} 个房间（Shift+右键表格可恢复）", "{0} lobbies hidden (Shift+right-click the table to restore)"), hiddenNow), SRApi.Ctl.Label);
-            }
 
             // 筛选：单行 区域 / 模式 / 标签 / 状态（状态下沉到标签右面）；下拉框宽度按 4 个均分。
             float cellW = Mathf.Max(SRApi.Ctl.Sc(96), (SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40)) / 4f - SRApi.Ctl.Sc(8));
@@ -512,7 +506,7 @@ namespace SR_UCH.Tweaks {
             HeightGrip();   // 表格底边：拖动改高度
         }
 
-        // 表格底边拖动条；Shift+右键还原列宽 / 高度 / 隐藏。
+        // 表格底边拖动条；Shift+右键还原列宽 / 高度 / 列隐藏（房间行不再支持右键隐藏）。
         private static string DispName(string key, string v) {
             if (string.IsNullOrEmpty(v)) return SRApi.T("全部", "All");
             if (key == "Filter Region") return DispRegion(v);

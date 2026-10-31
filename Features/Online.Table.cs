@@ -54,18 +54,6 @@ namespace SR_UCH.Tweaks {
         }
 
         // 切换「游戏质量」列的技能匹配质量系数显示；页面 MouseDown 与核心 click 两条入口共用。
-        // 行右键：隐藏该房间（核心 rowRightClick 回调，参数=可见行下标）。
-        private static void HideLobbyAt(int row) {
-            try {
-                Matchmaker.LobbyListInfo li = row >= 0 && row < _shownLobbies.Count ? _shownLobbies[row] : null;
-                if (li == null) return;
-                _hidden.Add(li.sLobbyID);
-                _lobbiesDirty = true;
-                Notes("已隐藏房间：" + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner),
-                      "Hidden: " + (string.IsNullOrEmpty(li.LobbyOwner) ? li.sLobbyID : li.LobbyOwner));
-            } catch (Exception __ex) { SRApi.Guard.Log("联机/隐藏房间", __ex); }
-        }
-
         private static void ToggleQualityCoeff(string from) {
             if (_showQualityCoeff == null) return;
             bool v = !_showQualityCoeff.Value;
@@ -216,7 +204,6 @@ namespace SR_UCH.Tweaks {
         private static readonly Action<int[]> _applyOrderFn = delegate(int[] o) { _order = o; SaveCols(); };
         private static readonly Action _resetAllFn = delegate { ResetTable(); };
         private static readonly Action<int> _headerShiftFn = delegate(int ci) { if (ci == QualityCol) ToggleQualityCoeff("core header"); };
-        private static readonly Action<int> _rowRightClickFn = delegate(int row) { HideLobbyAt(row); };
         private static readonly Func<int, string[]> _rowCellsFn = delegate(int r) { return CellTexts(_shownLobbies[r]); };
         private static readonly Func<int, float> _rowAlphaFn = delegate(int r) { return IsJoinable(_shownLobbies[r]) ? 1f : 0.55f; };
         private static readonly Func<string> _emptyHintFn = delegate { return SRApi.T("（没有符合筛选的房间）", "(no lobbies match the filters)"); };
@@ -250,7 +237,6 @@ namespace SR_UCH.Tweaks {
             // 表头 Shift+左键（核心在 MouseDown 派发，修饰键可靠）：质量列切换系数显示。
             _tableArgs.headerShiftClick = _headerShiftFn;
             // 行右键（核心派发，钉住操作列不算行命中）：隐藏该房间。
-            _tableArgs.rowRightClick = _rowRightClickFn;
             _tableArgs.rowCells = _rowCellsFn;
             _tableArgs.rowAlpha = _rowAlphaFn;
             _tableArgs.headerCells = _headerCellsPage; _tableArgs.headerCols = _headerCols;
@@ -374,8 +360,7 @@ namespace SR_UCH.Tweaks {
                     }
                     e.Use();   // 表头右键隐藏列由核心完成，这里只负责落盘/提示
                 }
-                // 行右键隐藏房间：已交给核心 rowRightClick 回调（HideLobbyAt），页面不再自行命中。
-            }
+                }
             // 加入按钮：手动点击
             for (int i = 0; i < _joinRectsPage.Count; i++) {
                 if (!_joinRectsPage[i].Contains(mp)) continue;
@@ -393,7 +378,7 @@ namespace SR_UCH.Tweaks {
             if (e.type == EventType.MouseUp) { _joinDownRow = -1; _joinDownId = null; }
         }
 
-        // Shift+右键还原列宽 / 表格高度 / 列顺序，并取消所有隐藏（房间与列）。
+        // Shift+右键还原列宽 / 表格高度 / 列顺序，并取消列隐藏。
         private static void ResetTable() {
             try {
                 _cw = (float[])DefWidths.Clone();
@@ -403,7 +388,6 @@ namespace SR_UCH.Tweaks {
                 for (int i = 0; i < ColCount; i++) _order[i] = i;
                 _hiddenCols.Clear();
                 if (_tableH != null) _tableH.Value = 0;
-                _hidden.Clear();
                 _lobbiesDirty = true;
                 SaveCols();
                 Notes("已还原列宽、顺序与高度，并显示全部房间与列", "Widths, order and height reset; all sessions and columns restored");
