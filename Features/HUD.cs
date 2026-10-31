@@ -12,7 +12,7 @@ namespace SR_UCH.Tweaks {
     // 本类自带 [HarmonyPatch]，由 ITweak 反射发现后手动 CreateAndPatchAll。
     [SrFeature("sr.roundhud", "HUD", "1.0")]
     public partial class HUD : ITweak {
-        private const string Sec = "Round HUD";
+        private const string Sec = "HUD";   // 原名 Round HUD，2026-10 改名（迁移见 ConfigMigration）
         private const int WinScoreFallback = 250;
 
         // 布局：四角按固定边距贴边；Custom 用拖动后的运行期位置（会话内有效）。

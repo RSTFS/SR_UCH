@@ -30,6 +30,8 @@ namespace SR_UCH.Tweaks {
             { "实验", "Experiments" },
             { "会话内容", "Chat" },
             { "Treehouse Suicide", "Quick Adjust" },
+            // HUD 原名 Round HUD（功能早已只剩 HUD），老 cfg 段头统一改名并保留全部键值。
+            { "Round HUD", "HUD" },
             // 早期版本用过的中文段名（与各功能 LocSec 的中文名一致）：缺了它们对应段及其键都识别不出来。
             { "自由模式", "Freeplay" },
             { "联机", "Online" },
@@ -695,7 +697,7 @@ namespace SR_UCH.Tweaks {
             text = RemoveKeys(text, "Settings", new[] { "Show Advanced" });
             // HUD 玩家面板已删除：[Round HUD] 段里的总开关、五个列开关与五个列颜色键必须清掉，
             // 否则老配置会留下永远不再读取的脏键（界面已无对应行）。
-            text = RemoveKeys(text, "Round HUD", new[] { "Show Player Panel", "Show Number", "Show Name", "Show Animal", "Show Score", "Show Handicap", "Color Panel Number", "Color Panel Name", "Color Panel Animal", "Color Panel Score", "Color Panel Handicap" });
+            text = RemoveKeys(text, "HUD", new[] { "Show Player Panel", "Show Number", "Show Name", "Show Animal", "Show Score", "Show Handicap", "Color Panel Number", "Color Panel Name", "Color Panel Animal", "Color Panel Score", "Color Panel Handicap" });
                 text = RemoveKeys(text, "Respawn", new[] {
                     "Enabled", "Spawn Immunity", "Delay", "Spawn Points Enabled",
                     "Set Spawn Key", "Respawn Key", "Reset Spawn Keys"
