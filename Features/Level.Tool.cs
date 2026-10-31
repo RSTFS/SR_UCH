@@ -284,7 +284,11 @@ public partial class Level {
                     + "，仅补回前 " + queue.Count + " 条（" + (total - queue.Count) + " 条被丢弃，重载后分数会偏少）");
             }
             if (queue.Count == 0) return;
-            lm.StartCoroutine(FillScoresCoroutine(queue));
+            // 宿主必须"不随场景销毁"：重载会切场景，挂在 LobbyManager 上的协程会被直接掐断，
+            // 备份已置 null 而 _refillPending 仍为真 → 下回合跳过清分块 → 分块累积 → 分数翻倍（评审 P0-C）。
+            FillHost host = FillHost.Ensure();
+            if (host != null) host.StartCoroutine(FillScoresCoroutine(queue));
+            else lm.StartCoroutine(FillScoresCoroutine(queue));
             SRApi.LogInfo("[补分] 队列 " + queue.Count + " 条，分帧发送（每帧 " + FillPerFrame + " 条）");
         } catch (Exception ex) {
             SRApi.LogWarn("[补分] 初始化失败: " + ex.Message);
@@ -293,6 +297,7 @@ public partial class Level {
 
     private static System.Collections.IEnumerator FillScoresCoroutine(List<KeyValuePair<int, PointBlock.pointBlockType>> queue) {
         int sent = 0;
+        try {
         while (sent < queue.Count) {
             int batch = Mathf.Min(FillPerFrame, queue.Count - sent);
             for (int i = 0; i < batch; i++) {
@@ -311,6 +316,36 @@ public partial class Level {
                 sent++;
             }
             yield return null; // 每帧发一批
+        }
+        } finally {
+            // 未能发完（场景被切走 / 异常）：把剩下的写回备份，下回合续补，
+            // 绝不留"已消费但没补"的状态（那正是分数翻倍的成因）。
+            if (sent < queue.Count) {
+                try {
+                    Dictionary<int, List<PointBlock.pointBlockType>> rest = new Dictionary<int, List<PointBlock.pointBlockType>>();
+                    for (int i = sent; i < queue.Count; i++) {
+                        List<PointBlock.pointBlockType> list;
+                        if (!rest.TryGetValue(queue[i].Key, out list)) { list = new List<PointBlock.pointBlockType>(); rest[queue[i].Key] = list; }
+                        list.Add(queue[i].Value);
+                    }
+                    _scoreBackupBlocks = rest;
+                    SRApi.LogWarn("[补分] 发送中断，已把剩余 " + (queue.Count - sent) + " 条写回备份，下回合续补");
+                } catch (Exception __rq) { SRApi.Guard.Log("补分/回写剩余", __rq); }
+            }
+        }
+    }
+
+    // 持久宿主：DontDestroyOnLoad 的空对象，专门承载不能被场景切换掐断的协程。
+    private sealed class FillHost : UnityEngine.MonoBehaviour {
+        private static FillHost _inst;
+        internal static FillHost Ensure() {
+            try {
+                if (_inst != null) return _inst;
+                GameObject go = new GameObject("SR_UCH.CoroutineHost");
+                UnityEngine.Object.DontDestroyOnLoad(go);
+                _inst = go.AddComponent<FillHost>();
+                return _inst;
+            } catch (Exception __hx) { SRApi.Guard.Log("补分/创建持久宿主", __hx); return null; }
         }
     }
 }
