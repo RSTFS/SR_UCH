@@ -44,7 +44,8 @@ public partial class SR {
                                 "组合键修饰（旧命名，已弃用；值会自动迁移到带分区名的新条目）");
                             if (!string.IsNullOrEmpty(legacy.Value)) {
                                 modEntry.Value = legacy.Value;
-                                legacy.Value = "";
+                                // 不在这里清空旧条目：清空后一旦新条目被重置/删掉，用户原来的修饰设置
+                                // 就永久丢失（audit 05-P0-4）。旧条目留着当备份，代价只是一个空转的键。
                             }
                         }
                     } catch (Exception __ex) { Guard.Log("RegisterComboEntry", __ex); }
@@ -70,7 +71,11 @@ public partial class SR {
             foreach (KeyValuePair<ConfigEntryBase, ComboMod> kv in _pendingComboDefault) defs.Add(kv);
             _pendingComboDefault.Clear();
             for (int i = 0; i < defs.Count; i++) {
-                if (!_keyMods.ContainsKey(defs[i].Key)) SetKeyComboMod(defs[i].Key, defs[i].Value);
+                // 以"持久化字符串是否为空"为准：只设主键/清空修饰键的用户在 _keyMods 里没有条目，
+                // 用 _keyMods 判会把延迟默认又写回去，配置看起来"自己变回来"（audit 05-P0-3）。
+                ConfigEntry<string> __me;
+                bool __has = _keyModEntries.TryGetValue(defs[i].Key, out __me) && __me != null && !string.IsNullOrEmpty(__me.Value);
+                if (!__has) SetKeyComboMod(defs[i].Key, defs[i].Value);
             }
         }
 
