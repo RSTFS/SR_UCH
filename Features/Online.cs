@@ -486,7 +486,10 @@ namespace SR_UCH.Tweaks {
             // 宽度用纯尺寸计算：布局矩形与屏幕矩形（ContentArea）不同坐标系，混算会导致表格框超宽、操作列被推出屏幕。
             float availW = Mathf.Max(SRApi.Ctl.Sc(220), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(12));
             // 高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
-            float availH = SRApi.Ctl.TableFitHeight(last.yMax, _pageTopY, _tableH, SRApi.Ctl.Sc(140));
+            // 与预设列表共用核心高度：min(可用, 表头 + 行数*行高 + 拖拽条)。
+            float availH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableH, SRApi.Ctl.Sc(140),
+                _shownLobbies != null ? _shownLobbies.Count : 0, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
+                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f);
             // 高度由核心拖拽条直接写入配置，这里只按可用高度铺满。
             float boxH = availH;
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
