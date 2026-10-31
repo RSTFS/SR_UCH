@@ -164,7 +164,8 @@ namespace SR_UCH.Tweaks {
         // 页面级滚轮（页面关掉滚动后，表格必须自己吃滚轮；只有这个钩子能在滚动区建立之前拿到事件）。
     internal static bool OnLobbyWheel(Vector2 mouse, float wheel) {
         try {
-            if (_tableArgs == null || _tableArgs.box.width <= 0f || !_tableArgs.box.Contains(mouse)) return false;
+            Rect __ca = new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
+            if (!__ca.Contains(mouse)) return false;
             if (_tableMaxY > 0f) {
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y + wheel * SRApi.Ctl.Sc(40), 0f, _tableMaxY);
                 return true;

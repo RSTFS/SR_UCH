@@ -381,8 +381,8 @@ namespace SR_UCH.Tweaks {
         private static bool OnPresetWheel(Vector2 mouse, float wheel) {
             try {
                 // 命中框：_tableBox 是布局坐标、且 Layout 趟只有 1x1；无效时退回页面内容区。
-                Rect hitBox = _tableBox.width > 1f ? _tableBox
-                    : new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
+                // 核心现在传屏幕坐标：直接用页面内容区判定（_tableBox 是布局坐标，Layout 趟只有 1x1）。
+                Rect hitBox = new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
                 // 诊断：每秒最多一条，记录命中判定与实时可滚范围（滚不动时靠这一行定位）。
                 if (Time.unscaledTime - _wheelDiagAt > 1f) {
                     _wheelDiagAt = Time.unscaledTime;
@@ -404,7 +404,8 @@ namespace SR_UCH.Tweaks {
                     _maxScrollY = maxY;
                     return true;
                 }
-                if (_maxScrollX > 0f) {
+                // 横向只在按住 Shift 时滚（否则竖向余量为 0 时会误判成横向滚动）
+                if (_maxScrollX > 0f && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))) {
                     _scrollCols.x = Mathf.Clamp(_scrollCols.x + wheel * SRApi.Ctl.Sc(60), 0f, _maxScrollX);
                     return true;
                 }

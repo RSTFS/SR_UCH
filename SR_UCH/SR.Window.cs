@@ -540,7 +540,7 @@ public partial class SR {
             if (__wasWheel) {
                 try {
                     float __pw = -(Mathf.Abs(__we.delta.y) > 0.001f ? __we.delta.y : __we.delta.x);
-                    if (SRApi.DispatchPageWheel(__wheelMouse, __pw)) {
+                    if (SRApi.DispatchPageWheel(__wheelMouse + SR.AreaOffset, __pw)) {   // 统一传屏幕坐标，页面才能和 ContentArea 比较
                         __we.Use(); __we.type = EventType.Used; WheelShieldHit = true; SR.MarkWheelUsed();
                     }
                 } catch (Exception __pwx) { Guard.Log("页面级滚轮", __pwx); }
