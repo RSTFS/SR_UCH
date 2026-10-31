@@ -718,12 +718,30 @@ public partial class Experiments : ITweak
         private static float _nextScanAt;    // 下次全扫时间
         private static string _scanScene;    // 上次扫描的场景名（换场景立即重扫）
 
+        // 自己的开关（评审 G8）：以前它只跟着「解除关卡边界」主开关走，作为独立功能却无法单独启用。
+        // 默认 false；打开边界主开关时行为与以前一致（两者是"或"关系）。
+        private static ConfigEntry<bool> _own;
+
         public void Initialize(IFeatureHost plugin) {
             try {
+                _own = plugin.Config.Bind("Experiments", "Remove UI 3 Overlay", false,
+                    "停画 UI 3 层上的纯黑遮罩 Renderer（BlankLevel 的界外黑幕）。\n"
+                    + "默认关；打开「解除关卡边界」时也会一并生效。\n"
+                    + "只影响渲染，不改关卡数据。");
                 SRApi.RegisterTick("解除UI3", Tick);
                 SRApi.RegisterSceneHook(Reset);
                 SRApi.RegisterDismissHook(Restore);
             } catch (Exception __ex) { SRApi.Guard.Log("解除UI3 初始化", __ex); }
+        }
+
+        // 是否该停画 UI3：自己的开关 或 边界主开关（保持旧行为）。
+        private static bool WantOn {
+            get {
+                try {
+                    if (_own != null && _own.Value) return true;
+                    return LevelBoundsUnlock.MasterOn;
+                } catch { return false; }
+            }
         }
 
         // 换场景必须清 _wasOn：其为强引用字典，旧 Renderer 已随场景销毁，原值无意义且会逐场累积。
@@ -733,8 +751,8 @@ public partial class Experiments : ITweak
             try {
                 if (_frame == Time.frameCount) return;
                 _frame = Time.frameCount;
-                // 已并入「解除关卡边界」主开关。
-                bool want = LevelBoundsUnlock.MasterOn;
+                // 自己的开关 或 边界主开关（见 WantOn）。
+                bool want = WantOn;
                 if (!want) { Restore(); return; }
                 if (!SRApi.GateMaster) { Restore(); return; }
                 Apply();

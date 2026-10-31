@@ -145,9 +145,9 @@ public partial class Experiments : ITweak
                 SRApi.RegisterKey("实验-自由相机", _key, "press");
                 SRApi.RegisterTick("自由相机-开关", CheckKey);
                 SRApi.RegisterWheelHook(WheelZoom);
-                // 启动时强制重置为默认状态：关闭自由相机、FOV 回 10（赋值会写盘，属 BepInEx 行为）。
-                _on.Value = false;
-                _fov.Value = 10f;
+                // 启动时不再"强制重置并写盘"（评审 G8：会覆盖用户手动保存的设置，且每次启动都写 cfg）。
+                // 只修非法值：FOV 超出范围时回落到默认 10；开关状态完全交给用户/会话控制。
+                try { if (_fov.Value <= 0f || _fov.Value > 32f) _fov.Value = 10f; } catch (Exception __fv) { SRApi.Guard.Log("自由相机/修正FOV", __fv); }
                 SRApi.RegisterCameraView(ApplyToCamera);
                 SRApi.RegisterTick("自由相机-移动速度", ApplyFollowSpeed);
                 _on.SettingChanged += OnLockChanged;

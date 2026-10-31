@@ -45,7 +45,7 @@
     <Compile Include="SR_UCH\**\*.cs" />
     <!-- 功能源码（运行时各自编译成独立 DLL；这里一起编进 MSBuild 产物只为 IDE 里能看代码/查游戏 API，
          该产物不部署 —— 部署用 _tools\build_sr_uch.ps1 产出：
-           默认（合并模式）  = 1 个 SR_UCH.dll（核心 + 8 个功能，当前发布形态）
+           默认（合并模式）  = 1 个 SR_UCH.dll（核心 + 8 个功能分组 / 22 个 ITweak 实现，当前发布形态）
            -Split            = SR_Manager.dll（核心，程序集标识仍是 SR_UCH）+ 8 个 SR_UCH_<功能>.dll
            -All              = 再顺带编译 SR_UCH_EX.dll 与 Others 下的 4 个独立插件
          （**Opt-23（审计 §4.3）**：这里原来写"11 个 DLL"，与实际产物数量不符，已按上面更正。） -->
