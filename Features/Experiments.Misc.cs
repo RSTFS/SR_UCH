@@ -1,6 +1,7 @@
 // 实验 · 其它页：自由相机 + 加载后清理（GC）。
 
 using System;
+using System.Reflection;
 using BepInEx;
 using BepInEx.Configuration;
 using GameEvent;
@@ -24,6 +25,33 @@ public partial class Experiments : ITweak
                 if (FreeCam.SpeedNote != null && FreeCam.SpeedNote.Length > 0) {
                     GUILayout.Space(SRApi.Ctl.Sc(2));
                     DrawStatus(FreeCam.SpeedNote);
+                }
+
+                // 跨平台联机：直接改游戏自己的 CrossPlatformToggle（反射定位，不绑版本）。
+                GUILayout.Space(SRApi.Ctl.Sc(6));
+                SRApi.Ctl.SectionTitle("- " + SRApi.T("跨平台联机", "Cross-play") + " -",
+                    SRApi.T("开：匹配池包含其它平台（走 Unity 大厅/中继，延迟通常更高）；关：只和同平台玩家联机. "
+                        + "新建存档的默认值是关.",
+                        "ON: the matchmaking pool includes other platforms (Unity lobby + relay, usually higher ping); "
+                        + "OFF: same platform only. New saves default to OFF."));
+                GUILayout.BeginHorizontal();
+                if (!CrossPlay.Available) {
+                    GUILayout.Label(SRApi.T("当前游戏版本找不到该设置（开关不可用）", "Setting not found in this game build"), SRApi.Ctl.Label);
+                } else {
+                    bool on = CrossPlay.Read();
+                    GUILayout.Label(SRApi.T("当前：", "Now: ") + (on ? SRApi.T("开", "ON") : SRApi.T("关", "OFF")),
+                        SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(96)));
+                    if (GUILayout.Button(on ? SRApi.T("关闭", "Turn off") : SRApi.T("开启", "Turn on"),
+                            SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(84)), GUILayout.Height(SRApi.Ctl.Sc(26)))) {
+                        CrossPlay.Write(!on);
+                        SRApi.Notify(CrossPlay.Note);
+                    }
+                }
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
+                if (CrossPlay.Note != null && CrossPlay.Note.Length > 0) {
+                    GUILayout.Space(SRApi.Ctl.Sc(2));
+                    DrawStatus(CrossPlay.Note);
                 }
 
                 // 加载后清理
@@ -275,6 +303,141 @@ public partial class Experiments : ITweak
             if (_savedFov <= 0f || cam == null) return;
             try { if (cam.orthographic) cam.orthographicSize = _savedFov; else cam.fieldOfView = _savedFov; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             _savedFov = -1f;
+        }
+    }
+    // 实验 · 跨平台联机：反射定位游戏自己的 CrossPlatformToggle，读/写/尝试让游戏落盘。
+    internal static class CrossPlay {
+        private const string MemberName = "CrossPlatformToggle";
+        private static MemberInfo _member;      // FieldInfo 或 PropertyInfo
+        private static object _owner;           // 成员是实例成员时的宿主对象（null = 静态成员）
+        private static bool _probed;
+        internal static string Note = "";
+
+        // 初始化入口（由 Experiments.Initialize 调用；UI 侧也会惰性 Probe）。
+        internal static void Init() {
+            try { Probe(); } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/探测", __ex); }
+        }
+
+        // 找成员 + 宿主：优先静态成员；否则在单例（instance / Instance / Current）上取。
+        private static void Probe() {
+            if (_probed) return;
+            _probed = true;
+            try {
+                Assembly[] asms = AppDomain.CurrentDomain.GetAssemblies();
+                for (int a = 0; a < asms.Length; a++) {
+                    Assembly asm = asms[a];
+                    if (asm == null || asm.IsDynamic) continue;
+                    string an = "";
+                    try { an = asm.GetName().Name; } catch { continue; }
+                    if (an != "Assembly-CSharp") continue;   // 只认游戏本体，避免撞到别的模组
+                    Type[] types;
+                    try { types = asm.GetTypes(); } catch (ReflectionTypeLoadException __tl) { types = __tl.Types; }
+                    catch (Exception __t) { SRApi.Guard.Log("跨平台联机/取类型", __t); continue; }
+                    if (types == null) continue;
+                    for (int t = 0; t < types.Length; t++) {
+                        Type ty = types[t];
+                        if (ty == null) continue;
+                        try {
+                            FieldInfo f = ty.GetField(MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+                            if (f != null && (f.FieldType == typeof(bool))) {
+                                _member = f;
+                                _owner = f.IsStatic ? null : FindOwner(ty);
+                                break;
+                            }
+                            PropertyInfo pr = ty.GetProperty(MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+                            if (pr != null && pr.PropertyType == typeof(bool) && pr.CanRead) {
+                                _member = pr;
+                                _owner = (pr.GetGetMethod(true) != null && pr.GetGetMethod(true).IsStatic) ? null : FindOwner(ty);
+                                break;
+                            }
+                        } catch (Exception __m) { SRApi.Guard.Log("跨平台联机/读成员 " + ty.Name, __m); }
+                    }
+                    if (_member != null) break;
+                }
+                if (_member == null) SRApi.LogWarn("[跨平台] 没找到 CrossPlatformToggle（游戏版本可能改了名），开关将不可用");
+                else SRApi.LogInfo("[跨平台] 已定位 " + _member.DeclaringType.FullName + "." + _member.Name
+                    + (_owner != null ? "（实例）" : "（静态）") + "，当前值=" + (Read() ? "开" : "关"));
+            } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/探测成员", __ex); }
+        }
+
+        // 单例查找：常见命名 instance / Instance / Current / singleton。
+        private static object FindOwner(Type ty) {
+            string[] names = new string[] { "instance", "Instance", "Current", "current", "singleton", "Singleton" };
+            for (int i = 0; i < names.Length; i++) {
+                try {
+                    FieldInfo f = ty.GetField(names[i], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                    if (f != null && typeof(object).IsAssignableFrom(f.FieldType)) {
+                        object v = f.GetValue(null);
+                        if (v != null) return v;
+                    }
+                    PropertyInfo pr = ty.GetProperty(names[i], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                    if (pr != null && pr.CanRead) {
+                        object v = pr.GetValue(null, null);
+                        if (v != null) return v;
+                    }
+                } catch (Exception __f) { SRApi.Guard.Log("跨平台联机/找单例 " + names[i], __f); }
+            }
+            return null;
+        }
+
+        internal static bool Available { get { Probe(); return _member != null; } }
+
+        internal static bool Read() {
+            try {
+                if (_member == null) return false;
+                FieldInfo f = _member as FieldInfo;
+                if (f != null) return (bool)f.GetValue(f.IsStatic ? null : _owner);
+                PropertyInfo pr = _member as PropertyInfo;
+                if (pr != null && pr.CanRead) return (bool)pr.GetValue(pr.GetGetMethod(true).IsStatic ? null : _owner, null);
+            } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/读值", __ex); }
+            return false;
+        }
+
+        // 写值 + 让游戏自己落盘（能存上才算真的改了；存不上就提示）。
+        internal static bool Write(bool on) {
+            try {
+                if (_member == null) return false;
+                object target = _member is FieldInfo ? (((FieldInfo)_member).IsStatic ? null : _owner)
+                                                     : ((((PropertyInfo)_member).GetGetMethod(true).IsStatic) ? null : _owner);
+                FieldInfo fl = _member as FieldInfo;
+                if (fl != null) fl.SetValue(fl.IsStatic ? null : _owner, on);
+                else {
+                    PropertyInfo pr = (PropertyInfo)_member;
+                    if (!pr.CanWrite) { Note = SRApi.T("该设置不可写（只读属性）", "read-only property"); return false; }
+                    pr.SetValue(pr.GetSetMethod(true).IsStatic ? null : _owner, on, null);
+                }
+                bool persisted = TryPersist(target);
+                Note = (on ? SRApi.T("已开启跨平台联机", "Cross-play ON") : SRApi.T("已关闭跨平台联机", "Cross-play OFF"))
+                    + (persisted ? "" : SRApi.T("（未能确认写入存档，重启游戏可能回退）", " (could not confirm it was saved; may revert on restart)"));
+                SRApi.LogInfo("[跨平台] " + Note);
+                return true;
+            } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/写值", __ex); return false; }
+        }
+
+        // 找游戏自己的保存入口：方法名包含 save/write/flush 且无参、返回 void 或 bool。
+        private static bool TryPersist(object owner) {
+            if (owner == null) return false;
+            try {
+                Type ty = owner.GetType();
+                MethodInfo[] ms = ty.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+                string[] keys = new string[] { "SaveData", "WriteSave", "SaveToDisk", "Save", "Write", "Flush", "Persist" };
+                for (int k = 0; k < keys.Length; k++) {
+                    for (int i = 0; i < ms.Length; i++) {
+                        MethodInfo m = ms[i];
+                        if (m == null || m.IsAbstract || m.GetParameters().Length != 0) continue;
+                        string n = m.Name;
+                        if (n.IndexOf(keys[k], StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        if (m.ReturnType != typeof(void) && m.ReturnType != typeof(bool)) continue;
+                        try {
+                            object r = m.Invoke(m.IsStatic ? null : owner, null);
+                            if (m.ReturnType == typeof(bool) && !(bool)r) continue;
+                            SRApi.LogInfo("[跨平台] 已调用保存入口 " + ty.Name + "." + n + "(" + (m.GetParameters().Length) + " 参)");
+                            return true;
+                        } catch (Exception __i) { SRApi.Guard.Log("跨平台联机/调用 " + ty.Name + "." + n, __i); }
+                    }
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/找保存入口", __ex); }
+            return false;
         }
     }
 }
