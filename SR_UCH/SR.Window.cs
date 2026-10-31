@@ -473,8 +473,9 @@ public partial class SR {
             GUILayout.Space(Sc(2));
             GUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.Height(__bodyH));
             if (_mode == Mode.Settings) {
+                // 旧的"恢复默认"按钮已停用：统一由页签栏右侧那一个按钮负责（带悬浮说明）。
                 GUILayout.BeginHorizontal();
-                if (GUILayout.Button(T("恢复默认", "Defaults"), _btn, GUILayout.Width(Sc(84)))) {
+                if (false && GUILayout.Button(T("恢复默认", "Defaults"), _btn, GUILayout.Width(Sc(84)))) {
                     if (_internalConfig != null) {
                         foreach (ConfigEntryBase ce in AllEntries(_internalConfig)) {
                             Guard.Try("恢复默认值 " + ce.Definition.Key, () => ce.BoxedValue = ce.DefaultValue);

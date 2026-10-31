@@ -128,7 +128,11 @@ public partial class SR {
                 GUILayout.FlexibleSpace();
                 // 恢复默认只在通用页出现（自检页没有可复位的配置）。
                 if (SettingsTab == 0) {
-                    if (GUILayout.Button(T("恢复默认", "Reset defaults"), _btn, GUILayout.Height(Sc(26)))) ResetAllDefaults();
+                    // 悬浮说明：告诉它会重置哪些东西、会不会影响 HUD 位置等。
+                    GUIContent __def = new GUIContent(T("恢复默认", "Reset defaults"),
+                        T("恢复默认\n把设置段（按键 / 界面 / 插件）全部写回默认值\n只影响通用页，不动自检与各功能页的开关",
+                          "Reset defaults\nwrites every Settings-section entry (keys / UI / plugins) back to its default\nonly affects the General tab, feature pages are untouched"));
+                    if (GUILayout.Button(__def, _btn, GUILayout.Height(Sc(26)))) ResetAllDefaults();
                 }
                 GUILayout.EndHorizontal();
                 GUILayout.Space(Sc(4));
