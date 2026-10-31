@@ -511,17 +511,12 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 我上一版把 ContentArea（屏幕坐标）和 last.yMax（布局坐标）混算，结果反而更矮。
             // 核心化：高度 = min(可用, 表头 + 行数*行高 + 拖拽条)。行少 -> 收紧，行多 -> 填满并滚动。
             // 高度只按内容：传 null 忽略"表高配置"，否则以前拖过的高度会把表格抬到配置值、行下方留白。
-            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, null, 0f,
+            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, null, SRApi.Ctl.TableMinH(),
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-0f, false);   // 不留拖拽条高度、minH=0：高度恰好=表头+行，行下方没有任何空白
+0f, true);   // fillViewport=true：表格始终填满到页面底部（行多时内部滚动）
                 _actionHitThisFrame = false;
                 List<PresetInfo> visible = VisiblePresets();
-                if (visible.Count <= 0) {
-                    // 没有可见预设：不画表格（否则是一片空表体），只给一行提示。
-                    SRApi.Ctl.LabelAuto(SRApi.T("（没有预设，先保存一个布局）", "(no presets yet; save a layout first)"));
-                } else {
-                    RenderPresetTable(tableH, visible);
-                }
+                RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
                 // 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
                 try {
                     if (!string.IsNullOrEmpty(_pendingKey) && _pendingKey == pendingBefore && !_actionHitThisFrame
