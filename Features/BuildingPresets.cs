@@ -230,6 +230,8 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec(Section, "布局预设", "Layout Presets");
             SRApi.Nav(Section, 45); // 关卡(40) 之后、构建工具(50) 之前
             SRApi.RegisterPage(Section, Render);
+            // 页面关掉了滚动，列表要自己吃滚轮：只有页面级钩子能在滚动区建立之前拿到事件。
+            SRApi.RegisterPageWheel(OnPresetWheel);
             // 重载锁自愈：TickReloadLock 写好了却从未注册，等于"超时兜底"根本不存在，
             // 失败路径漏放锁只能等用户再点一次加载（audit 10-P0-2）。
             // 重载锁自愈 + levelPortalXml 兜底清理：两个 tick 都必须注册，否则兜底逻辑等于不存在。
@@ -373,6 +375,23 @@ namespace SR_UCH.Tweaks {
         // 预设列表在固定高度区域内用自己的滚轮滚动。
         // 页面内容在布局空间里的起点 y（零高度探针），用于计算表格上方已用高度（同联机列表）。
         private static float _pageTopY;
+
+        // 页面级滚轮：鼠标在表格矩形内就把滚轮换算成行滚动（与核心 TableWheelInput 同一套系数）。
+        private static bool OnPresetWheel(Vector2 mouse, float wheel) {
+            try {
+                if (_tableBox.width <= 0f || !_tableBox.Contains(mouse)) return false;
+                bool used = false;
+                if (_maxScrollY > 0f) {
+                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + wheel * SRApi.Ctl.Sc(40), 0f, _maxScrollY);
+                    used = true;
+                }
+                if (_maxScrollX > 0f && !used) {
+                    _scrollCols.x = Mathf.Clamp(_scrollCols.x + wheel * SRApi.Ctl.Sc(60), 0f, _maxScrollX);
+                    used = true;
+                }
+                return used;
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/页面滚轮", __ex); return false; }
+        }
 
         private static void Render() {
             try {

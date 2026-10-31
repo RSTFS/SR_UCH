@@ -383,14 +383,16 @@ public partial class SR {
                 GUILayout.BeginVertical(GUI.skin.box);
                 // 三个元素统一行高，水平居中对齐：绿点与标题用同一样式（以前标题用 _secHeader，
                 // 蓝色分区标题带基线偏移，才显得"文字偏下、和绿点对不上"）。
-                GUILayout.BeginHorizontal(GUILayout.Height(Sc(20)));
+                // 先算标题高，再让整行至少和标题同高：以前行高写死 20px，两行标题被行裁掉。
+                float __titleH0 = Mathf.Max(Sc(20), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)));
+                GUILayout.BeginHorizontal(GUILayout.Height(__titleH0));
                 Color prev = GUI.color;
                 try {
                     GUI.color = ok ? new Color(0.55f, 0.92f, 0.55f) : new Color(1f, 0.78f, 0.35f);
                     GUILayout.Label(ok ? "●" : "▲", _label, GUILayout.Width(Sc(18)), GUILayout.Height(Sc(20)));
                 } finally { GUI.color = prev; }
                 // 标题自适应高度：长标题换行显示，不再被固定 20px 截断。
-                float __titleH = Mathf.Max(Sc(22), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)) + Sc(6));   // 底部多留 6px：中文标题的下缘笔画以前会被裁
+                float __titleH = Mathf.Max(Sc(22), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)) );   // 高度不再加额外内边距：真正的原因是外层行高被写死 20px
                 GUILayout.Label(title, _labelWrap, GUILayout.Width(Sc(120)), GUILayout.Height(__titleH));
                 GUILayout.Label(summary, _label, GUILayout.Height(Sc(20)));
                 GUILayout.FlexibleSpace();
