@@ -160,6 +160,7 @@ namespace SR_UCH.Tweaks {
                 if (li.isAFK) return false;
                 if (li.Players <= 0) return false;   // 0 人房不可加入（以前只判满员，空房被算成可加入）
                 if (IsFull(li)) return false;
+                if (IsStale(li)) return false;   // 心跳 10 秒没更新 = 房间大概率已死，别让玩家点进去（audit 14-P0-3）
                 return true;
             } catch { return false; }
         }
@@ -170,6 +171,7 @@ namespace SR_UCH.Tweaks {
             if (IsSelfLobby(li)) return SRApi.T("完成", "done");
             // "房间已空"必须在 IsJoinable 之前判定：IsJoinable 只看 Players >= 4，0 人会被算作可加入。
             if (li.Players == 0) return SRApi.T("房间已空", "empty");
+            if (IsStale(li) && !IsJoinable(li)) return SRApi.T("已失联", "No heartbeat");
             if (IsJoinable(li)) return SRApi.T("加入", "Join");
             if (li.error || !li.InfoReceived) return SRApi.T("信息不全", "no info");
             if (li.matchProgress != 0) return SRApi.T("对局中", "in match");

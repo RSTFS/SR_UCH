@@ -208,7 +208,10 @@ namespace SR_UCH.Tweaks {
                 _joinedLobbyId = id;
                 _joinInFlight = true;
                 _joinInFlightUntil = Time.unscaledTime + 20f;   // 加载超过 20 秒还没进去就允许重试
-                try { mm.StartCoroutine(JoinFlow(id, useCode, mm)); return; } catch (Exception __jf) { SRApi.Guard.Log("联机.加入流程", __jf); }
+                // 协程宿主必须是常驻对象：挂在 Matchmaker 上时，切场景/离房会把它销毁，
+            // 加入请求就永远发不出去（audit 14-P0-1）。
+            try { CoroutineHost().StartCoroutine(JoinFlow(id, useCode, mm)); return; }
+            catch (Exception __jf) { SRApi.Guard.Log("联机.加入流程", __jf); }
                 try { SRApi.LogInfo("[联机] 协程启动失败，退回直接 JoinLobby"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 mm.JoinLobby(id, useCode, new UnityEngine.Events.UnityAction<bool>(ok => {
                     try {
@@ -256,5 +259,19 @@ namespace SR_UCH.Tweaks {
                 DisarmWatchdog();
             } catch (Exception __ex) { SRApi.Guard.Log("延时加入房间", __ex); }
         }
+        // 常驻协程宿主：DontDestroyOnLoad，切场景不会销毁。
+        private sealed class CoHost : UnityEngine.MonoBehaviour { }
+        private static CoHost _coHost;
+        private static CoHost CoroutineHost() {
+            if (_coHost != null) return _coHost;
+            try {
+                GameObject go = new GameObject("SR_UCH.OnlineCo");
+                UnityEngine.Object.DontDestroyOnLoad(go);
+                _coHost = go.AddComponent<CoHost>();
+            } catch (Exception __ch) { SRApi.Guard.Log("联机/创建协程宿主", __ch); }
+            return _coHost;
+        }
+
+
     }
 }
