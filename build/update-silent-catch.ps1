@@ -19,8 +19,19 @@ foreach ($d in $dirs) {
     if ($d -eq $root) { $files = @() }
     foreach ($f in ($files + $(if ($d -eq $root) { $rootFiles } else { @() }))) {
         $txt = [System.IO.File]::ReadAllText($f.FullName)
-        $n = ([regex]::Matches($txt, 'catch\s*\{\s*/\*\s*静默')).Count
-        if ($n -gt 0) { $rows += [pscustomobject]@{ Name = ($f.FullName.Substring($root.Length) -replace '\\','/').TrimStart('/'); N = $n }; $total += $n }
+        # 与守卫同一口径：注释形态 + 空 catch 都算（review 2026-10-31 §3.4）。
+$n = ([regex]::Matches($txt, 'catch\s*(\([^)]*\))?\s*\{\s*(\}|/\*\s*静默)')).Count
+        if ($n -gt 0) {
+            # PS5.1 没有 [IO.Path]::GetRelativePath：手算相对仓库根的路径（与守卫同口径）。
+            $rel = if ($f.FullName.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+                $f.FullName.Substring($root.Length + 1)
+            } else {
+                '../' + $f.FullName.Substring((Split-Path -Parent $root).Length + 1)
+            }
+            $rel = $rel -replace '\\','/'
+            $total += $n
+            $rows += [pscustomobject]@{ Name = $rel; N = $n }
+        }
     }
 }
 

@@ -295,7 +295,9 @@ function Check-SilentCatch {
             Where-Object { ($_.FullName -replace '\\', '/') -notmatch '/bin/|/obj/|/tests/' }
         foreach ($f in $files) {
             $txt = [System.IO.File]::ReadAllText($f.FullName)
-            $n = ([regex]::Matches($txt, 'catch\s*\{\s*/\*\s*静默')).Count
+            # 同时计空 catch（catch (...) { } / catch { }）：以前只认带「/* 静默」注释的形态，
+            # 空 catch 完全逃脱棘轮（review 2026-10-31 §3.4）。注释形态与空形态都算一处。
+            $n = ([regex]::Matches($txt, 'catch\s*(\([^)]*\))?\s*\{\s*(\}|/\*\s*静默)')).Count
             if ($n -eq 0) { continue }
             $total += $n
             $limit = 0
