@@ -244,6 +244,8 @@ public partial class SR {
 
         // 序列匹配（仅"有序列前键"时启用；纯修饰键组合走 held 判定）
         private static readonly Dictionary<ConfigEntryBase, int> _seqProg = new Dictionary<ConfigEntryBase, int>();
+        // 序列进度的时间戳：超过 1.2 秒没有新按键就作废，避免半完成进度跨帧永久残留（audit 05-P0-1）
+        private static readonly Dictionary<ConfigEntryBase, float> _seqAt = new Dictionary<ConfigEntryBase, float>();
         private static readonly Dictionary<ConfigEntryBase, int> _seqStamp = new Dictionary<ConfigEntryBase, int>();
         private static readonly Dictionary<ConfigEntryBase, bool> _seqResult = new Dictionary<ConfigEntryBase, bool>();
         // 普通组合键（修饰键 + 主键）的按帧去重，与 SeqMatched 同机制。
@@ -295,6 +297,12 @@ public partial class SR {
             if (down.Count == 0) return false;
             int prog;
             _seqProg.TryGetValue(entry, out prog);
+            // 半完成进度必须有时效：超过 1.2 秒没有任何新按键，就当用户已经放弃这次序列。
+            float __lastAt;
+            if (prog != 0) {
+                _seqAt.TryGetValue(entry, out __lastAt);
+                if (Time.unscaledTime - __lastAt > 1.2f) prog = 0;
+            }
             bool fired = false;
             for (int i = 0; i < down.Count; i++) {
                 KeyCode k = down[i];
@@ -307,7 +315,15 @@ public partial class SR {
                     prog = 0;
                 }
             }
-            _seqProg[entry] = prog;
+            if (prog != 0) {
+                _seqProg[entry] = prog;
+                _seqAt[entry] = Time.unscaledTime;
+            } else {
+                _seqProg.Remove(entry);
+                _seqAt.Remove(entry);
+            }
+            // 上限兜底：条目被重建后旧键不会自己消失，超过 256 条整体清空（键位状态本来就每帧可重建）。
+            if (_seqProg.Count > 256) { _seqProg.Clear(); _seqAt.Clear(); _seqStamp.Clear(); _seqResult.Clear(); }
             _seqResult[entry] = fired;
             return fired;
         }
