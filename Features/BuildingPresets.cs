@@ -425,7 +425,8 @@ namespace SR_UCH.Tweaks {
                 SRApi.Ctl.SectionTitle(SRApi.T("- 保存 / 导入 / 导出 -", "- Save / Import / Export -"));
                 GUILayout.BeginHorizontal();
                 try {
-                    SRApi.Ctl.LabelAuto(SRApi.T("预设名称", "Preset name"));
+                    GUILayout.Label(SRApi.T("预设名称", "Preset name"), SRApi.Ctl.Label,
+                        GUILayout.Width(SRApi.Ctl.Sc(52f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
                     string typed = SRApi.ClearableTextField(_newName ?? "", 40, SRApi.Ctl.SearchBox,
                         GUILayout.Width(W(220)), GUILayout.Height(W(24)));
                     if (typed != null && typed != _newName) _newName = typed;
@@ -438,7 +439,8 @@ namespace SR_UCH.Tweaks {
                 // 分区 2：导入 / 导出（XML 路径单独一行；下一行为 路径导入 / 剪贴板导入 / 全部导出）。
                 GUILayout.BeginHorizontal();
                 try {
-                    SRApi.Ctl.LabelAuto(SRApi.T("XML 路径", "XML path"));
+                    GUILayout.Label(SRApi.T("XML 路径", "XML path"), SRApi.Ctl.Label,
+                        GUILayout.Width(SRApi.Ctl.Sc(52f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
                     string path = SRApi.ClearableTextField(_importPath ?? "", 260, SRApi.Ctl.SearchBox,
                         GUILayout.Width(W(220)), GUILayout.Height(W(24)));
                     if (path != null && path != _importPath) _importPath = path;
@@ -448,6 +450,7 @@ namespace SR_UCH.Tweaks {
                 }
                 GUILayout.BeginHorizontal();
                 try {
+                    GUILayout.Space(SRApi.Ctl.Sc(52f));   // 与上面两个输入框左边缘对齐
                     if (GUILayout.Button(SRApi.T("从路径导入", "Import path"), SRApi.Ctl.Btn,
                         GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ImportFromPath();
                     if (GUILayout.Button(SRApi.T("从剪贴板导入", "Import clipboard"), SRApi.Ctl.Btn,
@@ -768,7 +771,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 也已经被算进 last.yMax（TableFitHeight 的 used）。再扣一次 titleH + 拖拽条，
                 // 表格就会比可用区域矮一截 —— 列表中下方那片空白的直接来源。
                 // 不再抬到 120：按调用方给的内容高度画，行少时不留空白表体。
-                float rowsH = Mathf.Max(0f, tableH - headerH);
+                float __gripH = SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f;
+                // 行区 = 表格高 − 表头 − 拖拽条：把拖拽条算进来会让 maxY 恒为 0（列表因此永远滚不动）。
+                float rowsH = Mathf.Max(0f, tableH - headerH - __gripH);
                 Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
                 EnsureCols();
                 // 操作列宽始终跟随当前语言的按钮文字：语言热切换后也能立刻避免英文标签被截断。
@@ -882,17 +887,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                             SRApi.MarkWheelUsed();
                         }
                     } catch (Exception __aw) { SRApi.Guard.Log("布局预设/滚轮轴", __aw); }
-                    // 临时诊断日志：点表头时记录核心是否认到拖动/列宽拖动（构建后看 BepInEx 日志即可定位拖拽问题）。
-                    if (e.type == EventType.MouseDown && e.button == 0) {
-                        try {
-                            for (int k = 0; k < _headerCells.Count; k++) {
-                                if (!_headerCells[k].Contains(mp)) continue;
-                                SRApi.LogInfo("[布局预设] 表头按下: 列=" + _headerCols[k] + " moveCol=" + _args.moveCol
-                                    + " dragCol=" + _args.dragCol + " inBox=" + _args.box.Contains(mp));
-                                break;
-                            }
-                        } catch (Exception) { }
-                    }
                     if (e.type == EventType.MouseUp) SRApi.BlockWindowDrag = false;
                 }
             } catch (Exception __ex) {
