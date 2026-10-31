@@ -268,7 +268,6 @@ public partial class SR {
                     });
 
                 // ---- 失效目标卡（有问题才展开） ----
-                bool issuesOpen = bad > 0;
                 Card(bad == 0, T("按名绑定的目标", "Named targets"),
                     bad == 0 ? T(SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " 补丁 · " + SR.AuditRefOk + "/" + SR.AuditRefTotal + " 反射，全部有效",
                                  SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " patches · " + SR.AuditRefOk + "/" + SR.AuditRefTotal + " members, all valid")
@@ -290,11 +289,10 @@ public partial class SR {
                             GUILayout.EndHorizontal();
                         }
                         GUILayout.EndScrollView();
-                    }, ref issuesOpen);
+                    });
 
                 // ---- 性能卡 ----
                 string tickRep = SR.TickProfileReport();
-                bool perfOpen = false;
                 Card(true, T("帧钩子", "Frame hooks"),
                     T("按名字排序，超阈值才需要关注", "sorted by name; only over-threshold rows matter"),
                     delegate {
@@ -306,10 +304,9 @@ public partial class SR {
                             for (int i = 0; i < rows.Length; i++) if (!string.IsNullOrEmpty(rows[i])) AuditLabel(rows[i]);
                         }
                         GUILayout.EndScrollView();
-                    }, ref perfOpen);
+                    });
 
                 // ---- 配置健康卡 ----
-                bool cfgOpen = false;
                 Card(SR.OrphanKeyCount == 0 && SR.FallbackSectionCount == 0, T("配置", "Config"),
                     T("孤儿键 " + SR.OrphanKeyCount + " · 无主段 " + SR.FallbackSectionCount + " · 运行时异常 " + SR.Guard.WarnCount,
                       "orphan keys " + SR.OrphanKeyCount + " · unowned sections " + SR.FallbackSectionCount + " · runtime errors " + SR.Guard.WarnCount),
@@ -318,42 +315,42 @@ public partial class SR {
                         if (!string.IsNullOrEmpty(SR.Guard.LastWhat))
                             AuditLabel(T("最近一次", "Last") + "：" + SR.Guard.LastWhat + " - " + (SR.Guard.LastError ?? ""));
                         try { AuditLabel(SR.AttributionReport()); } catch (Exception __at) { Guard.Log("自检/归因", __at); }
-                    }, ref cfgOpen);
+                    });
             } catch (Exception __ex) { Guard.Log("渲染自检", __ex); }
         }
 
         // 一张卡片：状态点 + 标题 + 一行结论（+ 可选 [详情] 展开体）。
-        private static void Card(bool ok, string title, string summary, Action body, ref bool expanded) {
+        // 卡片展开状态按"标题"记住：之前把 ref expanded 传给方法里的临时变量，
+        // 点"详情"改的是副本，所以永远打不开 / 收不上。
+        private static readonly HashSet<string> _cardOpen = new HashSet<string>();
+
+        private static void Card(bool ok, string title, string summary, Action body) {
             try {
                 bool canExpand = body != null;
+                bool open = canExpand && _cardOpen.Contains(title);
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.BeginHorizontal();
+                // 三个元素统一行高，水平居中对齐：绿点与标题用同一样式（以前标题用 _secHeader，
+                // 蓝色分区标题带基线偏移，才显得"文字偏下、和绿点对不上"）。
+                GUILayout.BeginHorizontal(GUILayout.Height(Sc(20)));
                 Color prev = GUI.color;
                 try {
                     GUI.color = ok ? new Color(0.55f, 0.92f, 0.55f) : new Color(1f, 0.78f, 0.35f);
-                    GUILayout.Label(ok ? "●" : "▲", _label, GUILayout.Width(Sc(18)));
+                    GUILayout.Label(ok ? "●" : "▲", _label, GUILayout.Width(Sc(18)), GUILayout.Height(Sc(20)));
                 } finally { GUI.color = prev; }
-                GUILayout.Label(title, _secHeader, GUILayout.Width(Sc(120)));
-                GUILayout.Label(summary, _label);
+                GUILayout.Label(title, _label, GUILayout.Width(Sc(120)), GUILayout.Height(Sc(20)));
+                GUILayout.Label(summary, _label, GUILayout.Height(Sc(20)));
                 GUILayout.FlexibleSpace();
                 if (canExpand) {
-                    if (GUILayout.Button(expanded ? T("收起", "Hide") : T("详情", "Details"), _btn,
-                            GUILayout.Width(Sc(64)), GUILayout.Height(Sc(22)))) expanded = !expanded;
+                    if (GUILayout.Button(open ? T("收起", "Hide") : T("详情", "Details"), _btn,
+                            GUILayout.Width(Sc(64)), GUILayout.Height(Sc(20)))) {
+                        if (open) _cardOpen.Remove(title); else _cardOpen.Add(title);
+                    }
                 }
                 GUILayout.EndHorizontal();
-                if (canExpand && expanded) {
-                    GUILayout.Space(Sc(4));
-                    body();
-                }
+                if (open) { GUILayout.Space(Sc(4)); body(); }
                 GUILayout.EndVertical();
                 GUILayout.Space(Sc(4));
             } catch (Exception __ex) { Guard.Log("自检卡片 " + title, __ex); }
-        }
-
-        // 兼容旧调用：不需要展开参数的卡片。
-        private static void Card(bool ok, string title, string summary, Action body) {
-            bool unused = true;
-            Card(ok, title, summary, body, ref unused);
         }
 
 
