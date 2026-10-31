@@ -523,6 +523,13 @@ namespace SR_UCH.Tweaks {
                             byKey[mode + "/" + file] = pi;
                         }
                     } catch (Exception __ex) {
+                            // 索引坏了就当它不存在：改名为 .bad 留证，继续用 XML 扫描重建（不再整批放弃）。
+                            try {
+                                string bad = index + ".bad-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+                                File.Move(index, bad);
+                                SRApi.LogWarn("[布局预设] index.json 解析失败，已隔离为 " + Path.GetFileName(bad) + " 并从 XML 重建索引");
+                            } catch (Exception __mv) { SRApi.Guard.Log("布局预设/隔离坏索引", __mv); }
+                            upgraded = true;
                         SRApi.Guard.Log("布局预设/读索引", __ex);
                     }
                 }
@@ -752,7 +759,7 @@ namespace SR_UCH.Tweaks {
                     if (p == null || p.IsLocal) continue; // 本地关卡是游戏存档，不写进预设索引
                     if (!first) sb.Append(",\n");
                     first = false;
-                    sb.Append("    {\"file\":\"").Append(JsonEsc(p.File))
+                    sb.Append("    {\"schema\":").Append(IndexSchema).Append(",\"file\":\"").Append(JsonEsc(p.File))
                         .Append("\",\"name\":\"").Append(JsonEsc(p.Name))
                         .Append("\",\"mode\":\"").Append(JsonEsc(p.Mode))
                         .Append("\",\"level\":\"").Append(JsonEsc(p.Level))

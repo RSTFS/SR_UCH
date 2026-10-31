@@ -24,6 +24,8 @@ namespace SR_UCH.Tweaks {
         // 索引格式版本：v2 起新增 level / ok；v3 起新增 levelName；v4 起新增 levelCode（关卡代码/快照码）。
         // 老索引缺字段按默认值处理并在扫描时自愈。
         private const int IndexVersion = 4;
+        // index.json 每条记录的 schema 版本：缺失 = 旧格式（下次写盘会补上）。
+        private const int IndexSchema = 1;
         // 排序方式：0=时间（新→旧），1=名称（A→Z）。旧配置里的 2/3 已弃用，读取时夹到 0。
         private const int SortModeMin = 0;
         private const int SortModeMax = 1;

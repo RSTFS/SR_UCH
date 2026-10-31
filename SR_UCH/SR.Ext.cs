@@ -62,6 +62,9 @@ public partial class SR {
             if (onSceneChanged != null && !_sceneHooks.Contains(onSceneChanged)) _sceneHooks.Add(onSceneChanged);
         }
         public static void FireSceneChanged() {
+            // 切场景先取消按键录制：录制态依赖连续的 IMGUI 事件，场景一换事件链就断了，
+            // 留在录制态会让所有快捷键失效（报告 §4.2 的第三条保险）。
+            try { if (IsCapturingKey) CancelCapture(); } catch (Exception __cc) { Guard.Log("切场景取消按键录制", __cc); }
             for (int i = 0; i < _sceneHooks.Count; i++) {
                 try { _sceneHooks[i](); } catch (Exception __ex) { Guard.Log("场景切换通知", __ex); }
             }
