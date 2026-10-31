@@ -216,7 +216,7 @@ public partial class Level {
                 _key = plugin.Config.Bind("Level", "Drop Held Piece", KeyCode.None,
                     "按这个键就把手上拿着的那块丢掉（走游戏原生通道, 全员可见）, 填 None 就是不绑键.");
                 SRApi.RegisterKey("关卡-放弃道具", _key, "press");
-                SRApi.RegisterTick("放弃道具", Tick);
+                SRApi.RegisterTick("KEY_DROP", Tick);
             } catch (Exception __ex) { SRApi.Guard.Log("放弃道具 初始化", __ex); }
         }
 
@@ -309,7 +309,7 @@ public class LevelPartyBox : ITweak {
                     "关闭派对盒快捷键（结束派对盒选择、进入游玩阶段；按下即触发）");
                 SRApi.RegisterKey("关卡-刷新派对盒", _refreshPartyBoxKey, "press");
                 SRApi.RegisterKey("关卡-关闭派对盒", _closePartyBoxKey, "press");
-                SRApi.RegisterTick("派对盒快捷键", Tick);
+                SRApi.RegisterTick("KEY_PARTYBOX", Tick);
                 // 反射成员登记：游戏改名时启动自检会告警。
                 SRApi.Ref.Override("PartyBox.pieces", "关卡派对盒道具（清场/重抽）");
                 SRApi.Ref.Override("VersusControl.showPartyBox", "关卡派对盒：完整流程");
