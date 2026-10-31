@@ -162,6 +162,7 @@ public partial class SR {
         }
 
         private static SRApi.TableArgs _hookArgs;   // 帧钩子表格（SR 列表）
+        private static List<string[]> _hookRows = new List<string[]>();   // 每帧刷新的行数据
         internal static int SettingsTab;   // 0 = 通用，1 = 自检
 
         // 设置页入口：顶部两个页签，下面按页签渲染。页面切换只改这个字段，不重建任何配置。
@@ -341,7 +342,8 @@ public partial class SR {
                             return;
                         }
                         // 改用核心 SR 列表（与联机/预设同一套 TableDraw）：按内容高、不套内层滚动区。
-                        List<string[]> hrows = SR.TickProfileRows();
+                        _hookRows = SR.TickProfileRows();   // 静态字段：委托每次读它，避免闭包把第一帧的数据钉死
+                        List<string[]> hrows = _hookRows;
                         if (hrows.Count == 0) { AuditLabel(T("（还没有采样）", "(no samples yet)")); return; }
                         if (_hookArgs == null) {
                             _hookArgs = new SRApi.TableArgs();
@@ -351,7 +353,7 @@ public partial class SR {
                             _hookArgs.vis = new List<int>();   // 核心按 order+hidden 推导可见列
                             _hookArgs.resizable = true;
                             _hookArgs.title = delegate (int c) { return c == 0 ? T("钩子", "Hook") : c == 1 ? T("平均", "Avg") : c == 2 ? T("峰值", "Max") : c == 3 ? T("调用", "Calls") : T("超限", "Over"); };
-                            _hookArgs.rowCells = delegate (int row) { return hrows[row]; };
+                            _hookArgs.rowCells = delegate (int row) { return _hookRows[row]; };
                         }
                         _hookArgs.rowCount = hrows.Count;
                         float __hh = SRApi.Ctl.TableHeaderH(), __rh = SRApi.Ctl.TableRowH();
@@ -388,13 +390,14 @@ public partial class SR {
                     GUILayout.Label(ok ? "●" : "▲", _label, GUILayout.Width(Sc(18)), GUILayout.Height(Sc(20)));
                 } finally { GUI.color = prev; }
                 // 标题自适应高度：长标题换行显示，不再被固定 20px 截断。
-                float __titleH = Mathf.Max(Sc(24), _labelWrap.CalcHeight(new GUIContent(title), Sc(150)) + Sc(4));   // 宽度放宽到 150、底部多 4px：中文标题以前会被裁
-                GUILayout.Label(title, _labelWrap, GUILayout.Width(Sc(150)), GUILayout.Height(__titleH));
+                float __titleH = Mathf.Max(Sc(22), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)) + Sc(3));   // 底部多留 3px：中文标题的下缘笔画以前会被裁
+                GUILayout.Label(title, _labelWrap, GUILayout.Width(Sc(120)), GUILayout.Height(__titleH));
                 GUILayout.Label(summary, _label, GUILayout.Height(Sc(20)));
                 GUILayout.FlexibleSpace();
                 if (canExpand) {
+                    // 详情按钮跟随标题高度：标题换行变高时按钮不会缩在 20px 里显得错位。
                     if (GUILayout.Button(open ? T("收起", "Hide") : T("详情", "Details"), _btn,
-                            GUILayout.Width(Sc(64)), GUILayout.Height(Sc(20)))) {
+                            GUILayout.Width(Sc(64)), GUILayout.Height(Mathf.Max(Sc(20), __titleH)))) {
                         if (open) _cardOpen.Remove(title); else _cardOpen.Add(title);
                     }
                 }

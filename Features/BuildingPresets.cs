@@ -514,9 +514,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 我上一版把 ContentArea（屏幕坐标）和 last.yMax（布局坐标）混算，结果反而更矮。
             // 核心化：高度 = min(可用, 表头 + 行数*行高 + 拖拽条)。行少 -> 收紧，行多 -> 填满并滚动。
             // 高度只按内容：传 null 忽略"表高配置"，否则以前拖过的高度会把表格抬到配置值、行下方留白。
-            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, null, SRApi.Ctl.TableMinH(),
+            // 按内容收紧（不用填满模式）：填满会在最后一行下面留一大块空表框，看起来就是"列表下面的空白"。
+            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, null, 0f,
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-0f, true);   // fillViewport=true：表格始终填满到页面底部（行多时内部滚动）
+                0f, false);  // fillViewport=false：高度=表头+行，行多时按可用高度截断并滚动
                 _actionHitThisFrame = false;
                 List<PresetInfo> visible = VisiblePresets();
                 RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
