@@ -524,7 +524,7 @@ namespace SR_UCH.Tweaks {
                 try { SRApi.RegisterKey("HUD-显示键", _showKey, "hold"); }
                 catch (Exception __ex) { SRApi.Guard.Log("HUD 键位注册", __ex); }
 
-                SRApi.RegisterTick("sr.roundhud", Tick);
+                SRApi.RegisterTick("HUD", Tick);
                 SRApi.RegisterSceneHook(ResetStateSafe);
 
                 // 常驻对象：只承载 OnGUI 绘制。

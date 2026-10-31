@@ -231,8 +231,6 @@ public partial class SR {
 
         private static void RenderAuditBlock() {
             try {
-                GUILayout.Space(Sc(6));
-                GUILayout.Label("- " + T("自检", "Self-check") + " -", _secHeader);
                 // 一键导出：复制到剪贴板 / 写进日志（两者都不依赖用户去找文件）。
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button(T("复制诊断", "Copy report"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
