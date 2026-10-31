@@ -155,7 +155,7 @@ namespace SR_UCH.Tweaks {
                 Matchmaker mm = MatchmakerOrNull();
                 if (mm == null) {
                     Notes("联机功能未初始化，请先进入一次游戏的联机界面", "Online is not initialised; open the in-game online screen once");
-                    _pendingJoin = "";
+                    ClearPendingJoin("匹配器不可用");
                     _pendingSteamId = 0;   // 这条加入意图作废，房号不能留到下一次
                     _joinGuardUntil = 0f;
                     return;
@@ -170,20 +170,20 @@ namespace SR_UCH.Tweaks {
                 try { ArmAutoEnterMainMenu(); } catch (Exception __ae) { SRApi.Guard.Log("联机/启用自动进入", __ae); }
                 try { SRApi.LogInfo("[联机] 加入请求 id=" + id + " mm=" + mm.GetType().FullName + " useCode=" + useCode); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 // 必须在这里清掉待加入队列：它是每帧轮询的，不清会重复发起同一次加入。
-                _pendingJoin = "";
+                ClearPendingJoin("加入请求已发出");
                 try { mm.StartCoroutine(JoinFlow(id, useCode, mm)); return; } catch (Exception __jf) { SRApi.Guard.Log("联机.加入流程", __jf); }
                 try { SRApi.LogInfo("[联机] 协程启动失败，退回直接 JoinLobby"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 mm.JoinLobby(id, useCode, new UnityEngine.Events.UnityAction<bool>(ok => {
                     try {
-                        _pendingJoin = "";
+                        ClearPendingJoin("加入回调完成");
                         Notes(ok ? "已发送加入请求" : "加入失败", ok ? "Join request sent" : "Join failed");
                     } catch (Exception __ex) { SRApi.Guard.Log("加入房间回调", __ex); }
                 }));
                 // 发出即算完成：这里立刻清空，避免回调未触发时 TickPendingJoin 反复重发。
-                _pendingJoin = "";
+                ClearPendingJoin("回退路径已发出");
             } catch (Exception e) {
                 SRApi.LogWarn("加入房间失败: " + e.Message);
-                _pendingJoin = "";
+                ClearPendingJoin("加入异常");
                 _joinGuardUntil = 0f;
             }
         }
@@ -194,7 +194,7 @@ namespace SR_UCH.Tweaks {
             try {
                 float now = Time.unscaledTime;
                 if (now > _pendingGiveUpAt) {
-                    _pendingJoin = "";
+                    ClearPendingJoin("等待超时");
                     _joinGuardUntil = 0f;   // 超时取消：立刻允许重新点
                     Notes("加入超时，已取消", "Join timed out and was cancelled");
                     return;

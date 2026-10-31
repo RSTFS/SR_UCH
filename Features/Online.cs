@@ -55,7 +55,15 @@ namespace SR_UCH.Tweaks {
         private static float[] _cw;                         //当前列宽
         private static bool _widthsLoaded;                  // 列宽是否已初始化
         // 对局内点加入：先退出当前房间，退出后立刻加入。
-        private static string _pendingJoin = "";
+        private static string _pendingJoin = "";   // 待加入队列：只在 ClearPendingJoin() 里清空，避免漏一处就重复加入
+
+        // 清空待加入队列的唯一入口（评审 B-P0-10）。reason 只为日志留痕，不影响逻辑。
+        internal static void ClearPendingJoin(string reason) {
+            if (string.IsNullOrEmpty(_pendingJoin)) return;
+            _pendingJoin = "";
+            SRApi.LogInfo("[联机] 已清空待加入队列（" + reason + "）");
+        }
+
         private static bool _pendingUseCode;                 //true = 按房间码加入
         private static float _pendingGiveUpAt;               //挂起到这个时刻就放弃（30 秒）
         private static float _pendingWaitFrom;               // 本次待加入开始等待的时刻（用于超时加速与输入屏蔽上限）
@@ -198,7 +206,7 @@ namespace SR_UCH.Tweaks {
         public static void GoMainMenu() {
             Notes("正在返回主界面", "Returning to the main menu");
             // 点返回主界面即取消待加入：TickPendingJoin 每帧轮询，退出完成后会立刻 DoJoin。
-            _pendingJoin = "";
+            ClearPendingJoin("界面重置");
             _pendingSteamId = 0;   // 取消待加入，Steam 房号一并作废
             // reason 不能传自定义串：游戏会把它当成玩家可见提示弹出；传 null 则不覆盖游戏自己设的 abortReason。
             try { SRApi.LogInfo("[联机] 请求返回主界面（reason 传 null，避免把调试串弹给玩家）"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -246,7 +254,7 @@ namespace SR_UCH.Tweaks {
                 return;
             }
             Notes("正在强制返回主界面", "Force-returning to the main menu");
-            _pendingJoin = "";   // 同时取消待加入，否则退出后仍会被拉进目标房
+            ClearPendingJoin("强制返回主界面");   // 同时取消待加入，否则退出后仍会被拉进目标房
             _pendingSteamId = 0; // Steam 房号随之作废
             _abortDeadline = 0f;
             _forceDeadline = 0f;

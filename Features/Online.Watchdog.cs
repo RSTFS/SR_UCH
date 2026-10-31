@@ -74,7 +74,7 @@ namespace SR_UCH.Tweaks {
             try {
                 // 1) 取消未完成的加入：房主已不在，继续等只会超时。
                 bool wasPending = !string.IsNullOrEmpty(_pendingJoin);
-                _pendingJoin = "";
+                ClearPendingJoin("房主解散");
                 // 2) 解除回家看门狗，避免它的超时兜底强断连接 / 销毁 LobbyManager。
                 DisarmWatchdog();
                 ClearLobbyList();

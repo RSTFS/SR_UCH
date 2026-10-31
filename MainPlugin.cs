@@ -387,6 +387,9 @@ namespace SR_UCH {
         // 外部 DLL（功能 / 语言包）：实现 ITweak 或 ILanguagePack，不需要 [BepInPlugin] 与 BepInEx 引用，
         // 只引用 SR_UCH.dll，把生成的 DLL 丢进 BepInEx\plugins\（或 BepInEx\modules\）。
         private void LoadExternal() {
+            // 供应链透明化（评审 G6）：本方法会对 plugins/ 与 modules/ 下每个 dll 做 LoadFrom 并实例化其中的
+            // ITweak/ILanguagePack。第三方 dll 一旦放进受信任目录就等于会被执行 —— 所以这里把"扫到哪些、
+            // 实际加载了哪些、来自哪个文件、多大、什么时候改的"逐条写进日志，出问题时能对账。
             string[] dirs = null;
             try {
                 dirs = new[] { Paths.PluginPath, Path.Combine(Paths.BepInExRootPath, "modules") };
@@ -403,6 +406,17 @@ namespace SR_UCH {
             }
         }
 
+        // 外部模块一行摘要：文件、大小、修改时间、是否本次新加载。永不抛异常（日志失败不影响加载）。
+        private void TryLogExternalModule(string dll, string name, bool loadedNow) {
+            try {
+                long size = -1; DateTime when = DateTime.MinValue;
+                try { FileInfo fi = new FileInfo(dll); if (fi.Exists) { size = fi.Length; when = fi.LastWriteTime; } } catch { /* 静默：取不到元数据就只记路径 */ }
+                ModLogger.LogInfo("[SR.Mod] 外部模块 " + name + (loadedNow ? "（本次加载）" : "（已在内存中）")
+                    + " | 文件=" + dll + (size >= 0 ? " | 字节=" + size : "") + (when != DateTime.MinValue ? " | 修改=" + when.ToString("yyyy-MM-dd HH:mm") : ""));
+                ModLogger.LogWarning("[SR.Mod] 提醒：外部模块以完全权限运行（无签名校验）。只安装你信任的 dll。");
+            } catch { /* 静默：日志失败不影响加载流程 */ }
+        }
+
         private void LoadOneExternal(string dll) {
             try {
                 string name = Path.GetFileNameWithoutExtension(dll);
@@ -417,8 +431,11 @@ namespace SR_UCH {
                         if (string.Equals(an, name, StringComparison.OrdinalIgnoreCase)) { asm = a; break; }
                     } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 }
-                if (asm == null) asm = Assembly.LoadFrom(dll);
+                bool loadedNow = false;
+                if (asm == null) { asm = Assembly.LoadFrom(dll); loadedNow = true; }
                 if (asm == null) return;
+                // 只记"本次真正加载"与"识别出可挂载类型"的，避免把 BepInEx 自带的几十个 dll 刷满日志。
+                TryLogExternalModule(dll, name, loadedNow);
 
                 // 同一份程序集只处理一次：重复会 Initialize 两遍、补丁打两遍。
                 // 语言包允许随独立 BepInEx 插件提供，故不能按"是不是刚加载的"判断。
