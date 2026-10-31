@@ -369,9 +369,11 @@ namespace SR_UCH.Tweaks {
                     return;
                 }
                 if (name.Length > 40) name = name.Substring(0, 40);
+                string oldName = p.Name;
                 p.Name = name;
                 // 回写 XML 的 srName：XML 是权威数据源，只改索引的话，换场景重扫（LoadFromDisk 从 XML 回填）
                 // 会把名字退回旧的 —— 这是"重命名后名字自己变回去"的根因。
+                bool written = false;
                 try {
                     string xmlPath = p.FilePath;
                     if (!string.IsNullOrEmpty(xmlPath) && File.Exists(xmlPath)) {
@@ -380,9 +382,24 @@ namespace SR_UCH.Tweaks {
                         if (doc != null && doc.DocumentElement != null) {
                             doc.DocumentElement.SetAttribute("srName", name);
                             WriteFileAtomic(xmlPath, doc.OuterXml);
+                            // 回读校验：XML 才是权威源。写不进去（只读/被杀毒占用/磁盘满）时
+                            // 不能只改索引，否则下次扫描会从 XML 回填旧名，两处永久分叉。
+                            try {
+                                XmlDocument verify = ParseXmlSafe(File.ReadAllText(xmlPath));
+                                written = verify != null && verify.DocumentElement != null
+                                    && verify.DocumentElement.GetAttribute("srName") == name;
+                            } catch (Exception __vf) { SRApi.Guard.Log("布局预设/重命名校验", __vf); }
                         }
                     }
                 } catch (Exception __wx) { SRApi.Guard.Log("布局预设/重命名回写XML", __wx); }
+                if (!written) {
+                    p.Name = oldName;
+                    _renameKey = null;
+                    _renameText = null;
+                    SRApi.Notify(SRApi.T("重命名失败：预设文件写不进去（只读或被占用）",
+                        "Rename failed: the preset file could not be written"));
+                    return;
+                }
                 _renameKey = null;
                 _renameText = null;
                 SaveIndex();
