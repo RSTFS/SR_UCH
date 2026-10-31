@@ -149,7 +149,7 @@ namespace SR_UCH.Tweaks {
                 ReloadGuard reloadGuard = ReloadGuard.Begin("重载加载预设");
                 try {
                     // 一次性静态字段：游戏在 OnSetupStartLevel 里读取后立即置 null 并原生广播给全员。
-                    QuickSaver.levelPortalXml = xml;
+                    SetLevelPortalXml(xml);
                     // 不再校验/拦截模式差异：按预设自己的模式（或页面选择的加载模式）走原来的重载流程（ReloadScene 会把模式同步给房客）。
                     GameState.GameMode toMode = ResolveLoadMode(p, st.GameMode);
                     try { st.GameMode = toMode; } catch (Exception __mx) { SRApi.Guard.Log("布局预设/设置预设模式", __mx); }
@@ -304,7 +304,7 @@ namespace SR_UCH.Tweaks {
                 }
                 gs.currentSnapshotInfo = info;
                 st.GameMode = targetMode;
-                QuickSaver.levelPortalXml = xml;
+                SetLevelPortalXml(xml);
                 MsgPrepareToReloadScene msg = new MsgPrepareToReloadScene {
                     reloadToMode = targetMode,
                     snapshotInfo = info
@@ -702,6 +702,36 @@ namespace SR_UCH.Tweaks {
                 catch (Exception __cx) { SRApi.Guard.Log("布局预设/清理预设XML", __cx); }
                 SetReloadBusy(false);
             }
+        }
+
+        // levelPortalXml 是游戏侧的 static 字段：写进去之后如果加载被掐断（换场景把挂在
+        // LobbyManager 上的协程销毁），脏 XML 会一直留着，下一次原生开局会误加载旧快照
+        // （audit 12-P0-1/12-P0-2）。这里记录写入时刻，由 tick 兜底清理，不依赖协程存活。
+        private static float _xmlSetAt = -1f;
+        private static string _xmlWritten;
+
+        private static void SetLevelPortalXml(string xml) {
+            try {
+                QuickSaver.levelPortalXml = xml;
+                _xmlSetAt = Time.unscaledTime;
+                _xmlWritten = xml;
+            } catch (Exception __sx) { SRApi.Guard.Log("布局预设/写入 levelPortalXml", __sx); }
+        }
+
+        // 每帧兜底：超过 25 秒还没被游戏消费（字段仍是自己写的那份）就清掉。
+        private static void TickXmlGuard() {
+            try {
+                if (_xmlSetAt < 0f) return;
+                if (Time.unscaledTime - _xmlSetAt <= 25f) return;
+                string cur = null;
+                try { cur = QuickSaver.levelPortalXml; } catch (Exception __rc) { SRApi.Guard.Log("布局预设/读 levelPortalXml", __rc); }
+                if (cur != null && ReferenceEquals(cur, _xmlWritten)) {
+                    try { QuickSaver.levelPortalXml = null; } catch (Exception __cc) { SRApi.Guard.Log("布局预设/清 levelPortalXml", __cc); }
+                    SRApi.LogWarn("[布局预设] levelPortalXml 25 秒未被消费，已清理，避免污染下一局");
+                }
+                _xmlSetAt = -1f;
+                _xmlWritten = null;
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/XML 兜底清理", __ex); }
         }
 
         // 锁的单一入口：记录"谁加的锁"，方便自愈时在日志里指出漏放锁的路径（audit P0-8）。

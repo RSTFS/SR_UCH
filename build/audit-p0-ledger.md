@@ -37,8 +37,8 @@
 | 31 | 10_布局预设核心 | P0-2 | 加载异常或失败路径可能永久持有本功能重载锁 | `ported` | TickReloadLock 之前从未注册：现在在 SelfReg 里注册，超时自愈真正生效 |
 | 32 | 11_预设IO与修改器 | P0-1 | ResolveImportPath 的目录穿越防护可被 `..` 与路径分隔符绕过 | `ported` | IsUnderRoot + 绝对路径根校验（提交 5e153fb） |
 | 33 | 11_预设IO与修改器 | P0-2 | SafeFileName 净化结果与用户意图脱节，造成"找不到文件"且越界读风险并存 | `ported` | SafeFileName 拒绝 .. 与两种分隔符（提交 5e153fb） |
-| 34 | 12_预设加载与工具 | P0-1 | 场景切换掐断挂载在 LobbyManager 上的加载协程，25 秒 XML 清理与放锁逻辑永久失效，仅能靠 45 秒自愈 | `todo` |  |
-| 35 | 12_预设加载与工具 | P0-2 | `levelPortalXml` 是 static 字段，协程被掐后脏 XML 残留，下一次原生开局会误加载旧快照 | `todo` |  |
+| 34 | 12_预设加载与工具 | P0-1 | 场景切换掐断挂载在 LobbyManager 上的加载协程，25 秒 XML 清理与放锁逻辑永久失效，仅能靠 45 秒自愈 | `ported` | 锁自愈 tick 已注册；levelPortalXml 改由 tick 兜底清理，不再依赖挂在 LobbyManager 上的协程存活 |
+| 35 | 12_预设加载与工具 | P0-2 | `levelPortalXml` 是 static 字段，协程被掐后脏 XML 残留，下一次原生开局会误加载旧快照 | `ported` | 写入统一走 SetLevelPortalXml，超过 25 秒未被消费则清空，脏 XML 不再污染下一局 |
 | 36 | 12_预设加载与工具 | P0-3 | 联机直接替换关卡时房客 `SelectedLevel` 不同步，且失败后无任何回退机制 | `todo` |  |
 | 37 | 12_预设加载与工具 | P0-4 | `TryReadPresetMeta` 遇自闭合 `<scene .../>` 直接返回 false，该预设元数据全丢失 | `ported` | 自闭合 <scene/> 空预设按成功返回，根元素属性不再丢弃 |
 | 38 | 13_联机主流程 | P0-01 | `DisbandOrLeave` 二次点击捷径会在"刚进主菜单又点一次"时误触发 | `todo` |  |

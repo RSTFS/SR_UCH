@@ -232,8 +232,11 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterPage(Section, Render);
             // 重载锁自愈：TickReloadLock 写好了却从未注册，等于"超时兜底"根本不存在，
             // 失败路径漏放锁只能等用户再点一次加载（audit 10-P0-2）。
+            // 重载锁自愈 + levelPortalXml 兜底清理：两个 tick 都必须注册，否则兜底逻辑等于不存在。
             try { SRApi.RegisterTick("布局预设-锁自愈", TickReloadLock); }
             catch (Exception __tl) { SRApi.Guard.Log("布局预设/注册锁自愈", __tl); }
+            try { SRApi.RegisterTick("布局预设-XML兜底", TickXmlGuard); }
+            catch (Exception __tx) { SRApi.Guard.Log("布局预设/注册XML兜底", __tx); }
             // 已删除的配置键：Show Timestamps（时间列固定显示，不再提供开关）。
             // 用功能自注册的迁移规则清理旧 cfg，避免遗留孤儿键（只列真正不再 Bind 的键）。
             try { SRApi.Migration.Remove(Section, "Show Timestamps"); }
