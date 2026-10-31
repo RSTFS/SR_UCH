@@ -318,8 +318,6 @@ public partial class Experiments : ITweak
                     if (_member != null) break;
                 }
                 if (_member == null) SRApi.LogWarn("[跨平台] 没找到 CrossPlatformToggle（游戏版本可能改了名），开关将不可用");
-                else SRApi.LogInfo("[跨平台] 已定位 " + _member.DeclaringType.FullName + "." + _member.Name
-                    + (_owner != null ? "（实例）" : "（静态）") + "，当前值=" + (Read() ? "开" : "关"));
             } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/探测成员", __ex); }
         }
 

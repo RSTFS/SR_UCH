@@ -387,10 +387,15 @@ namespace SR_UCH.Tweaks {
                         + " maxY=" + _maxScrollY.ToString("0.0") + " rows=" + VisiblePresets().Count
                         + " rowH=" + SRApi.Ctl.TableRowH().ToString("0.0"));
                 }
-                if (_tableBox.width <= 0f || !_tableBox.Contains(mouse)) return false;
+                // _tableBox 是布局坐标、且要等表格画完才有值；未量到时（首帧/异常帧）退回页面内容区判定，
+                // 否则命不中等于滚轮永远不生效。
+                Rect hitBox = _tableBox.width > 1f
+                    ? _tableBox
+                    : new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
+                if (!hitBox.Contains(mouse)) return false;
                 // 不依赖 RenderPresetTable 里算出的 _maxScrollY（那一帧可能还没跑或窗口刚变过），
                 // 直接用表格框的实时高度重算可滚动范围，避免"范围算成 0 就滚不动"。
-                float rowsH = Mathf.Max(0f, _tableBox.height - SRApi.Ctl.TableHeaderH()
+                float rowsH = Mathf.Max(0f, hitBox.height - SRApi.Ctl.TableHeaderH()
                                         - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));
                 int n = VisiblePresets().Count;
                 float maxY = Mathf.Max(0f, n * SRApi.Ctl.TableRowH() - rowsH);
