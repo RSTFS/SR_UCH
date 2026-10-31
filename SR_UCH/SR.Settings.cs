@@ -272,9 +272,14 @@ public partial class SR {
                                        : kindRaw == "反射" ? T("反射", "Reflection")
                                        : kindRaw;
                         GUILayout.BeginHorizontal();
-                        GUILayout.Label("✗ " + kindTxt, _label, GUILayout.Width(Sc(64)), GUILayout.Height(Sc(20)));
-                        GUILayout.Label(issues[i].Target ?? "", _label, GUILayout.Width(Sc(320)), GUILayout.Height(Sc(20)));
-                        GUILayout.Label(issues[i].Scope ?? "", _label, GUILayout.Height(Sc(20)));
+                        GUILayout.Label("✗ " + kindTxt, _label, GUILayout.Width(Sc(64)));
+                        // 目标名可能很长：给固定列宽 + 自动换行，高度按实测内容（不再固定 20px）。
+                        string tgt = issues[i].Target ?? "";
+                        float tgtH = _labelWrap.CalcHeight(new GUIContent(tgt), Sc(320));
+                        GUILayout.Label(tgt, _labelWrap, GUILayout.Width(Sc(320)), GUILayout.Height(tgtH));
+                        string scp = issues[i].Scope ?? "";
+                        float scpH = _labelWrap.CalcHeight(new GUIContent(scp), Sc(260));
+                        GUILayout.Label(scp, _labelWrap, GUILayout.Width(Sc(260)), GUILayout.Height(scpH));
                         GUILayout.FlexibleSpace();
                         GUILayout.EndHorizontal();
                     }
@@ -327,8 +332,9 @@ public partial class SR {
                     for (int i = 0; i < rows.Length; i++) {
                         string row = rows[i];
                         if (string.IsNullOrEmpty(row)) continue;
-                        // 每行固定高度：内容（数字）变化不会让整页高度跳动。
-                        GUILayout.Label(row, _label, GUILayout.Height(Sc(18f)));
+                        // 用实测高度而不是固定 18px：一行装不下时换行显示，不再被裁掉。
+                        // 视口高度固定（132px），所以整页高度仍然稳定，不会因为数字变化抖动。
+                        AuditLabel(row);
                     }
                 }
                 GUILayout.EndScrollView();
