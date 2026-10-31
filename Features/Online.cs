@@ -39,6 +39,9 @@ namespace SR_UCH.Tweaks {
         // 运行时状态
         private static readonly List<Matchmaker.LobbyListInfo> _lobbies = new List<Matchmaker.LobbyListInfo>();
         private static readonly HashSet<string> _hidden = new HashSet<string>();   //右键隐藏的房间 id
+        private static int _lobbyCbCount;           // 本次搜索收到的回调数
+        private static float _lobbyCbFirst = -1f;   // 首个回调时刻
+        private static float _lobbyCbLast = -1f;    // 最近一次回调时刻
         private static bool _lobbySearching;
         private static float _lobbySearchAt = -999f;
         private static string _lobbyMsg = "";
@@ -316,6 +319,8 @@ namespace SR_UCH.Tweaks {
                 _lobbyErr = false;          // 本次搜索开始，清掉上一次的错误提示
                 _lobbyMsg = SRApi.T("搜索中...", "Searching...");
                 _lobbySearchAt = Time.unscaledTime;
+                _lobbyCbFirst = -1f; _lobbyCbLast = -1f; _lobbyCbCount = 0;
+                SRApi.LogInfo("[联机] 开始搜索房间（回调是否流式看 [联机] 列表回调日志）");
                 mm.FindLobbies(new Matchmaker.LobbyListingCallback(OnLobbyInfo));
             } catch (Exception e) {
                 _lobbySearching = false;
@@ -335,6 +340,16 @@ namespace SR_UCH.Tweaks {
                     if (_lobbies[i] != null && _lobbies[i].sLobbyID == info.sLobbyID) { exist = i; break; }
                 }
                 if (exist >= 0) _lobbies[exist] = info; else _lobbies.Add(info);
+                float cbNow = Time.unscaledTime;
+                if (_lobbyCbFirst < 0f) {
+                    _lobbyCbFirst = cbNow;
+                    SRApi.LogInfo("[联机] 列表回调：第 1 个房间，搜索后 " + (cbNow - _lobbySearchAt).ToString("0.00") + "s");
+                }
+                _lobbyCbLast = cbNow;
+                _lobbyCbCount++;
+                if (_lobbyCbCount % 5 == 0) {
+                    SRApi.LogInfo("[联机] 列表回调：已 " + _lobbyCbCount + " 个，" + (cbNow - _lobbySearchAt).ToString("0.00") + "s");
+                }
                 RegionCode(info);
                 // 只标记"变了"：排序与统计延迟到渲染时各做一次。
                 _lobbiesDirty = true;
@@ -345,6 +360,7 @@ namespace SR_UCH.Tweaks {
         public static void TickOnline() {
             TickWatchdog();
             TickPendingJoin();
+            TickJoinState();
         }
 
         // ---------- 加入房间后自动进入主菜单（跳过"按一次空格/确认"） ----------
@@ -442,6 +458,12 @@ namespace SR_UCH.Tweaks {
                 try { if (Matchmaker.IsInstantiated) gameDone = !Matchmaker.Instance.Searching; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 if (gameDone || Time.unscaledTime - _lobbySearchAt > SearchTimeout()) {
                     _lobbySearching = false;
+                    try {
+                        float span = (_lobbyCbLast >= 0f && _lobbyCbFirst >= 0f) ? (_lobbyCbLast - _lobbyCbFirst) : 0f;
+                        SRApi.LogInfo("[联机] 搜索结束：共 " + _lobbyCbCount + " 个回调，回调跨度 " + span.ToString("0.00")
+                            + "s，总耗时 " + (Time.unscaledTime - _lobbySearchAt).ToString("0.00") + "s"
+                            + (span < 0.05f ? "（平台一次性回调）" : "（流式回调）"));
+                    } catch (Exception __lg) { SRApi.Guard.Log("联机/搜索统计日志", __lg); }
                     PruneHidden();   // 搜索结束这一帧裁剪一次
                 }
             }

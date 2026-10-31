@@ -139,9 +139,23 @@ namespace SR_UCH.Tweaks {
         // 房间满 4 人不可加入（游戏自己的列表也是 Players"/4"）。
         private static bool IsFull(Matchmaker.LobbyListInfo li) { return li.Players >= 4; }
 
+        // 这一行是不是"我们已经在的房间"：加入时记下的房号与行一致，且当前确实在会话里。
+        private static bool IsSelfLobby(Matchmaker.LobbyListInfo li) {
+            try {
+                if (li == null) return false;
+                string joined = Online.JoinedLobbyId;
+                if (string.IsNullOrEmpty(joined)) return false;
+                string key = !string.IsNullOrEmpty(li.sLobbyID) ? li.sLobbyID
+                    : (li.UnityMatchID != 0UL ? li.UnityMatchID.ToString(CultureInfo.InvariantCulture) : (li.LobbyOwner ?? ""));
+                return key == joined;
+            } catch { return false; }
+        }
+
         private static bool IsJoinable(Matchmaker.LobbyListInfo li) {
             try {
                 if (li.error || !li.InfoReceived) return false;
+                // 自己已经在的房间：不允许再点（重复进入会出现两套光标共用一套控制器）。
+                if (IsSelfLobby(li)) return false;
                 if (li.matchProgress != 0) return false; // 进度 != 0 = 已开局，进去会卡加载
                 if (li.isAFK) return false;
                 if (li.Players <= 0) return false;   // 0 人房不可加入（以前只判满员，空房被算成可加入）
@@ -152,6 +166,8 @@ namespace SR_UCH.Tweaks {
 
         // 按钮 / 提示文字：说明不能加入的原因。
         private static string JoinText(Matchmaker.LobbyListInfo li) {
+            // 已经在这个房间里：显示"已加入"而不是"加入"，避免误以为还能再进一次。
+            if (IsSelfLobby(li)) return SRApi.T("已加入", "joined");
             // "房间已空"必须在 IsJoinable 之前判定：IsJoinable 只看 Players >= 4，0 人会被算作可加入。
             if (li.Players == 0) return SRApi.T("房间已空", "empty");
             if (IsJoinable(li)) return SRApi.T("加入", "Join");
@@ -364,6 +380,11 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void UpdateLobbyMsg() {
+            if (_lobbySearching) {
+                _lobbyMsg = string.Format(SRApi.T("搜索中… 已找到 {0} 个（筛选后 {1} 个）", "Searching... {0} found ({1} after filters)"),
+                    _lobbies.Count, CountShown());
+                return;
+            }
             _lobbyMsg = string.Format(SRApi.T("共 {0} 个房间，筛选后 {1} 个", "{0} lobbies, {1} after filters"), _lobbies.Count, CountShown());
         }
 

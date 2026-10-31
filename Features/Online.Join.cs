@@ -95,11 +95,43 @@ namespace SR_UCH.Tweaks {
         // 正在加入的抑制窗口：JoinFlow 是一次性协程，重复点击会并发两条流程（audit P0-22/23）。
         // 用时间窗而不是 bool：协程异常/被销毁时也会自然过期，不会把入口永久锁死。
         private static float _joinGuardUntil;
+        // 每帧维护加入状态：进房成功清"在途"；离开房间后清"已加入房号"（否则会一直挡住该房）。
+        internal static void TickJoinState() {
+            try {
+                bool inSession = InSession();
+                if (inSession) {
+                    if (_joinInFlight) { _joinInFlight = false; SRApi.LogInfo("[联机] 已进入房间，清除加入在途状态"); }
+                } else if (!string.IsNullOrEmpty(_joinedLobbyId) && !_joinInFlight) {
+                    _joinedLobbyId = "";
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("加入状态维护", __ex); }
+        }
+
+        // 已经发起/已经加入的目标房号（sLobbyID 或 UnityMatchID 的字符串形式）：
+        // 用于列表里把"自己已在的房间"标成已加入并禁止再点（重复进入会出现两套光标共用控制器）。
+        private static string _joinedLobbyId = "";
+        // 加入在途：从发出请求到真正进房之间不许再发第二请求（4 秒窗口在加载慢时会漏）。
+        private static bool _joinInFlight;
+        private static float _joinInFlightUntil;
+        internal static bool JoinInFlight { get { return _joinInFlight && Time.unscaledTime < _joinInFlightUntil; } }
+        internal static string JoinedLobbyId { get { return _joinedLobbyId; } }
         private const float JoinGuardSeconds = 4f;
 
         private static void JoinLobbyInternal(string id, bool useCode, bool keepSteamId) {
             if (!keepSteamId) _pendingSteamId = 0;
             if (string.IsNullOrEmpty(id)) return;
+            // 已经在这个房间里：再点一次只会让游戏再走一遍加入流程（表现为两套光标共用同一控制器）。
+            try {
+                if (!string.IsNullOrEmpty(_joinedLobbyId) && _joinedLobbyId == id && InSession()) {
+                    Notes("已在该房间中", "Already in this session");
+                    return;
+                }
+            } catch (Exception __aj) { SRApi.Guard.Log("加入/已加入判定", __aj); }
+            // 加入在途（含加载中）：不让第二次点击再开一条流程。
+            if (JoinInFlight) {
+                Notes("正在加入，请稍后", "Already joining; please wait");
+                return;
+            }
             // 连点/双击：窗口内只认第一次，第二次给一句提示（不然会并发两条加入流程）。
             if (Time.unscaledTime < _joinGuardUntil) {
                 Notes("正在加入，请稍候", "Already joining; please wait");
@@ -114,7 +146,7 @@ namespace SR_UCH.Tweaks {
                 // 记下等待起点，供超时加速与输入屏蔽上限使用。
                 _pendingWaitFrom = Time.unscaledTime;
                 _pendingNudged = false;
-                _pendingGiveUpAt = Time.unscaledTime + 30f;
+                _pendingGiveUpAt = Time.unscaledTime + 10f;   // 等待离开旧房的超时（30s 太长，用户实测要 10s）
                 Notes("正在退出当前房间并在退出后加入", "Leaving the current session, then joining");
                 // 只做"离开当前房间"，不等主界面：不调用 ReturnToMainMenu，省一趟场景加载。
                 LeaveCurrentForJoin();
@@ -171,6 +203,9 @@ namespace SR_UCH.Tweaks {
                 try { SRApi.LogInfo("[联机] 加入请求 id=" + id + " mm=" + mm.GetType().FullName + " useCode=" + useCode); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 // 必须在这里清掉待加入队列：它是每帧轮询的，不清会重复发起同一次加入。
                 ClearPendingJoin("加入请求已发出");
+                _joinedLobbyId = id;
+                _joinInFlight = true;
+                _joinInFlightUntil = Time.unscaledTime + 20f;   // 加载超过 20 秒还没进去就允许重试
                 try { mm.StartCoroutine(JoinFlow(id, useCode, mm)); return; } catch (Exception __jf) { SRApi.Guard.Log("联机.加入流程", __jf); }
                 try { SRApi.LogInfo("[联机] 协程启动失败，退回直接 JoinLobby"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 mm.JoinLobby(id, useCode, new UnityEngine.Events.UnityAction<bool>(ok => {
@@ -185,6 +220,8 @@ namespace SR_UCH.Tweaks {
                 SRApi.LogWarn("加入房间失败: " + e.Message);
                 ClearPendingJoin("加入异常");
                 _joinGuardUntil = 0f;
+                _joinInFlight = false;
+                _joinedLobbyId = "";
             }
         }
 

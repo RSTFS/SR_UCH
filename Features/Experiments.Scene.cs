@@ -33,6 +33,12 @@ public partial class Experiments : ITweak
                 SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
                     return e.Definition.Key.StartsWith("Splash ") || e.Definition.Key == "Gentle Load";
                 });
+                // 关闭遮罩：点一次立刻关掉当前这块黑幕（只在有遮罩时生效，不做常驻行为）。
+                GUILayout.Space(SRApi.Ctl.Sc(2));
+                if (GUILayout.Button(SRApi.T("关闭遮罩（立即）", "Close the mask now"), SRApi.Ctl.Btn,
+                        GUILayout.Height(SRApi.Ctl.Sc(28)), GUILayout.Width(SRApi.Ctl.Sc(180)))) {
+                    SplashTools.CloseMaskNow();
+                }
                 if (SplashTools.Note != null && SplashTools.Note.Length > 0) {
                     GUILayout.Space(SRApi.Ctl.Sc(2));
                     DrawStatus(SplashTools.Note);
@@ -131,6 +137,32 @@ public partial class Experiments : ITweak
             if (Time.frameCount - _splashScanAt < 15) return null;
             _splashScanAt = Time.frameCount;
             try { return UnityEngine.Object.FindObjectOfType<LoadingInterstitialSplash>(); } catch { return null; }
+        }
+
+        // 一次性关闭当前加载遮罩：按钮点一次走一次，不改变「跳过加载动画」的设置。
+        internal static void CloseMaskNow() {
+            try {
+                LoadingInterstitialSplash sp = FindSplash();
+                if (sp == null) {
+                    Note = SRApi.T("当前没有遮罩", "No mask on screen");
+                    SRApi.Notify(SRApi.T("当前没有遮罩", "No mask on screen"));
+                    return;
+                }
+                bool closed = false;
+                try {
+                    // 游戏自己的快进路径：把状态推进到淡出，然后由游戏正常收尾。
+                    if (sp.State == UISplashScreen.STATE.FADING_IN || sp.State == UISplashScreen.STATE.SHOW) {
+                        sp.Skip();
+                        closed = true;
+                    }
+                } catch (Exception __sk) { SRApi.Guard.Log("关闭遮罩/Skip", __sk); }
+                // Skip 会把游戏的 SkipBool 置真且没有取消入口：这里立刻清回 false，
+                // 保证"只关这一次"，下一次加载照常走（与「跳过加载动画」开关互不影响）。
+                try { ClearSkip(sp); } catch (Exception __cs) { SRApi.Guard.Log("关闭遮罩/清SkipBool", __cs); }
+                Note = closed ? SRApi.T("已关闭一次遮罩", "Mask closed once")
+                              : SRApi.T("遮罩不在可关闭状态", "Mask is not in a closable state");
+                SRApi.LogInfo("[实验.场景] " + Note);
+            } catch (Exception __ex) { SRApi.Guard.Log("关闭遮罩", __ex); }
         }
 
         internal static bool GentleOn() { return _gentleLoad != null && _gentleLoad.Value && SRApi.GateMaster; }
