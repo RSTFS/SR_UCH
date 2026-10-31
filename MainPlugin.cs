@@ -370,7 +370,6 @@ namespace SR_UCH {
             // 补丁归因：推迟 3 秒扫描，等其它 BepInEx 插件把补丁打完（只读查询，见 SR.Plugins.cs）。
             try { SR.InitAttribution(); } catch (Exception __at) { try { ModLogger.LogWarning("[SR] 补丁归因初始化失败: " + __at.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
             // 诊断浮层：独立常驻宿主，面板关闭时也显示（开关在 设置 → 自检）。
-            try { SR_UCH.Tweaks.SrDiagOverlay.Ensure(); } catch (Exception __ov) { try { ModLogger.LogWarning("[SR] 诊断浮层宿主创建失败: " + __ov.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
             // P1-1：运行时冒烟测试标记 —— 单行、固定格式、可被脚本 grep（build\smoke.ps1）。
             try {
                 try { ModLogger.LogInfo("[SR] 游戏版本=" + UnityEngine.Application.version + " | 契约=v" + SRContract.Version); } catch { /* 静默：非关键路径，失败可直接忽略 */ }

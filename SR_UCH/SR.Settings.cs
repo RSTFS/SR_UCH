@@ -164,7 +164,6 @@ public partial class SR {
             foreach (ConfigEntryBase entry in SettingsEntries()) {
                 any = true;
                 // 诊断浮层开关属于"自检"页（与补丁/反射信息放一起），通用页不再重复显示。
-                if (entry.Definition.Key == "Show Diagnostics") continue;
                 //栏目宽度专用行：滑块 + [-]/[+] 步进
                 if (entry.Definition.Key == Keys.SidebarWidth) { RenderSidebarWidthRow(); continue; }
                 string g = SettingsGroup(entry.Definition.Key);
@@ -234,10 +233,6 @@ public partial class SR {
             try {
                 GUILayout.Space(Sc(6));
                 GUILayout.Label("- " + T("自检", "Self-check") + " -", _secHeader);
-                // 诊断浮层开关（独立常驻浮层：面板关闭也显示，关掉开关才消失）。
-                SRApi.RenderSectionEntries(Keys.Settings, delegate (ConfigEntryBase e) {
-                    return e.Definition.Key == "Show Diagnostics";
-                });
                 // 一键导出：复制到剪贴板 / 写进日志（两者都不依赖用户去找文件）。
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button(T("复制诊断", "Copy report"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
@@ -279,7 +274,7 @@ public partial class SR {
                     return;
                 }
                 if (GUILayout.Button(T("收起细节", "Hide details"), _btn, GUILayout.Width(Sc(110)), GUILayout.Height(Sc(24)))) { _auditExpanded = false; return; }
-                GUILayout.Label(T("按名绑定的补丁目标", "Named patch targets") + "："
+                AuditLabel(T("按名绑定的补丁目标", "Named patch targets") + "："
                     + SR.AuditPatchOk + " / " + SR.AuditPatchTotal);
                 AuditLabel(T("反射成员", "Reflected members") + "：" + SR.AuditRefOk + " / " + SR.AuditRefTotal);
                 System.Collections.Generic.IList<SR.AuditIssue> issues = SR.AuditIssues;
