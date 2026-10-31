@@ -442,15 +442,15 @@ public partial class SR {
         // Shift+滚轮横向滚动；无纵向余量时自动转横向。
         if (e.shift && maxX > 0f) {
             scrollCols.x = Mathf.Clamp(scrollCols.x + amt * Sc(60), 0f, maxX);
-            e.Use(); MarkWheelUsed(); return true;
+            e.Use(); MarkWheelUsed(); WheelShieldHit = true; return true;
         }
         if (maxY > 0f) {
             scrollRows.y = Mathf.Clamp(scrollRows.y + amt * Sc(40), 0f, maxY);
-            e.Use(); MarkWheelUsed(); return true;
+            e.Use(); MarkWheelUsed(); WheelShieldHit = true; return true;
         }
         if (maxX > 0f) {
             scrollCols.x = Mathf.Clamp(scrollCols.x + amt * Sc(60), 0f, maxX);
-            e.Use(); MarkWheelUsed(); return true;
+            e.Use(); MarkWheelUsed(); WheelShieldHit = true; return true;
         }
         return false;
     }
