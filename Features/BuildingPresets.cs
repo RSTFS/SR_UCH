@@ -794,6 +794,11 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 _maxScrollX = Mathf.Max(0f, totalW - stripW);
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
                 _maxScrollY = Mathf.Max(0f, visible.Count * rowH - rowsH);
+                if (Time.unscaledTime - _wheelDiagAt > 2f) {
+                    _wheelDiagAt = Time.unscaledTime;
+                    SRApi.LogInfo("[布局预设] 表格 box=" + box + " rowsH=" + rowsH.ToString("0.0")
+                        + " maxY=" + _maxScrollY.ToString("0.0") + " rows=" + visible.Count + " scrollY=" + _scrollRows.y.ToString("0.0"));
+                }
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _maxScrollY);
                 Event e = Event.current;
                 Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
@@ -878,6 +883,15 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                         ref _args.dragCol, ref _dragH, SaveCols, null, null);
                     if (!_sbHandled)
                         SRApi.TableWheelInput(e, box, mp, _maxScrollX, _maxScrollY, ref _scrollCols, ref _scrollRows);
+                    // 兜底：事件可能被外层滚动区吃掉，这里直接轮询滚轮轴（与相机缩放同一做法）。
+                    // 判定用表格真实 box（屏幕坐标，和 Event 的鼠标同一空间），命中就滚行。
+                    try {
+                        float __ax = Input.GetAxis("Mouse ScrollWheel");
+                        if (Mathf.Abs(__ax) > 0.0001f && e != null && box.Contains(e.mousePosition) && _maxScrollY > 0f) {
+                            _scrollRows.y = Mathf.Clamp(_scrollRows.y + __ax * SRApi.Ctl.Sc(400f), 0f, _maxScrollY);
+                            SRApi.MarkWheelUsed();
+                        }
+                    } catch (Exception __aw) { SRApi.Guard.Log("布局预设/滚轮轴", __aw); }
                     // 临时诊断日志：点表头时记录核心是否认到拖动/列宽拖动（构建后看 BepInEx 日志即可定位拖拽问题）。
                     if (e.type == EventType.MouseDown && e.button == 0) {
                         try {
