@@ -623,7 +623,11 @@ public partial class SR {
             // 滚动区是弹性高度，不受页面内容影响，所以这个值不会形成抖动反馈。
             try {
                 Rect __sv = GUILayoutUtility.GetLastRect();
-                if (__sv.height > Sc(40f)) SRApi.PageViewportHeight = __sv.height;
+                // 硬上限：区域高 - 页头 - 底栏预留。Layout 趟 GetLastRect 可能返回"内容高度"，
+                // 不夹住的话表格会按几千像素取高，列表下方出现一大片空白。
+                float __vpMax = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
+                if (__sv.height > Sc(40f)) SRApi.PageViewportHeight = Mathf.Min(__sv.height, __vpMax);
+                else if (SRApi.PageViewportHeight > __vpMax) SRApi.PageViewportHeight = __vpMax;
             } catch (Exception __vm) { Guard.Log("页面视口实测", __vm); }
             // 滚轮被下拉框 / 滑块吃掉 -> 撤销本帧页面滚动。
             // 两道判定：1) 盾（绘制前、上一帧矩形命中）；2) 本帧绘制后的控件矩形命中。

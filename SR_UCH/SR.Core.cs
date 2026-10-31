@@ -837,6 +837,29 @@ public partial class SR : ITweak {
             } catch (Exception __ex) { Guard.Log("帧钩子性能剖析", __ex); }
         }
 
+        // 供自检页「帧钩子」表格使用：每行 = 名称 / 平均 / 峰值 / 调用 / 超限。
+        internal static List<string[]> TickProfileRows() {
+            List<string[]> rows = new List<string[]>();
+            try {
+                List<TickHook> all = new List<TickHook>();
+                for (int i = 0; i < _tickHooks.Count; i++) if (_tickHooks[i] != null) all.Add(_tickHooks[i]);
+                all.Sort(delegate (TickHook a, TickHook b) { return string.Compare(a.Name, b.Name, StringComparison.Ordinal); });
+                // 上限 40 行：表格里再多也没人看，页面还要滚。
+                int n = Mathf.Min(40, all.Count);
+                for (int i = 0; i < n; i++) {
+                    TickHook h = all[i];
+                    rows.Add(new string[] {
+                        h.Name ?? "",
+                        h.AvgMs.ToString("0.000") + "ms",
+                        h.MaxMs.ToString("0.000") + "ms",
+                        h.Calls.ToString(),
+                        h.Overruns > 0 ? h.Overruns.ToString() : ""
+                    });
+                }
+            } catch (Exception __ex) { Guard.Log("帧钩子行数据", __ex); }
+            return rows;
+        }
+
         // 供"健康检查"页导出：把当前 tick 排名拼成多行文本。
         internal static string TickProfileReport() {
             try {

@@ -161,9 +161,8 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("设置页签栏", __ex); }
         }
 
+        private static SRApi.TableArgs _hookArgs;   // 帧钩子表格（SR 列表）
         internal static int SettingsTab;   // 0 = 通用，1 = 自检
-        private static Vector2 _scrollIssues;   // 自检页表格的滚动位置
-        private static Vector2 _scrollHooks;
 
         // 设置页入口：顶部两个页签，下面按页签渲染。页面切换只改这个字段，不重建任何配置。
         internal static void RenderSettingsPage(float colWidth) {
@@ -300,8 +299,7 @@ public partial class SR {
                              : T(bad + " 项失效", bad + " broken"),
                     delegate {
                         if (bad > 0) {
-                        _scrollIssues = GUILayout.BeginScrollView(_scrollIssues, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
-                            GUIStyle.none, GUILayout.Height(Sc(150f)));
+                        // 不再用内层滚动区：页面本身可滚，嵌套 BeginScrollView 会让设置页排版错位。rticalScrollbar,
                         for (int i = 0; i < issues.Count; i++) {
                             string kindRaw = issues[i].Kind;
                             string kindTxt = kindRaw == "补丁" ? T("补丁", "Patch") : kindRaw == "反射" ? T("反射", "Reflection") : kindRaw;
@@ -314,7 +312,7 @@ public partial class SR {
                             GUILayout.Label(issues[i].Scope ?? "", _labelWrap, GUILayout.Width(Sc(220)), GUILayout.Height(h));
                             GUILayout.EndHorizontal();
                         }
-                        GUILayout.EndScrollView();
+                        // （内层滚动区已移除）
                         }
                         // 配置健康（原独立卡片，已合并到本卡）
                         AuditLabel(T("配置：孤儿键", "Config: orphan keys") + "：" + SR.OrphanKeyCount
@@ -342,14 +340,29 @@ public partial class SR {
                             AuditLabel(T("（剖析已关闭：勾选上面的开关后开始采样）", "(profiling is off: tick the switch above to start sampling)"));
                             return;
                         }
-                        _scrollHooks = GUILayout.BeginScrollView(_scrollHooks, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
-                            GUIStyle.none, GUILayout.Height(Sc(190f)));
-                        if (string.IsNullOrEmpty(tickRep)) GUILayout.Label(T("（还没有采样）", "(no samples yet)"), _label);
-                        else {
-                            string[] rows = tickRep.Split('\n');
-                            for (int i = 0; i < rows.Length; i++) if (!string.IsNullOrEmpty(rows[i])) AuditLabel(rows[i]);
+                        // 改用核心 SR 列表（与联机/预设同一套 TableDraw）：按内容高、不套内层滚动区。
+                        List<string[]> hrows = SR.TickProfileRows();
+                        if (hrows.Count == 0) { AuditLabel(T("（还没有采样）", "(no samples yet)")); return; }
+                        if (_hookArgs == null) {
+                            _hookArgs = new SRApi.TableArgs();
+                            _hookArgs.colW = new float[] { 200f, 90f, 90f, 70f, 60f };
+                            _hookArgs.order = new int[] { 0, 1, 2, 3, 4 };
+                            _hookArgs.hidden = new HashSet<int>();
+                            _hookArgs.resizable = true;
+                            _hookArgs.title = delegate (int c) { return c == 0 ? T("钩子", "Hook") : c == 1 ? T("平均", "Avg") : c == 2 ? T("峰值", "Max") : c == 3 ? T("调用", "Calls") : T("超限", "Over"); };
+                            _hookArgs.rowCells = delegate (int row) { return hrows[row]; };
                         }
-                        GUILayout.EndScrollView();
+                        _hookArgs.rowCount = hrows.Count;
+                        float __hh = SRApi.Ctl.TableHeaderH(), __rh = SRApi.Ctl.TableRowH();
+                        float __h = __hh + hrows.Count * __rh;
+                        _hookArgs.headerH = __hh; _hookArgs.rowH = __rh; _hookArgs.rowsH = hrows.Count * __rh;
+                        _hookArgs.mp = Event.current != null ? Event.current.mousePosition : Vector2.zero;
+                        Rect __hbox = GUILayoutUtility.GetRect(0f, __h, GUILayout.ExpandWidth(true));
+                        _hookArgs.box = __hbox;
+                        _hookArgs.rowsClip = new Rect(__hbox.x, __hbox.y + __hh, __hbox.width, hrows.Count * __rh);
+                        _hookArgs.stripW = __hbox.width;
+                        _hookArgs.pinCol = -1; _hookArgs.alignLeftCol = 0; _hookArgs.headerLeft = true;
+                        SR.TableDraw(_hookArgs);
                     });
 
             } catch (Exception __ex) { Guard.Log("渲染自检", __ex); }
@@ -626,7 +639,6 @@ public partial class SR {
         private static float[] _ordColW;
         private static float[] _ordDefaultColW() { int n = Mathf.Max(1, _ordN); float[] d = new float[n]; for (int i = 0; i < n; i++) d[i] = 64f; return d; }
         private static int[] _ordOrder;   //显示顺序（数据列下标）
-        private static Vector2 _ordScroll;   //列表内部的滚动位置
         private static void EnsureOrdArgs(int n) {
             if (_ordArgs != null && _ordN == n) return;
             _ordN = n;
@@ -690,13 +702,13 @@ public partial class SR {
                 if (sum < Sc(60)) sum = Sc(60);
                 GUILayout.Space(Sc(2));
                 //列表内部滚动：滚动条隐藏，滚轮仍可用
-                _ordScroll = GUILayout.BeginScrollView(_ordScroll, false, false, GUIStyle.none, GUIStyle.none, GUIStyle.none);
+                // 不再套内层滚动区：嵌套 BeginScrollView 会让设置页排版错位。
                 a.box = GUILayoutUtility.GetRect(sum, Sc(24));   //横向列头：高度固定 24px
                 a.stripW = sum;
                 if (_ordOrder == null) { _ordOrder = new int[n]; for (int i = 0; i < n; i++) _ordOrder[i] = i; a.order = _ordOrder; }   //恒等序兜底
                 a.mp = Event.current != null ? Event.current.mousePosition : Vector2.zero;
                 SR.TableDraw(a);
-                GUILayout.EndScrollView();
+                // （内层滚动区已移除）
                 for (int i = 0; i < n; i++) {
                     bool hid = _ordHidden.Contains(i);
                     if (hid != SR._userHiddenSections.Contains(SR._allSections[i])) SR.SetSectionHidden(SR._allSections[i], hid);
