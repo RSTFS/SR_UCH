@@ -440,6 +440,7 @@ public partial class SR {
                 if (GUILayout.Button(ZhSection(s), sbSel ? _selItem : _item, GUILayout.Height(Sc(26)), GUILayout.ExpandWidth(true))) {
                     _mode = Mode.Internal;
                     _selectedInternalSection = s;
+                    _scroll = Vector2.zero;
                     NoPageScrollBars = false;   // 换栏目：页面级滚动条要求复位（由自绘页每帧重新声明）
                     _editText.Clear();
                     _editOpen.Clear();
@@ -456,6 +457,7 @@ public partial class SR {
                 if (GUILayout.Button(new GUIContent(label, p.guid + (IsExternalDisabled(p.guid) ? "\n" + T("已禁用（设置页可重新启用）", "disabled (re-enable in Settings)") : "")),
                         _mode == Mode.External && p.guid == _pluginKey ? _selItem : _item, GUILayout.Height(Sc(26)), GUILayout.ExpandWidth(true))) {
                     _mode = Mode.External;
+                    _scroll = Vector2.zero;
                 // 右键这一行即可绑定该插件的启用 / 禁用热键（组合键 / 序列都支持）
                     _pluginKey = p.guid;
                     NoPageScrollBars = false;
@@ -663,6 +665,7 @@ public partial class SR {
             GUI.backgroundColor = __setBg;
             if (__setClicked) {
                 _mode = Mode.Settings;
+                _scroll = Vector2.zero;   // 换页必须复位滚动位置，否则新页继承旧偏移
                 NoPageScrollBars = false;
                 _editText.Clear();
                 _editOpen.Clear();
@@ -690,6 +693,7 @@ public partial class SR {
                         try { if (fb.OnClick != null) fb.OnClick(); } catch (Exception __ex) { Guard.Log("底栏按钮", __ex); }
                         _mode = Mode.Internal;
                         _selectedInternalSection = fb.Id;
+                        _scroll = Vector2.zero;
                         NoPageScrollBars = false;
                         _editText.Clear();
                         _editOpen.Clear();
