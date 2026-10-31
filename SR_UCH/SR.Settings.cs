@@ -281,7 +281,8 @@ public partial class SR {
                             string kindRaw = issues[i].Kind;
                             string kindTxt = kindRaw == "补丁" ? T("补丁", "Patch") : kindRaw == "反射" ? T("反射", "Reflection") : kindRaw;
                             string tgt = issues[i].Target ?? "";
-                            float h = Mathf.Max(_label.CalcHeight(new GUIContent(tgt), Sc(320)), Sc(18));
+                            // 行高下限统一取核心 TableRowH()（与所有列表一致）。
+                            float h = Mathf.Max(_label.CalcHeight(new GUIContent(tgt), Sc(320)), Ctl.TableRowH());
                             GUILayout.BeginHorizontal();
                             GUILayout.Label("✗ " + kindTxt, _label, GUILayout.Width(Sc(64)), GUILayout.Height(h));
                             GUILayout.Label(tgt, _labelWrap, GUILayout.Width(Sc(320)), GUILayout.Height(h));
