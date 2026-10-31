@@ -701,7 +701,9 @@ public partial class Experiments : ITweak
         // 换场景：Level / 相机 / 光标 / 方块均为新对象，旧原值字典整体作废。
         private static void Reset() {
             _igScans = 0;
-            _cursorsAt = -9999; _lvCacheAt = -9999; _zcAt = -9999; _fixersAt = -9999;
+            // 不再把 *At 时间戳打成 -9999：Reset 由 dismiss 钩子频繁触发（面板开关/开局都会），
+            // 打掉时间戳等于让 Cursors()/Levels() 的缓存失效，每帧重新 FindObjectsOfType ——
+            // 这正是 tick 剖析里 关卡边界-应用 长期 4ms 的来源。场景换了对象自然为 null，调用方已有判空。
 
             _igScans = 0;
 
@@ -722,6 +724,8 @@ public partial class Experiments : ITweak
             _camDiagDone = false;
             _applied = false;
             Status = "（换场景：已重置，等待下次应用）";
+            // 注意：不要在这里清 _tick / _nextApplyAt —— 面板开关会频繁触发 Reset，
+            // 清掉它们等于让 2Hz 门限失效，于是每帧都跑一遍重活（tick 剖析里 4ms 就是这么来的）。
         }
 
         private static void Dismiss() {
