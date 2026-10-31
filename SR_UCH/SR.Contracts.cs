@@ -883,12 +883,23 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             // 列表可用高度：内容底界(pageBottomY) - 页面起点(pageTopY)，再按用户自定义高度夹取（entry 值 0 = 自动）。
             // 列表自适应高度（核心化）：可用高度与"内容高度"取小 —— 行少时不留空表格体，
             // 行多时才填满并滚动。所有列表都应走这一个出��口，避免各页自己算高度。
+            // fillViewport = true：底部贴着页面底的列表（如联机房间列表）始终填满可用高度，
+            // 随界面大小自适应；false：按内容自适应，或按 Table Height 配置固定（>0 生效）。
             public static float ListTableHeight(float pageBottomY, float pageTopY, ConfigEntryBase heightEntry,
-                                                float minH, int rowCount, float rowH, float headerH, float gripH) {
+                                                float minH, int rowCount, float rowH, float headerH, float gripH,
+                                                bool fillViewport = false) {
                 try {
                     float avail = TableFitHeight(pageBottomY, pageTopY, heightEntry, minH);
+                    if (fillViewport) return Mathf.Max(minH, avail);
                     float content = headerH + Mathf.Max(0, rowCount) * rowH + Mathf.Max(0f, gripH);
                     float h = Mathf.Min(avail, content);
+                    // 固定高度模式：配置 > 0 时以配置为准（仍不超过可用高度）。
+                    try {
+                        if (heightEntry != null) {
+                            int v = System.Convert.ToInt32(heightEntry.BoxedValue);
+                            if (v > 0) h = Mathf.Min(avail, Sc(v));
+                        }
+                    } catch { /* 读不到配置就按自适应 */ }
                     return Mathf.Max(minH, h);
                 } catch { return minH; }
             }

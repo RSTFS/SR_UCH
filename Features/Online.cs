@@ -489,7 +489,7 @@ namespace SR_UCH.Tweaks {
             // 与预设列表共用核心高度：min(可用, 表头 + 行数*行高 + 拖拽条)。
             float availH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableH, SRApi.Ctl.Sc(140),
                 _shownLobbies != null ? _shownLobbies.Count : 0, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f);
+                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, true);   // 底部贴页面底：始终填满
             // 高度由核心拖拽条直接写入配置，这里只按可用高度铺满。
             float boxH = availH;
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
