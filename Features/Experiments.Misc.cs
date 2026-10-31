@@ -27,6 +27,19 @@ public partial class Experiments : ITweak
                     DrawStatus(FreeCam.SpeedNote);
                 }
 
+                // 解锁帧率
+                GUILayout.Space(SRApi.Ctl.Sc(6));
+                SRApi.Ctl.SectionTitle("- " + SRApi.T("性能", "Performance") + " -",
+                    SRApi.T("解锁帧率：关闭垂直同步并把帧率上限设为不限制. 游戏 / 分辨率变化后会自动重新应用.",
+                        "Unlock framerate: turns off vSync and removes the frame cap. Re-applied automatically after scene or resolution changes."));
+                SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
+                    return e.Definition.Key == "Unlock Framerate";
+                });
+                if (UnlockFps.Note != null && UnlockFps.Note.Length > 0) {
+                    GUILayout.Space(SRApi.Ctl.Sc(2));
+                    DrawStatus(UnlockFps.Note);
+                }
+
                 // 跨平台联机：直接改游戏自己的 CrossPlatformToggle（反射定位，不绑版本）。
                 GUILayout.Space(SRApi.Ctl.Sc(6));
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("跨平台联机", "Cross-play") + " -",
@@ -305,6 +318,72 @@ public partial class Experiments : ITweak
             _savedFov = -1f;
         }
     }
+    // 实验 · 解锁帧率：关掉 vSync 并把 targetFrameRate 设为 -1（不限制）。
+    // 游戏在换场景 / 改分辨率 / 切窗口后会把这两个值改回去，所以启用期间每 1 秒复查一次。
+    // 关闭时恢复启用前抓到的原值（抓不到就用 Unity 默认：vSync=1、targetFrameRate=-1）。
+    internal static class UnlockFps {
+        internal static string Note = "";
+        private static ConfigEntry<bool> _on;
+        private static bool _armed;
+        private static bool _applied;
+        private static float _nextAt;
+        private static int _origTarget = int.MinValue;
+        private static int _origVsync = int.MinValue;
+
+        internal static void Init(IFeatureHost plugin) {
+            try {
+                _on = plugin.Config.Bind("Experiments", "Unlock Framerate", false,
+                    "解锁帧率。\n关闭垂直同步并把帧率上限设为不限制（-1）。\n换场景或改分辨率后会自动重新应用；关闭本项立即恢复原值。");
+                SRApi.LocKey("Experiments", "Unlock Framerate", "解锁帧率", "Unlock framerate");
+                SRApi.LocDesc("Experiments", "Unlock Framerate",
+                    "解锁帧率\n关掉垂直同步、取消帧率上限（-1）\n换场景或改分辨率后自动重新应用；关闭即恢复原值",
+                    "unlock framerate\nturns off vSync and removes the frame cap (-1)\nre-applied after scene or resolution changes; switching it off restores the previous values");
+                _armed = true;
+                SRApi.RegisterTick("解锁帧率", Tick);
+            } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率 初始化", __ex); }
+        }
+
+        private static void Tick() {
+            try {
+                if (!_armed) return;
+                bool want = SRApi.GateMaster && _on != null && _on.Value;
+                if (!want) {
+                    if (_applied) Restore();
+                    return;
+                }
+                float now = Time.unscaledTime;
+                if (_applied && now < _nextAt) return;
+                _nextAt = now + 1f;
+                if (!_applied) {
+                    try { _origTarget = Application.targetFrameRate; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/记 targetFrameRate", __ex); }
+                    try { _origVsync = QualitySettings.vSyncCount; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/记 vSyncCount", __ex); }
+                }
+                bool changed = false;
+                try { if (QualitySettings.vSyncCount != 0) { QualitySettings.vSyncCount = 0; changed = true; } } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/关 vSync", __ex); }
+                try { if (Application.targetFrameRate != -1) { Application.targetFrameRate = -1; changed = true; } } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/取消上限", __ex); }
+                if (!_applied) {
+                    _applied = true;
+                    Note = SRApi.T("已解锁帧率（vSync 关，帧率不限）", "Framerate unlocked (vSync off, no cap)");
+                    SRApi.LogInfo("[实验.性能] " + Note);
+                } else if (changed) {
+                    SRApi.LogInfo("[实验.性能] 检测到游戏改回帧率设置，已重新应用");
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率 Tick", __ex); }
+        }
+
+        private static void Restore() {
+            try {
+                int t = _origTarget == int.MinValue ? -1 : _origTarget;
+                int v = _origVsync == int.MinValue ? 1 : _origVsync;
+                try { Application.targetFrameRate = t; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/还原 targetFrameRate", __ex); }
+                try { QualitySettings.vSyncCount = v; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/还原 vSync", __ex); }
+                _applied = false;
+                Note = SRApi.T("已恢复原帧率设置", "Framerate settings restored");
+                SRApi.LogInfo("[实验.性能] " + Note);
+            } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率 还原", __ex); }
+        }
+    }
+
     // 实验 · 跨平台联机：反射定位游戏自己的 CrossPlatformToggle，读/写/尝试让游戏落盘。
     internal static class CrossPlay {
         private const string MemberName = "CrossPlatformToggle";

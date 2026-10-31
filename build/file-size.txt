@@ -7,5 +7,5 @@ SR_UCH/SR.Settings.cs=1309
 SR_UCH/SR.Core.cs=1254
 SR_UCH/SR.Ctl.cs=1117
 Features/BuildingPresets.cs=1091
-Features/HUD.cs=1014
+Features/HUD.cs=1036
 ../SR_UCH_EX/ExModule/ExModule.Core.cs=917

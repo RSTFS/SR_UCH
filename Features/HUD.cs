@@ -73,6 +73,12 @@ namespace SR_UCH.Tweaks {
                 DescEn = "Win target\nwinning score from the game settings\nfalls back to 250; hidden when off"
             },
             new ContentDef {
+                Key = "Show Fps", ColorKey = "Color Fps",
+                LabelZh = "帧率", LabelEn = "FPS",
+                DescZh = "帧率\n显示当前帧率（每 0.25 秒刷新一次，带一位小数）\n只在 HUD 可见时统计",
+                DescEn = "FPS\ncurrent frame rate, refreshed every 0.25s with one decimal\nonly measured while the HUD is visible"
+            },
+            new ContentDef {
                 Key = "Extra Line 1", ColorKey = "Color Extra 1",
                 LabelZh = "额外信息行 1", LabelEn = "Extra line 1",
                 DescZh = "额外信息行 1\n自定义文本，按原文显示（不翻译）\n留空则不显示",
@@ -112,6 +118,7 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<string> _colLevel;
         private static ConfigEntry<string> _colWin;
         private static ConfigEntry<string> _colExtra1;
+        private static ConfigEntry<string> _colFps;
         private static ConfigEntry<string> _colExtra2;
 
         // ---- 阶段/对局状态 ----
@@ -166,6 +173,13 @@ namespace SR_UCH.Tweaks {
         private static bool _wasVisible;
 
         // ---- 额外信息行 ----
+        // ---- 帧率 ----
+        private static string _fpsText;
+        private static float _fpsAccum;
+        private static int _fpsFrames;
+        private static float _fpsNextAt;
+        private static ConfigEntry<bool> _showFps;
+
         private static string _extra1Text;
         private static string _extra2Text;
 
@@ -498,6 +512,8 @@ namespace SR_UCH.Tweaks {
                 _colLevel = cfg.Bind(Sec, "Color Level", "#FFFFFF", "关卡/模式文字颜色（#RRGGBB）。");
                 _showWin = cfg.Bind(Sec, "Show Win Score", false, "显示获胜目标（默认关闭）。");
                 _colWin = cfg.Bind(Sec, "Color Win Score", "#FFFFFF", "获胜文字颜色（#RRGGBB）。");
+                _showFps = cfg.Bind(Sec, "Show Fps", false, "显示帧率（默认关闭；每 0.25 秒刷新一次）。");
+                _colFps = cfg.Bind(Sec, "Color Fps", "#FFFFFF", "帧率文字颜色（#RRGGBB）。");
                 _extra1 = cfg.Bind(Sec, "Extra Line 1", "", "额外信息行 1：按原文显示，留空则不显示。");
                 _colExtra1 = cfg.Bind(Sec, "Color Extra 1", "#FFFFFF", "额外信息行 1 文字颜色（#RRGGBB）。");
                 _extra2 = cfg.Bind(Sec, "Extra Line 2", "", "额外信息行 2：按原文显示，留空则不显示。");
@@ -771,6 +787,7 @@ namespace SR_UCH.Tweaks {
                 Color cRound = Col(_colRound, Color.white);
                 Color cLevel = Col(_colLevel, Color.white);
                 Color cWin = Col(_colWin, Color.white);
+                Color cFps = Col(_colFps, Color.white);
                 Color cExtra1 = Col(_colExtra1, Color.white);
                 Color cExtra2 = Col(_colExtra2, Color.white);
 
@@ -781,6 +798,7 @@ namespace SR_UCH.Tweaks {
                     if (ShowOn(_showRound) && !string.IsNullOrEmpty(_roundText)) AddSeg(cRound, _roundText);
                     if (ShowOn(_showLevel) && !string.IsNullOrEmpty(_levelText)) AddSeg(cLevel, _levelText);
                     if (ShowOn(_showWin) && !string.IsNullOrEmpty(_winText)) AddSeg(cWin, _winText);
+                    if (ShowOn(_showFps) && !string.IsNullOrEmpty(_fpsText)) AddSeg(cFps, _fpsText);
                     if (!string.IsNullOrEmpty(_extra1Text)) AddSeg(cExtra1, _extra1Text);
                     if (!string.IsNullOrEmpty(_extra2Text)) AddSeg(cExtra2, _extra2Text);
                 } else {
@@ -808,6 +826,10 @@ namespace SR_UCH.Tweaks {
                     if (ShowOn(_showWin) && !string.IsNullOrEmpty(_winText)) {
                         float f = SlotFadeChange(4, _winText);
                         AddLineFade(ref n, _winText, null, LineSmall, WithA(cWin, textA * f));
+                    }
+                    if (ShowOn(_showFps) && !string.IsNullOrEmpty(_fpsText)) {
+                        float fF = SlotFadeChange(7, _fpsText);
+                        AddLineFade(ref n, _fpsText, null, LineSmall, WithA(cFps, textA * fF));
                     }
                     if (!string.IsNullOrEmpty(_extra1Text)) {
                         float f = SlotFadeChange(5, _extra1Text);

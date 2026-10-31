@@ -34,6 +34,7 @@ public partial class Experiments : ITweak
             InitCleanup(plugin);
             // 跨平台联机开关：初始化时探测一次把定位结果写日志（功能本体在 CrossPlay 里）。
             try { CrossPlay.Init(); } catch (Exception __cp) { SRApi.Guard.Log("跨平台联机 初始化", __cp); }
+            try { UnlockFps.Init(plugin); } catch (Exception __uf) { SRApi.Guard.Log("解锁帧率 初始化", __uf); }
         }
 }
 }

@@ -37,6 +37,7 @@ public partial class HUD {
         }
         private static void Tick() {
             try {
+                UpdateFps();
                 if (!IsEnabled()) {
                     _hasGame = false;
                     _inLobby = false;
@@ -98,6 +99,26 @@ public partial class HUD {
                 UpdateVisible();
             } catch (Exception __ex) { SRApi.Guard.Log("HUD 状态更新", __ex); }
         }
+        // 帧率：每 0.25 秒结算一次（按 unscaled 时间累加，统计的是真实渲染节奏）。
+        private static void UpdateFps() {
+            try {
+                if (!ShowOn(_showFps)) { if (_fpsText != null) _fpsText = null; return; }
+                float dt = Time.unscaledDeltaTime;
+                if (dt <= 0f) return;
+                _fpsAccum += dt;
+                _fpsFrames++;
+                float now = Time.unscaledTime;
+                if (now < _fpsNextAt) return;
+                if (_fpsAccum > 0.0001f && _fpsFrames > 0) {
+                    float fps = _fpsFrames / _fpsAccum;
+                    _fpsText = "FPS " + fps.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+                }
+                _fpsAccum = 0f;
+                _fpsFrames = 0;
+                _fpsNextAt = now + 0.25f;
+            } catch (Exception __ex) { SRApi.Guard.Log("HUD/帧率", __ex); }
+        }
+
         private static void UpdateVisible() {
             bool keyVis;
             try {
