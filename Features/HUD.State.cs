@@ -315,12 +315,25 @@ public partial class HUD {
         private static void UpdateRoundNotice() {
             try {
                 int round = _trueRound;
-                if (round <= 0 || round == _lastRound) return;
-                _lastRound = round;
-                if (!RoundNoticeOn()) return;
-                _roundNoticeText = RoundWord() + round;
-                _roundNoticeStart = Time.unscaledTime;
-            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                // 只有"回合真的前进"才重新触发提示：以前只要值不等就重置计时，
+                // _trueRound 在两个值之间抖动时提示会永远重来（用户反馈：回合提示不消失）。
+                if (round > _lastRound) {
+                    _lastRound = round;
+                    if (RoundNoticeOn()) {
+                        _roundNoticeText = RoundWord() + round;
+                        _roundNoticeStart = Time.unscaledTime;
+                    }
+                } else if (round < _lastRound) {
+                    // 回退（新对局/重载）：同步基准并立刻收起旧提示，不再重播一次。
+                    _lastRound = round;
+                    _roundNoticeText = null;
+                }
+                // 兜底：到点一定清掉，避免任何异常路径把它留在屏幕上。
+                if (!string.IsNullOrEmpty(_roundNoticeText)
+                    && Time.unscaledTime - _roundNoticeStart >= RoundNoticeDuration) {
+                    _roundNoticeText = null;
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("HUD/回合提示", __ex); }
         }
         private static LevelPortal FindLeadingPortal(LobbyManager lm, out int votes) {
             votes = 0;

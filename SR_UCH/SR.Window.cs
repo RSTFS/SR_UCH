@@ -585,7 +585,7 @@ public partial class SR {
                     if (!any) GUILayout.Label(T("（无匹配条目）", "(no matching entries)"), _label);
                 }
             } else if (_mode == Mode.Settings) {
-                RenderSettingsEntries(colWidth);   // 外部插件清单在界面分组之后渲染
+                RenderSettingsPage(colWidth);   // 通用 / 自检 两页（自检页含诊断浮层开关）
             } else {
                 PluginEntry curExt = CurrentExternalPlugin();
                 if (curExt != null) {
@@ -697,8 +697,6 @@ public partial class SR {
             GUILayout.EndArea();
 
             DrawResizeGripAndCursor(winRect, mouse, gripRect);
-            DrawDiagOverlay();
-            SRApi.DiagLines.Clear();   // 帧末清空：功能可在任意时机写入，下一帧浮层显示
             DrawTooltip(mouse);
             } finally {
                 GUI.matrix = prevMatrix; GUI.color = prevColor; GUI.skin.font = SR.Ctl.OrigSkinFont() ?? _prevFont;
@@ -765,5 +763,64 @@ public partial class SR {
             }
         }
 
+    }
+
+    // 诊断浮层宿主：独立 MonoBehaviour，**面板关闭时也显示**，只有设置里的开关能关掉它。
+    // 样式贴近 HUD：圆角深色面板 + 标题行 + 等宽小字内容。写屏后清空 DiagLines（唯一清空点）。
+    internal sealed class SrDiagOverlay : MonoBehaviour {
+        private static SrDiagOverlay _host;
+        private static GUIStyle _diagTitle;
+        private static GUIStyle _diagBody;
+
+        internal static void Ensure() {
+            if (_host != null) return;
+            try {
+                GameObject go = new GameObject("SR_UCH.DiagOverlay");
+                UnityEngine.Object.DontDestroyOnLoad(go);
+                _host = go.AddComponent<SrDiagOverlay>();
+            } catch (Exception __ex) { SR.Guard.Log("诊断浮层/创建", __ex); }
+        }
+
+        private void OnGUI() {
+            try {
+                if (!SR.DiagEnabled) { SRApi.DiagLines.Clear(); return; }
+                List<string> lines = SRApi.DiagLines;
+                if (lines == null || lines.Count == 0) return;
+
+                if (_diagTitle == null) {
+                    _diagTitle = new GUIStyle(GUI.skin.label);
+                    _diagTitle.fontSize = Mathf.Max(11, Mathf.RoundToInt(12f * SRApi.Ctl.Sc(1f)));
+                    _diagTitle.normal.textColor = new Color(1f, 0.86f, 0.42f, 1f);
+                    _diagBody = new GUIStyle(GUI.skin.label);
+                    _diagBody.fontSize = Mathf.Max(10, Mathf.RoundToInt(11f * SRApi.Ctl.Sc(1f)));
+                    _diagBody.wordWrap = true;
+                    _diagBody.normal.textColor = new Color(0.92f, 0.92f, 0.95f, 1f);
+                }
+
+                float w = Mathf.Min(Screen.width - 20f, Mathf.Max(260f, 460f * SRApi.Ctl.Sc(1f)));
+                float innerW = w - 12f;
+                float titleH = 16f;
+                float total = titleH + 6f;
+                for (int i = 0; i < lines.Count; i++) total += _diagBody.CalcHeight(new GUIContent(lines[i]), innerW) + 1f;
+                float maxH = Screen.height * 0.6f;
+                float boxH = Mathf.Min(total + 10f, maxH);
+
+                Rect box = new Rect(8f, 8f, w, boxH);
+                // HUD 同款：半透明深色圆角面板。
+                SR.DrawRounded(box, new Color(0.06f, 0.06f, 0.07f, 0.82f), SRApi.Ctl.ThemeRadius);
+                GUI.Label(new Rect(box.x + 6f, box.y + 4f, innerW, titleH), "SR DIAG", _diagTitle);
+
+                float cy = box.y + 4f + titleH + 4f;
+                float bottom = box.yMax - 4f;
+                for (int i = 0; i < lines.Count; i++) {
+                    string s = lines[i];
+                    float hh = _diagBody.CalcHeight(new GUIContent(s), innerW);
+                    if (cy + hh > bottom) break;   // 超出面板高度就截断（不画到窗口外）
+                    GUI.Label(new Rect(box.x + 6f, cy, innerW, hh), s, _diagBody);
+                    cy += hh + 1f;
+                }
+                lines.Clear();   // 写完清空：下一帧重新由功能写入
+            } catch (Exception __ex) { SR.Guard.Log("诊断浮层/绘制", __ex); }
+        }
     }
 }

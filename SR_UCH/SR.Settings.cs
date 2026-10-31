@@ -105,12 +105,31 @@ public partial class SR {
             return null;
         }
 
+        internal static int SettingsTab;   // 0 = 通用，1 = 自检
+        private static Vector2 _scrollIssues;   // 自检页表格的滚动位置
+
+        // 设置页入口：顶部两个页签，下面按页签渲染。页面切换只改这个字段，不重建任何配置。
+        internal static void RenderSettingsPage(float colWidth) {
+            try {
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button(T("通用", "General"), SettingsTab == 0 ? _selItem : _item, GUILayout.Height(Sc(26)))) SettingsTab = 0;
+                if (GUILayout.Button(T("自检", "Self-check"), SettingsTab == 1 ? _selItem : _item, GUILayout.Height(Sc(26)))) SettingsTab = 1;
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
+                GUILayout.Space(Sc(4));
+                if (SettingsTab == 1) RenderAuditBlock();
+                else RenderSettingsEntries(colWidth);
+            } catch (Exception __ex) { Guard.Log("设置页", __ex); }
+        }
+
         private static void RenderSettingsEntries(float colWidth) {
             string lastGroup = null;
             bool any = false;
             bool pluginListDrawn = false;
             foreach (ConfigEntryBase entry in SettingsEntries()) {
                 any = true;
+                // 诊断浮层开关属于"自检"页（与补丁/反射信息放一起），通用页不再重复显示。
+                if (entry.Definition.Key == "Show Diagnostics") continue;
                 //栏目宽度专用行：滑块 + [-]/[+] 步进
                 if (entry.Definition.Key == Keys.SidebarWidth) { RenderSidebarWidthRow(); continue; }
                 string g = SettingsGroup(entry.Definition.Key);
@@ -181,6 +200,10 @@ public partial class SR {
             try {
                 GUILayout.Space(Sc(6));
                 GUILayout.Label("- " + T("自检", "Self-check") + " -", _secHeader);
+                // 诊断浮层开关（独立常驻浮层：面板关闭也显示，关掉开关才消失）。
+                SRApi.RenderSectionEntries(Keys.Settings, delegate (ConfigEntryBase e) {
+                    return e.Definition.Key == "Show Diagnostics";
+                });
                 // 一键导出：复制到剪贴板 / 写进日志（两者都不依赖用户去找文件）。
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button(T("复制诊断", "Copy report"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
@@ -206,14 +229,23 @@ public partial class SR {
                 } else {
                     AuditLabel(T("以下目标已失效 -> 对应功能不会生效（开关还在、行为没了）：",
                         "These targets no longer exist - the listed features will NOT work:"));
+                    // 固定高度表格：类型 / 目标 / 所属范围，超出滚动（不再逐行撑高页面）。
+                    float tbH = Sc(150f);
+                    _scrollIssues = GUILayout.BeginScrollView(_scrollIssues, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
+                        GUIStyle.none, GUILayout.Height(tbH));
                     for (int i = 0; i < issues.Count; i++) {
-                        //AuditIssue.Kind 取值是中文（"补丁" / "反射"），须映射为当前语言；未知取值原样输出。
                         string kindRaw = issues[i].Kind;
                         string kindTxt = kindRaw == "补丁" ? T("补丁", "Patch")
                                        : kindRaw == "反射" ? T("反射", "Reflection")
                                        : kindRaw;
-                        AuditLabel("   ✗  " + kindTxt + "  " + issues[i].Target + "   <- " + issues[i].Scope);
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Label("✗ " + kindTxt, _label, GUILayout.Width(Sc(64)), GUILayout.Height(Sc(20)));
+                        GUILayout.Label(issues[i].Target ?? "", _label, GUILayout.Width(Sc(320)), GUILayout.Height(Sc(20)));
+                        GUILayout.Label(issues[i].Scope ?? "", _label, GUILayout.Height(Sc(20)));
+                        GUILayout.FlexibleSpace();
+                        GUILayout.EndHorizontal();
                     }
+                    GUILayout.EndScrollView();
                 }
                 //显示当前生效的扩展点数量，便于外部模块对接时确认是否接上。
                 AuditLabel(T("扩展点", "Extension points") + "："
