@@ -138,7 +138,6 @@ public partial class SR {
         internal static int SettingsTab;   // 0 = 通用，1 = 自检
         private static Vector2 _scrollIssues;   // 自检页表格的滚动位置
         private static Vector2 _scrollHooks;
-        private static bool _auditExpanded;   // 全绿时默认收起细节    // 自检页帧钩子表格的滚动位置
 
         // 设置页入口：顶部两个页签，下面按页签渲染。页面切换只改这个字段，不重建任何配置。
         internal static void RenderSettingsPage(float colWidth) {
@@ -242,7 +241,13 @@ public partial class SR {
                              : T(bad + " 项失效：开关还在，行为没了", bad + " broken target(s): the switches remain, the behaviour is gone"),
                     delegate {
                         GUILayout.BeginHorizontal();
-                        if (GUILayout.Button(T("重新扫描", "Rescan"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) { _auditExpanded = !_auditExpanded; }
+                        if (GUILayout.Button(T("重新扫描", "Rescan"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
+                            // 真正重新采集：重扫 Harmony 补丁表并重建归因快照（不是只切展开状态）。
+                            try {
+                                SR.ScanPatches();
+                                SR.Notify(T("已重新扫描补丁与归因", "Patches and attribution rescanned"));
+                            } catch (Exception __rs) { Guard.Log("自检/重新扫描", __rs); }
+                        }
                         if (GUILayout.Button(T("复制报告", "Copy report"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
                             string rep = BuildDiagnosticReport();
                             bool ok = false;
