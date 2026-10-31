@@ -172,6 +172,7 @@ public partial class SR {
                     }
                 }
                 sb.AppendLine(SR.TickProfileReport());
+                sb.AppendLine(SR.AttributionReport());
             } catch (Exception __ex) { Guard.Log("生成诊断报告", __ex); }
             return sb.ToString();
         }
@@ -255,6 +256,20 @@ public partial class SR {
                     AuditLabel(T("帧钩子耗时（滑动平均）", "Frame hooks (moving average)"));
                     AuditLabel(tickRep);
                 }
+                // 补丁归因：谁还在改同一个方法（装了别的 mod 后行为变怪时先看这里）。
+                GUILayout.Space(Sc(4));
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(T("补丁归因（谁在改同一个方法）", "Patch attribution (who else patches it)"), _label);
+                if (GUILayout.Button(T("重新扫描", "Rescan"), _btn, GUILayout.Width(Sc(84)), GUILayout.Height(Sc(24)))) {
+                    SR.ScanPatches();
+                    SR.Notify(T("补丁归因已重新扫描", "Patch attribution rescanned"));
+                }
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
+                string attrRep = SR.AttributionReport();
+                AuditLabel(string.IsNullOrEmpty(attrRep)
+                    ? T("（启动 3 秒后自动扫描；当前可能还没有其它 mod 打补丁）", "(scans 3s after startup; no other patching mods yet)")
+                    : attrRep);
                 if (SR.Guard.WarnCount > 0) {
                     AuditLabel(T("运行时异常次数", "Runtime errors") + "：" + SR.Guard.WarnCount);
                     if (!string.IsNullOrEmpty(SR.Guard.LastWhat)) {

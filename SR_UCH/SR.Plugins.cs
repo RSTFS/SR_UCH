@@ -2,8 +2,10 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
 using BepInEx;
 using BepInEx.Bootstrap;
+using HarmonyLib;
 using BepInEx.Configuration;
 using UnityEngine;
 
@@ -202,5 +204,174 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("外部插件清单渲染", __ex); }
         }
 
+
+        // ============================================================
+        // 分区：补丁归因（谁改了同一个游戏方法）
+        // 目的：自检只能证明"我们的目标存在"，不能证明"别人也在改同一个方法"。
+        // 这里用 Harmony 自带的全局补丁表，把每个被改方法的补丁按"声明程序集"分组，
+        // 分出"我们 / 其它 mod"，并把其它 mod 还原成 GUID+版本（经 Chainloader 查表）。
+        // 只读查询，不改任何补丁；扫描推迟到启动 3 秒后（等其它插件打完补丁）。
+        // ============================================================
+
+        private sealed class SharedMethodInfo {
+            public string Signature;
+            public List<string> Owners = new List<string>();
+        }
+
+        private static readonly List<SharedMethodInfo> _sharedMethods = new List<SharedMethodInfo>();
+        private static readonly List<string> _foreignPatchers = new List<string>();
+        private static readonly Dictionary<Assembly, string> _modLabels = new Dictionary<Assembly, string>();
+        private static int _attrPatched;
+        private static int _attrOurs;
+        private static int _attrShared;
+        private static bool _attrDone;
+        private static bool _attrArmed;
+        private static float _attrAt;
+        internal static string AttributionError = "";
+
+        internal static bool AttributionReady { get { return _attrDone; } }
+
+        internal static void InitAttribution() {
+            try {
+                _attrArmed = true;
+                _attrAt = Time.unscaledTime + 3f;
+                RegisterTick("补丁归因", TickAttribution);
+            } catch (Exception __ex) { Guard.Log("补丁归因 初始化", __ex); }
+        }
+
+        private static void TickAttribution() {
+            try {
+                if (!_attrArmed || Time.unscaledTime < _attrAt) return;
+                _attrArmed = false;
+                ScanPatches();
+            } catch (Exception __ex) { Guard.Log("补丁归因 Tick", __ex); }
+        }
+
+        // 把程序集还原成"插件名 版本"；查不到就退回程序集名。结果缓存（同一程序集只算一次）。
+        private static string ModLabel(Assembly asm) {
+            if (asm == null) return "?";
+            string hit;
+            if (_modLabels.TryGetValue(asm, out hit)) return hit;
+            string label = null;
+            try {
+                foreach (KeyValuePair<string, PluginInfo> kv in Chainloader.PluginInfos) {
+                    PluginInfo pi = kv.Value;
+                    if (pi == null || pi.Instance == null) continue;
+                    Assembly pa = null;
+                    try { pa = pi.Instance.GetType().Assembly; } catch (Exception __pa) { Guard.Log("补丁归因/取插件程序集", __pa); }
+                    if (pa != asm) continue;
+                    string name = pi.Metadata != null ? pi.Metadata.Name : kv.Key;
+                    string ver = pi.Metadata != null ? pi.Metadata.Version.ToString() : "";
+                    label = string.IsNullOrEmpty(ver) ? name : (name + " " + ver);
+                    break;
+                }
+            } catch (Exception __ex) { Guard.Log("补丁归因/查插件表", __ex); }
+            if (string.IsNullOrEmpty(label)) {
+                try { label = asm.GetName().Name; } catch { label = "?"; }
+            }
+            _modLabels[asm] = label;
+            return label;
+        }
+
+        private static string MethodSignature(MethodBase m) {
+            try {
+                string type = m.DeclaringType != null ? m.DeclaringType.Name : "?";
+                return type + "." + m.Name;
+            } catch { return "?"; }
+        }
+
+        private static void CollectPatches(Patches info, List<Patch> into) {
+            if (info == null) return;
+            if (info.Prefixes != null) into.AddRange(info.Prefixes);
+            if (info.Postfixes != null) into.AddRange(info.Postfixes);
+            if (info.Transpilers != null) into.AddRange(info.Transpilers);
+            if (info.Finalizers != null) into.AddRange(info.Finalizers);
+        }
+
+        internal static void ScanPatches() {
+            try {
+                AttributionError = "";
+                _sharedMethods.Clear();
+                _foreignPatchers.Clear();
+                _modLabels.Clear();
+                _attrPatched = 0;
+                _attrOurs = 0;
+                _attrShared = 0;
+
+                Assembly ours = typeof(SR).Assembly;
+                System.Collections.IEnumerable all = null;
+                try {
+                    MethodInfo gam = typeof(Harmony).GetMethod("GetAllPatchedMethods",
+                        BindingFlags.Public | BindingFlags.Static);
+                    if (gam != null) all = gam.Invoke(null, null) as System.Collections.IEnumerable;
+                } catch (Exception __gm) { Guard.Log("补丁归因/取全局补丁表", __gm); }
+                if (all == null) { AttributionError = "当前 Harmony 不支持 GetAllPatchedMethods()"; _attrDone = true; return; }
+
+                HashSet<string> foreignSet = new HashSet<string>();
+                List<Patch> buf = new List<Patch>(8);
+                foreach (object o in all) {
+                    MethodBase m = o as MethodBase;
+                    if (m == null) continue;
+                    _attrPatched++;
+                    Patches info = null;
+                    try { info = Harmony.GetPatchInfo(m); } catch (Exception __pi) { Guard.Log("补丁归因/取补丁信息 " + MethodSignature(m), __pi); continue; }
+                    if (info == null) continue;
+
+                    buf.Clear();
+                    CollectPatches(info, buf);
+
+                    bool mine = false;
+                    List<string> foreign = null;
+                    for (int i = 0; i < buf.Count; i++) {
+                        Patch p = buf[i];
+                        Assembly asm = null;
+                        try { asm = p.PatchMethod != null && p.PatchMethod.DeclaringType != null ? p.PatchMethod.DeclaringType.Assembly : null; }
+                        catch (Exception __asm) { Guard.Log("补丁归因/取声明程序集", __asm); }
+                        if (asm == ours) { mine = true; continue; }
+                        string label = ModLabel(asm);
+                        if (foreign == null) foreign = new List<string>();
+                        if (!foreign.Contains(label)) foreign.Add(label);
+                        if (foreignSet.Count < 64) foreignSet.Add(label);
+                    }
+                    if (mine) _attrOurs++;
+                    if (foreign != null && foreign.Count > 0) {
+                        _attrShared++;
+                        if (_sharedMethods.Count < 40)
+                            _sharedMethods.Add(new SharedMethodInfo { Signature = MethodSignature(m), Owners = foreign });
+                    }
+                }
+                foreach (string s in foreignSet) _foreignPatchers.Add(s);
+                _foreignPatchers.Sort(StringComparer.OrdinalIgnoreCase);
+                _sharedMethods.Sort(delegate (SharedMethodInfo a, SharedMethodInfo b) { return string.CompareOrdinal(a.Signature, b.Signature); });
+                _attrDone = true;
+                LogInfo("[补丁归因] 扫描 " + _attrPatched + " 个被改方法：我们参与 " + _attrOurs + "，其它 mod 参与 " + _attrShared
+                    + ( _foreignPatchers.Count > 0 ? "；其它 mod：" + string.Join(", ", _foreignPatchers.ToArray()) : ""));
+            } catch (Exception __ex) {
+                AttributionError = __ex.Message;
+                Guard.Log("补丁归因/扫描", __ex);
+            }
+        }
+
+        // 供诊断页与报告使用：多行文本。
+        internal static string AttributionReport() {
+            try {
+                if (!_attrDone) return "";
+                if (!string.IsNullOrEmpty(AttributionError)) return "补丁归因不可用：" + AttributionError;
+                StringBuilder sb = new StringBuilder();
+                sb.Append("补丁归因：扫描 ").Append(_attrPatched).Append(" 个被改方法，本模组参与 ").Append(_attrOurs)
+                  .Append(" 个，另有其它 mod 参与 ").Append(_attrShared).AppendLine(" 个");
+                if (_foreignPatchers.Count > 0) {
+                    sb.Append("其它改动游戏方法的 mod：").AppendLine(string.Join(", ", _foreignPatchers.ToArray()));
+                }
+                for (int i = 0; i < _sharedMethods.Count; i++) {
+                    SharedMethodInfo s = _sharedMethods[i];
+                    sb.Append("  ").Append(s.Signature).Append("  <- ").AppendLine(string.Join(", ", s.Owners.ToArray()));
+                }
+                if (_sharedMethods.Count == 0 && _foreignPatchers.Count == 0) {
+                    sb.AppendLine("目前只有本模组在打补丁。");
+                }
+                return sb.ToString();
+            } catch (Exception __ex) { Guard.Log("补丁归因/报告", __ex); return ""; }
+        }
     }
 }
