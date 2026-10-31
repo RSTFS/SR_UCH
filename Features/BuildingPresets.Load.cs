@@ -589,21 +589,24 @@ namespace SR_UCH.Tweaks {
         // 25 秒未消费则清掉本次写入的 XML，避免污染下一次原生开局。
         private static IEnumerator TreehouseLoadWatchdog(string name, string expectedXml) {
             float startedAt = Time.unscaledTime;
-            bool consumed = false;
+            // 三种结局必须分开（评审 P0-A1）：以前"变了"和"被取走"都算 consumed，
+            // 于是别的预设/别的功能把字段覆盖掉时，会误判成"本预设已被游戏消费"。
+            int outcome = 0;   // 0=超时 1=被游戏取走 2=被别的内容替换
             while (Time.unscaledTime - startedAt < PresetConsumeTimeout) {
                 string remaining = null;
                 try { remaining = QuickSaver.levelPortalXml; } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取树屋预设XML", __ex); }
-                if (string.IsNullOrEmpty(remaining) || remaining != expectedXml) {
-                    consumed = true;
-                    break;
-                }
+                if (string.IsNullOrEmpty(remaining)) { outcome = 1; break; }
+                if (!ReferenceEquals(remaining, expectedXml) && remaining != expectedXml) { outcome = 2; break; }
                 yield return null;
             }
-            if (!consumed) {
+            if (outcome == 0) {
                 try {
                     if (QuickSaver.levelPortalXml == expectedXml) QuickSaver.levelPortalXml = null;
                 } catch (Exception __ex) { SRApi.Guard.Log("布局预设/清理树屋超时预设XML", __ex); }
                 SRApi.LogWarn("[布局预设] 树屋加载后预设 XML 未被游戏消费（可能开局失败），已清掉: " + name);
+            } else if (outcome == 2) {
+                // 别人写入了新内容：不要清它（那是别人的），但要说清"本次预设没有生效"。
+                SRApi.LogWarn("[布局预设] 待消费的预设 XML 已被其它加载覆盖，本次预设可能没有生效: " + name);
             }
             SetReloadBusy(false);
         }

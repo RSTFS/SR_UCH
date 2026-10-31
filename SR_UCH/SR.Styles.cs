@@ -92,10 +92,11 @@ public partial class SR {
                 _fontNextTryAt = Time.unscaledTime + 3f;
             } else {
                 _fontFailSize = -1;               //清除失败记录
-                //GUI.skin 为全局共享皮肤（ConfigurationManager 等同样使用），改动前须记录原始值。
+                //GUI.skin 为全局共享皮肤（ConfigurationManager 等同样使用）。
+                //这里只"记录原值"，不再写皮肤：字体由 SR.Window 在自己的 try 里应用、finally 里还原，
+                //否则创建字体这一步就会把全局皮肤改掉（评审 G7：跨模组污染、且失败路径也会赋值）。
                 try {
                     if (_origSkinFont == null) _origSkinFont = GUI.skin.font;
-                    GUI.skin.font = _font;
                 } catch (Exception __ex) { Guard.Log("EnsureFont", __ex); }
                 //销毁旧字体，避免逐档泄漏
                 if (old != null && !ReferenceEquals(old, _font)) UnityEngine.Object.Destroy(old);

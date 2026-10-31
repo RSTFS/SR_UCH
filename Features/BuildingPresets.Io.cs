@@ -331,7 +331,28 @@ namespace SR_UCH.Tweaks {
                 if (p == null) return;
                 if (p.IsLocal) return; // 游戏本地存档不允许从这里删除
                 if (!ActionAllowed()) return;
-                if (File.Exists(p.FilePath)) File.Delete(p.FilePath);
+                // 先删文件，再同步内存列表与索引：只删文件的话，列表这一帧还显示它、
+                // 下一次磁盘扫描又会把它从 index.json 复活（评审 P0-A2）。
+                bool existed = false;
+                try { existed = File.Exists(p.FilePath); } catch (Exception __fe) { SRApi.Guard.Log("布局预设/删除前检查", __fe); }
+                if (existed) {
+                    try { File.Delete(p.FilePath); }
+                    catch (Exception __df) {
+                        SRApi.Guard.Log("布局预设/删除文件", __df);
+                        SRApi.Notify(SRApi.T("删除失败：文件被占用？", "Delete failed: file in use?"));
+                        return;   // 文件没删掉就不要动索引，避免"索引说没了、磁盘还在"
+                    }
+                }
+                for (int i = _presets.Count - 1; i >= 0; i--) {
+                    PresetInfo it = _presets[i];
+                    if (it == null) { _presets.RemoveAt(i); continue; }
+                    if (ReferenceEquals(it, p) || it.Key == p.Key) _presets.RemoveAt(i);
+                }
+                _visibleCache = null;
+                SaveIndex();
+                _status = SRApi.T("已删除预设：", "Deleted preset: ") + (p.Name ?? "");
+                SRApi.Notify(_status);
+                SRApi.LogInfo("[布局预设] " + _status);
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/删除", __ex);
             }
