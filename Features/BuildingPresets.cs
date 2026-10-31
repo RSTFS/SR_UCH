@@ -137,6 +137,7 @@ namespace SR_UCH.Tweaks {
         private static readonly string[] _cells = new string[ColCount];
         private static SRApi.TableArgs _args;
         private static Vector2 _scrollRows;
+        private static float _wheelDiagAt;   // 滚轮诊断日志节流
         private static Vector2 _scrollCols;   // 诊断：每帧只记一次滚轮事件
         private static Rect _tableBox;     // 表格在屏幕上的矩形（页面级滚轮钩子按它判断是否滚表格）
         private static float _maxScrollX;
@@ -379,6 +380,13 @@ namespace SR_UCH.Tweaks {
         // 页面级滚轮：鼠标在表格矩形内就把滚轮换算成行滚动（与核心 TableWheelInput 同一套系数）。
         private static bool OnPresetWheel(Vector2 mouse, float wheel) {
             try {
+                // 诊断：每秒最多一条，记录命中判定与可滚范围（滚不动时靠这一行定位）。
+                if (Time.unscaledTime - _wheelDiagAt > 1f) {
+                    _wheelDiagAt = Time.unscaledTime;
+                    SRApi.LogInfo("[布局预设] 滚轮 box=" + _tableBox + " mouse=" + mouse + " hit=" + _tableBox.Contains(mouse)
+                        + " maxY=" + _maxScrollY.ToString("0.0") + " rows=" + VisiblePresets().Count
+                        + " rowH=" + SRApi.Ctl.TableRowH().ToString("0.0"));
+                }
                 if (_tableBox.width <= 0f || !_tableBox.Contains(mouse)) return false;
                 // 不依赖 RenderPresetTable 里算出的 _maxScrollY（那一帧可能还没跑或窗口刚变过），
                 // 直接用表格框的实时高度重算可滚动范围，避免"范围算成 0 就滚不动"。
@@ -414,7 +422,7 @@ namespace SR_UCH.Tweaks {
                 if (Event.current != null && Event.current.type == EventType.Layout) { _pageTopY = topProbe.y; }
 
                 // 分区 1：保存（名称 + 保存，紧凑一行）。
-                SRApi.Ctl.SectionTitle(SRApi.T("- 保存 -", "- Save -"));
+                SRApi.Ctl.SectionTitle(SRApi.T("- 保存 / 导入 / 导出 -", "- Save / Import / Export -"));
                 GUILayout.BeginHorizontal();
                 try {
                     SRApi.Ctl.LabelAuto(SRApi.T("预设名称", "Preset name"));
@@ -428,7 +436,6 @@ namespace SR_UCH.Tweaks {
                 }
 
                 // 分区 2：导入 / 导出（XML 路径单独一行；下一行为 路径导入 / 剪贴板导入 / 全部导出）。
-                SRApi.Ctl.SectionTitle(SRApi.T("- 导入 / 导出 -", "- Import / Export -"));
                 GUILayout.BeginHorizontal();
                 try {
                     SRApi.Ctl.LabelAuto(SRApi.T("XML 路径", "XML path"));
@@ -473,11 +480,11 @@ namespace SR_UCH.Tweaks {
                         GUILayout.Width(W(120)), GUILayout.Height(W(24)));
                     if (q != null && q != _search) _search = q;
                     GUILayout.Space(W(8));
-                    SRApi.Ctl.LabelAuto(SRApi.T("类型", "Type"));
-                    RenderTypeFilterCombo();
-                    GUILayout.Space(W(8));
                     SRApi.Ctl.LabelAuto(SRApi.T("排序", "Sort"));
                     RenderSortCombo();
+                    GUILayout.Space(W(8));
+                    SRApi.Ctl.LabelAuto(SRApi.T("加载", "Load"));
+                    RenderLoadModeCombo();
                     GUILayout.Space(W(7));
                     if (GUILayout.Button(SRApi.Ctl.Content(SRApi.T("刷新", "Refresh"),
                             SRApi.T("重新扫描预设目录（手动放入/删除了 XML 时用），也用于重建索引",
@@ -491,15 +498,14 @@ namespace SR_UCH.Tweaks {
                 }
                 GUILayout.BeginHorizontal();
                 try {
+                    SRApi.Ctl.LabelAuto(SRApi.T("类型", "Type"));
+                    RenderTypeFilterCombo();
+                    GUILayout.Space(W(8));
                     SRApi.Ctl.LabelAuto(SRApi.T("关卡", "Level"));
                     RenderLevelFilterCombo();
                     GUILayout.Space(W(8));
                     SRApi.Ctl.LabelAuto(SRApi.T("模式", "Mode"));
                     RenderModeFilterCombo();
-                    GUILayout.Space(W(8));
-                    SRApi.Ctl.LabelAuto(SRApi.T("加载模式", "Load mode"));
-                    RenderLoadModeCombo();
-                    // 用户要求：删掉「加载模式」右侧的数据按钮（它打开的是游戏原生规则书界面）。
                     GUILayout.FlexibleSpace();
                 } finally {
                     GUILayout.EndHorizontal();

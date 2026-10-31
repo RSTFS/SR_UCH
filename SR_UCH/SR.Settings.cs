@@ -386,7 +386,7 @@ public partial class SR {
                 // 先算标题高，再让整行至少和标题同高：以前行高写死 20px，两行标题被行裁掉。
                 float __titleH0 = Mathf.Max(Sc(20), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)));
                 // 结论行（「38/38 补丁 · 40/40 反射…」这类）同样会换行：两者取高，否则结论被 20px 行裁掉。
-                float __sumH0 = Mathf.Max(Sc(20), _labelWrap.CalcHeight(new GUIContent(summary), Sc(260)));
+                float __sumH0 = Mathf.Max(Sc(20), _label.CalcHeight(new GUIContent(summary), 99999f) + Sc(2));   // 不换行：宽度自适应，高度只留 2px 缓冲
                 GUILayout.BeginHorizontal(GUILayout.Height(Mathf.Max(__titleH0, __sumH0)));
                 Color prev = GUI.color;
                 try {
@@ -396,7 +396,7 @@ public partial class SR {
                 // 标题自适应高度：长标题换行显示，不再被固定 20px 截断。
                 float __titleH = Mathf.Max(Sc(22), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)) );   // 高度不再加额外内边距：真正的原因是外层行高被写死 20px
                 GUILayout.Label(title, _labelWrap, GUILayout.Width(Sc(120)), GUILayout.Height(__titleH));
-                GUILayout.Label(summary, _labelWrap, GUILayout.Height(__sumH0));
+                GUILayout.Label(summary, _label, GUILayout.Height(__sumH0));
                 GUILayout.FlexibleSpace();
                 if (canExpand) {
                     // 详情按钮跟随标题高度：标题换行变高时按钮不会缩在 20px 里显得错位。
