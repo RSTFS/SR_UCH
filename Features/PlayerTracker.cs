@@ -266,6 +266,10 @@ namespace SR_UCH.Tweaks {
             if (line.renderer != null) line.renderer.positionCount = 0;
         }
 
+        // networkNumber 直接当槽位下标时，索引不连续会撑出大量空 LineRenderer。
+        // 游戏最多 4 名玩家，这里给到 8 的上限即可（audit 21-P0-3）。
+        private const int MaxTrackedPlayers = 8;
+
         private static void EnsureCapacity(int count) {
             if (_lines != null && _lines.Length >= count) return;
             int target = Mathf.Max(count, _lines == null ? 8 : _lines.Length);
@@ -323,6 +327,7 @@ namespace SR_UCH.Tweaks {
                 foreach (GamePlayer gp in lm.CurrentGameController.CurrentPlayerQueue) {
                     if (gp == null) continue;
                     int idx = gp.networkNumber - 1;
+                if (idx < 0 || idx >= MaxTrackedPlayers) continue;   // 见 MaxTrackedPlayers 注释（audit 21-P0-3）
                     if (idx < 0) continue;
                     _gpByIndex[idx] = gp;
                     if (idx + 1 > need) need = idx + 1;
@@ -343,6 +348,7 @@ namespace SR_UCH.Tweaks {
                 foreach (LobbyPlayer lp in lm.GetLobbyPlayers()) {
                     if (lp == null) continue;
                     int idx = lp.networkNumber - 1;
+                if (idx < 0 || idx >= MaxTrackedPlayers) continue;   // audit 21-P0-3
                     if (idx < 0) continue;
                     _lpByIndex[idx] = lp;
                     if (idx + 1 > need) need = idx + 1;

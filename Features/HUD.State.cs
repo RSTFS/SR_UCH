@@ -237,10 +237,14 @@ public partial class HUD {
                 // 直接采用游戏自身的 roundNumber（避免被“结算证据”门槛卡住），只显示「重试：N」。
                 if (IsChallengeMode()) {
                     if (candidate <= 0) { _roundText = null; return; }
-                    _trueRound = candidate;
-                    _roundPending = 0;
-                    _roundTallySeen = false;
-                    _roundText = RoundWord() + candidate;
+                    // 只接受"前进"或"回到 1"：直接采纳任何值会让 roundNumber 抖动时
+                    // 每帧都把 _trueRound 改来改去，回合提示跟着反复重播（audit 21-P0-4）。
+                    if (candidate > _trueRound || candidate <= 1) {
+                        _trueRound = candidate;
+                        _roundPending = 0;
+                        _roundTallySeen = false;
+                    }
+                    _roundText = RoundWord() + _trueRound;
                     return;
                 }
                                 if (candidate < _trueRound) {

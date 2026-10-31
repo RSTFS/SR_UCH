@@ -60,6 +60,6 @@
 | 54 | 20_实验模块与派对盒 | P0-1 | `CrossPlay.TryPersist` 按方法名子串猜测并 Invoke 保存入口，可能触发破坏性方法 | `ported` | 保存入口改为白名单精确名 + 必须声明在目标类型自身，不再子串匹配继承链 |
 | 55 | 21_HUD状态与轨迹 | P0-1 | `DiagTick` 是未关闭的调试残留，会长期污染日志 | `ported` | 临时诊断 DiagTick 已删除（提交 97172cf） |
 | 56 | 21_HUD状态与轨迹 | P0-2 | `OnShutdown` 只销毁根对象，未注销 `LevelResetEvent` 监听器，重载模组会重复订阅 | `ported` | 保留监听器引用，关机回调里 ChangeListener(false) 注销并置空 |
-| 57 | 21_HUD状态与轨迹 | P0-3 | `networkNumber` 与数组槽位下标耦合，索引不连续时会创建大量空 `LineRenderer` | `todo` |  |
-| 58 | 21_HUD状态与轨迹 | P0-4 | 挑战模式分支绕过"结算证据"门槛，回合提示会在一局内反复重播 | `todo` |  |
+| 57 | 21_HUD状态与轨迹 | P0-3 | `networkNumber` 与数组槽位下标耦合，索引不连续时会创建大量空 `LineRenderer` | `ported` | networkNumber 下标加 MaxTrackedPlayers=8 上限，不再为不连续索引撑出大量空 LineRenderer |
+| 58 | 21_HUD状态与轨迹 | P0-4 | 挑战模式分支绕过"结算证据"门槛，回合提示会在一局内反复重播 | `ported` | 挑战模式回合数只接受「前进」或「回到 1」，抖动不再重播提示 |
 | 59 | 21_HUD状态与轨迹 | P0-5 | `UpdateChallengeTimer` 中 `runTime`/`runStarted` 字段名未经游戏侧核实，反射取不到会静默退化 | `already-fixed` | 已核实游戏 ChallengeControl 确有 private float runTime / private bool runStarted（decompiled 121889/121893），反射名正确 |
