@@ -842,7 +842,14 @@ private static float TableHeight() {
             // 以前这里固定扣 300px，表格下方留白、手轮落在留白上就变成滚页面。
             try {
                 Rect last = GUILayoutUtility.GetLastRect();
-                return SRApi.Ctl.TableFitHeight(last.yMax, SRApi.ContentArea.y, _tableHEntry, SRApi.Ctl.Sc(140));
+                // TableFitHeight 会把高度夹到"表高配置"上限；预设页这个配置值偏小，
+                // 于是表格永远填不满、下面留一大片空白。这里直接用剩余可用高度，
+                // 表高配置只在它更大时作为上限（用户拖高过才生效）。
+                float avail = SRApi.ContentArea.yMax - last.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(8);
+                float cap = _tableHEntry != null && _tableHEntry.Value > 0 ? SRApi.Ctl.Sc(_tableHEntry.Value) : 0f;
+                float h = avail > 0f ? avail : SRApi.Ctl.Sc(340);
+                if (cap > h) h = Mathf.Min(cap, avail > 0f ? Mathf.Max(avail, cap) : cap);
+                return Mathf.Max(SRApi.Ctl.Sc(140), h);
             } catch (Exception __th) { SRApi.Guard.Log("预设/表格高度", __th); return SRApi.Ctl.Sc(340); }
         }
 
