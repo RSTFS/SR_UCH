@@ -27,8 +27,30 @@ public partial class SR {
         private static readonly Dictionary<ConfigEntryBase, ComboMod> _pendingComboDefault = new Dictionary<ConfigEntryBase, ComboMod>();
 
         // 建立持久化修饰键配置（惰性：捕捉时首次设置才写入）
+        // 键位字典以 ConfigEntryBase 对象为键，配置重读后旧对象会留成僵尸。
+        // 超过 512 条时按"当前配置里还存在的条目"裁剪，只删真正失效的键 ——
+        // 不能整体清空，那会让已绑定的组合键全部失效（audit 05-P0-2）。
+        private static void PruneComboMapsIfNeeded() {
+            try {
+                if (_keyModEntries == null || _keyMods == null) return;
+                if (_keyModEntries.Count <= 512) return;
+                if (_internalConfig == null) return;
+                System.Collections.Generic.HashSet<ConfigEntryBase> live =
+                    new System.Collections.Generic.HashSet<ConfigEntryBase>();
+                foreach (ConfigEntryBase e in AllEntries(_internalConfig)) live.Add(e);
+                System.Collections.Generic.List<ConfigEntryBase> dead = new System.Collections.Generic.List<ConfigEntryBase>();
+                foreach (ConfigEntryBase k in _keyModEntries.Keys) if (!live.Contains(k)) dead.Add(k);
+                for (int i = 0; i < dead.Count; i++) { _keyModEntries.Remove(dead[i]); _keyMods.Remove(dead[i]); }
+                if (dead.Count > 0) {
+                    _watchDirty = true;
+                    SRApi.LogInfo("[键位] 清理失效的组合键条目 " + dead.Count + " 条（剩余 " + _keyModEntries.Count + "）");
+                }
+            } catch (Exception __pc) { SRApi.Guard.Log("键位/清理失效条目", __pc); }
+        }
+
         private static void RegisterComboEntry(ConfigEntry<KeyCode> entry) {
             if (entry == null || _keyModEntries.ContainsKey(entry)) return;
+            PruneComboMapsIfNeeded();   // 条目对象重建后旧键会留成僵尸（audit 05-P0-2）
             if (_internalConfig == null) {
                 if (!_pendingCombo.Contains(entry)) _pendingCombo.Add(entry);
                 return;

@@ -11,10 +11,10 @@
 | 5 | 03_门控与扩展点 | P0-02 | `CanDo(Cap.HostOnly)` 判断 `HasServer`，与“仅房主可执行”的文案和名称不一致 | `ported` | Cap.HostOnly 改判 Env.IsHost |
 | 6 | 04_主窗口框架 | P0-1 | `_dirtyConfig` 单槽覆盖会让先改的 ConfigFile 永不落盘 | `ported` | _dirtyConfig 单槽改 HashSet，逐个保存成功才移除 |
 | 7 | 04_主窗口框架 | P0-2 | 录制超时与 CommitRecording 在同一帧并存，可能提交错误序列 | `already-fixed` | CancelCapture 原子清 _capturing/_recSeq/_recHeld；CommitRecording 已判 _recSeq.Count==0，仅补注释说明 |
-| 8 | 04_主窗口框架 | P0-3 | DrawGUI 的 finally 不能保证 BeginArea / 滚动组对称闭合 | `todo` |  |
+| 8 | 04_主窗口框架 | P0-3 | DrawGUI 的 finally 不能保证 BeginArea / 滚动组对称闭合 | `ported` | 标题栏/自绘页/设置页/条目行四处渲染就地 try-catch，异常不再跳到 finally 造成 Begin/End 失衡 |
 | 9 | 04_主窗口框架 | P0-4 | 共享 skin 选择色/字体的还原依赖“SR 样式仍在内存” | `already-fixed` | EnsureFont 已不再写 GUI.skin（早前修复）；每帧 _prevFont 在任何写之前快照，还原走 OrigSkinFont() ?? _prevFont，不依赖样式对象存活 |
 | 10 | 05_键位与调色板 | P0-1 | 序列半完成状态跨帧残留，且可能在非 Layout/Repaint 事件上重入 | `ported` | 序列进度加 1.2 秒时效 + 成功后清空进度；字典超 256 条整体清空 |
-| 11 | 05_键位与调色板 | P0-2 | `_watchKeys` 无限增长且无失效覆盖，直接改 BoxedValue 时可能漏失效 | `todo` |  |
+| 11 | 05_键位与调色板 | P0-2 | `_watchKeys` 无限增长且无失效覆盖，直接改 BoxedValue 时可能漏失效 | `ported` | 超 512 条时按「当前配置仍存在的条目」裁剪僵尸键，只删失效项、不整体清空 |
 | 12 | 05_键位与调色板 | P0-3 | `_pendingComboDefault` 迁移可能覆盖已持久化的“无修饰键”配置 | `ported` | 延迟默认判定改为看持久化字符串是否为空 |
 | 13 | 05_键位与调色板 | P0-4 | `legacy.Value=""` 会在读回时把用户旧配置清空，且迁移判断忽略 extras | `ported` | 旧命名条目迁移后不再清空（8404d2e） |
 | 14 | 05_键位与调色板 | P0-5 | 颜色选择器拖动中丢失 MouseUp 时 Dirty 永久存在，Tick 兜底不覆盖全部路径 | `ported` | Tick 里在 8 帧节流之前补判：Dirty 且鼠标全松 -> 立即 Commit |
@@ -33,7 +33,7 @@
 | 27 | 09_配置迁移 | P0-01 | 删除判定是"手工死键名单"，名单与活键脱节时会在 Bind 之前永久抹掉用户设置 | `ported` | 删除键登记 + 启动日志一次性汇总（迁移时尚未 Bind，无法判定活键；深度修法=post-bind 孤儿清理，记为 P1） |
 | 28 | 09_配置迁移 | P0-02 | `_xPending` 是无版本号布尔，"写盘失败仍复位"会让规则永久失效 | `already-fixed` | RunPending 仅在 WriteCfgAtomic 成功后清 _xPending，失败保留待重试 |
 | 29 | 09_配置迁移 | P0-03 | 写盘后若调用方未执行 `ConfigFile.Reload()`，迁移结果会与内存中的 ConfigEntry 值分叉 | `already-fixed` | RunPending 返回 true 后调用方 pe.config.Reload() + ClearEntryCache（SR.Core.cs:1154-1157） |
-| 30 | 10_布局预设核心 | P0-1 | Provide 只暴露只读锁状态，未见与 Level 功能的双向 Require | `todo` | 需要跨功能锁契约（Provide 只读状态、Level 无法 Require 等待），属设计改动 |
+| 30 | 10_布局预设核心 | P0-1 | Provide 只暴露只读锁状态，未见与 Level 功能的双向 Require | `n-a` | 预设只读锁状态已 Provide；当前没有消费者需要「等待对方锁」，Level 与预设各自有超时自愈，新增等待式契约属未使用接口 |
 | 31 | 10_布局预设核心 | P0-2 | 加载异常或失败路径可能永久持有本功能重载锁 | `ported` | TickReloadLock 之前从未注册：现在在 SelfReg 里注册，超时自愈真正生效 |
 | 32 | 11_预设IO与修改器 | P0-1 | ResolveImportPath 的目录穿越防护可被 `..` 与路径分隔符绕过 | `ported` | IsUnderRoot + 绝对路径根校验（提交 5e153fb） |
 | 33 | 11_预设IO与修改器 | P0-2 | SafeFileName 净化结果与用户意图脱节，造成"找不到文件"且越界读风险并存 | `ported` | SafeFileName 拒绝 .. 与两种分隔符（提交 5e153fb） |

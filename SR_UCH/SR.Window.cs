@@ -439,7 +439,10 @@ public partial class SR {
             // 窗口区域内 rect 是区域局部坐标，鼠标事件是屏幕坐标：记下区域偏移供滚轮盾换算。
             SR.AreaOffset = new Vector2(winRect.x + Sc(4), winRect.y + Sc(4));
             GUILayout.BeginArea(new Rect(winRect.x + Sc(4), winRect.y + Sc(4), winRect.width - Sc(8), winRect.height - Sc(8)));
-            float barH = DrawTitleBar(winRect.width - Sc(8));
+            float barH = 0f;
+            // 标题栏异常同样不能跳到 finally，否则下面的 BeginHorizontal 等配对失衡（audit 04-P0-3）。
+            try { barH = DrawTitleBar(winRect.width - Sc(8)); }
+            catch (Exception __tb) { Guard.Log("标题栏渲染", __tb); }
             GUILayout.Space(barH + Sc(2));
             // 底栏是绝对定位的固定高条（区域坐标系）：内容行高度必须扣掉它，右栏/左栏都在它上方结束。
             float __footH = Sc(28f);
@@ -596,18 +599,23 @@ public partial class SR {
                 // 功能自绘页：各功能在自己的 SelfReg 里 SR.RegisterPage(section, render) 注册，
                 // 新增功能不必再改 SR.Window。
                 if (SR.HasPage(_selectedInternalSection)) {
-                    SR.RenderPage(_selectedInternalSection);
+                    // 页面内部异常必须就地吞掉并记日志：否则会跳到外层 finally，
+                    // 让 BeginArea/滚动组/水平组配对失衡（audit 04-P0-3）。
+                    try { SR.RenderPage(_selectedInternalSection); }
+                    catch (Exception __pg) { Guard.Log("页面渲染 " + _selectedInternalSection, __pg); }
                 } else {
                     // 兜底：纯通用条目列表（没有自绘页的栏目）
                     bool any = false;
                     foreach (ConfigEntryBase entry in InternalSectionEntries()) {
                         any = true;
-                        RenderEntryRow(entry, true, colWidth);
+                        try { RenderEntryRow(entry, true, colWidth); }
+                        catch (Exception __er) { Guard.Log("条目行渲染", __er); }
                     }
                     if (!any) GUILayout.Label(T("（无匹配条目）", "(no matching entries)"), _label);
                 }
             } else if (_mode == Mode.Settings) {
-                RenderSettingsPage(colWidth);   // 通用 / 自检 两页（自检页含诊断浮层开关）
+                try { RenderSettingsPage(colWidth); }   // 通用 / 自检 两页（自检页含诊断浮层开关）
+                catch (Exception __sp) { Guard.Log("设置页渲染", __sp); }
             } else {
                 PluginEntry curExt = CurrentExternalPlugin();
                 if (curExt != null) {
