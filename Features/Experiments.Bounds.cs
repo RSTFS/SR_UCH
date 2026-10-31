@@ -181,7 +181,7 @@ public partial class Experiments : ITweak
                 if (_radius != null) _radius.SettingChanged += (s, e) => { if (_on != null && _on.Value) { try { ApplyHardBounds(); } catch (Exception __ex) { SRApi.Guard.Log("边界半径刷新", __ex); } } };
                 // 半径不挂 SettingChanged，Tick 每帧会调 ApplyHardBounds，改完下一帧自然生效。
                 // 旧的子项键已无任何 Config.Bind，统一由 SR.ConfigMigration 的 RemoveKeys 清理。
-                SRApi.RegisterTick("关卡边界-应用", Tick);
+                SRApi.RegisterTick("关卡边界", Tick);
                 try { GameEvent.GameEventManager.ChangeListener<GameEvent.PiecePlacedEvent>(new PieceIgnoreListener(), true); }
                 catch (Exception __ex) { SRApi.Guard.Log("边界/事件监听", __ex); }
                 SRApi.RegisterSceneHook(Reset);
