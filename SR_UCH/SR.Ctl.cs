@@ -12,7 +12,7 @@ public partial class SR {
 // 分区：Ctl（功能页能力门面 + 管理器通用控件 + 首页 + 行/页扩展点）
 // Ctl 只转发不放逻辑：功能页与外部模块走 SR.Ctl，核心内部（SR 各分部文件）直接调 SR；新能力在 Ctl 里补纯转发成员。
 
-    public static class Ctl {
+    public static partial class Ctl {
 
         // 颜色调色板自注入：核心在 Ctl 首次被访问时把实现挂到契约层门面。
         // 放在这里而不是 MainPlugin 的注入清单里 —— 新增 Set*Sinks 会要求 MainPlugin 同步改（该文件由他人收尾）。
@@ -312,17 +312,6 @@ public partial class SR {
         public static void DrawTooltip(Vector2 mp) { SR.DrawTooltip(mp); }
 
         // 样式（深色主题，见 SR.Styles.cs）
-        public static GUIStyle Label { get { return _label; } }
-        public static GUIStyle LabelClip { get { return _labelClip; } }
-        public static GUIStyle LabelClipCenter { get { return _labelClipCenter; } }
-        public static GUIStyle SecHeaderCenter { get { return _secHeaderCenter; } }
-        public static GUIStyle LabelWrap { get { return _labelWrap; } }
-        public static GUIStyle ChatLabel { get { return _chatLabel; } }
-        public static GUIStyle ChatArea { get { return _chatArea; } }
-        public static GUIStyle SecHeader { get { return _secHeader; } }
-        public static GUIStyle SelItem { get { return _selItem; } }
-        public static GUIStyle Btn { get { return _btn; } }
-        public static GUIStyle BtnClip { get { return _btnClip; } }
         // 表格列偏好的统一持久化组件（三处表格共用）：格式 "o=0,1,2;h=1,3;w=..."
         public class TablePrefs {
             private readonly BepInEx.Configuration.ConfigEntry<string> _entry;
@@ -481,10 +470,6 @@ public partial class SR {
             return clicked;
         }
 
-        public static GUIStyle CheckOn { get { return _checkOn; } }
-        public static GUIStyle CheckOff { get { return _checkOff; } }
-        public static GUIStyle SearchBox { get { return _searchBox; } }
-        public static GUIStyle Footer { get { return _footer; } }
 
         public static float WinWidth { get { return _winWidth; } }
         //滚到底（新消息到达时用；不要拿属性返回值去改 y，那是副本，改了不生效）
