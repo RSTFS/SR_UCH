@@ -631,16 +631,37 @@ public partial class SR : ITweak {
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return "";
         }
+        // 该程序集是否引用了 SR_UCH（= 用契约层编译出来的模块）。
+        private static bool IsContractConsumer(string asmName) {
+            try {
+                foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies()) {
+                    try {
+                        if (a == null || a.IsDynamic) continue;
+                        if (!string.Equals(a.GetName().Name, asmName, StringComparison.OrdinalIgnoreCase)) continue;
+                        foreach (AssemblyName rn in a.GetReferencedAssemblies()) {
+                            if (rn != null && string.Equals(rn.Name, typeof(SR).Assembly.GetName().Name, StringComparison.OrdinalIgnoreCase)) return true;
+                        }
+                        return false;   // 找到该程序集但没引用 SR_UCH -> 非契约调用方
+                    } catch (Exception __a) { Guard.Log("豁免登记/检查引用", __a); }
+                }
+            } catch (Exception __ex) { Guard.Log("豁免登记/遍历程序集", __ex); }
+            return false;
+        }
+
         private static bool NoteOverrideSource(string kind) {
             try {
                 string who = CallerAssembly();
-                // 豁免登记是对外契约 API：核心与任何外部 DLL 都应允许，
-                // 但来源必须落进 OverrideSources 供设置页查看（不再按具体模块名开白名单，
-                // 否则外部登记会全部被拒、开关变成不可达）。
-                bool ok = true;
-                // 只记录来源供设置页展示，不写日志（静默）。
-                string line = kind + " <- " + (string.IsNullOrEmpty(who) ? "unknown" : who) + (ok ? "" : " (已拒绝：不在白名单)");
+                // 信任规则（不按具体模块名开白名单）：核心自身，以及**引用了 SR_UCH 的程序集**
+                // 才允许登记 —— 后者就是用契约层编译出来的模块，是这些 API 的合法调用方；
+                // 其它来源拒绝并写一条可见日志，避免任意插件静默提权。
+                bool ok = string.IsNullOrEmpty(who) || IsContractConsumer(who);
+                string line = kind + " <- " + (string.IsNullOrEmpty(who) ? "核心" : who)
+                    + (ok ? "" : "（已拒绝：非契约调用方）");
                 if (!OverrideSources.Contains(line)) OverrideSources.Add(line);
+                if (!ok) {
+                    try { LogWarn("[门控] 拒绝非契约调用方的豁免登记：" + line); }
+                    catch (Exception __lw) { Guard.Log("豁免登记拒绝日志", __lw); }
+                }
                 return ok;
             } catch { return false; }
         }
