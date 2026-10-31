@@ -27,19 +27,6 @@ public partial class Experiments : ITweak
                     DrawStatus(FreeCam.SpeedNote);
                 }
 
-                // 解锁帧率
-                GUILayout.Space(SRApi.Ctl.Sc(6));
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("性能", "Performance") + " -",
-                    SRApi.T("解锁帧率：关闭垂直同步并把帧率上限设为不限制. 游戏 / 分辨率变化后会自动重新应用.",
-                        "Unlock framerate: turns off vSync and removes the frame cap. Re-applied automatically after scene or resolution changes."));
-                SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
-                    return e.Definition.Key == "Unlock Framerate";
-                });
-                if (UnlockFps.Note != null && UnlockFps.Note.Length > 0) {
-                    GUILayout.Space(SRApi.Ctl.Sc(2));
-                    DrawStatus(UnlockFps.Note);
-                }
-
                 // 跨平台联机：直接改游戏自己的 CrossPlatformToggle（反射定位，不绑版本）。
                 GUILayout.Space(SRApi.Ctl.Sc(6));
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("跨平台联机", "Cross-play") + " -",
@@ -67,66 +54,34 @@ public partial class Experiments : ITweak
                     DrawStatus(CrossPlay.Note);
                 }
 
-                // 加载后清理
-                GUILayout.Space(SRApi.Ctl.Sc(6));
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("加载后清理", "Cleanup after load") + " -", SRApi.T("进关卡时执行一次垃圾回收和资源卸载. 减少对局内卡顿. 不影响结算速度.",
-                     "Runs GC and asset unload once on level load, reducing in-match stutter. Does not affect scoring."));
-                SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
-                    return e.Definition.Key == "GC After Load";
-                });
-                GUILayout.Space(SRApi.Ctl.Sc(6));
             } catch (Exception __ex) { SRApi.Guard.Log("其它页 渲染", __ex); }
         }
-        // 加载后清理的初始化：配置 + 每帧钩子 + 补丁注册（UI 在上面的加载后清理分区）。
-        internal static void InitCleanup(IFeatureHost plugin) {
-            SRApi.LocKey("Experiments", "GC After Load", "加载后清理", "GC after load");
-            SRApi.LocDesc("Experiments", "GC After Load", "加载后清理\n首次进入关卡时执行一次 GC 与资源卸载\n同一关卡的回合切换不重复执行", "Cleanup after load\none GC and asset unload on first level entry\nskipped on round changes within a level");
-            _gcAfterLoadEntry = plugin.Config.Bind<bool>("Experiments", "GC After Load", false, "进关卡/换关卡时执行一次 GC 回收 + 资源卸载，减少对局内卡顿。同关卡回合切换不清理（场景名不变自动跳过），不影响结算速度。");
-            SRApi.RegisterTick("加载后清理", TickCleanup); // 每帧钩子（加载完成 1 秒后执行一次 GC）
-            // CreateAndPatchAll 不会自动发现带 [HarmonyPatch] 的类型，必须显式注册一次。
-            try { Harmony.CreateAndPatchAll(typeof(Experiments), (string)null); }
-            catch (Exception e) { SRApi.LogError("实验页(加载后清理) 补丁注册失败: " + e.Message); }
+        // 性能页：解锁帧率 / 抗锯齿 / 帧率显示（原"其它"页里的性能分区搬到这里）。
+        public static void RenderPerf() {
+            try {
+                SRApi.Ctl.SectionTitle("- " + SRApi.T("帧率", "Framerate") + " -",
+                    SRApi.T("解锁帧率：关闭垂直同步并把上限设为不限制. 换场景/改分辨率后会自动重新应用. 抗锯齿可一并设置.",
+                        "Unlock framerate: turns off vSync and removes the cap. Re-applied after scene or resolution changes. Anti-aliasing can be set here too."));
+                SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
+                    return e.Definition.Key == "Unlock Framerate" || e.Definition.Key == "Anti Aliasing"
+                        || e.Definition.Key == "Show Fps";
+                });
+                if (UnlockFps.Note != null && UnlockFps.Note.Length > 0) {
+                    GUILayout.Space(SRApi.Ctl.Sc(2));
+                    DrawStatus(UnlockFps.Note);
+                }
+                GUILayout.Space(SRApi.Ctl.Sc(6));
+            } catch (Exception __ex) { SRApi.Guard.Log("性能页 渲染", __ex); }
         }
 
-        // 分区：加载后清理（UI 在本页，配置与实现同在本文件）。
-        private static ConfigEntry<bool> _gcAfterLoadEntry;
-        // 加载完成时回收垃圾，减少进入对局后的卡顿；同场景（回合切换）跳过。
-        // 延迟 1 秒执行，避免 GC 的同步阻塞卡住淡出过渡。
-        private static string _lastCleanedScene = "";
-        private static float _pendingCleanupAt = -1f;
-        private static string _pendingCleanupScene = "";
-        // 加载后清理的实际执行（SR 每帧钩子 每帧钩子）：FadeOut 后延迟 1 秒再 GC。
-        internal static void TickCleanup()
-        {
-            // 与记录处对称：总开关关闭时不执行。
-            if (!SRApi.GateMaster) return;
-            if (_pendingCleanupAt < 0f || Time.unscaledTime < _pendingCleanupAt) return;
-            _pendingCleanupAt = -1f;
-            try
-            {
-                _lastCleanedScene = _pendingCleanupScene;
-                System.GC.Collect();
-                Resources.UnloadUnusedAssets();
-            }
-            catch (Exception __ex) { SRApi.Guard.Log("加载后清理(GC)", __ex); }
+        // 本页功能的补丁统一注册点（CreateAndPatchAll 不会自动发现带 [HarmonyPatch] 的类型）。
+        internal static void InitCleanup(IFeatureHost plugin) {
+            try { Harmony.CreateAndPatchAll(typeof(Experiments), (string)null); }
+            catch (Exception e) { SRApi.LogError("实验页 补丁注册失败: " + e.Message); }
         }
-        // 加载过渡结束（FadeOut 后缀）：记录待清理场景与 1 秒后的执行时刻。
-        [HarmonyPatch(typeof(LoadingInterstitialSplash), "FadeOut")]
-        [HarmonyPostfix]
-        static void OnLoadEndRecordCleanup()
-        {
-            if (!SRApi.GateMaster) return;
-            if (_gcAfterLoadEntry == null || !_gcAfterLoadEntry.Value) return;
-            try
-            {
-                string sc = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-                if (sc == _lastCleanedScene) return; // 同场景（回合切换重载）不清理
-                _pendingCleanupScene = sc;
-                _pendingCleanupAt = Time.unscaledTime + 1f;
-            }
-            catch (Exception __ex) { SRApi.Guard.Log("记录加载后清理场景", __ex); }
-        }
+
 }
+
     // 自由相机（实验）：经游戏自己的 ZoomCamera 生效，不直接写 Camera.fieldOfView（会被每帧覆盖）。
     // 默认键 F3，滚轮调 FOV（1-32，每格 0.5）；仅开启时消费滚轮，每次启用从相机当前 FOV 起算，关闭时还原。
     [SrFeature("sr.freecam", "FreeCam", "1.0")]
@@ -324,6 +279,9 @@ public partial class Experiments : ITweak
     internal static class UnlockFps {
         internal static string Note = "";
         private static ConfigEntry<bool> _on;
+        private static ConfigEntry<int> _aa;
+        private static ConfigEntry<bool> _showFps;
+        private static int _origAa = int.MinValue;
         private static bool _armed;
         private static bool _applied;
         private static float _nextAt;
@@ -332,6 +290,19 @@ public partial class Experiments : ITweak
 
         internal static void Init(IFeatureHost plugin) {
             try {
+                _aa = plugin.Config.Bind("Experiments", "Anti Aliasing", 0,
+                    new ConfigDescription("抗锯齿倍数（与解锁帧率一起应用；0 = 关闭，2/4/8 = MSAA）。",
+                        new AcceptableValueList<int>(0, 2, 4, 8)));
+                SRApi.LocKey("Experiments", "Anti Aliasing", "抗锯齿", "Anti-aliasing");
+                SRApi.LocDesc("Experiments", "Anti Aliasing",
+                    "抗锯齿\n0 = 关闭，2/4/8 = MSAA 倍数\n与解锁帧率一起应用，关闭解锁帧率时恢复原值",
+                    "anti-aliasing\n0 = off, 2/4/8 = MSAA samples\napplied together with the framerate unlock and restored when it is turned off");
+                _showFps = plugin.Config.Bind("Experiments", "Show Fps", false,
+                    "显示帧率。\n在屏幕左上角单独显示当前帧率（不属于 HUD）\n关闭后立即消失");
+                SRApi.LocKey("Experiments", "Show Fps", "显示帧率", "Show FPS");
+                SRApi.LocDesc("Experiments", "Show Fps",
+                    "显示帧率\n屏幕左上角独立显示帧率，不随面板开关\n关闭后立即消失",
+                    "show FPS\nan independent readout in the top-left corner, visible even with the panel closed\nhidden as soon as it is switched off");
                 _on = plugin.Config.Bind("Experiments", "Unlock Framerate", false,
                     "解锁帧率。\n关闭垂直同步并把帧率上限设为不限制（-1）。\n换场景或改分辨率后会自动重新应用；关闭本项立即恢复原值。");
                 SRApi.LocKey("Experiments", "Unlock Framerate", "解锁帧率", "Unlock framerate");
@@ -359,6 +330,11 @@ public partial class Experiments : ITweak
                     try { _origVsync = QualitySettings.vSyncCount; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/记 vSyncCount", __ex); }
                 }
                 bool changed = false;
+                try {
+                    if (_origAa == int.MinValue) _origAa = QualitySettings.antiAliasing;
+                    int wantAa = _aa != null ? _aa.Value : 0;
+                    if (QualitySettings.antiAliasing != wantAa) { QualitySettings.antiAliasing = wantAa; changed = true; }
+                } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/抗锯齿", __ex); }
                 try { if (QualitySettings.vSyncCount != 0) { QualitySettings.vSyncCount = 0; changed = true; } } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/关 vSync", __ex); }
                 try { if (Application.targetFrameRate != -1) { Application.targetFrameRate = -1; changed = true; } } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/取消上限", __ex); }
                 if (!_applied) {
@@ -368,6 +344,7 @@ public partial class Experiments : ITweak
                 } else if (changed) {
                     SRApi.LogInfo("[实验.性能] 检测到游戏改回帧率设置，已重新应用");
                 }
+                FpsOverlay.Update(_showFps != null && _showFps.Value);
             } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率 Tick", __ex); }
         }
 
@@ -377,10 +354,62 @@ public partial class Experiments : ITweak
                 int v = _origVsync == int.MinValue ? 1 : _origVsync;
                 try { Application.targetFrameRate = t; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/还原 targetFrameRate", __ex); }
                 try { QualitySettings.vSyncCount = v; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/还原 vSync", __ex); }
+                try { if (_origAa != int.MinValue) QualitySettings.antiAliasing = _origAa; } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率/还原抗锯齿", __ex); }
                 _applied = false;
                 Note = SRApi.T("已恢复原帧率设置", "Framerate settings restored");
                 SRApi.LogInfo("[实验.性能] " + Note);
             } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率 还原", __ex); }
+        }
+    }
+
+    // 帧率叠加层：独立于面板与 HUD，开就一直显示（左上角），关掉立即消失。
+    internal sealed class FpsOverlay : UnityEngine.MonoBehaviour {
+        private static FpsOverlay _host;
+        private static GUIStyle _style;
+        private static string _text;
+        private static float _accum, _nextAt;
+        private static int _frames;
+
+        internal static void Update(bool want) {
+            try {
+                if (!want) {
+                    _text = null;
+                    return;
+                }
+                EnsureHost();
+                float dt = Time.unscaledDeltaTime;
+                if (dt > 0f) { _accum += dt; _frames++; }
+                float now = Time.unscaledTime;
+                if (now < _nextAt) return;
+                if (_accum > 0.0001f && _frames > 0) {
+                    float fps = _frames / _accum;
+                    _text = "FPS " + fps.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+                }
+                _accum = 0f; _frames = 0; _nextAt = now + 0.25f;
+            } catch (Exception __ex) { SRApi.Guard.Log("帧率叠加层", __ex); }
+        }
+
+        private static void EnsureHost() {
+            if (_host != null) return;
+            try {
+                GameObject go = new GameObject("SR_UCH.FpsOverlay");
+                UnityEngine.Object.DontDestroyOnLoad(go);
+                _host = go.AddComponent<FpsOverlay>();
+            } catch (Exception __ex) { SRApi.Guard.Log("帧率叠加层/创建", __ex); }
+        }
+
+        private void OnGUI() {
+            try {
+                string s = _text;
+                if (string.IsNullOrEmpty(s)) return;
+                if (_style == null) {
+                    _style = new GUIStyle(GUI.skin.label);
+                    _style.alignment = TextAnchor.UpperLeft;
+                    _style.fontSize = Mathf.Max(12, Mathf.RoundToInt(13f * SRApi.Ctl.Sc(1f)));
+                    _style.normal.textColor = new Color(1f, 1f, 1f, 0.85f);
+                }
+                GUI.Label(new Rect(SRApi.Ctl.Sc(10f), SRApi.Ctl.Sc(8f), SRApi.Ctl.Sc(160f), SRApi.Ctl.Sc(20f)), s, _style);
+            } catch (Exception __ex) { SRApi.Guard.Log("帧率叠加层/绘制", __ex); }
         }
     }
 
@@ -441,6 +470,16 @@ public partial class Experiments : ITweak
 
         // 单例查找：常见命名 instance / Instance / Current / singleton。
         private static object FindOwner(Type ty) {
+            // 先试 GetInstance()（UCH 的 GameSettings 就是用这个而不是 instance 字段）。
+            try {
+                System.Reflection.MethodInfo gi = ty.GetMethod("GetInstance",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static,
+                    null, System.Type.EmptyTypes, null);
+                if (gi != null) {
+                    object v = gi.Invoke(null, null);
+                    if (v != null) return v;
+                }
+            } catch (Exception __gi) { SRApi.Guard.Log("跨平台联机/GetInstance", __gi); }
             string[] names = new string[] { "instance", "Instance", "Current", "current", "singleton", "Singleton" };
             for (int i = 0; i < names.Length; i++) {
                 try {
@@ -485,12 +524,54 @@ public partial class Experiments : ITweak
                     if (!pr.CanWrite) { Note = SRApi.T("该设置不可写（只读属性）", "read-only property"); return false; }
                     pr.SetValue(pr.GetSetMethod(true).IsStatic ? null : _owner, on, null);
                 }
-                bool persisted = TryPersist(target);
+                // 只写 GameSettings 只在本次会话生效；存档里的真值是 SaveFileData.CrossPlatformToggle，
+                // 通过 StatTracker 拿到主用户存档后同步写一次，再让游戏自己保存。
+                bool savedFile = TryWriteSaveFile(on);
+                bool persisted = TryPersist(target) || savedFile;
                 Note = (on ? SRApi.T("已开启跨平台联机", "Cross-play ON") : SRApi.T("已关闭跨平台联机", "Cross-play OFF"))
                     + (persisted ? "" : SRApi.T("（未能确认写入存档，重启游戏可能回退）", " (could not confirm it was saved; may revert on restart)"));
                 SRApi.LogInfo("[跨平台] " + Note);
                 return true;
             } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/写值", __ex); return false; }
+        }
+
+        // 同步写存档对象：StatTracker.Instance.GetSaveFileDataForMainUser().CrossPlatformToggle。
+        private static bool TryWriteSaveFile(bool on) {
+            try {
+                Type st = null;
+                foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies()) {
+                    try {
+                        if (asm.GetName().Name != "Assembly-CSharp") continue;
+                        st = asm.GetType("StatTracker", false);
+                    } catch (Exception __a) { SRApi.Guard.Log("跨平台联机/找 StatTracker", __a); }
+                    if (st != null) break;
+                }
+                if (st == null) return false;
+                object tracker = null;
+                try {
+                    MethodInfo gi = st.GetMethod("GetInstance",
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, null, Type.EmptyTypes, null);
+                    if (gi != null) tracker = gi.Invoke(null, null);
+                } catch (Exception __gi) { SRApi.Guard.Log("跨平台联机/StatTracker 实例", __gi); }
+                if (tracker == null) {
+                    try {
+                        PropertyInfo pi = st.GetProperty("Instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                        if (pi != null) tracker = pi.GetValue(null, null);
+                    } catch (Exception __pi) { SRApi.Guard.Log("跨平台联机/StatTracker.Instance", __pi); }
+                }
+                if (tracker == null) return false;
+                MethodInfo get = st.GetMethod("GetSaveFileDataForMainUser",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, Type.EmptyTypes, null);
+                if (get == null) return false;
+                object data = get.Invoke(tracker, null);
+                if (data == null) return false;
+                FieldInfo f = data.GetType().GetField("CrossPlatformToggle", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (f == null || f.FieldType != typeof(bool)) return false;
+                f.SetValue(data, on);
+                try { TryPersist(tracker); } catch (Exception __p) { SRApi.Guard.Log("跨平台联机/保存 StatTracker", __p); }
+                SRApi.LogInfo("[跨平台] 已同步写入存档字段 CrossPlatformToggle=" + (on ? "true" : "false"));
+                return true;
+            } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/写存档", __ex); return false; }
         }
 
         // 找游戏自己的保存入口：方法名包含 save/write/flush 且无参、返回 void 或 bool。

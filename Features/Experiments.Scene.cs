@@ -33,26 +33,18 @@ public partial class Experiments : ITweak
                 SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
                     return e.Definition.Key.StartsWith("Splash ") || e.Definition.Key == "Gentle Load";
                 });
-                // 同位体：对当前房间再进一次，游戏会再建一个本地角色，两个角色共用同一套输入（WASD）。
-                GUILayout.Space(SRApi.Ctl.Sc(2));
-                if (GUILayout.Button(SRApi.T("同位体（再进一次当前房间）", "Alter self (rejoin current lobby)"), SRApi.Ctl.Btn,
-                        GUILayout.Height(SRApi.Ctl.Sc(28)), GUILayout.Width(SRApi.Ctl.Sc(240)))) {
-                    bool ok = Online.ForceRejoinSelf();
-                    SplashTools.Note = ok
-                        ? SRApi.T("同位体：已对当前房间再发一次加入", "Alter self: rejoin request sent")
-                        : SRApi.T("同位体：当前不在房间里", "Alter self: not in a lobby");
-                    SRApi.Notify(SplashTools.Note);
-                }
-                // 关闭遮罩：点一次立刻关掉当前这块黑幕（只在有遮罩时生效，不做常驻行为）。
-                GUILayout.Space(SRApi.Ctl.Sc(2));
-                if (GUILayout.Button(SRApi.T("关闭遮罩（立即）", "Close the mask now"), SRApi.Ctl.Btn,
-                        GUILayout.Height(SRApi.Ctl.Sc(28)), GUILayout.Width(SRApi.Ctl.Sc(180)))) {
-                    SplashTools.CloseMaskNow();
-                }
-                if (SplashTools.Note != null && SplashTools.Note.Length > 0) {
-                    GUILayout.Space(SRApi.Ctl.Sc(2));
-                    DrawStatus(SplashTools.Note);
-                }
+                // 同位体：对当前房间再进一次（通用条目：可右键绑快捷键 + 悬浮说明）。
+                SRApi.Ctl.HotkeyButton("exp.alter_self", SRApi.T("同位体", "Alter self"),
+                    SRApi.T("再进一次当前房间\n游戏会再建一个本地角色，两个角色共用同一套输入\n只在房间/对局内有效",
+                        "rejoin the current lobby\nthe game spawns a second local character sharing the same input\nonly works inside a lobby or match"),
+                    delegate { Online.ForceRejoinSelf(); });
+
+                // 关闭遮罩：只关当前这一块。
+                SRApi.Ctl.HotkeyButton("exp.close_mask", SRApi.T("关闭遮罩", "Close the mask"),
+                    SRApi.T("立刻关掉当前加载遮罩\n只关这一次，不改变「跳过加载动画」设置",
+                        "dismiss the current loading mask\none shot; does not change the skip-load-animation setting"),
+                    delegate { SplashTools.CloseMaskNow(); });
+
                 GUILayout.Space(SRApi.Ctl.Sc(6));
             } catch (Exception __ex) { SRApi.Guard.Log("场景页 渲染", __ex); }
         }
