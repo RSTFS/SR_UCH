@@ -381,6 +381,9 @@ namespace SR_UCH.Tweaks {
                 // 本帧开始前的二次确认状态：只有"之前已确认、本帧又没点中操作按钮"才在空白处取消，
                 // 避免把本帧其它按钮（保存/导入）刚点出来的二次确认立刻清掉。
                 string pendingBefore = _pendingKey;
+                // 与联机列表一致：页面级滚动关闭，上方筛选/工具行恒可见，表格占据剩余高度。
+                SRApi.PageScroll = Vector2.zero;
+                SRApi.NoPageScrollBars = true;
                 // 页面滚动保持可用（滚动条已统一隐藏）：表格内部滚轮失效时也能靠页面滚动看到全部内容。
                 Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
                 if (Event.current != null && Event.current.type == EventType.Layout) { _pageTopY = topProbe.y; }
@@ -503,9 +506,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 关键：GetLastRect() 在 Layout 趟里可能是退化矩形（诊断日志里 lastYMax=1.0），
             // 用它算"已用高度"会得到 ~0，表格于是按整个视口取高、直接溢出页面底部。
             // 这里放一个零高度探针，拿到当前布局游标的真实 y。
-                // 分区标题先画：它占的高度必须计入 last.yMax，否则表格底边会超出页面底部（下方留白/末行被裁）。
-                SRApi.Ctl.SectionTitle(SRApi.T("- 预设列表", "- Preset list") + " (" + VisiblePresets().Count + "/" + _presets.Count
-                    + SRApi.T("，上限 ", ", limit ") + MaxPresets + ")");
             Rect last = GUILayoutUtility.GetRect(1f, 0f);
                 // 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
                 // 表格高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
@@ -515,9 +515,9 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 核心化：高度 = min(可用, 表头 + 行数*行高 + 拖拽条)。行少 -> 收紧，行多 -> 填满并滚动。
             // 高度只按内容：传 null 忽略"表高配置"，否则以前拖过的高度会把表格抬到配置值、行下方留白。
             // 按内容收紧（不用填满模式）：填满会在最后一行下面留一大块空表框，看起来就是"列表下面的空白"。
-            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, null, 0f,
+            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, null, SRApi.Ctl.TableMinH(),
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-                0f, false);  // fillViewport=false：高度=表头+行，行多时按可用高度截断并滚动
+                0f, true);   // fillViewport=true：与联机页一致，表格占满剩余高度、内部滚动
                 _actionHitThisFrame = false;
                 List<PresetInfo> visible = VisiblePresets();
                 RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示

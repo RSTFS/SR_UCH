@@ -390,14 +390,14 @@ public partial class SR {
                     GUILayout.Label(ok ? "●" : "▲", _label, GUILayout.Width(Sc(18)), GUILayout.Height(Sc(20)));
                 } finally { GUI.color = prev; }
                 // 标题自适应高度：长标题换行显示，不再被固定 20px 截断。
-                float __titleH = Mathf.Max(Sc(22), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)) + Sc(3));   // 底部多留 3px：中文标题的下缘笔画以前会被裁
+                float __titleH = Mathf.Max(Sc(22), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)) + Sc(6));   // 底部多留 6px：中文标题的下缘笔画以前会被裁
                 GUILayout.Label(title, _labelWrap, GUILayout.Width(Sc(120)), GUILayout.Height(__titleH));
                 GUILayout.Label(summary, _label, GUILayout.Height(Sc(20)));
                 GUILayout.FlexibleSpace();
                 if (canExpand) {
                     // 详情按钮跟随标题高度：标题换行变高时按钮不会缩在 20px 里显得错位。
                     if (GUILayout.Button(open ? T("收起", "Hide") : T("详情", "Details"), _btn,
-                            GUILayout.Width(Sc(64)), GUILayout.Height(Mathf.Max(Sc(20), __titleH)))) {
+                            GUILayout.Width(Sc(54)), GUILayout.Height(Mathf.Max(Sc(18), __titleH - Sc(4))))) {
                         if (open) _cardOpen.Remove(title); else _cardOpen.Add(title);
                     }
                 }
