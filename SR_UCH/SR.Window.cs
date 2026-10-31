@@ -490,9 +490,6 @@ public partial class SR {
                     }
                 }
                 GUILayout.FlexibleSpace();
-                GUILayout.Label(T("恢复所有 SR＿UCH 配置为默认值", "Reset all SR＿UCH settings to defaults"), _label);
-                GUILayout.EndHorizontal();
-                GUILayout.Space(Sc(4));
             }
             float colWidth = EntryNameWidth();
             // 功能页外框部件（滚动区之外，功能自注册，仅在对应栏目被选中时调用）。

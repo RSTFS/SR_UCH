@@ -297,7 +297,7 @@ public partial class SR {
                     T("按名字排序，超阈值才需要关注", "sorted by name; only over-threshold rows matter"),
                     delegate {
                         _scrollHooks = GUILayout.BeginScrollView(_scrollHooks, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
-                            GUIStyle.none, GUILayout.Height(Sc(132f)));
+                            GUIStyle.none, GUILayout.Height(Sc(190f)));
                         if (string.IsNullOrEmpty(tickRep)) GUILayout.Label(T("（还没有采样）", "(no samples yet)"), _label);
                         else {
                             string[] rows = tickRep.Split('\n');
@@ -337,7 +337,9 @@ public partial class SR {
                     GUI.color = ok ? new Color(0.55f, 0.92f, 0.55f) : new Color(1f, 0.78f, 0.35f);
                     GUILayout.Label(ok ? "●" : "▲", _label, GUILayout.Width(Sc(18)), GUILayout.Height(Sc(20)));
                 } finally { GUI.color = prev; }
-                GUILayout.Label(title, _label, GUILayout.Width(Sc(120)), GUILayout.Height(Sc(20)));
+                // 标题自适应高度：长标题换行显示，不再被固定 20px 截断。
+                float __titleH = Mathf.Max(Sc(20), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)));
+                GUILayout.Label(title, _labelWrap, GUILayout.Width(Sc(120)), GUILayout.Height(__titleH));
                 GUILayout.Label(summary, _label, GUILayout.Height(Sc(20)));
                 GUILayout.FlexibleSpace();
                 if (canExpand) {

@@ -221,6 +221,7 @@ public partial class Level {
         }
 
         private static void Tick() {
+                if (Time.frameCount % 6 != 0) return;   // 按键轮询降到 ~10Hz
             if (_key == null || _key.Value == KeyCode.None) return;
             if (!SRApi.ComboKeyDown(_key)) return;
             Perform();

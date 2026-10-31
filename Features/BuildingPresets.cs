@@ -137,8 +137,7 @@ namespace SR_UCH.Tweaks {
         private static readonly string[] _cells = new string[ColCount];
         private static SRApi.TableArgs _args;
         private static Vector2 _scrollRows;
-        private static Vector2 _scrollCols;
-        private static bool _wheelLoggedFrame;   // 诊断：每帧只记一次滚轮事件
+        private static Vector2 _scrollCols;   // 诊断：每帧只记一次滚轮事件
         private static Rect _tableBox;     // 表格在屏幕上的矩形（页面级滚轮钩子按它判断是否滚表格）
         private static float _maxScrollX;
         private static float _maxScrollY;
@@ -375,7 +374,6 @@ namespace SR_UCH.Tweaks {
                 // 本帧开始前的二次确认状态：只有"之前已确认、本帧又没点中操作按钮"才在空白处取消，
                 // 避免把本帧其它按钮（保存/导入）刚点出来的二次确认立刻清掉。
                 string pendingBefore = _pendingKey;
-                if (Event.current != null && Event.current.type == EventType.Layout) _wheelLoggedFrame = false;
                 // 页面滚动保持可用（滚动条已统一隐藏）：表格内部滚轮失效时也能靠页面滚动看到全部内容。
                 Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
                 if (Event.current != null && Event.current.type == EventType.Layout) { _pageTopY = topProbe.y; }
@@ -820,13 +818,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     // 拖拽兜底复位（拖列宽 / 换列位由核心处理，这里只接住状态与落盘回调）。
                     SRApi.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _args.moveCol, ref _args.moveDx,
                         ref _args.dragCol, ref _dragH, SaveCols, null, null);
-                    if (e.type == EventType.ScrollWheel && !_wheelLoggedFrame) {
-                        _wheelLoggedFrame = true;
-                        try {
-                            SRApi.LogInfo("[布局预设][滚轮] 到达页面层 type=" + e.type + " delta=" + e.delta.x + "," + e.delta.y
-                                + " inBox=" + box.Contains(mp) + " maxY=" + _maxScrollY + " sb=" + _sbHandled);
-                        } catch (Exception) { }
-                    }
                     if (!_sbHandled)
                         SRApi.TableWheelInput(e, box, mp, _maxScrollX, _maxScrollY, ref _scrollCols, ref _scrollRows);
                     // 临时诊断日志：点表头时记录核心是否认到拖动/列宽拖动（构建后看 BepInEx 日志即可定位拖拽问题）。
