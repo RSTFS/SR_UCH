@@ -125,12 +125,12 @@ The panel has sections on the left and pages on the right. Listed by section bel
 
 ## Build
 
-`powershell
+```powershell
 # Requires: .NET SDK (provides Roslyn csc) + a local game install (provides reference assemblies)
-.\build\build.ps1                                        # -> bin\Release\SR_UCH.dll
-.\build\build.ps1 -Deploy                                # build and copy to <game>\BepInEx\plugins
-.\build\build.ps1 -GameDir "D:\...\Ultimate Chicken Horse"
-`
+./build/build.ps1                                        # -> bin/Release/SR_UCH.dll
+./build/build.ps1 -Deploy                                # build and copy to <game>/BepInEx/plugins
+./build/build.ps1 -GameDir "D:/.../Ultimate Chicken Horse"
+```
 
 The game folder is auto-detected from common Steam paths; set the UCH_DIR environment variable to override.
 

@@ -321,6 +321,55 @@ namespace SR_UCH.Tweaks {
         }
 
         // 同一段内同名键只保留最后一条（BepInEx 解析为后写覆盖先写，生效值不变）。
+        // 清理"旧命名"的 [Settings] 热键条目：名字是 "组合键 <键>"（剩余部分不以任何已存在的段名开头），
+        // 且值为空。值非空的不动（可能是用户手改的，宁可留着）。
+        // 注意：条目上方通常紧跟它自己的三行注释（## 说明 / # Setting type / # Default value），一起删掉。
+        private static string PruneLegacyComboKeys(string text) {
+            try {
+                string[] lines = text.Replace("\r\n", "\n").Split('\n');
+                HashSet<string> sections = new HashSet<string>(StringComparer.Ordinal);
+                for (int i = 0; i < lines.Length; i++) {
+                    string s = lines[i].Trim();
+                    if (s.Length > 2 && s[0] == '[' && s[s.Length - 1] == ']') sections.Add(s.Substring(1, s.Length - 2));
+                }
+                List<string> keep = new List<string>(lines.Length);
+                string cur = null;
+                int removed = 0;
+                for (int i = 0; i < lines.Length; i++) {
+                    string ln = lines[i];
+                    string s = ln.Trim();
+                    if (s.Length > 2 && s[0] == '[' && s[s.Length - 1] == ']') {
+                        cur = s.Substring(1, s.Length - 2);
+                        keep.Add(ln);
+                        continue;
+                    }
+                    if (cur == "Settings" && s.StartsWith("组合键 ", StringComparison.Ordinal)) {
+                        string rest = s.Substring(4).Trim();   // "组合键 " = 3 字 + 空格
+                        int eq = rest.IndexOf('=');
+                        string name = eq >= 0 ? rest.Substring(0, eq).Trim() : rest;
+                        string val = eq >= 0 ? rest.Substring(eq + 1).Trim() : "";
+                        bool prefixed = false;
+                        foreach (string sec in sections) {
+                            if (name.StartsWith(sec + " ", StringComparison.Ordinal)) { prefixed = true; break; }
+                        }
+                        if (!prefixed && val.Length == 0) {
+                            // 连同紧贴它的注释一起删（遇到空行/段头就停）。
+                            while (keep.Count > 0) {
+                                string back = keep[keep.Count - 1].Trim();
+                                if (back.Length == 0 || back[0] != '#') break;
+                                keep.RemoveAt(keep.Count - 1);
+                            }
+                            removed++;
+                            continue;
+                        }
+                    }
+                    keep.Add(ln);
+                }
+                if (removed > 0) SR.LogInfo("[配置迁移] 清理旧命名热键条目 " + removed + " 个（无分区前缀且值为空）");
+                return string.Join("\n", keep);
+            } catch (Exception __ex) { SR.Guard.Log("cfg 旧热键条目清理", __ex); return text; }
+        }
+
         private static string DedupeSectionKeys(string text) {
             try {
                 string[] lines = text.Replace("\r\n", "\n").Split('\n');
@@ -747,6 +796,9 @@ namespace SR_UCH.Tweaks {
                     "Show Spawn", "Show Goal", "Show Death Line", "Show Density", "Show Edges",
                     "Show Start Blocks", "Show Spawn Calc"
                 });
+                // 早期热键条目名是 "组合键 <键>"（不带分区名），现方案是 "组合键 <段> <键>"。
+                // 旧形式的条目已无任何代码读取（值都是空），连同紧贴它的注释一起清掉。
+                text = PruneLegacyComboKeys(text);
                 // cc.disband 与 cc.mainmenu 都映射到 online.disband（见 KeyMap），按“后写覆盖先写”只保留最后一条。
                 text = DedupeSectionKeys(text);
                 if (text == orig) return false;
