@@ -136,6 +136,7 @@ namespace SR_UCH.Tweaks {
         };
         private static readonly string[] _cells = new string[ColCount];
         private static SRApi.TableArgs _args;
+        private static float _hDiagAt;   // 高度诊断节流
         private static Vector2 _scrollRows;
         private static Vector2 _scrollCols;
         private static bool _wheelLoggedFrame;   // 诊断：每帧只记一次滚轮事件
@@ -712,6 +713,21 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 也已经被算进 last.yMax（TableFitHeight 的 used）。再扣一次 titleH + 拖拽条，
                 // 表格就会比可用区域矮一截 —— 列表中下方那片空白的直接来源。
                 tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH);
+                // 临时诊断：一次/秒打印高度各分量，定位"列表下面空白"到底哪一项算错。
+                try {
+                    float __now = Time.unscaledTime;
+                    if (__now >= _hDiagAt) {
+                        _hDiagAt = __now + 1f;
+                        SRApi.LogInfo("[预设高度] viewport=" + SRApi.PageViewportHeight.ToString("0.0")
+                            + " pageTop=" + _pageTopY.ToString("0.0")
+                            + " lastYMax=" + GUILayoutUtility.GetLastRect().yMax.ToString("0.0")
+                            + " tableH=" + tableH.ToString("0.0")
+                            + " titleH=" + titleH.ToString("0.0")
+                            + " headerH=" + headerH.ToString("0.0")
+                            + " rowsH=" + Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH).ToString("0.0")
+                            + " contentH=" + (visible.Count * rowH).ToString("0.0"));
+                    }
+                } catch (Exception __hd) { SRApi.Guard.Log("预设高度诊断", __hd); }
                 float rowsH = Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH);
                 Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
                 EnsureCols();
