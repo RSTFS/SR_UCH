@@ -75,8 +75,7 @@ public partial class SR {
                     BlockInput = value is bool bv && bv;
                     ApplyEventSystemGate();
                 }
-                _dirtyConfig = entry.ConfigFile;
-                _dirty = true;
+                MarkConfigDirty(entry.ConfigFile);
                 //外部改值时清空编辑框缓存；编辑框自身提交的那一帧不清，否则会吃掉小数点。
                 if (_editSelfFrame != Time.frameCount) _editText.Remove(entry);
             } catch (Exception ex) {

@@ -523,7 +523,9 @@ public partial class SR : ITweak {
         public static void MarkConfigDirty(ConfigFile cfg) {
             if (cfg == null) return;
             if (ReferenceEquals(cfg, _internalConfig)) { _cfgDirty = true; return; }
-            _dirtyConfig = cfg;
+            // 用集合而不是单槽：先改 A 插件、再改 B 插件时单槽会把 A 覆盖掉，
+            // A 的改动永远不会落盘（audit 04-P0-1）。
+            _dirtyConfigs.Add(cfg);
             _dirty = true;
         }
 
@@ -564,7 +566,9 @@ public partial class SR : ITweak {
         // 快捷键录制态：收集所有按键及其顺序（见 SR.Window 的录制分支 / CommitRecording）
         private static readonly List<KeyCode> _recSeq = new List<KeyCode>();
         private static readonly List<KeyCode> _recHeld = new List<KeyCode>(); // 录制中仍按住的键（全部松开即完成录制）
-        private static ConfigFile _dirtyConfig;
+        // 待落盘的外部插件配置集合（SR 自己的配置走 _cfgDirty + FlushConfig）
+        private static readonly HashSet<ConfigFile> _dirtyConfigs = new HashSet<ConfigFile>();
+        internal static HashSet<ConfigFile> DirtyConfigs { get { return _dirtyConfigs; } }
         private static readonly Dictionary<ConfigEntryBase, string> _editText = new Dictionary<ConfigEntryBase, string>();
         private static readonly Dictionary<ConfigEntryBase, bool> _editOpen = new Dictionary<ConfigEntryBase, bool>();
         // 窗口几何
@@ -1207,11 +1211,15 @@ public partial class SR : ITweak {
         private static void CloseMenu() {
             _visible = false;
             _capturing = null;
-            var dc = _dirtyConfig;
-            _dirtyConfig = null;
+            ConfigFile[] __dcs = new ConfigFile[_dirtyConfigs.Count];
+            _dirtyConfigs.CopyTo(__dcs);
             _dirty = false;
-            // 关闭菜单时保存配置，失败记日志
-            Guard.Try("关闭菜单时保存配置", () => { if (dc != null) dc.Save(); });
+            // 关闭菜单时保存配置，失败记日志（逐个保存，一个失败不影响其它）
+            for (int __i = 0; __i < __dcs.Length; __i++) {
+                ConfigFile __dc = __dcs[__i];
+                Guard.Try("关闭菜单时保存配置", () => __dc.Save());
+                _dirtyConfigs.Remove(__dc);
+            }
             ApplyEventSystemGate();
             try { ResetWheelState(); } catch (Exception __ex) { Guard.Log("CloseMenu", __ex); }   // 清掉滑块 / 滚轮盾的跨帧残留
         }

@@ -66,6 +66,12 @@ public partial class SR {
             RunTickHooks();
             CursorResize = false; // 每帧复位；命中检测时重新置位
             CursorMove = false;
+            // 兜底：鼠标已经全部松开就不允许 BlockWindowDrag 残留。
+            // 操作列 / 表格高度这两处只在"MouseUp 命中自己"的分支复位，指针移出后松手会漏
+            // （audit 06-P0-1/06-P0-2），表现为窗口拖拽被永久阻塞。
+            try {
+                if (!Input.GetMouseButton(0) && !Input.GetMouseButton(1)) BlockWindowDrag = false;
+            } catch (Exception __bwd) { Guard.Log("复位窗口拖拽标记", __bwd); }
             // EventSystem 门控必须每帧跟随：只在打开面板时判定一次，之后 InputLocked 变 false 就不再恢复。
             ApplyEventSystemGate();
             _uiAlpha = Mathf.Clamp01(_uiAlpha + (_visible ? 8f : -8f) * Time.unscaledDeltaTime);   // 打开/关闭约 0.12s 淡入淡出
@@ -77,11 +83,19 @@ public partial class SR {
             // 自动保存：按住鼠标时不写，松手即保存（避免拖动中每帧写盘）
             if (_dirty && !Input.GetMouseButton(0) && !Input.GetMouseButton(1)) {
                 _dirty = false;
-                if (_dirtyConfig != null) {
-                    var dc = _dirtyConfig;
-                    _dirtyConfig = null;
-                    // 配置写盘失败统一记日志
-                    Guard.Try("配置保存", () => dc.Save());
+                // 逐个保存，成功才从集合里移除；失败留下次再试（audit 04-P0-1）。
+                if (SR.DirtyConfigs.Count > 0) {
+                    var __all = new System.Collections.Generic.List<ConfigFile>(SR.DirtyConfigs);
+                    for (int __i = 0; __i < __all.Count; __i++) {
+                        ConfigFile __dc = __all[__i];
+                        bool __ok = false;
+                        Guard.Try("配置保存", () =>
+                        {
+                            __dc.Save();
+                            __ok = true;
+                        });
+                        if (__ok) SR.DirtyConfigs.Remove(__dc);
+                    }
                 }
             }
         }

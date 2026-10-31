@@ -9,7 +9,7 @@
 | 3 | 02_SR.Contracts | P0-2 | Slots.Require 类型不符与新名字超过 64 条后静默丢弃，自检界面呈现"假干净" | `ported` | 超 64 条聚合计数 + LogWarn；MissingSinks 注入前 Debug.LogError |
 | 4 | 03_门控与扩展点 | P0-01 | `UserMessage(show, false)` 命中错误的二参重载，所有屏幕提示被绑定到当前场景 | `ported` | 改调四参 UserMessage(show,2f,lo,false) |
 | 5 | 03_门控与扩展点 | P0-02 | `CanDo(Cap.HostOnly)` 判断 `HasServer`，与“仅房主可执行”的文案和名称不一致 | `ported` | Cap.HostOnly 改判 Env.IsHost |
-| 6 | 04_主窗口框架 | P0-1 | `_dirtyConfig` 单槽覆盖会让先改的 ConfigFile 永不落盘 | `todo` |  |
+| 6 | 04_主窗口框架 | P0-1 | `_dirtyConfig` 单槽覆盖会让先改的 ConfigFile 永不落盘 | `ported` | _dirtyConfig 单槽改 HashSet，逐个保存成功才移除 |
 | 7 | 04_主窗口框架 | P0-2 | 录制超时与 CommitRecording 在同一帧并存，可能提交错误序列 | `todo` |  |
 | 8 | 04_主窗口框架 | P0-3 | DrawGUI 的 finally 不能保证 BeginArea / 滚动组对称闭合 | `todo` |  |
 | 9 | 04_主窗口框架 | P0-4 | 共享 skin 选择色/字体的还原依赖“SR 样式仍在内存” | `todo` |  |
@@ -19,8 +19,8 @@
 | 13 | 05_键位与调色板 | P0-4 | `legacy.Value=""` 会在读回时把用户旧配置清空，且迁移判断忽略 extras | `todo` |  |
 | 14 | 05_键位与调色板 | P0-5 | 颜色选择器拖动中丢失 MouseUp 时 Dirty 永久存在，Tick 兜底不覆盖全部路径 | `todo` |  |
 | 15 | 05_键位与调色板 | P0-6 | `Tick` 兜底跳过条件与“窗口不再绘制”互斥，关闭/切页可能永远不落盘 | `todo` |  |
-| 16 | 06_控件门面Ctl | P0-1 | 操作列 MouseDown 置位但 MouseUp 未命中时不复位 BlockWindowDrag | `todo` |  |
-| 17 | 06_控件门面Ctl | P0-2 | 表格高度拖拽中途 MouseUp 外泄，同样可能让窗口拖拽永久阻塞 | `todo` |  |
+| 16 | 06_控件门面Ctl | P0-1 | 操作列 MouseDown 置位但 MouseUp 未命中时不复位 BlockWindowDrag | `ported` | 每帧鼠标全松时兜底清 BlockWindowDrag |
+| 17 | 06_控件门面Ctl | P0-2 | 表格高度拖拽中途 MouseUp 外泄，同样可能让窗口拖拽永久阻塞 | `ported` | 同上兜底覆盖表格高度拖拽外泄 |
 | 18 | 07_表格与样式 | P0-1 | 控制台表格未接入滚轮输入，玩家列表无法滚动 | `todo` |  |
 | 19 | 07_表格与样式 | P0-2 | 选中行高亮在非 Repaint 事件上逐行调用 DrawTexture | `todo` |  |
 | 20 | 07_表格与样式 | P0-3 | 字体回退路径会销毁当前正在使用的字体 | `todo` |  |
