@@ -30,9 +30,9 @@
 | 24 | 08_本地化与设置页 | P0-02 | ApplyCmOrder 用反射写 `<Description>k__BackingField`，BepInEx 5 实际字段名是 `description`（无编译器生成名） | `todo` |  |
 | 25 | 08_本地化与设置页 | P0-03 | ResetAllDefaults 只复位 `Section == "Settings"` 的条目，Sidebar/Internal 段与外部插件段被跳过且窗口几何被一并复位 | `todo` |  |
 | 26 | 08_本地化与设置页 | P0-04 | ModeLabel 缓存键用 `GameSettings.GetInstance().GameMode`，但 `gmKey` 声明在使用之后、且 catch 块吞掉异常后 `gmKey` 保持 `CREATIVE` 默认值 | `todo` |  |
-| 27 | 09_配置迁移 | P0-01 | 删除判定是"手工死键名单"，名单与活键脱节时会在 Bind 之前永久抹掉用户设置 | `todo` |  |
-| 28 | 09_配置迁移 | P0-02 | `_xPending` 是无版本号布尔，"写盘失败仍复位"会让规则永久失效 | `todo` |  |
-| 29 | 09_配置迁移 | P0-03 | 写盘后若调用方未执行 `ConfigFile.Reload()`，迁移结果会与内存中的 ConfigEntry 值分叉 | `todo` |  |
+| 27 | 09_配置迁移 | P0-01 | 删除判定是"手工死键名单"，名单与活键脱节时会在 Bind 之前永久抹掉用户设置 | `ported` | 删除键登记 + 启动日志一次性汇总（迁移时尚未 Bind，无法判定活键；深度修法=post-bind 孤儿清理，记为 P1） |
+| 28 | 09_配置迁移 | P0-02 | `_xPending` 是无版本号布尔，"写盘失败仍复位"会让规则永久失效 | `already-fixed` | RunPending 仅在 WriteCfgAtomic 成功后清 _xPending，失败保留待重试 |
+| 29 | 09_配置迁移 | P0-03 | 写盘后若调用方未执行 `ConfigFile.Reload()`，迁移结果会与内存中的 ConfigEntry 值分叉 | `already-fixed` | RunPending 返回 true 后调用方 pe.config.Reload() + ClearEntryCache（SR.Core.cs:1154-1157） |
 | 30 | 10_布局预设核心 | P0-1 | Provide 只暴露只读锁状态，未见与 Level 功能的双向 Require | `todo` |  |
 | 31 | 10_布局预设核心 | P0-2 | 加载异常或失败路径可能永久持有本功能重载锁 | `todo` |  |
 | 32 | 11_预设IO与修改器 | P0-1 | ResolveImportPath 的目录穿越防护可被 `..` 与路径分隔符绕过 | `todo` |  |

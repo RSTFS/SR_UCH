@@ -134,6 +134,11 @@ namespace SR_UCH.Tweaks {
             try {
                 // 登记删除规则，供启动后的冲突自检比对。
                 if (keys != null) for (int __k = 0; __k < keys.Length; __k++) _appliedRemovals.Add(new[] { section, keys[__k] });
+                // 删除由"手工死键名单"驱动，名单与活键脱节时会永久抹掉用户设置（audit 09-P0-01）。
+                // 迁移层此时尚未 Bind、读不到"哪些键还活着"，所以至少把每次删除写明，便于事后反查。
+                if (_removedKeysLog != null && keys != null) {
+                    for (int __k = 0; __k < keys.Length; __k++) _removedKeysLog.Add(section + "/" + keys[__k]);
+                }
                 string[] lines = text.Replace("\r\n", "\n").Split('\n');
                 List<string> outp = new List<string>();
                 string cur = "";
@@ -482,6 +487,8 @@ namespace SR_UCH.Tweaks {
         private static readonly List<string[]> _xMoves = new List<string[]>();       // [from,to,key]
         private static readonly List<string[]> _xRemovals = new List<string[]>();    // [sec, key...]
         private static bool _xPending;
+        // 本次启动内删除过的键（启动日志一次性汇总，audit 09-P0-01）
+        private static System.Collections.Generic.List<string> _removedKeysLog = new System.Collections.Generic.List<string>();
 
         // 是否有功能登记过、但还没应用的规则（SR.Core 据此决定要不要补跑一次）
         public static bool HasPending { get { return _xPending; } }
@@ -805,7 +812,16 @@ namespace SR_UCH.Tweaks {
                 text = DedupeSectionKeys(text);
                 if (text == orig) return false;
                 // 不再内联一份写盘逻辑：统一走 WriteCfgAtomic（评审 F1 P0-01：两份实现的失败路径不一致）。
-                return WriteCfgAtomic(cfgPath, text, "配置迁移·section/key");
+                bool __ok = WriteCfgAtomic(cfgPath, text, "配置迁移·section/key");
+            // 一次性汇总本次删除的键（audit 09-P0-01：删除必须可见，不能静默抹掉用户设置）。
+            try {
+                if (__ok && _removedKeysLog != null && _removedKeysLog.Count > 0) {
+                    SRApi.LogInfo("[配置迁移] 本次删除 " + _removedKeysLog.Count + " 个已删功能的配置键: "
+                        + string.Join(", ", _removedKeysLog.ToArray()));
+                    _removedKeysLog.Clear();
+                }
+            } catch { /* 汇总日志失败不影响迁移 */ }
+            return __ok;
             } catch (Exception __ex) { SR.Guard.Log("cfg section/key 迁移", __ex); return false; }
         }
     }
