@@ -712,6 +712,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 也已经被算进 last.yMax（TableFitHeight 的 used）。再扣一次 titleH + 拖拽条，
                 // 表格就会比可用区域矮一截 —— 列表中下方那片空白的直接来源。
                 tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH);
+                // 表格自适应：高度最多到"表头 + 行 + 底边拖拽条"，行数少时不留空表格体。
+                float contentH = visible.Count * rowH;
+                float fitH = headerH + contentH + SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f;
+                if (tableH > fitH) tableH = Mathf.Max(SRApi.Ctl.Sc(120), fitH);
                 float rowsH = Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH);
                 Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
                 EnsureCols();
