@@ -182,6 +182,10 @@ public partial class Experiments : ITweak
                 // 半径不挂 SettingChanged，Tick 每帧会调 ApplyHardBounds，改完下一帧自然生效。
                 // 旧的子项键已无任何 Config.Bind，统一由 SR.ConfigMigration 的 RemoveKeys 清理。
                 SRApi.RegisterTick("关卡边界", Tick);
+            SRApi.RegisterSceneHook(delegate {
+                _cursors = null; _lvCache = null; _zc = null; _fixers = null;
+                _igScans = 0;
+            });   // 换场景才重扫：边界钩子不再按帧做全场景 FindObjectsOfType
                 try { GameEvent.GameEventManager.ChangeListener<GameEvent.PiecePlacedEvent>(new PieceIgnoreListener(), true); }
                 catch (Exception __ex) { SRApi.Guard.Log("边界/事件监听", __ex); }
                 SRApi.RegisterSceneHook(Reset);
@@ -540,10 +544,12 @@ public partial class Experiments : ITweak
         }
 
         // 缓存
-        private const int CursorRefreshEvery = 120;   // 2 秒：只用于捕捉中途加入的玩家
+        private const int CursorRefreshEvery = 600;   // 10 秒兜底：正常只在换场景时重扫
         private static PiecePlacementCursor[] Cursors() {
             int f = Time.frameCount;
-            if (f - _cursorsAt < CursorRefreshEvery) return _cursors;
+            // 换场景由 SceneHook 清空缓存；场景内只有"新玩家加入"会新增光标，
+            // 所以这里保留 10 秒兜底即可，不必每 2 秒全扫一次。
+            if (_cursors != null && _cursors.Length > 0 && f - _cursorsAt < CursorRefreshEvery) return _cursors;
             _cursorsAt = f;
             try {
                 PiecePlacementCursor[] a = UnityEngine.Object.FindObjectsOfType<PiecePlacementCursor>();
@@ -553,7 +559,7 @@ public partial class Experiments : ITweak
         }
         private static global::Level[] Levels() {
             int f = Time.frameCount;
-            if (f - _lvCacheAt < 600 && _lvCache != null) return _lvCache;
+            if (_lvCache != null && _lvCache.Length > 0) return _lvCache;   // 换场景才失效
             _lvCacheAt = f;
             try {
                 global::Level[] a = UnityEngine.Object.FindObjectsOfType<global::Level>();
@@ -578,7 +584,7 @@ public partial class Experiments : ITweak
         }
         private static FixCameraToBoundaries[] Fixers() {
             int f = Time.frameCount;
-            if (f - _fixersAt < 600) return _fixers;
+            if (_fixers != null && _fixers.Length > 0) return _fixers;      // 换场景才失效
             _fixersAt = f;
             try {
                 FixCameraToBoundaries[] a = UnityEngine.Object.FindObjectsOfType<FixCameraToBoundaries>();
