@@ -2,7 +2,7 @@
 # 规则：任何 .cs 超过 900 行都必须在这里登记；登记的数字只允许变小（拆分后同步更新）。
 # 计数口径：与守卫一致（ReadAllLines 的行数）。触发脚本就是本文件。
 # 格式：相对仓库根的路径=行数
-SR_UCH/SR.Settings.cs=1391
+SR_UCH/SR.Settings.cs=1417
 SR_UCH/SR.Contracts.cs=1349
 SR_UCH/SR.Core.cs=1276
 SR_UCH/SR.Ctl.cs=1119

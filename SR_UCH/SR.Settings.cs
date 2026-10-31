@@ -137,7 +137,8 @@ public partial class SR {
 
         internal static int SettingsTab;   // 0 = 通用，1 = 自检
         private static Vector2 _scrollIssues;   // 自检页表格的滚动位置
-        private static Vector2 _scrollHooks;    // 自检页帧钩子表格的滚动位置
+        private static Vector2 _scrollHooks;
+        private static bool _auditExpanded;   // 全绿时默认收起细节    // 自检页帧钩子表格的滚动位置
 
         // 设置页入口：顶部两个页签，下面按页签渲染。页面切换只改这个字段，不重建任何配置。
         internal static void RenderSettingsPage(float colWidth) {
@@ -253,6 +254,31 @@ public partial class SR {
                 }
                 GUILayout.FlexibleSpace();
                 GUILayout.EndHorizontal();
+                // ===== 结论行：默认只看这一行，全绿时下面全部收起 =====
+                System.Collections.Generic.IList<SR.AuditIssue> __issues = SR.AuditIssues;
+                int __bad = __issues != null ? __issues.Count : 0;
+                bool __clean = __bad == 0;
+                Color __pc = GUI.color;
+                try {
+                    GUI.color = __clean ? new Color(0.55f, 0.92f, 0.55f) : new Color(1f, 0.78f, 0.35f);
+                    GUILayout.Label(__clean
+                            ? T("● 一切正常（补丁 " + SR.AuditPatchOk + "/" + SR.AuditPatchTotal
+                                + "，反射 " + SR.AuditRefOk + "/" + SR.AuditRefTotal + "）",
+                                "● All good (patches " + SR.AuditPatchOk + "/" + SR.AuditPatchTotal
+                                + ", reflection " + SR.AuditRefOk + "/" + SR.AuditRefTotal + ")")
+                            : T("▲ " + __bad + " 项失效：对应功能的开关还在，但行为没了",
+                                "▲ " + __bad + " broken target(s): the switches are still there, the behaviour is gone"),
+                        _secHeader);
+                } finally { GUI.color = __pc; }
+
+                if (__clean && !_auditExpanded) {
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button(T("展开细节", "Show details"), _btn, GUILayout.Width(Sc(110)), GUILayout.Height(Sc(24)))) _auditExpanded = true;
+                    GUILayout.FlexibleSpace();
+                    GUILayout.EndHorizontal();
+                    return;
+                }
+                if (GUILayout.Button(T("收起细节", "Hide details"), _btn, GUILayout.Width(Sc(110)), GUILayout.Height(Sc(24)))) { _auditExpanded = false; return; }
                 GUILayout.Label(T("按名绑定的补丁目标", "Named patch targets") + "："
                     + SR.AuditPatchOk + " / " + SR.AuditPatchTotal);
                 AuditLabel(T("反射成员", "Reflected members") + "：" + SR.AuditRefOk + " / " + SR.AuditRefTotal);
