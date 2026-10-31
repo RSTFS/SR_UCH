@@ -123,6 +123,12 @@ namespace SR_UCH.Tweaks {
                         // 单人/无远程客户端：直接在当前对局内切场景。
                         // 否则退回树屋方案，因为游戏没有在“对局内”更新房客 SelectedLevel 的 RPC/消息。
                         bool __directOk = (!hasRemoteClients || skipTreehouse) && StartDirectReplace(p, xml, targetLevel, targetMode);
+                        if (__directOk && hasRemoteClients) {
+                            // 直接替换时游戏不会替我们同步房客的 SelectedLevel；借游戏自己的
+                            // ClientRpc（RpcSetNextLevel）把下一关推给房客（audit 12-P0-3）。
+                            try { SyncGuestsNextLevel(targetLevel, targetMode, p); }
+                            catch (Exception __sg) { SRApi.Guard.Log("布局预设/同步房客下一关", __sg); }
+                        }
                         if (__directOk) {
                             guard.Handoff();
                             SRApi.LogInfo("[布局预设] 直接替换关卡并加载预设：" + p.Name
@@ -709,6 +715,22 @@ namespace SR_UCH.Tweaks {
         // （audit 12-P0-1/12-P0-2）。这里记录写入时刻，由 tick 兜底清理，不依赖协程存活。
         private static float _xmlSetAt = -1f;
         private static string _xmlWritten;
+
+        // 把"下一关"用游戏自己的 ClientRpc 同步给房客：RpcSetNextLevel 会写房客的
+        // GameState.SelectedLevel / currentSnapshotInfo 并触发 FadeIn，正是原生换关的路径。
+        private static void SyncGuestsNextLevel(GameState.LevelName level, GameState.GameMode mode, PresetInfo p) {
+            try {
+                LobbyManager lm = LobbyManager.instance;
+                LevelSelectController lsc = lm != null ? lm.CurrentLevelSelectController : null;
+                if (lsc == null) { SRApi.LogWarn("[布局预设] 没有 LevelSelectController，跳过房客同步"); return; }
+                LevelSelectController.PlayedSnapshotInfo info = new LevelSelectController.PlayedSnapshotInfo();
+                info.nextLevel = level;
+                if (p != null) { info.snapshotName = p.LevelName; info.snapshotCode = p.LevelCode; }
+                // 老引擎方法签名：CallRpcSetNextLevel 会广播到所有客户端。
+                lsc.CallRpcSetNextLevel(info);
+                SRApi.LogInfo("[布局预设] 已向房客广播下一关: " + level);
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/广播下一关", __ex); }
+        }
 
         private static void SetLevelPortalXml(string xml) {
             try {
