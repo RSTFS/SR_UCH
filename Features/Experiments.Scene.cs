@@ -33,6 +33,16 @@ public partial class Experiments : ITweak
                 SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
                     return e.Definition.Key.StartsWith("Splash ") || e.Definition.Key == "Gentle Load";
                 });
+                // 同位体：对当前房间再进一次，游戏会再建一个本地角色，两个角色共用同一套输入（WASD）。
+                GUILayout.Space(SRApi.Ctl.Sc(2));
+                if (GUILayout.Button(SRApi.T("同位体（再进一次当前房间）", "Alter self (rejoin current lobby)"), SRApi.Ctl.Btn,
+                        GUILayout.Height(SRApi.Ctl.Sc(28)), GUILayout.Width(SRApi.Ctl.Sc(240)))) {
+                    bool ok = Online.ForceRejoinSelf();
+                    SplashTools.Note = ok
+                        ? SRApi.T("同位体：已对当前房间再发一次加入", "Alter self: rejoin request sent")
+                        : SRApi.T("同位体：当前不在房间里", "Alter self: not in a lobby");
+                    SRApi.Notify(SplashTools.Note);
+                }
                 // 关闭遮罩：点一次立刻关掉当前这块黑幕（只在有遮罩时生效，不做常驻行为）。
                 GUILayout.Space(SRApi.Ctl.Sc(2));
                 if (GUILayout.Button(SRApi.T("关闭遮罩（立即）", "Close the mask now"), SRApi.Ctl.Btn,

@@ -167,7 +167,7 @@ namespace SR_UCH.Tweaks {
         // 按钮 / 提示文字：说明不能加入的原因。
         private static string JoinText(Matchmaker.LobbyListInfo li) {
             // 已经在这个房间里：显示"已加入"而不是"加入"，避免误以为还能再进一次。
-            if (IsSelfLobby(li)) return SRApi.T("已加入", "joined");
+            if (IsSelfLobby(li)) return SRApi.T("完成", "done");
             // "房间已空"必须在 IsJoinable 之前判定：IsJoinable 只看 Players >= 4，0 人会被算作可加入。
             if (li.Players == 0) return SRApi.T("房间已空", "empty");
             if (IsJoinable(li)) return SRApi.T("加入", "Join");

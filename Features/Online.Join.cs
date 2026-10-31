@@ -95,6 +95,60 @@ namespace SR_UCH.Tweaks {
         // 正在加入的抑制窗口：JoinFlow 是一次性协程，重复点击会并发两条流程（audit P0-22/23）。
         // 用时间窗而不是 bool：协程异常/被销毁时也会自然过期，不会把入口永久锁死。
         private static float _joinGuardUntil;
+        // 同位体（实验功能）：绕过"已加入/在途"两道门，对当前房间再发一次加入请求。
+        // 表现是游戏再建一套本地角色，与原来的角色共用同一套输入（WASD 同时控两个）——这是刻意行为。
+        internal static bool ForceRejoinSelf() {
+            try {
+                string id = _joinedLobbyId;
+                ulong steamId = 0UL;
+                if (string.IsNullOrEmpty(id)) {
+                    // 不是经本模组加入的房间：从游戏当前的大厅对象里反射取 id。
+                    object cur = Matchmaker.CurrentMatchmakingLobby;
+                    if (cur == null) { SRApi.LogWarn("[同位体] 当前不在房间里，无法再进一次"); return false; }
+                    Type ct = cur.GetType();
+                    string[] names = new string[] { "sLobbyID", "LobbyID", "lobbyID", "id", "Id" };
+                    for (int i = 0; i < names.Length && string.IsNullOrEmpty(id); i++) {
+                        try {
+                            System.Reflection.FieldInfo f = ct.GetField(names[i],
+                                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                            if (f != null) { object v = f.GetValue(cur); if (v != null) id = v.ToString(); }
+                        } catch (Exception __f) { SRApi.Guard.Log("同位体/取房号字段", __f); }
+                        if (string.IsNullOrEmpty(id)) {
+                            try {
+                                System.Reflection.PropertyInfo pr = ct.GetProperty(names[i],
+                                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                                if (pr != null && pr.CanRead) { object v = pr.GetValue(cur, null); if (v != null) id = v.ToString(); }
+                            } catch (Exception __p) { SRApi.Guard.Log("同位体/取房号属性", __p); }
+                        }
+                    }
+                    try {
+                        System.Reflection.FieldInfo fm = ct.GetField("UnityMatchID",
+                            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                        if (fm != null) { object v = fm.GetValue(cur); if (v is ulong) steamId = (ulong)v; }
+                    } catch (Exception __m) { SRApi.Guard.Log("同位体/取 UnityMatchID", __m); }
+                }
+                // 清掉两道门后直接发请求（JoinLobbyInternal 会拒"已加入/在途"，这里不走它）。
+                _joinGuardUntil = 0f;
+                _joinInFlight = false;
+                DisarmWatchdog();
+                if (steamId != 0UL) {
+                    SRApi.LogInfo("[同位体] 对当前房间再进一次（Steam 通道 id=" + steamId + "）");
+                    JoinLobbySteam(steamId, string.IsNullOrEmpty(id) ? "" : id);
+                    return true;
+                }
+                Matchmaker mm = MatchmakerOrNull();
+                if (mm == null) { SRApi.LogWarn("[同位体] 联机功能未初始化，请先进入一次联机界面"); return false; }
+                if (string.IsNullOrEmpty(id)) { SRApi.LogWarn("[同位体] 取不到当前房间号"); return false; }
+                SRApi.LogInfo("[同位体] 对当前房间再进一次（id=" + id + "）");
+                _joinedLobbyId = id;
+                _joinInFlight = true;
+                _joinInFlightUntil = Time.unscaledTime + 20f;
+                try { mm.JoinLobby(id, false, null); }
+                catch (Exception __j) { SRApi.Guard.Log("同位体/加入", __j); _joinInFlight = false; return false; }
+                return true;
+            } catch (Exception __ex) { SRApi.Guard.Log("同位体", __ex); return false; }
+        }
+
         // 每帧维护加入状态：进房成功清"在途"；离开房间后清"已加入房号"（否则会一直挡住该房）。
         internal static void TickJoinState() {
             try {
