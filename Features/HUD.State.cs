@@ -238,11 +238,14 @@ public partial class HUD {
                     _roundText = RoundWord() + candidate;
                     return;
                 }
-                if (candidate < _trueRound) {
-                    // 新对局/重载回退：以较小值重新开始
-                    _trueRound = candidate;
-                    _roundPending = 0;
-                    _roundTallySeen = false;
+                                if (candidate < _trueRound) {
+                    // 回合数回退：只在"确实换了对局"时才接受（否则保留较大的推算值，
+                    // 否则它会来回抖，回合提示跟着反复重播 —— 这就是闪烁的来源）。
+                    if (candidate <= 1) {
+                        _trueRound = candidate;
+                        _roundPending = 0;
+                        _roundTallySeen = false;
+                    }
                 }
                 if (_trueRound <= 0 && candidate > 0) {
                     // 首回合直接接受
@@ -314,20 +317,13 @@ public partial class HUD {
         }
         private static void UpdateRoundNotice() {
             try {
-                float now = Time.unscaledTime;
-                // 正在显示就完全不理外界（回合数在推算期本来就会来回抖动）：
-                // 以前每帧跟着 _trueRound 重置/清除，结果就是"闪一下、又一直在"。
-                if (!string.IsNullOrEmpty(_roundNoticeText)) {
-                    if (now - _roundNoticeStart < RoundNoticeDuration) return;
-                    _roundNoticeText = null;   // 到点收掉，只收一次
-                }
                 int round = _trueRound;
                 if (round <= 0 || round == _lastRound) return;
                 _lastRound = round;
                 if (!RoundNoticeOn()) return;
                 _roundNoticeText = RoundWord() + round;
-                _roundNoticeStart = now;
-            } catch (Exception __ex) { SRApi.Guard.Log("HUD/回合提示", __ex); }
+                _roundNoticeStart = Time.unscaledTime;
+            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
         private static LevelPortal FindLeadingPortal(LobbyManager lm, out int votes) {
             votes = 0;

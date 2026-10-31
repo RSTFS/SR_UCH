@@ -106,7 +106,8 @@ namespace SR_UCH.Tweaks {
                     object cur = Matchmaker.CurrentMatchmakingLobby;
                     if (cur == null) { SRApi.LogWarn("[同位体] 当前不在房间里，无法再进一次"); return false; }
                     Type ct = cur.GetType();
-                    string[] names = new string[] { "sLobbyID", "LobbyID", "lobbyID", "id", "Id" };
+                    // 先按常见命名找，找不到再扫全字段（UCH 的大厅对象命名不固定）。
+                    string[] names = new string[] { "sLobbyID", "LobbyID", "lobbyID", "id", "Id", "matchID", "MatchID", "unityMatchID" };
                     for (int i = 0; i < names.Length && string.IsNullOrEmpty(id); i++) {
                         try {
                             System.Reflection.FieldInfo f = ct.GetField(names[i],
@@ -126,6 +127,19 @@ namespace SR_UCH.Tweaks {
                             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
                         if (fm != null) { object v = fm.GetValue(cur); if (v is ulong) steamId = (ulong)v; }
                     } catch (Exception __m) { SRApi.Guard.Log("同位体/取 UnityMatchID", __m); }
+                    // 兜底：扫一遍所有字段，挑"看起来像房间号"的字符串（含 '-' 且长度 8~12，UCH 房间码形如 ABC1-2345）。
+                    if (string.IsNullOrEmpty(id) && steamId == 0UL) {
+                        FieldInfo[] fs = ct.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        for (int i = 0; i < fs.Length; i++) {
+                            try {
+                                if (fs[i].FieldType != typeof(string)) continue;
+                                string v = fs[i].GetValue(cur) as string;
+                                if (string.IsNullOrEmpty(v)) continue;
+                                if (v.Length >= 6 && v.Length <= 24 && v.IndexOf('-') > 0) { id = v; break; }
+                            } catch (Exception __sf) { SRApi.Guard.Log("同位体/扫字段 " + fs[i].Name, __sf); }
+                        }
+                        if (!string.IsNullOrEmpty(id)) SRApi.LogInfo("[同位体] 从当前大厅字段推断房号：" + id);
+                    }
                 }
                 // 清掉两道门后直接发请求（JoinLobbyInternal 会拒"已加入/在途"，这里不走它）。
                 _joinGuardUntil = 0f;

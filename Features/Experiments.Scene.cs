@@ -160,14 +160,13 @@ public partial class Experiments : ITweak
                     SRApi.Notify(SRApi.T("当前没有遮罩", "No mask on screen"));
                     return;
                 }
+                // 无条件尝试 Skip：以前只在 FADING_IN/SHOW 两个状态才调，其余状态直接"没反应"。
                 bool closed = false;
-                try {
-                    // 游戏自己的快进路径：把状态推进到淡出，然后由游戏正常收尾。
-                    if (sp.State == UISplashScreen.STATE.FADING_IN || sp.State == UISplashScreen.STATE.SHOW) {
-                        sp.Skip();
-                        closed = true;
-                    }
-                } catch (Exception __sk) { SRApi.Guard.Log("关闭遮罩/Skip", __sk); }
+                try { sp.Skip(); closed = true; }
+                catch (Exception __sk) { SRApi.Guard.Log("关闭遮罩/Skip", __sk); }
+                if (!closed) {
+                    try { sp.FadeOut(); closed = true; } catch (Exception __fo) { SRApi.Guard.Log("关闭遮罩/FadeOut", __fo); }
+                }
                 // Skip 会把游戏的 SkipBool 置真且没有取消入口：这里立刻清回 false，
                 // 保证"只关这一次"，下一次加载照常走（与「跳过加载动画」开关互不影响）。
                 try { ClearSkip(sp); } catch (Exception __cs) { SRApi.Guard.Log("关闭遮罩/清SkipBool", __cs); }
