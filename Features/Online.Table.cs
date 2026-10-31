@@ -210,6 +210,18 @@ namespace SR_UCH.Tweaks {
         }
 
 
+        // 表格回调委托只创建一次（评审 4.3）：DrawTableRows 每帧都会跑，内联 delegate 会逐帧产生垃圾。
+        // 这些委托只捕获静态成员，因此可以安全地复用同一实例。
+        private static readonly Func<int, string> _titleFn = delegate(int ci) { return SRApi.T(Titles[ci], TitlesEn[ci]); };
+        private static readonly Action<int[]> _applyOrderFn = delegate(int[] o) { _order = o; SaveCols(); };
+        private static readonly Action _resetAllFn = delegate { ResetTable(); };
+        private static readonly Action<int> _headerShiftFn = delegate(int ci) { if (ci == QualityCol) ToggleQualityCoeff("core header"); };
+        private static readonly Action<int> _rowRightClickFn = delegate(int row) { HideLobbyAt(row); };
+        private static readonly Func<int, string[]> _rowCellsFn = delegate(int r) { return CellTexts(_shownLobbies[r]); };
+        private static readonly Func<int, float> _rowAlphaFn = delegate(int r) { return IsJoinable(_shownLobbies[r]) ? 1f : 0.55f; };
+        private static readonly Func<string> _emptyHintFn = delegate { return SRApi.T("（没有符合筛选的房间）", "(no lobbies match the filters)"); };
+        private static readonly Action _joinDownReset = delegate { _joinDownRow = -1; };
+
         private static void DrawTableRows(Rect box, float headerH, float rowH, float stripW, float rowsH, float viewW, Vector2 mp) {
             // _rowRows 必须与 _rowRectsPage 一起清空：两者是"行矩形 -> _shownLobbies 下标"的一一对应。
             // 表头 / 行命中 / 行绘制统一交给核心入口。
@@ -220,7 +232,7 @@ namespace SR_UCH.Tweaks {
             _tableArgs.scrollX = _scrollCols.x; _tableArgs.scrollY = _scrollRows.y; _tableArgs.mp = mp;
             _tableArgs.pinW = _joinW; _tableArgs.pinX = _joinXPage; _tableArgs.drawHeader = true;   // 表头交给核心绘制
             // 核心画表头需要列标题回调，缺失会导致表头空白。
-            _tableArgs.title = delegate(int ci) { return SRApi.T(Titles[ci], TitlesEn[ci]); };
+            _tableArgs.title = _titleFn;
             // 表头悬停说明交给核心的 tip 回调（核心负责 inBox/单元格命中并设置 GUI.tooltip）。
             _tableArgs.tip = TipText;
             _tableArgs.pinTitle = SRApi.T(Titles[JoinCol], TitlesEn[JoinCol]);
@@ -231,23 +243,23 @@ namespace SR_UCH.Tweaks {
         _tableArgs.reorderable = true;
         // 把本页的列序源与换位回调注入核心。
         _tableArgs.order = _order;
-        _tableArgs.applyOrder = delegate(int[] o) { _order = o; SaveCols(); };
+        _tableArgs.applyOrder = _applyOrderFn;
             // Shift+右键 = 还原全部：接到本表自己的还原例程 ResetTable。
-            _tableArgs.resetAll = delegate { ResetTable(); };
+            _tableArgs.resetAll = _resetAllFn;
         _tableArgs.click = HeaderClickOnce;
             // 表头 Shift+左键（核心在 MouseDown 派发，修饰键可靠）：质量列切换系数显示。
-            _tableArgs.headerShiftClick = delegate(int ci) { if (ci == QualityCol) ToggleQualityCoeff("core headerShiftClick"); };
+            _tableArgs.headerShiftClick = _headerShiftFn;
             // 行右键（核心派发，钉住操作列不算行命中）：隐藏该房间。
-            _tableArgs.rowRightClick = delegate(int row) { HideLobbyAt(row); };
-            _tableArgs.rowCells = delegate(int r) { return CellTexts(_shownLobbies[r]); };
-            _tableArgs.rowAlpha = delegate(int r) { return IsJoinable(_shownLobbies[r]) ? 1f : 0.55f; };
+            _tableArgs.rowRightClick = _rowRightClickFn;
+            _tableArgs.rowCells = _rowCellsFn;
+            _tableArgs.rowAlpha = _rowAlphaFn;
             _tableArgs.headerCells = _headerCellsPage; _tableArgs.headerCols = _headerCols;
             _tableArgs.rowRects = _rowRectsPage; _tableArgs.rowRows = _rowRows;
             _tableArgs.pinRects = _joinRectsPage; _tableArgs.pinRows = _joinRows;
             // 钉住列按钮：位置/裁剪由核心算好，本页只负责画按钮内容。
             // 静态委托（不捕获 mp）：mp 已经存在 _tableArgs.mp 里，避免每帧新建闭包/委托。
             _tableArgs.pinDraw = _pinDrawCached;
-            _tableArgs.emptyHint = delegate { return SRApi.T("（没有符合筛选的房间）", "(no lobbies match the filters)"); };
+            _tableArgs.emptyHint = _emptyHintFn;
             _hiddenColsBeforeTable = _hiddenCols.Count;
             SRApi.TableDraw(_tableArgs);
             // 收回核心算出的钉住列表头矩形，供下方命中判定显示"操作"列 tooltip。
