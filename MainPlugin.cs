@@ -140,6 +140,22 @@ namespace SR_UCH {
                     delegate (Type __o, string __n, Type[] __p, string __f) { return SR.RefMethod(__o, __n, __p, __f); },
                     delegate (string __m, string __f) { SR.RefOverride(__m, __f); });
             });
+            SinkStep("Ctl/Table sinks", delegate () {
+                // 契约层给外部 DLL 预留的控件/表格 sink：内部实现一直都在，只是从没注入过。
+                SRApi.SetTableActionColumnWidthSink(delegate (SRApi.TableAction[] __a) { return SR.Ctl.TableActionColumnWidth(__a); });
+                SRApi.SetTableColMoveSink(delegate (Event __e, Rect __c, int __ci, int __k, List<int> __cols, Vector2 __mp, bool __inBox,
+                    List<Rect> __hc, int[] __ord, Action<int[]> __apply, Action __save, Action<int> __click,
+                    ref int __mc, ref float __x0, ref float __dx, ref Vector2 __sc, ref Vector2 __scAt, bool __vert) {
+                    return SR.TableColMove(__e, __c, __ci, __k, __cols, __mp, __inBox, __hc, __ord, __apply, __save, __click,
+                        ref __mc, ref __x0, ref __dx, ref __sc, ref __scAt, __vert);
+                });
+                SRApi.Ctl.SetSelfToggleButtonSink(delegate (string __l, string __t, bool __on, ConfigEntry<KeyCode> __k, float __w, bool __bind) {
+                    return SR.Ctl.SelfToggleButton(__l, __t, __on, __k, __w, __bind);
+                });
+                SRApi.Ctl.SetSelItemSink(delegate () { return SR.Ctl.SelItem; });
+                SRApi.Ctl.SetCheckStylesSink(delegate () { return SR.Ctl.CheckOn; }, delegate () { return SR.Ctl.CheckOff; });
+                SRApi.Ctl.SetForceZhSink(delegate () { return SR.Ctl.ForceZh; }, delegate (bool __v) { SR.Ctl.ForceZh = __v; });
+            });
             SinkStep("Ext", delegate () {
                 SRApi.SetExtSinks(
                     delegate (string __s, int __r) { SR.Nav(__s, __r); },
