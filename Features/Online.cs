@@ -120,6 +120,16 @@ namespace SR_UCH.Tweaks {
                 if (_hostEndedListener == null) {
                     _hostEndedListener = new HostEndedListener();
                     GameEventManager.ChangeListener<NetworkMessageReceivedEvent>(_hostEndedListener, true);
+                    // 关机时注销：否则功能被禁用/重载后再次 Initialize 会叠成 N 份回调
+                    // （audit 13-P0-05）。回调幂等，重复注销也无害。
+                    SRApi.OnShutdown("联机/房主解散监听", delegate {
+                        try {
+                            if (_hostEndedListener != null) {
+                                GameEventManager.ChangeListener<NetworkMessageReceivedEvent>(_hostEndedListener, false);
+                            }
+                        } catch (Exception __uh) { SRApi.Guard.Log("联机/注销房主解散监听", __uh); }
+                        _hostEndedListener = null;
+                    });
                 }
             } catch (Exception __he) {
                 _hostEndedListener = null;

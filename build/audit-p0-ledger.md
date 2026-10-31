@@ -44,8 +44,8 @@
 | 38 | 13_联机主流程 | P0-01 | `DisbandOrLeave` 二次点击捷径会在"刚进主菜单又点一次"时误触发 | `ported` | 二次点击强杀加 3 秒最短间隔，刚回主菜单再点不会打断收尾 |
 | 39 | 13_联机主流程 | P0-02 | `ForceMainMenu` 直接 `Destroy(LobbyManager.gameObject)` 可能打断游戏自己的收尾 | `ported` | ForceMainMenu 先调 Matchmaker.ReturnToMainMenu（静态），失败才 Disconnect+Destroy 兜底 |
 | 40 | 13_联机主流程 | P0-03 | `ForceMainMenu` 先 `LoadScene("MainMenu")` 后设 `_forceRawDeadline`，在场景切换失败时会永久不硬切 | `ported` | 先设 _forceRawDeadline 再 LoadScene，避免加载中被看门狗重复切场景 |
-| 41 | 13_联机主流程 | P0-04 | `GoMainMenu` 与 `ForceMainMenu` 的 `ClearPendingJoin` 时机不一致，可能让"退出后立刻加入"重复触发 | `todo` |  |
-| 42 | 13_联机主流程 | P0-05 | `HostEndedListener` 幂等哨兵依赖"不重复 Initialize"，热重载会叠成 N 份回调（未验证） | `todo` |  |
+| 41 | 13_联机主流程 | P0-04 | `GoMainMenu` 与 `ForceMainMenu` 的 `ClearPendingJoin` 时机不一致，可能让"退出后立刻加入"重复触发 | `already-fixed` | 两条路径都在 ReturnToMainMenu 之前 ClearPendingJoin 并清 _pendingSteamId，实现已统一 |
+| 42 | 13_联机主流程 | P0-05 | `HostEndedListener` 幂等哨兵依赖"不重复 Initialize"，热重载会叠成 N 份回调（未验证） | `ported` | 监听注册后登记 OnShutdown 注销并置空，禁用/重载后重新 Initialize 不会叠加回调 |
 | 43 | 14_联机加入与列表 | P0-1 | 加入协程挂在 Matchmaker 上，切场景/离房即被销毁，加入请求永不发出 | `todo` |  |
 | 44 | 14_联机加入与列表 | P0-2 | DoJoin 两条"已发出"清空路径互相覆盖，待加入队列实际由 TickPendingJoin 驱动，InSession() 判据可能永久为真 | `todo` |  |
 | 45 | 14_联机加入与列表 | P0-3 | IsStale（心跳 10 秒）只改显示字符串，不参与 IsJoinable，用户会点进死房间 | `todo` |  |
