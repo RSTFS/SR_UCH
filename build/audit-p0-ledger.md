@@ -18,7 +18,7 @@
 | 12 | 05_键位与调色板 | P0-3 | `_pendingComboDefault` 迁移可能覆盖已持久化的“无修饰键”配置 | `ported` | 延迟默认判定改为看持久化字符串是否为空 |
 | 13 | 05_键位与调色板 | P0-4 | `legacy.Value=""` 会在读回时把用户旧配置清空，且迁移判断忽略 extras | `todo` |  |
 | 14 | 05_键位与调色板 | P0-5 | 颜色选择器拖动中丢失 MouseUp 时 Dirty 永久存在，Tick 兜底不覆盖全部路径 | `ported` | Tick 里在 8 帧节流之前补判：Dirty 且鼠标全松 -> 立即 Commit |
-| 15 | 05_键位与调色板 | P0-6 | `Tick` 兜底跳过条件与“窗口不再绘制”互斥，关闭/切页可能永远不落盘 | `todo` |  |
+| 15 | 05_键位与调色板 | P0-6 | `Tick` 兜底跳过条件与“窗口不再绘制”互斥，关闭/切页可能永远不落盘 | `ported` | 收起/换页时 RegisterDismissHook 显式落盘；Tick 异常不再静默；注册失败立即提交一次 |
 | 16 | 06_控件门面Ctl | P0-1 | 操作列 MouseDown 置位但 MouseUp 未命中时不复位 BlockWindowDrag | `ported` | 每帧鼠标全松时兜底清 BlockWindowDrag |
 | 17 | 06_控件门面Ctl | P0-2 | 表格高度拖拽中途 MouseUp 外泄，同样可能让窗口拖拽永久阻塞 | `ported` | 同上兜底覆盖表格高度拖拽外泄 |
 | 18 | 07_表格与样式 | P0-1 | 控制台表格未接入滚轮输入，玩家列表无法滚动 | `already-fixed` | EX 控制台表格在 ExModule.Console.cs:261-276 自己处理 ScrollWheel（含 maxY=0 转横向），审计针对旧快照 |

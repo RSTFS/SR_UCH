@@ -66,7 +66,25 @@ public partial class SR {
         private static void EnsureTick() {
             if (_tickHooked) return;
             _tickHooked = true;
-            try { RegisterTick("颜色调色板兜底落盘", Tick); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+            try { RegisterTick("颜色调色板兜底落盘", Tick); }
+            catch (Exception __rt) {
+                // 注册失败就等于没有兜底：至少记一条，并且立刻提交一次当前展开项。
+                Guard.Log("颜色调色板兜底 tick 注册失败", __rt);
+                try { if (_open != null) { State __s; if (_states.TryGetValue(_open, out __s)) Commit(_open, __s); } }
+                catch (Exception __im) { Guard.Log("颜色调色板立即提交", __im); }
+            }
+            // 收起面板 / 换页时显式收尾：颜色预览与文本输入都在此落盘，不依赖"窗口是否还在绘制"。
+            try {
+                SRApi.RegisterDismissHook(delegate {
+                    try {
+                        State __s;
+                        if (_open != null && _states.TryGetValue(_open, out __s)) {
+                            if (__s.TextPending) FlushText(_open, __s);
+                            Commit(_open, __s);
+                        }
+                    } catch (Exception __dh) { Guard.Log("颜色调色板/收起时落盘", __dh); }
+                });
+            } catch (Exception __rh) { Guard.Log("颜色调色板/注册收起钩子", __rh); }
         }
 
         private static State Get(ConfigEntryBase e) {
@@ -246,7 +264,7 @@ public partial class SR {
                 if (s.Frame >= 0 && Time.frameCount - s.Frame <= 8) return;
                 Commit(_open, s);
                 if (s.TextPending) FlushText(_open, s);
-            } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+            } catch (Exception __tk) { Guard.Log("颜色调色板兜底落盘", __tk); }
         }
 
         private static string DefaultHex(ConfigEntryBase e) {
