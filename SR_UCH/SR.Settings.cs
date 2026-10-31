@@ -231,155 +231,121 @@ public partial class SR {
 
         private static void RenderAuditBlock() {
             try {
-                // 一键导出：复制到剪贴板 / 写进日志（两者都不依赖用户去找文件）。
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Button(T("复制诊断", "Copy report"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
-                    string rep = BuildDiagnosticReport();
-                    bool ok = false;
-                    try { GUIUtility.systemCopyBuffer = rep; ok = true; } catch (Exception __cb) { Guard.Log("复制诊断报告", __cb); }
-                    SR.Notify(ok ? T("诊断报告已复制到剪贴板", "Report copied to clipboard")
-                                 : T("复制失败，已改写到日志", "Copy failed; written to the log instead"));
-                    if (!ok) { try { SR.LogInfo(rep); } catch (Exception __lg) { Guard.Log("诊断报告写日志", __lg); } }
-                }
-                if (GUILayout.Button(T("写入日志", "Write to log"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
-                    try { SR.LogInfo(BuildDiagnosticReport()); SR.Notify(T("已写入日志", "Written to the log")); }
-                    catch (Exception __lg) { Guard.Log("写诊断日志", __lg); }
-                }
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-                // ===== 结论行：默认只看这一行，全绿时下面全部收起 =====
-                System.Collections.Generic.IList<SR.AuditIssue> __issues = SR.AuditIssues;
-                int __bad = __issues != null ? __issues.Count : 0;
-                bool __clean = __bad == 0;
-                Color __pc = GUI.color;
-                try {
-                    GUI.color = __clean ? new Color(0.55f, 0.92f, 0.55f) : new Color(1f, 0.78f, 0.35f);
-                    GUILayout.Label(__clean
-                            ? T("● 一切正常（补丁 " + SR.AuditPatchOk + "/" + SR.AuditPatchTotal
-                                + "，反射 " + SR.AuditRefOk + "/" + SR.AuditRefTotal + "）",
-                                "● All good (patches " + SR.AuditPatchOk + "/" + SR.AuditPatchTotal
-                                + ", reflection " + SR.AuditRefOk + "/" + SR.AuditRefTotal + ")")
-                            : T("▲ " + __bad + " 项失效：对应功能的开关还在，但行为没了",
-                                "▲ " + __bad + " broken target(s): the switches are still there, the behaviour is gone"),
-                        _secHeader);
-                } finally { GUI.color = __pc; }
-
-                if (__clean && !_auditExpanded) {
-                    GUILayout.BeginHorizontal();
-                    if (GUILayout.Button(T("展开细节", "Show details"), _btn, GUILayout.Width(Sc(110)), GUILayout.Height(Sc(24)))) _auditExpanded = true;
-                    GUILayout.FlexibleSpace();
-                    GUILayout.EndHorizontal();
-                    return;
-                }
-                if (GUILayout.Button(T("收起细节", "Hide details"), _btn, GUILayout.Width(Sc(110)), GUILayout.Height(Sc(24)))) { _auditExpanded = false; return; }
-                AuditLabel(T("按名绑定的补丁目标", "Named patch targets") + "："
-                    + SR.AuditPatchOk + " / " + SR.AuditPatchTotal);
-                AuditLabel(T("反射成员", "Reflected members") + "：" + SR.AuditRefOk + " / " + SR.AuditRefTotal);
+                // ===== 卡片式布局：每张卡 = 状态点 + 标题 + 一行结论 + [详情] =====
                 System.Collections.Generic.IList<SR.AuditIssue> issues = SR.AuditIssues;
-                if (issues == null || issues.Count == 0) {
-                    AuditLabel(T("按名绑定的目标全部有效。", "All name-bound targets are valid."));
-                } else {
-                    AuditLabel(T("以下目标已失效 -> 对应功能不会生效（开关还在、行为没了）：",
-                        "These targets no longer exist - the listed features will NOT work:"));
-                    // 固定高度表格：类型 / 目标 / 所属范围，超出滚动（不再逐行撑高页面）。
-                    float tbH = Sc(150f);
-                    _scrollIssues = GUILayout.BeginScrollView(_scrollIssues, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
-                        GUIStyle.none, GUILayout.Height(tbH));
-                    for (int i = 0; i < issues.Count; i++) {
-                        string kindRaw = issues[i].Kind;
-                        string kindTxt = kindRaw == "补丁" ? T("补丁", "Patch")
-                                       : kindRaw == "反射" ? T("反射", "Reflection")
-                                       : kindRaw;
+                int bad = issues != null ? issues.Count : 0;
+                bool allClean = bad == 0;
+
+                // ---- 总体卡 ----
+                Card(allClean, T("总体", "Overall"),
+                    allClean ? T("一切正常", "Everything is fine")
+                             : T(bad + " 项失效：开关还在，行为没了", bad + " broken target(s): the switches remain, the behaviour is gone"),
+                    delegate {
                         GUILayout.BeginHorizontal();
-                        GUILayout.Label("✗ " + kindTxt, _label, GUILayout.Width(Sc(64)));
-                        // 目标名可能很长：给固定列宽 + 自动换行，高度按实测内容（不再固定 20px）。
-                        string tgt = issues[i].Target ?? "";
-                        float tgtH = _labelWrap.CalcHeight(new GUIContent(tgt), Sc(320));
-                        GUILayout.Label(tgt, _labelWrap, GUILayout.Width(Sc(320)), GUILayout.Height(tgtH));
-                        string scp = issues[i].Scope ?? "";
-                        float scpH = _labelWrap.CalcHeight(new GUIContent(scp), Sc(260));
-                        GUILayout.Label(scp, _labelWrap, GUILayout.Width(Sc(260)), GUILayout.Height(scpH));
+                        if (GUILayout.Button(T("重新扫描", "Rescan"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) { _auditExpanded = !_auditExpanded; }
+                        if (GUILayout.Button(T("复制报告", "Copy report"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
+                            string rep = BuildDiagnosticReport();
+                            bool ok = false;
+                            try { GUIUtility.systemCopyBuffer = rep; ok = true; } catch (Exception __cb) { Guard.Log("复制诊断报告", __cb); }
+                            SR.Notify(ok ? T("诊断报告已复制", "Report copied") : T("复制失败，已写入日志", "Copy failed; written to log"));
+                            if (!ok) { try { SR.LogInfo(rep); } catch (Exception __lg) { Guard.Log("诊断报告写日志", __lg); } }
+                        }
+                        if (GUILayout.Button(T("写入日志", "Write to log"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
+                            try { SR.LogInfo(BuildDiagnosticReport()); SR.Notify(T("已写入日志", "Written to log")); }
+                            catch (Exception __lg) { Guard.Log("写诊断日志", __lg); }
+                        }
                         GUILayout.FlexibleSpace();
                         GUILayout.EndHorizontal();
-                    }
-                    GUILayout.EndScrollView();
-                }
-                //显示当前生效的扩展点数量，便于外部模块对接时确认是否接上。
-                AuditLabel(T("扩展点", "Extension points") + "："
-                    + T("槽位 ", "slots ") + Slots.Count
-                    + T("（", " (") + string.Join(", ", new List<string>(Slots.Names).ToArray()) + ")"
-                    + T("，覆盖层 ", ", overlays ") + SR.OverlayCount
-                    + T("，UI 阻断 ", ", UI blockers ") + SR.UiBlockProviderCount);
-                if (Slots.MissCount > 0) {
-                    AuditLabel(T("没人提供的槽位", "Unclaimed slots") + "：" + Slots.MissCount
-                        + T("（取用时返回 null，详见日志", " (Require returned null; see log)") + "："
-                        + string.Join(", ", new List<string>(Slots.MissNames).ToArray()) + ")");
-                }
-                if (SR.OrphanKeyCount > 0) {
-                    GUILayout.BeginHorizontal();
-                    AuditLabel(T("配置里的孤儿键", "Orphan config keys") + "：" + SR.OrphanKeyCount
-                        + T("（没有代码再读它；详见日志）", " (nothing reads them any more; see log)"));
-                    //一键清理这些键（原子替换，原文件备份为 .bak）
-                    if (GUILayout.Button(T("清理", "Clean up"), _btn, GUILayout.Width(Sc(64)), GUILayout.Height(Sc(24)))) {
-                        int cleaned = SR.CleanOrphanKeys();
-                        if (cleaned > 0) SR.Notify(SR.T("已清理 " + cleaned + " 个孤儿键（原文件已备份为 .bak）",
-                                                        "Cleaned " + cleaned + " orphan keys (previous file kept as .bak)"));
-                        else SR.Notify(SR.T("没有可清理的孤儿键，或读不到 BepInEx 的孤儿表", "Nothing to clean, or the orphan table is unavailable"));
-                    }
-                    GUILayout.FlexibleSpace();
-                    GUILayout.EndHorizontal();
-                }
-                if (ConfigMigration.RuleConflictCount > 0) {
-                    AuditLabel(T("迁移规则冲突", "Migration rule conflicts") + "：" + ConfigMigration.RuleConflictCount
-                        + T("（会让某些设置每次启动被删/读不到；详见日志", " (some settings get deleted or unreadable every launch; see log)"));
-                }
-                if (SR.FallbackSectionCount > 0) {
-                    AuditLabel(T("没有归属的配置段", "Unowned config sections") + "：" + SR.FallbackSectionCount
-                        + T("（会在侧栏以兜底页出现；详见日志", " (shown as fallback pages; see log)"));
-                }
-                //显示运行期异常计数与最近一条，弥补启动自检只能看到静态失效的缺口。
-                // 帧钩子耗时（前 8 名）：卡顿归因直接看这里，不用先去翻日志。
-                GUILayout.Space(Sc(4));
-                AuditLabel(T("帧钩子耗时（滑动平均，固定高度表格）", "Frame hooks (moving average, fixed-height table)"));
+                    });
+
+                // ---- 失效目标卡（有问题才展开） ----
+                bool issuesOpen = bad > 0;
+                Card(bad == 0, T("按名绑定的目标", "Named targets"),
+                    bad == 0 ? T(SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " 补丁 · " + SR.AuditRefOk + "/" + SR.AuditRefTotal + " 反射，全部有效",
+                                 SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " patches · " + SR.AuditRefOk + "/" + SR.AuditRefTotal + " members, all valid")
+                             : T(bad + " 项失效", bad + " broken"),
+                    delegate {
+                        if (bad == 0) return;
+                        _scrollIssues = GUILayout.BeginScrollView(_scrollIssues, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
+                            GUIStyle.none, GUILayout.Height(Sc(150f)));
+                        for (int i = 0; i < issues.Count; i++) {
+                            string kindRaw = issues[i].Kind;
+                            string kindTxt = kindRaw == "补丁" ? T("补丁", "Patch") : kindRaw == "反射" ? T("反射", "Reflection") : kindRaw;
+                            string tgt = issues[i].Target ?? "";
+                            float h = Mathf.Max(_label.CalcHeight(new GUIContent(tgt), Sc(320)), Sc(18));
+                            GUILayout.BeginHorizontal();
+                            GUILayout.Label("✗ " + kindTxt, _label, GUILayout.Width(Sc(64)), GUILayout.Height(h));
+                            GUILayout.Label(tgt, _labelWrap, GUILayout.Width(Sc(320)), GUILayout.Height(h));
+                            GUILayout.Label(issues[i].Scope ?? "", _labelWrap, GUILayout.Width(Sc(220)), GUILayout.Height(h));
+                            GUILayout.EndHorizontal();
+                        }
+                        GUILayout.EndScrollView();
+                    }, ref issuesOpen);
+
+                // ---- 性能卡 ----
                 string tickRep = SR.TickProfileReport();
-                _scrollHooks = GUILayout.BeginScrollView(_scrollHooks, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
-                    GUIStyle.none, GUILayout.Height(Sc(132f)));
-                if (string.IsNullOrEmpty(tickRep)) {
-                    GUILayout.Label(T("（还没有采样）", "(no samples yet)"), _label, GUILayout.Height(Sc(18f)));
-                } else {
-                    string[] rows = tickRep.Split('\n');
-                    for (int i = 0; i < rows.Length; i++) {
-                        string row = rows[i];
-                        if (string.IsNullOrEmpty(row)) continue;
-                        // 用实测高度而不是固定 18px：一行装不下时换行显示，不再被裁掉。
-                        // 视口高度固定（132px），所以整页高度仍然稳定，不会因为数字变化抖动。
-                        AuditLabel(row);
-                    }
-                }
-                GUILayout.EndScrollView();
-                // 补丁归因：谁还在改同一个方法（装了别的 mod 后行为变怪时先看这里）。
-                GUILayout.Space(Sc(4));
-                GUILayout.BeginHorizontal();
-                GUILayout.Label(T("补丁归因（谁在改同一个方法）", "Patch attribution (who else patches it)"), _label);
-                if (GUILayout.Button(T("重新扫描", "Rescan"), _btn, GUILayout.Width(Sc(84)), GUILayout.Height(Sc(24)))) {
-                    SR.ScanPatches();
-                    SR.Notify(T("补丁归因已重新扫描", "Patch attribution rescanned"));
-                }
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-                string attrRep = SR.AttributionReport();
-                AuditLabel(string.IsNullOrEmpty(attrRep)
-                    ? T("（启动 3 秒后自动扫描；当前可能还没有其它 mod 打补丁）", "(scans 3s after startup; no other patching mods yet)")
-                    : attrRep);
-                if (SR.Guard.WarnCount > 0) {
-                    AuditLabel(T("运行时异常次数", "Runtime errors") + "：" + SR.Guard.WarnCount);
-                    if (!string.IsNullOrEmpty(SR.Guard.LastWhat)) {
-                        AuditLabel(T("最近一次", "Last") + "：" + SR.Guard.LastWhat
-                            + " - " + (SR.Guard.LastError ?? ""));
-                    }
-                }
-            } catch (Exception __ex) { Guard.Log("渲染自检块", __ex); }
+                bool perfOpen = false;
+                Card(true, T("帧钩子", "Frame hooks"),
+                    T("按名字排序，超阈值才需要关注", "sorted by name; only over-threshold rows matter"),
+                    delegate {
+                        _scrollHooks = GUILayout.BeginScrollView(_scrollHooks, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
+                            GUIStyle.none, GUILayout.Height(Sc(132f)));
+                        if (string.IsNullOrEmpty(tickRep)) GUILayout.Label(T("（还没有采样）", "(no samples yet)"), _label);
+                        else {
+                            string[] rows = tickRep.Split('\n');
+                            for (int i = 0; i < rows.Length; i++) if (!string.IsNullOrEmpty(rows[i])) AuditLabel(rows[i]);
+                        }
+                        GUILayout.EndScrollView();
+                    }, ref perfOpen);
+
+                // ---- 配置健康卡 ----
+                bool cfgOpen = false;
+                Card(SR.OrphanKeyCount == 0 && SR.FallbackSectionCount == 0, T("配置", "Config"),
+                    T("孤儿键 " + SR.OrphanKeyCount + " · 无主段 " + SR.FallbackSectionCount + " · 运行时异常 " + SR.Guard.WarnCount,
+                      "orphan keys " + SR.OrphanKeyCount + " · unowned sections " + SR.FallbackSectionCount + " · runtime errors " + SR.Guard.WarnCount),
+                    delegate {
+                        AuditLabel(T("运行时异常次数", "Runtime errors") + "：" + SR.Guard.WarnCount);
+                        if (!string.IsNullOrEmpty(SR.Guard.LastWhat))
+                            AuditLabel(T("最近一次", "Last") + "：" + SR.Guard.LastWhat + " - " + (SR.Guard.LastError ?? ""));
+                        try { AuditLabel(SR.AttributionReport()); } catch (Exception __at) { Guard.Log("自检/归因", __at); }
+                    }, ref cfgOpen);
+            } catch (Exception __ex) { Guard.Log("渲染自检", __ex); }
         }
+
+        // 一张卡片：状态点 + 标题 + 一行结论（+ 可选 [详情] 展开体）。
+        private static void Card(bool ok, string title, string summary, Action body, ref bool expanded) {
+            try {
+                bool canExpand = body != null;
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.BeginHorizontal();
+                Color prev = GUI.color;
+                try {
+                    GUI.color = ok ? new Color(0.55f, 0.92f, 0.55f) : new Color(1f, 0.78f, 0.35f);
+                    GUILayout.Label(ok ? "●" : "▲", _label, GUILayout.Width(Sc(18)));
+                } finally { GUI.color = prev; }
+                GUILayout.Label(title, _secHeader, GUILayout.Width(Sc(120)));
+                GUILayout.Label(summary, _label);
+                GUILayout.FlexibleSpace();
+                if (canExpand) {
+                    if (GUILayout.Button(expanded ? T("收起", "Hide") : T("详情", "Details"), _btn,
+                            GUILayout.Width(Sc(64)), GUILayout.Height(Sc(22)))) expanded = !expanded;
+                }
+                GUILayout.EndHorizontal();
+                if (canExpand && expanded) {
+                    GUILayout.Space(Sc(4));
+                    body();
+                }
+                GUILayout.EndVertical();
+                GUILayout.Space(Sc(4));
+            } catch (Exception __ex) { Guard.Log("自检卡片 " + title, __ex); }
+        }
+
+        // 兼容旧调用：不需要展开参数的卡片。
+        private static void Card(bool ok, string title, string summary, Action body) {
+            bool unused = true;
+            Card(ok, title, summary, body, ref unused);
+        }
+
 
         private static void RenderSidebarWidthRow() {
             int cur = _sidebarWEntry != null ? Mathf.Clamp(_sidebarWEntry.Value, Ui.SidebarWMin, Ui.SidebarWMax) : 0;
