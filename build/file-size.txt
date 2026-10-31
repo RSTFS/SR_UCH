@@ -8,4 +8,4 @@ SR_UCH/SR.Core.cs=1276
 SR_UCH/SR.Ctl.cs=1119
 Features/BuildingPresets.cs=1093
 Features/HUD.cs=1014
-../SR_UCH_EX/ExModule/ExModule.Core.cs=917
+../SR_UCH_EX/ExModule/ExModule.Core.cs=921
