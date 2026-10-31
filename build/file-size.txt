@@ -7,6 +7,6 @@ SR_UCH/SR.Contracts.cs=1413
 SR_UCH/SR.Core.cs=1296
 SR_UCH/SR.Ctl.cs=1119
 Features/BuildingPresets.cs=1094
-Features/HUD.cs=1008
+Features/HUD.cs=1010
 ../SR_UCH_EX/ExModule/ExModule.Core.cs=921
 Features/BuildingPresets.Io.cs=917

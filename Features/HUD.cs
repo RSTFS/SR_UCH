@@ -474,7 +474,9 @@ namespace SR_UCH.Tweaks {
             // 默认就是"显示"状态：以前 _toggleOn 初始为 false，每次重开游戏都得先按一下显示键才出现，
             // 现在开局即有 HUD，按键只用来切换隐藏/显示。
             _toggleOn = true;
-                _showMode = cfg.Bind(Sec, "Show Mode", ShowMode.Hold, "显示方式：按住显示 / 切换显示。");
+                // 默认用"切换"而不是"按住"：Hold 模式下没按切换键时 HUD 不可见，
+            // 与"开局即有 HUD、按键只用来切换"的意图相反（audit 16-P0-1）。
+            _showMode = cfg.Bind(Sec, "Show Mode", ShowMode.Toggle, "显示方式：按住显示 / 切换显示。");
                 _layout = cfg.Bind(Sec, "Layout", HudLayout.TopLeft, "HUD 布局：四角贴边或自定义拖动位置。");
                 _fontSize = cfg.Bind(Sec, "Font Size", 18,
                     new ConfigDescription("字体大小（10-48）。", new AcceptableValueRange<int>(10, 48)));
