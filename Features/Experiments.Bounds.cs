@@ -248,7 +248,10 @@ public partial class Experiments : ITweak
                 SuppressFixCamera(CameraOn);
                 if (_tick % 30 != 0) return;
                 // 解除UI3 并入本钩子：每 30 次边界重放（约 15 秒）扫一次。
-                try { RemoveUI3.Tick(); } catch (Exception __ui) { SRApi.Guard.Log("解除UI3/并入", __ui); }
+                // 开关关着就完全不调用：否则即使内部会早退，也白白多一次函数调用与状态检查。
+                if (RemoveUI3.WantOn) {
+                    try { RemoveUI3.Tick(); } catch (Exception __ui) { SRApi.Guard.Log("解除UI3/并入", __ui); }
+                }
                 ApplyAllPiecesIgnore();
                 BuildStatus();
             } catch (Exception __ex) { SRApi.Guard.Log("关卡边界 Tick", __ex); }
@@ -764,7 +767,7 @@ public partial class Experiments : ITweak
         }
 
         // 是否该停画 UI3：跟随「解除关卡边界」主开关（含房主限制，与 Reeval/Tick 一致）。
-        private static bool WantOn { get { return LevelBoundsUnlock.MasterOn; } }
+        internal static bool WantOn { get { return LevelBoundsUnlock.MasterOn; } }
 
         // 换场景必须清 _wasOn：其为强引用字典，旧 Renderer 已随场景销毁，原值无意义且会逐场累积。
         private static void Reset() { _hitCount = -1; _scanScene = null; _nextScanAt = 0f; _ui3ScanTries = 0; Note = ""; _wasOn.Clear(); }
