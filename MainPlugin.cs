@@ -128,7 +128,7 @@ namespace SR_UCH {
             });
             // 线程契约检查：只有诊断模式打开时才启用（默认零成本），越线程访问静态集合会记一次警告。
             SinkStep("MainThread", delegate () {
-                SR_UCH.MainThread.Enable(SR.DiagEnabled);
+                SR_UCH.MainThread.Enable(false);   // 线程契约检查默认关（零成本）
             });
             SinkStep("Notify", delegate () {
                 SRApi.SetNotifySink(delegate (string __t) { SR.Notify(__t); });

@@ -163,14 +163,6 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/切换数据模式", __ex); }
         }
 
-        // 这条预设是否**真的**带自定义数据：光有开关不算，必须有实打实存下来的内容。
-        // （以前只看开关，规则读失败时也会显示"自定义"，导致显示的条目和预设实际内容对不上。）
-        // 是否带"实际数据"：现在只看 XML 里有没有 <mods>（规则/积分/模块概率的旁车已按用户要求整体删除）。
-        private static bool IsCustomData(PresetInfo p) {
-            if (p == null) return false;
-            if (string.Equals(p.ModsMode, ModsOff, StringComparison.Ordinal)) return true;   // 关闭 = 明确要去掉修改器
-            return ModsCountInXml(p) > 0;
-        }
 
 
 
@@ -251,6 +243,8 @@ namespace SR_UCH.Tweaks {
                 }
                 // 布尔项：走游戏的"开/关"本地化
                 bool bv = string.Equals(raw, "True", StringComparison.OrdinalIgnoreCase) || raw == "1";
+                // 反射登记：修改器布尔项文案靠这个方法，游戏改名后自检要能报出来。
+                SRApi.Ref.Override("Modifiers.GetOnOffValueString", "布局预设：修改器布尔项文案");
                 MethodInfo onOff = SRApi.Ref.Method(typeof(Modifiers), "GetOnOffValueString", "布局预设/修改器预览开关文本");
                 if (onOff != null) {
                     object r = onOff.Invoke(null, new object[] { bv });
@@ -305,36 +299,6 @@ namespace SR_UCH.Tweaks {
             } catch { return 0; }
         }
 
-        // 快照属性名 -> Modifiers 里的字段名（部分字段是 camelCase），读不到返回 null。
-        private static string ModFieldName(string attr) {
-            switch (attr) {
-                case "GravityMode": return "GravityMode";
-                case "JumpSpeedMode": return "JumpSpeedMode";
-                case "SprintSpeedMode": return "SprintSpeedMode";
-                case "GameSpeedMode": return "GameSpeedMode";
-                case "InvisibilityMode": return "invisibilityMode";
-                case "PlatformSpeedMode": return "PlatformSpeedMode";
-                case "RateOfFireMode": return "RateOfFireMode";
-                case "MultiJumpMode": return "MultiJumpMode";
-                case "ProjectileExplosionMode": return "ProjectileExplosionMode";
-                case "CharacterSizeMode": return "CharacterSizeMode";
-                case "PostDeathBehaviorMode": return "PostDeathBehaviorMode";
-                case "CameraFlipMode": return "CameraFlipMode";
-                case "DoomsdayMeteorsMode": return "DoomsdayMeteorsMode";
-                case "DoomsdayLavaMode": return "DoomsdayLavaMode";
-                case "ProjectileSpeedMode": return "ProjectileSpeedMode";
-                case "JetpackMode": return "jetpackMode";
-                case "WallJumpsDisabled": return "wallJumpsDisabled";
-                case "WallSlidesDisabled": return "wallSlidesDisabled";
-                case "DanceInvincibility": return "danceInvincibility";
-                case "MirrorControls": return "mirrorControls";
-                case "PlayerPlayerCollisions": return "playerPlayerCollisions";
-                case "PreviewModsInTreehouse": return "modsPreview";
-                case "ForceLobbyModifiers": return "forceLobbyModifiers";
-                case "Frictionless": return "frictionless";
-                default: return null;
-            }
-        }
 
 
         // ---------- 行内单元格交互 ----------

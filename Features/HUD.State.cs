@@ -334,46 +334,6 @@ public partial class HUD {
                 _roundNoticeStart = Time.unscaledTime;
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
-        private static LevelPortal FindLeadingPortal(LobbyManager lm, out int votes) {
-            votes = 0;
-            try {
-                if (lm == null) return null;
-                LevelSelectController lsc = lm.CurrentLevelSelectController;
-                if (lsc == null) return null;
-                LevelPortal best = null;
-                int bestVotes = 0;
-                if (lsc.portals != null) {
-                    for (int i = 0; i < lsc.portals.Length; i++) {
-                        LevelPortal p = lsc.portals[i];
-                        if (p == null || p.Votes == null) continue;
-                        if (p.Votes.Count > bestVotes) { bestVotes = p.Votes.Count; best = p; }
-                    }
-                }
-                if (lsc.snapshotPortals != null) {
-                    for (int i = 0; i < lsc.snapshotPortals.Length; i++) {
-                        LevelPortal p = lsc.snapshotPortals[i];
-                        if (p == null || p.Votes == null) continue;
-                        if (p.Votes.Count > bestVotes) { bestVotes = p.Votes.Count; best = p; }
-                    }
-                }
-                votes = bestVotes;
-                return best;
-            } catch { return null; }
-        }
-        private static string PortalName(LevelPortal p) {
-            try {
-                CustomLevelPortal cp = p as CustomLevelPortal;
-                if (cp != null && cp.snapshotInfo != null && !string.IsNullOrEmpty(cp.snapshotInfo.snapshotName)) {
-                    return Truncate(cp.snapshotInfo.snapshotName, 16);
-                }
-                if (p.TargetLevel == GameState.LevelName.RANDOM) return SRApi.T("随机", "Random");
-                string lv = GameState.GetLevelLocalizedName(p.TargetLevel);
-                if (string.IsNullOrEmpty(lv) || lv.IndexOf("default Level name error", StringComparison.Ordinal) >= 0) {
-                    lv = p.TargetLevel.ToString();
-                }
-                return Truncate(lv, 16);
-            } catch { return null; }
-        }
         private static void UpdateExtraText() {
             _extra1Text = ReadExtraLine(_extra1);
             _extra2Text = ReadExtraLine(_extra2);

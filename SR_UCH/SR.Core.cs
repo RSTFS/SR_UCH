@@ -29,7 +29,6 @@ public partial class SR : ITweak {
         private static ConfigEntry<float> _uiScaleEntry;
         private static ConfigEntry<string> _disabledPluginsEntry;
         private static ConfigEntry<bool> _allEnabledEntry;
-        public static bool DiagEnabled { get { return false; } }
         // 对外（外部 DLL）暴露的注册接口版本：外部模块初始化时比对自己的需求版本，不匹配就提示 / 降级。
         // 用 static readonly 而非 const：const 会在编译外部模块时被内联，握手只能靠运行时读取生效。
         public static readonly int ApiVersion = 3;
@@ -803,12 +802,13 @@ public partial class SR : ITweak {
                 int n = Mathf.Min(5, _tickProfTop.Count);
                 float total = 0f;
                 for (int i = 0; i < _tickProfTop.Count; i++) total += _tickProfTop[i].AvgMs;
-                SRApi.DiagLines.Add("帧钩子合计 " + total.ToString("0.00") + "ms（" + _tickProfTop.Count + " 个）");
+                // 浮层已删除：剖析结果只进日志，不再往 DiagLines 里堆
+                _ = ("帧钩子合计 " + total.ToString("0.00") + "ms（" + _tickProfTop.Count + " 个）");
                 for (int i = 0; i < n; i++) {
                     TickHook h = _tickProfTop[i];
                     string mark = h.AvgMs >= TickBadMs ? "!!" : (h.AvgMs >= TickWarnMs ? "!" : "  ");
-                    SRApi.DiagLines.Add(mark + " " + h.Name + " " + h.AvgMs.ToString("0.00") + "ms"
-                        + (h.Overruns > 0 ? "（超限 " + h.Overruns + "）" : ""));
+                    _ = mark + " " + h.Name + " " + h.AvgMs.ToString("0.00") + "ms"
+                        + (h.Overruns > 0 ? "（超限 " + h.Overruns + "）" : "");
                 }
             } catch (Exception __ex) { Guard.Log("帧钩子性能剖析", __ex); }
         }

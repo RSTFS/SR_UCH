@@ -49,6 +49,13 @@ namespace SR_UCH.Tweaks {
             m = new RegionMember();
             // 属性没有 SRApi.Ref 的按名取法，保留 raw 反射；字段走 SRApi.Ref.Field（失效会进自检告警）。
             try { m.Loc = t.GetProperty("LocalizedShortName"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+            // 反射登记（动态类型：按发现时的类型名登记），游戏改字段名后自检能报出来。
+            try {
+                string tn = t != null ? t.Name : "Region";
+                SRApi.Ref.Override(tn + ".shortName", "联机列表：区域短名");
+                SRApi.Ref.Override(tn + ".name", "联机列表：区域名");
+                SRApi.Ref.Override(tn + ".id", "联机列表：区域编号");
+            } catch (Exception __ro) { SRApi.Guard.Log("联机/登记区域字段", __ro); }
             m.Short = SRApi.Ref.Field(t, "shortName", "联机列表");
             m.Name = SRApi.Ref.Field(t, "name", "联机列表");
             m.Id = SRApi.Ref.Field(t, "id", "联机列表");

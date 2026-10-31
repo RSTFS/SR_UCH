@@ -66,6 +66,8 @@ public partial class Experiments : ITweak
         private static void SelfReg() {
             // Scene 段条目全部渲染在场景页，必须 NavHide，否则兜底分支会再加一个独立侧栏栏目。
             SRApi.NavHide("Scene");
+            // 反射登记：SkipBool 是 protected 字段，游戏改名后自检要能报出来。
+            SRApi.Ref.Override("UISplashScreen.SkipBool", "关闭跳过加载动画需清此标志");
             SRApi.LocKey("Scene", "Splash Skip Load", "跳过加载动画", "Skip load animation");
             SRApi.LocDesc("Scene", "Splash Skip Load", "跳过加载动画\n加载画面一出现就跳过\n无副作用，只省等待", "Skip loading animation\nskips the splash as soon as it appears\nno side effects, only saves the wait");
             SRApi.LocKey("Scene", "Gentle Load", "温柔加载", "Gentle load");

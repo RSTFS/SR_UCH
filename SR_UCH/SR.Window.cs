@@ -13,29 +13,6 @@ public partial class SR {
 
 // 分区：Window（主窗口框架：Tick 主循环 / 标题栏 / DrawGUI / 窗口拖动缩放）
 
-        // 诊断浮层（设置页开关控制）：按换行实测高度绘制，内容来自 SRApi.DiagLines。
-        private static void DrawDiagOverlay() {
-            try {
-                if (SR.DiagEnabled && SRApi.DiagLines.Count > 0) {
-                    float w = Sc(520f);
-                    float __innerW = w - Sc(12f);
-                    float __y = Sc(4f);
-                    // 先按换行测量总高，避免长行被裁掉。
-                    float __total = _label.CalcHeight(new GUIContent("SR DIAG"), __innerW) + Sc(4f);
-                    for (int i = 0; i < SRApi.DiagLines.Count; i++)
-                        __total += _labelWrap.CalcHeight(new GUIContent(SRApi.DiagLines[i]), __innerW);
-                    Rect box = new Rect(Sc(8f), Sc(34f), w, Mathf.Min(__total + Sc(10f), Screen.height * 0.5f));
-                    SR.DrawRounded(box, new Color(0f, 0f, 0f, 0.78f), SRApi.Ctl.ThemeRadius);
-                    GUI.Label(new Rect(box.x + Sc(6f), box.y + Sc(2f), __innerW, _label.CalcHeight(new GUIContent("SR DIAG"), __innerW)), "SR DIAG", _label);
-                    __y += _label.CalcHeight(new GUIContent("SR DIAG"), __innerW) + Sc(2f);
-                    for (int i = 0; i < SRApi.DiagLines.Count; i++) {
-                        float hh = _labelWrap.CalcHeight(new GUIContent(SRApi.DiagLines[i]), __innerW);
-                        GUI.Label(new Rect(box.x + Sc(6f), box.y + Sc(2f) + __y, __innerW, hh), SRApi.DiagLines[i], _labelWrap);
-                        __y += hh;
-                    }
-                }
-            } catch (Exception __dg) { Guard.Log("诊断浮层", __dg); }
-        }
 
         // 缩放把手 + 自绘光标（从 DrawGUI 提取，保持原有绘制顺序与状态）。
         private static void DrawResizeGripAndCursor(Rect winRect, Vector2 mouse, Rect gripRect) {

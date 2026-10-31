@@ -28,21 +28,6 @@ namespace SR_UCH.Tweaks {
         // 生成房主当前快照并经 CompressAndSendSnapshotBytes 广播，全员按房主视角重建；不重载场景，分数保留；仅房主可调用。
         // 快照来源判定：房主发送时在 XML 根节点写 srSnapshot="1"，客户端按该标记识别（不依赖进程内静态门闩）。
 
-        // 给快照 XML 根节点加 srSnapshot="1"（幂等；解析失败原样返回）
-        internal static string MarkSnapshotXml(string xml) {
-            try {
-                if (string.IsNullOrEmpty(xml)) return xml;
-                System.Xml.XmlDocument d = new System.Xml.XmlDocument();
-                d = ParseXmlSafe(xml);
-                if (d.DocumentElement == null) return xml;
-                if (d.DocumentElement.GetAttribute("srSnapshot") == "1") return xml;
-                d.DocumentElement.SetAttribute("srSnapshot", "1");
-                return d.OuterXml;
-            } catch (Exception __ex) {
-                SRApi.LogWarn("[快照] 打标记失败，按原样发送: " + __ex.Message);
-                return xml;
-            }
-        }
 
         // 该快照是否由 SR 发起：只看 XML 标记（房主与房客同一判据）。
         private static bool IsSrSnapshot(System.Xml.XmlDocument doc) {

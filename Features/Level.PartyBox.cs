@@ -314,6 +314,7 @@ public class LevelPartyBox : ITweak {
                 // 反射成员登记：游戏改名时启动自检会告警。
                 SRApi.Ref.Override("PartyBox.pieces", "关卡派对盒道具（清场/重抽）");
                 SRApi.Ref.Override("VersusControl.showPartyBox", "关卡派对盒：完整流程");
+            SRApi.Ref.Override("VersusControl.showingPlacementWarning", "派对盒：建造阶段警告判定");
                 SRApi.Ref.Override("VersusControl.IsSecondBox", "关卡派对盒：第二次开箱");
                 SRApi.Ref.Override("VersusControl.ToPlaceMode", "关卡派对盒：房客一起进建造状态");
                 SRApi.Ref.Override("VersusControl.SetupPlacementCursors", "关卡派对盒：同步放置光标");
