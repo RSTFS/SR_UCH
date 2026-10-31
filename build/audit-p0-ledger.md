@@ -10,7 +10,7 @@
 | 4 | 03_门控与扩展点 | P0-01 | `UserMessage(show, false)` 命中错误的二参重载，所有屏幕提示被绑定到当前场景 | `ported` | 改调四参 UserMessage(show,2f,lo,false) |
 | 5 | 03_门控与扩展点 | P0-02 | `CanDo(Cap.HostOnly)` 判断 `HasServer`，与“仅房主可执行”的文案和名称不一致 | `ported` | Cap.HostOnly 改判 Env.IsHost |
 | 6 | 04_主窗口框架 | P0-1 | `_dirtyConfig` 单槽覆盖会让先改的 ConfigFile 永不落盘 | `ported` | _dirtyConfig 单槽改 HashSet，逐个保存成功才移除 |
-| 7 | 04_主窗口框架 | P0-2 | 录制超时与 CommitRecording 在同一帧并存，可能提交错误序列 | `todo` |  |
+| 7 | 04_主窗口框架 | P0-2 | 录制超时与 CommitRecording 在同一帧并存，可能提交错误序列 | `already-fixed` | CancelCapture 原子清 _capturing/_recSeq/_recHeld；CommitRecording 已判 _recSeq.Count==0，仅补注释说明 |
 | 8 | 04_主窗口框架 | P0-3 | DrawGUI 的 finally 不能保证 BeginArea / 滚动组对称闭合 | `todo` |  |
 | 9 | 04_主窗口框架 | P0-4 | 共享 skin 选择色/字体的还原依赖“SR 样式仍在内存” | `todo` |  |
 | 10 | 05_键位与调色板 | P0-1 | 序列半完成状态跨帧残留，且可能在非 Layout/Repaint 事件上重入 | `todo` |  |
