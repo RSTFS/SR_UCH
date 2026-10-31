@@ -510,9 +510,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 与联机列表逐字一致：页布局顶 + 已用高度 -> 核心公式（PageViewportHeight − used）。
             // 我上一版把 ContentArea（屏幕坐标）和 last.yMax（布局坐标）混算，结果反而更矮。
             // 核心化：高度 = min(可用, 表头 + 行数*行高 + 拖拽条)。行少 -> 收紧，行多 -> 填满并滚动。
-            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.TableMinH(),
+            // 高度只按内容：传 null 忽略"表高配置"，否则以前拖过的高度会把表格抬到配置值、行下方留白。
+            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, null, 0f,
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, false);  // 按内容收紧：行少时不留空表体（列表下方不再有大片空白）
+0f, false);   // 不留拖拽条高度、minH=0：高度恰好=表头+行，行下方没有任何空白
                 _actionHitThisFrame = false;
                 List<PresetInfo> visible = VisiblePresets();
                 if (visible.Count <= 0) {
@@ -727,8 +728,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 不再二次扣减：调用方给的 tableH 已经是"可用总高度"，而分区标题在 GetLastRect 里
                 // 也已经被算进 last.yMax（TableFitHeight 的 used）。再扣一次 titleH + 拖拽条，
                 // 表格就会比可用区域矮一截 —— 列表中下方那片空白的直接来源。
-                tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH);
-                float rowsH = Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH);
+                // 不再抬到 120：按调用方给的内容高度画，行少时不留空白表体。
+                float rowsH = Mathf.Max(0f, tableH - headerH);
                 Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
                 EnsureCols();
                 // 操作列宽始终跟随当前语言的按钮文字：语言热切换后也能立刻避免英文标签被截断。
@@ -817,7 +818,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 SRApi.TableDraw(_args);
                 HandlePresetCells();   // 数据列：悬浮预览 / 左键切三态 / 右键开界面；名称列：右键重命名
                 // 底边拖拽条（核心统一绘制 + 拖动 + 持久化）。
-                SRApi.Ctl.TableHeightGripBar(_tableHEntry, (box.height + SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
+                // 高度按内容自适应，不再绘制底边拖拽条（拖了也不生效，反而误导）。
                 // 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
                 _sbHandled = SRApi.Ctl.TableScrollbarFor(_args, e, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);
                 if (_hiddenCols.Count > _hiddenBeforeTable) {
