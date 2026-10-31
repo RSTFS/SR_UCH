@@ -147,10 +147,55 @@ public partial class SR {
             GUILayout.Label(text, _labelWrap, GUILayout.Height(Mathf.Max(Sc(18f), h)));
         }
 
+        // 诊断报告：把自检、功能清单、帧钩子耗时、运行时异常拼成一段可粘贴的文本。
+        // 用户在游戏里点一下就能拿到，不需要去找 LogOutput.log。
+        internal static string BuildDiagnosticReport() {
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            try {
+                sb.AppendLine("=== SR_UCH 诊断报告 ===");
+                sb.Append("游戏版本: ").AppendLine(Application.version);
+                sb.Append("契约版本: v").AppendLine(SRContract.Version.ToString());
+                sb.Append("补丁: ").Append(SR.AuditPatchOk).Append("/").Append(SR.AuditPatchTotal)
+                  .Append("  反射: ").Append(SR.AuditRefOk).Append("/").Append(SR.AuditRefTotal).AppendLine();
+                sb.Append("功能: ").Append(Features.Count).Append("  问题: ").Append(Features.ProblemCount).AppendLine();
+                sb.Append("API 注入: ").Append(SRApi.SinkCount()).Append("/").Append(SRApi.SinkTotal()).AppendLine();
+                string[] miss = SRApi.MissingSinks();
+                if (miss != null && miss.Length > 0) sb.Append("缺失注入: ").AppendLine(string.Join(",", miss));
+                sb.Append("槽位: ").Append(Slots.Count).Append("  未提供: ").Append(Slots.MissCount).AppendLine();
+                if (Slots.MissNames != null && Slots.MissNames.Count > 0) sb.Append("未提供的槽位: ").AppendLine(string.Join(", ", new List<string>(Slots.MissNames).ToArray()));
+                sb.Append("运行时异常: ").AppendLine(SR.Guard.WarnCount.ToString());
+                if (!string.IsNullOrEmpty(SR.Guard.LastWhat)) sb.Append("最近一次: ").Append(SR.Guard.LastWhat).Append(" - ").AppendLine(SR.Guard.LastError ?? "");
+                IList<SR.AuditIssue> issues = SR.AuditIssues;
+                if (issues != null) {
+                    for (int i = 0; i < issues.Count; i++) {
+                        sb.Append("  ✗ ").Append(issues[i].Kind).Append(" ").Append(issues[i].Target).Append(" <- ").AppendLine(issues[i].Scope);
+                    }
+                }
+                sb.AppendLine(SR.TickProfileReport());
+            } catch (Exception __ex) { Guard.Log("生成诊断报告", __ex); }
+            return sb.ToString();
+        }
+
         private static void RenderAuditBlock() {
             try {
                 GUILayout.Space(Sc(6));
                 GUILayout.Label("- " + T("自检", "Self-check") + " -", _secHeader);
+                // 一键导出：复制到剪贴板 / 写进日志（两者都不依赖用户去找文件）。
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button(T("复制诊断", "Copy report"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
+                    string rep = BuildDiagnosticReport();
+                    bool ok = false;
+                    try { GUIUtility.systemCopyBuffer = rep; ok = true; } catch (Exception __cb) { Guard.Log("复制诊断报告", __cb); }
+                    SR.Notify(ok ? T("诊断报告已复制到剪贴板", "Report copied to clipboard")
+                                 : T("复制失败，已改写到日志", "Copy failed; written to the log instead"));
+                    if (!ok) { try { SR.LogInfo(rep); } catch (Exception __lg) { Guard.Log("诊断报告写日志", __lg); } }
+                }
+                if (GUILayout.Button(T("写入日志", "Write to log"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
+                    try { SR.LogInfo(BuildDiagnosticReport()); SR.Notify(T("已写入日志", "Written to the log")); }
+                    catch (Exception __lg) { Guard.Log("写诊断日志", __lg); }
+                }
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
                 GUILayout.Label(T("按名绑定的补丁目标", "Named patch targets") + "："
                     + SR.AuditPatchOk + " / " + SR.AuditPatchTotal);
                 AuditLabel(T("反射成员", "Reflected members") + "：" + SR.AuditRefOk + " / " + SR.AuditRefTotal);
@@ -203,6 +248,13 @@ public partial class SR {
                         + T("（会在侧栏以兜底页出现；详见日志", " (shown as fallback pages; see log)"));
                 }
                 //显示运行期异常计数与最近一条，弥补启动自检只能看到静态失效的缺口。
+                // 帧钩子耗时（前 8 名）：卡顿归因直接看这里，不用先去翻日志。
+                string tickRep = SR.TickProfileReport();
+                if (!string.IsNullOrEmpty(tickRep)) {
+                    GUILayout.Space(Sc(4));
+                    AuditLabel(T("帧钩子耗时（滑动平均）", "Frame hooks (moving average)"));
+                    AuditLabel(tickRep);
+                }
                 if (SR.Guard.WarnCount > 0) {
                     AuditLabel(T("运行时异常次数", "Runtime errors") + "：" + SR.Guard.WarnCount);
                     if (!string.IsNullOrEmpty(SR.Guard.LastWhat)) {

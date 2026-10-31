@@ -673,6 +673,12 @@ public partial class SR : ITweak {
         private sealed class TickHook {
             public string Name;
             public Action Run;
+            // 性能剖析（F9 浮层 + 超阈值告警）：滑动平均耗时、上一帧耗时、累计调用与超限次数。
+            public float AvgMs;
+            public float LastMs;
+            public long Calls;
+            public long Overruns;
+            public float WarnedAt = -999f;
         }
         private static readonly List<TickHook> _tickHooks = new List<TickHook>();
         private static readonly List<TickHook> _frameEndHooks = new List<TickHook>();
@@ -714,13 +720,82 @@ public partial class SR : ITweak {
         // 每帧收尾（面板关闭的早退分支也要调，否则光标形状会留在屏幕上）
         private static void RunFrameEndHooks() { RunHooks(_frameEndHooks, "每帧收尾:"); }
 
+        // 性能剖析阈值：单 tick 超过 WarnMs 记一次告警（每 tick 每 10 秒最多一条），超过 BadMs 在浮层里标红。
+        private const float TickWarnMs = 0.30f;
+        private const float TickBadMs = 1.00f;
+        private static float _tickProfLastAt = -999f;
+        private static readonly List<TickHook> _tickProfTop = new List<TickHook>(8);
+
         private static void RunHooks(List<TickHook> hooks, string what) {
+            float now = Time.realtimeSinceStartup;
             for (int i = 0; i < hooks.Count; i++) {
                 TickHook h = hooks[i];
                 if (h == null || h.Run == null) continue;
+                float t0 = Time.realtimeSinceStartup;
                 try { h.Run(); }
                 catch (Exception __ex) { Guard.Log(what + h.Name, __ex); }
+                float ms = (Time.realtimeSinceStartup - t0) * 1000f;
+                h.LastMs = ms;
+                h.Calls++;
+                // 指数滑动平均（0.1 权重 ≈ 最近十帧），避免单帧噪声把排名抖来抖去。
+                h.AvgMs = h.Calls <= 1 ? ms : (h.AvgMs * 0.9f + ms * 0.1f);
+                if (ms >= TickWarnMs) {
+                    h.Overruns++;
+                    if (now - h.WarnedAt > 10f) {
+                        h.WarnedAt = now;
+                        Guard.Log("帧钩子耗时 " + h.Name + " " + ms.ToString("0.00") + "ms（阈值 "
+                            + TickWarnMs.ToString("0.00") + "ms，累计 " + h.Overruns + " 次超限）", null);
+                    }
+                }
             }
+            PublishTickProfile(now);
+        }
+
+        // 每 0.5 秒把"最慢的 5 个"写进 F9 浮层 + 一段日志，方便用户直接贴出来。
+        private static void PublishTickProfile(float now) {
+            try {
+                if (now - _tickProfLastAt < 0.5f) return;
+                _tickProfLastAt = now;
+                _tickProfTop.Clear();
+                for (int i = 0; i < _tickHooks.Count; i++) {
+                    TickHook h = _tickHooks[i];
+                    if (h == null || h.AvgMs <= 0f) continue;
+                    _tickProfTop.Add(h);
+                }
+                if (_tickProfTop.Count == 0) return;
+                _tickProfTop.Sort(delegate (TickHook a, TickHook b) { return b.AvgMs.CompareTo(a.AvgMs); });
+                int n = Mathf.Min(5, _tickProfTop.Count);
+                float total = 0f;
+                for (int i = 0; i < _tickProfTop.Count; i++) total += _tickProfTop[i].AvgMs;
+                SRApi.DiagLines.Add("帧钩子合计 " + total.ToString("0.00") + "ms（" + _tickProfTop.Count + " 个）");
+                for (int i = 0; i < n; i++) {
+                    TickHook h = _tickProfTop[i];
+                    string mark = h.AvgMs >= TickBadMs ? "!!" : (h.AvgMs >= TickWarnMs ? "!" : "  ");
+                    SRApi.DiagLines.Add(mark + " " + h.Name + " " + h.AvgMs.ToString("0.00") + "ms"
+                        + (h.Overruns > 0 ? "（超限 " + h.Overruns + "）" : ""));
+                }
+            } catch (Exception __ex) { Guard.Log("帧钩子性能剖析", __ex); }
+        }
+
+        // 供"健康检查"页导出：把当前 tick 排名拼成多行文本。
+        internal static string TickProfileReport() {
+            try {
+                List<TickHook> all = new List<TickHook>();
+                for (int i = 0; i < _tickHooks.Count; i++) if (_tickHooks[i] != null) all.Add(_tickHooks[i]);
+                all.Sort(delegate (TickHook a, TickHook b) { return b.AvgMs.CompareTo(a.AvgMs); });
+                StringBuilder sb = new StringBuilder();
+                float total = 0f;
+                for (int i = 0; i < all.Count; i++) total += all[i].AvgMs;
+                sb.Append("帧钩子 ").Append(all.Count).Append(" 个，合计 ").Append(total.ToString("0.00")).AppendLine("ms");
+                int n = Mathf.Min(15, all.Count);
+                for (int i = 0; i < n; i++) {
+                    TickHook h = all[i];
+                    if (h.AvgMs <= 0.001f) break;
+                    sb.Append("  ").Append(h.AvgMs.ToString("0.000")).Append("ms  ").Append(h.Name)
+                      .Append("  调用=").Append(h.Calls).Append("  超限=").Append(h.Overruns).AppendLine();
+                }
+                return sb.ToString();
+            } catch (Exception __ex) { Guard.Log("帧钩子报告", __ex); return ""; }
         }
 
         // 强制复位全部 UI 状态（对局开始时调用，避免卡住的管理器 / 地图拖住快照加载握手）。
