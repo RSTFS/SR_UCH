@@ -338,6 +338,7 @@ public partial class SR {
         List<Rect> cells, List<int> cellCols, bool vertical, float scrollY, bool headerLeft, out Rect pinHeader) {
         cells.Clear(); cellCols.Clear(); pinHeader = new Rect(0f, 0f, 0f, 0f);
         float __vh = vertical ? (headerH * Mathf.Max(1, vis.Count)) : headerH; // 纵向：裁剪区是总高
+        Color __hdrSaved = GUI.color;   // 裁剪块内改了 GUI.color 必须还原（audit 07-P0-5）
         GUI.BeginClip(new Rect(box.x, box.y, stripW, vertical ? __vh : headerH));
         try {
         // 表头底（ImGui TableHeaderBg）：颜色走 CurStyle，可单表覆盖。
@@ -371,9 +372,10 @@ public partial class SR {
                 if (mp.x < cc.xMax) { DrawRect(new Rect(cc.x - box.x - 1f, 0f, Sc(3), headerH), 0.9f); break; }
             }
         }
-        } finally { GUI.EndClip(); }
+        } finally { GUI.EndClip(); GUI.color = __hdrSaved; }
         if (pinW > 0f) {
             pinHeader = new Rect(pinX, box.y, pinW, headerH);
+            Color __pinSaved = GUI.color;
             GUI.BeginClip(new Rect(pinX, box.y, pinW, headerH));
             try {
             // 钉住列表头：统一表头底上叠一层淡 accent，保留可辨识度。
@@ -381,7 +383,7 @@ public partial class SR {
             DrawRect(new Rect(0f, 0f, pinW, headerH), 0.10f);
             SR.Ctl.SecHeaderCenter.Draw(new Rect(0f, 0f, pinW, headerH),
                 new GUIContent(pinTitle ?? ""), false, false, false, false);
-            } finally { GUI.EndClip(); }
+            } finally { GUI.EndClip(); GUI.color = __pinSaved; }
             DrawLine(new Rect(pinX - 1f, box.y, 1f, headerH), CurStyle.LineStrong);
         }
     }
