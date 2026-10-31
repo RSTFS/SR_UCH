@@ -268,12 +268,13 @@ public partial class SR {
                     });
 
                 // ---- 失效目标卡（有问题才展开） ----
-                Card(bad == 0, T("按名绑定的目标", "Named targets"),
-                    bad == 0 ? T(SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " 补丁 · " + SR.AuditRefOk + "/" + SR.AuditRefTotal + " 反射，全部有效",
-                                 SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " patches · " + SR.AuditRefOk + "/" + SR.AuditRefTotal + " members, all valid")
+                bool __cfgOk = SR.OrphanKeyCount == 0 && SR.FallbackSectionCount == 0;
+                Card(bad == 0 && __cfgOk, T("目标与配置", "Targets & config"),
+                    bad == 0 ? T(SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " 补丁 · " + SR.AuditRefOk + "/" + SR.AuditRefTotal + " 反射 · 孤儿键 " + SR.OrphanKeyCount + " · 异常 " + SR.Guard.WarnCount,
+                                 SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " patches · " + SR.AuditRefOk + "/" + SR.AuditRefTotal + " members · orphan keys " + SR.OrphanKeyCount + " · errors " + SR.Guard.WarnCount)
                              : T(bad + " 项失效", bad + " broken"),
                     delegate {
-                        if (bad == 0) return;
+                        if (bad > 0) {
                         _scrollIssues = GUILayout.BeginScrollView(_scrollIssues, false, true, GUIStyle.none, GUI.skin.verticalScrollbar,
                             GUIStyle.none, GUILayout.Height(Sc(150f)));
                         for (int i = 0; i < issues.Count; i++) {
@@ -289,6 +290,14 @@ public partial class SR {
                             GUILayout.EndHorizontal();
                         }
                         GUILayout.EndScrollView();
+                        }
+                        // 配置健康（原独立卡片，已合并到本卡）
+                        AuditLabel(T("配置：孤儿键", "Config: orphan keys") + "：" + SR.OrphanKeyCount
+                            + " · " + T("无主段", "unowned sections") + "：" + SR.FallbackSectionCount
+                            + " · " + T("运行时异常", "runtime errors") + "：" + SR.Guard.WarnCount);
+                        if (!string.IsNullOrEmpty(SR.Guard.LastWhat))
+                            AuditLabel(T("最近一次", "Last") + "：" + SR.Guard.LastWhat + " - " + (SR.Guard.LastError ?? ""));
+                        try { AuditLabel(SR.AttributionReport()); } catch (Exception __at) { Guard.Log("自检/归因", __at); }
                     });
 
                 // ---- 性能卡 ----
