@@ -79,7 +79,9 @@ namespace SR_UCH.Tweaks {
                     string cd = reader.GetAttribute("snapshotCode");
                     if (string.IsNullOrEmpty(cd)) cd = reader.GetAttribute("levelCode");
                     if (!string.IsNullOrEmpty(cd)) levelCode = cd;
-                    if (reader.IsEmptyElement) return false;
+                    // 自闭合 <scene .../>（没有方块的空预设）：根元素的属性已经读完，
+                    // 这里应按成功返回，否则该预设的等级/名称/代码等元数据会全部丢失（audit 12-P0-4）。
+                    if (reader.IsEmptyElement) return true;
                     int rootDepth = reader.Depth;
                     while (reader.Read()) {
                         if (reader.NodeType == XmlNodeType.Element && reader.Depth == rootDepth + 1) {

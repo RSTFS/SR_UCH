@@ -40,7 +40,7 @@
 | 34 | 12_预设加载与工具 | P0-1 | 场景切换掐断挂载在 LobbyManager 上的加载协程，25 秒 XML 清理与放锁逻辑永久失效，仅能靠 45 秒自愈 | `todo` |  |
 | 35 | 12_预设加载与工具 | P0-2 | `levelPortalXml` 是 static 字段，协程被掐后脏 XML 残留，下一次原生开局会误加载旧快照 | `todo` |  |
 | 36 | 12_预设加载与工具 | P0-3 | 联机直接替换关卡时房客 `SelectedLevel` 不同步，且失败后无任何回退机制 | `todo` |  |
-| 37 | 12_预设加载与工具 | P0-4 | `TryReadPresetMeta` 遇自闭合 `<scene .../>` 直接返回 false，该预设元数据全丢失 | `todo` |  |
+| 37 | 12_预设加载与工具 | P0-4 | `TryReadPresetMeta` 遇自闭合 `<scene .../>` 直接返回 false，该预设元数据全丢失 | `ported` | 自闭合 <scene/> 空预设按成功返回，根元素属性不再丢弃 |
 | 38 | 13_联机主流程 | P0-01 | `DisbandOrLeave` 二次点击捷径会在"刚进主菜单又点一次"时误触发 | `todo` |  |
 | 39 | 13_联机主流程 | P0-02 | `ForceMainMenu` 直接 `Destroy(LobbyManager.gameObject)` 可能打断游戏自己的收尾 | `todo` |  |
 | 40 | 13_联机主流程 | P0-03 | `ForceMainMenu` 先 `LoadScene("MainMenu")` 后设 `_forceRawDeadline`，在场景切换失败时会永久不硬切 | `todo` |  |
