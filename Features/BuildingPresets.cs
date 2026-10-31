@@ -137,6 +137,8 @@ namespace SR_UCH.Tweaks {
         private static readonly string[] _cells = new string[ColCount];
         private static SRApi.TableArgs _args;
         private static Vector2 _scrollRows;
+        private static bool _sbDraggingPresets;   // 核心滚动条拖拽态
+        private static float _sbGrabPresets;      // 抓取点相对滚动条的位置
         private static Vector2 _scrollCols;
         private static bool _wheelLoggedFrame;   // 诊断：每帧只记一次滚轮事件
         private static Rect _tableBox;     // 表格在屏幕上的矩形（页面级滚轮钩子按它判断是否滚表格）
@@ -250,16 +252,7 @@ namespace SR_UCH.Tweaks {
             // 换场景后下次打开面板重新扫盘（手动放入/删除的 XML、其它存档的改动都能看到）。
             // 页面级滚轮钩子：在窗口建立滚动区【之前】拿到滚轮，鼠标在预设表格上就滚表格。
             // （页面内部拿到的事件已被滚动区处理过，所以必须在这一层接。）
-            try {
-                SRApi.RegisterPageWheel(delegate(Vector2 __mp, float __w) {
-                    if (_tableBox.width <= 1f || _maxScrollY <= 0f) return false;
-                    if (!_tableBox.Contains(__mp)) return false;
-                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + __w * SRApi.Ctl.Sc(40f), 0f, _maxScrollY);
-                    return true;
-                });
-            } catch (Exception __pwr) { SRApi.Guard.Log("布局预设/注册滚轮钩子", __pwr); }
-            try { SRApi.RegisterSceneHook(delegate { _loaded = false; }); }
-            catch (Exception __sh) { SRApi.Guard.Log("布局预设/注册场景钩子", __sh); }
+            // 手轮改由核心 TableScrollbarFor 统一处理（与联机列表同一入口，见下方绘制）。
             // 返回树屋：注册动作并允许右键绑键（悬浮提示里不写绑定说明）。
             try { SRApi.HotkeyAction("presets.treehouse", "返回树屋", delegate { ReturnToTreehouse(); }); }
             catch (Exception __hk) { SRApi.Guard.Log("布局预设/注册返回树屋快捷键", __hk); }
@@ -735,6 +728,11 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
                 _maxScrollY = Mathf.Max(0f, visible.Count * rowH - rowsH);
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _maxScrollY);
+                // 与联机列表同一个入口：命中判定 / 手轮归属 / 事件消费全交给核心，
+                // 不再依赖页面级钩子（那个钩子只有一个槽位，会被其它页覆盖）。
+                try {
+                    SRApi.Ctl.TableScrollbarFor(_args, Event.current, ref _sbDraggingPresets, ref _sbGrabPresets, ref _scrollRows.y);
+                } catch (Exception __sbp) { SRApi.Guard.Log("预设/滚动条", __sbp); }
                 Event e = Event.current;
                 Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
                 _args.box = box;
