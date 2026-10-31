@@ -140,8 +140,15 @@ public partial class Level {
                 PointBlock pb = __instance.newPointBlocks[i];
                 if (pb == null) continue;
                 if (!pb.AlwaysAward && _externAwardedKeys.Contains(Key(pb))) {
-                    // 外部加分的非 AlwaysAward 分块：缓存，重载备份时补回
-                    _clearedExternBlocks.Add(pb);
+                    // 外部加分的非 AlwaysAward 分块：缓存，重载备份时补回。
+                    // 按 (玩家, 类型) 去重，而不是按对象引用：引用相同的重复对象会被合并成一块，
+                    // 补回时丢分块（audit 15-P0-3）。
+                    int __k = Key(pb);
+                    bool __dup = false;
+                    for (int __j = 0; __j < _clearedExternBlocks.Count; __j++) {
+                        if (_clearedExternBlocks[__j] != null && Key(_clearedExternBlocks[__j]) == __k) { __dup = true; break; }
+                    }
+                    if (!__dup) _clearedExternBlocks.Add(pb);
                 }
             }
             if (_clearedExternBlocks.Count > 500) {

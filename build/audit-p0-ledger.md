@@ -47,12 +47,12 @@
 | 41 | 13_联机主流程 | P0-04 | `GoMainMenu` 与 `ForceMainMenu` 的 `ClearPendingJoin` 时机不一致，可能让"退出后立刻加入"重复触发 | `already-fixed` | 两条路径都在 ReturnToMainMenu 之前 ClearPendingJoin 并清 _pendingSteamId，实现已统一 |
 | 42 | 13_联机主流程 | P0-05 | `HostEndedListener` 幂等哨兵依赖"不重复 Initialize"，热重载会叠成 N 份回调（未验证） | `ported` | 监听注册后登记 OnShutdown 注销并置空，禁用/重载后重新 Initialize 不会叠加回调 |
 | 43 | 14_联机加入与列表 | P0-1 | 加入协程挂在 Matchmaker 上，切场景/离房即被销毁，加入请求永不发出 | `ported` | 加入协程改挂常驻 DontDestroyOnLoad 宿主，切场景不再被销毁 |
-| 44 | 14_联机加入与列表 | P0-2 | DoJoin 两条"已发出"清空路径互相覆盖，待加入队列实际由 TickPendingJoin 驱动，InSession() 判据可能永久为真 | `todo` |  |
+| 44 | 14_联机加入与列表 | P0-2 | DoJoin 两条"已发出"清空路径互相覆盖，待加入队列实际由 TickPendingJoin 驱动，InSession() 判据可能永久为真 | `ported` | 待加入等待旧房离开超过 6 秒即取消并提示，不再静默卡到 10 秒 give-up |
 | 45 | 14_联机加入与列表 | P0-3 | IsStale（心跳 10 秒）只改显示字符串，不参与 IsJoinable，用户会点进死房间 | `ported` | IsStale 参与 IsJoinable（心跳断=不可加入），文案显示「已失联」 |
-| 46 | 15_关卡重载与快照 | P0-1 | FillScoresCoroutine 的 finally 无法覆盖协程被销毁场景，导致分数翻倍 | `todo` |  |
-| 47 | 15_关卡重载与快照 | P0-2 | levelPortalXml 清理绑定协程生命周期，协程销毁时旧快照污染下一局 | `todo` |  |
-| 48 | 15_关卡重载与快照 | P0-3 | _clearedExternBlocks 按对象引用去重会合并错分块，造成补回错误类型 | `todo` |  |
-| 49 | 15_关卡重载与快照 | P0-4 | NetworkServer.active 在协程内可能翻转，补分阶段未再校验 | `todo` |  |
+| 46 | 15_关卡重载与快照 | P0-1 | FillScoresCoroutine 的 finally 无法覆盖协程被销毁场景，导致分数翻倍 | `already-fixed` | 补分协程已挂 FillHost(Ensure, DontDestroyOnLoad)，finally 会把未发完的写回备份 |
+| 47 | 15_关卡重载与快照 | P0-2 | levelPortalXml 清理绑定协程生命周期，协程销毁时旧快照污染下一局 | `already-fixed` | levelPortalXml 清理改由注册的 tick 兜底（见 12-P0-1/2），不依赖协程存活 |
+| 48 | 15_关卡重载与快照 | P0-3 | _clearedExternBlocks 按对象引用去重会合并错分块，造成补回错误类型 | `ported` | 被清除的外部加分分块改为按 (玩家,类型) 去重，不再按对象引用合并错分块 |
+| 49 | 15_关卡重载与快照 | P0-4 | NetworkServer.active 在协程内可能翻转，补分阶段未再校验 | `already-fixed` | 补分循环每发一条前都复查 NetworkServer.active，非权威立即中止 |
 | 50 | 16_回合HUD主实现 | P0-1 | 默认 `Show Mode = Hold` 使"开局即有 HUD"的修复完全失效，打开总开关后 HUD 不可见 | `ported` | Show Mode 默认从 Hold 改为 Toggle，开局即显示 HUD，按键只切显隐 |
 | 51 | 17_会话聊天 | P0-1 | 取不到本地玩家号时按 -1 发送，消息被服务端与所有客户端静默丢弃 | `ported` | 取不到本地玩家号时不再按 -1 发送（会被全体丢弃），改为 Notify 提示并返回 |
 | 52 | 19_方块破坏 | P0-1 | `_useSmoke` 配置项从未被读取，用户关闭后烟雾效果仍播放 | `ported` | 游戏 DestroySelf 就有 useSmoke 参数：开关传进去真正生效（上一版误删已回滚） |

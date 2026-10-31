@@ -242,7 +242,16 @@ namespace SR_UCH.Tweaks {
                     return;
                 }
                 // 尚未退出干净：继续等待，不算重试。
+                // InSession() 在某些断线态下可能永远为真：等到 6 秒还不干净就放弃并说明，
+                // 不要一直静默等到 10 秒 give-up（audit 14-P0-2）。
                 if (InSession() || Matchmaker.CurrentMatchmakingLobby != null) {
+                    if (now - _pendingWaitFrom > 6f) {
+                        ClearPendingJoin("仍停留在旧房间");
+                        _joinGuardUntil = 0f;
+                        Notes("仍在旧房间里，加入已取消", "Still in the old lobby; join cancelled");
+                        SRApi.LogWarn("[联机] 等待离开旧房间超过 6 秒，已取消加入");
+                        return;
+                    }
                     // 每帧判定离开是否完成（判据都是廉价字段读取），离开一完成立刻发请求。
                     float waited = now - _pendingWaitFrom;
                     if (waited > 2.5f && !_pendingNudged) {
