@@ -501,7 +501,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 真正决定表格高度的是这里（渲染函数只在 tableH<=0 时才回退到 TableHeight）。
             // 与联机列表逐字一致：页布局顶 + 已用高度 -> 核心公式（PageViewportHeight − used）。
             // 我上一版把 ContentArea（屏幕坐标）和 last.yMax（布局坐标）混算，结果反而更矮。
-            float tableH = SRApi.Ctl.TableFitHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.TableMinH());
+            // 核心化：高度 = min(可用, 表头 + 行数*行高 + 拖拽条)。行少 -> 收紧，行多 -> 填满并滚动。
+            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.TableMinH(),
+                VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
+                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f);
                 _actionHitThisFrame = false;
                 List<PresetInfo> visible = VisiblePresets();
                 RenderPresetTable(tableH, visible);
@@ -712,10 +715,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 也已经被算进 last.yMax（TableFitHeight 的 used）。再扣一次 titleH + 拖拽条，
                 // 表格就会比可用区域矮一截 —— 列表中下方那片空白的直接来源。
                 tableH = Mathf.Max(SRApi.Ctl.Sc(120), tableH);
-                // 表格自适应：高度最多到"表头 + 行 + 底边拖拽条"，行数少时不留空表格体。
-                float contentH = visible.Count * rowH;
-                float fitH = headerH + contentH + SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f;
-                if (tableH > fitH) tableH = Mathf.Max(SRApi.Ctl.Sc(120), fitH);
                 float rowsH = Mathf.Max(SRApi.Ctl.Sc(80), tableH - headerH);
                 Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
                 EnsureCols();

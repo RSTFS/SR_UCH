@@ -91,6 +91,7 @@ TableAutoHeight
 TableDragWatchdog
 TableDraw
 TableFitHeight
+ListTableHeight
 TableHeightGripBar
 TableLineStrong
 TableScrollbar

@@ -881,6 +881,18 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
                 return SRApi.TableScrollbarFor(a, e, ref dragging, ref grabY, ref scrollY);
             }
             // 列表可用高度：内容底界(pageBottomY) - 页面起点(pageTopY)，再按用户自定义高度夹取（entry 值 0 = 自动）。
+            // 列表自适应高度（核心化）：可用高度与"内容高度"取小 —— 行少时不留空表格体，
+            // 行多时才填满并滚动。所有列表都应走这一个出��口，避免各页自己算高度。
+            public static float ListTableHeight(float pageBottomY, float pageTopY, ConfigEntryBase heightEntry,
+                                                float minH, int rowCount, float rowH, float headerH, float gripH) {
+                try {
+                    float avail = TableFitHeight(pageBottomY, pageTopY, heightEntry, minH);
+                    float content = headerH + Mathf.Max(0, rowCount) * rowH + Mathf.Max(0f, gripH);
+                    float h = Mathf.Min(avail, content);
+                    return Mathf.Max(minH, h);
+                } catch { return minH; }
+            }
+
             public static float TableFitHeight(float pageBottomY, float pageTopY, ConfigEntryBase heightEntry, float minH) {
                 float used = Mathf.Max(0f, pageBottomY - pageTopY);
                 float h = Mathf.Max(minH, SRApi.PageViewportHeight - used);
