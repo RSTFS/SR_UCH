@@ -269,8 +269,13 @@ public partial class SR {
                     // PlayedSnapshotInfo 是 struct：没有 null 可判，直接看字段。
                     if (!string.IsNullOrEmpty(info.snapshotName)) snap = info.snapshotName;
                 } catch (Exception __si) { Guard.Log("ModeLabel 快照名(缓存键)", __si); }
+                // 模式读不到（刚启动 / 切场景瞬间 GetInstance() 会抛）时不要把假值写进缓存键，
+                // 否则缓存每帧不命中、页脚模式文本反复闪烁且每次都全量重算（audit 08-P0-04）。
                 GameState.GameMode gmKey = GameState.GameMode.CREATIVE;
-                try { gmKey = GameSettings.GetInstance().GameMode; } catch (Exception __gk) { Guard.Log("ModeLabel 模式(缓存键)", __gk); }
+                bool __gmOk = false;
+                try { gmKey = GameSettings.GetInstance().GameMode; __gmOk = true; }
+                catch (Exception __gk) { Guard.Log("ModeLabel 模式(缓存键)", __gk); }
+                if (!__gmOk) { key = null; return ModeLabelRaw(); }
                 key = sc + "|" + (int)gmKey + "|" + snap + "|" + LangVer + "|" + (_forceZh ? 1 : 0) + "|" + (UseEn ? 1 : 0);
                 if (key == _modeLabelKey && _modeLabelVal != null) return _modeLabelVal;
             } catch { LogWarn("ModeLabel 缓存键失败，退回直算"); }

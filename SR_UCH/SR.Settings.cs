@@ -120,16 +120,24 @@ public partial class SR {
         }
 
         // 恢复默认：把设置段里所有条目写回各自的默认值（不动「自检」页的诊断开关以外的内容）。
+        // 窗口几何（WinWidth/WinHeight/WinX/WinY）与侧栏宽度一起复位会让窗口"跳走"，
+        // 用户点"恢复默认"并不期望改变窗口位置/大小（audit 08-P0-03），所以显式跳过。
         private static void ResetAllDefaults() {
             try {
-                int n = 0;
+                int n = 0, skipped = 0;
                 foreach (ConfigEntryBase e in SettingsEntries()) {
                     if (e == null || e.Definition == null) continue;
                     if (e.Definition.Section != "Settings") continue;
+                    string k = e.Definition.Key;
+                    if (k == Keys.WinWidth || k == Keys.WinHeight || k == Keys.WinX || k == Keys.WinY
+                        || k == Keys.SidebarWidth) { skipped++; continue; }
                     try { e.BoxedValue = e.DefaultValue; n++; } catch (Exception __one) { Guard.Log("恢复默认 " + e.Definition.Key, __one); }
                 }
-                SRApi.Notify(T("已恢复默认：" + n + " 项", "Defaults restored: " + n));
-                SRApi.LogInfo("[设置] 恢复默认 " + n + " 项");
+                SRApi.Notify(skipped > 0
+                    ? T("已恢复默认：" + n + " 项（窗口位置/大小与侧栏宽度保持不变）",
+                        "Defaults restored: " + n + " (window geometry and sidebar width untouched)")
+                    : T("已恢复默认：" + n + " 项", "Defaults restored: " + n));
+                SRApi.LogInfo("[设置] 恢复默认 " + n + " 项，跳过窗口几何/侧栏 " + skipped + " 项");
             } catch (Exception __ex) { Guard.Log("恢复默认", __ex); }
         }
 

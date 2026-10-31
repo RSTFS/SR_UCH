@@ -28,8 +28,8 @@
 | 22 | 07_表格与样式 | P0-5 | 表头裁剪块缺少 GUI.color 保护，且鼠标坐标语义可能跨裁剪原点错位 | `ported` | 表头与钉住列表头两个裁剪块都保存/还原 GUI.color |
 | 23 | 08_本地化与设置页 | P0-01 | SetValue 在编辑框自身提交帧跳过 `_editText` 清理，会回滚掉"1."之外的后续编辑 | `todo` |  |
 | 24 | 08_本地化与设置页 | P0-02 | ApplyCmOrder 用反射写 `<Description>k__BackingField`，BepInEx 5 实际字段名是 `description`（无编译器生成名） | `ported` | 改为按类型+名字含 escription 探测后备字段，探测失败 LogWarn（带 BepInEx 版本） |
-| 25 | 08_本地化与设置页 | P0-03 | ResetAllDefaults 只复位 `Section == "Settings"` 的条目，Sidebar/Internal 段与外部插件段被跳过且窗口几何被一并复位 | `todo` |  |
-| 26 | 08_本地化与设置页 | P0-04 | ModeLabel 缓存键用 `GameSettings.GetInstance().GameMode`，但 `gmKey` 声明在使用之后、且 catch 块吞掉异常后 `gmKey` 保持 `CREATIVE` 默认值 | `todo` |  |
+| 25 | 08_本地化与设置页 | P0-03 | ResetAllDefaults 只复位 `Section == "Settings"` 的条目，Sidebar/Internal 段与外部插件段被跳过且窗口几何被一并复位 | `ported` | 恢复默认跳过 WinWidth/WinHeight/WinX/WinY/SidebarWidth，Notify 说明几何未动 |
+| 26 | 08_本地化与设置页 | P0-04 | ModeLabel 缓存键用 `GameSettings.GetInstance().GameMode`，但 `gmKey` 声明在使用之后、且 catch 块吞掉异常后 `gmKey` 保持 `CREATIVE` 默认值 | `ported` | GameMode 读取失败时不写缓存键，直接 ModeLabelRaw（避免页脚模式文本闪烁+全量重算） |
 | 27 | 09_配置迁移 | P0-01 | 删除判定是"手工死键名单"，名单与活键脱节时会在 Bind 之前永久抹掉用户设置 | `ported` | 删除键登记 + 启动日志一次性汇总（迁移时尚未 Bind，无法判定活键；深度修法=post-bind 孤儿清理，记为 P1） |
 | 28 | 09_配置迁移 | P0-02 | `_xPending` 是无版本号布尔，"写盘失败仍复位"会让规则永久失效 | `already-fixed` | RunPending 仅在 WriteCfgAtomic 成功后清 _xPending，失败保留待重试 |
 | 29 | 09_配置迁移 | P0-03 | 写盘后若调用方未执行 `ConfigFile.Reload()`，迁移结果会与内存中的 ConfigEntry 值分叉 | `already-fixed` | RunPending 返回 true 后调用方 pe.config.Reload() + ClearEntryCache（SR.Core.cs:1154-1157） |
