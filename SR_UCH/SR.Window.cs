@@ -56,6 +56,8 @@ public partial class SR {
 
 
         private static void Tick() {
+            // 诊断浮层宿主惰性创建：以前只在启动时建一次，若那次失败/时机不对就永远不显示。
+            try { if (DiagEnabled) SR_UCH.Tweaks.SrDiagOverlay.Ensure(); } catch (Exception __dg) { Guard.Log("诊断浮层/确保宿主", __dg); }
             // 门控快照：每帧刷新一次（所有限制读同一份 -> 同帧一致）
             RefreshGate();
             FlushConfig(); // 配置节流落盘（最多延迟 1 秒）

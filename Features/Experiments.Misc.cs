@@ -27,6 +27,16 @@ public partial class Experiments : ITweak
                     DrawStatus(FreeCam.SpeedNote);
                 }
 
+                // 性能：解锁帧率 / 抗锯齿 / 帧率显示
+                GUILayout.Space(SRApi.Ctl.Sc(6));
+                SRApi.Ctl.SectionTitle("- " + SRApi.T("性能", "Performance") + " -",
+                    SRApi.T("解锁帧率：关闭垂直同步并把上限设为不限制. 换场景/改分辨率后会自动重新应用. 抗锯齿与帧率显示也在这里.",
+                        "Unlock framerate: turns off vSync and removes the cap, re-applied after scene or resolution changes. Anti-aliasing and the FPS readout live here too."));
+                SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
+                    return e.Definition.Key == "Unlock Framerate" || e.Definition.Key == "Anti Aliasing"
+                        || e.Definition.Key == "Show Fps";
+                });
+
                 // 跨平台联机：直接改游戏自己的 CrossPlatformToggle（反射定位，不绑版本）。
                 GUILayout.Space(SRApi.Ctl.Sc(6));
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("跨平台联机", "Cross-play") + " -",
@@ -56,24 +66,6 @@ public partial class Experiments : ITweak
 
             } catch (Exception __ex) { SRApi.Guard.Log("其它页 渲染", __ex); }
         }
-        // 性能页：解锁帧率 / 抗锯齿 / 帧率显示（原"其它"页里的性能分区搬到这里）。
-        public static void RenderPerf() {
-            try {
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("帧率", "Framerate") + " -",
-                    SRApi.T("解锁帧率：关闭垂直同步并把上限设为不限制. 换场景/改分辨率后会自动重新应用. 抗锯齿可一并设置.",
-                        "Unlock framerate: turns off vSync and removes the cap. Re-applied after scene or resolution changes. Anti-aliasing can be set here too."));
-                SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
-                    return e.Definition.Key == "Unlock Framerate" || e.Definition.Key == "Anti Aliasing"
-                        || e.Definition.Key == "Show Fps";
-                });
-                if (UnlockFps.Note != null && UnlockFps.Note.Length > 0) {
-                    GUILayout.Space(SRApi.Ctl.Sc(2));
-                    DrawStatus(UnlockFps.Note);
-                }
-                GUILayout.Space(SRApi.Ctl.Sc(6));
-            } catch (Exception __ex) { SRApi.Guard.Log("性能页 渲染", __ex); }
-        }
-
         // 本页功能的补丁统一注册点（CreateAndPatchAll 不会自动发现带 [HarmonyPatch] 的类型）。
         internal static void InitCleanup(IFeatureHost plugin) {
             try { Harmony.CreateAndPatchAll(typeof(Experiments), (string)null); }
@@ -317,6 +309,8 @@ public partial class Experiments : ITweak
         private static void Tick() {
             try {
                 if (!_armed) return;
+                // 帧率显示独立于"解锁帧率"开关：先更新叠加层，再判断要不要动帧率设置。
+                FpsOverlay.Update(_showFps != null && _showFps.Value);
                 bool want = SRApi.GateMaster && _on != null && _on.Value;
                 if (!want) {
                     if (_applied) Restore();
@@ -344,7 +338,6 @@ public partial class Experiments : ITweak
                 } else if (changed) {
                     SRApi.LogInfo("[实验.性能] 检测到游戏改回帧率设置，已重新应用");
                 }
-                FpsOverlay.Update(_showFps != null && _showFps.Value);
             } catch (Exception __ex) { SRApi.Guard.Log("解锁帧率 Tick", __ex); }
         }
 
@@ -500,13 +493,37 @@ public partial class Experiments : ITweak
 
         internal static bool Available { get { Probe(); return _member != null; } }
 
+        // 宿主按需解析：GameSettings 是 ScriptableObject 单例，插件初始化时 GetInstance() 往往还是 null，
+        // 之前把它缓存成"静态成员"处理，导致读/写都抛 "Non-static field requires a target"。
+        private static object CurrentOwner(out bool isStaticField) {
+            isStaticField = true;
+            try {
+                if (_member == null) return null;
+                FieldInfo f = _member as FieldInfo;
+                if (f != null) {
+                    isStaticField = f.IsStatic;
+                    if (f.IsStatic) return null;
+                } else {
+                    PropertyInfo pr = (PropertyInfo)_member;
+                    MethodInfo g = pr.GetGetMethod(true);
+                    isStaticField = g != null && g.IsStatic;
+                    if (isStaticField) return null;
+                }
+                if (_owner == null) _owner = FindOwner(_member.DeclaringType);
+                return _owner;
+            } catch (Exception __co) { SRApi.Guard.Log("跨平台联机/解析宿主", __co); return null; }
+        }
+
         internal static bool Read() {
             try {
                 if (_member == null) return false;
+                bool isStatic;
+                object owner = CurrentOwner(out isStatic);
+                if (!isStatic && owner == null) return false;   // 游戏还没实例化：静默当"关"，不报异常
                 FieldInfo f = _member as FieldInfo;
-                if (f != null) return (bool)f.GetValue(f.IsStatic ? null : _owner);
+                if (f != null) return (bool)f.GetValue(f.IsStatic ? null : owner);
                 PropertyInfo pr = _member as PropertyInfo;
-                if (pr != null && pr.CanRead) return (bool)pr.GetValue(pr.GetGetMethod(true).IsStatic ? null : _owner, null);
+                if (pr != null && pr.CanRead) return (bool)pr.GetValue(isStatic ? null : owner, null);
             } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/读值", __ex); }
             return false;
         }
@@ -515,14 +532,19 @@ public partial class Experiments : ITweak
         internal static bool Write(bool on) {
             try {
                 if (_member == null) return false;
-                object target = _member is FieldInfo ? (((FieldInfo)_member).IsStatic ? null : _owner)
-                                                     : ((((PropertyInfo)_member).GetGetMethod(true).IsStatic) ? null : _owner);
+                bool isStatic;
+                object resolved = CurrentOwner(out isStatic);
+                if (!isStatic && resolved == null) {
+                    Note = SRApi.T("游戏还没初始化完，稍后再试", "The game is not initialised yet; try again");
+                    return false;
+                }
+                object target = isStatic ? null : resolved;
                 FieldInfo fl = _member as FieldInfo;
-                if (fl != null) fl.SetValue(fl.IsStatic ? null : _owner, on);
+                if (fl != null) fl.SetValue(fl.IsStatic ? null : target, on);
                 else {
                     PropertyInfo pr = (PropertyInfo)_member;
                     if (!pr.CanWrite) { Note = SRApi.T("该设置不可写（只读属性）", "read-only property"); return false; }
-                    pr.SetValue(pr.GetSetMethod(true).IsStatic ? null : _owner, on, null);
+                    pr.SetValue(isStatic ? null : target, on, null);
                 }
                 // 只写 GameSettings 只在本次会话生效；存档里的真值是 SaveFileData.CrossPlatformToggle，
                 // 通过 StatTracker 拿到主用户存档后同步写一次，再让游戏自己保存。

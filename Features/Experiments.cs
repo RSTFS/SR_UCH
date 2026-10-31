@@ -15,7 +15,6 @@ public partial class Experiments : ITweak
             SRApi.RegisterPage("Experiments", "p1", "关卡边界", "Bounds", 20, Render);
             SRApi.RegisterPage("Experiments", "p2", "其它", "Misc", 30, RenderPage2);
             SRApi.RegisterPage("Experiments", "p3", "场景", "Scene", 10, RenderPage3);
-            SRApi.RegisterPage("Experiments", "p4", "性能", "Performance", 5, RenderPerf);
         }
 
         // 状态行：只读、可复制。

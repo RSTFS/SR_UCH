@@ -764,8 +764,9 @@ public partial class SR : ITweak {
                     h.Overruns++;
                     if (now - h.WarnedAt > 10f) {
                         h.WarnedAt = now;
-                        Guard.Log("帧钩子耗时 " + h.Name + " " + ms.ToString("0.00") + "ms（阈值 "
-                            + TickWarnMs.ToString("0.00") + "ms，累计 " + h.Overruns + " 次超限）", null);
+                        // 用 Warn 而不是 Guard.Log(..., null)：后者会拼上"失败: 未知错误"，把性能告警说成异常。
+                        LogWarn("[性能] 帧钩子耗时 " + h.Name + " " + ms.ToString("0.00") + "ms（阈值 "
+                            + TickWarnMs.ToString("0.00") + "ms，累计 " + h.Overruns + " 次超限）");
                     }
                 }
             }
