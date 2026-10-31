@@ -592,10 +592,10 @@ namespace SR_UCH.Tweaks {
 
         private static void ResetGameState() {
             _gc = null;
-            _phase = GameControl.GamePhase.NONE;
+            // 不清 _phase：HUD 的相位/回合由 Tick 每帧从 GameControl 重读，
+            // 换场景时清零会让 HUD 收起再展开（闪烁）并抹掉正在显示的回合提示。
             _phaseStart = 0f;
             _eventSeen = false;
-            _hasGame = false;
             _timerText = "00:00";
             _warnLevel = 0;
             _roundText = null;
