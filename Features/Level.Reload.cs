@@ -293,7 +293,9 @@ namespace SR_UCH.Tweaks {
     // 外部加分（MsgPointAwarded.AlwaysAward=true）的分块标记：被清除时缓存，重载备份时补回。
     private static HashSet<int> _externAwardedKeys = new HashSet<int>();
     // 结算时被 Clear 的外部加分分块，重载备份时合并进 _scoreBackupBlocks
-    private static List<PointBlock> _clearedExternBlocks = new List<PointBlock>();
+    // 存「玩家号 + 分块类型」的值快照，而不是 PointBlock 引用：游戏 tally 后这些对象会被复用，
+    private static List<KeyValuePair<int, PointBlock.pointBlockType>> _clearedExternBlocks
+        = new List<KeyValuePair<int, PointBlock.pointBlockType>>();   // 值快照：对象会被游戏复用
     // 备份：networkNumber -> handicap，重载后由房主显式写回 SyncVar
     private static Dictionary<int, int> _handicapBackup = null;
 

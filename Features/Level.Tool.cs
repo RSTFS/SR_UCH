@@ -126,9 +126,11 @@ public partial class Level {
                             int k = Key(pb);
                             bool dup = false;
                             for (int j = 0; j < _clearedExternBlocks.Count; j++) {
-                                if (_clearedExternBlocks[j] != null && Key(_clearedExternBlocks[j]) == k) { dup = true; break; }
+                                KeyValuePair<int, PointBlock.pointBlockType> it = _clearedExternBlocks[j];
+                                if (Key(it.Key, it.Value) == k) { dup = true; break; }
                             }
-                            if (!dup) _clearedExternBlocks.Add(pb);
+                            // 立刻快照（玩家号 + 类型），之后不再持有这个对象
+                            if (!dup) _clearedExternBlocks.Add(new KeyValuePair<int, PointBlock.pointBlockType>(pb.playerNumber, pb.type));
                         }
                     }
                 } catch (Exception __cex) { SRApi.Guard.Log("缓存补分分块", __cex); }
@@ -146,9 +148,10 @@ public partial class Level {
                     int __k = Key(pb);
                     bool __dup = false;
                     for (int __j = 0; __j < _clearedExternBlocks.Count; __j++) {
-                        if (_clearedExternBlocks[__j] != null && Key(_clearedExternBlocks[__j]) == __k) { __dup = true; break; }
+                        KeyValuePair<int, PointBlock.pointBlockType> __it = _clearedExternBlocks[__j];
+                        if (Key(__it.Key, __it.Value) == __k) { __dup = true; break; }
                     }
-                    if (!__dup) _clearedExternBlocks.Add(pb);
+                    if (!__dup) _clearedExternBlocks.Add(new KeyValuePair<int, PointBlock.pointBlockType>(pb.playerNumber, pb.type));
                 }
             }
             if (_clearedExternBlocks.Count > 500) {
@@ -212,8 +215,11 @@ public partial class Level {
                 SRApi.LogWarn("[保分] 备份 newPointBlocks 失败: " + ex.Message);
             }
             if (_clearedExternBlocks != null && _clearedExternBlocks.Count > 0) {
-                // 结算时被 Clear 的外部加分分块：合并进备份，重载后补回
-                blocks.AddRange(_clearedExternBlocks);
+                // 结算时被 Clear 的外部加分分块：用值快照重建 PointBlock 再合并进备份
+                for (int __bi = 0; __bi < _clearedExternBlocks.Count; __bi++) {
+                    KeyValuePair<int, PointBlock.pointBlockType> it = _clearedExternBlocks[__bi];
+                    blocks.Add(new PointBlock(it.Value, it.Key));
+                }
                 SRApi.LogInfo("[保分] 合并被清除的外部加分分块 " + _clearedExternBlocks.Count + " 条");
                 _clearedExternBlocks.Clear();
             }
