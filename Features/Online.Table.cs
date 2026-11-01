@@ -12,12 +12,6 @@ using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
     public partial class Online {
-        private static void HeightGrip() {
-            Rect r = GUILayoutUtility.GetLastRect();
-            // 核心统一：间隙 + 拖拽条 + 拖动改高度并持久化（与预设列表同一外观/行为）。
-            SRApi.Ctl.TableHeightGripBar(_tableH, r.height / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
-        }
-
         // 落盘统一交给 SRApi.Ctl.MarkConfigDirty（节流写盘，失败有 Warning）。
         // 拖动期间高度只写 _dragHTmp，到这里才同步进配置；核心的拖拽看门狗也会调本方法。
         private static void SaveTableH() {

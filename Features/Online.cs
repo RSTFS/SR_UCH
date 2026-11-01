@@ -524,7 +524,7 @@ namespace SR_UCH.Tweaks {
             TableDraw(box);
             TableInput(box, Event.current);
 
-            HeightGrip();   // 表格底边：拖动改高度
+            // 底边拖拽条已移除：它只有 4px 高、与底栏同色，几乎看不见，却留下一条隐形热区。
         }
 
         // 表格底边拖动条；Shift+右键还原列宽 / 高度 / 列隐藏（房间行不再支持右键隐藏）。
