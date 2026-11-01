@@ -76,6 +76,7 @@ namespace SR_UCH.Tweaks {
         private static bool _sbHandled;   // 本帧核心滚动条是否已处理鼠标事件                //正在拖竖向滚动条
         private static float _sbGrabY;                  //按下时鼠标相对滑块顶部的偏移
         private static float _tableMaxX, _tableMaxY;
+    private static float _rowsHCache;   // 行区高度缓存（滚轮钩子首帧兜底）
         private static float _joinW, _joinXPage;  // 钉在右边的操作列几何
         private static float _pageTopY;                 //页面内容在布局空间里的起点 y（见 RenderOnlinePage）
         private static int _joinDownRow = -1;           //加入按钮按下的行（仅用于高亮）
@@ -166,12 +167,14 @@ namespace SR_UCH.Tweaks {
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x + wheel * SRApi.Ctl.Sc(60), 0f, _tableMaxX);
                 return true;
             }
-            if (_tableMaxY > 0f) {
-                _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, _tableMaxY);
-                return true;
+            // 防御：_tableMaxY 为 0（首帧/刚切页）时用缓存行区重算，避免第一次滚没反应。
+            float __maxY = _tableMaxY;
+            if (__maxY <= 0f && _rowsHCache > 0f) {
+                __maxY = Mathf.Max(0f, _shownLobbies != null ? _shownLobbies.Count * SRApi.Ctl.TableRowH() - _rowsHCache : 0f);
             }
-            if (_tableMaxX > 0f) {
-                _scrollCols.x = Mathf.Clamp(_scrollCols.x + wheel * SRApi.Ctl.Sc(60), 0f, _tableMaxX);
+            if (__maxY > 0f) {
+                _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, __maxY);
+                _tableMaxY = __maxY;
                 return true;
             }
             return false;
@@ -207,6 +210,7 @@ namespace SR_UCH.Tweaks {
             _rowsClipPage = new Rect(box.x, box.y + headerH, stripW, rowsH);
             _tableMaxX = Mathf.Max(0f, totalW - stripW);
             _tableMaxY = Mathf.Max(0f, contentH - rowsH);
+            _rowsHCache = rowsH;
             _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _tableMaxX);
             _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _tableMaxY);
             if (e == null) return;
