@@ -513,7 +513,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 } finally {
                     GUILayout.EndHorizontal();
                 }
-                if (!string.IsNullOrEmpty(_renameKey)) RenderRenameBar();
+                // 重命名改为表格内联编辑（右键名称单元格直接变输入框），不再有独立的编辑条。
                 GUILayout.Space(W(2));
                 // 高度：核心统一公式（页面顶部已用高度 + 表格高度 = 底栏之上可用高度），窗口变化实时跟随。
                 // 关键：GetLastRect() 在 Layout 趟里可能是退化矩形（诊断日志里 lastYMax=1.0），
@@ -533,6 +533,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             _actionHitThisFrame = false;
             List<PresetInfo> visible = VisiblePresets();
             RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
+            DrawInlineRename();   // 右键名称格：该格就地变输入框
             // 底边拖拽条：紧贴表格底边、正好在底栏之上（与联机列表同一处理）。
             SRApi.Ctl.TableHeightGripBar(_tableHEntry, (tableH) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
             // 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
@@ -694,33 +695,46 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             }
         }
 
-        // 重命名编辑条（列表操作列进入）：表格单元格不能内嵌输入框，单独一行编辑。
-        private static void RenderRenameBar() {
+        // 内联重命名：右键名称单元格后，该行名称格就地变成输入框（不再另开编辑条）。
+        // 提交：回车 / 点击别处；取消：Esc。
+        private static void DrawInlineRename() {
             try {
-                PresetInfo p = FindPreset(_renameKey);
-                if (p == null) { _renameKey = null; _renameText = null; return; }
-                GUILayout.BeginHorizontal();
-                try {
-                    SRApi.Ctl.LabelAuto(SRApi.T("重命名：", "Rename: "));
-                    string typed = SRApi.ClearableTextField(_renameText ?? p.Name, 40, SRApi.Ctl.SearchBox,
-                        GUILayout.Width(W(220)), GUILayout.Height(W(24)));
-                    if (typed != null && typed != _renameText) _renameText = typed;
-                    if (GUILayout.Button(SRApi.T("确定", "OK"), SRApi.Ctl.Btn, GUILayout.Width(W(60)), GUILayout.Height(W(24)))) {
-                        CommitRename(p);
-                        _renameKey = null;
-                        _renameText = null;
-                    }
-                    if (GUILayout.Button(SRApi.T("取消", "Cancel"), SRApi.Ctl.Btn, GUILayout.Width(W(60)), GUILayout.Height(W(24)))) {
-                        _renameKey = null;
-                        _renameText = null;
-                    }
-                    GUILayout.FlexibleSpace();
-                } finally {
-                    GUILayout.EndHorizontal();
+                if (string.IsNullOrEmpty(_renameKey) || _args == null || _args.rowRects == null) return;
+                int row = -1;
+                List<PresetInfo> vis = _visibleCache;
+                if (vis == null) return;
+                for (int i = 0; i < vis.Count && i < _args.rowRects.Count; i++) {
+                    if (vis[i] != null && vis[i].Key == _renameKey) { row = i; break; }
                 }
-            } catch (Exception __ex) {
-                SRApi.Guard.Log("布局预设/重命名编辑条", __ex);
-            }
+                if (row < 0) { _renameKey = null; _renameText = null; return; }
+                PresetInfo p = vis[row];
+                Rect rowRect = _args.rowRects[row];
+                // 名称列在可见列中的横向偏移（隐藏/换序后仍然正确）。
+                float x = _args.box.x;
+                for (int k2 = 0; k2 < _args.vis.Count; k2++) {
+                    int ci = _args.vis[k2];
+                    if (ci == ColName) break;
+                    x += SRApi.Ctl.Sc(_colW[ci]);
+                }
+                Rect cell = new Rect(x, rowRect.y + W(1f), SRApi.Ctl.Sc(_colW[ColName]) - W(2f), rowRect.height - W(2f));
+                GUI.BeginGroup(cell);
+                try {
+                    string typed = SRApi.ClearableTextField(_renameText ?? p.Name, 40, SRApi.Ctl.SearchBox,
+                        GUILayout.Width(cell.width), GUILayout.Height(cell.height));
+                    if (typed != null && typed != _renameText) _renameText = typed;
+                } finally { GUI.EndGroup(); }
+                Event e = Event.current;
+                if (e == null) return;
+                if (e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)) {
+                    CommitRename(p); _renameKey = null; _renameText = null; e.Use(); return;
+                }
+                if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape) {
+                    _renameKey = null; _renameText = null; e.Use(); return;
+                }
+                if (e.type == EventType.MouseDown && !cell.Contains(e.mousePosition)) {
+                    CommitRename(p); _renameKey = null; _renameText = null;
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/内联重命名", __ex); }
         }
 
         // 标准表格：核心 TableDraw 负责表头/行/拖列宽/换列位/钉住操作列；本页只提供列定义、单元格文本与操作按钮。
