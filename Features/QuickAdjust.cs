@@ -429,9 +429,11 @@ public class QuickAdjust : ITweak {
         private static float _keepApplyAt = -1f;
 
         [HarmonyPatch(typeof(GamePlayer), "OnStartClient")]
+        [HarmonyPostfix]
         private static void OnStartClientQueueKeep(GamePlayer __instance) { QueueKeepIfLocal(__instance); }
 
         [HarmonyPatch(typeof(GamePlayer), "OnStartServer")]
+        [HarmonyPostfix]
         private static void OnStartServerQueueKeep(GamePlayer __instance) { QueueKeepIfLocal(__instance); }
 
         private static void QueueKeepIfLocal(GamePlayer gp) {

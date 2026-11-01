@@ -347,11 +347,6 @@ public partial class HUD {
                 return s.Length > 0 ? s : null;
             } catch { return null; }
         }
-        private static string Truncate(string s, int max) {
-            if (string.IsNullOrEmpty(s)) return s;
-            if (max <= 3 || s.Length <= max) return s;
-            return s.Substring(0, max - 2) + "..";
-        }
         private static string ModeName(GameState.GameMode mode) {
             switch (mode) {
             case GameState.GameMode.FREEPLAY: return SRApi.T("自由", "Freeplay");
