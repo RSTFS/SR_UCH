@@ -161,11 +161,11 @@ namespace SR_UCH.Tweaks {
             public int Blocks = -1;  // -1 = 索引里没有，需要从 XML 现算
             public DateTime TimeUtc = DateTime.MinValue;
             public bool Ok;          // XML 可解析且方块数 > 0（存 index.json；缺字段按 false，扫描时自愈）
-            // 修改器策略："" = 继承预设自带（默认）；"off" = 全部还原默认；"custom" = 用 ModsVals 覆盖。
+        // 修改器策略："" = 预设自带（默认）；"current" = 用游戏当前值；"off" = 全部还原默认。
             public string ModsMode = "";
             // 加载该预设时是否一并应用 游戏规则 / 积分设置 / 模块概率（保存时写入 sidecar）。
             public bool ApplyRules, ApplyPoints, ApplyBlocks;
-            public Dictionary<string, string> ModsVals;   // 仅 custom 时有值：<mods> 属性名 -> 值
+        public Dictionary<string, string> ModsVals;   // 旧索引（custom）遗留值；新数据不再写入
             // 来源：false = 本功能 presets 目录里的预设；true = 游戏本地保存的自定义关卡（.snapshot，只读）。
             public bool IsLocal;
             public string LocalRelative = ""; // 本地条目在 snapshots 目录里的相对文件名（key 用 "local:"+相对路径）

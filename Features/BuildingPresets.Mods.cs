@@ -55,15 +55,15 @@ namespace SR_UCH.Tweaks {
             new ModDef("Frictionless",            "无摩擦",     "Frictionless",       true)
         };
 
-        // 策略取值："" = 继承预设（默认）；"off" = 全部默认；"custom" = 用自定义值覆盖。
-        private const string ModsInherit = "";
+        // 策略取值："" = 预设（默认）；"current" = 用游戏当前值；"off" = 全部默认。
+        // "custom" 仅为旧索引兼容保留（现在的 UI 不会再产生它）。
+        private const string ModsInherit = "";   // 预设（默认）
         private const string ModsOff = "off";
         private const string ModsCustom = "custom";
         // "current" = 按当前（游戏里正在用的）修改器加载：不写 <mods>，交给游戏保留现值。
         private const string ModsCurrent = "current";
 
         // 编辑器状态（不落配置：打开时从预设/索引读，保存时写回索引）。
-        private static readonly Dictionary<string, string> _modsDraft = new Dictionary<string, string>();
         // 规则 / 积分设置 / 模块概率：加载该预设时是否一并应用（草稿）。
 
         private static string ModDefault(ModDef d) { return d.IsBool ? "False" : "0"; }
@@ -156,7 +156,7 @@ namespace SR_UCH.Tweaks {
             } catch { return "-"; }
         }
 
-        //   预设 = 加载时用 XML 里的 <mods>；关闭 = 加载时把修改器写成默认值
+        //   预设 = 用 XML 里的 <mods>；当前 = 不移除/覆盖（用游戏现值）；关闭 = 写成默认值
         private static void CycleDataMode(PresetInfo p) {
             try {
                 if (p == null || p.IsLocal) return;
@@ -268,7 +268,7 @@ namespace SR_UCH.Tweaks {
             } catch { return 0; }
         }
 
-        // 数据列：悬浮预览 / 左键切换 预设-自定义-关闭 / 右键打开数据界面
+        // 数据列：悬浮预览 / 左键切换 预设-当前-关闭
         // 名称列：右键重命名
         private static void HandlePresetCells() {
             try {
