@@ -176,6 +176,9 @@ public partial class SR {
                         __e.Use();
                     }
                 } catch (Exception __sw) { Guard.Log("设置页/Ctrl 滚轮切页", __sw); }
+                // 页面滚动恢复：联机/预设页每帧把 NoPageScrollBars 置真，切到本页必须复位，
+                // 否则设置页也会被当成"页面不滚动"——这是自检页滚不动的直接原因。
+                SRApi.NoPageScrollBars = false;
                 GUILayout.Space(Sc(4));
                 if (SettingsTab == 1) RenderAuditBlock();
                 else RenderSettingsEntries(colWidth);
@@ -391,33 +394,30 @@ public partial class SR {
                 bool canExpand = body != null;
                 bool open = canExpand && _cardOpen.Contains(title);
                 GUILayout.BeginVertical(GUI.skin.box);
-                // 三个元素统一行高，水平居中对齐：绿点与标题用同一样式（以前标题用 _secHeader，
-                // 蓝色分区标题带基线偏移，才显得"文字偏下、和绿点对不上"）。
-                // 先算标题高，再让整行至少和标题同高：以前行高写死 20px，两行标题被行裁掉。
-                float __titleH0 = Mathf.Max(Sc(20), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)));
-                // 结论行（「38/38 补丁 · 40/40 反射…」这类）同样会换行：两者取高，否则结论被 20px 行裁掉。
-                float __sumH0 = Mathf.Max(Sc(20), _label.CalcHeight(new GUIContent(summary), 99999f) + Sc(2));   // 不换行：宽度自适应，高度只留 2px 缓冲
                 EnsureCardStyles();
-                float __rowH = Mathf.Max(__titleH0, __sumH0);
+                // 行高 = 标题与结论两者较高者 + 2px；点、标题、结论都用 MiddleLeft 样式并同高，
+                // 这样三者在行内垂直居中对齐，标题也不会被行裁掉。
+                float __titleH = Mathf.Max(Sc(20), _cdTitle.CalcHeight(new GUIContent(title), Sc(120)));
+                float __sumH = Mathf.Max(Sc(20), _cdSum.CalcHeight(new GUIContent(summary), Mathf.Max(Sc(120), Sc(SRApi.ContentArea.width * 0.55f))));
+                float __rowH = Mathf.Max(__titleH, __sumH) + Sc(2);
                 GUILayout.BeginHorizontal(GUILayout.Height(__rowH));
                 Color prev = GUI.color;
                 try {
                     GUI.color = ok ? new Color(0.55f, 0.92f, 0.55f) : new Color(1f, 0.78f, 0.35f);
                     GUILayout.Label(ok ? "●" : "▲", _cdDot, GUILayout.Width(Sc(18)), GUILayout.Height(__rowH));
                 } finally { GUI.color = prev; }
-                // 标题自适应高度：长标题换行显示，不再被固定 20px 截断。
-                float __titleH = Mathf.Max(Sc(22), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)) );   // 高度不再加额外内边距：真正的原因是外层行高被写死 20px
                 GUILayout.Label(title, _cdTitle, GUILayout.Width(Sc(120)), GUILayout.Height(__rowH));
                 GUILayout.Label(summary, _cdSum, GUILayout.Height(__rowH));
-                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
+                // 整行可点：点这一行的任意位置即可展开/收起（详情按钮已删除）。
                 if (canExpand) {
-                    // 详情按钮跟随标题高度：标题换行变高时按钮不会缩在 20px 里显得错位。
-                    if (GUILayout.Button(open ? T("收起", "Hide") : T("详情", "Details"), _btn,
-                            GUILayout.Width(Sc(54)), GUILayout.Height(Mathf.Max(Sc(18), __titleH - Sc(4))))) {
+                    Rect __row = GUILayoutUtility.GetLastRect();
+                    Event __e = Event.current;
+                    if (__e != null && __e.type == EventType.MouseUp && __e.button == 0 && __row.Contains(__e.mousePosition)) {
                         if (open) _cardOpen.Remove(title); else _cardOpen.Add(title);
+                        __e.Use();
                     }
                 }
-                GUILayout.EndHorizontal();
                 if (open) { GUILayout.Space(Sc(4)); body(); }
                 GUILayout.EndVertical();
                 GUILayout.Space(Sc(4));
