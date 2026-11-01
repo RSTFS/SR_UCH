@@ -167,7 +167,7 @@ namespace SR_UCH.Tweaks {
             Rect __ca = new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
             if (!__ca.Contains(mouse)) return false;
             if (_tableMaxY > 0f) {
-                _scrollRows.y = Mathf.Clamp(_scrollRows.y + wheel * SRApi.Ctl.Sc(40), 0f, _tableMaxY);
+                _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, _tableMaxY);
                 return true;
             }
             if (_tableMaxX > 0f) {

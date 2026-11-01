@@ -392,7 +392,7 @@ namespace SR_UCH.Tweaks {
                     maxY = Mathf.Max(0f, VisiblePresets().Count * SRApi.Ctl.TableRowH() - _rowsHCache);
                 }
                 if (maxY > 0f) {
-                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + wheel * SRApi.Ctl.Sc(40), 0f, maxY);
+                    _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, maxY);
                     _maxScrollY = maxY;
                     return true;
                 }
@@ -550,12 +550,13 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 与联机列表同一套高度语义：表高配置（0=自动）+ 可用高度夹取 + 填满。
             float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.Sc(140),
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, false);  // 按内容收紧：行少时不留空表体
+                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, true);   // 填满：底边拖拽条正好在底栏之上
             // 行多时以可视高度为上限（此时 maxY>0，滚轮才滚得动）。
             try {
                 float __screenTop = SRApi.ContentArea.y + last.yMax;
                 float __visible = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(6f) - __screenTop;
-                if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableMinH(), __visible));
+                // 让出拖拽条高度：box + 拖拽条 = 可视底，拖拽条贴在底栏上沿。
+                if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableMinH(), __visible - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f)));
             } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
                 _actionHitThisFrame = false;
                 List<PresetInfo> visible = VisiblePresets();
@@ -874,7 +875,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     try {
                         float __ax = Input.GetAxis("Mouse ScrollWheel");
                         if (Mathf.Abs(__ax) > 0.0001f && e != null && box.Contains(e.mousePosition) && _maxScrollY > 0f) {
-                            _scrollRows.y = Mathf.Clamp(_scrollRows.y + __ax * SRApi.Ctl.Sc(400f), 0f, _maxScrollY);
+                            _scrollRows.y = Mathf.Clamp(_scrollRows.y - __ax * SRApi.Ctl.Sc(400f), 0f, _maxScrollY);
                             SRApi.MarkWheelUsed();
                         }
                     } catch (Exception __aw) { SRApi.Guard.Log("布局预设/滚轮轴", __aw); }
