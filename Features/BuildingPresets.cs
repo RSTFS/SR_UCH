@@ -60,7 +60,6 @@ namespace SR_UCH.Tweaks {
         private const float ReloadLockStale = SrTimeouts.ReloadLockStaleSeconds;   // 单一真值：契约层 SrTimeouts
         // 等游戏消费 levelPortalXml 的硬上限（秒）
         private const float PresetConsumeTimeout = SrTimeouts.PresetConsumeTimeoutSeconds;   // 单一真值：契约层 SrTimeouts
-        private static ConfigEntry<bool> _enabled;
         private static ConfigEntry<int> _maxPresets;
         private static ConfigEntry<bool> _skipTreehouse;   // 跳过树屋流程（联机直接替换关卡，风险自负）
         private static bool _actionHitThisFrame;   // 本帧是否命中操作按钮（空白处取消二次确认）
@@ -70,7 +69,6 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<string> _colHiddenEntry;
         private static ConfigEntry<int> _tableHEntry;
         // 运行期快照：配置变化回调里即时更新，供每帧渲染读取
-        private static bool _featureOn;
         private static int _sortMode;
         // 存储根目录缓存
         private static string _rootDir;
@@ -118,10 +116,8 @@ namespace SR_UCH.Tweaks {
         private static readonly List<int> _rowRows = new List<int>();
         private static readonly List<Rect> _pinRects = new List<Rect>();
         private static readonly List<int> _pinRows = new List<int>();
-        // 操作列按钮描述（复用对象，避免逐行分配）：布局 / 命中 / 悬浮统一交给核心 SRApi.TableActionButtons。
-        // 不传固定宽度（widths = null）：核心按当前语言文字宽自适应，避免英文标签被截断。
+
         private static PresetInfo _actPreset;
-        // 用户要求：删掉「数据」按钮 —— 它打开的是游戏原生规则书界面，与预设列表的「预设 / 关闭」两态重复。
         private static readonly SRApi.TableAction[] _actActions = new SRApi.TableAction[] {
             new SRApi.TableAction { OnClick = DoActLoad },
             new SRApi.TableAction { OnClick = DoActExport },
@@ -147,8 +143,8 @@ namespace SR_UCH.Tweaks {
         // 关卡列显示模式：false = 关卡名称（本地化），true = 关卡代码（快照码/场景名）；运行期状态，不落配置。
         private static bool _levelShowCode;
 
-        // 加载预设时的重载锁（本功能自己的，和 Level 的锁互相不可见）。
-        private static string _reloadBusyReason;   // 锁的来源（日志用）
+        // 加载预设时的重载锁
+        private static string _reloadBusyReason;   // 锁的来源
         private static float _otherBusySince = -1f;   // 对方重载锁开始等待的时刻（-1 = 没在等）
         private static bool _reloadBusy;
         private static float _reloadBusyAt = -1f;
@@ -180,10 +176,6 @@ namespace SR_UCH.Tweaks {
         public void Initialize(IFeatureHost plugin) {
             try {
                 SelfReg();
-                _enabled = plugin.Config.Bind(Section, "Enabled", false,
-                    "布局预设总开关：开启后可保存 / 加载 / 导入导出方块布局预设。");
-                _featureOn = _enabled.Value;
-                _enabled.SettingChanged += delegate { _featureOn = _enabled.Value; };
                 _maxPresets = plugin.Config.Bind(Section, "Max Presets", 100,
                     new ConfigDescription("预设数量上限（1-100，默认 100）：列表最多保留多少条，达到上限后必须先删除旧预设才能保存新布局。",
                         new AcceptableValueRange<int>(1, 100)));
@@ -237,14 +229,11 @@ namespace SR_UCH.Tweaks {
             catch (Exception __tl) { SRApi.Guard.Log("布局预设/注册锁自愈", __tl); }
             try { SRApi.RegisterTick("布局预设-XML兜底", TickXmlGuard); }
             catch (Exception __tx) { SRApi.Guard.Log("布局预设/注册XML兜底", __tx); }
-            // 已删除的配置键：Show Timestamps（时间列固定显示，不再提供开关）。
-            // 用功能自注册的迁移规则清理旧 cfg，避免遗留孤儿键（只列真正不再 Bind 的键）。
+            // 淘汰旧键：Show Timestamps（功能已删）与 Enabled（总开关已删除，UI 不可达）。
             try { SRApi.Migration.Remove(Section, "Show Timestamps"); }
             catch (Exception __mx) { SRApi.Guard.Log("布局预设/注册淘汰键", __mx); }
-            SRApi.LocKey(Section, "Enabled", "布局预设总开关", "Layout presets");
-            SRApi.LocDesc(Section, "Enabled",
-                "布局预设总开关\n开启后可保存与加载方块布局\n关闭后仍可查看列表，但操作全部无效",
-                "Layout preset master switch\nsave and load block layouts while on\noff still lists presets but disables every action");
+            try { SRApi.Migration.Remove(Section, "Enabled"); }
+            catch (Exception __me) { SRApi.Guard.Log("布局预设/淘汰总开关键", __me); }
             SRApi.LocKey(Section, "Max Presets", "预设数量上限", "Max presets");
             SRApi.LocDesc(Section, "Max Presets",
                 "预设数量上限\n列表最多保留多少条预设\n范围 1-100；只限制新保存，不删磁盘文件",
@@ -259,7 +248,6 @@ namespace SR_UCH.Tweaks {
             // 手轮/滚动条统一走核心 TableScrollbarFor（见表格绘制之后）。
             try { SRApi.RegisterSceneHook(delegate { _loaded = false; }); }
             catch (Exception __sh) { SRApi.Guard.Log("布局预设/注册场景钩子", __sh); }
-            // 返回树屋：注册动作并允许右键绑键（悬浮提示里不写绑定说明）。
             try { SRApi.HotkeyAction("presets.treehouse", "返回树屋", delegate { ReturnToTreehouse(); }); }
             catch (Exception __hk) { SRApi.Guard.Log("布局预设/注册返回树屋快捷键", __hk); }
             SRApi.LocKey(Section, "Skip Treehouse", "跳过树屋流程", "Skip treehouse");
@@ -282,9 +270,6 @@ namespace SR_UCH.Tweaks {
 
         // ---------- 配置读取 ----------
 
-        private static bool FeatureOn {
-            get { return _featureOn; }
-        }
 
         private static int MaxPresets {
             get {
@@ -302,10 +287,6 @@ namespace SR_UCH.Tweaks {
         private static bool ActionAllowed() {
             if (!SRApi.GateMaster) {
                 SRApi.Notify(SRApi.MsgMasterOff);
-                return false;
-            }
-            if (!FeatureOn) {
-                SRApi.Notify(SRApi.T("布局预设总开关已关闭", "Layout presets are disabled"));
                 return false;
             }
             return true;
@@ -384,7 +365,6 @@ namespace SR_UCH.Tweaks {
                 // 以前用 ContentArea 高度重算：那是整个右栏，远大于表格行区，maxY 被算成 0，滚轮就死了。
                 if (!hitBox.Contains(mouse)) return false;
                 float maxY = _maxScrollY;
-                // 首帧 / 刚切到本页时 _maxScrollY 还是 0：用缓存的行区高度补算，避免"第一次滚没反应"。
                 if (maxY <= 0f && _rowsHCache > 0f) {
                     maxY = Mathf.Max(0f, VisiblePresets().Count * SRApi.Ctl.TableRowH() - _rowsHCache);
                 }
@@ -490,8 +470,8 @@ namespace SR_UCH.Tweaks {
                     RenderLoadModeCombo();
                     GUILayout.Space(W(7));
                     if (GUILayout.Button(SRApi.Ctl.Content(SRApi.T("刷新", "Refresh"),
-                            SRApi.T("重新扫描预设目录（手动放入/删除了 XML 时用），也用于重建索引",
-                                "rescan the presets folder (after manually adding/removing XML files) and rebuild the index")),
+                            SRApi.T("重新扫描预设目录",
+                                "rescan the presets folder")),
                         SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Btn.CalcSize(SRApi.Ctl.Content(SRApi.T("刷新", "Refresh"))).x + SRApi.Ctl.Sc(18)), GUILayout.Height(W(24)))) {
                         try { _loaded = false; LoadFromDisk(true); } catch (Exception __rx) { SRApi.Guard.Log("布局预设/刷新列表", __rx); }
                     }
@@ -534,7 +514,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     GUILayout.EndHorizontal();
                 }
                 if (!string.IsNullOrEmpty(_renameKey)) RenderRenameBar();
-                // 自建的修改器编辑页已下线：修改器/规则/积分/模块一律用游戏自己的界面（操作列的「游戏界面」）。
                 GUILayout.Space(W(2));
                 // 高度：核心统一公式（页面顶部已用高度 + 表格高度 = 底栏之上可用高度），窗口变化实时跟随。
                 // 关键：GetLastRect() 在 Layout 趟里可能是退化矩形（诊断日志里 lastYMax=1.0），
@@ -769,8 +748,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 滚动条已全局隐藏（SR.Table.HideTableScrollbars），这里也不再为它留宽度：
                 // 数据区直接吃满到钉住列，右侧不再空一条。
                 float __sbW = 0f;
-// 窗口变窄时先缩钉住列、再缩数据区：以前数据区有 Sc(80) 地板，
-                // 宽度不足时操作列会被这块地板顶在原地（看起来"走到极限就不动了"）。
+
                 float __pinMax = Mathf.Max(SRApi.Ctl.Sc(40f), box.width - SRApi.Ctl.Sc(80f));
                 if (pinW > __pinMax) pinW = __pinMax;
                 float stripW = Mathf.Max(0f, box.width - pinW - __sbW);

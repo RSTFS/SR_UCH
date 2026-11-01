@@ -17,7 +17,6 @@ public partial class Chat : ITweak {
 
         private const string Sec = "Chat Window";
 
-        private static ConfigEntry<bool> _enabled;
         private static ConfigEntry<bool> _noAutoShow;
         private static ConfigEntry<bool> _noFade;
         private static ConfigEntry<KeyCode> _key;          //显示窗口
@@ -82,6 +81,9 @@ public partial class Chat : ITweak {
             SRApi.RowSliders.Add(FontSizeSlider);
             SRApi.RowSliders.Add(PosSlider); //位置 X/Y：滑块范围按当前分辨率给
 
+        // 总开关已删除：清掉可能残留在配置里的旧键。
+        try { SRApi.Migration.Remove(Sec, "Enabled"); }
+        catch (Exception __cx) { SRApi.Guard.Log("对话窗口/淘汰总开关键", __cx); }
             SRApi.LocKey(Sec, "Enabled", "启用增强", "Enable tweaks");
             SRApi.LocDesc(Sec, "Enabled", "聊天窗口增强总开关\n开启后本页各项修改才生效\n关闭即回到游戏原版行为", "Chat window master switch\nthe options here apply only while on\noff returns to vanilla behaviour");
             SRApi.LocKey(Sec, "No Auto Show", "关闭自动弹出", "Suppress auto show");
@@ -110,7 +112,6 @@ public partial class Chat : ITweak {
             SRApi.LocDesc(Sec, "Pos Y", "垂直偏移（像素）\n负值把聊天框向下移\n仅在位置调整开启时生效", "Vertical offset (px)\nnegative values move the window down\nonly applies while position tweaks are on");
 
             //绑定顺序 = 页面显示顺序
-            _enabled = plugin.Config.Bind(Sec, "Enabled", false, "总开关：关闭后本页所有改动都不生效。");
             _noAutoShow = plugin.Config.Bind(Sec, "No Auto Show", false, "关闭自动弹出：新消息不再自动显示聊天窗口。");
             _noFade = plugin.Config.Bind(Sec, "No Fade", false, "关闭淡入淡出动画：出现/消失都瞬切。");
             _key = plugin.Config.Bind(Sec, "Window Key", KeyCode.Z, "显示聊天窗口的按键（默认 Z）");
@@ -265,7 +266,8 @@ public partial class Chat : ITweak {
             } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口可见计时器清零", __ex); }
         }
 
-        private static bool EnabledOn { get { return SRApi.GateMaster && _enabled != null && _enabled.Value; } }
+        // 总开关已删除（页面没有渲染它，UI 不可达）：本页只受全局开关控制。
+        private static bool EnabledOn { get { return SRApi.GateMaster; } }
 
         [HarmonyPatch(typeof(ChatDisplay), "Update")]
         [HarmonyPostfix]
