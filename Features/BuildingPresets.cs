@@ -551,23 +551,15 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.Sc(140),
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
                 0f, true);   // 填满：表格占据底栏之上的整块区域（不留拖拽条高度）
-            // 行多时以可视高度为上限（此时 maxY>0，滚轮才滚得动）。
+            _actionHitThisFrame = false;
+            List<PresetInfo> visible = VisiblePresets();
+            RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
+            // 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
             try {
-                float __screenTop = SRApi.ContentArea.y + last.yMax;
-                float __visible = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f) - __screenTop;   // 正好占满到 底栏上沿
-                // 让出拖拽条高度：box + 拖拽条 = 可视底，拖拽条贴在底栏上沿。
-                if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableMinH(), __visible));
-            } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
-                _actionHitThisFrame = false;
-                List<PresetInfo> visible = VisiblePresets();
-                RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
-                // 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
-                try {
-                    if (!string.IsNullOrEmpty(_pendingKey) && _pendingKey == pendingBefore && !_actionHitThisFrame
-                        && Event.current != null && Event.current.type == EventType.MouseUp && Event.current.button == 0) {
-                        ClearPending();
-                    }
-                } catch (Exception __pe) { SRApi.Guard.Log("布局预设/空白处取消确认", __pe); }
+                if (!string.IsNullOrEmpty(_pendingKey) && _pendingKey == pendingBefore && !_actionHitThisFrame
+                    && Event.current != null && Event.current.type == EventType.MouseUp && Event.current.button == 0)
+                    ClearPending();
+            } catch (Exception __pe) { SRApi.Guard.Log("布局预设/空白处取消确认", __pe); }
             } catch (Exception __ex) {
                 SRApi.Guard.Log("渲染布局预设页", __ex);
             }
