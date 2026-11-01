@@ -547,10 +547,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 核心化：高度 = min(可用, 表头 + 行数*行高 + 拖拽条)。行少 -> 收紧，行多 -> 填满并滚动。
             // 高度只按内容：传 null 忽略"表高配置"，否则以前拖过的高度会把表格抬到配置值、行下方留白。
             // 按内容收紧（不用填满模式）：填满会在最后一行下面留一大块空表框，看起来就是"列表下面的空白"。
-            // 与联机列表同一套高度语义：表高配置（0=自动）+ 可用高度夹取 + 填满。
-            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.Sc(140),
+            // 自适应：高度 = min(可用高度, 表头 + 行数×行高)。行少时表格只到内容高，行多时截到可用高度并内滚。
+            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, 0f,
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-                0f, true);   // 填满：表格占据底栏之上的整块区域（不留拖拽条高度）
+                0f, false);   // fillViewport=false：按内容自适应（minH=0，不抬最小高）
             _actionHitThisFrame = false;
             List<PresetInfo> visible = VisiblePresets();
             RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
