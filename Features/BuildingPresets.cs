@@ -546,24 +546,12 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             Rect last = GUILayoutUtility.GetRect(1f, 0f);
                 // 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
                 // 表格高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
-                // 真正决定表格高度的是这里（渲染函数只在 tableH<=0 时才回退到 TableHeight）。
-            // 与联机列表逐字一致：页布局顶 + 已用高度 -> 核心公式（PageViewportHeight − used）。
-            // 我上一版把 ContentArea（屏幕坐标）和 last.yMax（布局坐标）混算，结果反而更矮。
-            // 核心化：高度 = min(可用, 表头 + 行数*行高 + 拖拽条)。行少 -> 收紧，行多 -> 填满并滚动。
-            // 高度只按内容：传 null 忽略"表高配置"，否则以前拖过的高度会把表格抬到配置值、行下方留白。
-            // 按内容收紧（不用填满模式）：填满会在最后一行下面留一大块空表框，看起来就是"列表下面的空白"。
-            // 自适应：高度 = min(可用高度, 表头 + 行数×行高)。行少时表格只到内容高，行多时截到可用高度并内滚。
-            // 自适应高度先由核心算出（min(可用, 内容)），再用"页面真实可视底"夹一次：
-            // PageViewportHeight 偶尔偏大，会让表格超出页面底 -> 行被裁且 maxY=0（既看不到也滚不到）。
-            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, 0f,
+            // 高度与联机列表逐字一致：fillViewport=true、minH=Sc(140)、grip=0；
+            // 可用高度 = PageViewportHeight − 表格上方已用高度（两种页面同一套公式）。
+            // 与联机列表逐字一致：fillViewport=true、minH=Sc(140)、grip=0。
+            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.Sc(140),
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-                0f, false);   // fillViewport=false：按内容自适应（minH=0，不抬最小高）
-            try {
-                float __pageTop = SRApi.PageScrollTopY > 0f ? SRApi.PageScrollTopY : _pageTopY;
-                float __screenTop = SRApi.ContentArea.y + Mathf.Max(0f, last.yMax - __pageTop);
-                float __visible = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f) - __screenTop;
-                if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(0f, __visible));
-            } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
+                0f, true);
             _actionHitThisFrame = false;
             List<PresetInfo> visible = VisiblePresets();
             RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
@@ -780,7 +768,11 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 滚动条已全局隐藏（SR.Table.HideTableScrollbars），这里也不再为它留宽度：
                 // 数据区直接吃满到钉住列，右侧不再空一条。
                 float __sbW = 0f;
-                float stripW = Mathf.Max(SRApi.Ctl.Sc(80), box.width - pinW - __sbW);
+// 窗口变窄时先缩钉住列、再缩数据区：以前数据区有 Sc(80) 地板，
+                // 宽度不足时操作列会被这块地板顶在原地（看起来"走到极限就不动了"）。
+                float __pinMax = Mathf.Max(SRApi.Ctl.Sc(40f), box.width - SRApi.Ctl.Sc(80f));
+                if (pinW > __pinMax) pinW = __pinMax;
+                float stripW = Mathf.Max(0f, box.width - pinW - __sbW);
                 float totalW = 0f;
                 for (int i = 0; i < _order.Length; i++) {
                     int ci = _order[i];
