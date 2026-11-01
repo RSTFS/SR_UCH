@@ -44,23 +44,22 @@ namespace SR_UCH.Tweaks {
         private const string ColWidthsKey = "Preset Widths";
         private const string ColOrderKey = "Preset Order";
         private const string ColHiddenKey = "Preset Hidden";
-        // 操作列按钮种类：0=加载 1=导出 2=删除（重命名改为右键名称列；「数据」按钮已按用户要求删除）。
+        // 操作列按钮种类：0=加载 1=导出 2=删除
         private const int ActLoad = 0;
         private const int ActExport = 1;
         private const int ActDelete = 2;
-        // 从剪贴板导入的上限：方块数 / XML 字符数。超出直接拒绝，避免一次性重建拖垮帧率或整段解析爆内存。
+        // 从剪贴板导入的上限：方块数 / XML 字符数。
         private const int MaxImportBlocks = 3000;
         private const int MaxImportChars = 2000000;
-        // 游戏本地关卡快照：7z 压缩文件的大小 / 解压后 XML 大小上限（与导入上限同一套防护，防止畸形文件拖垮扫描）。
+        // 游戏本地关卡快照：7z 压缩文件的大小 / 解压后 XML 大小上限
         private const int MaxSnapshotBytes = 4 * 1024 * 1024;
         private const int MaxLocalXmlBytes = 8 * 1024 * 1024;
-        // 二次确认窗口（秒）：超时后按钮自动恢复第一次点击前的文案。
+        // 二次确认窗口（秒）
         private const float ConfirmWindow = 5f;
-        // 重载锁自愈阈值（秒）：与功能 Level 的 45 秒保持一致。
+        // 重载锁自愈阈值（秒）
         private const float ReloadLockStale = SrTimeouts.ReloadLockStaleSeconds;   // 单一真值：契约层 SrTimeouts
-        // 等游戏消费 levelPortalXml 的硬上限（秒）：与功能 Level 的 25 秒兜底一致。
+        // 等游戏消费 levelPortalXml 的硬上限（秒）
         private const float PresetConsumeTimeout = SrTimeouts.PresetConsumeTimeoutSeconds;   // 单一真值：契约层 SrTimeouts
-
         private static ConfigEntry<bool> _enabled;
         private static ConfigEntry<int> _maxPresets;
         private static ConfigEntry<bool> _skipTreehouse;   // 跳过树屋流程（联机直接替换关卡，风险自负）
@@ -70,10 +69,10 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<string> _colOrderEntry;
         private static ConfigEntry<string> _colHiddenEntry;
         private static ConfigEntry<int> _tableHEntry;
-        // 运行期快照：配置变化回调里即时更新，供每帧渲染读取（避免每帧访问 ConfigEntry）。
+        // 运行期快照：配置变化回调里即时更新，供每帧渲染读取
         private static bool _featureOn;
         private static int _sortMode;
-        // 存储根目录缓存（BepInEx.Paths 的调用只做一次）。
+        // 存储根目录缓存
         private static string _rootDir;
 
         private static bool _loaded;
@@ -551,10 +550,12 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 不再经过 ListTableHeight 的 minH/内容夹取，避免留出 2~140px 的缝。
             float __used = Mathf.Max(0f, last.yMax - _pageTopY);
             float tableH = Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(),
-                                     SRApi.PageViewportHeight - __used);
+                                     SRApi.PageViewportHeight - __used - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));   // 让出拖拽条位置
             _actionHitThisFrame = false;
             List<PresetInfo> visible = VisiblePresets();
             RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
+            // 底边拖拽条：紧贴表格底边、正好在底栏之上（与联机列表同一处理）。
+            SRApi.Ctl.TableHeightGripBar(_tableHEntry, (tableH) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
             // 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
             try {
                 if (!string.IsNullOrEmpty(_pendingKey) && _pendingKey == pendingBefore && !_actionHitThisFrame

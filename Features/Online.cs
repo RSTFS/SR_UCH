@@ -516,15 +516,17 @@ namespace SR_UCH.Tweaks {
             float availH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableH, SRApi.Ctl.Sc(140),
                 _shownLobbies != null ? _shownLobbies.Count : 0, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
                 SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, true);   // 底部贴页面底：始终填满
-            // 高度由核心拖拽条直接写入配置，这里只按可用高度铺满。
-            float boxH = availH;
+            // 让出拖拽条位置：表格底 → 间隙 → 4px 拖拽条 → 底栏上沿（两个列表同一处理）。
+            float __gripTotal = SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f;
+            float boxH = Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(), availH - __gripTotal);
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
 
             TableDraw(box);
             TableInput(box, Event.current);
 
-            // 底边拖拽条已移除：它只有 4px 高、与底栏同色，几乎看不见，却留下一条隐形热区。
+            // 底边拖拽条：紧贴表格底边、正好在底栏之上；拖动改高度并持久化。
+            SRApi.Ctl.TableHeightGripBar(_tableH, boxH / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
         }
 
         // 表格底边拖动条；Shift+右键还原列宽 / 高度 / 列隐藏（房间行不再支持右键隐藏）。
