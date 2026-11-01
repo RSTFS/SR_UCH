@@ -396,6 +396,11 @@ namespace SR_UCH.Tweaks {
                     _maxScrollY = maxY;
                     return true;
                 }
+                // 竖向没有余量时，Shift+滚轮横向滚（列比可视区宽时）。
+                if (_maxScrollX > 0f && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))) {
+                    _scrollCols.x = Mathf.Clamp(_scrollCols.x + wheel * SRApi.Ctl.Sc(60), 0f, _maxScrollX);
+                    return true;
+                }
                 return false;
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/页面滚轮", __ex); return false; }
         }
@@ -548,9 +553,17 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 高度只按内容：传 null 忽略"表高配置"，否则以前拖过的高度会把表格抬到配置值、行下方留白。
             // 按内容收紧（不用填满模式）：填满会在最后一行下面留一大块空表框，看起来就是"列表下面的空白"。
             // 自适应：高度 = min(可用高度, 表头 + 行数×行高)。行少时表格只到内容高，行多时截到可用高度并内滚。
+            // 自适应高度先由核心算出（min(可用, 内容)），再用"页面真实可视底"夹一次：
+            // PageViewportHeight 偶尔偏大，会让表格超出页面底 -> 行被裁且 maxY=0（既看不到也滚不到）。
             float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, 0f,
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
                 0f, false);   // fillViewport=false：按内容自适应（minH=0，不抬最小高）
+            try {
+                float __pageTop = SRApi.PageScrollTopY > 0f ? SRApi.PageScrollTopY : _pageTopY;
+                float __screenTop = SRApi.ContentArea.y + Mathf.Max(0f, last.yMax - __pageTop);
+                float __visible = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f) - __screenTop;
+                if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(0f, __visible));
+            } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
             _actionHitThisFrame = false;
             List<PresetInfo> visible = VisiblePresets();
             RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
