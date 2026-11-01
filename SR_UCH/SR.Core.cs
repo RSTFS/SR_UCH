@@ -805,6 +805,9 @@ public partial class SR : ITweak {
                 h.AvgMs = h.Calls <= 1 ? ms : (h.AvgMs * 0.9f + ms * 0.1f);
                 if (ms > h.MaxMs) h.MaxMs = ms;
                 // 节流钩子（<30Hz）不按单次耗时判超限：0.5s 跑一次的 1ms 只占每秒 0.2%。
+                // 节流钩子（0.5s 跑一次）不累计超限：单次耗时与帧预算无可比性，
+                // 否则钩子列表里会堆出几千上万条"超限"，掩盖真正每帧变慢的钩子。
+                if (h.Hz > 0f && h.Hz < 30f) h.Overruns = 0;
                 if (ms >= TickWarnMs && h.Hz >= 30f) {
                     h.Overruns++;
                     if (now - h.WarnedAt > 10f) {
@@ -863,7 +866,7 @@ public partial class SR : ITweak {
                         h.Name ?? "",
                         h.AvgMs.ToString("0.000") + "ms",
                         h.MaxMs.ToString("0.000") + "ms",
-                        h.Calls.ToString(),
+                        h.Hz > 0f ? h.Hz.ToString("0.0") + "/s" : "-",
                         h.Overruns > 0 ? h.Overruns.ToString() : ""
                     });
                 }

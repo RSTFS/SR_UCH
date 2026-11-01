@@ -355,7 +355,7 @@ public partial class SR {
                             _hookArgs.hidden = new HashSet<int>();
                             _hookArgs.vis = new List<int>();   // 核心按 order+hidden 推导可见列
                             _hookArgs.resizable = true;
-                            _hookArgs.title = delegate (int c) { return c == 0 ? T("钩子", "Hook") : c == 1 ? T("平均", "Avg") : c == 2 ? T("峰值", "Max") : c == 3 ? T("调用", "Calls") : T("超限", "Over"); };
+                            _hookArgs.title = delegate (int c) { return c == 0 ? T("钩子", "Hook") : c == 1 ? T("平均", "Avg") : c == 2 ? T("峰值", "Max") : c == 3 ? T("频率", "Rate") : T("超限", "Over"); };
                             _hookArgs.rowCells = delegate (int row) { return _hookRows[row]; };
                         }
                         _hookArgs.rowCount = hrows.Count;

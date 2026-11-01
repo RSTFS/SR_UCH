@@ -554,7 +554,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 行多时以可视高度为上限（此时 maxY>0，滚轮才滚得动）。
             try {
                 float __screenTop = SRApi.ContentArea.y + last.yMax;
-                float __visible = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(6f) - __screenTop;
+                float __visible = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f) - __screenTop;   // 正好占满到 底栏上沿
                 // 让出拖拽条高度：box + 拖拽条 = 可视底，拖拽条贴在底栏上沿。
                 if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableMinH(), __visible));
             } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
