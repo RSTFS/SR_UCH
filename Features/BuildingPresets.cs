@@ -382,20 +382,11 @@ namespace SR_UCH.Tweaks {
                 // 命中框：_tableBox 是布局坐标、且 Layout 趟只有 1x1；无效时退回页面内容区。
                 // 核心现在传屏幕坐标：直接用页面内容区判定（_tableBox 是布局坐标，Layout 趟只有 1x1）。
                 Rect hitBox = new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
-                // 不依赖 RenderPresetTable 里算出的 _maxScrollY（那一帧可能还没跑或窗口刚变过），
-                // 直接用表格框的实时高度重算可滚动范围，避免"范围算成 0 就滚不动"。
-                float rowsH = Mathf.Max(0f, hitBox.height - SRApi.Ctl.TableHeaderH()
-                                        - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));
-                int n = VisiblePresets().Count;
-                float maxY = Mathf.Max(0f, n * SRApi.Ctl.TableRowH() - rowsH);
-                if (maxY > 0f) {
-                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + wheel * SRApi.Ctl.Sc(40), 0f, maxY);
-                    _maxScrollY = maxY;
-                    return true;
-                }
-                // 横向只在按住 Shift 时滚（否则竖向余量为 0 时会误判成横向滚动）
-                if (_maxScrollX > 0f && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))) {
-                    _scrollCols.x = Mathf.Clamp(_scrollCols.x + wheel * SRApi.Ctl.Sc(60), 0f, _maxScrollX);
+                // 复用表格自身算出的滚动上限（由真实 rowsH 得出，帧间稳定），与联机列表同一套。
+                // 以前用 ContentArea 高度重算：那是整个右栏，远大于表格行区，maxY 被算成 0，滚轮就死了。
+                if (!hitBox.Contains(mouse)) return false;
+                if (_maxScrollY > 0f) {
+                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + wheel * SRApi.Ctl.Sc(40), 0f, _maxScrollY);
                     return true;
                 }
                 return false;
@@ -556,13 +547,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 行多时以可视高度为上限（此时 maxY>0，滚轮才滚得动）。
             try {
                 float __screenTop = SRApi.ContentArea.y + last.yMax;
-                float __visible = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(6f) - __screenTop;
-                if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableMinH(), __visible));
-            } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
-            // 关键：把表格高度夹在"页面可视底"以内。页面关掉滚动后，表格若比可视区高，
-            // 超出的行既看不到、又因为 rowsH 被算大而 maxY=0，滚轮也就滚不到 —— 这就是"滚不动"。
-            try {
-                float __screenTop = SRApi.ContentArea.y + last.yMax;      // 布局 y 与 ContentArea 同一原点
                 float __visible = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(6f) - __screenTop;
                 if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableMinH(), __visible));
             } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
@@ -764,7 +748,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 _visibleCache = visible;   // 悬浮预览按行号取预设时用（与 RowCells 同一份列表）
                 float rowH = SRApi.Ctl.TableRowH();
                 float headerH = SRApi.Ctl.TableHeaderH();
-                if (tableH <= 0f) tableH = TableHeight();
                 // Render() 传入的 tableH 是「分区标题 + 表格」可用的总高度；分区标题本身也占高，
                 // 这里扣掉它的实测高度，否则表格底部会超出可视区、最后一行被底栏裁掉且滚不到。
                 // 不再二次扣减：调用方给的 tableH 已经是"可用总高度"，而分区标题在 GetLastRect 里
@@ -892,24 +875,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/表格绘制", __ex);
             }
-        }
-
-        // 表格高度：按页面视口高度扣掉上方固定行，尽量让整页不出现页面级滚动条；最小 140、最大 480 设计单位。
-        // 预设列表本身在固定高度区域内用 TableWheelInput 滚动，所以页面不需要滚动。
-private static float TableHeight() {
-            // 和联机列表同一条核心公式：页面视口 − 表格之前已用高度，再夹到 [min, 表高配置]。
-            // 以前这里固定扣 300px，表格下方留白、手轮落在留白上就变成滚页面。
-            try {
-                Rect last = GUILayoutUtility.GetLastRect();
-                // TableFitHeight 会把高度夹到"表高配置"上限；预设页这个配置值偏小，
-                // 于是表格永远填不满、下面留一大片空白。这里直接用剩余可用高度，
-                // 表高配置只在它更大时作为上限（用户拖高过才生效）。
-                float avail = SRApi.ContentArea.yMax - last.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(8);
-                float cap = _tableHEntry != null && _tableHEntry.Value > 0 ? SRApi.Ctl.Sc(_tableHEntry.Value) : 0f;
-                float h = avail > 0f ? avail : SRApi.Ctl.Sc(340);
-                if (cap > h) h = Mathf.Min(cap, avail > 0f ? Mathf.Max(avail, cap) : cap);
-                return Mathf.Max(SRApi.Ctl.Sc(140), h);
-            } catch (Exception __th) { SRApi.Guard.Log("预设/表格高度", __th); return SRApi.Ctl.Sc(340); }
         }
 
         // Shift+右键表头：核心还原列宽并清空隐藏列后回调这里，再补一次"列序 + 列宽 + 隐藏"的整表还原并落盘。

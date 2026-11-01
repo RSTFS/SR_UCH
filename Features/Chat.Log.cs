@@ -85,8 +85,6 @@ public partial class Chat : ITweak {
                     SRApi.Notify(SRApi.T("聊天：还没分配到玩家号，稍后再试", "Chat: no player number yet, try again later"));
                     return;
                 }
-                // num < 0（还没分配到玩家号）时不要直接 return：那条分支连"回到底部"都跳过了，
-                // 自己发的消息会停在回看态（audit B-5）。取不到号就按 -1 交给聊天系统，滚动照做。
                 if (GameState.ChatSystem != null) {
                     GameState.ChatSystem.NewChatMessage(text, EmoteMeanings.CHAT_Text, num);
                     // 自己刚发的消息：即使正在回看也直接回到底部；仅在对话内容页可见时动页面滚动，

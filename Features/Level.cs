@@ -12,6 +12,15 @@ namespace SR_UCH.Tweaks {
 public partial class Level : ITweak {
 
     // 栏目注册：本地化文案、侧栏顺序、页签、快捷键。
+    // 重载锁自愈：协程被场景切换掐断时没人复位，超时即视为残留并放锁。
+    private static void TickReloadLock() {
+        try {
+            if (!ReloadLockStuck()) return;
+            SetReloadBusy(false);
+            SRApi.LogWarn("[重载] 重载锁超时未复位，已自动释放（tick 兜底）");
+        } catch (Exception __ex) { SRApi.Guard.Log("关卡重载/锁自愈", __ex); }
+    }
+
     private static void SelfReg() {
 // 反射游戏私有成员登记：改名时启动自检会在日志告警。
         SRApi.Ref.Override("ScoreKeeper.historyPointBlocks", "重载保分（历史分块）");
@@ -34,6 +43,10 @@ public partial class Level : ITweak {
         Slots.Provide(SlotClearPlacedBlocks, (Action<List<Placeable>, string>)ClearPlacedBlocks);
         // 对外槽位：关卡重载忙碌状态（布局预设等功能据此避免与本功能的重载并发）。
         Slots.Provide("level.reloadBusy", (Func<bool>)(() => _reloadBusy));
+        // 锁自愈 tick：与布局预设侧对称。以前只有"用户再点一次重载"才会发现残留锁，
+        // 于是预设加载会被一条早已死掉的 level.reloadBusy 永久拦住。
+        try { SRApi.RegisterTick("关卡重载-锁自愈", TickReloadLock); }
+        catch (Exception __tr) { SRApi.Guard.Log("关卡重载/注册锁自愈", __tr); }
         _reloadMode = plugin.Config.Bind<ReloadMode>("Level", "Reload Mode", ReloadMode.KeepScore, "重载关卡模式：\n保留方块和分数（允许补分）= 重载后当前方块保留；房主按重载前的分类型分块（获胜/金币/陷阱等原样）给全员广播补分，下一回合结算时全员得分板显示与重载前一致的分数和类型（含未装 mod 的房客；补分不立即结算，图标随正常结算显示）。\n仅保留方块（跳过补分）= 重载后当前方块保留，分数重置（重新对局，不补分）。");
             // CreateAndPatchAll 不自动发现带 [HarmonyPatch] 的独立类，必须显式注册；单个补丁目标失效只丢本类功能，不影响其它功能。
         try { Harmony.CreateAndPatchAll(typeof(Level), (string)null); }

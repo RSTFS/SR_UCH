@@ -51,7 +51,7 @@ public class QuickAdjust : ITweak {
         SRApi.LocDesc("Quick Adjust", "More Handicap Values", "自由输入百分比\n评分百分比改为输入框而非整十滑块\n范围 10-100 任意整数", "Free percentage input\nreplaces the tens slider with an input box\nany integer 10-100");
         // 预登记本页自动快捷键。
         SRApi.HotkeyAction("qa.apply_discount", "应用折扣", () => QuickAdjust.ApplyScoreDiscount());
-        SRApi.HotkeyAction("qa.restore_discount", "还原折扣", () => QuickAdjust.RestoreScoreDiscount());
+        SRApi.HotkeyAction("qa.restore_discount", "重置为不折扣", () => QuickAdjust.RestoreScoreDiscount());
     }
 
     public static void Render() {

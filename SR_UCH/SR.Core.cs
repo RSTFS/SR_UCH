@@ -424,7 +424,7 @@ public partial class SR : ITweak {
                 cfg.Reload();
                 ClearEntryCache();
                 OrphanKeyCount = 0;
-            OrphanPendingCount = 0;
+                OrphanPendingCount = 0;
             AuditOrphan = 0;
                 LogInfo("[SR.Cfg] 已清理 " + pairs.Count + " 个孤儿键（原文件已留成 .bak）");
                 return pairs.Count;
