@@ -530,6 +530,12 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             float __used = Mathf.Max(0f, last.yMax - _pageTopY);
             float tableH = Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(),
                                      SRApi.PageViewportHeight - __used - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));   // 让出拖拽条位置
+            // 可视底夹取：内容/视口算大时，行会画到窗口外面（看起来溢出且滚不动）。
+            try {
+                float __screenTop = SRApi.ContentArea.y + last.yMax;
+                float __visible = (SRApi.ContentArea.yMax - SRApi.FooterHeight - W(2f)) - __screenTop;
+                if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(), __visible));
+            } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
             _actionHitThisFrame = false;
             List<PresetInfo> visible = VisiblePresets();
             RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
@@ -731,6 +737,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape) {
                     _renameKey = null; _renameText = null; e.Use(); return;
                 }
+                // 点空白提交：不判 e.Used（文本框会先吃掉 MouseDown）。
                 if (e.type == EventType.MouseDown && !cell.Contains(e.mousePosition)) {
                     CommitRename(p); _renameKey = null; _renameText = null;
                 }
