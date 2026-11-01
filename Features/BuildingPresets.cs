@@ -828,8 +828,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 _tableBox = box;      // 供页面级滚轮钩子命中判定
                 SRApi.TableDraw(_args);
                 HandlePresetCells();   // 数据列：悬浮预览 / 左键切三态 / 右键开界面；名称列：右键重命名
-                // 底边拖拽条（核心统一绘制 + 拖动 + 持久化）。
-                // 底边拖拽条（核心统一绘制 + 拖动 + 持久化）：与联机列表同款。
                 // 不画底边拖拽条：预设列表不需要手动调高（整块区域就是列表）。
                 // 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
                 _sbHandled = SRApi.Ctl.TableScrollbarFor(_args, e, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);

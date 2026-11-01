@@ -59,6 +59,8 @@ namespace SR_UCH.Tweaks {
         private const string ModsInherit = "";
         private const string ModsOff = "off";
         private const string ModsCustom = "custom";
+        // "current" = 按当前（游戏里正在用的）修改器加载：不写 <mods>，交给游戏保留现值。
+        private const string ModsCurrent = "current";
 
         // 编辑器状态（不落配置：打开时从预设/索引读，保存时写回索引）。
         private static readonly Dictionary<string, string> _modsDraft = new Dictionary<string, string>();
@@ -109,6 +111,15 @@ namespace SR_UCH.Tweaks {
             try {
                 if (p == null || p.IsLocal) return xml;         // 游戏本地关卡是只读数据，不做改写
                 string mode = p.ModsMode ?? ModsInherit;
+                if (mode == ModsCurrent) {
+                    // 当前：把 <mods> 去掉，游戏就用它此刻的修改器，不被预设覆盖。
+                    XmlDocument __cd = ParseXmlSafe(xml);
+                    if (__cd == null || __cd.DocumentElement == null) return xml;
+                    XmlElement __cm = __cd.DocumentElement.SelectSingleNode("mods") as XmlElement;
+                    if (__cm != null) __cd.DocumentElement.RemoveChild(__cm);
+                    SRApi.LogInfo("[布局预设] 修改器策略=当前，已移除 <mods>（保留游戏当前修改器）");
+                    return __cd.OuterXml;
+                }
                 if (mode != ModsOff && mode != ModsCustom) return xml;
                 if (string.IsNullOrEmpty(xml)) return xml;
                 XmlDocument doc = ParseXmlSafe(xml);
@@ -133,29 +144,28 @@ namespace SR_UCH.Tweaks {
         }
 
 
-
-
-
         // 表内显示用短标签：继承显示 "-"（不改动），关闭显示「关」，自定义显示「改」。
         private static string ModsLabel(PresetInfo p) {
             try {
                 if (p == null || p.IsLocal) return "-";
                 string m = p.ModsMode ?? ModsInherit;
+                if (string.Equals(m, ModsCurrent, StringComparison.Ordinal)) return SRApi.T("当前", "Current");
                 if (string.Equals(m, ModsOff, StringComparison.Ordinal)) return SRApi.T("关闭", "Off");
                 // 历史数据里的 ModsCustom 一律按"预设"显示：真值已迁回 XML 的 <mods>。
                 return SRApi.T("预设", "Preset");
             } catch { return "-"; }
         }
 
-        // 两态切换（用户要求取消旁车，XML 的 <mods> 是唯一真值）：
-        //   预设 = 加载时用 XML 里的 <mods>；关闭 = 加载时把修改器写成默认值（等于不用这套修改器）。
+        //   预设 = 加载时用 XML 里的 <mods>；关闭 = 加载时把修改器写成默认值
         private static void CycleDataMode(PresetInfo p) {
             try {
                 if (p == null || p.IsLocal) return;
                 string m = p.ModsMode ?? ModsInherit;
-                string next = string.Equals(m, ModsOff, StringComparison.Ordinal) ? ModsInherit : ModsOff;
+                // 顺序：预设 -> 当前 -> 关闭 -> 预设
+                string next = string.Equals(m, ModsInherit, StringComparison.Ordinal) || string.IsNullOrEmpty(m)
+                    ? ModsCurrent
+                    : (string.Equals(m, ModsCurrent, StringComparison.Ordinal) ? ModsOff : ModsInherit);
                 p.ModsMode = next;
-                // 兼容旧数据：进入"预设"态时把遗留的索引自定义值丢掉（真值已回到 XML）。
                 if (string.Equals(next, ModsInherit, StringComparison.Ordinal)) p.ModsVals = null;
                 SaveIndex();
                 SRApi.Notify(SRApi.T("数据：", "Data: ") + ModsLabel(p) + " · " + (p.Name ?? ""));
@@ -164,50 +174,9 @@ namespace SR_UCH.Tweaks {
         }
 
 
-
-
-
-        // ---------- 下拉框（数值项）：选项与文案都取自游戏 Modifiers 自带的取值表 / 名称函数 ----------
-
-
-
-
-
-
-
-
-
-
-        // ---------- 规则 / 积分设置 / 模块概率（游戏的 GameRulePreset） ----------
-        // 保存预设时把当前规则集写成 sidecar（<预设>.xml.ruleset.xml），加载时按三个开关选择性应用。
-        // 用游戏自己的入口：GameRulePreset.GetRulesetFromCurrentRules / GetRulesetXmlString（读），
-        // LoadRulesetFromXML + GameSettings.ApplyTemporaryRuleset（写；mods 由修改器策略单独处理，这里传 false）。
-        // 侧车放在 <预设根>/rulesets/<模式>/<预设文件名> —— 单独子目录，绝不混进预设列表。
         private const string RulesetsDirName = "rulesets";
 
-        // 加载前调用：按该预设的三个开关，把 sidecar 里的规则集应用到当前对局（房主侧）。
-        // ---------- 借用游戏自己的界面 ----------
-        // 打开游戏规则书（TabletRulesScreen 那一套）：规则 / 积分 / 模块概率 / 修改器都在里面，
-        // 玩家改完关掉，再回本页点「读取游戏当前」。必须先把本面板收起来，否则输入被冻结、游戏界面点不动。
-        // 正在游戏规则书里编辑的预设 Key（null = 没在编辑）；_bookSeenOpen = 已确认打开过一次（用来识别"已关闭"）
 
-        // 由预设文件路径推出侧车路径（保存时用，此时 PresetInfo 可能还没建好）。
-        // 打开游戏自己的规则书（InventoryBook）：
-        //   1) 若传了预设，先把它的规则/积分/模块/修改器灌进游戏，打开后看到的就是这条预设的数据；
-        //   2) GameRuleBook 可能还没生成 —— 先 SpawnRuleBook（私有，反射），初始化回调里 Show(true) + 定位页面；
-        //   3) 玩家关掉规则书后由 TickRulebook 回收：读回数据 -> 写进预设 -> 自动勾选"自定义" -> 自动弹回本面板。
-        // 场景里的平板（规则/修改器界面的载体）。
-        // 场景里的规则书道具（树屋里的那本）。关卡里通常没有 -> 返回 null。
-        // 走 InventoryBook：AddPlayer（放进光标）+ Show + 翻到规则页；这条路径关卡内也能用。
-        // 生成规则书对象（SpawnRuleBook 是私有方法，走反射；失败只影响这一次打开）。
-        // 把预设内容灌进游戏（打开规则书前调用）：规则/积分/模块按勾选应用，修改器一律按预设值写。
-        // 每 0.25 秒看一次：规则书从"打开"变"关闭"就回收数据。
-        // 规则书已关闭：把游戏当前内容读回这条预设，自动设为"自定义"，再自动弹回本面板。
-        // 读游戏当前的规则集 -> 写进这条预设的 sidecar，并把三个开关打开。
-        // 读游戏当前的 24 项修改器 -> 直接写回该预设 XML 的 <mods>（不再经过旁车 / 自定义草稿）。
-        // 把草稿里的 24 项修改器写进预设 XML 的 <mods> 节点（XML 是唯一真值，不再写旁车 / 索引）。
-        // 把修改器的原始值翻成游戏自己的本地化文本（可读性要求）：优先调用 Modifiers 的
-        // Get*ValueString；布尔项走 GetOnOffValueString；两者都拿不到时退回原始值。
         private static string ModValueText(ModDef d, string raw) {
             try {
                 if (string.IsNullOrEmpty(raw)) return "";
@@ -299,11 +268,8 @@ namespace SR_UCH.Tweaks {
             } catch { return 0; }
         }
 
-
-
-        // ---------- 行内单元格交互 ----------
         // 数据列：悬浮预览 / 左键切换 预设-自定义-关闭 / 右键打开数据界面
-        // 名称列：右键重命名（操作列不再放重命名按钮）
+        // 名称列：右键重命名
         private static void HandlePresetCells() {
             try {
                 Event e = Event.current;
@@ -370,8 +336,14 @@ namespace SR_UCH.Tweaks {
         private static string DataPreviewTip(PresetInfo p) {
             try {
                 if (p == null) return null;
-                if (string.Equals(p.ModsMode ?? ModsInherit, ModsOff, StringComparison.Ordinal)) {
-                    return SRApi.T("关闭：加载时把修改器写成默认值\n左键切回「预设」", "Off: modifiers are reset to defaults at load time\nleft-click to go back to Preset");
+                string __mm = p.ModsMode ?? ModsInherit;
+                if (string.Equals(__mm, ModsCurrent, StringComparison.Ordinal)) {
+                    return SRApi.T("当前：加载时用游戏此刻的修改器（不覆盖预设自带）\n左键切到「关闭」",
+                                     "Current: the level loads with the game's present modifiers (preset's own mods ignored)\nleft-click for Off");
+                }
+                if (string.Equals(__mm, ModsOff, StringComparison.Ordinal)) {
+                    return SRApi.T("关闭：加载时把修改器写成默认值\n左键切回「预设」",
+                                     "Off: modifiers are reset to defaults at load time\nleft-click for Preset");
                 }
                 string summary = ModsSummaryFromXml(p, 12);
                 if (string.IsNullOrEmpty(summary)) {
