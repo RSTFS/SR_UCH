@@ -21,15 +21,13 @@ namespace SR_UCH.Tweaks {
         // 配置段名：导航栏目名 / LocSec / Config.Bind 三处必须完全一致。
         private const string Section = "Building Presets";
         private const string IndexFileName = "index.json";
-        // 索引格式版本：v2 起新增 level / ok；v3 起新增 levelName；v4 起新增 levelCode（关卡代码/快照码）。
-        // 老索引缺字段按默认值处理并在扫描时自愈。
         private const int IndexVersion = 4;
-        // index.json 每条记录的 schema 版本：缺失 = 旧格式（下次写盘会补上）。
+        // index.json 每条记录的 schema 版本：缺失 = 旧格式。
         private const int IndexSchema = 1;
-        // 排序方式：0=时间（新→旧），1=名称（A→Z）。旧配置里的 2/3 已弃用，读取时夹到 0。
+        // 排序方式：0=时间（新→旧），1=名称（A→Z）。
         private const int SortModeMin = 0;
         private const int SortModeMax = 1;
-        // 表格列索引（与 TableArgs.colW 顺序一致）：名称 / 关卡 / 模式 / 修改器 / 时间 / 操作（操作列钉在右侧）。
+        // 表格列索引（与 TableArgs.colW 顺序一致）：名称 / 关卡 / 模式 / 数据 / 时间 / 操作（操作列钉在右侧）。
         private const int ColName = 0;
         private const int ColLevel = 1;
         private const int ColMode = 2;
@@ -549,9 +547,11 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 高度与联机列表逐字一致：fillViewport=true、minH=Sc(140)、grip=0；
             // 可用高度 = PageViewportHeight − 表格上方已用高度（两种页面同一套公式）。
             // 与联机列表逐字一致：fillViewport=true、minH=Sc(140)、grip=0。
-            float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.Sc(140),
-                VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-                0f, true);
+            // 高度直接取"页面视口 − 表格上方已用高度"：底边正好落在底栏上沿（原拖拽条的位置），
+            // 不再经过 ListTableHeight 的 minH/内容夹取，避免留出 2~140px 的缝。
+            float __used = Mathf.Max(0f, last.yMax - _pageTopY);
+            float tableH = Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(),
+                                     SRApi.PageViewportHeight - __used);
             _actionHitThisFrame = false;
             List<PresetInfo> visible = VisiblePresets();
             RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
