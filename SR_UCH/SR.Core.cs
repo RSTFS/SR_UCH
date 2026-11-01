@@ -710,6 +710,11 @@ public partial class SR : ITweak {
         // 单次最坏耗时：重钩子（2Hz / 0.5s）的平均值会被空闲帧摊平，只有峰值能反映真实的掉帧风险。
         public float MaxMs;
             public long Calls;
+            // 调用频率（Hz）：0.5s / 2Hz 这类节流钩子按每次耗时判超限必然误报，
+            // 只有接近每帧（>=30Hz）的钩子才用单次阈值衡量。
+            public float WindowStart;
+            public int WindowCalls;
+            public float Hz;
             public long Overruns;
             public float WarnedAt = -999f;
         }
@@ -791,10 +796,16 @@ public partial class SR : ITweak {
                 float ms = (Time.realtimeSinceStartup - t0) * 1000f;
                 h.LastMs = ms;
                 h.Calls++;
+                if (now - h.WindowStart >= 1f) {
+                    if (h.WindowStart > 0f) h.Hz = h.WindowCalls / Mathf.Max(0.0001f, now - h.WindowStart);
+                    h.WindowStart = now; h.WindowCalls = 0;
+                }
+                h.WindowCalls++;
                 // 指数滑动平均（0.1 权重 ≈ 最近十帧），避免单帧噪声把排名抖来抖去。
                 h.AvgMs = h.Calls <= 1 ? ms : (h.AvgMs * 0.9f + ms * 0.1f);
                 if (ms > h.MaxMs) h.MaxMs = ms;
-                if (ms >= TickWarnMs) {
+                // 节流钩子（<30Hz）不按单次耗时判超限：0.5s 跑一次的 1ms 只占每秒 0.2%。
+                if (ms >= TickWarnMs && h.Hz >= 30f) {
                     h.Overruns++;
                     if (now - h.WarnedAt > 10f) {
                         h.WarnedAt = now;

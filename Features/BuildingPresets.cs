@@ -550,13 +550,13 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             // 与联机列表同一套高度语义：表高配置（0=自动）+ 可用高度夹取 + 填满。
             float tableH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableHEntry, SRApi.Ctl.Sc(140),
                 VisiblePresets().Count, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, true);   // 填满：底边拖拽条正好在底栏之上
+                0f, true);   // 填满：表格占据底栏之上的整块区域（不留拖拽条高度）
             // 行多时以可视高度为上限（此时 maxY>0，滚轮才滚得动）。
             try {
                 float __screenTop = SRApi.ContentArea.y + last.yMax;
                 float __visible = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(6f) - __screenTop;
                 // 让出拖拽条高度：box + 拖拽条 = 可视底，拖拽条贴在底栏上沿。
-                if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableMinH(), __visible - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f)));
+                if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableMinH(), __visible));
             } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
                 _actionHitThisFrame = false;
                 List<PresetInfo> visible = VisiblePresets();
@@ -762,7 +762,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 也已经被算进 last.yMax（TableFitHeight 的 used）。再扣一次 titleH + 拖拽条，
                 // 表格就会比可用区域矮一截 —— 列表中下方那片空白的直接来源。
                 // 不再抬到 120：按调用方给的内容高度画，行少时不留空白表体。
-                float __gripH = SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f;
+                float __gripH = 0f;   // 已删除底边拖拽条
                 // 行区 = 表格高 − 表头 − 拖拽条：把拖拽条算进来会让 maxY 恒为 0（列表因此永远滚不动）。
                 float rowsH = Mathf.Max(0f, tableH - headerH - __gripH);
                 Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
@@ -855,7 +855,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 HandlePresetCells();   // 数据列：悬浮预览 / 左键切三态 / 右键开界面；名称列：右键重命名
                 // 底边拖拽条（核心统一绘制 + 拖动 + 持久化）。
                 // 底边拖拽条（核心统一绘制 + 拖动 + 持久化）：与联机列表同款。
-                SRApi.Ctl.TableHeightGripBar(_tableHEntry, (box.height + SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
+                // 不画底边拖拽条：预设列表不需要手动调高（整块区域就是列表）。
                 // 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
                 _sbHandled = SRApi.Ctl.TableScrollbarFor(_args, e, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);
                 if (_hiddenCols.Count > _hiddenBeforeTable) {

@@ -379,6 +379,15 @@ public partial class SR {
         // 点"详情"改的是副本，所以永远打不开 / 收不上。
         private static readonly HashSet<string> _cardOpen = new HashSet<string>();
 
+        // 卡片行样式：点/标题/结论统一垂直居中，避免基线差异导致"结论比标题高一点"。
+        private static GUIStyle _cdDot, _cdTitle, _cdSum;
+        private static void EnsureCardStyles() {
+            if (_cdSum != null) return;
+            _cdDot = new GUIStyle(_label); _cdDot.alignment = TextAnchor.MiddleLeft;
+            _cdTitle = new GUIStyle(_labelWrap); _cdTitle.alignment = TextAnchor.MiddleLeft;
+            _cdSum = new GUIStyle(_label); _cdSum.alignment = TextAnchor.MiddleLeft;
+        }
+
         private static void Card(bool ok, string title, string summary, Action body) {
             try {
                 bool canExpand = body != null;
@@ -390,16 +399,18 @@ public partial class SR {
                 float __titleH0 = Mathf.Max(Sc(20), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)));
                 // 结论行（「38/38 补丁 · 40/40 反射…」这类）同样会换行：两者取高，否则结论被 20px 行裁掉。
                 float __sumH0 = Mathf.Max(Sc(20), _label.CalcHeight(new GUIContent(summary), 99999f) + Sc(2));   // 不换行：宽度自适应，高度只留 2px 缓冲
-                GUILayout.BeginHorizontal(GUILayout.Height(Mathf.Max(__titleH0, __sumH0)));
+                EnsureCardStyles();
+                float __rowH = Mathf.Max(__titleH0, __sumH0);
+                GUILayout.BeginHorizontal(GUILayout.Height(__rowH));
                 Color prev = GUI.color;
                 try {
                     GUI.color = ok ? new Color(0.55f, 0.92f, 0.55f) : new Color(1f, 0.78f, 0.35f);
-                    GUILayout.Label(ok ? "●" : "▲", _label, GUILayout.Width(Sc(18)), GUILayout.Height(Sc(20)));
+                    GUILayout.Label(ok ? "●" : "▲", _cdDot, GUILayout.Width(Sc(18)), GUILayout.Height(__rowH));
                 } finally { GUI.color = prev; }
                 // 标题自适应高度：长标题换行显示，不再被固定 20px 截断。
                 float __titleH = Mathf.Max(Sc(22), _labelWrap.CalcHeight(new GUIContent(title), Sc(120)) );   // 高度不再加额外内边距：真正的原因是外层行高被写死 20px
-                GUILayout.Label(title, _labelWrap, GUILayout.Width(Sc(120)), GUILayout.Height(__titleH));
-                GUILayout.Label(summary, _label, GUILayout.Height(__sumH0));
+                GUILayout.Label(title, _cdTitle, GUILayout.Width(Sc(120)), GUILayout.Height(__rowH));
+                GUILayout.Label(summary, _cdSum, GUILayout.Height(__rowH));
                 GUILayout.FlexibleSpace();
                 if (canExpand) {
                     // 详情按钮跟随标题高度：标题换行变高时按钮不会缩在 20px 里显得错位。
