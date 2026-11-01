@@ -160,6 +160,12 @@ namespace SR_UCH.Tweaks {
         try {
             Rect __ca = new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
             if (!__ca.Contains(mouse)) return false;
+            // Shift+滚轮 = 横向（与表格内部 TableWheelInput 同一约定），否则竖向。
+            bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            if (__shift && _tableMaxX > 0f) {
+                _scrollCols.x = Mathf.Clamp(_scrollCols.x + wheel * SRApi.Ctl.Sc(60), 0f, _tableMaxX);
+                return true;
+            }
             if (_tableMaxY > 0f) {
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, _tableMaxY);
                 return true;

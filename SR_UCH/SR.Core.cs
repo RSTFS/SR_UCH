@@ -710,6 +710,7 @@ public partial class SR : ITweak {
         // 单次最坏耗时：重钩子（2Hz / 0.5s）的平均值会被空闲帧摊平，只有峰值能反映真实的掉帧风险。
         public float MaxMs;
             public long Calls;
+            public float NextDue;   // 下次允许执行的时间（统一 10Hz 限流）
             // 调用频率（Hz）：0.5s / 2Hz 这类节流钩子按每次耗时判超限必然误报，
             // 只有接近每帧（>=30Hz）的钩子才用单次阈值衡量。
             public float WindowStart;
@@ -790,6 +791,9 @@ public partial class SR : ITweak {
             for (int i = 0; i < hooks.Count; i++) {
                 TickHook h = hooks[i];
                 if (h == null || h.Run == null) continue;
+                // 统一限流：所有帧钩子最多每秒 10 次（用户要求）。
+                if (h.NextDue > 0f && now < h.NextDue) continue;
+                h.NextDue = now + 0.1f;
                 float t0 = Time.realtimeSinceStartup;
                 try { h.Run(); }
                 catch (Exception __ex) { Guard.Log(what + h.Name, __ex); }

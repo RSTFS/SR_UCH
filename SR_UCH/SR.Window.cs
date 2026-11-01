@@ -546,6 +546,11 @@ public partial class SR {
                 } catch (Exception __pwx) { Guard.Log("页面级滚轮", __pwx); }
             }
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
+            // 设置页签常驻：画在滚动区之外，页面滚动不会带走页签（与底栏同级的固定区）。
+            if (_mode == Mode.Settings) {
+                try { SR.RenderSettingsTabBar(); }
+                catch (Exception __tb) { Guard.Log("设置页签", __tb); }
+            }
             bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
             // 设置页的页签画在滚动区**之外**：常驻顶部，不受滚动影响；
             // 「恢复默认」跟着页签排在最右侧（只对通用页有意义，自检页隐藏）。

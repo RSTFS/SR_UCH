@@ -518,7 +518,12 @@ namespace SR_UCH.Tweaks {
                 SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, true);   // 底部贴页面底：始终填满
             // 让出拖拽条位置：表格底 → 间隙 → 4px 拖拽条 → 底栏上沿（两个列表同一处理）。
             float __gripTotal = SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f;
-            float boxH = Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(), availH - __gripTotal);
+            // 直接以"页面视口 − 表格上方已用高度 − 拖拽条"定高：比 ListTableHeight 的夹取更贴底，
+            // 最后一行不会再被底栏吃掉（预设列表用同一公式）。
+            float __used = Mathf.Max(0f, last.yMax - _pageTopY);
+            float __fill = SRApi.PageViewportHeight - __used - __gripTotal;
+            float boxH = Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(),
+                                   Mathf.Min(availH, __fill > 0f ? __fill : availH));
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
 

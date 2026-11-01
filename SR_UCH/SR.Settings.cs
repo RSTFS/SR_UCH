@@ -176,8 +176,6 @@ public partial class SR {
                         __e.Use();
                     }
                 } catch (Exception __sw) { Guard.Log("设置页/Ctrl 滚轮切页", __sw); }
-                // 页签栏画在页面内容里：与其它页共用同一套布局/滚动，不会出现设置页独有的偏移。
-                RenderSettingsTabBar();
                 GUILayout.Space(Sc(4));
                 if (SettingsTab == 1) RenderAuditBlock();
                 else RenderSettingsEntries(colWidth);
