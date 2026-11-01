@@ -315,6 +315,9 @@ public partial class SR {
                         }
                         // （内层滚动区已移除）
                         }
+                        // 契约版本（SMAPI 式）：宿主 API 版本与该功能要求的最低版本，升级/降级时一眼可见。
+                        AuditLabel(T("契约版本", "Contract") + "：API v" + SRContract.Version
+                            + " · " + T("最低要求", "min required") + " ≤ v" + SRContract.Version);
                         // 配置健康（原独立卡片，已合并到本卡）
                         AuditLabel(T("配置：孤儿键", "Config: orphan keys") + "：" + SR.OrphanKeyCount
                             + " · " + T("无主段", "unowned sections") + "：" + SR.FallbackSectionCount

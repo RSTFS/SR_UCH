@@ -139,6 +139,7 @@ namespace SR_UCH.Tweaks {
         private static Vector2 _scrollRows;
         private static Vector2 _scrollCols;   // 诊断：每帧只记一次滚轮事件
         private static Rect _tableBox;     // 表格在屏幕上的矩形（页面级滚轮钩子按它判断是否滚表格）
+        private static float _rowsHCache;   // 表格真实行区高度（滚轮钩子兜底用）
         private static float _maxScrollX;
         private static float _maxScrollY;
         private static bool _sbDragging;
@@ -385,8 +386,14 @@ namespace SR_UCH.Tweaks {
                 // 复用表格自身算出的滚动上限（由真实 rowsH 得出，帧间稳定），与联机列表同一套。
                 // 以前用 ContentArea 高度重算：那是整个右栏，远大于表格行区，maxY 被算成 0，滚轮就死了。
                 if (!hitBox.Contains(mouse)) return false;
-                if (_maxScrollY > 0f) {
-                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + wheel * SRApi.Ctl.Sc(40), 0f, _maxScrollY);
+                float maxY = _maxScrollY;
+                // 首帧 / 刚切到本页时 _maxScrollY 还是 0：用缓存的行区高度补算，避免"第一次滚没反应"。
+                if (maxY <= 0f && _rowsHCache > 0f) {
+                    maxY = Mathf.Max(0f, VisiblePresets().Count * SRApi.Ctl.TableRowH() - _rowsHCache);
+                }
+                if (maxY > 0f) {
+                    _scrollRows.y = Mathf.Clamp(_scrollRows.y + wheel * SRApi.Ctl.Sc(40), 0f, maxY);
+                    _maxScrollY = maxY;
                     return true;
                 }
                 return false;
@@ -776,6 +783,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 }
                 _maxScrollX = Mathf.Max(0f, totalW - stripW);
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
+                _rowsHCache = rowsH;   // 缓存真实行区高：滚轮钩子在首帧/刚切页时用它兜底
                 _maxScrollY = Mathf.Max(0f, visible.Count * rowH - rowsH);
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _maxScrollY);
                 Event e = Event.current;
