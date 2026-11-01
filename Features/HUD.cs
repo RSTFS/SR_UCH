@@ -214,7 +214,7 @@ namespace SR_UCH.Tweaks {
 
         // ================= 配置取值 =================
         private static bool IsEnabled() {
-            try { return _enabled != null && _enabled.Value; } catch { return false; }
+            try { return SRApi.GateMaster && _enabled != null && _enabled.Value; } catch { return false; }
         }
 
         private static bool FadeOn() {

@@ -77,6 +77,7 @@ public partial class Chat : ITweak {
         // 从本页发送聊天，走游戏原生 ChatSent 消息。
         public static void SendChatText(string text) {
             if (string.IsNullOrEmpty(text)) return;
+            if (!SRApi.GateMaster) { SRApi.Notify(SRApi.MsgMasterOff); return; }   // 全局总开关关闭：不发送
             try {
                 int num = LocalNetworkNumber();
                 // 取不到玩家号就别发：按 -1 发出去会被服务端与所有客户端静默丢弃，

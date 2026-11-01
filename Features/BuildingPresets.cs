@@ -789,7 +789,6 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 _args.rowCells = delegate(int r) { return RowCells(visible, r); };
                 _args.rowSelected = null;
                 _args.rowAlpha = null;
-                // 与联机列表一致：表头可拖列宽、可拖动换位，变化经回调写回配置。
                 _args.resizable = true;
                 _args.reorderable = true;
                 _args.order = _order;

@@ -188,6 +188,7 @@ namespace SR_UCH.Tweaks {
         // 返回树屋：走游戏原生「结束对局」流程（与替换关卡的第一步相同），房主有效。
         private static void ReturnToTreehouse() {
             try {
+                if (!ActionAllowed()) return;   // 全局总开关关闭：本页动作全部无效
                 if (!SRApi.GateHost || !NetworkServer.active) {
                     SRApi.NotifyT("仅房主可返回树屋：", "Host only: ", SRApi.T("返回树屋", "Back to treehouse"));
                     return;
@@ -438,6 +439,7 @@ namespace SR_UCH.Tweaks {
         //      本地应用 →「切到预设关卡并应用方块」完成。仅房主可执行；自定义关卡（BlankLevel）无法用 LevelPortal 映射。
         private static void TryLoadPresetInTreehouse(PresetInfo p) {
             bool started = false;
+                if (!ActionAllowed()) return;   // 全局总开关关闭：任何加载路径都不许走
             try {
                 LobbyManager lm = LobbyManager.instance;
                 if (lm == null) {
