@@ -144,7 +144,7 @@ public partial class SR {
                 for (int i = 0; i < actions.Length; i++) {
                     SRApi.TableAction a = actions[i];
                     if (a == null) continue;
-                    float w = (st != null ? st.CalcSize(new GUIContent(a.Label ?? "")).x : Sc(30f)) + Sc(11f);
+                    float w = (st != null ? st.CalcSize(SRApi.Ctl.Content(a.Label ?? "", null)).x : Sc(30f)) + Sc(11f);
                     if (valid > 0) total += Sc(2f);
                     total += w;
                     valid++;

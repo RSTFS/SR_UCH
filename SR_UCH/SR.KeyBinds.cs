@@ -442,6 +442,8 @@ public partial class SR {
                 bool cached; return _comboResult.TryGetValue(entry, out cached) && cached;
             }
             bool res = ComboModDown(entry) && Input.GetKeyDown(main);
+            // 与 _seqProg 同一套上限：配置重载后条目对象会重建，旧键会留成僵尸。
+            if (_comboStamp.Count > 256) { _comboStamp.Clear(); _comboResult.Clear(); }
             _comboStamp[entry] = Time.frameCount;
             _comboResult[entry] = res;
             return res;

@@ -91,7 +91,13 @@ public partial class SR {
             State s;
             // 容量上限：配置重读后条目对象会重建，旧键会留成僵尸（评审 G4）。
             // 真正的一致失效由 ClearStates() 负责，这里只做兜底。
-            if (_states.Count > 128) _states.Clear();
+            if (_states.Count > 128) {
+                    // 只清"非当前编辑项"：正在拖动/有未提交文本的 State 一旦被清，用户刚调的颜色就没了。
+                    var __keep = _open;
+                    _states.Clear();
+                    if (__keep != null) _states[__keep] = default(State);
+                    SRApi.LogWarn("[颜色] 状态缓存超过 128 条，已清理非当前项");
+                }
             if (e != null && _states.TryGetValue(e, out s)) return s;
             s = new State();
             if (e != null) { Load(s, ReadColor(e)); _states[e] = s; }
