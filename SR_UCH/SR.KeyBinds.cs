@@ -441,7 +441,8 @@ public partial class SR {
             if (_comboStamp.TryGetValue(entry, out stamp) && stamp == Time.frameCount) {
                 bool cached; return _comboResult.TryGetValue(entry, out cached) && cached;
             }
-            bool res = ComboModDown(entry) && Input.GetKeyDown(main);
+            // Input 主通道；未命中时再吃一次 IMGUI 捕获的按键（游戏界面吞输入时更跟手）。
+            bool res = ComboModDown(entry) && (Input.GetKeyDown(main) || ConsumeGuiKey(main));
             // 与 _seqProg 同一套上限：配置重载后条目对象会重建，旧键会留成僵尸。
             if (_comboStamp.Count > 256) { _comboStamp.Clear(); _comboResult.Clear(); }
             _comboStamp[entry] = Time.frameCount;

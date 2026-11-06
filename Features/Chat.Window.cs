@@ -216,9 +216,25 @@ public partial class Chat : ITweak {
             try { return d != null ? d.ChatHolder : null; } catch { return null; }
         }
 
+        // 是否真的在打字：ChatMode 残留（输入框已经关闭/失焦，但字段没被复位）会让核心的 Typing 一直为真，
+        // 表现就是"所有快捷键突然不灵"。这里额外要求输入框存在、可见且确实聚焦；残留时按"没在打字"处理并记一次日志。
         private static bool ChatInputActive(ChatDisplay d) {
-            try { return d != null && d.ChatMode; } catch { return false; }
+            try {
+                if (d == null || !d.ChatMode) return false;
+                ChatInputField f = d.currentChatInputField;
+                bool really = f != null && f.gameObject != null && f.gameObject.activeSelf
+                    && f.inputField != null && f.inputField.isFocused;
+                if (!really) {
+                    if (Time.unscaledTime - _staleTypingAt > 5f) {
+                        _staleTypingAt = Time.unscaledTime;
+                        SRApi.LogWarn("[会话] ChatMode 残留但输入框未聚焦，已按未打字处理（快捷键恢复）");
+                    }
+                    return false;
+                }
+                return true;
+            } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口/打字判定", __ex); return false; }
         }
+        private static float _staleTypingAt = -999f;
 
         // 游戏自己的淡入淡出速度（GameSettings.ChatMessagingFadeSpeed，默认 0.8/秒，淡入为其 10 倍）。
         private static float FadeSpeed() {

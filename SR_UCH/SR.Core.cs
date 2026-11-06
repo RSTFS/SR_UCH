@@ -1182,6 +1182,30 @@ public partial class SR : ITweak {
 
         // 正在打字登记（通用：任何有输入框的功能都能登记）；多个来源任一为真即认为"正在打字"。
         private static readonly List<Func<bool>> _typingProviders = new List<Func<bool>>();
+        // OnGUI 按键捕获：IMGUI 的 KeyDown 事件在个别帧比 Input.GetKeyDown 更可靠（例如界面正在吞输入时）。
+        // 按键记录只保留两帧，ComboKeyDown 命中一次即消费，避免跨帧重复触发。
+        private static int _guiKeyAt;
+        private static readonly List<KeyCode> _guiKeys = new List<KeyCode>();
+
+        internal static void RecordGuiKeyEvent(Event e) {
+            try {
+                if (e == null || e.type != EventType.KeyDown) return;
+                KeyCode k = e.keyCode;
+                if (k == KeyCode.None) return;
+                if (Time.frameCount - _guiKeyAt > 1) { _guiKeys.Clear(); _guiKeyAt = Time.frameCount; }
+                if (!_guiKeys.Contains(k)) _guiKeys.Add(k);
+            } catch (Exception __ex) { Guard.Log("记录 IMGUI 按键", __ex); }
+        }
+
+        // 消费一次记录（最多保留两帧），命中即移除，避免同一次按下触发两次。
+        internal static bool ConsumeGuiKey(KeyCode k) {
+            try {
+                if (_guiKeys.Count == 0) return false;
+                if (Time.frameCount - _guiKeyAt > 2) { _guiKeys.Clear(); return false; }
+                return _guiKeys.Remove(k);
+            } catch (Exception __ex) { Guard.Log("读取 IMGUI 按键", __ex); return false; }
+        }
+
         public static void RegisterTypingProvider(Func<bool> provider) {
             if (provider != null && !_typingProviders.Contains(provider)) _typingProviders.Add(provider);
         }

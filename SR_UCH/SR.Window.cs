@@ -765,6 +765,8 @@ public partial class SR {
             }
 
             private void OnGUI() {
+                // 先记按键：界面正在吞输入时，ComboKeyDown 还能靠这条记录命中。
+                try { SR.RecordGuiKeyEvent(Event.current); } catch (Exception __gk) { SR.Guard.Log("OnGUI 记录按键", __gk); }
                 // 分开包：DrawGUI 抛异常时滚轮收口仍要执行。
                 Guard.Try("绘制面板", () => SR.DrawGUI());
                 // 滚轮仲裁收口：必须在 DrawGUI 之后（界面件已处理完本帧滚轮，Input 读轴的缩放才不会抢滚轮）。

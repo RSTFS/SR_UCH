@@ -15,7 +15,7 @@ public partial class Level {
         public static void RenderPartyBox() {
         // 分区：道具（自动道具 + 放弃道具放在同一分区里）
         SRApi.Ctl.SectionTitle("- " + SRApi.T("道具", "Items") + " -",
-            SRApi.T("道具：开箱后自动挑一个，以及沿用游戏原生的放弃道具。",
+            SRApi.T("道具：开箱自动选择，以及放弃道具。",
                     "Items: auto-pick one when the box opens, plus the game's native drop-piece key."));
         GUILayout.Space(SRApi.Ctl.Sc(2));
         SRApi.RenderSectionEntries("Level", delegate (ConfigEntryBase e) {
