@@ -173,9 +173,10 @@ namespace SR_UCH.Tweaks {
                 __maxY = Mathf.Max(0f, _shownLobbies != null ? _shownLobbies.Count * SRApi.Ctl.TableRowH() - _rowsHCache : 0f);
             }
             if (__maxY > 0f) {
+                float before = _scrollRows.y;
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, __maxY);
                 _tableMaxY = __maxY;
-                return true;
+                if (Mathf.Abs(_scrollRows.y - before) > 0.01f) return true;
             }
             return false;
         } catch (Exception __ex) { SRApi.Guard.Log("联机列表/页面滚轮", __ex); return false; }

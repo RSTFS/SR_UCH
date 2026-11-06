@@ -451,11 +451,16 @@ public partial class SR {
             e.Use(); MarkWheelUsed(); WheelShieldHit = true; return true;
         }
         if (maxY > 0f) {
+            float before = scrollRows.y;
             scrollRows.y = Mathf.Clamp(scrollRows.y + amt * Sc(40), 0f, maxY);
+            // 已经到头/到底：本次滚轮没有产生位移，就不消费它——交给页面滚动，避免"列表滚不动、页面也不滚"。
+            if (Mathf.Abs(scrollRows.y - before) < 0.01f) return false;
             e.Use(); MarkWheelUsed(); WheelShieldHit = true; return true;
         }
         if (maxX > 0f) {
+            float beforeX = scrollCols.x;
             scrollCols.x = Mathf.Clamp(scrollCols.x + amt * Sc(60), 0f, maxX);
+            if (Mathf.Abs(scrollCols.x - beforeX) < 0.01f) return false;
             e.Use(); MarkWheelUsed(); WheelShieldHit = true; return true;
         }
         return false;

@@ -517,7 +517,11 @@ public partial class SR {
             try {
                 string __sig = (_mode == Mode.Settings ? "settings" : (_selectedInternalSection ?? ""))
                     + "|" + (_mode == Mode.Settings ? SR.SettingsTab.ToString() : (SR.SelectedPageId(_selectedInternalSection) ?? ""));
-                if (__sig != _lastPageSig) { _lastPageSig = __sig; SR.CloseOpenCombos(); }
+                if (__sig != _lastPageSig) {
+                    _lastPageSig = __sig;
+                    SR.CloseOpenCombos();
+                    _scroll = Vector2.zero;     // 换页回到顶部：新页内容更短时不会停在空白处，看起来像"滚不动"
+                }
             } catch (Exception __cs) { Guard.Log("换页收起下拉框", __cs); }
 
             Vector2 pageBefore = _scroll;
@@ -548,8 +552,16 @@ public partial class SR {
             SRApi.Diag("mode=" + _mode + " section=" + _selectedInternalSection);
             SRApi.Diag("areaH=" + __areaH.ToString("0.0") + " usedTop=" + __usedTop.ToString("0.0") + " barH=" + __barH.ToString("0.0"));
             SRApi.Diag("viewport=" + SRApi.PageViewportHeight.ToString("0.0") + " footerTop=" + (__areaH - __barH).ToString("0.0") + " scrollY=" + _scroll.y.ToString("0.0"));
-            // 页面级滚轮：页面可以在滚动区之前抢走滚轮（自绘固定高度列表靠这个滚动）。
+            // 滚轮诊断（只在有滚轮事件时写）：遇到"滚不动"时这行能直接指出是盾、控件悬停还是页面声明了关滚动。
             if (__wasWheel) {
+                try {
+                    SRApi.Diag("wheel mode=" + _mode + " sec=" + _selectedInternalSection
+                        + " shield=" + WheelShieldHit + " overCtrl=" + __overCtrlPrev + " noBars=" + _noScrollDeclared
+                        + " scrollY=" + _scroll.y.ToString("0.0"));
+                } catch (Exception __wd) { Guard.Log("滚轮诊断", __wd); }
+            }
+            // 页面级滚轮：页面可以在滚动区之前抢走滚轮（自绘固定高度列表靠这个滚动）。
+            if (__wasWheel && !WheelShieldHit) {
                 try {
                     float __pw = -(Mathf.Abs(__we.delta.y) > 0.001f ? __we.delta.y : __we.delta.x);
                     if (SRApi.DispatchPageWheel(__wheelMouse + SR.AreaOffset, __pw)) {   // 统一传屏幕坐标，页面才能和 ContentArea 比较

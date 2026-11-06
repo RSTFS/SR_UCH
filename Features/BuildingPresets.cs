@@ -466,9 +466,11 @@ namespace SR_UCH.Tweaks {
                     maxY = Mathf.Max(0f, VisiblePresets().Count * SRApi.Ctl.TableRowH() - _rowsHCache);
                 }
                 if (maxY > 0f) {
+                    float before = _scrollRows.y;
                     _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, maxY);
                     _maxScrollY = maxY;
-                    return true;
+                    // 到位后不消费，滚轮继续交给页面滚动
+                    if (Mathf.Abs(_scrollRows.y - before) > 0.01f) return true;
                 }
                 // 竖向没有余量时，Shift+滚轮横向滚（列比可视区宽时）。
                 if (_maxScrollX > 0f && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))) {
