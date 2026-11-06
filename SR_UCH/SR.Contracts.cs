@@ -1015,6 +1015,24 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             // 选中态按钮样式（EX 的总开关等自绘按钮用）：与侧栏选中项同款。
             private static Func<GUIStyle> _getSelItem;
             public static void SetSelItemSink(Func<GUIStyle> f) { _getSelItem = f; }
+
+            // ---- 统一行控件：功能页不再各写一份"标签 + 控件"排版 ----
+            // 标签宽度按文字实测（与 RestoreLabel 同一套），输入框/开关左边缘在所有页面里对齐。
+            private static Action<string, string, ConfigEntryBase, float> _labeledRow;
+            public static void SetLabeledRowSink(Action<string, string, ConfigEntryBase, float> f) { _labeledRow = f; }
+            public static void LabeledRow(string label, string tip, ConfigEntryBase e, float labelWidth = 0f) {
+                Action<string, string, ConfigEntryBase, float> f = _labeledRow;
+                if (f != null) f(label, tip, e, labelWidth);
+            }
+
+            // 带标签的滑块行：统一 0.1 步进、数值右对齐（以前每个页面各抄一份，格式与宽度容易走样）。
+            private static Func<string, string, ConfigEntryBase, float, float, float, string, bool> _rowSlider;
+            public static void SetRowSliderSink(Func<string, string, ConfigEntryBase, float, float, float, string, bool> f) { _rowSlider = f; }
+            // 返回 true 表示本帧用户拖动并写入了新值
+            public static bool RowSlider(string label, string tip, ConfigEntryBase e, float min, float max, string fmt = "0.0", float labelWidth = 0f) {
+                Func<string, string, ConfigEntryBase, float, float, float, string, bool> f = _rowSlider;
+                return f != null && f(label, tip, e, min, max, labelWidth, fmt);
+            }
             public static GUIStyle SelItem { get { Func<GUIStyle> f = _getSelItem; return f != null ? f() : null; } }
 
             // 勾选样式（自绘行 / 表格钉住列用）：与设置页完全同款。

@@ -990,6 +990,10 @@ public partial class SR : ITweak {
                     return SR.Ctl.SelfToggleButton(__l, __t, __o, __k, __w, __b);
                 });
                 SRApi.Ctl.SetSelItemSink(delegate () { return SR.Ctl.SelItem; });
+                SRApi.Ctl.SetLabeledRowSink(delegate (string __l, string __t, ConfigEntryBase __e, float __w) { SR.Ctl.LabeledRow(__l, __t, __e, __w); });
+                SRApi.Ctl.SetRowSliderSink(delegate (string __l, string __t, ConfigEntryBase __e, float __min, float __max, float __w, string __f) {
+                    return SR.Ctl.RowSlider(__l, __t, __e, __min, __max, __w, __f);
+                });
                 SRApi.Ctl.SetCheckStylesSink(delegate () { return SR.Ctl.CheckOn; }, delegate () { return SR.Ctl.CheckOff; });
                 SRApi.SetTableColMoveSink(delegate (Event __e, Rect __c, int __ci, int __k, List<int> __cols, Vector2 __mp, bool __in,
                     List<Rect> __hc, int[] __ord, Action<int[]> __ao, Action __sv, Action<int> __ck,

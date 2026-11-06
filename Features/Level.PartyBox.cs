@@ -23,24 +23,13 @@ public partial class Level {
         ConfigEntryBase __autoEntry = SRApi.Ctl.FindEntry("Level", "Auto Party Item");
         if (__autoEntry != null) SRApi.Ctl.DrawEntryRow(__autoEntry, __itemCol);
 
-        // 自动道具延迟：滑块 0-3 秒，步进 0.1（按行自绘，条目本身不参与自动渲染）
+        // 自动道具延迟：统一滑块行（0-3 秒，0.1 步进；格式与其它页面一致）
         ConfigEntryBase __dl = SRApi.Ctl.FindEntry("Level", "Auto Party Item Delay");
-        if (__dl != null) {
-            GUILayout.BeginHorizontal();
-            try {
-                GUILayout.Label(SRApi.T("自动道具延迟", "Auto item delay"), SRApi.Ctl.Label,
-                    GUILayout.Width(SRApi.Ctl.Sc(110f)), GUILayout.Height(SRApi.Ctl.Sc(26f)));
-                float cur = (float)__dl.BoxedValue;
-                cur = Mathf.Round(cur * 10f) / 10f;
-                Rect r = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(150f), SRApi.Ctl.Sc(28f));
-                float v = SRApi.Ctl.DrawSlider(r, cur, 0f, 3f, false);
-                v = Mathf.Round(Mathf.Clamp(v, 0f, 3f) * 10f) / 10f;
-                if (Mathf.Abs(v - cur) > 0.0001f) SRApi.Ctl.SetValue(__dl, v);
-                GUILayout.Label(v.ToString("0.0") + "s", SRApi.Ctl.Label,
-                    GUILayout.Width(SRApi.Ctl.Sc(44f)), GUILayout.Height(SRApi.Ctl.Sc(26f)));
-                GUILayout.FlexibleSpace();
-            } finally { GUILayout.EndHorizontal(); }
-        }
+        if (__dl != null)
+            SRApi.Ctl.RowSlider(SRApi.T("自动道具延迟", "Auto item delay"),
+                SRApi.T("开箱后等多久再自动挑\n范围 0-3 秒，步进 0.1",
+                        "how long to wait before picking\n0-3 seconds in 0.1 steps"),
+                __dl, 0f, 3f, "0.0");
         // 放弃道具（排队阶段手上拿着道具时才有意义）
         ConfigEntryBase __drop = SRApi.Ctl.FindEntry("Level", "Drop Held Piece");
         if (__drop != null) SRApi.Ctl.DrawEntryRow(__drop, __itemCol);

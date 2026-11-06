@@ -234,6 +234,42 @@ public partial class SR {
         // 条目标签（可点击恢复默认值；tooltip = 说明 + 后缀追加的默认值，不再带恢复提示）
         public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey = null) { SR.RestoreLabel(content, entry, w, h, hotkey); }
         public static void RenderControl(ConfigEntryBase entry) { SR.RenderControl(entry); }
+
+        // 统一行控件：标签按文字实测 + 右侧控件；与 RestoreLabel 的排版一致，页面不再各写一份。
+        public static void LabeledRow(string label, string tip, ConfigEntryBase e, float labelWidth) {
+            try {
+                GUILayout.BeginHorizontal();
+                try {
+                    float lw = labelWidth > 0f ? Sc(labelWidth)
+                        : Mathf.Max(Sc(60), SR.Ctl.Label.CalcSize(SRApi.Ctl.Content(label, tip)).x + Sc(10));
+                    GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
+                    if (e != null) RenderControl(e);
+                    GUILayout.FlexibleSpace();
+                } finally { GUILayout.EndHorizontal(); }
+            } catch (Exception __ex) { Guard.Log("统一行控件", __ex); }
+        }
+
+        // 统一滑块行：0.1 步进 + 数值右对齐；返回本帧是否写入了新值。
+        public static bool RowSlider(string label, string tip, ConfigEntryBase e, float min, float max, float labelWidth, string fmt) {
+            if (e == null || max <= min) return false;
+            bool written = false;
+            try {
+                GUILayout.BeginHorizontal();
+                try {
+                    float lw = labelWidth > 0f ? Sc(labelWidth)
+                        : Mathf.Max(Sc(60), SR.Ctl.Label.CalcSize(SRApi.Ctl.Content(label, tip)).x + Sc(10));
+                    GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
+                    float cur = (float)e.BoxedValue;
+                    Rect r = GUILayoutUtility.GetRect(Sc(150f), Sc(28f));
+                    float v = DrawSlider(r, cur, min, max, false);
+                    v = Mathf.Round(Mathf.Clamp(v, min, max) * 10f) / 10f;
+                    if (Mathf.Abs(v - cur) > 0.0001f) { SetValue(e, v); written = true; }
+                    GUILayout.Label(v.ToString(fmt), SR.Ctl.Label, GUILayout.Width(Sc(48)), GUILayout.Height(Sc(26)));
+                    GUILayout.FlexibleSpace();
+                } finally { GUILayout.EndHorizontal(); }
+            } catch (Exception __ex) { Guard.Log("统一滑块行", __ex); }
+            return written;
+        }
         public static void RenderEntryRow(ConfigEntryBase entry, bool isInternal, float colWidth) { SR.RenderEntryRow(entry, isInternal, colWidth); }
         public static ConfigEntryBase FindEntry(string section, string key) { return SR.FindInternalEntry(section, key); }
         public static IEnumerable<ConfigEntryBase> AllEntries(ConfigFile config) { return SR.AllEntries(config); }

@@ -162,44 +162,23 @@ public class QuickAdjust : ITweak {
                         "Auto retry and hold-to-retry for challenge mode; both only affect challenge runs."));
             GUILayout.Space(SRApi.Ctl.Sc(2));
 
-            GUILayout.BeginHorizontal();
             ConfigEntryBase qr = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry");
-            SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("死后自动重试", "Auto retry on death"),
+            if (qr != null) SRApi.Ctl.LabeledRow(SRApi.T("死后自动重试", "Auto retry on death"),
                 SRApi.T("仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n对局中开关立即生效。",
-                        "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nTakes effect immediately.")),
-                qr, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
-            if (qr != null) SRApi.Ctl.RenderControl(qr);
-            GUILayout.FlexibleSpace();
-            GUILayout.EndHorizontal();
+                        "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nTakes effect immediately."),
+                qr, 140f);
 
-            GUILayout.Space(SRApi.Ctl.Sc(2));
-            GUILayout.BeginHorizontal();
             ConfigEntryBase qrf = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Fast");
-            SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("快速重试", "Quick retry"),
+            if (qrf != null) SRApi.Ctl.LabeledRow(SRApi.T("快速重试", "Quick retry"),
                 SRApi.T("仅挑战模式：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n长按时间在下方设置，对局中开关立即生效。",
-                        "Challenge only: after death, hold B for the set seconds to auto-retry.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately.")),
-                qrf, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
-            if (qrf != null) SRApi.Ctl.RenderControl(qrf);
-            GUILayout.FlexibleSpace();
-            GUILayout.EndHorizontal();
+                        "Challenge only: after death, hold B for the set seconds to auto-retry.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately."),
+                qrf, 140f);
 
-            GUILayout.Space(SRApi.Ctl.Sc(2));
-            GUILayout.BeginHorizontal();
             ConfigEntryBase qrh = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Hold");
-            GUILayout.Label(SRApi.Ctl.Content(SRApi.T("等待秒数", "Hold s"),
-                SRApi.T("长按 B 的等待阈值（Character.SuicideTime）：挑战模式重试游戏默认 0.5 秒。",
-                        "Hold-B threshold (Character.SuicideTime): vanilla 0.5s for challenge retry.")),
-                SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(84)), GUILayout.Height(SRApi.Ctl.Sc(26)));
-            if (qrh != null) {
-                float hv = (float)qrh.BoxedValue;
-                Rect hr = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(150), SRApi.Ctl.Sc(28));
-                float hn = SRApi.Ctl.DrawSlider(hr, hv, 0f, 2f, false);
-                hn = Mathf.Round(hn * 10f) / 10f;
-                if (Mathf.Abs(hn - hv) > 0.0001f) SRApi.Ctl.SetValue(qrh, hn);
-                GUILayout.Label(hn.ToString("0.0") + "s", SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(44)), GUILayout.Height(SRApi.Ctl.Sc(26)));
-            }
-            GUILayout.FlexibleSpace();
-            GUILayout.EndHorizontal();
+            if (qrh != null) SRApi.Ctl.RowSlider(SRApi.T("等待秒数", "Hold s"),
+                SRApi.T("长按 B 的等待阈值（Character.SuicideTime）：挑战模式重试游戏默认 0.5 秒。\n范围 0-2，0.1 步进",
+                        "Hold-B threshold (Character.SuicideTime): vanilla 0.5s for challenge retry.\nrange 0-2 in 0.1 steps"),
+                qrh, 0f, 2f, "0.0");
         } catch (Exception __ex) { SRApi.Guard.Log("快速调整/挑战页", __ex); }
     }
 
