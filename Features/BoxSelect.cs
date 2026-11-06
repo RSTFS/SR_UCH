@@ -12,6 +12,9 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<bool> _enabled;
         private static ConfigEntry<KeyCode> _selectKey;
         private static ConfigEntry<KeyCode> _deleteKey;
+        private static ConfigEntry<KeyCode> _appendKey;
+        private static ConfigEntry<bool> _sameType;
+        private static float _armedAt = -10f;   // 删除确认：第一次按下记时间，2 秒内再按才真删
         private static readonly List<Placeable> _selected = new List<Placeable>();
         private static bool _dragging;
         private static Vector2 _dragStart;
@@ -24,6 +27,10 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Box Select", "框选\n按住下面的键并左键拖框选中多个方块\n选中后按删除键整批删除（仅房主）", "Box select\nhold the key below and drag with the left mouse to select several pieces\npress the delete key to remove them all (host only)");
             SRApi.LocKey(Sec, "Box Select Key", "框选键", null);
             SRApi.LocDesc(Sec, "Box Select Key", "框选键\n按住它再左键拖框\n松开后保留选中，右键或 Esc 取消", "Box select key\nhold it and drag a rectangle with the left mouse\nreleasing keeps the selection; right click or Esc clears it");
+            SRApi.LocKey(Sec, "Box Append Key", "追加选择键", null);
+            SRApi.LocDesc(Sec, "Box Append Key", "追加选择键\n按住它再框选＝新选中的并入现有选择\n不按＝每次框选都重新开始", "Append key\nhold it while dragging to add to the current selection\nwithout it each drag starts a fresh selection");
+            SRApi.LocKey(Sec, "Box Same Type", "只选同类", null);
+            SRApi.LocDesc(Sec, "Box Same Type", "只选同类\n开启后框选只保留与第一个命中方块同名的\n便于批量处理同一种方块", "Same type only\nkeeps only pieces whose name matches the first hit\nhandy for batch work on one kind of piece");
             SRApi.LocKey(Sec, "Box Delete Key", "删除选中键", null);
             SRApi.LocDesc(Sec, "Box Delete Key", "删除选中键\n把当前选中的方块全部删除\n仅房主生效；删除走游戏自己的同步", "Delete selection key\nremoves every selected piece\nhost only; deletion uses the game's own sync");
         }
@@ -33,7 +40,9 @@ namespace SR_UCH.Tweaks {
                 SelfReg();
                 _enabled = plugin.Config.Bind(Sec, "Box Select", false, "框选：按住框选键拉框选中多个方块，配合删除键批量删除。");
                 _selectKey = plugin.Config.Bind(Sec, "Box Select Key", KeyCode.LeftControl, "框选键（按住 + 左键拖框）。");
-                _deleteKey = plugin.Config.Bind(Sec, "Box Delete Key", KeyCode.Delete, "删除选中键（仅房主）。");
+                _deleteKey = plugin.Config.Bind(Sec, "Box Delete Key", KeyCode.Delete, "删除选中键（连按两次确认，仅房主）。");
+                _appendKey = plugin.Config.Bind(Sec, "Box Append Key", KeyCode.LeftShift, "追加选择键（按住框选＝并入现有选择）。");
+                _sameType = plugin.Config.Bind(Sec, "Box Same Type", false, "只选同类：框选只保留与第一个命中同名的方块。");
                 SRApi.RegisterKey("框选-框选键", _selectKey, "hold");
                 SRApi.RegisterKey("框选-删除键", _deleteKey, "press");
                 SRApi.RegisterTick("KEY_BOXSELECT", Tick);
@@ -63,7 +72,11 @@ namespace SR_UCH.Tweaks {
                 if (!Active) { if (_dragging) EndDrag(false); return; }
                 // 删除选中
                 if (_selected.Count > 0 && _deleteKey != null && _deleteKey.Value != KeyCode.None && Input.GetKeyDown(_deleteKey.Value)) {
-                    DeleteSelected();
+                    // 二次确认：第一次只提示，2 秒内再按一次才真删，避免误按 Delete 清掉一片
+                    if (Time.unscaledTime - _armedAt <= 2f) { _armedAt = -10f; DeleteSelected(); return; }
+                    _armedAt = Time.unscaledTime;
+                    _hint = SRApi.T("再按一次删除键确认删除 ", "press delete again to remove ") + _selected.Count;
+                    SRApi.Notify(SRApi.T("再按一次删除键确认", "Press delete again to confirm"));
                     return;
                 }
                 // 取消：右键 / Esc
@@ -87,13 +100,26 @@ namespace SR_UCH.Tweaks {
                 Vector2 end = Input.mousePosition;
                 _dragging = false;
                 if (!commit || !_dragMoved) return;
-                _selected.Clear();
+                bool append = _appendKey != null && _appendKey.Value != KeyCode.None && Input.GetKey(_appendKey.Value);
+                if (!append) _selected.Clear();
+                string firstType = null;
+                if (_sameType != null && _sameType.Value && _selected.Count > 0) firstType = _selected[0] != null ? _selected[0].Name : null;
                 Rect r = ScreenRect(_dragStart, end);
+                List<Placeable> hits = new List<Placeable>();
                 foreach (Placeable p in Placeable.AllPlaceables) {
                     if (!Eligible(p)) continue;
                     Vector3 sp = Camera.main != null ? Camera.main.WorldToScreenPoint(p.transform.position) : Vector3.zero;
                     if (sp.z < 0f) continue;
-                    if (r.Contains(new Vector2(sp.x, sp.y))) _selected.Add(p);
+                    if (r.Contains(new Vector2(sp.x, sp.y))) hits.Add(p);
+                }
+                // 只选同类：以第一个命中为准，其余同名才保留
+                if (_sameType != null && _sameType.Value && hits.Count > 0) {
+                    string type = firstType ?? hits[0].Name;
+                    for (int i = 0; i < hits.Count; i++) {
+                        if (hits[i] != null && hits[i].Name == type && !_selected.Contains(hits[i])) _selected.Add(hits[i]);
+                    }
+                } else {
+                    for (int i = 0; i < hits.Count; i++) if (!_selected.Contains(hits[i])) _selected.Add(hits[i]);
                 }
                 _hint = _selected.Count > 0 ? SRApi.T("已选 ", "selected ") + _selected.Count : "";
                 if (_selected.Count > 0) SRApi.LogInfo("[框选] 已选中 " + _selected.Count + " 个方块");
