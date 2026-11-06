@@ -9,7 +9,7 @@
 ../SR_UCH_EX/ExModule/ExModule.Round.cs=5
 ../SR_UCH_EX/ExModule/ExModule.Score.cs=7
 ../SR_UCH_EX/ExModule/ExModule.Target.cs=13
-Features/BuildingPresets.cs=5
+Features/BuildingPresets.cs=3
 Features/BuildingPresets.Io.cs=7
 Features/BuildingPresets.Load.cs=4
 Features/BuildingPresets.Mods.cs=2

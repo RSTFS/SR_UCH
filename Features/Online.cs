@@ -490,14 +490,14 @@ namespace SR_UCH.Tweaks {
 
                         }
             }
-            // 列表或可见性变化时重排并刷新统计，否则最多每 1 秒重排一次。
+            // 列表或可见性变化时重排，否则最多每 1 秒重排一次（排序成本与显示无关）。
             if (_lobbiesDirty || Time.unscaledTime - _lobbySortAt >= 1f) {
-                // 统计文案仅在列表真的变了或搜索已结束时刷新，避免把"搜索中..."覆盖成"共 0 个房间"。
-                // 错误提示粘住：_lobbyErr 时不覆盖 _lobbyMsg。
-                bool refreshMsg = !_lobbyErr && (_lobbiesDirty || !_lobbySearching);
                 _lobbySortAt = Time.unscaledTime;
-                if (refreshMsg) UpdateLobbyMsg();
             }
+            // 统计文案每帧重算：CountShown 只是一次 O(n) 过滤，代价可忽略；
+            // 以前只在"脏了或搜索结束"时刷新，改筛选后要等最多 1 秒才更新（用户看到"刷新不及时"）。
+            // 错误提示粘住：_lobbyErr 时不覆盖 _lobbyMsg。
+            if (!_lobbyErr) UpdateLobbyMsg();
             string hint = SRApi.T("（点刷新列表查询）表头：左键点=按该列排序（升->降->默认），拖分隔线=调列宽（<->），拖表头=换列位置（+），Shift+点游戏质量=显示/隐藏匹配质量系数，右键=隐藏该列，Shift+右键=还原；滚轮=上下，Ctrl+滚轮=左右；表格底边可拖高度",
                                "(click 'Refresh' to query) Header: left-click = sort by that column (asc/desc/default), drag a separator = resize (<->), drag a header = reorder (+), Shift+click 'Quality' = show/hide the skill-match coefficient, right-click = hide that column, Shift+right-click = reset; wheel = up/down, Ctrl+wheel = left/right; drag the table's bottom edge to resize height");
             GUILayout.Label(string.IsNullOrEmpty(_lobbyMsg) ? hint : _lobbyMsg, SRApi.Ctl.Label);
