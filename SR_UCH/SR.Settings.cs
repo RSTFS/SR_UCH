@@ -316,6 +316,30 @@ public partial class SR {
                         }
                         // （内层滚动区已移除）
                         }
+                        // 孤儿键清理：读 OrphanedEntries -> 原子改写 cfg（留 .bak）-> 重载配置
+                        GUILayout.Space(Sc(4));
+                        GUILayout.BeginHorizontal();
+                        try {
+                            bool had = SR.OrphanKeyCount > 0;
+                            bool oldEn2 = GUI.enabled;
+                            try {
+                                GUI.enabled = oldEn2 && had;
+                                if (GUILayout.Button(T("清理孤儿键（", "Clean orphan keys (") + SR.OrphanKeyCount + ")", _btn,
+                                        GUILayout.Width(Sc(170)), GUILayout.Height(Sc(24)))) {
+                                    int __n = SR.CleanOrphanKeys();
+                                    SR.Notify(__n > 0
+                                        ? T("已清理 ", "Cleaned ") + __n + T(" 个孤儿键（原文件已备份）", " orphan keys (backup kept)")
+                                        : T("没有可清理的孤儿键", "Nothing to clean"));
+                                    try { SR.ScanPatches(); } catch (Exception __rs) { Guard.Log("自检/清理后重扫", __rs); }
+                                }
+                            } finally { GUI.enabled = oldEn2; }
+                            GUILayout.Label(had
+                                    ? T("配置里有已不再使用的键；清理会先备份原文件", "The config still has keys nothing reads any more; the original file is backed up first")
+                                    : T("没有孤儿键", "No orphan keys"),
+                                _label, GUILayout.Height(Sc(24)));
+                            GUILayout.FlexibleSpace();
+                        } finally { GUILayout.EndHorizontal(); }
+
                         // 契约版本（SMAPI 式）：宿主 API 版本与该功能要求的最低版本，升级/降级时一眼可见。
                         AuditLabel(T("契约版本", "Contract") + "：API v" + SRContract.Version
                             + " · " + T("最低要求", "min required") + " ≤ v" + SRContract.Version);
@@ -380,6 +404,8 @@ public partial class SR {
                         SRApi.RenderSectionEntries(Keys.Settings, delegate (ConfigEntryBase e) {
                             return e.Definition.Key == "Tick Profiling";
                         });
+                        // 预算状态：压力 / 当前档位（超预算时非输入钩子自动降频，按键类永不降频）
+                        try { AuditLabel(SR.TickBudgetText()); } catch (Exception __tb) { Guard.Log("自检/预算状态", __tb); }
                         if (!__profOn) {
                             AuditLabel(T("（剖析已关闭：勾选上面的开关后开始采样）", "(profiling is off: tick the switch above to start sampling)"));
                             return;

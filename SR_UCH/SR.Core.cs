@@ -710,7 +710,9 @@ public partial class SR : ITweak {
         // 单次最坏耗时：重钩子（2Hz / 0.5s）的平均值会被空闲帧摊平，只有峰值能反映真实的掉帧风险。
         public float MaxMs;
             public long Calls;
-            // 限流已移除：各钩子按需自限，核心不再统一压频。
+            // 预算驱动的限流：NextDue = 下次允许执行的时间；Interval 由核心按预算压力设置（0 = 每帧）。
+            public float NextDue;
+            public float Interval;
             // 调用频率（Hz）：0.5s / 2Hz 这类节流钩子按每次耗时判超限必然误报，
             // 只有接近每帧（>=30Hz）的钩子才用单次阈值衡量。
             public float WindowStart;
@@ -720,6 +722,15 @@ public partial class SR : ITweak {
             public float WarnedAt = -999f;
         }
         private static readonly List<TickHook> _tickHooks = new List<TickHook>();
+        // ---- 帧钩子预算（参考 Unreal Animation Budget Allocator 的固定预算 + 压力平滑 + 防抖）----
+        private const float TickBudgetMs = 1.0f;      // 每帧给所有钩子的软预算
+        private const float Tier1Factor = 1.5f;       // 压力超过 1.5 倍 -> 非输入钩子降到 30Hz
+        private const float Tier2Factor = 2.0f;       // 压力超过 2.0 倍 -> 降到 10Hz
+        private const float UpgradeFactor = 0.8f;     // 压力低于 0.8 倍才恢复，避免抖动
+        private const int TierSwitchFrames = 20;      // 两次档位切换至少隔多少帧
+        private static float _tickPressure = 1f;      // 平滑后的预算压力（1.0 = 刚好用完预算）
+        private static int _tickTier;                 // 0 = 全速，1 = 30Hz，2 = 10Hz
+        private static int _tierChangedFrame = -1000;
         private static readonly List<TickHook> _frameEndHooks = new List<TickHook>();
 
         // 按名去重：同名 = 同一钩子的重新注册（覆盖 Run），与 RegisterPage 的同名覆盖语义一致；
@@ -798,12 +809,19 @@ public partial class SR : ITweak {
 
         private static void RunHooks(List<TickHook> hooks, string what) {
             float now = Time.realtimeSinceStartup;
+            float frameStart = now;
+            float spentMs = 0f;
+            bool sliced = false;   // 本帧预算已超 -> 后续非输入钩子让路（时间片）
             for (int i = 0; i < hooks.Count; i++) {
                 TickHook h = hooks[i];
                 if (h == null || h.Run == null) continue;
-                // 不再统一限流：以前所有非按键钩子被压到 10Hz，按键轮询即使放行也只有 100ms 粒度，
-                // 手感就是"不跟手/要按两下"。现在全部每帧执行；需要节流的钩子在自己的实现里按时间自限
-                // （自由相机速度 0.5s、派对盒自动道具 0.15s、角色 0.1s 等），不再由核心一刀切。
+                bool input = IsInputHookName(h.Name);
+                // 按键类永不降频；其余按预算档位限流（Interval 由 UpdateTickBudget 写入）。
+                if (!input) {
+                    if (h.Interval > 0f && now < h.NextDue) continue;
+                    if (sliced) continue;   // 本帧已超预算，剩下的非输入钩子留给下一帧
+                    h.NextDue = now + h.Interval;
+                }
                 float t0 = Time.realtimeSinceStartup;
                 try { h.Run(); }
                 catch (Exception __ex) { Guard.Log(what + h.Name, __ex); }
@@ -822,6 +840,8 @@ public partial class SR : ITweak {
                 // 节流钩子（0.5s 跑一次）不累计超限：单次耗时与帧预算无可比性，
                 // 否则钩子列表里会堆出几千上万条"超限"，掩盖真正每帧变慢的钩子。
                 if (h.Hz > 0f && h.Hz < 30f) h.Overruns = 0;
+                spentMs += ms;
+                if (!input && spentMs > TickBudgetMs * 2f) sliced = true;
                 if (ms >= TickWarnMs && h.Hz >= 30f) {
                     h.Overruns++;
                     if (now - h.WarnedAt > 10f) {
@@ -835,7 +855,41 @@ public partial class SR : ITweak {
                     }
                 }
             }
+            if (ReferenceEquals(hooks, _tickHooks)) UpdateTickBudget(spentMs, spentMs / TickBudgetMs);
             PublishTickProfile(now);
+        }
+
+        // 预算压力平滑 + 防抖换档：压力大就降频，压力小且持续才恢复；两次切换至少隔 TierSwitchFrames 帧。
+        private static void UpdateTickBudget(float spentMs, float rawPressure) {
+            try {
+                // 指数平滑（0.1 权重 ≈ 最近十帧），避免单帧尖峰导致档位来回跳。
+                _tickPressure = _tickPressure * 0.9f + rawPressure * 0.1f;
+                int want = _tickTier;
+                if (_tickPressure > Tier2Factor) want = 2;
+                else if (_tickPressure > Tier1Factor) want = 1;
+                else if (_tickPressure < UpgradeFactor) want = 0;
+                if (want == _tickTier) return;
+                if (Time.frameCount - _tierChangedFrame < TierSwitchFrames) return;
+                _tickTier = want;
+                _tierChangedFrame = Time.frameCount;
+                float interval = want == 2 ? 0.1f : (want == 1 ? 1f / 30f : 0f);
+                for (int i = 0; i < _tickHooks.Count; i++) {
+                    TickHook h = _tickHooks[i];
+                    if (h == null) continue;
+                    // 按键类永远全速
+                    h.Interval = IsInputHookName(h.Name) ? 0f : interval;
+                }
+                LogInfo("[性能] 帧钩子预算档位 -> " + (want == 0 ? "全速（每帧）" : want == 1 ? "30Hz" : "10Hz")
+                    + "（压力 " + _tickPressure.ToString("0.00") + "，预算 " + TickBudgetMs.ToString("0.0") + "ms/帧）");
+            } catch (Exception __ex) { Guard.Log("帧钩子预算", __ex); }
+        }
+
+        // 自检页显示当前预算状态
+        internal static string TickBudgetText() {
+            try {
+                return "预算 " + TickBudgetMs.ToString("0.0") + "ms/帧 · 压力 " + _tickPressure.ToString("0.00")
+                    + " · 档位 " + (_tickTier == 0 ? "全速" : _tickTier == 1 ? "30Hz" : "10Hz");
+            } catch { return ""; }
         }
 
         // 每 0.5 秒把"最慢的 5 个"写进 F9 浮层 + 一段日志，方便用户直接贴出来。
@@ -880,7 +934,7 @@ public partial class SR : ITweak {
                         h.Name ?? "",
                         h.AvgMs.ToString("0.000") + "ms",
                         h.MaxMs.ToString("0.000") + "ms",
-                        h.Hz > 0f ? h.Hz.ToString("0.0") + "/s" : "-",
+                        (h.Hz > 0f ? h.Hz.ToString("0.0") + "/s" : "-") + (h.Interval > 0f ? "↓" : ""),
                         h.Overruns > 0 ? h.Overruns.ToString() : ""
                     });
                 }
