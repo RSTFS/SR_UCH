@@ -437,7 +437,9 @@ namespace SR_UCH.Tweaks {
 
 
         // 游戏本地化小工具：用游戏自己的 I2 术语表，取不到则退回默认值。
+        private static int _renderFrame = -1000;   // 本页最近一次被渲染的帧（滚轮钩子只在自己页面上工作）
         private static void RenderOnlinePage() {
+            _renderFrame = Time.frameCount;
             // 本页无页面级滚动：表头 / 筛选必须始终可见，房间只在下方框内滚动。
             SRApi.PageScroll = Vector2.zero;
             SRApi.NoPageScrollBars = true;   // 页面级横纵向滚动条都关闭

@@ -450,8 +450,11 @@ namespace SR_UCH.Tweaks {
         private static float _pageTopY;
 
         // 页面级滚轮：鼠标在表格矩形内就把滚轮换算成行滚动（与核心 TableWheelInput 同一套系数）。
+        private static int _renderFrame = -1000;   // 本页最近一次被渲染的帧（滚轮钩子只在自己页面上工作）
         private static bool OnPresetWheel(Vector2 mouse, float wheel) {
             try {
+                // 页面级滚轮钩子是全局注册的：不判"本页是否可见"的话，离开本页后仍会吃掉别的页面的滚轮。
+                if (Time.frameCount - _renderFrame > 2) return false;
                 // 命中框：_tableBox 是布局坐标、且 Layout 趟只有 1x1；无效时退回页面内容区。
                 // 核心现在传屏幕坐标：直接用页面内容区判定（_tableBox 是布局坐标，Layout 趟只有 1x1）。
                 Rect hitBox = new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
@@ -497,6 +500,7 @@ namespace SR_UCH.Tweaks {
 
         private static void Render() {
             try {
+                _renderFrame = Time.frameCount;
                 EnsureLoaded();
                 EnsureCols();
                 // 本帧开始前的二次确认状态：只有"之前已确认、本帧又没点中操作按钮"才在空白处取消，
