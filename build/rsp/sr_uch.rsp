@@ -74,3 +74,4 @@ Features\CharacterAuto.cs
 Features\ChallengeSplits.cs
 Features\CameraPan.cs
 Features\FreeColor.cs
+Features\BoxSelect.cs

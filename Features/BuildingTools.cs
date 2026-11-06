@@ -67,7 +67,7 @@ namespace SR_UCH.Tweaks {
         }
 
         // 自绘页：按分区标题 + 条目逐行渲染（分区判据取自 Initialize 里 Bind 的键名）。
-        private static bool IsEnhanceKey(string k) { return k == "Collision Override" || k == "Grid Override" || k == "Free Color" || k == "Free Color Key" || k == "Free Color Key Code"; }
+        private static bool IsEnhanceKey(string k) { return k == "Collision Override" || k == "Grid Override" || k == "Free Color" || k == "Free Color Key" || k == "Free Color Key Code" || k == "Box Select" || k == "Box Select Key" || k == "Box Delete Key"; }
         private static bool IsLimitKey(string k) { return k == "Lift Build Cap" || k == "Build Cap Value"; }
         private static void RenderPage() {
             float col = Mathf.Max(SRApi.Ctl.Sc(180), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(240));
