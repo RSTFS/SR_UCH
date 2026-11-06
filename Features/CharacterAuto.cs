@@ -120,7 +120,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocKey(Sec, "Retry", "重试间隔", null);
             SRApi.LocDesc(Sec, "Retry", "重试间隔\n没挑到（被占用/还没轮到你）多久再试\n范围 0.5-10 秒", "Retry interval\nhow long to wait before trying again when the animal is taken\nrange 0.5-10 seconds");
             SRApi.LocKey(Sec, "Only When Unpicked", "已选则不覆盖", null);
-            SRApi.LocDesc(Sec, "Only When Unpicked", "已选则不覆盖\n已经选好角色时不再自动挑\n关掉后也不会主动放弃你已选的角色", "Only when unpicked\nskip auto picking once you have an animal\nturning it off still never drops your pick");
+            SRApi.LocDesc(Sec, "Only When Unpicked", "已选则不覆盖\n开着：已经选好角色就不再自动挑\n关掉：按配置自动换角色（先走原生放弃，再挑目标）", "Only when unpicked\non: skip auto picking once you have an animal\noff: switches automatically (native unpick, then pick)");
             SRApi.LocKey(Sec, "Outfit Enabled", "自动时装", null);
             SRApi.LocDesc(Sec, "Outfit Enabled", "自动时装\n选定角色后自动穿上指定外观\n只使用已解锁的外观", "Auto outfit\napplies the chosen outfits once an animal is picked\nonly unlocked outfits are used");
             SRApi.LocKey(Sec, "Use Saved Outfits", "优先用保存记录", null);
@@ -148,7 +148,8 @@ namespace SR_UCH.Tweaks {
                 _slot4 = plugin.Config.Bind(Sec, "Slot 4", "", "玩家 4 的动物（空 = 不指定）");
                 _delay = plugin.Config.Bind(Sec, "Delay", 1.5f, new ConfigDescription("进入后延迟（0-10 秒）", new AcceptableValueRange<float>(0f, 10f)));
                 _retry = plugin.Config.Bind(Sec, "Retry", 1.5f, new ConfigDescription("重试间隔（0.5-10 秒）", new AcceptableValueRange<float>(0.5f, 10f)));
-                _onlyUnpicked = plugin.Config.Bind(Sec, "Only When Unpicked", true, "已选角色时不覆盖");
+                _onlyUnpicked = plugin.Config.Bind(Sec, "Only When Unpicked", true,
+                    "已选则不覆盖：开着时已有角色就不再自动挑；关掉时允许自动换角色（先放弃再挑）。");
                 _outfitOn = plugin.Config.Bind(Sec, "Outfit Enabled", false, "自动时装总开关");
                 _oAcc = plugin.Config.Bind(Sec, "Accessory", "", "配件：空=不干预，random=随机，数字=序号");
                 _oBody = plugin.Config.Bind(Sec, "Body", "", "身体：空=不干预，random=随机，数字=序号");
@@ -194,6 +195,17 @@ namespace SR_UCH.Tweaks {
                     RowAnimal(SRApi.T("玩家 3", "Player 3"), _slot3);
                     RowAnimal(SRApi.T("玩家 4", "Player 4"), _slot4);
                 }
+                // 立即执行 + 手动放弃：方便验证当前配置，也能在角色被占时手动重来。
+                GUILayout.Space(SRApi.Ctl.Sc(4f));
+                GUILayout.BeginHorizontal();
+                try {
+                    if (GUILayout.Button(SRApi.T("立即挑选", "Pick now"), SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(110f)), GUILayout.Height(SRApi.Ctl.Sc(26f))))
+                        RunPickNow();
+                    if (GUILayout.Button(SRApi.T("放弃当前角色", "Unpick"), SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(140f)), GUILayout.Height(SRApi.Ctl.Sc(26f))))
+                        UnpickNow();
+                    GUILayout.FlexibleSpace();
+                } finally { GUILayout.EndHorizontal(); }
+                SRApi.Ctl.LabelAuto(BuildStatus());
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动选择页", __ex); }
         }
 
@@ -216,6 +228,8 @@ namespace SR_UCH.Tweaks {
                         _outfitApplied = null;
                     if (GUILayout.Button(SRApi.T("清除当前角色记录", "Clear this animal"), SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(160f)), GUILayout.Height(SRApi.Ctl.Sc(26f))))
                         ClearCurrentLook();
+                    if (GUILayout.Button(SRApi.T("随机整套", "Randomize all"), SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(120f)), GUILayout.Height(SRApi.Ctl.Sc(26f))))
+                        RandomizeAll();
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
                 string curAnimal = CurrentAnimalName();
@@ -259,6 +273,69 @@ namespace SR_UCH.Tweaks {
                     SRApi.Ctl.Label);
                 GUILayout.FlexibleSpace();
             } finally { GUILayout.EndHorizontal(); }
+        }
+
+        // 立即挑选：跳过延迟立刻跑一次（失败会把原因写进状态行）。
+        private static void RunPickNow() {
+            try {
+                LobbyManager lm = LobbyManager.instance;
+                if (lm == null) { SRApi.Notify(SRApi.T("现在不在房间里", "Not in a room")); return; }
+                LevelSelectController lsc = lm.CurrentLevelSelectController;
+                LobbyPlayer lp = LocalLobbyPlayer(lm);
+                if (lsc == null || lp == null) { SRApi.Notify(SRApi.T("找不到本地玩家或房间", "No local player or lobby")); return; }
+                _pickedAt = Time.unscaledTime - 99f;   // 绕过延迟
+                TryPick(lp, lsc);
+                SRApi.Notify(SRApi.T("已请求挑选", "Pick requested"));
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/立即挑选", __ex); }
+        }
+
+        private static void UnpickNow() {
+            try {
+                LobbyManager lm = LobbyManager.instance; if (lm == null) return;
+                LobbyPlayer lp = LocalLobbyPlayer(lm); if (lp == null) return;
+                if (lp.CharacterInstance == null) { SRApi.Notify(SRApi.T("当前没有角色", "No animal picked")); return; }
+                if (lp.CursorInstance != null) { lp.UnpickCharacter(); SRApi.Notify(SRApi.T("已放弃当前角色", "Animal unpicked")); }
+                else lp.CallCmdSwitchToCursor();
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/放弃当前角色", __ex); }
+        }
+
+        // 随机整套：四类外观全部随机（不受保存记录影响），用于"今天想换一身"。
+        private static void RandomizeAll() {
+            try {
+                LobbyManager lm = LobbyManager.instance; if (lm == null) return;
+                LobbyPlayer lp = LocalLobbyPlayer(lm); if (lp == null) return;
+                Character ch = lp.CharacterInstance;
+                if (ch == null) { SRApi.Notify(SRApi.T("还没选角色", "Pick an animal first")); return; }
+                Outfit[] all = ch.GetComponentsInChildren<Outfit>(true);
+                Outfit.OutfitType[] types = { Outfit.OutfitType.Accessory, Outfit.OutfitType.Body, Outfit.OutfitType.Head, Outfit.OutfitType.Skin };
+                for (int t = 0; t < types.Length; t++) ApplyRandom(all, types[t]);
+                try { ch.OnOutfitsUpdated(all); } catch (Exception __uo) { SRApi.Guard.Log("角色/随机整套刷新", __uo); }
+                lp.CallCmdSetOutfitsFromArray(ch.GetOutfitsAsArray());
+                _outfitApplied = ch;
+                SRApi.Notify(SRApi.T("已随机整套外观", "Random look applied"));
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/随机整套", __ex); }
+        }
+
+        private static void ApplyRandom(Outfit[] all, Outfit.OutfitType type) {
+            List<Outfit> cand = Candidates(all, type);
+            if (cand.Count == 0) return;
+            Outfit sel = cand[UnityEngine.Random.Range(0, cand.Count)];
+            for (int i = 0; i < all.Length; i++) {
+                Outfit o = all[i];
+                if (o != null && o.outfitType == type && o.followThisOutfit == null) o.on = ReferenceEquals(o, sel);
+            }
+        }
+
+        // 状态行：当前角色 / 是否启用 / 已保存记录数量，一眼能看出配置是否生效。
+        private static string BuildStatus() {
+            try {
+                string animal = CurrentAnimalName();
+                int looks = ParseSavedLooks().Count;
+                string pick = (_enabled != null && _enabled.Value) ? SRApi.T("自动选择开", "auto pick on") : SRApi.T("自动选择关", "auto pick off");
+                string outfit = (_outfitOn != null && _outfitOn.Value) ? SRApi.T("自动时装开", "auto outfit on") : SRApi.T("自动时装关", "auto outfit off");
+                string cur = string.IsNullOrEmpty(animal) ? SRApi.T("未选角色", "no animal") : animal;
+                return SRApi.T("当前：", "now: ") + cur + "   ·   " + pick + " / " + outfit + "   ·   " + SRApi.T("记录 ", "looks ") + looks;
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/状态行", __ex); return ""; }
         }
 
         // ---------------- 外观记录（按角色） ----------------
@@ -382,9 +459,20 @@ namespace SR_UCH.Tweaks {
 
         private static void TryPick(LobbyPlayer lp, LevelSelectController lsc) {
             try {
-                // 已经选好角色：默认不覆盖；本功能也不会主动"放弃已选角色"（那会把你自己的选择丢掉）。
-                if (lp.CharacterInstance != null) return;
-                if (_onlyUnpicked == null || _onlyUnpicked.Value) { /* 放在这里是为了语义清晰：未选才挑 */ }
+                // 已经选好角色：默认不覆盖；关掉「已选则不覆盖」时允许自动换角色——
+                // 走游戏原生的 UnpickCharacter（放弃角色回到光标），下一次轮询再挑，不会硬改同步状态。
+                if (lp.CharacterInstance != null) {
+                    if (_onlyUnpicked == null || _onlyUnpicked.Value) return;
+                    Character.Animals want = ChooseAnimal(lsc, lp);
+                    if (want == Character.Animals.NONE || want == lp.CharacterInstance.CharacterSprite) return;
+                    if (Time.unscaledTime - _unpickAt < 1f) return;   // 别每轮都发放弃请求
+                    _unpickAt = Time.unscaledTime;
+                    try {
+                        if (lp.CursorInstance != null) { lp.UnpickCharacter(); SRApi.LogInfo("[角色] 已放弃当前角色，准备换 " + want); }
+                        else lp.CallCmdSwitchToCursor();
+                    } catch (Exception __up) { SRApi.Guard.Log("角色/放弃当前角色", __up); }
+                    return;
+                }
                 float delay = _delay != null ? Mathf.Clamp(_delay.Value, 0f, 10f) : 1.5f;
                 if (_pickedAt <= 0f) { _pickedAt = Time.unscaledTime; return; }             // 进房第一帧只记时间
                 if (Time.unscaledTime - _pickedAt < delay) return;
@@ -401,6 +489,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static float _pickedAt = -1f;
+        private static float _unpickAt = -999f;
 
         private static Character.Animals ChooseAnimal(LevelSelectController lsc, LobbyPlayer lp) {
             string mode = _mode != null ? _mode.Value : "target";

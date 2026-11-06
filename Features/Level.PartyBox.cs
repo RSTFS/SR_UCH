@@ -13,15 +13,15 @@ public partial class Level {
         private static readonly int[] BombTypeVals = new int[] { 0, 1, 2 }; // 派对盒炸弹种类下拉的取值（0 小 / 1 大 / 2 超级）
 
         public static void RenderPartyBox() {
-        // 自动道具：开箱后自动随机挑一个（在"放弃道具"上面，属于同一组道具相关开关）
+        // 分区：道具（自动道具 + 放弃道具放在同一分区里）
+        SRApi.Ctl.SectionTitle("- " + SRApi.T("道具", "Items") + " -",
+            SRApi.T("道具：开箱后自动挑一个，以及沿用游戏原生的放弃道具。",
+                    "Items: auto-pick one when the box opens, plus the game's native drop-piece key."));
+        GUILayout.Space(SRApi.Ctl.Sc(2));
         SRApi.RenderSectionEntries("Level", delegate (ConfigEntryBase e) {
-            return e.Definition.Key == "Auto Party Item"
-                || e.Definition.Key == "Auto Party Item Delay"
-                || e.Definition.Key == "Auto Party Item Skip Bomb";
-        });
-        // 放弃道具条目：排队阶段手上拿着道具时才有意义
-        SRApi.RenderSectionEntries("Level", delegate (ConfigEntryBase e) {
-            return e.Definition.Key == "Drop Held Piece";
+            string k = e.Definition.Key;
+            return k == "Auto Party Item" || k == "Auto Party Item Delay" || k == "Auto Party Item Skip Bomb"
+                || k == "Drop Held Piece";   // 排队阶段手上拿着道具时才有意义
         });
 
         // 派对盒炸弹：对局内所有成员都发过炸弹！快捷短语才生成
