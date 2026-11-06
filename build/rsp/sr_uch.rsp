@@ -71,7 +71,4 @@ Features\BuildingPresets.Util.cs
 Features\HUD.cs
 Features\HUD.State.cs
 Features\CharacterAuto.cs
-Features\ChallengeSplits.cs
 Features\CameraPan.cs
-Features\FreeColor.cs
-Features\BoxSelect.cs

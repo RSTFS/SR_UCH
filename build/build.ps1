@@ -97,12 +97,9 @@ $rspFeatures = @(
     'feat_Level.rsp',
     'feat_Chat.rsp',
     'feat_Online.rsp',
-    'feat_Experiments.rsp',
     'feat_BuildingPresets.rsp',
     'feat_HUD.rsp',
-    'feat_CameraPan.rsp',
-    'feat_FreeColor.rsp',
-    'feat_BoxSelect.rsp'
+    'feat_CameraPan.rsp'
 )
 $outDir = Join-Path $Root 'bin\Release'
 

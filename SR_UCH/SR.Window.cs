@@ -176,6 +176,7 @@ public partial class SR {
         // 上一帧页面声明的"不要页面滚动条"。页面每帧在渲染时重新声明，渲染结束后由核心收走并清零，
         // 因此切到不声明它的页面（或用 Ctrl+滚轮切页）时不会继承上一页的"关滚动"状态。
         private static bool _noScrollDeclared;
+        private static string _lastPageSig;   // 上一次的"栏目|页签"，变化时收起下拉框
 
         // 界面缩放：窗口随缩放比例同比放大 / 缩小一次，并把位置夹回屏幕内。
         private static float _lastScale;
@@ -510,6 +511,14 @@ public partial class SR {
                     SR.MarkWheelUsed();
                 }
             }
+
+            // 换栏目/换页签时收起所有下拉框：展开态一旦跨页残留，控件会一直声明"滚轮归我"，
+            // 页面滚动就表现为"一开始能用、切几次页后失效"。
+            try {
+                string __sig = (_mode == Mode.Settings ? "settings" : (_selectedInternalSection ?? ""))
+                    + "|" + (_mode == Mode.Settings ? SR.SettingsTab.ToString() : (SR.SelectedPageId(_selectedInternalSection) ?? ""));
+                if (__sig != _lastPageSig) { _lastPageSig = __sig; SR.CloseOpenCombos(); }
+            } catch (Exception __cs) { Guard.Log("换页收起下拉框", __cs); }
 
             Vector2 pageBefore = _scroll;
             // 真实页面视口 = 内容区高 - 已用页头高 - 底栏保留高：显式限制滚动区高度，

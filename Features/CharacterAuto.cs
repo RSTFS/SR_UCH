@@ -23,6 +23,7 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<bool> _onlyUnpicked;     // 已选角色则不覆盖
         private static ConfigEntry<bool> _outfitOn;         // 自动时装总开关
         private static ConfigEntry<string> _oAcc, _oBody, _oHead, _oSkin;
+        private static ConfigEntry<bool> _oOnSpawn;   // 角色每次出生/重载时自动穿（参考 AutoDress）
         private static ConfigEntry<bool> _oSavedUse;   // 优先使用"按角色保存的外观"
         private static ConfigEntry<string> _oSavedPick; // 用第几套：random / 1 / 2 / ...
         private static ConfigEntry<string> _oSaved;    // 记录：动物=配饰,身体,头部,皮肤|...
@@ -126,6 +127,8 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Only When Unpicked", "已选则不覆盖\n开着：已经选好角色就不再自动挑\n关掉：按配置自动换角色（先走原生放弃，再挑目标）", "Only when unpicked\non: skip auto picking once you have an animal\noff: switches automatically (native unpick, then pick)");
             SRApi.LocKey(Sec, "Outfit Enabled", "自动时装", null);
             SRApi.LocDesc(Sec, "Outfit Enabled", "自动时装\n选定角色后自动穿上指定外观\n只使用已解锁的外观", "Auto outfit\napplies the chosen outfits once an animal is picked\nonly unlocked outfits are used");
+            SRApi.LocKey(Sec, "Auto Dress On Spawn", "每次出生自动穿", null);
+            SRApi.LocDesc(Sec, "Auto Dress On Spawn", "每次出生自动穿\n角色每次生成/重载时都按记录重穿一次外观\n参考 AutoDress 的行为，不再是选完角色才穿一次", "Auto dress on spawn\nre-applies the saved look every time your animal spawns or reloads\nmatches AutoDress instead of only dressing once when you pick");
             SRApi.LocKey(Sec, "Use Saved Outfits", "优先用保存记录", null);
             SRApi.LocDesc(Sec, "Use Saved Outfits", "优先用保存记录\n该角色有保存的外观时按记录套用\n没有记录才用下面四类规则", "Prefer saved looks\nuse the per-animal record when it exists\notherwise fall back to the four rules below");
             SRApi.LocKey(Sec, "Saved Look Pick", "用第几套", null);
@@ -160,6 +163,7 @@ namespace SR_UCH.Tweaks {
                 _oBody = plugin.Config.Bind(Sec, "Body", "", "身体：空=不干预，random=随机，数字=序号");
                 _oHead = plugin.Config.Bind(Sec, "Head", "", "头部：空=不干预，random=随机，数字=序号");
                 _oSkin = plugin.Config.Bind(Sec, "Skin", "", "皮肤：空=不干预，random=随机，数字=序号");
+                _oOnSpawn = plugin.Config.Bind(Sec, "Auto Dress On Spawn", true, "每次出生自动穿：角色每次生成/重载时按记录重穿外观。");
                 _oSavedUse = plugin.Config.Bind(Sec, "Use Saved Outfits", true, "优先使用按角色保存的外观记录");
                 _oSaved = plugin.Config.Bind(Sec, "Saved Outfits", "", "内部状态：按角色保存的外观记录（勿手动修改）");
                 _oSavedPick = plugin.Config.Bind(Sec, "Saved Look Pick", "random",
@@ -174,6 +178,8 @@ namespace SR_UCH.Tweaks {
                 if (_outfitOn != null) _outfitOn.SettingChanged += delegate { _outfitApplied = null; };
 
                 SRApi.RegisterTick("角色-自动选择", Tick);
+                try { HarmonyLib.Harmony.CreateAndPatchAll(typeof(CharacterAuto)); }
+                catch (Exception __hp) { SRApi.Guard.Log("角色/自动穿补丁注册", __hp); }
                 SRApi.RegisterSceneHook(delegate {
                     _outfitApplied = null; _nextAt = 0f; _pickedAt = -1f;
                     // 换场景 = 新房间：常用轮换推进一格
@@ -268,13 +274,23 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动时装页", __ex); }
         }
 
-        private static void RowCombo(string label, string current, string[] vals, string[] labels, ref bool open, ConfigEntry<string> entry) {
+        // 下拉框：把真实配置条目交给核心（核心按条目记展开状态），选中后主动收起。
+        // 以前传 null 条目 + 自持 ref open，展开态与核心脱节：下拉框关不掉且会一直吞滚轮，页面滚动随之失效。
+        private static void RowCombo(string label, string current, string[] vals, string[] labels, ref bool fallbackOpen, ConfigEntry<string> entry) {
             GUILayout.BeginHorizontal();
             try {
                 GUILayout.Label(label, SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(96f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
                 int cur = 0;
                 for (int i = 0; i < vals.Length; i++) if (vals[i] == current) { cur = i; break; }
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, SRApi.Ctl.Sc(160f));
+                bool open = entry != null && SRApi.Ctl.EditOpen != null && SRApi.Ctl.EditOpen.ContainsKey(entry) && SRApi.Ctl.EditOpen[entry];
+                bool openRef = entry == null ? fallbackOpen : open;
+                int sel = SRApi.Ctl.ComboBox(entry, labels[cur], vals, labels, ref openRef, SRApi.Ctl.Sc(160f));
+                if (entry == null) fallbackOpen = openRef;
+                else if (SRApi.Ctl.EditOpen != null) {
+                    // 选中或核心要求收起时，明确写回展开态，避免残留
+                    if (sel >= 0) openRef = false;
+                    SRApi.Ctl.EditOpen[entry] = openRef;
+                }
                 if (sel >= 0 && sel < vals.Length && entry != null && entry.Value != vals[sel]) entry.Value = vals[sel];
                 GUILayout.FlexibleSpace();
             } finally { GUILayout.EndHorizontal(); }
@@ -363,6 +379,21 @@ namespace SR_UCH.Tweaks {
                 string cur = string.IsNullOrEmpty(animal) ? SRApi.T("未选角色", "no animal") : animal;
                 return SRApi.T("当前：", "now: ") + cur + "   ·   " + pick + " / " + outfit + "   ·   " + SRApi.T("记录 ", "looks ") + looks;
             } catch (Exception __ex) { SRApi.Guard.Log("角色/状态行", __ex); return ""; }
+        }
+
+        // 参考 AutoDress：角色每次 Enable（出生/换场景/重生）都按保存记录重穿一次外观。
+        [HarmonyLib.HarmonyPatch(typeof(Character), "Enable")]
+        [HarmonyLib.HarmonyPostfix]
+        private static void AfterCharacterEnable(Character __instance) {
+            try {
+                if (_oOnSpawn == null || !_oOnSpawn.Value) return;
+                if (!SRApi.GateMaster || __instance == null) return;
+                LobbyPlayer lp = __instance.AssociatedLobbyPlayer;
+                if (lp == null || !lp.isLocalPlayer) return;
+                _outfitApplied = null;      // 强制重穿
+                _nextAt = 0f;
+                TryOutfits(lp);
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/出生自动穿", __ex); }
         }
 
         // ---------------- 外观记录（按角色） ----------------

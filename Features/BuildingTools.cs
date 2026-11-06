@@ -76,28 +76,7 @@ namespace SR_UCH.Tweaks {
 
             // 分区按条目键显式划分，不依赖遍历顺序（SectionEntries 按键名排序，顺序与分区无关）。
 
-            // 分区一：建造增强
-            SRApi.Ctl.SectionTitle("- " + SRApi.T("建造", "Build") + " -", SRApi.T("建造增强：让方块无视放置规则、按更细的网格自由微调摆放。",
-                     "Build: place pieces ignoring the placement rules and snap on a finer grid."));
-            GUILayout.Space(SRApi.Ctl.Sc(2));
-            for (int i = 0; i < entries.Count; i++) {
-                ConfigEntryBase e = entries[i];
-                if (!IsEnhanceKey(e.Definition.Key)) continue;
-                any = true;
-                SRApi.Ctl.DrawEntryRow(e, col);
-            }
-
-            // 自由取色的颜色行：用核心的调色板控件（字符串 #RRGGBB）
-            ConfigEntryBase fcv = SRApi.Ctl.FindEntry("build", "Free Color Value");
-            if (fcv != null) {
-                GUILayout.Space(SRApi.Ctl.Sc(2));
-                GUILayout.BeginHorizontal();
-                try {
-                    SRApi.Ctl.ColorEdit(new GUIContent(SRApi.T("自定义颜色", "Custom colour"), SRApi.T("自由取色时使用的颜色", "colour used by free colour")),
-                        fcv, Mathf.Max(SRApi.Ctl.Sc(180), col * 0.45f), SRApi.Ctl.Sc(26));
-                    GUILayout.FlexibleSpace();
-                } finally { GUILayout.EndHorizontal(); }
-            }
+            // 「建造」分区已按要求整段删除：无视碰撞 / 自由放置 / 自由取色 / 框选 都不再出现在界面上。
 
             // 分区二：建造上限
             GUILayout.Space(SRApi.Ctl.Sc(6));
@@ -131,8 +110,8 @@ namespace SR_UCH.Tweaks {
             // 其余条目：避免出现未渲染的条目
             for (int i = 0; i < entries.Count; i++) {
                 ConfigEntryBase e = entries[i];
-                if (IsEnhanceKey(e.Definition.Key) || IsLimitKey(e.Definition.Key)) continue;
-                if (e.Definition.Key == "Free Color Value") continue;   // 已用调色板控件画过
+                if (IsLimitKey(e.Definition.Key)) continue;
+                if (IsEnhanceKey(e.Definition.Key)) continue;   // 已删除的「建造」分区条目一律不再渲染
                 any = true;
                 SRApi.Ctl.DrawEntryRow(e, col);
             }

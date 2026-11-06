@@ -17,6 +17,7 @@ public partial class Chat : ITweak {
 
         private const string Sec = "Chat Window";
 
+        private static ConfigEntry<bool> _enabled;      // 会话窗口总开关（之前被误删，页面少了开关）
         private static ConfigEntry<bool> _noAutoShow;
         private static ConfigEntry<bool> _noFade;
         private static ConfigEntry<KeyCode> _key;          //显示窗口
@@ -63,6 +64,8 @@ public partial class Chat : ITweak {
         }
 
         private static void SelfRegWindow(IFeatureHost plugin) {
+            SRApi.LocKey(Sec, "Enabled", "会话窗口开关", null);
+            SRApi.LocDesc(Sec, "Enabled", "会话窗口开关\n总的开关：关掉后本页所有聊天框改动都不生效\n聊天本身仍在游戏里正常显示", "Chat window switch\nmaster switch: when off none of this page's chat box changes apply\nchatting itself keeps working in the game");
             // ChatCanvasGroup / ChatHolder / ChatMode 为 public 字段，已改为直接访问，不登记；仅 VisibilityTimer 保留登记。
             SRApi.Ref.Override("ChatDisplay.VisibilityTimer", "聊天窗口（可见计时器：保持显示但不自己写 alpha，淡入淡出交给游戏）");
 
@@ -112,6 +115,7 @@ public partial class Chat : ITweak {
             SRApi.LocDesc(Sec, "Pos Y", "垂直偏移（像素）\n负值把聊天框向下移\n仅在位置调整开启时生效", "Vertical offset (px)\nnegative values move the window down\nonly applies while position tweaks are on");
 
             //绑定顺序 = 页面显示顺序
+            _enabled = plugin.Config.Bind(Sec, "Enabled", true, "会话窗口总开关：关掉后本页的聊天框改动全部不生效。");
             _noAutoShow = plugin.Config.Bind(Sec, "No Auto Show", false, "关闭自动弹出：新消息不再自动显示聊天窗口。");
             _noFade = plugin.Config.Bind(Sec, "No Fade", false, "关闭淡入淡出动画：出现/消失都瞬切。");
             _key = plugin.Config.Bind(Sec, "Window Key", KeyCode.Z, "显示聊天窗口的按键（默认 Z）");
@@ -285,9 +289,13 @@ public partial class Chat : ITweak {
         // 总开关已删除（页面没有渲染它，UI 不可达）：本页只受全局开关控制。
         private static bool EnabledOn { get { return SRApi.GateMaster; } }
 
+        internal static bool Enabled { get { try { return _enabled == null || _enabled.Value; } catch { return true; } } }
+
         [HarmonyPatch(typeof(ChatDisplay), "Update")]
         [HarmonyPostfix]
         static void AfterChatUpdate(ChatDisplay __instance) {
+                if (!Enabled) return;   // 总开关关闭：完全不改游戏聊天框
+
             try {
                 if (__instance == null) return;
                 CanvasGroup cg = GroupOf(__instance);

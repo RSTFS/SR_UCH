@@ -481,7 +481,7 @@ namespace SR_UCH.Tweaks {
 
         // 筛选行的标签统一宽度：两行控件的左边缘才能对齐成两列网格。
         private static void RowLabel(string text) {
-            GUILayout.Label(text, SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(52f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+            GUILayout.Label(text, SRApi.Ctl.Label, GUILayout.Width(FormLabelWidth()), GUILayout.Height(SRApi.Ctl.Sc(24f)));
         }
 
         // 列表状态栏：条数 / 筛选结果 + 最近一次操作反馈。
@@ -496,6 +496,15 @@ namespace SR_UCH.Tweaks {
                 GUILayout.Label(SRApi.Ctl.Content(count, string.IsNullOrEmpty(_status) ? null : _status), SRApi.Ctl.Label,
                     GUILayout.Height(SRApi.Ctl.Sc(26f)));
             } catch (Exception __ls) { SRApi.Guard.Log("布局预设/列表状态栏", __ls); }
+        }
+
+        // 保存区的两个标签（预设名称 / XML 路径）按实测宽度取最大值，两行输入框左边缘保持对齐。
+        private static float FormLabelWidth() {
+            try {
+                float wa = SRApi.Ctl.Label.CalcSize(new GUIContent(SRApi.T("预设名称", "Preset name"))).x;
+                float wb = SRApi.Ctl.Label.CalcSize(new GUIContent(SRApi.T("XML 路径", "XML path"))).x;
+                return Mathf.Max(SRApi.Ctl.Sc(52f), Mathf.Max(wa, wb) + SRApi.Ctl.Sc(10f));
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/标签宽度", __ex); return SRApi.Ctl.Sc(90f); }
         }
 
         private static void Render() {
@@ -518,7 +527,7 @@ namespace SR_UCH.Tweaks {
                 GUILayout.BeginHorizontal();
                 try {
                     GUILayout.Label(SRApi.T("预设名称", "Preset name"), SRApi.Ctl.Label,
-                        GUILayout.Width(SRApi.Ctl.Sc(52f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+                        GUILayout.Width(FormLabelWidth()), GUILayout.Height(SRApi.Ctl.Sc(24f)));
                     string typed = SRApi.ClearableTextField(_newName ?? "", 40, SRApi.Ctl.SearchBox,
                         GUILayout.Width(W(220)), GUILayout.Height(W(24)));
                     if (typed != null && typed != _newName) _newName = typed;
@@ -532,7 +541,7 @@ namespace SR_UCH.Tweaks {
                 GUILayout.BeginHorizontal();
                 try {
                     GUILayout.Label(SRApi.T("XML 路径", "XML path"), SRApi.Ctl.Label,
-                        GUILayout.Width(SRApi.Ctl.Sc(52f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+                        GUILayout.Width(FormLabelWidth()), GUILayout.Height(SRApi.Ctl.Sc(24f)));
                     string path = SRApi.ClearableTextField(_importPath ?? "", 260, SRApi.Ctl.SearchBox,
                         GUILayout.Width(W(220)), GUILayout.Height(W(24)));
                     if (path != null && path != _importPath) _importPath = path;
@@ -542,7 +551,7 @@ namespace SR_UCH.Tweaks {
                 }
                 GUILayout.BeginHorizontal();
                 try {
-                    GUILayout.Space(SRApi.Ctl.Sc(52f));   // 与上面两个输入框左边缘对齐
+                    GUILayout.Space(FormLabelWidth());   // 与上面两个输入框左边缘对齐
                     if (GUILayout.Button(SRApi.T("从路径导入", "Import path"), SRApi.Ctl.Btn,
                         GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ImportFromPath();
                     if (GUILayout.Button(SRApi.T("从剪贴板导入", "Import clipboard"), SRApi.Ctl.Btn,
