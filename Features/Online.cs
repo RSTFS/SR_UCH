@@ -59,10 +59,15 @@ namespace SR_UCH.Tweaks {
         // 对局内点加入：先退出当前房间，退出后立刻加入。
         private static string _pendingJoin = "";   // 待加入队列：只在 ClearPendingJoin() 里清空，避免漏一处就重复加入
 
+        // 待加入是否来自"切换加入"（而不是别的入口）：看门狗强制回主界面时不能把它清掉，
+        // 否则"退出旧房 -> 回主界面 -> 加入新房"这条链会在中途丢掉目标房间。
+        private static bool _pendingIsJoin;
+
         // 清空待加入队列的唯一入口（评审 B-P0-10）。reason 只为日志留痕，不影响逻辑。
         internal static void ClearPendingJoin(string reason) {
-            if (string.IsNullOrEmpty(_pendingJoin)) return;
+            if (string.IsNullOrEmpty(_pendingJoin)) { _pendingIsJoin = false; return; }
             _pendingJoin = "";
+            _pendingIsJoin = false;
             SRApi.LogInfo("[联机] 已清空待加入队列（" + reason + "）");
         }
 
@@ -270,7 +275,9 @@ namespace SR_UCH.Tweaks {
                 return;
             }
             Notes("正在强制返回主界面", "Force-returning to the main menu");
-            ClearPendingJoin("强制返回主界面");   // 同时取消待加入，否则退出后仍会被拉进目标房
+            // 切换加入途中的待加入不能清：看门狗本身就是这条链的兜底，清掉等于把目标房丢掉。
+            if (_pendingIsJoin) SRApi.LogInfo("[联机] 强制返回主界面：保留切换加入的目标房（" + _pendingJoin + "）");
+            else ClearPendingJoin("强制返回主界面");   // 其它情况取消待加入，否则退出后仍会被拉进目标房
             _pendingSteamId = 0; // Steam 房号随之作废
             _abortDeadline = 0f;
             _forceDeadline = 0f;

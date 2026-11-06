@@ -34,7 +34,7 @@ namespace SR_UCH.Tweaks {
 
         // 加入流程：先离开当前房间 -> 轮询等待离开完成 -> 再加入目标房间。
         // inPlatformLobbyNoRelay 是私有字段且声明在子类上，必须用 mm.GetType()（运行时类型）反射。
-        private static System.Collections.IEnumerator JoinFlow(string id, bool useCode, Matchmaker mm) {
+        private static System.Collections.IEnumerator JoinFlow(string id, bool useCode, Matchmaker mm, Action<bool> done) {
             // 反射游戏私有成员必须走 SRApi.Ref.Field（带功能名提示、失败告警与结果缓存）。
             // 类型必须是运行时类型：Steam 与 Unity 的匹配器是两条独立继承链，字段声明在各自的链上。
             System.Reflection.FieldInfo inLobby = SRApi.Ref.Field(mm.GetType(), "inPlatformLobbyNoRelay",
@@ -62,6 +62,12 @@ namespace SR_UCH.Tweaks {
                     } catch (Exception __lv3) { SRApi.Guard.Log("联机.补发离开房间", __lv3); }
                 }
                 try { SRApi.LogInfo("[联机] 离开完成(inLobby=" + InLobby() + ")，开始加入"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                if (InLobby()) {
+                    // 仍是平台房间成员：JoinLobby 必定失败，提前告知并结束本次加入。
+                    SRApi.LogWarn("[联机] 旧房仍未退出，放弃本次加入");
+                    if (done != null) done(false);
+                    yield break;
+                }
             }
             // Steam 通道判定放在 JoinFlow：它是两条加入路径（直接加入 / 延时加入）的汇聚点。
             // sLobbyID 在 Steam 平台是 GUID，真正的 Steam 房间号在 UnityMatchID。
@@ -74,12 +80,19 @@ namespace SR_UCH.Tweaks {
                     if (jsu != null) {
                         SRApi.LogInfo("[联机] 走 JoinSteamLobby(ulong) " + sid);
                         jsu.Invoke(mm, new object[] { sid });
+                        if (done != null) done(true);
                         yield break;   // 已按 Steam 通道发出加入请求，不再走通用 JoinLobby
                     }
                     SRApi.LogWarn("[联机] 无 JoinSteamLobby(ulong)，退回通用流程");
                 } catch (Exception __jsl) { SRApi.Guard.Log("联机.JoinSteamLobby", __jsl); }
             }
-            try { mm.JoinLobby(id, useCode, null); } catch (Exception __jl) { SRApi.Guard.Log("联机.加入", __jl); }
+            try {
+                mm.JoinLobby(id, useCode, null);
+                if (done != null) done(true);
+            } catch (Exception __jl) {
+                SRApi.Guard.Log("联机.加入", __jl);
+                if (done != null) done(false);
+            }
         }
 
 
@@ -107,6 +120,12 @@ namespace SR_UCH.Tweaks {
                     if (_joinInFlight) { _joinInFlight = false; SRApi.LogInfo("[联机] 已进入房间，清除加入在途状态"); }
                 } else if (!string.IsNullOrEmpty(_joinedLobbyId) && !_joinInFlight) {
                     _joinedLobbyId = "";
+                }
+                // 在途窗口到期：加入可能已静默失败（超时/被拒），必须放行重试，否则列表里该房一直显示"已进入"。
+                if (_joinInFlight && Time.unscaledTime > _joinInFlightUntil) {
+                    _joinInFlight = false;
+                    _joinedLobbyId = "";
+                    SRApi.LogWarn("[联机] 加入在途超过 20 秒未完成，已解除在途状态（可重新点击加入）");
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("加入状态维护", __ex); }
         }
@@ -146,6 +165,7 @@ namespace SR_UCH.Tweaks {
             DisarmWatchdog();
             if (InSession() || Matchmaker.CurrentMatchmakingLobby != null) {
                 _pendingJoin = id;
+                _pendingIsJoin = true;   // 看门狗强制回主界面时保留这个目标
                 _pendingUseCode = useCode;
                 // 记下等待起点，供超时加速与输入屏蔽上限使用。
                 _pendingWaitFrom = Time.unscaledTime;
@@ -227,17 +247,19 @@ namespace SR_UCH.Tweaks {
                 try { SRApi.LogInfo("[联机] 加入请求 id=" + id + " mm=" + mm.GetType().FullName + " useCode=" + useCode); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 // 必须在这里清掉待加入队列：它是每帧轮询的，不清会重复发起同一次加入。
                 ClearPendingJoin("加入请求已发出");
-                _joinedLobbyId = id;
+                _pendingJoinId = id;
                 _joinInFlight = true;
                 _joinInFlightUntil = Time.unscaledTime + 20f;   // 加载超过 20 秒还没进去就允许重试
                 // 协程宿主必须是常驻对象：挂在 Matchmaker 上时，切场景/离房会把它销毁，
             // 加入请求就永远发不出去（audit 14-P0-1）。
-            try { CoroutineHost().StartCoroutine(JoinFlow(id, useCode, mm)); return; }
+            try { CoroutineHost().StartCoroutine(JoinFlow(id, useCode, mm, JoinFlowDone)); return; }
             catch (Exception __jf) { SRApi.Guard.Log("联机.加入流程", __jf); }
                 try { SRApi.LogInfo("[联机] 协程启动失败，退回直接 JoinLobby"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 mm.JoinLobby(id, useCode, new UnityEngine.Events.UnityAction<bool>(ok => {
                     try {
                         ClearPendingJoin("加入回调完成");
+                        if (ok) _joinedLobbyId = id;
+                        else { _joinedLobbyId = ""; _joinInFlight = false; _joinGuardUntil = 0f; }
                         Notes(ok ? "已发送加入请求" : "加入失败", ok ? "Join request sent" : "Join failed");
                     } catch (Exception __ex) { SRApi.Guard.Log("加入房间回调", __ex); }
                 }));
@@ -252,6 +274,24 @@ namespace SR_UCH.Tweaks {
             }
         }
 
+        // JoinFlow 的结果回传：成功才把房号记成"已加入"（失败否则该房会被永久标成已进入、点不动）。
+        private static void JoinFlowDone(bool ok) {
+            try {
+                if (ok) {
+                    _joinedLobbyId = _pendingJoinId;
+                    return;
+                }
+                _joinedLobbyId = "";
+                _joinInFlight = false;
+                _joinGuardUntil = 0f;
+                Notes("加入失败：没能退出上一个房间", "Join failed: could not leave the previous lobby");
+                SRApi.LogWarn("[联机] 加入流程失败，已清空已加入房号与在途状态");
+            } catch (Exception __ex) { SRApi.Guard.Log("联机/加入结果回传", __ex); }
+        }
+
+        // DoJoin 记下本次目标房号，供 JoinFlowDone 使用（回调发生在协程里，不能再读已清空的 pending）。
+        private static string _pendingJoinId = "";
+
         // 对局内加入：等退出当前房间后再发一次加入请求，只发一次。
         private static void TickPendingJoin() {
             if (string.IsNullOrEmpty(_pendingJoin)) return;
@@ -259,6 +299,7 @@ namespace SR_UCH.Tweaks {
                 float now = Time.unscaledTime;
                 if (now > _pendingGiveUpAt) {
                     ClearPendingJoin("等待超时");
+                    _pendingSteamId = 0;   // 目标作废，房号不能留到下一次
                     _joinGuardUntil = 0f;   // 超时取消：立刻允许重新点
                     Notes("加入超时，已取消", "Join timed out and was cancelled");
                     return;
