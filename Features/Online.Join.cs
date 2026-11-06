@@ -95,6 +95,8 @@ namespace SR_UCH.Tweaks {
         // 正在加入的抑制窗口：JoinFlow 是一次性协程，重复点击会并发两条流程（audit P0-22/23）。
         // 用时间窗而不是 bool：协程异常/被销毁时也会自然过期，不会把入口永久锁死。
         private static float _joinGuardUntil;
+        // 等待旧房退出时是否已升级为"走游戏原生返回"（避免反复调 ReturnToMainMenu）。
+        private static bool _pendingEscalated;
 
 
         // 每帧维护加入状态：进房成功清"在途"；离开房间后清"已加入房号"（否则会一直挡住该房）。
@@ -148,7 +150,7 @@ namespace SR_UCH.Tweaks {
                 // 记下等待起点，供超时加速与输入屏蔽上限使用。
                 _pendingWaitFrom = Time.unscaledTime;
                 _pendingNudged = false;
-                _pendingGiveUpAt = Time.unscaledTime + 10f;   // 等待离开旧房的超时（30s 太长，用户实测要 10s）
+                _pendingGiveUpAt = Time.unscaledTime + 15f;   // 等待离开旧房：留出"回主界面"兜底的时间
                 Notes("正在退出当前房间并在退出后加入", "Leaving the current session, then joining");
                 // 只做"离开当前房间"，不等主界面：不调用 ReturnToMainMenu，省一趟场景加载。
                 LeaveCurrentForJoin();
@@ -159,6 +161,8 @@ namespace SR_UCH.Tweaks {
 
         // 直接离开当前联机（收尾交给游戏的 AbortGame）；退出干净后由 TickPendingJoin 发一次加入请求。
         private static void LeaveCurrentForJoin() {
+            _pendingEscalated = false;
+            bool left = false;
             try {
                 Matchmaker mm = MatchmakerOrNull();
                 if (mm != null) {
@@ -166,8 +170,26 @@ namespace SR_UCH.Tweaks {
                     // 第二个参数必须保留：LeaveLobby 只有 (string, UserMsgPriority) 一个重载。
                     try { SRApi.LogInfo("[联机] 离开当前房间以切换（reason 传 null，不弹提示）"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     mm.LeaveLobby(null, UserMessageManager.UserMsgPriority.hi);
+                    left = true;
                 }
             } catch (Exception e) { SRApi.LogWarn("切换房间前退出失败: " + e.Message); }
+            if (!left) {
+                // 拿不到匹配器（对局中匹配器已被销毁是常见情形）：只能走游戏自己的返回主界面流程。
+                EscalateToMainMenu("无匹配器");
+            }
+            ArmWatchdog();
+        }
+
+        // 升级路径：走游戏自己的 ReturnToMainMenu（房主会广播 HostEndedGame、清理玩家、销毁 LobbyManager、加载主界面）。
+        // 注意：不能调用 GoMainMenu()——它会 ClearPendingJoin，把"切换加入"的意图清掉。
+        private static void EscalateToMainMenu(string why) {
+            if (_pendingEscalated) return;
+            _pendingEscalated = true;
+            try {
+                SRApi.LogWarn("[联机] 旧房未退出（" + why + "），改走游戏原生返回主界面，返回后再加入");
+                NudgeSplash();
+                Matchmaker.ReturnToMainMenu(null);
+            } catch (Exception __ex) { SRApi.Guard.Log("联机/升级为返回主界面", __ex); }
             ArmWatchdog();
         }
 
@@ -241,26 +263,25 @@ namespace SR_UCH.Tweaks {
                     Notes("加入超时，已取消", "Join timed out and was cancelled");
                     return;
                 }
-                // 尚未退出干净：继续等待，不算重试。
-                // InSession() 在某些断线态下可能永远为真：等到 6 秒还不干净就放弃并说明，
-                // 不要一直静默等到 10 秒 give-up（audit 14-P0-2）。
-                if (InSession() || Matchmaker.CurrentMatchmakingLobby != null) {
-                    if (now - _pendingWaitFrom > 6f) {
-                        ClearPendingJoin("仍停留在旧房间");
-                        _joinGuardUntil = 0f;
-                        Notes("仍在旧房间里，加入已取消", "Still in the old lobby; join cancelled");
-                        SRApi.LogWarn("[联机] 等待离开旧房间超过 6 秒，已取消加入");
-                        return;
-                    }
-                    // 每帧判定离开是否完成（判据都是廉价字段读取），离开一完成立刻发请求。
-                    float waited = now - _pendingWaitFrom;
+                float waited = now - _pendingWaitFrom;
+                bool stillIn = InSession() || Matchmaker.CurrentMatchmakingLobby != null;
+                // 已经在主界面 = 旧房一定退干净了（哪怕 InSession() 还残留旧的联机状态对象）。
+                bool atMainMenu = false;
+                try { atMainMenu = SceneManager.GetActiveScene().name == "MainMenu"; } catch (Exception __mn) { SRApi.Guard.Log("联机/读取场景名", __mn); }
+                if (stillIn && !atMainMenu) {
+                    // 2.5 秒还没退出：先放遮罩，再升级为"走游戏原生返回主界面"。
+                    // 以前这里在 6 秒时直接取消并提示"仍在旧房间里"——那正是"退不出旧房间"的直接来源：
+                    // 房主对局里平台 LeaveLobby 并不会结束对局，必须由游戏自己的 ReturnToMainMenu 收尾。
                     if (waited > 2.5f && !_pendingNudged) {
                         _pendingNudged = true;
-                        SRApi.LogWarn("[联机] 离开房间已等 " + waited.ToString("0.0") + " 秒，放出加载遮罩加速");
+                        SRApi.LogWarn("[联机] 离开房间已等 " + waited.ToString("0.0") + " 秒，放出加载遮罩并走原生返回");
                         NudgeSplash();
+                        EscalateToMainMenu("超过 2.5 秒未退出");
                     }
+                    // 15 秒仍没到主界面也没有退出：放弃（此时确实无法安全加入）。
                     return;
                 }
+                if (atMainMenu && stillIn) SRApi.LogInfo("[联机] 已回主界面，忽略残留的联机状态，继续加入");
                 string id = _pendingJoin;
                 bool useCode = _pendingUseCode;
                 DoJoin(id, useCode);
