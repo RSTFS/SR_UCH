@@ -505,6 +505,47 @@ public partial class SR {
             return it;
         }
 
+        // 键位冲突：两条自动快捷键绑了同一个（主键 + 修饰键）组合时列出，自检页据此报警。
+        public sealed class KeyConflict {
+            public string A, B;
+            public string Combo;
+        }
+
+        // 收集当前所有自动快捷键的冲突（同键 + 同修饰键才算冲突；None 忽略）。
+        public static List<KeyConflict> FindKeyConflicts() {
+            List<KeyConflict> res = new List<KeyConflict>();
+            try {
+                HkInitAll();
+                for (int i = 0; i < _hkItems.Count; i++) {
+                    HkItem a = _hkItems[i];
+                    if (a == null || a.Key == null || a.Key.Value == KeyCode.None) continue;
+                    for (int j = i + 1; j < _hkItems.Count; j++) {
+                        HkItem b = _hkItems[j];
+                        if (b == null || b.Key == null || b.Key.Value == KeyCode.None) continue;
+                        if (a.Key.Value != b.Key.Value) continue;
+                        if (ComboModOf(a.Key) != ComboModOf(b.Key)) continue;
+                        res.Add(new KeyConflict { A = a.Label ?? a.Id, B = b.Label ?? b.Id, Combo = ComboNameOf(a.Key) });
+                    }
+                }
+            } catch (Exception __ex) { Guard.Log("键位冲突检测", __ex); }
+            return res;
+        }
+
+        // 修饰键状态（与 ComboKeyDown 一致的来源：隐藏的组合键条目）。
+        private static int ComboModOf(ConfigEntry<KeyCode> e) {
+            try {
+                ComboMod m;
+                if (_keyMods != null && _keyMods.TryGetValue(e, out m)) return (int)m;
+            } catch (Exception __ex) { Guard.Log("键位冲突/读修饰键", __ex); }
+            return 0;
+        }
+
+        // 冲突展示用："Ctrl+Shift+K" 形式。
+        private static string ComboNameOf(ConfigEntry<KeyCode> e) {
+            try { return FormatComboMod(KeyComboMod(e)) + KeyDisplayName(e.Value); }
+            catch (Exception __ex) { Guard.Log("键位冲突/组合键文本", __ex); return e != null ? e.Value.ToString() : ""; }
+        }
+
         // 登记"按下即执行"的按钮动作（Initialize 或页面渲染时调用均可，重复登记无副作用）
         public static void HotkeyAction(string id, string label, Action action) {
             HkItem it = HkEnsure(id, label);

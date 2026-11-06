@@ -328,6 +328,45 @@ public partial class SR {
                         try { AuditLabel(SR.AttributionReport()); } catch (Exception __at) { Guard.Log("自检/归因", __at); }
                     });
 
+                // ---- 功能总览卡 ----
+                IList<FeatureInfo> feats = Features.All;
+                int fCount = feats != null ? feats.Count : 0;
+                int fBad = Features.ProblemCount;
+                Card(fBad == 0, T("功能总览", "Features"),
+                    T(fCount + " 个功能 · 问题 " + fBad, fCount + " feature(s) · " + fBad + " problem(s)"),
+                    delegate {
+                        for (int i = 0; i < fCount; i++) {
+                            FeatureInfo fi = feats[i];
+                            if (fi == null) continue;
+                            bool ok = !fi.ContractTooNew && fi.MissingDeps.Count == 0 && fi.ConflictSlots.Count == 0;
+                            GUILayout.BeginHorizontal();
+                            GUILayout.Label(ok ? "✓" : "✗", _label, GUILayout.Width(Sc(20)), GUILayout.Height(Ctl.TableRowH()));
+                            GUILayout.Label(fi.Name ?? fi.Id, _label, GUILayout.Width(Sc(150)), GUILayout.Height(Ctl.TableRowH()));
+                            GUILayout.Label(fi.Id ?? "", _labelWrap, GUILayout.Width(Sc(190)), GUILayout.Height(Ctl.TableRowH()));
+                            GUILayout.Label("v" + (fi.Version ?? "0"), _label, GUILayout.Width(Sc(60)), GUILayout.Height(Ctl.TableRowH()));
+                            GUILayout.Label(ok ? T("正常", "ok") : fi.ToString(), _labelWrap, GUILayout.ExpandWidth(true), GUILayout.Height(Ctl.TableRowH()));
+                            GUILayout.EndHorizontal();
+                        }
+                        if (fCount == 0) AuditLabel(T("（还没有扫描到功能）", "(no features scanned yet)"));
+                    });
+
+                // ---- 键位冲突卡 ----
+                List<SR.KeyConflict> conflicts = SR.FindKeyConflicts();
+                Card(conflicts.Count == 0, T("键位冲突", "Key conflicts"),
+                    conflicts.Count == 0 ? T("没有重复的快捷键", "no duplicate hotkeys")
+                                         : T(conflicts.Count + " 组快捷键重复", conflicts.Count + " duplicate combo(s)"),
+                    delegate {
+                        for (int i = 0; i < conflicts.Count; i++) {
+                            SR.KeyConflict kc = conflicts[i];
+                            if (kc == null) continue;
+                            GUILayout.BeginHorizontal();
+                            GUILayout.Label("✗ " + (kc.Combo ?? ""), _label, GUILayout.Width(Sc(140)), GUILayout.Height(Ctl.TableRowH()));
+                            GUILayout.Label(kc.A + "  ↔  " + kc.B, _labelWrap, GUILayout.ExpandWidth(true), GUILayout.Height(Ctl.TableRowH()));
+                            GUILayout.EndHorizontal();
+                        }
+                        if (conflicts.Count == 0) AuditLabel(T("（自动快捷键与右键绑定都在检测范围内；重复时两条动作会同时触发）", "(covers auto hotkeys and right-click bindings; a duplicate fires both actions)"));
+                    });
+
                 // ---- 性能卡 ----
                 // 开关关闭时不刷新：不读采样、不重算，卡片只显示一行提示（勾选框在卡片里）。
                 bool __profOn = false;

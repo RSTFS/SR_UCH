@@ -21,6 +21,7 @@ public partial class Level {
         SRApi.RenderSectionEntries("Level", delegate (ConfigEntryBase e) {
             string k = e.Definition.Key;
             return k == "Auto Party Item" || k == "Auto Party Item Delay" || k == "Auto Party Item Skip Bomb"
+                || k == "Auto Party Item Include" || k == "Auto Party Item Exclude"
                 || k == "Drop Held Piece";   // 排队阶段手上拿着道具时才有意义
         });
 
@@ -473,6 +474,8 @@ public class AutoPartyItem : ITweak {
     private static ConfigEntry<bool> _enabled;
     private static ConfigEntry<float> _delay;
     private static ConfigEntry<bool> _skipBomb;
+    private static ConfigEntry<string> _include;   // 只挑这些（关键词，逗号分隔）
+    private static ConfigEntry<string> _exclude;   // 排除这些（关键词，逗号分隔）
     private static System.Reflection.FieldInfo _fPieces;
     private static float _armedAt = -1f;      // 本次开箱开始计时的时刻
     private static int _lastBoxId;            // 已经处理过的派对盒实例
@@ -484,6 +487,10 @@ public class AutoPartyItem : ITweak {
         SRApi.LocDesc("Level", "Auto Party Item", "自动道具\n派对盒开启后自动随机挑一个道具\n与手动挑选同一条链路，服务端发放", "Auto party item\npicks a random piece for you once the box opens\nsame path as picking by hand; the server hands it over");
         SRApi.LocKey("Level", "Auto Party Item Delay", "自动道具延迟", null);
         SRApi.LocDesc("Level", "Auto Party Item Delay", "自动道具延迟\n开箱后等多少秒再挑\n范围 0-10，默认 0.5", "Auto item delay\nseconds to wait after the box opens\nrange 0-10; default 0.5");
+        SRApi.LocKey("Level", "Auto Party Item Include", "只挑这些", null);
+        SRApi.LocDesc("Level", "Auto Party Item Include", "只挑这些（关键词）\n逗号分隔，命中任一关键词才进候选\n留空=不限；例如 桥,坡道", "Only these (keywords)\ncomma separated; a piece must match one to be a candidate\nempty = no restriction, e.g. bridge,ramp");
+        SRApi.LocKey("Level", "Auto Party Item Exclude", "排除这些", null);
+        SRApi.LocDesc("Level", "Auto Party Item Exclude", "排除这些（关键词）\n逗号分隔，命中任一关键词就跳过\n例如 炸弹,黑洞", "Exclude these (keywords)\ncomma separated; a piece matching any is skipped\ne.g. bomb,blackhole");
         SRApi.LocKey("Level", "Auto Party Item Skip Bomb", "跳过炸弹", null);
         SRApi.LocDesc("Level", "Auto Party Item Skip Bomb", "跳过炸弹\n自动挑道具时排除派对盒里的炸弹\n关闭后炸弹也可能被自动挑中", "Skip bombs\nexcludes party-box bombs from the random pick\nwhen off a bomb may be picked");
     }
@@ -497,6 +504,10 @@ public class AutoPartyItem : ITweak {
                 new ConfigDescription("自动道具延迟（0-10 秒，默认 0.5）：开箱后等多久再自动挑。", new AcceptableValueRange<float>(0f, 10f)));
             _skipBomb = plugin.Config.Bind("Level", "Auto Party Item Skip Bomb", true,
                 "跳过炸弹：自动挑道具时不挑派对盒里的炸弹。");
+            _include = plugin.Config.Bind("Level", "Auto Party Item Include", "",
+                "只挑这些：逗号分隔的关键词，方块名命中任一才进入候选；留空 = 不限。");
+            _exclude = plugin.Config.Bind("Level", "Auto Party Item Exclude", "",
+                "排除这些：逗号分隔的关键词，方块名命中任一就跳过。");
             SRApi.RegisterTick("派对盒-自动道具", Tick);
         } catch (Exception __ex) { SRApi.Guard.Log("自动道具/初始化", __ex); }
     }
@@ -559,15 +570,54 @@ public class AutoPartyItem : ITweak {
 
     private static PickableBlock Choose(PartyBox pb, List<PickableBlock> pieces) {
         bool skipBomb = _skipBomb == null || _skipBomb.Value;
+        string[] inc = SplitKws(_include != null ? _include.Value : null);
+        string[] exc = SplitKws(_exclude != null ? _exclude.Value : null);
         List<PickableBlock> cand = new List<PickableBlock>(pieces.Count);
         for (int i = 0; i < pieces.Count; i++) {
             PickableBlock p = pieces[i];
             if (p == null) continue;
             if (skipBomb && IsBomb(pb, p)) continue;
+            string nm = NameOf(p);
+            if (exc.Length > 0 && MatchesAny(nm, exc)) continue;
+            if (inc.Length > 0 && !MatchesAny(nm, inc)) continue;
             cand.Add(p);
         }
-        if (cand.Count == 0) return null;   // 只剩炸弹且选择了跳过：放弃本次自动挑选
+        if (cand.Count == 0) {
+            // 规则把候选筛空了：退一步只排除炸弹，避免"设了规则就永远不自动挑"
+            for (int i = 0; i < pieces.Count; i++) {
+                PickableBlock p = pieces[i];
+                if (p == null) continue;
+                if (skipBomb && IsBomb(pb, p)) continue;
+                cand.Add(p);
+            }
+            if (cand.Count == 0) return null;   // 只剩炸弹且选择了跳过：放弃本次自动挑选
+            SRApi.LogWarn("[自动道具] 只挑/排除 规则把候选筛空，已退回只按炸弹规则挑选");
+        }
         return cand[UnityEngine.Random.Range(0, cand.Count)];
+    }
+
+    private static string[] SplitKws(string raw) {
+        if (string.IsNullOrEmpty(raw)) return new string[0];
+        string[] parts = raw.Split(new char[] { ',', '，', ';', '；' }, StringSplitOptions.RemoveEmptyEntries);
+        List<string> res = new List<string>();
+        for (int i = 0; i < parts.Length; i++) {
+            string t = parts[i].Trim();
+            if (t.Length > 0) res.Add(t.ToLowerInvariant());
+        }
+        return res.ToArray();
+    }
+
+    private static string NameOf(PickableBlock p) {
+        try {
+            if (p.placeablePrefab != null && !string.IsNullOrEmpty(p.placeablePrefab.Name)) return p.placeablePrefab.Name.ToLowerInvariant();
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/取方块名", __ex); }
+        return (p.name ?? "").ToLowerInvariant();
+    }
+
+    private static bool MatchesAny(string name, string[] kws) {
+        if (string.IsNullOrEmpty(name)) return false;
+        for (int i = 0; i < kws.Length; i++) if (name.IndexOf(kws[i], StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        return false;
     }
 
     private static bool IsBomb(PartyBox pb, PickableBlock p) {
