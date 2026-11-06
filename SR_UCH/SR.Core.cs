@@ -1192,6 +1192,10 @@ public partial class SR : ITweak {
                 if (e == null || e.type != EventType.KeyDown) return;
                 KeyCode k = e.keyCode;
                 if (k == KeyCode.None) return;
+                // 关键：Input.GetKeyDown 本轮已经上报过的键不再补记。
+                // 否则 Update 里读到一次、下一帧又从记录里读到一次，同一次按下会触发两遍
+                // （打开面板的键会"开了又立刻关"，表现就是界面打不开）。
+                if (Input.GetKeyDown(k)) return;
                 if (Time.frameCount - _guiKeyAt > 1) { _guiKeys.Clear(); _guiKeyAt = Time.frameCount; }
                 if (!_guiKeys.Contains(k)) _guiKeys.Add(k);
             } catch (Exception __ex) { Guard.Log("记录 IMGUI 按键", __ex); }
