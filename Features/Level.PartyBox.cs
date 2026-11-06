@@ -73,7 +73,8 @@ public partial class Level {
                 GUILayout.Space(SRApi.Ctl.Sc(2));
                 GUILayout.BeginHorizontal();
                 ConfigEntryBase qrh = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Hold");
-                string vanillaRetry = QuickAdjust.VanillaHoldBText(false);
+                // 不依赖「快速调整」功能的静态方法（拆分模式下两者可能不在同一个 DLL 里）。
+                const string vanillaRetry = "0.5s";
                 GUILayout.Label(SRApi.Ctl.Content(SRApi.T("等待秒数", "Hold s"), SRApi.T("长按 B 的等待阈值（Character.SuicideTime）：挑战模式重试游戏默认 " + vanillaRetry + "。", "Hold-B threshold (Character.SuicideTime): vanilla " + vanillaRetry + " for challenge retry.")),
                     SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(84)), GUILayout.Height(SRApi.Ctl.Sc(26)));
                 if (qrh != null) {
