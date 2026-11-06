@@ -64,7 +64,9 @@ namespace SR_UCH.Tweaks {
                 try { SRApi.LogInfo("[联机] 离开完成(inLobby=" + InLobby() + ")，开始加入"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 if (InLobby()) {
                     // 仍是平台房间成员：JoinLobby 必定失败，提前告知并结束本次加入。
-                    SRApi.LogWarn("[联机] 旧房仍未退出，放弃本次加入");
+                    // 直接加入路径没有 TickPendingJoin 兜底：这里也升级为原生返回，让下一次点击能进房。
+                    SRApi.LogWarn("[联机] 旧房仍未退出，改走原生返回主界面后请再点一次加入");
+                    try { Matchmaker.ReturnToMainMenu(null); } catch (Exception __rm) { SRApi.Guard.Log("联机/加入失败后返回主界面", __rm); }
                     if (done != null) done(false);
                     yield break;
                 }
@@ -138,7 +140,7 @@ namespace SR_UCH.Tweaks {
         private static float _joinInFlightUntil;
         internal static bool JoinInFlight { get { return _joinInFlight && Time.unscaledTime < _joinInFlightUntil; } }
         internal static string JoinedLobbyId { get { return _joinedLobbyId; } }
-        private const float JoinGuardSeconds = 4f;
+        private const float JoinGuardSeconds = 1.5f;   // 只挡双击；失败后可立刻重试
 
         private static void JoinLobbyInternal(string id, bool useCode, bool keepSteamId) {
             if (!keepSteamId) _pendingSteamId = 0;
@@ -182,6 +184,17 @@ namespace SR_UCH.Tweaks {
         // 直接离开当前联机（收尾交给游戏的 AbortGame）；退出干净后由 TickPendingJoin 发一次加入请求。
         private static void LeaveCurrentForJoin() {
             _pendingEscalated = false;
+            // 房主在对局中时平台 LeaveLobby 结束不了对局（IsHost / IsInOnlineGame 都不变），
+            // 干等只会让玩家多站一两秒——直接走游戏原生返回，退出才及时。
+            try {
+                LobbyManager lm0 = LobbyManager.instance;
+                if (lm0 != null && lm0.IsHost && lm0.IsInOnlineGame) {
+                    SRApi.LogInfo("[联机] 房主在对局中切换房间：直接走原生返回主界面");
+                    EscalateToMainMenu("房主在对局中");
+                    ArmWatchdog();
+                    return;
+                }
+            } catch (Exception __lh) { SRApi.Guard.Log("联机/房主切换判定", __lh); }
             bool left = false;
             try {
                 Matchmaker mm = MatchmakerOrNull();
@@ -313,11 +326,11 @@ namespace SR_UCH.Tweaks {
                     // 2.5 秒还没退出：先放遮罩，再升级为"走游戏原生返回主界面"。
                     // 以前这里在 6 秒时直接取消并提示"仍在旧房间里"——那正是"退不出旧房间"的直接来源：
                     // 房主对局里平台 LeaveLobby 并不会结束对局，必须由游戏自己的 ReturnToMainMenu 收尾。
-                    if (waited > 2.5f && !_pendingNudged) {
+                    if (waited > 1.2f && !_pendingNudged) {
                         _pendingNudged = true;
                         SRApi.LogWarn("[联机] 离开房间已等 " + waited.ToString("0.0") + " 秒，放出加载遮罩并走原生返回");
                         NudgeSplash();
-                        EscalateToMainMenu("超过 2.5 秒未退出");
+                        EscalateToMainMenu("超过 1.2 秒未退出");
                     }
                     // 15 秒仍没到主界面也没有退出：放弃（此时确实无法安全加入）。
                     return;
