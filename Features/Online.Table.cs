@@ -76,6 +76,7 @@ namespace SR_UCH.Tweaks {
         private static bool _sbHandled;   // 本帧核心滚动条是否已处理鼠标事件                //正在拖竖向滚动条
         private static float _sbGrabY;                  //按下时鼠标相对滑块顶部的偏移
         private static float _tableMaxX, _tableMaxY;
+        private static Rect _tableScreenBox;   // 表格矩形（屏幕坐标）：滚轮只在这个范围内滚列表
     private static float _rowsHCache;   // 行区高度缓存（滚轮钩子首帧兜底）
         private static float _joinW, _joinXPage;  // 钉在右边的操作列几何
         private static float _pageTopY;                 //页面内容在布局空间里的起点 y（见 RenderOnlinePage）
@@ -159,8 +160,10 @@ namespace SR_UCH.Tweaks {
         // 页面级滚轮（页面关掉滚动后，表格必须自己吃滚轮；只有这个钩子能在滚动区建立之前拿到事件）。
     internal static bool OnLobbyWheel(Vector2 mouse, float wheel) {
         try {
-            Rect __ca = new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
-            if (!__ca.Contains(mouse)) return false;
+            // 光标在列表里滚列表，在界面上交给页面滚动。
+            Rect __box = _tableScreenBox;
+            if (__box.width <= 2f || __box.height <= 2f) return false;
+            if (!__box.Contains(mouse)) return false;
             // Shift+滚轮 = 横向（与表格内部 TableWheelInput 同一约定），否则竖向。
             bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             if (__shift && _tableMaxX > 0f) {
@@ -190,6 +193,13 @@ namespace SR_UCH.Tweaks {
             Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
             CollectShown();
             float rowH = SRApi.Ctl.TableRowH(), headerH = SRApi.Ctl.TableHeaderH();
+            // 记录本帧表格的屏幕矩形（box 是布局坐标，加区域偏移即屏幕坐标）
+            try {
+                float __offX = SRApi.ContentArea.x - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(2f);
+                float __offY = SRApi.ContentArea.y;
+                if (box.width > 2f && box.height > 2f)
+                    _tableScreenBox = new Rect(box.x + __offX, box.y + __offY, box.width, box.height);
+            } catch (Exception __tbox) { SRApi.Guard.Log("联机表格/命中框", __tbox); }
             float rowsH = Mathf.Max(SRApi.Ctl.Sc(20), box.height - headerH);
             float contentH = _shownLobbies.Count * rowH;
             // 滚动条已全局隐藏，不再为它预留宽度（数据区吃满到钉住列）。

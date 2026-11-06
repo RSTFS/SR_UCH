@@ -455,9 +455,10 @@ namespace SR_UCH.Tweaks {
             try {
                 // 页面级滚轮钩子是全局注册的：不判"本页是否可见"的话，离开本页后仍会吃掉别的页面的滚轮。
                 if (Time.frameCount - _renderFrame > 2) return false;
-                // 命中框：_tableBox 是布局坐标、且 Layout 趟只有 1x1；无效时退回页面内容区。
-                // 核心现在传屏幕坐标：直接用页面内容区判定（_tableBox 是布局坐标，Layout 趟只有 1x1）。
-                Rect hitBox = new Rect(SRApi.ContentArea.x, SRApi.ContentArea.y, SRApi.ContentArea.width, SRApi.ContentArea.height);
+                // 命中框 = 表格真实矩形（布局坐标转屏幕坐标）：光标在列表里才滚列表，在界面上就交给页面滚动。
+                Rect hitBox = TableScreenBox();
+                if (hitBox.width <= 2f || hitBox.height <= 2f) return false;   // 表格还没画出来：本帧不抢
+
                 // 复用表格自身算出的滚动上限（由真实 rowsH 得出，帧间稳定），与联机列表同一套。
                 // 以前用 ContentArea 高度重算：那是整个右栏，远大于表格行区，maxY 被算成 0，滚轮就死了。
                 if (!hitBox.Contains(mouse)) return false;
@@ -479,6 +480,25 @@ namespace SR_UCH.Tweaks {
                 }
                 return false;
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/页面滚轮", __ex); return false; }
+        }
+
+        // 布局坐标 -> 屏幕坐标：页面布局原点在 BeginArea(winRect+Sc(4))，与 ContentArea 只差"侧栏宽 + 2"。
+        internal static Vector2 LayoutToScreen(Vector2 layout) {
+            try {
+                float offX = SRApi.ContentArea.x - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(2f);
+                float offY = SRApi.ContentArea.y;
+                return new Vector2(layout.x + offX, layout.y + offY);
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/坐标换算", __ex); return layout; }
+        }
+
+        // 表格矩形（屏幕坐标）：_tableBox 是布局坐标，且 Layout 趟可能还是退化矩形。
+        internal static Rect TableScreenBox() {
+            try {
+                Rect b = _tableBox;
+                if (b.width <= 2f || b.height <= 2f) return b;
+                Vector2 p0 = LayoutToScreen(new Vector2(b.x, b.y));
+                return new Rect(p0.x, p0.y, b.width, b.height);
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/表格命中框", __ex); return _tableBox; }
         }
 
         // 筛选行的标签统一宽度：两行控件的左边缘才能对齐成两列网格。
@@ -519,7 +539,7 @@ namespace SR_UCH.Tweaks {
                 string pendingBefore = _pendingKey;
                 // 与联机列表一致：页面级滚动关闭，上方筛选/工具行恒可见，表格占据剩余高度。
                 SRApi.PageScroll = Vector2.zero;
-                SRApi.NoPageScrollBars = true;
+                // 页面滚动保持可用：光标不在列表上时由页面滚动接管（列表自己的钩子只在表格矩形内生效）。
                 // 页面滚动保持可用（滚动条已统一隐藏）：表格内部滚轮失效时也能靠页面滚动看到全部内容。
                 Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
                 if (Event.current != null && Event.current.type == EventType.Layout) { _pageTopY = topProbe.y; }

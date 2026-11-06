@@ -442,7 +442,7 @@ namespace SR_UCH.Tweaks {
             _renderFrame = Time.frameCount;
             // 本页无页面级滚动：表头 / 筛选必须始终可见，房间只在下方框内滚动。
             SRApi.PageScroll = Vector2.zero;
-            SRApi.NoPageScrollBars = true;   // 页面级横纵向滚动条都关闭
+            // 页面滚动保持可用：光标不在列表上时由页面滚动接管（列表钩子只在表格矩形内生效）。
             // 列宽拖动 / 表格高度拖动的收尾都由核心处理，这里无需再收尾。
             EnsureWidths();
             // 页面内容在布局空间的起点 y（零高度探针），用于计算表格上方已用高度。
