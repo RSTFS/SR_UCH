@@ -67,7 +67,7 @@ namespace SR_UCH.Tweaks {
         }
 
         // 自绘页：按分区标题 + 条目逐行渲染（分区判据取自 Initialize 里 Bind 的键名）。
-        private static bool IsEnhanceKey(string k) { return k == "Collision Override" || k == "Grid Override"; }
+        private static bool IsEnhanceKey(string k) { return k == "Collision Override" || k == "Grid Override" || k == "Free Color" || k == "Free Color Key" || k == "Free Color Key Code"; }
         private static bool IsLimitKey(string k) { return k == "Lift Build Cap" || k == "Build Cap Value"; }
         private static void RenderPage() {
             float col = Mathf.Max(SRApi.Ctl.Sc(180), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(240));
@@ -85,6 +85,18 @@ namespace SR_UCH.Tweaks {
                 if (!IsEnhanceKey(e.Definition.Key)) continue;
                 any = true;
                 SRApi.Ctl.DrawEntryRow(e, col);
+            }
+
+            // 自由取色的颜色行：用核心的调色板控件（字符串 #RRGGBB）
+            ConfigEntryBase fcv = SRApi.Ctl.FindEntry("build", "Free Color Value");
+            if (fcv != null) {
+                GUILayout.Space(SRApi.Ctl.Sc(2));
+                GUILayout.BeginHorizontal();
+                try {
+                    SRApi.Ctl.ColorEdit(new GUIContent(SRApi.T("自定义颜色", "Custom colour"), SRApi.T("自由取色时使用的颜色", "colour used by free colour")),
+                        fcv, Mathf.Max(SRApi.Ctl.Sc(180), col * 0.45f), SRApi.Ctl.Sc(26));
+                    GUILayout.FlexibleSpace();
+                } finally { GUILayout.EndHorizontal(); }
             }
 
             // 分区二：建造上限
@@ -120,6 +132,7 @@ namespace SR_UCH.Tweaks {
             for (int i = 0; i < entries.Count; i++) {
                 ConfigEntryBase e = entries[i];
                 if (IsEnhanceKey(e.Definition.Key) || IsLimitKey(e.Definition.Key)) continue;
+                if (e.Definition.Key == "Free Color Value") continue;   // 已用调色板控件画过
                 any = true;
                 SRApi.Ctl.DrawEntryRow(e, col);
             }
