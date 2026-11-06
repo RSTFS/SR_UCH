@@ -37,13 +37,19 @@ namespace SR_UCH.Tweaks {
         private static System.Collections.IEnumerator JoinFlow(string id, bool useCode, Matchmaker mm, Action<bool> done) {
             // 反射游戏私有成员必须走 SRApi.Ref.Field（带功能名提示、失败告警与结果缓存）。
             // 类型必须是运行时类型：Steam 与 Unity 的匹配器是两条独立继承链，字段声明在各自的链上。
+            // 用游戏自己的 Matchmaker.IsInLobby()（抽象方法，Steam/Unity 各自实现）。
+            // 以前反射 inPlatformLobbyNoRelay：那是 Unity 匹配器的字段，Steam 通道下不代表真实状态。
             System.Reflection.FieldInfo inLobby = SRApi.Ref.Field(mm.GetType(), "inPlatformLobbyNoRelay",
                 "联机：判断客户端是否已在平台房间里（加入前必须先退出）");
             // 这里不能静默：反射一退化就返回 false，会跳过"先退旧房"整段逻辑，而通用 JoinLobby
             // 在仍处于平台房间时必定失败 —— 现象是"加入没反应且日志一片空白"（评审 R-2）。
             bool InLobby() {
-                try { return inLobby != null && (bool)inLobby.GetValue(mm); }
-                catch (Exception __il) { SRApi.Guard.Log("联机/读取平台房间状态", __il); return false; }
+                try { return mm.IsInLobby(); }   // 游戏自报的权威状态（含 Unity relay / Steam 两条链）
+                catch (Exception __il) {
+                    SRApi.Guard.Log("联机/读取平台房间状态", __il);
+                    try { return inLobby != null && (bool)inLobby.GetValue(mm); }   // 兜底：老版本反射
+                    catch { return false; }
+                }
             }
             if (InLobby()) {
                 try { SRApi.LogInfo("[联机] 已在房间中，先离开..."); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -127,7 +133,7 @@ namespace SR_UCH.Tweaks {
                 if (_joinInFlight && Time.unscaledTime > _joinInFlightUntil) {
                     _joinInFlight = false;
                     _joinedLobbyId = "";
-                    SRApi.LogWarn("[联机] 加入在途超过 20 秒未完成，已解除在途状态（可重新点击加入）");
+                    SRApi.LogWarn("[联机] 加入在途超过 10 秒未完成，已解除在途状态（可重新点击加入）");
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("加入状态维护", __ex); }
         }
@@ -222,6 +228,18 @@ namespace SR_UCH.Tweaks {
                 SRApi.LogWarn("[联机] 旧房未退出（" + why + "），改走游戏原生返回主界面，返回后再加入");
                 NudgeSplash();
                 Matchmaker.ReturnToMainMenu(null);
+                // 用游戏自己的"主界面加载完成"回调发加入请求（与游戏处理 Steam 邀请同一套机制）：
+                // 比每帧轮询场景名更准，也保证"回主界面"这一趟真的结束之后再 JoinLobby。
+                string __target = _pendingJoin;
+                bool __useCode = _pendingUseCode;
+                LobbyManagerManager.WaitForMainMenu(delegate {
+                    try {
+                        if (string.IsNullOrEmpty(_pendingJoin) || _pendingJoin != __target) return;   // 目标已变/已取消
+                        ClearPendingJoin("已回主界面");
+                        DoJoin(__target, __useCode);
+                        DisarmWatchdog();
+                    } catch (Exception __wm) { SRApi.Guard.Log("联机/主界面回调加入", __wm); }
+                });
             } catch (Exception __ex) { SRApi.Guard.Log("联机/升级为返回主界面", __ex); }
             ArmWatchdog();
         }
@@ -262,7 +280,7 @@ namespace SR_UCH.Tweaks {
                 ClearPendingJoin("加入请求已发出");
                 _pendingJoinId = id;
                 _joinInFlight = true;
-                _joinInFlightUntil = Time.unscaledTime + 20f;   // 加载超过 20 秒还没进去就允许重试
+                _joinInFlightUntil = Time.unscaledTime + 10f;   // 加载超过 10 秒还没进去就允许重试
                 // 协程宿主必须是常驻对象：挂在 Matchmaker 上时，切场景/离房会把它销毁，
             // 加入请求就永远发不出去（audit 14-P0-1）。
             try { CoroutineHost().StartCoroutine(JoinFlow(id, useCode, mm, JoinFlowDone)); return; }
@@ -318,7 +336,17 @@ namespace SR_UCH.Tweaks {
                     return;
                 }
                 float waited = now - _pendingWaitFrom;
-                bool stillIn = InSession() || Matchmaker.CurrentMatchmakingLobby != null;
+                // 平台房间已经退出、且此刻不在对局中（树屋/主界面）= 旧房确实退干净了，
+                // 可以立刻加入；InSession() 只看 LobbyManager 的残留字段，会多等一两秒。
+                bool leftPlatform = false;
+                try {
+                    Matchmaker __mm = MatchmakerOrNull();
+                    bool inMatch = false;
+                    try { LobbyManager __lm = LobbyManager.instance; inMatch = __lm != null && __lm.CurrentGameController != null; }
+                    catch (Exception __li) { SRApi.Guard.Log("联机/判断是否在对局", __li); }
+                    leftPlatform = __mm != null && !__mm.IsInLobby() && !inMatch;
+                } catch (Exception __lp) { SRApi.Guard.Log("联机/判断平台房间状态", __lp); }
+                bool stillIn = !leftPlatform && (InSession() || Matchmaker.CurrentMatchmakingLobby != null);
                 // 已经在主界面 = 旧房一定退干净了（哪怕 InSession() 还残留旧的联机状态对象）。
                 bool atMainMenu = false;
                 try { atMainMenu = SceneManager.GetActiveScene().name == "MainMenu"; } catch (Exception __mn) { SRApi.Guard.Log("联机/读取场景名", __mn); }
@@ -336,6 +364,8 @@ namespace SR_UCH.Tweaks {
                     return;
                 }
                 if (atMainMenu && stillIn) SRApi.LogInfo("[联机] 已回主界面，忽略残留的联机状态，继续加入");
+                // 已登记 WaitForMainMenu 回调：由它发加入请求，这里只等（防重复 JoinLobby）。
+                if (_pendingEscalated && !atMainMenu && stillIn) return;
                 string id = _pendingJoin;
                 bool useCode = _pendingUseCode;
                 DoJoin(id, useCode);
