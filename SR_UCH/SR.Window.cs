@@ -173,6 +173,9 @@ public partial class SR {
         // 自绘页要求：本页内容自己适配窗口，不要页面级滚动条（滚动条被 PageScroll 拖住且不随缩放）。
         // 页面自己每帧末置 true，切换栏目时清掉。
         public static bool NoPageScrollBars;
+        // 上一帧页面声明的"不要页面滚动条"。页面每帧在渲染时重新声明，渲染结束后由核心收走并清零，
+        // 因此切到不声明它的页面（或用 Ctrl+滚轮切页）时不会继承上一页的"关滚动"状态。
+        private static bool _noScrollDeclared;
 
         // 界面缩放：窗口随缩放比例同比放大 / 缩小一次，并把位置夹回屏幕内。
         private static float _lastScale;
@@ -551,7 +554,7 @@ public partial class SR {
                 try { SR.RenderSettingsTabBar(); }
                 catch (Exception __tb) { Guard.Log("设置页签", __tb); }
             }
-            bool __noScroll = NoPageScrollBars || __overCtrlPrev || WheelShieldHit;
+            bool __noScroll = _noScrollDeclared || __overCtrlPrev || WheelShieldHit;
             // 设置页的页签画在滚动区**之外**：常驻顶部，不受滚动影响；
             // 「恢复默认」跟着页签排在最右侧（只对通用页有意义，自检页隐藏）。
             _scroll = __noScroll
@@ -704,6 +707,9 @@ public partial class SR {
                 GUI.matrix = prevMatrix; GUI.color = prevColor; GUI.skin.font = SR.Ctl.OrigSkinFont() ?? _prevFont;
                 // 还原全局选择色：GUI.skin 是共享皮肤（Configuration Manager 也在用），只在 SR 绘制期间改色。
                 RestoreSkinSelectionColor();
+                // 收走本帧页面声明并清零：下帧只有"仍在声明"的页面才会关闭页面滚动。
+                _noScrollDeclared = NoPageScrollBars;
+                NoPageScrollBars = false;
             }
             // 自绘页本帧声明的鼠标形状在此统一应用并复位：未声明时回到"不强制"，特殊光标不会残留。
             RunFrameEndHooks();
