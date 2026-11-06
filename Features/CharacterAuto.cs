@@ -194,9 +194,15 @@ namespace SR_UCH.Tweaks {
                     ModeVals,
                     new string[] { ModeLabel("target"), ModeLabel("random"), ModeLabel("smart") },
                     ref _comboOpenMode, _mode);
-                if ((_mode != null ? _mode.Value : "target") == "target") {
+                // 结构必须与事件趟无关：无论当前模式是什么都画同一行，非「指定角色」时置灰。
+                // 以前按模式动态增删这一行：下拉框在点击趟写入新值后，同一帧的 Repaint 趟控件数量变了，
+                // IMGUI 就会报 "Mismatched LayoutGroup.repaint"，整页渲染被打断。
+                bool __target = (_mode == null || string.IsNullOrEmpty(_mode.Value) || _mode.Value == "target");
+                bool __guien = GUI.enabled;
+                try {
+                    GUI.enabled = __guien && __target;
                     RowAnimal(SRApi.T("指定动物", "Target animal"), _animal);
-                }
+                } finally { GUI.enabled = __guien; }
                 // 立即执行 + 手动放弃：方便验证当前配置，也能在角色被占时手动重来。
                 GUILayout.Space(SRApi.Ctl.Sc(4f));
                 GUILayout.BeginHorizontal();
