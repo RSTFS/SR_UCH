@@ -170,18 +170,31 @@ public partial class HUD {
                     if (partyTotal > 0.05f) { countdown = true; remaining = partyTotal - elapsed; }
                     break;
                 }
-                bool useTimer = gs != null && gs.UsePlaceTimer;
-                if (useTimer) {
-                    if (vs != null) {
-                        float t = ReadFloat(ref _fPlacementTimer, vs, "placementTimer", "HUD（建造剩余时间）");
-                        if (t >= 0f) {
-                            if (t > 0.01f) _vsPlaceSeen = true;
-                            if (_vsPlaceSeen) { countdown = true; remaining = t; break; }
-                        }
+                // 建造倒计时：优先游戏自己的 placementTimer（暂停时不减），再用 PlaceTime − 经过时间兜底；
+                // 两个来源都在动时取较小值（谁先到算谁）。
+                float placeLeft = -1f;
+                if (vs != null) {
+                    float t = ReadFloat(ref _fPlacementTimer, vs, "placementTimer", "HUD（建造剩余时间）");
+                    if (t >= 0f) {
+                        if (t > 0.01f) _vsPlaceSeen = true;
+                        if (_vsPlaceSeen) placeLeft = t;
                     }
-                    float total = gs != null ? gs.PlaceTime : 0f;
-                    if (total > 0.05f) { countdown = true; remaining = total - elapsed; }
                 }
+                if (gs != null && gs.UsePlaceTimer) {
+                    float total = gs.PlaceTime;
+                    if (total > 0.05f) {
+                        float byElapsed = total - elapsed;
+                        placeLeft = placeLeft > 0f ? Mathf.Min(placeLeft, byElapsed) : byElapsed;
+                    }
+                }
+                // 整场限时在建造阶段也在走：总时间可能先于建造时间耗尽，取较小者才不会误导。
+                float totalLeft2 = -1f;
+                if (gs != null && gs.GameLimitType == GameLimitType.TIME && vs != null) {
+                    float used = ReadFloat(ref _fLevelTimer, vs, "levelTimer", "HUD（对局已用时间）");
+                    if (used >= 0f) totalLeft2 = (float)gs.MaxTime - used;
+                }
+                if (placeLeft > 0f) { countdown = true; remaining = placeLeft; }
+                if (totalLeft2 > 0f && (!countdown || totalLeft2 < remaining)) { countdown = true; remaining = totalLeft2; }
                 break;
             }
             case GameControl.GamePhase.PLAY: {
@@ -192,11 +205,15 @@ public partial class HUD {
                     float runLeft = -1f;
                     try { if (vs.runTimer != null) runLeft = vs.runTimer.TimeLeft; }
                     catch (Exception __rt) { SRApi.Guard.Log("HUD/读每回合剩余时间", __rt); }
-                    if (runLeft > 0.01f) { countdown = true; remaining = runLeft; break; }
-                    // 2) 整场时间限制（GameLimitType.TIME）：用游戏累计的 levelTimer 反推剩余。
+                    if (runLeft > 0.01f) { countdown = true; remaining = runLeft; }
+                    // 2) 整场时间限制（GameLimitType.TIME）：levelTimer 在所有阶段累计（游戏源码 VersusControl.Update），
+                    //    与每回合限时同时存在时取较小值——谁先耗尽就算谁。
                     if (gs != null && gs.GameLimitType == GameLimitType.TIME) {
                         float used = ReadFloat(ref _fLevelTimer, vs, "levelTimer", "HUD（对局已用时间）");
-                        if (used >= 0f) { countdown = true; remaining = (float)gs.MaxTime - used; }
+                        if (used >= 0f) {
+                            float totalLeft = (float)gs.MaxTime - used;
+                            if (!countdown || totalLeft < remaining) { countdown = true; remaining = totalLeft; }
+                        }
                     }
                 }
                 break;

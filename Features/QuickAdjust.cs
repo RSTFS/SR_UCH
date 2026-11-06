@@ -13,6 +13,9 @@ public class QuickAdjust : ITweak {
 
         private static ConfigEntry<int> _handicap;
         private static ConfigEntry<bool> _moreHandicap;
+    // 输入框草稿：编辑期间不写配置、不钳制，点"应用"（或回车）时才提交并钳制。
+    private static string _draftText;
+    private static int _draftFrame = -1;
     private static ConfigEntry<bool> _quickSwitchEnabled;
     private static ConfigEntry<float> _quickSwitchHold;
     private static ConfigEntry<bool> _quickRetryEnabled;
@@ -70,19 +73,21 @@ public class QuickAdjust : ITweak {
         GUILayout.Label(__dct, SRApi.Ctl.LabelWrap, GUILayout.Width(__dcw), GUILayout.Height(SRApi.Ctl.Sc(52)));
         int slideVal = Mathf.Clamp(discVal, 10, 100);
         if (QuickAdjust.MoreHandicapOn) {
-            // 自由输入：隐藏右侧数值标签，输入框自己显示数值。
-            string cur = slideVal.ToString();
+            // 自由输入：编辑期间只更新草稿，不写配置也不钳制（否则"85"打到"8"就被钳成 10）。
+            string cur = _draftText ?? slideVal.ToString();
             string nvText = SRApi.ClearableTextField(cur, SRApi.Ctl.SearchBox, GUILayout.Width(SRApi.Ctl.Sc(90)), GUILayout.Height(SRApi.Ctl.Sc(26)));
-            int parsed;
-            if (nvText != cur && int.TryParse(nvText, out parsed)) {
-                parsed = Mathf.Clamp(parsed, 10, 100);
-                if (disc != null) SRApi.Ctl.SetValue(disc, parsed);
+            if (nvText != cur) { _draftText = nvText; _draftFrame = Time.frameCount; }
+            Event __ev = Event.current;
+            if (__ev != null && __ev.type == EventType.KeyDown && (__ev.keyCode == KeyCode.Return || __ev.keyCode == KeyCode.KeypadEnter)) {
+                QuickAdjust.CommitDraft(disc);
+                __ev.Use();
             }
         } else {
             Rect sr = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(200), SRApi.Ctl.Sc(28));
             float nv = SRApi.Ctl.DrawSlider(sr, slideVal, 10f, 100f, true);
             int nslide = Mathf.Clamp(Mathf.RoundToInt(nv / 10f) * 10, 10, 100);
             if (nslide != slideVal && disc != null) SRApi.Ctl.SetValue(disc, nslide);
+            _draftText = null;   // 滑块模式以配置为准
             GUILayout.Label(nslide + "%", SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(56)), GUILayout.Height(SRApi.Ctl.Sc(26)));
         }
         GUILayout.Space(SRApi.Ctl.Sc(10));
@@ -91,6 +96,7 @@ public class QuickAdjust : ITweak {
         GUILayout.Space(SRApi.Ctl.Sc(2));
         GUILayout.BeginHorizontal();
         if (SRApi.Ctl.HotkeyButton("qa.apply_discount", SRApi.T("应用折扣", "Apply"), SRApi.T("把评分百分比设成上面的数值.\n滑块 10 到 100 整十走, 100 不折扣, 10 相当于减 90%.\n这一局立刻生效, 平衡板上能看到.", "Set your score percentage to the value above.\nSlider goes 10-100 in tens: 100 = no discount, 10 = 90% off.\nTakes effect immediately and shows on the balancer."), QuickAdjust.ApplyScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
+            QuickAdjust.CommitDraft(SRApi.Ctl.FindEntry("Quick Adjust", "Handicap"));
             QuickAdjust.ApplyScoreDiscount();
         }
         GUILayout.Space(SRApi.Ctl.Sc(8));
@@ -239,6 +245,20 @@ public class QuickAdjust : ITweak {
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("读取 SwitchTime 默认值", __ex); }
             return s;
+        }
+
+        // 提交草稿：只有在这里才钳制（10-100），并把最终值写回配置。
+        public static void CommitDraft(ConfigEntryBase entry) {
+            try {
+                string txt = _draftText;
+                _draftText = null;
+                if (string.IsNullOrEmpty(txt)) return;
+                int v;
+                if (!int.TryParse(txt.Trim(), out v)) { SRApi.Notify(SRApi.T("评分百分比必须是数字", "Score percentage must be a number")); return; }
+                int clamped = Mathf.Clamp(v, 10, 100);
+                if (clamped != v) SRApi.Notify(SRApi.T("评分百分比已钳制到 ", "Score percentage clamped to ") + clamped + "%");
+                if (entry != null) SRApi.Ctl.SetValue(entry, clamped);
+            } catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.CommitDraft", __ex); }
         }
 
         public static int HandicapValue => (_handicap != null) ? Mathf.Clamp(_handicap.Value, 10, 100) : 100;
@@ -473,6 +493,13 @@ public class QuickAdjust : ITweak {
                 int target = Mathf.Clamp(HandicapValue, 10, 100);
                 if (ApplyOwnHandicap(target))
                 {
+                    // 核实：读回本地 LobbyPlayer 的 handicap，值不对就明确提示（而不是静默成功）。
+                    try {
+                        LobbyPlayer __lp = FindLocalLobbyPlayer();
+                        if (__lp != null && __lp.handicap != target) {
+                            SRApi.LogWarn("[快速调整] 已下发 " + target + "%，但本地读回 " + __lp.handicap + "%（可能被服务器或规则覆盖）");
+                        }
+                    } catch (Exception __v) { SRApi.Guard.Log("QuickAdjust/核实 handicap", __v); }
                     // 100 也要记住：100% = 不折扣，但它是当前生效值。以前把它归零等于放弃保持，
                     // 角色重建/重生后可能被大厅里的旧值盖回去（audit C-9）。
                     _keepHandicap = target;

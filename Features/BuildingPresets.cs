@@ -491,7 +491,7 @@ namespace SR_UCH.Tweaks {
                 if (!string.IsNullOrEmpty(_status)) count += "   ·   " + _status;
                 // 状态文本可能很长（导出路径），单行放不下时用 tooltip 给全文。
                 GUILayout.Label(SRApi.Ctl.Content(count, string.IsNullOrEmpty(_status) ? null : _status), SRApi.Ctl.Label,
-                    GUILayout.ExpandWidth(true), GUILayout.Height(SRApi.Ctl.Sc(20f)));
+                    GUILayout.Height(SRApi.Ctl.Sc(26f)));
             } catch (Exception __ls) { SRApi.Guard.Log("布局预设/列表状态栏", __ls); }
         }
 
@@ -601,8 +601,9 @@ namespace SR_UCH.Tweaks {
                 } finally {
                     GUILayout.EndHorizontal();
                 }
-                // 底部工具：跳过树屋流程（标准配置勾选框）+ 返回树屋（普通核心按钮）。
-                // 单独一行，不与上面的筛选行混在一起。
+                // 底部工具：跳过树屋流程（标准配置勾选框）+ 返回树屋（普通核心按钮）+ 条数状态。
+                // 状态与按钮同一行（用户要求），不再单独占一行。
+                List<PresetInfo> visible = VisiblePresets();
                 GUILayout.BeginHorizontal();
                 try {
                     if (_skipTreehouse != null) {
@@ -617,6 +618,8 @@ namespace SR_UCH.Tweaks {
 if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "Back to treehouse"),
                         SRApi.T("走游戏原生的结束对局流程回到树屋（房主有效）", "ends the current match through the game's native flow and returns to the treehouse (host only)"),
                         delegate { ReturnToTreehouse(); }, SRApi.Ctl.Sc(150), SRApi.Ctl.Sc(26))) ReturnToTreehouse();
+                    GUILayout.Space(SRApi.Ctl.Sc(10));
+                    RenderListStatus(visible.Count, _presets.Count);
                     GUILayout.FlexibleSpace();
                 } finally {
                     GUILayout.EndHorizontal();
@@ -635,9 +638,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 _scrollRows.y = 0f;
                 if (!string.IsNullOrEmpty(_pendingKey)) ClearPending();
             }
-            // 状态栏必须放在高度探针之前，这样它的高度会被计入 __used，表格才不会被底栏裁掉。
-            List<PresetInfo> visible = VisiblePresets();
-            RenderListStatus(visible.Count, _presets.Count);
+            // 条数状态已在上面工具行里渲染（与返回树屋同一行）；探针仍放在它之后，
+            // 这样工具行的高度会被计入 __used，表格不会被底栏裁掉。
             Rect last = GUILayoutUtility.GetRect(1f, 0f);
                 // 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
                 // 表格高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
