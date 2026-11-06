@@ -318,8 +318,8 @@ namespace SR_UCH.Tweaks {
             _selectMode = _mp.Config.Bind(
                 "Destroy Blocks",
                 "Select Mode",
-                SelectMode.Placement,
-                "选择模式：放置顺序（默认）= 最后放的先选，依次往回；距离 = 按离自己的距离排序，初始选最近的。");
+                SelectMode.Distance,
+                "选择模式：距离 = 方块按离自己的距离排序，初始选最近的，滚轮从近到远；放置顺序 = 最后放的先选，依次往回。");
             _listMode = _mp.Config.Bind(
                 "Destroy Blocks",
                 "List Mode",

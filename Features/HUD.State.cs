@@ -172,21 +172,15 @@ public partial class HUD {
                 }
                 bool useTimer = gs != null && gs.UsePlaceTimer;
                 if (useTimer) {
-                    float fromGame = -1f, fromElapsed = -1f;
                     if (vs != null) {
                         float t = ReadFloat(ref _fPlacementTimer, vs, "placementTimer", "HUD（建造剩余时间）");
                         if (t >= 0f) {
                             if (t > 0.01f) _vsPlaceSeen = true;
-                            if (_vsPlaceSeen) fromGame = t;
+                            if (_vsPlaceSeen) { countdown = true; remaining = t; break; }
                         }
                     }
                     float total = gs != null ? gs.PlaceTime : 0f;
-                    if (total > 0.05f) fromElapsed = total - elapsed;
-                    // 两个来源都可能"卡住"（游戏计时器在暂停/未开始时不减；本地推算在阶段起点丢失时不准），
-                    // 取确实在减少的那个：都有效时取较小值，保证建造阶段倒计时始终在走。
-                    if (fromGame > 0f && fromElapsed > 0f) { countdown = true; remaining = Mathf.Min(fromGame, fromElapsed); }
-                    else if (fromGame > 0f) { countdown = true; remaining = fromGame; }
-                    else if (fromElapsed > 0f) { countdown = true; remaining = fromElapsed; }
+                    if (total > 0.05f) { countdown = true; remaining = total - elapsed; }
                 }
                 break;
             }

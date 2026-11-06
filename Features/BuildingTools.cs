@@ -17,7 +17,6 @@ namespace SR_UCH.Tweaks {
         // 自由放置（网格覆盖）：方块吸附 0.01 单位而非 1 单位网格。
         private static bool _gridOverride;
         private static ConfigEntry<bool> _gridEntry;
-        private static ConfigEntry<bool> _unlimitPlace;   // 建造阶段不限时
         private static ConfigEntry<KeyCode> _toggleGridKey;
         // 运行期开关：游戏内管理器同时也可改。
         public static bool Enabled = true;
@@ -41,8 +40,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc("build", "Collision Override", "无视碰撞放置\n方块可与任何东西重叠、悬空、穿插\n只影响放置判定，不改物理与玩法", "Ignore-collision placement\npieces may overlap, float or intersect anything\nplacement rules only; physics unchanged");
             SRApi.LocKey("build", "Collision Toggle Key", "无视碰撞开关", null);
             SRApi.LocDesc("build", "Collision Toggle Key", "无视碰撞按键\n对局内临时开关无视碰撞放置\n可改绑，支持组合键", "Ignore-collision key\ntoggles ignore-collision placement in-game\nrebindable, combos supported");
-            SRApi.LocKey("build", "Unlimited Place Time", "建造阶段不限时", null);
-            SRApi.LocDesc("build", "Unlimited Place Time", "建造阶段不限时\n建造倒计时到点前一直保持初始值\n仅房主生效；关闭后立即恢复正常倒计时", "Unlimited place time\nkeeps the placement countdown at its start value\nhost only; turning it off restores the normal timer");
             SRApi.LocKey("build", "Grid Override", "自由放置", null);
             SRApi.LocDesc("build", "Grid Override", "自由放置\n吸附从 1 格改为 0.01 格，可微调位置\n只在建造阶段生效，关闭立即恢复整格", "Free placement\nsnapping goes from 1 unit to 0.01 for fine-tuning\nbuild phase only; off restores 1-unit snapping");
             SRApi.LocKey("build", "Grid Toggle Key", "自由放置开关", null);
@@ -70,7 +67,7 @@ namespace SR_UCH.Tweaks {
         }
 
         // 自绘页：按分区标题 + 条目逐行渲染（分区判据取自 Initialize 里 Bind 的键名）。
-        private static bool IsEnhanceKey(string k) { return k == "Collision Override" || k == "Grid Override" || k == "Unlimited Place Time"; }
+        private static bool IsEnhanceKey(string k) { return k == "Collision Override" || k == "Grid Override"; }
         private static bool IsLimitKey(string k) { return k == "Lift Build Cap" || k == "Build Cap Value"; }
         private static void RenderPage() {
             float col = Mathf.Max(SRApi.Ctl.Sc(180), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(240));
@@ -129,27 +126,6 @@ namespace SR_UCH.Tweaks {
             if (!any) GUILayout.Label(SRApi.T("（无匹配条目）", "(no matching entries)"), SRApi.Ctl.Label);
         }
 
-        // 建造阶段不限时：每 0.5 秒把游戏的 placementTimer 拉回初始值（暂停/未开始时不减）。
-        private static float _unlimitAt = -9999f;
-        private static void TickUnlimitedPlace() {
-            try {
-                if (_unlimitPlace == null || !_unlimitPlace.Value) return;
-                if (!SRApi.GateMaster || !SRApi.GateHost) return;
-                if (Time.unscaledTime - _unlimitAt < 0.5f) return;
-                _unlimitAt = Time.unscaledTime;
-                LobbyManager lm = LobbyManager.instance;
-                if (lm == null) return;
-                GameControl gc = lm.CurrentGameController;
-                VersusControl vs = gc as VersusControl;
-                if (vs == null || gc.Phase != GameControl.GamePhase.PLACE) return;
-                GameSettings gs = GameSettings.GetInstance();
-                if (gs == null || !gs.UsePlaceTimer) return;
-                float want = Mathf.Max(5f, gs.PlaceTime);
-                System.Reflection.FieldInfo f = SRApi.Ref.Field(typeof(VersusControl), "placementTimer", "建造增强/建造阶段不限时");
-                if (f != null) f.SetValue(vs, want);
-            } catch (Exception __ex) { SRApi.Guard.Log("建造增强/建造阶段不限时", __ex); }
-        }
-
         public void Initialize(IFeatureHost plugin) {
             SelfReg();
             _mp = plugin;
@@ -179,10 +155,6 @@ namespace SR_UCH.Tweaks {
                 KeyCode.F2,
                 "Key to toggle free placement (grid override) in-game");
             SRApi.RegisterKey("建造增强-自由放置开关", _toggleGridKey, "toggle");
-            _unlimitPlace = _mp.Config.Bind("build", "Unlimited Place Time", false,
-                "建造阶段不限时：在建造阶段把所有玩家的建造倒计时保持在初始值（仅房主生效）。");
-            SRApi.Ref.Override("VersusControl.placementTimer", "建造增强：建造阶段不限时");
-            SRApi.RegisterTick("建造增强-建造不限时", TickUnlimitedPlace);
 
             // 注意：Harmony 的 CreateAndPatchAll(外层类型) 会连**嵌套类型**一起打补丁（FreePlacementPatch 是嵌套类），
             // 再显式注册一次会让它的 Prefix/Postfix 每帧执行两遍（位置写入两次、反射翻倍）。
