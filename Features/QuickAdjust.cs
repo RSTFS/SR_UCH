@@ -118,42 +118,7 @@ public class QuickAdjust : ITweak {
         GUILayout.Space(SRApi.Ctl.Sc(8));
         GUILayout.Space(SRApi.Ctl.Sc(6));
 
-        SRApi.Ctl.SectionTitle(SRApi.T("- 快速重试 -", "- Quick retry -"));
-        GUILayout.BeginHorizontal();
-        ConfigEntryBase qr = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry");
-        SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("死后自动重试", "Auto retry on death"), SRApi.T("仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n对局中开关立即生效。", "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nTakes effect immediately.")), qr, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
-        if (qr != null) SRApi.Ctl.RenderControl(qr);
-        GUILayout.FlexibleSpace();
-        GUILayout.EndHorizontal();
-        GUILayout.Space(SRApi.Ctl.Sc(2));
-        GUILayout.BeginHorizontal();
-        ConfigEntryBase qrf = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Fast");
-        SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("快速重试", "Quick retry"), SRApi.T("仅挑战模式：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n长按时间在下方设置，对局中开关立即生效。", "Challenge only: after death, hold B for the set seconds to auto-retry.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately.")), qrf, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
-        if (qrf != null) SRApi.Ctl.RenderControl(qrf);
-        GUILayout.FlexibleSpace();
-        GUILayout.EndHorizontal();
-        GUILayout.Space(SRApi.Ctl.Sc(2));
-        GUILayout.BeginHorizontal();
-        ConfigEntryBase qrh = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Hold");
-        // T(zh, en) 的两个实参都会被求值：先取局部变量，避免每帧算两次。
-        string vanillaRetry = QuickAdjust.VanillaHoldBText(false);
-        GUILayout.Label(SRApi.Ctl.Content(SRApi.T("等待秒数", "Hold s"),
-            SRApi.T("长按 B 的等待阈值（Character.SuicideTime）：挑战模式重试游戏默认 " + vanillaRetry + "。",
-              "Hold-B threshold (Character.SuicideTime): vanilla " + vanillaRetry + " for challenge retry.")),
-            SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(84)), GUILayout.Height(SRApi.Ctl.Sc(26)));
-        if (qrh != null) {
-            float hv = (float)qrh.BoxedValue;
-            Rect hr = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(150), SRApi.Ctl.Sc(28));
-            float hn = SRApi.Ctl.DrawSlider(hr, hv, 0f, 2f, false);
-            hn = Mathf.Round(hn * 10f) / 10f;
-            // 值变了就写
-            if (Mathf.Abs(hn - hv) > 0.0001f) SRApi.Ctl.SetValue(qrh, hn);
-            // 中英文字符串相同，无需 T()；直接拼一次。
-            string hs = hn.ToString("0.0") + "s";
-            GUILayout.Label(hs, SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(44)), GUILayout.Height(SRApi.Ctl.Sc(26)));
-        }
-        GUILayout.FlexibleSpace();
-        GUILayout.EndHorizontal();
+        // 重试相关内容已迁出：自动重试在「挑战」栏目，快速重试在「关卡 → 重试」页。
         GUILayout.Space(SRApi.Ctl.Sc(6));
 
         SRApi.Ctl.SectionTitle(SRApi.T("- 快速切换 -", "- Quick switch -"));

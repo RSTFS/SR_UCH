@@ -79,6 +79,21 @@ namespace SR_UCH.Tweaks {
                     SRApi.T("按金币或重试把一局切成多段，并与本地 PB 分段比较；数据只存在本机配置里。",
                             "Splits a run at coins or retries and compares against your local PB; data stays in the local config."));
                 SRApi.RenderSectionEntries(Sec);
+                // 自动重试（原「快速调整」里的死后自动重试，移动到挑战栏目）
+                GUILayout.Space(SRApi.Ctl.Sc(6f));
+                SRApi.Ctl.SectionTitle("- " + SRApi.T("自动重试", "Auto retry") + " -",
+                    SRApi.T("仅挑战模式：死亡后自动重开，无需长按；等待秒数的快速重试在「关卡 → 重试」。",
+                            "Challenge only: restarts automatically after death, no hold; the hold-based quick retry is under Level -> Retry."));
+                GUILayout.BeginHorizontal();
+                try {
+                    ConfigEntryBase qr = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry");
+                    SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("死后自动重试", "Auto retry on death"),
+                        SRApi.T("仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n对局中开关立即生效。",
+                                "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nTakes effect immediately.")),
+                        qr, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
+                    if (qr != null) SRApi.Ctl.RenderControl(qr);
+                    GUILayout.FlexibleSpace();
+                } finally { GUILayout.EndHorizontal(); }
                 GUILayout.Space(SRApi.Ctl.Sc(6f));
                 GUILayout.BeginHorizontal();
                 try {

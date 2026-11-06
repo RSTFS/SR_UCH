@@ -918,12 +918,37 @@ public partial class SR {
         PageRenderers.Remove(section);
     }
 
-    //当前选中的子页 id（未选中时默认第一页）, 供页面外框（顶栏/底栏）判断是否属于自己那页
+    // 选中的子页要跨会话记住：写进内部配置（[UI] Page <段名>），重启后回到上次那一页。
+    // 用字面量做段/键名，避免新增私有静态字段（SR 分区的字段登记守卫）。
+    private static string PersistedPage(string section) {
+        try {
+            if (_internalConfig == null || string.IsNullOrEmpty(section)) return null;
+            return _internalConfig.Bind("UI", "Page " + section, "", "上次打开的子页（内部状态，勿手动修改）").Value;
+        } catch (Exception __ex) { Guard.Log("读取记忆子页", __ex); return null; }
+    }
+
+    private static void PersistPage(string section, string id) {
+        try {
+            if (_internalConfig == null || string.IsNullOrEmpty(section)) return;
+            ConfigEntryBase e = _internalConfig.Bind("UI", "Page " + section, "", "上次打开的子页（内部状态，勿手动修改）");
+            string cur = e.BoxedValue as string ?? "";
+            if (cur != (id ?? "")) e.BoxedValue = id ?? "";
+        } catch (Exception __ex) { Guard.Log("记忆子页", __ex); }
+    }
+
+    //当前选中的子页 id（未选中时用上次记住的，其次第一页）, 供页面外框（顶栏/底栏）判断是否属于自己那页
     public static string SelectedPageId(string section) {
         string id;
         if (!string.IsNullOrEmpty(section) && _pageSel.TryGetValue(section, out id)) return id;
         List<PageInfo> list;
-        if (!string.IsNullOrEmpty(section) && _pageLists.TryGetValue(section, out list) && list.Count > 0) return list[0].Id;
+        if (!string.IsNullOrEmpty(section) && _pageLists.TryGetValue(section, out list) && list.Count > 0) {
+            // 上次记住的页还在才用；页面被移除/改名时回退第一页。
+            string saved = PersistedPage(section);
+            if (!string.IsNullOrEmpty(saved)) {
+                for (int i = 0; i < list.Count; i++) if (list[i].Id == saved) { id = saved; _pageSel[section] = id; return id; }
+            }
+            return list[0].Id;
+        }
         return null;
     }
 
@@ -937,6 +962,7 @@ public partial class SR {
             for (int i = 0; i < list.Count; i++) if (list[i].Id == cur) { idx = i; break; }
             int nx = ((idx + (dir >= 0 ? 1 : -1)) % list.Count + list.Count) % list.Count;
             _pageSel[section] = list[nx].Id;
+            PersistPage(section, list[nx].Id);
         } catch (Exception __ex) { Guard.Log("切换子页", __ex); }
     }
 
@@ -1063,7 +1089,7 @@ public partial class SR {
             for (int i = 0; i < list.Count; i++) {
                 bool on = list[i].Id == sel;
                 string nm = string.IsNullOrEmpty(list[i].En) ? list[i].Zh : T(list[i].Zh, list[i].En);
-                if (GUILayout.Button(nm, on ? _selItem : _item, GUILayout.Height(Sc(26)))) _pageSel[section] = list[i].Id;
+                if (GUILayout.Button(nm, on ? _selItem : _item, GUILayout.Height(Sc(26)))) { _pageSel[section] = list[i].Id; PersistPage(section, list[i].Id); }
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
@@ -1076,7 +1102,7 @@ public partial class SR {
         if (!string.IsNullOrEmpty(section) && _pageLists.TryGetValue(section, out list) && list.Count > 0) {
             try {
                 string sel = SelectedPageId(section);
-                if (list.Count <= 1) _pageSel[section] = sel;
+                if (list.Count <= 1) { _pageSel[section] = sel; PersistPage(section, sel); }
                 for (int i = 0; i < list.Count; i++) {
                     if (list[i].Id == sel) { list[i].Render(); break; }
                 }
