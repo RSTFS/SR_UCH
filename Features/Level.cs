@@ -28,9 +28,9 @@ public partial class Level : ITweak {
         SRApi.Ref.Override("QuickSaver.initialLevelPlaceables", "快照加载后的初始方块集合（关卡自带件）");
         SRApi.LocSec("Level", "关卡", null);
         SRApi.Nav("Level", 40); //侧栏栏目顺序 40
-        // 一个栏目三页，页签切换：派对盒 → 重试 → 关卡工具（工具后移到第 3 页）。
+        // 一个栏目三页，页签切换：派对盒 → 挑战 → 关卡工具（工具后移到第 3 页）。
         SRApi.RegisterPage("Level", "partybox", "派对盒", "Party Box", 10, RenderPartyBox);
-        SRApi.RegisterPage("Level", "retry", "重试", "Retry", 20, RenderRetryPage);
+        SRApi.RegisterPage("Level", "retry", "挑战", "Challenge", 20, RenderRetryPage);
         SRApi.RegisterPage("Level", "tools", "关卡工具", "Level Tools", 30, RenderTools);
         SRApi.LocKey("Level", "Reload Mode", "重载模式", null);
         SRApi.LocDesc("Level", "Reload Mode", "关卡重载模式\n保留方块和分数＝保方块并给全员补分；只保留方块＝分数清零\n补分在下次结算显示，未装本模组的房客同样生效", "Reload mode\nblocks+score = refill scores too; blocks only = scores reset\nrefill shows at the next settlement and also covers vanilla clients");

@@ -60,7 +60,7 @@ public partial class Level {
         // 第 2 页：重试（原「快速调整」里的快速重试，移动到关卡里）
         public static void RenderRetryPage() {
             try {
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("重试", "Retry") + " -",
+                SRApi.Ctl.SectionTitle("- " + SRApi.T("挑战", "Challenge") + " -",
                     SRApi.T("挑战模式的长按重试与等待秒数；自动重试在「挑战」栏目里。",
                             "Hold-to-retry and its wait time for challenge mode; auto retry lives in the Challenge section."));
                 GUILayout.Space(SRApi.Ctl.Sc(2));
