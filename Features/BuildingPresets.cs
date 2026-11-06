@@ -140,6 +140,26 @@ namespace SR_UCH.Tweaks {
         private static bool _sbHandled;    // 本帧核心滚动条是否已处理鼠标事件
         private static bool _dragH;
         private static float _dragWatchdog;
+
+        // ============ 列表数据管线缓存（完美列表）============
+        // 可见行：用"数据 + 筛选 + 排序"签名驱动，签名不变时跨帧复用；
+        // 以前按 frameCount 每帧 Invalidate，什么都不变也要做一次 O(n log n) 排序。
+        private static int _visSig = int.MinValue;
+        private static int _sigFrame = -1, _sigCache;
+        // 筛选下拉：按 _presets 的 Level/Mode 签名缓存，避免每帧建 List + HashSet + 排序 + ToArray。
+        private static int _levelOptSig = int.MinValue, _modeOptSig = int.MinValue;
+        private static List<string> _levelOpts = new List<string>(), _modeOpts = new List<string>();
+        private static string[] _levelOptVals = new string[0], _levelOptLabels = new string[0];
+        private static string[] _modeOptVals = new string[0], _modeOptLabels = new string[0];
+        // 单元格文本：key 用预设的稳定标识字符串（不用 PresetInfo 引用，避免扫描重建后旧对象被字典强引用累积）。
+        // 值带显示签名，上限 256，超了整体清空（预设上限 100）。
+        private sealed class CellCacheEntry {
+            public int Sig;
+            public readonly string[] Cells = new string[ColCount];
+        }
+        private static readonly Dictionary<string, CellCacheEntry> _presetCellCache = new Dictionary<string, CellCacheEntry>(64);
+        // 筛选签名上一帧值：变化后复位滚动与二次确认，避免"滚到一半改搜索"或误触旧行的确认态。
+        private static int _filterSigLast = int.MinValue;
         // 关卡列显示模式：false = 关卡名称（本地化），true = 关卡代码（快照码/场景名）；运行期状态，不落配置。
         private static bool _levelShowCode;
 
@@ -207,6 +227,16 @@ namespace SR_UCH.Tweaks {
                 new ConfigDescription(SRApi.T("预设列表高度（0 = 自动；拖动表格底边可直接修改并保存）", "Preset list height (0 = auto; drag the table bottom edge to change and save)")));
             // 旧版本的默认值被夹成 120，一次性复位为 0（自动）。
             if (_tableHEntry.Value == 120) _tableHEntry.Value = 0;
+            // 一次性迁移：以前"拖拽会写 Table Height 但从不读取"，旧值没有任何可见效果；
+            // 现在它真正生效，若不迁移，老用户升级后列表会突然变矮。用独立标记键保证只做一次。
+            try {
+                ConfigEntry<bool> __migH = plugin.Config.Bind(Section, "Table Height Migrated", false,
+                    "内部状态：是否已把旧版无效的表格高度复位（勿手动修改）。");
+                if (!__migH.Value) {
+                    __migH.Value = true;
+                    if (_tableHEntry.Value > 0) { _tableHEntry.Value = 0; SRApi.LogInfo("[布局预设] 旧的表格高度值已复位为自动（此前该值从未生效）"); }
+                }
+            } catch (Exception __mh) { SRApi.Guard.Log("布局预设/表格高度迁移", __mh); }
                 // 互斥槽位：关卡重载（Level 功能）动手前会 Require 这个槽位；双方都忙时互相拦下，避免两套重载并发。
                 try { Slots.Provide("presets.reloadBusy", (Func<bool>)(() => _reloadBusy)); }
                 catch (Exception __sx) { SRApi.Guard.Log("布局预设/登记重载互斥槽位", __sx); }
@@ -312,17 +342,81 @@ namespace SR_UCH.Tweaks {
 
         // 当前搜索过滤（名称 / 关卡 / 模式）+ 关卡下拉筛选 + 排序后的可见列表。
         private static readonly SRApi.TableSource<PresetInfo> _visSource = new SRApi.TableSource<PresetInfo>();
-        private static long _visStamp = -1;
 
         private static List<PresetInfo> _visibleCache;   // 当前表格的可见行（供数据列悬浮预览取预设）
 
         private static List<PresetInfo> VisiblePresets() {
-            // 核心数据管线：过滤/排序每帧最多一次（同一帧多次调用返回同一份缓存）。
-            _visSource.Filter = PassPresetFilter;
-            _visSource.Sort = ComparePreset;
-            long stamp = Time.frameCount;
-            if (_visStamp != stamp) { _visSource.Invalidate(); _visStamp = stamp; }
-            return _visSource.Refresh(_presets, stamp);
+            // 签名驱动：只有数据 / 筛选 / 排序 / 语言 / 显示模式真正变化时才重算。
+            // 同一帧内 OnGUI 的多次调用由 _sigFrame 折叠成一次签名计算。
+            int sig = VisibleSignature();
+            if (sig != _visSig) {
+                _visSig = sig;
+                _visSource.Filter = PassPresetFilter;
+                _visSource.Sort = ComparePreset;
+                long stamp = Time.frameCount;
+                _visSource.Invalidate();
+                _visSource.Refresh(_presets, stamp);
+            }
+            return _visSource.Rows;
+        }
+
+        // 覆盖所有会影响可见行内容的输入。漏掉任何一处都只会让列表"不刷新"，所以显式枚举，
+        // 不依赖调用方记得 Invalidate。签名按帧缓存，避免每趟 OnGUI 都遍历一次。
+        private static int VisibleSignature() {
+            if (_sigFrame == Time.frameCount) return _sigCache;
+            unchecked {
+                int h = 17;
+                h = h * 31 + _presets.Count;
+                h = h * 31 + SortMode;
+                h = h * 31 + (_search ?? "").GetHashCode();
+                h = h * 31 + (_levelFilter ?? "").GetHashCode();
+                h = h * 31 + (_modeFilter ?? "").GetHashCode();
+                h = h * 31 + (_typeFilter ?? "").GetHashCode();
+                h = h * 31 + (SRApi.Ctl.LangEn ? 1 : 0);
+                h = h * 31 + (_levelShowCode ? 1 : 0);
+                for (int i = 0; i < _presets.Count; i++) {
+                    PresetInfo p = _presets[i];
+                    if (p == null) { h = h * 31; continue; }
+                    h = h * 31 + (p.Name ?? "").GetHashCode();
+                    h = h * 31 + (p.Level ?? "").GetHashCode();
+                    h = h * 31 + (p.Mode ?? "").GetHashCode();
+                    h = h * 31 + p.TimeUtc.GetHashCode();
+                    h = h * 31 + (p.Ok ? 1 : 0);
+                    h = h * 31 + (p.ModsMode ?? "").GetHashCode();
+                    h = h * 31 + (p.IsLocal ? 1 : 0);
+                }
+                _sigFrame = Time.frameCount;
+                _sigCache = h;
+                return h;
+            }
+        }
+
+        // 仅筛选条件（不含数据）的签名：变化时复位滚动位置与二次确认态。
+        private static int FilterSignature() {
+            unchecked {
+                int h = 7;
+                h = h * 31 + (_search ?? "").GetHashCode();
+                h = h * 31 + (_levelFilter ?? "").GetHashCode();
+                h = h * 31 + (_modeFilter ?? "").GetHashCode();
+                h = h * 31 + (_typeFilter ?? "").GetHashCode();
+                h = h * 31 + SortMode;
+                return h;
+            }
+        }
+
+        // 筛选下拉选项的签名：只依赖预设集合里的 Level/Mode 与当前语言。
+        private static int FilterOptionsSignature(bool level) {
+            unchecked {
+                int h = level ? 3 : 5;
+                h = h * 31 + _presets.Count;
+                h = h * 31 + (SRApi.Ctl.LangEn ? 1 : 0);
+                for (int i = 0; i < _presets.Count; i++) {
+                    PresetInfo p = _presets[i];
+                    if (p == null) { h = h * 31; continue; }
+                    h = h * 31 + (level ? (p.Level ?? "") : (p.Mode ?? "")).GetHashCode();
+                }
+                return h;
+            }
         }
 
         // 过滤条件（原 VisiblePresets 内的判断，原样保留语义）。
@@ -385,6 +479,20 @@ namespace SR_UCH.Tweaks {
         // 筛选行的标签统一宽度：两行控件的左边缘才能对齐成两列网格。
         private static void RowLabel(string text) {
             GUILayout.Label(text, SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(52f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+        }
+
+        // 列表状态栏：条数 / 筛选结果 + 最近一次操作反馈。
+        // _status 此前被 10 处赋值却从未读取，用户操作后只能看到会淡出的 Notify；这里让它真正上屏。
+        private static void RenderListStatus(int shown, int total) {
+            try {
+                string count = (shown == total)
+                    ? SRApi.T("共 ", "Total ") + total + SRApi.T(" 条", " items")
+                    : SRApi.T("显示 ", "Showing ") + shown + SRApi.T(" / ", " / ") + total + SRApi.T(" 条", " items");
+                if (!string.IsNullOrEmpty(_status)) count += "   ·   " + _status;
+                // 状态文本可能很长（导出路径），单行放不下时用 tooltip 给全文。
+                GUILayout.Label(SRApi.Ctl.Content(count, string.IsNullOrEmpty(_status) ? null : _status), SRApi.Ctl.Label,
+                    GUILayout.ExpandWidth(true), GUILayout.Height(SRApi.Ctl.Sc(20f)));
+            } catch (Exception __ls) { SRApi.Guard.Log("布局预设/列表状态栏", __ls); }
         }
 
         private static void Render() {
@@ -519,6 +627,17 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 // 关键：GetLastRect() 在 Layout 趟里可能是退化矩形（诊断日志里 lastYMax=1.0），
             // 用它算"已用高度"会得到 ~0，表格于是按整个视口取高、直接溢出页面底部。
             // 这里放一个零高度探针，拿到当前布局游标的真实 y。
+            // 筛选 / 排序变化：滚动回到顶部并清掉二次确认。
+            // 必须放在工具行之后，才能读到本帧 ComboBox / TextField 的最终值（放开头会差一帧）。
+            int fSig = FilterSignature();
+            if (fSig != _filterSigLast) {
+                _filterSigLast = fSig;
+                _scrollRows.y = 0f;
+                if (!string.IsNullOrEmpty(_pendingKey)) ClearPending();
+            }
+            // 状态栏必须放在高度探针之前，这样它的高度会被计入 __used，表格才不会被底栏裁掉。
+            List<PresetInfo> visible = VisiblePresets();
+            RenderListStatus(visible.Count, _presets.Count);
             Rect last = GUILayoutUtility.GetRect(1f, 0f);
                 // 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
                 // 表格高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
@@ -536,8 +655,17 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 float __visible = (SRApi.ContentArea.yMax - SRApi.FooterHeight - W(2f)) - __screenTop;
                 if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(), __visible));
             } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
+            // 底边拖拽条写进 "Table Height" 的值必须真正参与高度计算（0 = 自动）。
+            // 以前 tableH 完全由视口算出，配置只在拖拽时被写入、从不读取 —— 用户拖了没反应。
+            // 与核心 TableFitHeight 同语义：配置值作为上限夹取，不会把表格撑出可视区。
+            try {
+                if (_tableHEntry != null && _tableHEntry.Value > 0) {
+                    float manual = SRApi.Ctl.Sc(_tableHEntry.Value);
+                    float minH = SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH();
+                    tableH = Mathf.Clamp(manual, minH, Mathf.Max(minH, tableH));
+                }
+            } catch (Exception __th) { SRApi.Guard.Log("布局预设/读取表格高度", __th); }
             _actionHitThisFrame = false;
-            List<PresetInfo> visible = VisiblePresets();
             RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
             DrawInlineRename();   // 右键名称格：该格就地变输入框
             // 底边拖拽条：紧贴表格底边、正好在底栏之上（与联机列表同一处理）。
@@ -562,10 +690,19 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 for (int i = 0; i < vals.Count; i++) {
                     if (string.Equals(vals[i], _levelFilter, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
                 }
-                string[] labels = new string[vals.Count];
-                for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
+                // 选项数组由 LevelFilterValues 一并缓存：以前每帧 vals.ToArray() + 新建 labels[]。
+                if (_levelOptVals == null || _levelOptVals.Length != vals.Count) {
+                    _levelOptVals = vals.ToArray();
+                    _levelOptLabels = null;
+                }
+                string[] labels = _levelOptLabels;
+                if (labels == null || labels.Length != vals.Count) {
+                    labels = new string[vals.Count];
+                    for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
+                    _levelOptLabels = labels;
+                }
                 bool open = _levelFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open, W(110));
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], _levelOptVals, labels, ref open, W(110));
                 _levelFilterOpen = open;
                 if (sel >= 0 && sel < vals.Count) _levelFilter = vals[sel];
             } catch (Exception __ex) {
@@ -575,6 +712,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 
         // 关卡筛选选项：第一项为空（全部），其余为当前预设里出现过的关卡场景名，按本地化关卡名排序。
         private static List<string> LevelFilterValues() {
+            int sig = FilterOptionsSignature(true);
+            if (sig == _levelOptSig && _levelOpts.Count > 0) return _levelOpts;
             List<string> vals = new List<string>();
             try {
                 HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -587,6 +726,12 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     return string.Compare(LevelDisplayNameForScene(a), LevelDisplayNameForScene(c), StringComparison.OrdinalIgnoreCase);
                 });
                 vals.Insert(0, "");
+                _levelOptVals = vals.ToArray();
+                string[] labels = new string[vals.Count];
+                for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
+                _levelOptLabels = labels;
+                _levelOptSig = sig;
+                _levelOpts = vals;
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/关卡筛选项", __ex);
             }
@@ -602,10 +747,18 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 for (int i = 0; i < vals.Count; i++) {
                     if (string.Equals(vals[i], _modeFilter, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
                 }
-                string[] labels = new string[vals.Count];
-                for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
+                if (_modeOptVals == null || _modeOptVals.Length != vals.Count) {
+                    _modeOptVals = vals.ToArray();
+                    _modeOptLabels = null;
+                }
+                string[] labels = _modeOptLabels;
+                if (labels == null || labels.Length != vals.Count) {
+                    labels = new string[vals.Count];
+                    for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
+                    _modeOptLabels = labels;
+                }
                 bool open = _modeFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals.ToArray(), labels, ref open, W(110));
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], _modeOptVals, labels, ref open, W(110));
                 _modeFilterOpen = open;
                 if (sel >= 0 && sel < vals.Count) _modeFilter = vals[sel];
             } catch (Exception __ex) {
@@ -615,6 +768,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
 
         // 模式筛选选项：第一项为空（全部），其余为当前预设里出现过的模式目录名，按本地化模式名排序。
         private static List<string> ModeFilterValues() {
+            int sig = FilterOptionsSignature(false);
+            if (sig == _modeOptSig && _modeOpts.Count > 0) return _modeOpts;
             List<string> vals = new List<string>();
             try {
                 HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -627,6 +782,12 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     return string.Compare(ModeText(a), ModeText(c), StringComparison.OrdinalIgnoreCase);
                 });
                 vals.Insert(0, "");
+                _modeOptVals = vals.ToArray();
+                string[] labels = new string[vals.Count];
+                for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
+                _modeOptLabels = labels;
+                _modeOptSig = sig;
+                _modeOpts = vals;
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/模式筛选项", __ex);
             }
@@ -705,41 +866,73 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
         // 提交：回车 / 点击别处；取消：Esc。
         private static void DrawInlineRename() {
             try {
-                if (string.IsNullOrEmpty(_renameKey) || _args == null || _args.rowRects == null) return;
-                int row = -1;
+                if (string.IsNullOrEmpty(_renameKey) || _args == null) return;
+                if (_args.rowRects == null || _args.rowRows == null || _args.vis == null) return;
                 List<PresetInfo> vis = _visibleCache;
                 if (vis == null) return;
-                for (int i = 0; i < vis.Count && i < _args.rowRects.Count; i++) {
+
+                // 目标在"全部可见行"里的下标。
+                int row = -1;
+                for (int i = 0; i < vis.Count; i++) {
                     if (vis[i] != null && vis[i].Key == _renameKey) { row = i; break; }
                 }
-                if (row < 0) { _renameKey = null; _renameText = null; return; }
-                PresetInfo p = vis[row];
-                Rect rowRect = _args.rowRects[row];
-                // 名称列在可见列中的横向偏移（隐藏/换序后仍然正确）。
-                float x = _args.box.x;
+                PresetInfo p = (row >= 0 && row < vis.Count) ? vis[row] : null;
+                if (p == null) { _renameKey = null; _renameText = null; return; }
+
+                // rowRects 只含【当前视口内的行】（TableRowRects 从 first 到 last，rowRows 记真实行号）。
+                // 以前直接用 vis 的下标去索引 rowRects[row] —— 滚动之后输入框会画到别的行上，
+                // 甚至因 row >= rowRects.Count 而完全不画、状态还留着。
+                Rect rowRect = default(Rect);
+                bool onScreen = false;
+                for (int k = 0; k < _args.rowRects.Count && k < _args.rowRows.Count; k++) {
+                    if (_args.rowRows[k] == row) { rowRect = _args.rowRects[k]; onScreen = true; break; }
+                }
+                if (!onScreen) {
+                    // 目标滚出视口：把它滚回来再画，不让编辑框凭空消失或卡住。
+                    // 不在这里 clamp 到上一帧的 _maxScrollY：交给下一帧 RenderPresetTable 用真实值夹取。
+                    _scrollRows.y = Mathf.Max(0f, row * SRApi.Ctl.TableRowH());
+                    return;
+                }
+
+                // 名称列横向偏移：必须减 scrollX（与 ColumnAtX 同名列判定一致），并跳过钉住的操作列。
+                // 名称列被隐藏时不画输入框，直接取消编辑。
+                float x = _args.box.x - _args.scrollX;
+                bool found = false;
                 for (int k2 = 0; k2 < _args.vis.Count; k2++) {
                     int ci = _args.vis[k2];
-                    if (ci == ColName) break;
+                    if (ci == _args.pinCol) continue;
+                    if (ci == ColName) { found = true; break; }
                     x += SRApi.Ctl.Sc(_colW[ci]);
                 }
-                Rect cell = new Rect(x, rowRect.y + W(1f), SRApi.Ctl.Sc(_colW[ColName]) - W(2f), rowRect.height - W(2f));
+                if (!found) { _renameKey = null; _renameText = null; return; }
+
+                Rect cell = new Rect(x, rowRect.y + W(1f), SRApi.Ctl.Sc(_colW[ColName]) - W(2f), Mathf.Max(W(14f), rowRect.height - W(2f)));
                 GUI.BeginGroup(cell);
                 try {
                     string typed = SRApi.ClearableTextField(_renameText ?? p.Name, 40, SRApi.Ctl.SearchBox,
                         GUILayout.Width(cell.width), GUILayout.Height(cell.height));
                     if (typed != null && typed != _renameText) _renameText = typed;
                 } finally { GUI.EndGroup(); }
+
                 Event e = Event.current;
                 if (e == null) return;
                 if (e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)) {
-                    CommitRename(p); _renameKey = null; _renameText = null; e.Use(); return;
+                    // 空名不要提交：CommitRename 会拒绝但旧写法无条件清状态，用户刚打的字直接丢了。
+                    if ((_renameText ?? "").Trim().Length == 0) {
+                        SRApi.Notify(SRApi.T("名称不能为空", "The name cannot be empty"));
+                    } else {
+                        CommitRename(p);
+                        _renameKey = null; _renameText = null;
+                    }
+                    e.Use(); return;
                 }
                 if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape) {
                     _renameKey = null; _renameText = null; e.Use(); return;
                 }
                 // 点空白提交：不判 e.Used（文本框会先吃掉 MouseDown）。
                 if (e.type == EventType.MouseDown && !cell.Contains(e.mousePosition)) {
-                    CommitRename(p); _renameKey = null; _renameText = null;
+                    if ((_renameText ?? "").Trim().Length != 0) CommitRename(p);
+                    _renameKey = null; _renameText = null;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/内联重命名", __ex); }
         }
@@ -864,15 +1057,11 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                         ref _args.dragCol, ref _dragH, SaveCols, null, null);
                     if (!_sbHandled)
                         SRApi.TableWheelInput(e, box, mp, _maxScrollX, _maxScrollY, ref _scrollCols, ref _scrollRows);
-                    // 兜底：事件可能被外层滚动区吃掉，这里直接轮询滚轮轴（与相机缩放同一做法）。
-                    // 判定用表格真实 box（屏幕坐标，和 Event 的鼠标同一空间），命中就滚行。
-                    try {
-                        float __ax = Input.GetAxis("Mouse ScrollWheel");
-                        if (Mathf.Abs(__ax) > 0.0001f && e != null && box.Contains(e.mousePosition) && _maxScrollY > 0f) {
-                            _scrollRows.y = Mathf.Clamp(_scrollRows.y - __ax * SRApi.Ctl.Sc(400f), 0f, _maxScrollY);
-                            SRApi.MarkWheelUsed();
-                        }
-                    } catch (Exception __aw) { SRApi.Guard.Log("布局预设/滚轮轴", __aw); }
+                    // 已删除 Input.GetAxis("Mouse ScrollWheel") 兜底：
+                    // 页面级钩子 OnPresetWheel 在 BeginScrollView 之前已处理滚轮并 e.Use()，
+                    // 把事件改成 Used 后 TableWheelInput 会自动跳过；但 GetAxis 是"每帧轮询"，
+                    // 既不检查事件类型也不检查 WheelTakenThisFrame，会在同一帧再滚一次（40 + 0.1*400）。
+                    // 结果就是一次滚轮滚两行、手感发飘。现在滚轮只有页面钩子一个入口。
                     if (e.type == EventType.MouseUp) SRApi.BlockWindowDrag = false;
                 }
             } catch (Exception __ex) {
@@ -921,21 +1110,52 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
             } catch { return null; }
         }
 
+        // 单元格显示签名：语言 / 关卡显示模式 / 名称 / 关卡 / 模式 / 时间 / 数据策略任一变化都重算。
+        private static int CellSignature(PresetInfo p) {
+            unchecked {
+                int h = 11;
+                h = h * 31 + (SRApi.Ctl.LangEn ? 1 : 0);
+                h = h * 31 + (_levelShowCode ? 1 : 0);
+                h = h * 31 + (p.Name ?? "").GetHashCode();
+                h = h * 31 + (p.Level ?? "").GetHashCode();
+                h = h * 31 + (p.LevelName ?? "").GetHashCode();
+                h = h * 31 + (p.LevelCode ?? "").GetHashCode();
+                h = h * 31 + (p.Mode ?? "").GetHashCode();
+                h = h * 31 + p.TimeUtc.GetHashCode();
+                h = h * 31 + (p.ModsMode ?? "").GetHashCode();
+                h = h * 31 + (p.IsLocal ? 1 : 0);
+                return h;
+            }
+        }
+
         private static string[] RowCells(List<PresetInfo> visible, int r) {
             PresetInfo p = PresetAt(visible, r);
             if (p == null) {
                 for (int i = 0; i < ColCount; i++) _cells[i] = "";
                 return _cells;
             }
-            _cells[ColName] = p.IsLocal
+            // 单元格文本缓存：核心 TableDraw 只读该数组（SR.Table.cs:232 取用后直接传给 DrawTableCells），
+            // 复用安全。以前每可见行每趟 OnGUI 都做 5 次字符串生成 + 本地化，20 行就是上百次/帧。
+            int sig = CellSignature(p);
+            string key = p.Key;
+            CellCacheEntry ent;
+            if (_presetCellCache.TryGetValue(key, out ent) && ent.Sig == sig) return ent.Cells;
+            if (ent == null) {
+                if (_presetCellCache.Count > 256) _presetCellCache.Clear();
+                ent = new CellCacheEntry();
+                _presetCellCache[key] = ent;
+            }
+            string[] c = ent.Cells;
+            c[ColName] = p.IsLocal
                 ? SRApi.T("本地", "Local") + " · " + (p.Name ?? "")
                 : (p.Name ?? "");
-            _cells[ColLevel] = _levelShowCode ? LevelCodeText(p) : LevelText(p);
-            _cells[ColMode] = ModeText(p.Mode);
-            _cells[ColMods] = ModsLabel(p);
-            _cells[ColTime] = TimeText(p);
-            _cells[ColAction] = "";
-            return _cells;
+            c[ColLevel] = _levelShowCode ? LevelCodeText(p) : LevelText(p);
+            c[ColMode] = ModeText(p.Mode);
+            c[ColMods] = ModsLabel(p);
+            c[ColTime] = TimeText(p);
+            c[ColAction] = "";
+            ent.Sig = sig;
+            return c;
         }
 
         private static PresetInfo PresetAt(List<PresetInfo> visible, int row) {
