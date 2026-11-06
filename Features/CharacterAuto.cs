@@ -17,7 +17,6 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<bool> _enabled;          // 自动选择总开关
         private static ConfigEntry<string> _mode;           // target / random / slot
         private static ConfigEntry<string> _animal;         // 指定动物
-        private static ConfigEntry<string> _slot1, _slot2, _slot3, _slot4;   // 按槽位
         private static ConfigEntry<float> _delay;           // 进房后延迟
         private static ConfigEntry<float> _retry;           // 失败重试间隔
         private static ConfigEntry<bool> _onlyUnpicked;     // 已选角色则不覆盖
@@ -33,15 +32,12 @@ namespace SR_UCH.Tweaks {
         private static Character _outfitApplied;            // 已套用时装的角色（换角色/改配置后清空）
         private static bool _comboOpenMode;
 
-        private static readonly string[] ModeVals = { "target", "random", "smart", "rotate", "slot" };
-        private static int _rotateIdx;   // 轮换游标：每进一次房间推进一格
+        private static readonly string[] ModeVals = { "target", "random", "smart" };
         private static readonly string[] OutfitVals = { "", "random" };   // "" = 不干预，random = 随机
 
         private static string ModeLabel(string v) {
             if (v == "random") return SRApi.T("随机空闲", "Random free");
             if (v == "smart") return SRApi.T("智能选择", "Smart pick");
-            if (v == "rotate") return SRApi.T("常用轮换", "Rotate favourites");
-            if (v == "slot") return SRApi.T("按玩家槽位", "Per player slot");
             return SRApi.T("指定角色", "Specific animal");
         }
         private static string OutfitLabel(string v) {
@@ -111,14 +107,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Mode", "选择方式\n指定/随机/智能/常用轮换/按槽位\n轮换每进一次房间换下一个常用角色", "Pick mode\nSpecific / Random / Smart / Rotate favourites / Per slot\nRotate advances to the next favourite each room");
             SRApi.LocKey(Sec, "Animal", "指定动物", null);
             SRApi.LocDesc(Sec, "Animal", "指定动物\n“指定角色”方式下要挑的动物\n被占用时会按重试间隔再试", "Target animal\nthe animal used by the Specific mode\nif it is taken the pick is retried");
-            SRApi.LocKey(Sec, "Slot 1", "玩家 1", null);
-            SRApi.LocDesc(Sec, "Slot 1", "玩家 1 的动物\n“按槽位”方式下第 1 位玩家用这只\n留空 = 该槽位不指定", "Animal for player 1\nused by the Per-slot mode for the first player\nempty = leave this slot alone");
-            SRApi.LocKey(Sec, "Slot 2", "玩家 2", null);
-            SRApi.LocDesc(Sec, "Slot 2", "玩家 2 的动物\n“按槽位”方式下第 2 位玩家用这只\n留空 = 该槽位不指定", "Animal for player 2\nused by the Per-slot mode for the second player\nempty = leave this slot alone");
-            SRApi.LocKey(Sec, "Slot 3", "玩家 3", null);
-            SRApi.LocDesc(Sec, "Slot 3", "玩家 3 的动物\n“按槽位”方式下第 3 位玩家用这只\n留空 = 该槽位不指定", "Animal for player 3\nused by the Per-slot mode for the third player\nempty = leave this slot alone");
-            SRApi.LocKey(Sec, "Slot 4", "玩家 4", null);
-            SRApi.LocDesc(Sec, "Slot 4", "玩家 4 的动物\n“按槽位”方式下第 4 位玩家用这只\n留空 = 该槽位不指定", "Animal for player 4\nused by the Per-slot mode for the fourth player\nempty = leave this slot alone");
             SRApi.LocKey(Sec, "Delay", "进入后延迟", null);
             SRApi.LocDesc(Sec, "Delay", "进入后延迟\n进房后等多少秒再挑选\n给游戏留出分配角色的时间", "Delay after entering\nhow long to wait before picking\nleaves the game time to assign players");
             SRApi.LocKey(Sec, "Retry", "重试间隔", null);
@@ -150,10 +138,6 @@ namespace SR_UCH.Tweaks {
                 _enabled = plugin.Config.Bind(Sec, "Enabled", false, "自动选择角色总开关");
                 _mode = plugin.Config.Bind(Sec, "Mode", "target", "选择方式：target 指定 / random 随机空闲 / slot 按槽位");
                 _animal = plugin.Config.Bind(Sec, "Animal", "CHICKEN", "指定方式下要挑的动物（枚举名）");
-                _slot1 = plugin.Config.Bind(Sec, "Slot 1", "", "玩家 1 的动物（空 = 不指定）");
-                _slot2 = plugin.Config.Bind(Sec, "Slot 2", "", "玩家 2 的动物（空 = 不指定）");
-                _slot3 = plugin.Config.Bind(Sec, "Slot 3", "", "玩家 3 的动物（空 = 不指定）");
-                _slot4 = plugin.Config.Bind(Sec, "Slot 4", "", "玩家 4 的动物（空 = 不指定）");
                 _delay = plugin.Config.Bind(Sec, "Delay", 1.5f, new ConfigDescription("进入后延迟（0-10 秒）", new AcceptableValueRange<float>(0f, 10f)));
                 _retry = plugin.Config.Bind(Sec, "Retry", 1.5f, new ConfigDescription("重试间隔（0.5-10 秒）", new AcceptableValueRange<float>(0.5f, 10f)));
                 _onlyUnpicked = plugin.Config.Bind(Sec, "Only When Unpicked", true,
@@ -183,34 +167,35 @@ namespace SR_UCH.Tweaks {
                 SRApi.RegisterSceneHook(delegate {
                     _outfitApplied = null; _nextAt = 0f; _pickedAt = -1f;
                     // 换场景 = 新房间：常用轮换推进一格
-                    if (_mode != null && _mode.Value == "rotate") _rotateIdx++;
                 });
             } catch (Exception __ex) { SRApi.Guard.Log("角色/初始化", __ex); }
         }
 
         // ---------------- 页面 ----------------
+        // 属于「自动时装」页的条目：选择页一律不显示。
+        private static bool IsOutfitKey(string k) {
+            return k == "Outfit Enabled" || k == "Accessory" || k == "Body" || k == "Head" || k == "Skin"
+                || k == "Use Saved Outfits" || k == "Saved Look Pick" || k == "Saved Outfits"
+                || k == "Auto Dress On Spawn";
+        }
+
         private static void RenderPick() {
             try {
                 SRApi.Ctl.SectionTitle(SRApi.T("- 自动选择 -", "- Auto pick -"));
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) {
                     string k = e.Definition.Key;
-                    if (k == "Mode" || k == "Animal" || k == "Slot 1" || k == "Slot 2" || k == "Slot 3" || k == "Slot 4") return false;
-                    // 时装页的条目不要出现在选择页
-                    return k != "Outfit Enabled" && k != "Accessory" && k != "Body" && k != "Head" && k != "Skin";
+                    if (k == "Mode" || k == "Animal") return false;
+                    // 时装页的条目一律不在选择页出现（含保存记录相关）
+                    return !IsOutfitKey(k);
                 });
                 EnsureAnimalList();
                 // 选择方式
                 RowCombo(SRApi.T("选择方式", "Pick mode"), ModeLabel(_mode != null ? _mode.Value : "target"),
                     ModeVals,
-                    new string[] { ModeLabel("target"), ModeLabel("random"), ModeLabel("smart"), ModeLabel("rotate"), ModeLabel("slot") },
+                    new string[] { ModeLabel("target"), ModeLabel("random"), ModeLabel("smart") },
                     ref _comboOpenMode, _mode);
                 if ((_mode != null ? _mode.Value : "target") == "target") {
                     RowAnimal(SRApi.T("指定动物", "Target animal"), _animal);
-                } else if ((_mode != null ? _mode.Value : "") == "slot") {
-                    RowAnimal(SRApi.T("玩家 1", "Player 1"), _slot1);
-                    RowAnimal(SRApi.T("玩家 2", "Player 2"), _slot2);
-                    RowAnimal(SRApi.T("玩家 3", "Player 3"), _slot3);
-                    RowAnimal(SRApi.T("玩家 4", "Player 4"), _slot4);
                 }
                 // 立即执行 + 手动放弃：方便验证当前配置，也能在角色被占时手动重来。
                 GUILayout.Space(SRApi.Ctl.Sc(4f));
@@ -229,11 +214,11 @@ namespace SR_UCH.Tweaks {
         private static void RenderOutfit() {
             try {
                 SRApi.Ctl.SectionTitle(SRApi.T("- 自动时装 -", "- Auto outfit -"));
-                SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) { return e.Definition.Key == "Outfit Enabled"; });
-                RowOutfit(SRApi.T("配件", "Accessory"), _oAcc, 0);
-                RowOutfit(SRApi.T("身体", "Body"), _oBody, 1);
-                RowOutfit(SRApi.T("头部", "Head"), _oHead, 2);
-                RowOutfit(SRApi.T("皮肤", "Skin"), _oSkin, 3);
+                // 只保留总开关与「外观记录」；四类手工编辑框已按需求删除（记录优先，无记录时按游戏默认）。
+                SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) {
+                    string k = e.Definition.Key;
+                    return k == "Outfit Enabled" || k == "Auto Dress On Spawn" || k == "Use Saved Outfits";
+                });
                 // 记录区：按角色保存一套外观，之后自动套用（可随时清除）
                 GUILayout.Space(SRApi.Ctl.Sc(4f));
                 SRApi.Ctl.SectionTitle(SRApi.T("- 外观记录 -", "- Saved looks -"));
@@ -596,24 +581,11 @@ namespace SR_UCH.Tweaks {
 
         private static Character.Animals ChooseAnimal(LevelSelectController lsc, LobbyPlayer lp) {
             string mode = _mode != null ? _mode.Value : "target";
-            if (mode == "slot") {
-                int slot = Mathf.Clamp(lp.localNumber, 1, 4);
-                ConfigEntry<string> e = slot == 1 ? _slot1 : slot == 2 ? _slot2 : slot == 3 ? _slot3 : _slot4;
-                return ParseAnimal(e != null ? e.Value : "");
-            }
             if (mode == "smart") {
                 Character.Animals best = SmartAnimal(lsc);
                 if (best != Character.Animals.NONE) return best;
                 // 智能拿不到（没有存档统计）时退化成随机空闲
                 mode = "random";
-            }
-            if (mode == "rotate") {
-                List<Character.Animals> ranked = RankedAnimals(lsc);
-                if (ranked.Count > 0) {
-                    int start = ((_rotateIdx % ranked.Count) + ranked.Count) % ranked.Count;
-                    return ranked[start];
-                }
-                mode = "random";   // 没有统计时退化成随机
             }
             if (mode == "random") {
                 List<Character.Animals> free = new List<Character.Animals>();
@@ -660,31 +632,7 @@ namespace SR_UCH.Tweaks {
         }
 
         // 常用角色排序（轮换用）：按存档统计打分降序，且过滤掉当前被占用的。
-        private static List<Character.Animals> RankedAnimals(LevelSelectController lsc) {
-            List<Character.Animals> res = new List<Character.Animals>();
-            Dictionary<Character.Animals, int> score = new Dictionary<Character.Animals, int>();
-            try {
-                SaveFileData data = StatTracker.Instance.GetSaveFileDataForMainUser();
-                StatCountArray wins = data != null ? data.GetStat<StatCountArray>("CharacterWins") : null;
-                StatCountArray succ = data != null ? data.GetStat<StatCountArray>("CharacterSuccess") : null;
-                foreach (string name in Animals) {
-                    Character.Animals a = ParseAnimal(name);
-                    if (a == Character.Animals.NONE) continue;
-                    int idx = (int)a;
-                    int v = 0;
-                    try { if (wins != null && wins.values != null && idx < wins.values.Length) v += wins.values[idx] * 3; } catch (Exception __w) { SRApi.Guard.Log("角色/轮换读胜场", __w); }
-                    try { if (succ != null && succ.values != null && idx < succ.values.Length) v += succ.values[idx]; } catch (Exception __s) { SRApi.Guard.Log("角色/轮换读通关", __s); }
-                    if (v > 0) score[a] = v;
-                }
-            } catch (Exception __ex) { SRApi.Guard.Log("角色/轮换排序", __ex); }
-            foreach (KeyValuePair<Character.Animals, int> kv in score) {
-                bool taken = false;
-                try { taken = lsc.IsCharacterTaken(kv.Key); } catch (Exception __t) { SRApi.Guard.Log("角色/轮换占用判定", __t); taken = true; }
-                if (!taken) res.Add(kv.Key);
-            }
-            res.Sort(delegate (Character.Animals a, Character.Animals b) { return score[b].CompareTo(score[a]); });
-            return res;
-        }
+
 
         private static Character FindFreeCharacter(LevelSelectController lsc, Character.Animals animal) {
             try {
