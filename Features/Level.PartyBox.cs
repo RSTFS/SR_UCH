@@ -13,6 +13,12 @@ public partial class Level {
         private static readonly int[] BombTypeVals = new int[] { 0, 1, 2 }; // 派对盒炸弹种类下拉的取值（0 小 / 1 大 / 2 超级）
 
         public static void RenderPartyBox() {
+        // 自动道具：开箱后自动随机挑一个（在"放弃道具"上面，属于同一组道具相关开关）
+        SRApi.RenderSectionEntries("Level", delegate (ConfigEntryBase e) {
+            return e.Definition.Key == "Auto Party Item"
+                || e.Definition.Key == "Auto Party Item Delay"
+                || e.Definition.Key == "Auto Party Item Skip Bomb";
+        });
         // 放弃道具条目：排队阶段手上拿着道具时才有意义
         SRApi.RenderSectionEntries("Level", delegate (ConfigEntryBase e) {
             return e.Definition.Key == "Drop Held Piece";
@@ -459,4 +465,136 @@ public class LevelPartyBox : ITweak {
             } catch (System.Exception e) { SRApi.LogWarn("重新开箱失败: " + e.Message); }
         }
     }
+
+// 自动道具：派对盒开启后，替本地玩家自动随机挑一个道具（默认跳过炸弹）。
+// 走游戏自己的 PiecePicked 消息，与手动挑选完全同一条链路，服务端负责把道具发到手上。
+[SrFeature("sr.autopartyitem", "AutoPartyItem", "1.0")]
+public class AutoPartyItem : ITweak {
+    private static ConfigEntry<bool> _enabled;
+    private static ConfigEntry<float> _delay;
+    private static ConfigEntry<bool> _skipBomb;
+    private static System.Reflection.FieldInfo _fPieces;
+    private static float _armedAt = -1f;      // 本次开箱开始计时的时刻
+    private static int _lastBoxId;            // 已经处理过的派对盒实例
+    private static int _pickedBoxId;          // 本次开箱已经挑过（防重复下发）
+    private static float _nextAt = -999f;
+
+    private static void SelfReg() {
+        SRApi.LocKey("Level", "Auto Party Item", "自动道具", null);
+        SRApi.LocDesc("Level", "Auto Party Item", "自动道具\n派对盒开启后自动随机挑一个道具\n与手动挑选同一条链路，服务端发放", "Auto party item\npicks a random piece for you once the box opens\nsame path as picking by hand; the server hands it over");
+        SRApi.LocKey("Level", "Auto Party Item Delay", "自动道具延迟", null);
+        SRApi.LocDesc("Level", "Auto Party Item Delay", "自动道具延迟\n开箱后等多少秒再挑\n范围 0-10，默认 0.5", "Auto item delay\nseconds to wait after the box opens\nrange 0-10; default 0.5");
+        SRApi.LocKey("Level", "Auto Party Item Skip Bomb", "跳过炸弹", null);
+        SRApi.LocDesc("Level", "Auto Party Item Skip Bomb", "跳过炸弹\n自动挑道具时排除派对盒里的炸弹\n关闭后炸弹也可能被自动挑中", "Skip bombs\nexcludes party-box bombs from the random pick\nwhen off a bomb may be picked");
+    }
+
+    public void Initialize(IFeatureHost plugin) {
+        try {
+            SelfReg();
+            _enabled = plugin.Config.Bind("Level", "Auto Party Item", false,
+                "自动道具：派对盒开启后自动随机挑一个道具（与手动挑选同一条链路）。");
+            _delay = plugin.Config.Bind("Level", "Auto Party Item Delay", 0.5f,
+                new ConfigDescription("自动道具延迟（0-10 秒，默认 0.5）：开箱后等多久再自动挑。", new AcceptableValueRange<float>(0f, 10f)));
+            _skipBomb = plugin.Config.Bind("Level", "Auto Party Item Skip Bomb", true,
+                "跳过炸弹：自动挑道具时不挑派对盒里的炸弹。");
+            SRApi.RegisterTick("派对盒-自动道具", Tick);
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/初始化", __ex); }
+    }
+
+    private static void Tick() {
+        try {
+            if (_enabled == null || !_enabled.Value) { _armedAt = -1f; return; }
+            if (!SRApi.GateMaster) return;
+            if (Time.unscaledTime < _nextAt) return;
+            _nextAt = Time.unscaledTime + 0.15f;   // 轮询节流：不抢游戏自己的逻辑，也不每帧全场景找
+
+            PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
+            if (pb == null) { _armedAt = -1f; _lastBoxId = 0; return; }
+            bool active = false;
+            try { active = pb.IsStillActive; } catch (Exception __ac) { SRApi.Guard.Log("自动道具/盒状态", __ac); }
+            if (!active) { _armedAt = -1f; _lastBoxId = 0; return; }
+
+            int boxId = pb.GetInstanceID();
+            if (boxId != _lastBoxId) { _lastBoxId = boxId; _armedAt = -1f; _pickedBoxId = 0; }
+            if (_pickedBoxId == boxId) return;      // 本次开箱已经自动挑过
+
+            PartyPickCursor cur = LocalCursor();
+            if (cur == null) { _armedAt = -1f; return; }
+            if (_armedAt < 0f) { _armedAt = Time.unscaledTime; return; }
+            float delay = _delay != null ? Mathf.Clamp(_delay.Value, 0f, 10f) : 0.5f;
+            if (Time.unscaledTime - _armedAt < delay) return;
+
+            List<PickableBlock> pieces = ReadPieces(pb);
+            if (pieces == null || pieces.Count == 0) return;
+            PickableBlock target = Choose(pb, pieces);
+            if (target == null) return;
+            if (DoPick(cur, target)) {
+                _pickedBoxId = boxId;
+                SRApi.LogInfo("[自动道具] 已自动挑选：" + (target.placeablePrefab != null ? target.placeablePrefab.Name : target.name));
+            }
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/轮询", __ex); }
+    }
+
+    // 本地玩家自己的派对盒光标：有权威、已启用、正处于挑选状态。
+    private static PartyPickCursor LocalCursor() {
+        try {
+            PartyPickCursor[] cursors = UnityEngine.Object.FindObjectsOfType<PartyPickCursor>();
+            if (cursors == null) return null;
+            for (int i = 0; i < cursors.Length; i++) {
+                PartyPickCursor c = cursors[i];
+                if (c == null || !c.hasAuthority || !c.Enabled || !c.Picking) continue;
+                return c;
+            }
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/查找光标", __ex); }
+        return null;
+    }
+
+    private static List<PickableBlock> ReadPieces(PartyBox pb) {
+        try {
+            if (_fPieces == null) _fPieces = SRApi.Ref.Field(typeof(PartyBox), "pieces", "派对盒自动道具（候选列表）");
+            if (_fPieces == null) return null;
+            return _fPieces.GetValue(pb) as List<PickableBlock>;
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/读取候选", __ex); return null; }
+    }
+
+    private static PickableBlock Choose(PartyBox pb, List<PickableBlock> pieces) {
+        bool skipBomb = _skipBomb == null || _skipBomb.Value;
+        List<PickableBlock> cand = new List<PickableBlock>(pieces.Count);
+        for (int i = 0; i < pieces.Count; i++) {
+            PickableBlock p = pieces[i];
+            if (p == null) continue;
+            if (skipBomb && IsBomb(pb, p)) continue;
+            cand.Add(p);
+        }
+        if (cand.Count == 0) return null;   // 只剩炸弹且选择了跳过：放弃本次自动挑选
+        return cand[UnityEngine.Random.Range(0, cand.Count)];
+    }
+
+    private static bool IsBomb(PartyBox pb, PickableBlock p) {
+        try {
+            if (pb.BombPrefab == null || p.placeablePrefab == null) return false;
+            for (int i = 0; i < pb.BombPrefab.Length; i++) {
+                if (pb.BombPrefab[i] != null && pb.BombPrefab[i] == p.placeablePrefab) return true;
+            }
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/炸弹判定", __ex); }
+        return false;
+    }
+
+    // 与游戏 PartyPickCursor.tryPickPiece 完全一致：记下选中的对象 -> 发 PiecePicked -> 冻结并关闭光标。
+    private static bool DoPick(PartyPickCursor cur, PickableBlock target) {
+        try {
+            if (UnityEngine.Networking.NetworkManager.singleton == null || UnityEngine.Networking.NetworkManager.singleton.client == null) return false;
+            UnityEngine.Networking.NetworkInstanceId netId = new UnityEngine.Networking.NetworkInstanceId(target.netIdValue);
+            cur.NetworkpickedPiece = UnityEngine.Networking.ClientScene.FindLocalObject(netId);
+            MsgPiecePicked msg = new MsgPiecePicked();
+            msg.PickableNetID = target.netIdValue;
+            msg.PlayerNumber = cur.networkNumber;
+            UnityEngine.Networking.NetworkManager.singleton.client.Send(NetMsgTypes.PiecePicked, msg);
+            cur.Freeze();
+            cur.Disable(false, false);
+            return true;
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/下发挑选", __ex); return false; }
+    }
+}
+
 }
