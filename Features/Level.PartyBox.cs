@@ -18,12 +18,10 @@ public partial class Level {
             SRApi.T("道具：开箱自动选择，以及放弃道具。",
                     "Items: auto-pick one when the box opens, plus the game's native drop-piece key."));
         GUILayout.Space(SRApi.Ctl.Sc(2));
-        SRApi.RenderSectionEntries("Level", delegate (ConfigEntryBase e) {
-            string k = e.Definition.Key;
-            return k == "Auto Party Item" || k == "Auto Party Item Skip Bomb"
-
-                || k == "Drop Held Piece";   // 排队阶段手上拿着道具时才有意义
-        });
+        // 分区内显式排序：自动道具 → 自动道具延迟 → 放弃道具 → 跳过炸弹
+        float __itemCol = Mathf.Max(SRApi.Ctl.Sc(180), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(240));
+        ConfigEntryBase __autoEntry = SRApi.Ctl.FindEntry("Level", "Auto Party Item");
+        if (__autoEntry != null) SRApi.Ctl.DrawEntryRow(__autoEntry, __itemCol);
 
         // 自动道具延迟：滑块 0-3 秒，步进 0.1（按行自绘，条目本身不参与自动渲染）
         ConfigEntryBase __dl = SRApi.Ctl.FindEntry("Level", "Auto Party Item Delay");
@@ -43,6 +41,12 @@ public partial class Level {
                 GUILayout.FlexibleSpace();
             } finally { GUILayout.EndHorizontal(); }
         }
+        // 放弃道具（排队阶段手上拿着道具时才有意义）
+        ConfigEntryBase __drop = SRApi.Ctl.FindEntry("Level", "Drop Held Piece");
+        if (__drop != null) SRApi.Ctl.DrawEntryRow(__drop, __itemCol);
+        // 跳过炸弹
+        ConfigEntryBase __skip = SRApi.Ctl.FindEntry("Level", "Auto Party Item Skip Bomb");
+        if (__skip != null) SRApi.Ctl.DrawEntryRow(__skip, __itemCol);
 
         // 派对盒炸弹：对局内所有成员都发过炸弹！快捷短语才生成
         SRApi.Ctl.SectionTitle(SRApi.T("- 派对盒子炸弹 -", "- Party-box bomb -"));
@@ -74,50 +78,6 @@ public partial class Level {
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(4));
-        }
-
-        // 第 2 页：重试（原「快速调整」里的快速重试，移动到关卡里）
-        public static void RenderRetryPage() {
-            try {
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("挑战", "Challenge") + " -",
-                    SRApi.T("挑战模式的自动重试与长按重试；两套都只影响挑战模式。",
-                            "Auto retry and hold-to-retry for challenge mode; both only affect challenge runs."));
-                GUILayout.Space(SRApi.Ctl.Sc(2));
-                // 自动重试（死亡后自动重开，无需长按）
-                GUILayout.BeginHorizontal();
-                ConfigEntryBase qrAuto = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry");
-                SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("死后自动重试", "Auto retry on death"),
-                    SRApi.T("仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n对局中开关立即生效。",
-                            "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nTakes effect immediately.")),
-                    qrAuto, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
-                if (qrAuto != null) SRApi.Ctl.RenderControl(qrAuto);
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-                GUILayout.Space(SRApi.Ctl.Sc(2));
-                GUILayout.BeginHorizontal();
-                ConfigEntryBase qrf = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Fast");
-                SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("快速重试", "Quick retry"), SRApi.T("仅挑战模式：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n长按时间在下方设置，对局中开关立即生效。", "Challenge only: after death, hold B for the set seconds to auto-retry.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately.")), qrf, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
-                if (qrf != null) SRApi.Ctl.RenderControl(qrf);
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-                GUILayout.Space(SRApi.Ctl.Sc(2));
-                GUILayout.BeginHorizontal();
-                ConfigEntryBase qrh = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Hold");
-                // 不依赖「快速调整」功能的静态方法（拆分模式下两者可能不在同一个 DLL 里）。
-                const string vanillaRetry = "0.5s";
-                GUILayout.Label(SRApi.Ctl.Content(SRApi.T("等待秒数", "Hold s"), SRApi.T("长按 B 的等待阈值（Character.SuicideTime）：挑战模式重试游戏默认 " + vanillaRetry + "。", "Hold-B threshold (Character.SuicideTime): vanilla " + vanillaRetry + " for challenge retry.")),
-                    SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(84)), GUILayout.Height(SRApi.Ctl.Sc(26)));
-                if (qrh != null) {
-                    float hv = (float)qrh.BoxedValue;
-                    Rect hr = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(150), SRApi.Ctl.Sc(28));
-                    float hn = SRApi.Ctl.DrawSlider(hr, hv, 0f, 2f, false);
-                    hn = Mathf.Round(hn * 10f) / 10f;
-                    if (Mathf.Abs(hn - hv) > 0.0001f) SRApi.Ctl.SetValue(qrh, hn);
-                    GUILayout.Label(hn.ToString("0.0") + "s", SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(44)), GUILayout.Height(SRApi.Ctl.Sc(26)));
-                }
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-            } catch (Exception __ex) { SRApi.Guard.Log("关卡/重试页", __ex); }
         }
 
 }

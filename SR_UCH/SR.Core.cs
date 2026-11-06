@@ -710,7 +710,7 @@ public partial class SR : ITweak {
         // 单次最坏耗时：重钩子（2Hz / 0.5s）的平均值会被空闲帧摊平，只有峰值能反映真实的掉帧风险。
         public float MaxMs;
             public long Calls;
-            public float NextDue;   // 下次允许执行的时间（统一 10Hz 限流）
+            // 限流已移除：各钩子按需自限，核心不再统一压频。
             // 调用频率（Hz）：0.5s / 2Hz 这类节流钩子按每次耗时判超限必然误报，
             // 只有接近每帧（>=30Hz）的钩子才用单次阈值衡量。
             public float WindowStart;
@@ -801,12 +801,9 @@ public partial class SR : ITweak {
             for (int i = 0; i < hooks.Count; i++) {
                 TickHook h = hooks[i];
                 if (h == null || h.Run == null) continue;
-                // 限流：默认每秒 10 次；但按键类钩子必须每帧跑，否则 100ms 的采样间隔会让按键明显变钝。
-                bool __isInput = IsInputHookName(h.Name);
-                if (!__isInput) {
-                    if (h.NextDue > 0f && now < h.NextDue) continue;
-                    h.NextDue = now + 0.1f;
-                }
+                // 不再统一限流：以前所有非按键钩子被压到 10Hz，按键轮询即使放行也只有 100ms 粒度，
+                // 手感就是"不跟手/要按两下"。现在全部每帧执行；需要节流的钩子在自己的实现里按时间自限
+                // （自由相机速度 0.5s、派对盒自动道具 0.15s、角色 0.1s 等），不再由核心一刀切。
                 float t0 = Time.realtimeSinceStartup;
                 try { h.Run(); }
                 catch (Exception __ex) { Guard.Log(what + h.Name, __ex); }
