@@ -149,7 +149,8 @@ public partial class Experiments : ITweak
                 _followAt = Time.unscaledTime;
                 // 每帧回调需自行判 GateMaster：不满足时还原原值并清快照，下次开启重新取。
                 // 只受模组总开关限制，不受「自由相机」开关限制。
-                if (!SRApi.GateMaster) {
+                // 非自由模式：把相机参数还回去，避免退出自由模式后还留着改动。
+                if (!SRApi.GateMaster || !FreeplayMode()) {
                     if (_followOrig >= 0f) {
                         try { if (_followZc != null) _followZc.MaxFollowSpeed = _followOrig; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     }
@@ -184,10 +185,23 @@ public partial class Experiments : ITweak
                                                  : SRApi.T("自由相机：关（已还原）", "Free camera: OFF (restored)"));
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 开关变化", __ex); }
         }
+        // 自由模式判定：自由相机只在该模式生效（Creative/Party/Challenge 都有自己的相机控制）。
+        internal static bool FreeplayMode() {
+            try {
+                GameSettings gs = GameSettings.GetInstance();
+                return gs != null && gs.GameMode == GameState.GameMode.FREEPLAY;
+            } catch (Exception __ex) { SRApi.Guard.Log("自由相机/判断自由模式", __ex); return false; }
+        }
+
         internal static void CheckKey() {
             try {
                 // 总开关必须在此判定，否则关闭模组后快捷键仍能改游戏相机。
                 if (!SRApi.GateMaster) return;
+                // 自由相机只在自由模式（Freeplay）可用：其它模式的相机由玩法控制，改了会破坏关卡逻辑。
+                if (!FreeplayMode()) {
+                    if (_on != null && _on.Value) { _on.Value = false; SRApi.Notify(SRApi.T("自由相机仅在自由模式可用", "Free camera is freeplay only")); }
+                    return;
+                }
                 if (!SRApi.ComboKeyDown(_key)) return;
                 // 自由相机全局有效，但仍只改游戏相机。
                 if (_on != null) _on.Value = !_on.Value;                   // 快捷键等于勾选框
