@@ -89,10 +89,11 @@ namespace SR_UCH.Tweaks {
 
         // 实时列表的重建节流：事件标脏后最快 RealtimeMinInterval 重建一次，避免每帧遍历上千个 AllPlaceables。
         // RealtimeFallbackInterval 兜底重建事件未覆盖的变化（重载 / 快照重建）。
-        private const float RealtimeMinInterval = 0.1f;
-        private const float RealtimeFallbackInterval = 0.5f;
+        private const float RealtimeMinInterval = 0.033f;   // ≈30Hz：足够"实时"，又不会每帧全量扫描
+        private const float RealtimeFallbackInterval = 0.2f; // 事件漏掉的场景变化兜底
         private static bool _listDirty; // 有变化待刷新（由放置/销毁事件置位）
         private static float _lastListRebuildAt = -999f; // 上次全量重建的时刻
+        private static int _lastPlaceableCount = -1;    // 上次重建时 AllPlaceables 的数量（零成本变化检测）
 
         // 追踪玩家仅在列表模式 = 普通时显示。
         public static bool TrackPlayerVisible { get { return _listMode == null || _listMode.Value == ListMode.Normal; } }
@@ -563,6 +564,11 @@ namespace SR_UCH.Tweaks {
         private static void TickRealtimeList() {
           try {
             float now = Time.unscaledTime;
+            // 计数变化 = 最廉价的变化信号：别人刚放/刚删时事件可能丢（房主端尤其），计数一定变。
+            try {
+                int cnt = Placeable.AllPlaceables != null ? Placeable.AllPlaceables.Count : -1;
+                if (cnt != _lastPlaceableCount) { _lastPlaceableCount = cnt; _listDirty = true; }
+            } catch (Exception __ct) { SRApi.Guard.Log("DestroyBlocks/计数变化检测", __ct); }
             // 兜底：放置/销毁事件未覆盖的变化（重载关卡、快照重建）靠固定间隔兜住，不由其它页面的开关决定。
             bool stale = (now - _lastListRebuildAt) >= RealtimeFallbackInterval;
             if (!_listDirty && !stale) return;

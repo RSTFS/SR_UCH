@@ -786,14 +786,27 @@ public partial class SR : ITweak {
         private static float _tickProfLastAt = -999f;
         private static readonly List<TickHook> _tickProfTop = new List<TickHook>(8);
 
+        // 按键类钩子的命名约定：KEY_* / 含"键" / 含 Hotkey —— 它们只读输入状态，必须每帧执行。
+        private static bool IsInputHookName(string name) {
+            if (string.IsNullOrEmpty(name)) return false;
+            if (name.StartsWith("KEY", StringComparison.Ordinal)) return true;
+            if (name.IndexOf("键", StringComparison.Ordinal) >= 0) return true;
+            if (name.IndexOf("Hotkey", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            // 这些钩子里要读"按住/按下"状态，10Hz 会让显示键明显发钝。
+            return name == "HUD" || name == "聊天窗口";
+        }
+
         private static void RunHooks(List<TickHook> hooks, string what) {
             float now = Time.realtimeSinceStartup;
             for (int i = 0; i < hooks.Count; i++) {
                 TickHook h = hooks[i];
                 if (h == null || h.Run == null) continue;
-                // 统一限流：所有帧钩子最多每秒 10 次（用户要求）。
-                if (h.NextDue > 0f && now < h.NextDue) continue;
-                h.NextDue = now + 0.1f;
+                // 限流：默认每秒 10 次；但按键类钩子必须每帧跑，否则 100ms 的采样间隔会让按键明显变钝。
+                bool __isInput = IsInputHookName(h.Name);
+                if (!__isInput) {
+                    if (h.NextDue > 0f && now < h.NextDue) continue;
+                    h.NextDue = now + 0.1f;
+                }
                 float t0 = Time.realtimeSinceStartup;
                 try { h.Run(); }
                 catch (Exception __ex) { Guard.Log(what + h.Name, __ex); }
