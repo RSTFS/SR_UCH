@@ -185,9 +185,19 @@ public partial class HUD {
                 break;
             }
             case GameControl.GamePhase.PLAY: {
-                if (gs != null && gs.GameLimitType == GameLimitType.TIME && vs != null) {
-                    float used = ReadFloat(ref _fLevelTimer, vs, "levelTimer", "HUD（对局已用时间）");
-                    if (used >= 0f) { countdown = true; remaining = (float)gs.MaxTime - used; }
+                if (vs != null) {
+                    // 1) 每回合时间限制（规则书里的 RunTimerLimit）：游戏自己的 RunTimer 是最权威的来源，
+                    //    它已经处理了回合起点与暂停；以前只看 GameLimitType==TIME，于是"回合限制+每回合限时"的对局
+                    //    在 HUD 上仍然正计时。
+                    float runLeft = -1f;
+                    try { if (vs.runTimer != null) runLeft = vs.runTimer.TimeLeft; }
+                    catch (Exception __rt) { SRApi.Guard.Log("HUD/读每回合剩余时间", __rt); }
+                    if (runLeft > 0.01f) { countdown = true; remaining = runLeft; break; }
+                    // 2) 整场时间限制（GameLimitType.TIME）：用游戏累计的 levelTimer 反推剩余。
+                    if (gs != null && gs.GameLimitType == GameLimitType.TIME) {
+                        float used = ReadFloat(ref _fLevelTimer, vs, "levelTimer", "HUD（对局已用时间）");
+                        if (used >= 0f) { countdown = true; remaining = (float)gs.MaxTime - used; }
+                    }
                 }
                 break;
             }
