@@ -72,3 +72,4 @@ Features\HUD.cs
 Features\HUD.State.cs
 Features\CharacterAuto.cs
 Features\ChallengeSplits.cs
+Features\CameraPan.cs

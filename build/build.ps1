@@ -99,7 +99,8 @@ $rspFeatures = @(
     'feat_Online.rsp',
     'feat_Experiments.rsp',
     'feat_BuildingPresets.rsp',
-    'feat_HUD.rsp'
+    'feat_HUD.rsp',
+    'feat_CameraPan.rsp'
 )
 $outDir = Join-Path $Root 'bin\Release'
 
