@@ -159,7 +159,15 @@ namespace SR_UCH.Tweaks {
             // 注意：Harmony 的 CreateAndPatchAll(外层类型) 会连**嵌套类型**一起打补丁（FreePlacementPatch 是嵌套类），
             // 再显式注册一次会让它的 Prefix/Postfix 每帧执行两遍（位置写入两次、反射翻倍）。
             // 所以这里只调一次外层；FreePlacementPatch 若哪天提成顶层类，再把下面那行显式注册放回来。
-            try { Harmony.CreateAndPatchAll(typeof(BuildingTools)); } catch (Exception e) { SRApi.LogWarn("BuildingTools 补丁失败: " + e.Message); }
+            try { Harmony.CreateAndPatchAll(typeof(BuildingTools)); }
+            catch (Exception e) {
+                // 某个补丁目标在新版游戏里消失时，Harmony 会让**整批**失败（与快速调整同样的坑），
+                // 自由放置就是被这样一起拖下水的。这里退一步单独注册自由放置补丁，
+                // 保证"其它补丁失败"不会连累它。
+                SRApi.LogWarn("BuildingTools 补丁失败（改为单独注册自由放置）: " + e.Message);
+                try { Harmony.CreateAndPatchAll(typeof(FreePlacementPatch)); }
+                catch (Exception __fp) { SRApi.LogWarn("自由放置 补丁失败: " + __fp.Message); }
+            }
         }
 
         [HarmonyPatch(typeof(GameState), "Update")]
