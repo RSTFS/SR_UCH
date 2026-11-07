@@ -1135,8 +1135,8 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         // 绘制期取用滚轮量（转发到 SRApi.WheelTake，供页面内控件/表格调用）
         public static float WheelTake(Rect layoutRect) { return SRApi.WheelTake(layoutRect); }
         // 兜底：绘制期取用失败时登记"矩形 + 应用函数"，帧尾若还有滚轮量再命中一次
-        private static Action<Rect, Func<float, bool>> _wheelFb;
-        public static void SetWheelFallbackSink(Action<Rect, Func<float, bool>> f) { _wheelFb = f; }
+        private static Action<string, Rect, Func<float, bool>> _wheelFb;
+        public static void SetWheelFallbackSink(Action<string, Rect, Func<float, bool>> f) { _wheelFb = f; }
         // 填充页的列表滚动回调：页面注册一次，帧尾若滚轮没被任何控件/钩子消费，
         // 且指针在内容区，就直接交给它（不依赖命中框，保证列表一定能滚）。
         // 带页面标识：只有当前页面的回调会被调用（审查 P1-1：以前会跨页面误滚联机列表）
@@ -1161,7 +1161,10 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             _fillIds.Add(id ?? ""); _fillHandlers.Add(h);
         }
 
-        public static void WheelFallback(Rect layoutRect, Func<float, bool> apply) { Action<Rect, Func<float, bool>> f = _wheelFb; if (f != null) f(layoutRect, apply); }
+        public static void WheelFallback(string key, Rect layoutRect, Func<float, bool> apply) {
+            Action<string, Rect, Func<float, bool>> f = _wheelFb;
+            if (f != null) f(key, layoutRect, apply);
+        }
         // 表格搜索高亮：页面每帧传入当前搜索串（空串 = 不高亮）
         private static Action<string> _tableHighlight;
         public static void SetTableHighlightSink(Action<string> f) { _tableHighlight = f; }

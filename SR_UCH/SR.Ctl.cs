@@ -372,7 +372,7 @@ public partial class SR {
                         float __w = SRApi.Ctl.WheelTake(r);
                         if (true) {
                             ConfigEntryBase __fe = e; float __fmin = min, __fmax = max;
-                            SRApi.Ctl.WheelFallback(r, delegate (float __fw) {
+                            SRApi.Ctl.WheelFallback("slider:" + (e != null ? e.Definition.Section + "/" + e.Definition.Key : ""), r, delegate (float __fw) {
                                 float __fc = System.Convert.ToSingle(__fe.BoxedValue);
                                 float __fspan = Mathf.Max(0.0001f, __fmax - __fmin);
                                 float __fst = Mathf.Max(__fspan * 0.02f, 0.01f) * Mathf.Clamp(Mathf.Abs(__fw), 1f, 8f);

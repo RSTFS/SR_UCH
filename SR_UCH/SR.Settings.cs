@@ -1465,7 +1465,7 @@ public partial class SR {
                     // 无论 take 是否命中都登记：滚动视图会先吃掉滚轮，靠这张表在窗口层提前命中
                     if (entry != null && vals != null) {
                         ConfigEntryBase __ce = entry; Array __cv = vals; string[] __co = options; string __cc = current;
-                        SRApi.Ctl.WheelFallback(boxRect, delegate (float __fw) {
+                        SRApi.Ctl.WheelFallback("combo:" + (entry != null ? entry.Definition.Section + "/" + entry.Definition.Key : ""), boxRect, delegate (float __fw) {
                             int __ccur = 0;
                             for (int i = 0; i < __co.Length; i++) { if (__co[i] == __cc) { __ccur = i; break; } }
                             int __cn = Mathf.Clamp(Mathf.RoundToInt(Mathf.Abs(__fw)), 1, 5);

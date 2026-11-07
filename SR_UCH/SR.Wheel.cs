@@ -23,10 +23,11 @@ namespace SR_UCH.Tweaks {
             internal static float Value { get { return _pending; } }
             internal static bool HasPending { get { return _hasEvent && Mathf.Abs(_pending) > 0.5f; } }
 
-            // 兜底：控件"绘制期取用失败"时登记一个矩形 + 回调；帧尾若还有剩余滚轮量，
-            // 再按这些**本趟刚画的**矩形命中一次。纯 take 路径若因坐标系差异没取到，这里一定能补上。
-            private static readonly System.Collections.Generic.List<Rect> _fbRects = new System.Collections.Generic.List<Rect>(16);
-            private static readonly System.Collections.Generic.List<Func<float, bool>> _fbHandlers = new System.Collections.Generic.List<Func<float, bool>>(16);
+            // 控件登记的"悬停矩形 + 应用函数"。按 key 去重：控件每趟（Layout/Repaint…）都会登记，
+            // 若每次追加，列表会无限增长并触发上限清空 → 表现为"有时能滚有时不能"。
+            private sealed class Fb { public Rect Rect; public Func<float, bool> Apply; }
+            private static readonly System.Collections.Generic.Dictionary<string, Fb> _fb =
+                new System.Collections.Generic.Dictionary<string, Fb>(64);
             // 矩形三种坐标候选（原始 / +区域偏移 / +区域偏移−页面滚动）各判一次
             private static bool HitAny(Rect rect, Vector2 mouse) {
                 if (rect.Contains(mouse)) return true;
@@ -37,19 +38,21 @@ namespace SR_UCH.Tweaks {
                 return r2.Contains(mouse);
             }
 
-            internal static void RegisterFallback(Rect rect, Func<float, bool> apply) {
+            internal static void RegisterFallback(string key, Rect rect, Func<float, bool> apply) {
                 try {
                     if (apply == null || rect.width < 2f || rect.height < 2f) return;
-                    if (_fbRects.Count >= 256) { _fbRects.Clear(); _fbHandlers.Clear(); }   // 防无限增长
-                    _fbRects.Add(rect); _fbHandlers.Add(apply);
+                    if (string.IsNullOrEmpty(key)) key = rect.x.ToString("0") + "," + rect.y.ToString("0");
+                    Fb f;
+                    if (!_fb.TryGetValue(key, out f)) { f = new Fb(); _fb[key] = f; }
+                    f.Rect = rect; f.Apply = apply;
                 } catch (Exception __ex) { SR.Guard.Log("滚轮/兜底登记", __ex); }
             }
 
             // 帧尾：尝试兜底命中（命中即消费并返回 true）
             internal static bool TryFallback() {
                 if (!HasPending) return false;
-                for (int i = 0; i < _fbRects.Count; i++) {
-                    Rect r = _fbRects[i];
+                foreach (Fb __f2 in _fb.Values) {
+                    Rect r = __f2.Rect;
                     bool hit = r.Contains(_mouse);
                     if (!hit) {
                         Rect r1 = new Rect(r.x + SR.AreaOffset.x, r.y + SR.AreaOffset.y, r.width, r.height);
@@ -63,7 +66,7 @@ namespace SR_UCH.Tweaks {
                     if (!hit) continue;
                     float v = _pending;
                     bool __used2 = false;
-                    try { __used2 = _fbHandlers[i](v); } catch (Exception __ex) { SR.Guard.Log("滚轮/兜底应用", __ex); }
+                    try { __used2 = __f2.Apply(v); } catch (Exception __ex) { SR.Guard.Log("滚轮/兜底应用", __ex); }
                     if (!__used2) continue;                // 到头/未消费：保留 pending，继续尝试
                     _pending = 0f; LastDecision = "fallback";
                     return true;
@@ -74,13 +77,13 @@ namespace SR_UCH.Tweaks {
             // 在页面滚动视图建立**之前**命中：滚动视图会先吃掉滚轮，控件永远等不到事件。
             internal static bool TryHoverApply(float wheel) {
                 if (Mathf.Abs(wheel) < 0.01f) return false;
-                for (int i = _fbRects.Count - 1; i >= 0; i--) {   // 后登记的优先（同一位置更具体的控件）
-                    Rect r = _fbRects[i];
+                foreach (Fb __f in _fb.Values) {
+                    Rect r = __f.Rect;
                     Vector2 mp = _mouse;
                     try { if (Event.current != null) mp = Event.current.mousePosition; } catch (Exception __m) { SR.Guard.Log("滚轮/命中鼠标", __m); }
                     if (!HitAny(r, mp)) continue;
                     bool __used = false;
-                    try { __used = _fbHandlers[i](wheel); } catch (Exception __ex) { SR.Guard.Log("滚轮/提前命中", __ex); }
+                    try { __used = __f.Apply(wheel); } catch (Exception __ex) { SR.Guard.Log("滚轮/提前命中", __ex); }
                     if (!__used) continue;                 // 控件到头了：不算消费，留给后面
                     _pending = 0f;                         // 已消费：清待处理量，避免页面再滚一次
                     LastDecision = "hover";
@@ -89,7 +92,7 @@ namespace SR_UCH.Tweaks {
                 return false;
             }
 
-            internal static void ClearFallback() { _fbRects.Clear(); _fbHandlers.Clear(); }
+            internal static void ClearFallback() { _fb.Clear(); }
             internal static string LastDecision = "none";   // 诊断：谁取走了这一格
 
             private static int _pendFrame = -1;
