@@ -1161,6 +1161,10 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             _fillIds.Add(id ?? ""); _fillHandlers.Add(h);
         }
 
+        private static Func<string, Rect, float> _wheelPoll;
+        public static void SetWheelPollSink(Func<string, Rect, float> f) { _wheelPoll = f; }
+        public static float WheelPoll(string key, Rect rect) { Func<string, Rect, float> f = _wheelPoll; return f != null ? f(key, rect) : 0f; }
+
         public static void WheelFallback(string key, Rect layoutRect, Func<float, bool> apply) {
             Action<string, Rect, Func<float, bool>> f = _wheelFb;
             if (f != null) f(key, layoutRect, apply);

@@ -1574,6 +1574,20 @@ public partial class SR {
                 }
             } catch (Exception __cw6) { Guard.Log("下拉框/滚轮(早期通道)", __cw6); }
 
+            // 最高优先：绘制期就地轮询（不经过事件、不依赖登记表）
+            try {
+                if (!open && options != null && options.Length > 1 && entry != null) {
+                    float __pw1 = SRApi.Ctl.WheelPoll("combo:" + entry.Definition.Section + "/" + entry.Definition.Key, boxRect);
+                    if (Mathf.Abs(__pw1) > 0.01f) {
+                        int __cur1 = 0;
+                        for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur1 = i; break; } }
+                        int __n1 = options.Length;
+                        int __ni1 = ((__cur1 + (__pw1 > 0f ? -1 : 1)) % __n1 + __n1) % __n1;
+                        if (__ni1 < vals.Length) SR.SetValue(entry, vals.GetValue(__ni1));
+                    }
+                }
+            } catch (Exception __pw1x) { Guard.Log("下拉框/就地轮询", __pw1x); }
+
             if (drew) {
                 //展开列表最多可见 8 项，其余经滚轮滚动。
                 int __visN = Mathf.Min(options.Length, 8);

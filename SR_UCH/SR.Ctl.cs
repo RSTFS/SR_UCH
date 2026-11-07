@@ -433,6 +433,17 @@ public partial class SR {
                             }
                         }
                     } catch (Exception __sw6) { Guard.Log("滑块/滚轮(早期通道)", __sw6); }
+                    // 最高优先：绘制期就地轮询
+                    try {
+                        float __pw2 = SRApi.Ctl.WheelPoll("slider:" + (e != null ? e.Definition.Section + "/" + e.Definition.Key : "?"), r);
+                        if (Mathf.Abs(__pw2) > 0.01f) {
+                            float __sp2 = Mathf.Max(0.0001f, max - min);
+                            float __st2 = Mathf.Max(__sp2 * 0.02f, 0.01f) * Mathf.Clamp(Mathf.Abs(__pw2), 1f, 8f);
+                            float __nv2 = Mathf.Clamp(cur + (__pw2 > 0f ? -__st2 : __st2), min, max);
+                            if (__sp2 >= 1f) __nv2 = Mathf.Round(__nv2 * 10f) / 10f;
+                            if (Mathf.Abs(__nv2 - cur) > 0.000001f) SetValue(e, __nv2);
+                        }
+                    } catch (Exception __pw2x) { Guard.Log("滑块/就地轮询", __pw2x); }
                     float v = DrawSlider(r, cur, min, max, false);
                     v = Mathf.Round(Mathf.Clamp(v, min, max) * 10f) / 10f;
                     if (Mathf.Abs(v - cur) > 0.0001f) { SetValue(e, v); written = true; }
@@ -1254,6 +1265,25 @@ public partial class SR {
         return r;
     }
 
+
+    // 绘制期就地滚轮：直接读 Input.mouseScrollDelta，用控件自己的矩形做命中，
+    // 每帧每控件只应用一次。完全不经过 IMGUI 事件，也不依赖跨趟登记。
+    private static readonly Dictionary<string, int> _wheelPollFrame = new Dictionary<string, int>();
+    public static float WheelPoll(string key, Rect rect) {
+        try {
+            Event e = Event.current;
+            if (e == null || !rect.Contains(e.mousePosition)) return 0f;
+            float d = 0f;
+            try { d = Input.mouseScrollDelta.y; } catch (Exception __iw) { Guard.Log("滚轮/就地轮询", __iw); }
+            if (Mathf.Abs(d) < 0.01f) return 0f;
+            int fr;
+            if (_wheelPollFrame.TryGetValue(key ?? "", out fr) && fr == Time.frameCount) return 0f;
+            if (_wheelPollFrame.Count > 256) _wheelPollFrame.Clear();
+            _wheelPollFrame[key ?? ""] = Time.frameCount;
+            MarkWheelUsed();
+            return d;
+        } catch (Exception __ex) { Guard.Log("滚轮/就地轮询外层", __ex); return 0f; }
+    }
 
     // 表格通用绘制原语（三处列表共用）。
     // 纯白填充用 Unity 内置 whiteTexture（常驻，无需自建/销毁）。
