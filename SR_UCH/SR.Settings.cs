@@ -1460,7 +1460,22 @@ public partial class SR {
             // 滚轮：绘制期直接问"这一格归我吗"（收起=换选项；展开=滚列表）
             if (options != null && options.Length > 1) {
                 float __w = 0f;
-                if (!open) __w = SRApi.Ctl.WheelTake(boxRect);
+                if (!open) {
+                    __w = SRApi.Ctl.WheelTake(boxRect);
+                    if (Mathf.Abs(__w) < 0.01f && entry != null && vals != null) {
+                        ConfigEntryBase __ce = entry; Array __cv = vals; string[] __co = options; string __cc = current;
+                        SRApi.Ctl.WheelFallback(boxRect, delegate (float __fw) {
+                            int __ccur = 0;
+                            for (int i = 0; i < __co.Length; i++) { if (__co[i] == __cc) { __ccur = i; break; } }
+                            int __cn = Mathf.Clamp(Mathf.RoundToInt(Mathf.Abs(__fw)), 1, 5);
+                            int __ci2 = __fw > 0f ? __ccur - __cn : __ccur + __cn;
+                            if (__ci2 < 0) __ci2 = __co.Length - 1;
+                            if (__ci2 >= __co.Length) __ci2 = 0;
+                            if (__ci2 < __cv.Length) SR.SetValue(__ce, __cv.GetValue(__ci2));
+                            return true;
+                        });
+                    }
+                }
                 else if (drew && options.Length > 8 && entry != null) {
                     int __vis2 = Mathf.Min(options.Length, 8);
                     __w = SRApi.Ctl.WheelTake(new Rect(boxRect.x, boxRect.yMax, width, CtlH() * __vis2));

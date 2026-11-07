@@ -634,11 +634,15 @@ public partial class SR {
                         else if (_mode == Mode.Settings) SR.SettingsTab = SR.Wheel.Value > 0f ? 0 : 1;
                         SR.Wheel.TakeRemaining(false);
                     } else {
+                        // 先试控件兜底（本趟刚画的矩形），再决定是否滚页面
+                        if (SR.Wheel.TryFallback()) { /* 已被控件消费 */ }
+                        else {
                         bool allow = !_noScrollDeclared;
                         float w = SR.Wheel.TakeRemaining(allow);
                         if (Mathf.Abs(w) > 0.01f) {
                             if (SR.Wheel.ShiftHeld) _scroll.x = Mathf.Max(0f, _scroll.x - w * Sc(64f));
                             else _scroll.y = Mathf.Max(0f, _scroll.y - w * Sc(64f));
+                        }
                         }
                     }
                 }

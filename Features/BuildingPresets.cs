@@ -457,8 +457,8 @@ namespace SR_UCH.Tweaks {
                 if (!string.IsNullOrEmpty(_modeFilter)
                     && !string.Equals(p.Mode, _modeFilter, StringComparison.OrdinalIgnoreCase)) return false;
                 if (q.Length > 0) {
-                    bool hit = ContainsText(p.Name, q) || ContainsText(p.Level, q) || ContainsText(ModeText(p.Mode), q);
-                    if (!hit) return false;
+                    // 只按名称搜索（用户要求）：关卡/模式已有专门的下拉筛选，文本搜索只负责命名。
+                    if (!ContainsText(p.Name, q)) return false;
                 }
                 return true;
             } catch { return false; }
@@ -1151,6 +1151,7 @@ namespace SR_UCH.Tweaks {
                 {
                     float __w = SRApi.Ctl.WheelTake(box);
                     if (Mathf.Abs(__w) > 0.01f) ScrollTableBy(__w);
+                    else SRApi.Ctl.WheelFallback(box, delegate (float __fw) { ScrollTableBy(__fw); return true; });
                 }
                 SRApi.TableDraw(_args);
                 // 拖列宽的结果在 _drawW 里（核心直接改传进去的数组）：除拉伸列外同步回持久化宽度

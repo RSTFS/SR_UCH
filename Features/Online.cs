@@ -41,7 +41,20 @@ namespace SR_UCH.Tweaks {
         private static int _lobbyCbCount;           // 本次搜索收到的回调数
         private static float _lobbyCbFirst = -1f;   // 首个回调时刻
         private static float _lobbyCbLast = -1f;    // 最近一次回调时刻
-        private static string _textFilter = "";   // 房间列表文本搜索（只匹配当前显示内容，不落配置）
+        private static SearchRefreshListener _refreshListener;
+
+        // 游戏要求刷新房间搜索时（房主心跳超时/房主结束），我们跟着重查一次列表
+        public class SearchRefreshListener : GameEvent.IGameEventListener {
+            public void handleEvent(GameEvent.GameEvent e) {
+                try {
+                    GameEvent.SpecialUIEvent se = e as GameEvent.SpecialUIEvent;
+                    if (se == null) return;
+                    if (se.SpecialUIType != GameEvent.SpecialUIEvent.SpecialUI.REFRESHSEARCH) return;
+                    SRApi.LogInfo("[联机] 游戏请求刷新搜索：跟随刷新房间列表");
+                    RefreshLobbies();
+                } catch (Exception __ex) { SRApi.Guard.Log("联机/刷新监听", __ex); }
+            }
+        }
 
         private static bool _lobbySearching;
         private static float _lobbySearchAt = -999f;
@@ -108,6 +121,17 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterTick("联机自动进入主菜单", TickAutoEnterMainMenu); // 加入成功后替玩家按一次确认
             // 换场景/多次返回主界面后复位加入瞬时状态，避免下一次点加入被旧状态直接忽略。
             SRApi.RegisterSceneHook(delegate { ResetJoinStateOnScene(); });
+            // 游戏在"当前房间房主心跳超 10 秒"时会 LeaveLobby 并广播 SpecialUIEvent(REFRESHSEARCH)。
+            // 我们与游戏共用同一份 Steam 房间快照：不跟着刷新，列表里的房间 id 全都会过期，
+            // 点加入必然失败（用户看到的"全失联"）。这里只做事件驱动刷新，不做定时轮询。
+            try {
+                _refreshListener = new SearchRefreshListener();
+                GameEventManager.ChangeListener<GameEvent.SpecialUIEvent>(_refreshListener, true);
+                SRApi.OnShutdown("联机/刷新监听", delegate {
+                    try { if (_refreshListener != null) GameEventManager.ChangeListener<GameEvent.SpecialUIEvent>(_refreshListener, false); }
+                    catch (Exception __ul) { SRApi.Guard.Log("联机/注销刷新监听", __ul); }
+                });
+            } catch (Exception __rl) { SRApi.Guard.Log("联机/刷新监听注册", __rl); }
             // 加入流程本身要用 EventSystem，禁用会卡在"正在进入"：登记门控挂起，让核心不禁用 EventSystem。
             // 屏蔽输入上限 3 秒，超过即不再屏蔽（pending 最长可挂 30 秒）。
         SRApi.RegisterInputGateHold(() => !string.IsNullOrEmpty(_pendingJoin)
@@ -517,25 +541,6 @@ namespace SR_UCH.Tweaks {
                                "(click 'Refresh' to query) Header: left-click = sort by that column (asc/desc/default), drag a separator = resize (<->), drag a header = reorder (+), Shift+click 'Quality' = show/hide the skill-match coefficient, right-click = hide that column, Shift+right-click = reset; wheel = up/down, Ctrl+wheel = left/right; drag the table's bottom edge to resize height");
             GUILayout.Label(string.IsNullOrEmpty(_lobbyMsg) ? hint : _lobbyMsg, SRApi.Ctl.Label);
 
-            // 搜索：按当前显示内容做子串匹配（房主/区域/模式/标签/标识…），命中片段在表格里高亮。
-            GUILayout.Space(SRApi.Ctl.Sc(2));
-            GUILayout.BeginHorizontal();
-            try {
-                GUIContent __sl = SRApi.Ctl.Content(SRApi.T("搜索", "Search"),
-                    SRApi.T("按显示内容过滤房间\n房主 / 区域 / 模式 / 标签 / 标识\n命中片段会在表格里高亮", "filter lobbies by their visible text\nhost / region / mode / tag / flags\nmatching parts are highlighted in the table"));
-                float __slw = Mathf.Max(SRApi.Ctl.Sc(44f), SRApi.Ctl.Label.CalcSize(new GUIContent(SRApi.T("搜索", "Search"))).x + SRApi.Ctl.Sc(10f));
-                GUILayout.Label(__sl, SRApi.Ctl.Label, GUILayout.Width(__slw), GUILayout.Height(SRApi.Ctl.Sc(24f)));
-                Rect __sr = GUILayoutUtility.GetLastRect();
-                Event __se = Event.current;
-                if (__se != null && __se.type == EventType.MouseDown && __se.button == 0 && __sr.Contains(__se.mousePosition)) {
-                    _textFilter = ""; __se.Use();   // 点标签清空
-                }
-                string __nt = SRApi.ClearableTextField(_textFilter ?? "", 64, SRApi.Ctl.SearchBox,
-                    GUILayout.Width(SRApi.Ctl.Sc(220f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
-                if (__nt != null && __nt != _textFilter) _textFilter = __nt;
-                GUILayout.FlexibleSpace();
-            } finally { GUILayout.EndHorizontal(); }
-
             // 筛选：单行 区域 / 模式 / 标签 / 状态（状态下沉到标签右面）；下拉框宽度按 4 个均分。
             float cellW = Mathf.Max(SRApi.Ctl.Sc(96), (SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40)) / 4f - SRApi.Ctl.Sc(8));
             GUILayout.Space(SRApi.Ctl.Sc(2));
@@ -578,7 +583,6 @@ namespace SR_UCH.Tweaks {
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
 
-            SRApi.Ctl.SetTableHighlight(_textFilter ?? "");   // 命中片段在表格里高亮
             TableDraw(box);
             TableInput(box, Event.current);
 

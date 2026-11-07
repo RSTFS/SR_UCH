@@ -1127,6 +1127,10 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static float LabelColumnWidth(string label) { Func<string, float> f = _labelCol; return f != null ? f(label) : 0f; }
         // 绘制期取用滚轮量（转发到 SRApi.WheelTake，供页面内控件/表格调用）
         public static float WheelTake(Rect layoutRect) { return SRApi.WheelTake(layoutRect); }
+        // 兜底：绘制期取用失败时登记"矩形 + 应用函数"，帧尾若还有滚轮量再命中一次
+        private static Action<Rect, Func<float, bool>> _wheelFb;
+        public static void SetWheelFallbackSink(Action<Rect, Func<float, bool>> f) { _wheelFb = f; }
+        public static void WheelFallback(Rect layoutRect, Func<float, bool> apply) { Action<Rect, Func<float, bool>> f = _wheelFb; if (f != null) f(layoutRect, apply); }
         // 表格搜索高亮：页面每帧传入当前搜索串（空串 = 不高亮）
         private static Action<string> _tableHighlight;
         public static void SetTableHighlightSink(Action<string> f) { _tableHighlight = f; }

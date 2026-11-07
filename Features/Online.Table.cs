@@ -208,6 +208,7 @@ namespace SR_UCH.Tweaks {
                 {
                     float __w = SRApi.Ctl.WheelTake(box);
                     if (Mathf.Abs(__w) > 0.01f) ScrollTableByWheel(__w);
+                    else SRApi.Ctl.WheelFallback(box, delegate (float __fw) { ScrollTableByWheel(__fw); return true; });
                 }
                 }
             } catch (Exception __tbox) { SRApi.Guard.Log("联机表格/命中框", __tbox); }

@@ -22,6 +22,43 @@ namespace SR_UCH.Tweaks {
 
             internal static float Value { get { return _pending; } }
             internal static bool HasPending { get { return _hasEvent && Mathf.Abs(_pending) > 0.5f; } }
+
+            // 兜底：控件"绘制期取用失败"时登记一个矩形 + 回调；帧尾若还有剩余滚轮量，
+            // 再按这些**本趟刚画的**矩形命中一次。纯 take 路径若因坐标系差异没取到，这里一定能补上。
+            private static readonly System.Collections.Generic.List<Rect> _fbRects = new System.Collections.Generic.List<Rect>(16);
+            private static readonly System.Collections.Generic.List<Func<float, bool>> _fbHandlers = new System.Collections.Generic.List<Func<float, bool>>(16);
+            internal static void RegisterFallback(Rect rect, Func<float, bool> apply) {
+                try {
+                    if (apply == null || rect.width < 2f || rect.height < 2f) return;
+                    if (_fbRects.Count >= 64) return;
+                    _fbRects.Add(rect); _fbHandlers.Add(apply);
+                } catch (Exception __ex) { SR.Guard.Log("滚轮/兜底登记", __ex); }
+            }
+
+            // 帧尾：尝试兜底命中（命中即消费并返回 true）
+            internal static bool TryFallback() {
+                if (!HasPending) return false;
+                for (int i = 0; i < _fbRects.Count; i++) {
+                    Rect r = _fbRects[i];
+                    bool hit = r.Contains(_mouse);
+                    if (!hit) {
+                        Rect r1 = new Rect(r.x + SR.AreaOffset.x, r.y + SR.AreaOffset.y, r.width, r.height);
+                        hit = r1.Contains(_mouse);
+                    }
+                    if (!hit) {
+                        Vector2 ps2 = SRApi.PageScroll;
+                        Rect r2 = new Rect(r.x + SR.AreaOffset.x - ps2.x, r.y + SR.AreaOffset.y - ps2.y, r.width, r.height);
+                        hit = r2.Contains(_mouse);
+                    }
+                    if (!hit) continue;
+                    float v = _pending; _pending = 0f; LastDecision = "fallback";
+                    try { _fbHandlers[i](v); } catch (Exception __ex) { SR.Guard.Log("滚轮/兜底应用", __ex); }
+                    return true;
+                }
+                return false;
+            }
+
+            internal static void ClearFallback() { _fbRects.Clear(); _fbHandlers.Clear(); }
             internal static string LastDecision = "none";   // 诊断：谁取走了这一格
 
             private static int _pendFrame = -1;
@@ -32,6 +69,7 @@ namespace SR_UCH.Tweaks {
             internal static void FrameStart(Event e) {
                 if (Time.frameCount != _pendFrame) { _pendFrame = Time.frameCount; _pending = 0f; _mouse = Vector2.zero; _shift = _ctrl = false; }
                 _hasEvent = e != null && e.type == EventType.ScrollWheel;
+                ClearFallback();   // 每次进入都清空：兜底列表只反映"本趟刚画"的控件
                 // 同一帧的后续 OnGUI 趟没有滚轮事件，但仍有未取走的量：鼠标/修饰键沿用事件趟的
                 if (!_hasEvent) { _hasEvent = Mathf.Abs(_pending) > 0.01f; return; }
                 try {

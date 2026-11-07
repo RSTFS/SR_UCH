@@ -32,9 +32,9 @@ public partial class SR {
             TableHeaderInteractions(a);
             TableDrawDragGhost(a);
             TablePinnedRects(a.rowCount, rowH, a.scrollY, a.rowsH, a.box.y, headerH, a.pinX, a.pinW, a.pinRects, a.pinRows);
-            TableDrawPinned(a);
             TableDrawEmptyHint(a, rowH);
             TableDrawRows(a, headerH, rowH);
+            TableDrawPinned(a);   // 钉住列最后画：盖在滚动行之上，横向滚动时始终可见
             TableHandleColumnHide(a);
             TableFinishResize(a);
             TableDispatchRowClick(a);
@@ -202,6 +202,11 @@ public partial class SR {
     // 相位 6：钉住列的按钮定位与派发（按钮内容由调用方给，本控件只负责矩形与命中）。
     private static void TableDrawPinned(SRApi.TableArgs a) {
         if (a.pinW <= 0f || a.pinDraw == null) return;
+        // 钉住列底：整条列区先垫不透明底（表头下方到行区底部），纵向滚动时下面的行不会透出来。
+        try {
+            float __h = Mathf.Max(0f, a.box.height - (a.headerH > 0f ? a.headerH : Sc(24)));
+            DrawFill(new Rect(a.pinX, a.box.y + (a.headerH > 0f ? a.headerH : Sc(24)), a.pinW, __h), CurStyle.RowBg);
+        } catch (Exception __pf) { Guard.Log("表格/钉住列底", __pf); }
         for (int k = 0; k < a.pinRects.Count && k < a.pinRows.Count; k++) {
             try { a.pinDraw(a.pinRows[k], a.pinRects[k], k); } catch (Exception __pd) { Guard.Log("钉住列按钮", __pd); }
         }
@@ -653,6 +658,7 @@ public partial class SR {
         public Color LineStrong = new Color(0.31f, 0.31f, 0.35f, 1f);
         public Color LineLight = new Color(0.23f, 0.23f, 0.25f, 1f);
         public Color RowAltBg = new Color(1f, 1f, 1f, 0.06f);
+        public Color RowBg = new Color(0.14f, 0.14f, 0.16f, 1f);   // 行区不透明底（钉住列垫底用）
     }
     private static readonly TableStyle _tableStyle = new TableStyle();
     public static TableStyle DefaultTableStyle { get { return _tableStyle; } }

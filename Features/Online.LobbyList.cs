@@ -295,15 +295,6 @@ namespace SR_UCH.Tweaks {
             }
                 v = Val(_fTag);
                 if (v.Length > 0 && li.lobbyTag.ToString() != v) return false;
-                // 文本搜索：对"当前显示内容"做子串匹配（与高亮用同一份文本，所见即所搜）
-                if (!string.IsNullOrEmpty(_textFilter)) {
-                    string[] __cells = CellTexts(li);
-                    bool __hit = false;
-                    for (int i = 0; __cells != null && i < __cells.Length && !__hit; i++) {
-                        if (!string.IsNullOrEmpty(__cells[i]) && __cells[i].IndexOf(_textFilter, StringComparison.OrdinalIgnoreCase) >= 0) __hit = true;
-                    }
-                    if (!__hit) return false;
-                }
                 v = Val(_fState);
                 if (v == "join") { if (!IsJoinable(li)) return false; }        //可加入：游戏自己的"能不能进"判据
                 else if (v == "full") { if (!IsFull(li)) return false; }        //人满

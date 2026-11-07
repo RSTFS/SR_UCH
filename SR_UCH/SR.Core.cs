@@ -1004,6 +1004,7 @@ public partial class SR : ITweak {
                 SRApi.Ctl.SetLabelColumnSink(delegate (string __l) { return SR.Ctl.LabelColumnWidth(__l); });
                 SRApi.SetWheelLayerSink(delegate { return SR.Wheel.LastDecision; });
                 SRApi.Ctl.SetTableHighlightSink(delegate (string __q) { SR.HighlightQuery = __q; });
+                SRApi.Ctl.SetWheelFallbackSink(delegate (Rect __r, Func<float, bool> __a) { SR.Wheel.RegisterFallback(__r, __a); });
                 SRApi.SetWheelTakeSink(delegate (Rect __rect) { return SR.Wheel.TakeIfInside(__rect); });
                 SRApi.SetOverlaySink(delegate (Action __d) { SR.RegisterOverlay(__d); });
                 SRApi.SetRoundedSink(delegate (Rect __r, Color __c, float __rad) { SR.DrawRounded(__r, __c, __rad); });
