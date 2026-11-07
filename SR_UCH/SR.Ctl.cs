@@ -878,6 +878,8 @@ public partial class SR {
                 _tipKey = tip;
                 _tipContent.text = tip;
                 _tipLines = tip.Split('\n');
+                for (int i = 0; i < _tipLines.Length; i++) if (_tipLines[i].StartsWith("\u0002")) _tipLines[i] = _tipLines[i].Substring(1);
+                _tipContent.text = string.Join("\n", _tipLines);   // 测量用去掉标记后的文本
                 GUIStyle st = TipTextStyle();
                 float limit = Mathf.Min(Sc(600f), Screen.width * 0.62f);
                 float maxLine = 0f;
@@ -899,7 +901,22 @@ public partial class SR {
             GUI.color = new Color(1f, 1f, 1f, __alpha);
             Rect __tipRect = new Rect(x, y, _tipW, _tipH);
             DrawRounded(__tipRect, SRApi.Ctl.ThemePanelBg, SRApi.Ctl.ThemeRadius);
-            GUI.Label(new Rect(__tipRect.x + Sc(6f), __tipRect.y + Sc(4f), _tipInnerW, _tipH - Sc(8f)), _tipContent, TipTextStyle());
+            // 逐行绘制：desc 的第 3 行（注意）用醒目色；默认值/键行保持普通色
+            {
+                GUIStyle __ts = TipTextStyle();
+                float __ty = __tipRect.y + Sc(4f);
+                for (int li = 0; li < _tipLines.Length; li++) {
+                    string __ln = _tipLines[li] ?? "";
+                    bool __note = li == 2 && _tipLines.Length >= 3;
+                    GUIContent __gc = new GUIContent(__ln);
+                    float __lh = __ts.CalcHeight(__gc, _tipInnerW);
+                    Color __pc = GUI.color;
+                    if (__note) GUI.color = new Color(1f, 0.83f, 0.35f, __alpha);   // 注意行：琥珀色
+                    GUI.Label(new Rect(__tipRect.x + Sc(6f), __ty, _tipInnerW, __lh), __gc, __ts);
+                    GUI.color = __pc;
+                    __ty += __lh;
+                }
+            }
             GUI.color = __oldTipColor;
         }
 // 分区：RowHooks（功能对通用条目行的扩展点）

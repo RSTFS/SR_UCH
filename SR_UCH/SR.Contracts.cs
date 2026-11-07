@@ -698,6 +698,18 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         // 正在输入文字（聊天/文本框）：键位轮询一律让路。面板打开本身不再拦功能快捷键。
         public static bool Typing { get { Func<bool> f = _typing; return f != null && f(); } }
 
+        // 表格滚轮领地（屏幕坐标）：注册后页面级滚动不再抢这一块，滚轮交给表格内部处理。
+        private static readonly System.Collections.Generic.List<Rect> _wheelClaims = new System.Collections.Generic.List<Rect>();
+        public static void ClaimWheelArea(Rect screenRect) {
+            try { if (screenRect.width > 2f && screenRect.height > 2f && _wheelClaims.Count < 8) _wheelClaims.Add(screenRect); }
+            catch { /* 静默：非关键路径，失败可直接忽略 */ }
+        }
+        public static void ClearWheelClaims() { _wheelClaims.Clear(); }
+        public static bool WheelAreaClaimed(Vector2 screenPos) {
+            for (int i = 0; i < _wheelClaims.Count; i++) if (_wheelClaims[i].Contains(screenPos)) return true;
+            return false;
+        }
+
         public static void RegisterTypingProvider(Func<bool> provider) { Action<Func<bool>> f = _typingProvider; if (f != null) f(provider); }
         public static void RegisterInputGateHold(Func<bool> hold) { Action<Func<bool>> f = _inputGateHold; if (f != null) f(hold); }
         public static void RegisterCameraView(Action<Camera> apply) { Action<Action<Camera>> f = _cameraView; if (f != null) f(apply); }

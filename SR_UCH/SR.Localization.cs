@@ -164,7 +164,8 @@ public partial class SR {
             try {
                 if (!string.IsNullOrEmpty(body)) {
                     string[] bl = body.Split('\n');
-                    if (bl.Length >= 3 && !bl[2].StartsWith("注意")) bl[2] = "注意：" + bl[2];
+                    // 第 3 行加不可见标记：绘制时这一行用醒目色（不显示前缀文字）
+                    if (bl.Length >= 3 && !bl[2].StartsWith("\u0002")) bl[2] = "\u0002" + bl[2];
                     body = string.Join("\n", bl);
                 }
             } catch (Exception __nt) { Guard.Log("悬浮条目/注意前缀", __nt); }

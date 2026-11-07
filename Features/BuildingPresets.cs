@@ -1049,7 +1049,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
                 EnsureCols();
                 // 操作列宽始终跟随当前语言的按钮文字：语言热切换后也能立刻避免英文标签被截断。
-                _colW[ColAction] = DefaultActionColW();
+                // 操作列：默认按按钮文字实测，但最多占表格宽度的 30%（窗口变窄时不会把数据列挤没）
+                _colW[ColAction] = Mathf.Min(DefaultActionColW(), Mathf.Max(SRApi.Ctl.Sc(96f), box.width * 0.30f));
                 if (_args == null) _args = new SRApi.TableArgs();
                 float pinW = SRApi.Ctl.Sc(_colW[ColAction]);
                 // 有纵向溢出时，在数据区与钉住列之间预留滚动条宽度（与联机列表一致）。
@@ -1134,6 +1135,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 };
                 _hiddenBeforeTable = _hiddenCols.Count;
                 _tableBox = box;      // 供页面级滚轮钩子命中判定
+                SRApi.ClaimWheelArea(TableScreenBox());   // 滚轮归表格内部处理，页面滚动不抢这块
                 SRApi.TableDraw(_args);
                 HandlePresetCells();   // 数据列：悬浮预览 / 左键切三态 / 右键开界面；名称列：右键重命名
                 // 不画底边拖拽条：预设列表不需要手动调高（整块区域就是列表）。

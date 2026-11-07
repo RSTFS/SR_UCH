@@ -13,7 +13,6 @@ namespace SR_UCH.Tweaks {
         private const string Sec = "Quick Adjust";
         private static ConfigEntry<float> _delay;          // 重生延迟（0-3 秒）
         private static ConfigEntry<float> _invincible;     // 出生无敌（0-10 秒）
-        private static ConfigEntry<bool> _autoRespawn;     // 自动重生（自由模式；挑战由自动重试负责）
         private static ConfigEntry<bool> _cannonRespawn;   // 炮弹卡死自动重生
         private static ConfigEntry<bool> _noScoreboard;    // 挑战死亡不弹记分板
         private static readonly Dictionary<int, float> _deadSince = new Dictionary<int, float>();
@@ -35,8 +34,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Respawn Delay", "重生延迟\n死亡后等多少秒再自动重生\n挑战/自由模式；0 = 立即", "Respawn delay\nseconds to wait after death before respawning automatically\nchallenge and freeplay; 0 = instant");
             SRApi.LocKey(Sec, "Spawn Invincible", "出生无敌", null);
             SRApi.LocDesc(Sec, "Spawn Invincible", "出生无敌\n每次出生后无敌多少秒\n挑战/自由模式；0 = 不加无敌", "Spawn invincibility\nseconds of invincibility after each spawn\nchallenge and freeplay; 0 = none");
-            SRApi.LocKey(Sec, "Auto Respawn", "自由模式自动重生", null);
-            SRApi.LocDesc(Sec, "Auto Respawn", "自由模式自动重生\n自由模式死亡后自动重生（按重生延迟等待）\n挑战模式请用快速调整页的死后自动重试", "Auto respawn in freeplay\nrespawns automatically after death in freeplay, honouring the delay\nfor challenge use auto retry on the quick-adjust tab");
             SRApi.LocKey(Sec, "Cannon Auto Respawn", "炮弹卡死自动重生", null);
             SRApi.LocDesc(Sec, "Cannon Auto Respawn", "炮弹卡死自动重生\n死了还卡在炮弹里超过 1.5 秒时自动重生\n挑战/自由模式", "Respawn when stuck in a cannon\nrespawns if you stay dead inside a cannon for over 1.5s\nchallenge and freeplay");
             SRApi.LocKey(Sec, "No Death Scoreboard", "挑战死亡不弹记分板", null);
@@ -48,7 +45,6 @@ namespace SR_UCH.Tweaks {
                 SelfReg();
                 _delay = plugin.Config.Bind(Sec, "Respawn Delay", 0.5f, new ConfigDescription("重生延迟（0-3 秒）", new AcceptableValueRange<float>(0f, 3f)));
                 _invincible = plugin.Config.Bind(Sec, "Spawn Invincible", 1f, new ConfigDescription("出生无敌（0-10 秒）", new AcceptableValueRange<float>(0f, 10f)));
-                _autoRespawn = plugin.Config.Bind(Sec, "Auto Respawn", false, "自由模式：死亡后自动重生（按重生延迟等待）。");
                 _cannonRespawn = plugin.Config.Bind(Sec, "Cannon Auto Respawn", false, "炮弹卡死：死亡且卡在炮弹里超过 1.5 秒自动重生。");
                 _noScoreboard = plugin.Config.Bind(Sec, "No Death Scoreboard", false, "挑战模式死亡时不弹记分板。");
                 SRApi.RegisterTick("重生-轮询", Tick);
@@ -78,9 +74,6 @@ namespace SR_UCH.Tweaks {
                 if (_invincible != null) SRApi.Ctl.RowSlider(SRApi.T("出生无敌", "Spawn invincibility"),
                     SRApi.T("每次出生后的无敌秒数\n游戏原生重生后是 1 秒\n挑战/自由模式", "seconds of invincibility after each spawn\nvanilla gives 1s after respawn\nchallenge and freeplay"),
                     _invincible, 0f, 10f, "0.0");
-                ConfigEntryBase ar = SRApi.Ctl.FindEntry(Sec, "Auto Respawn");
-                if (ar != null) SRApi.Ctl.LabeledRow(SRApi.T("自由模式自动重生", "Auto respawn (freeplay)"),
-                    SRApi.T("自由模式死亡后自动重生\n按上面的重生延迟等待\n挑战模式用上面的「死后自动重试」", "respawns automatically after death in freeplay\nhonours the delay above\nfor challenge use auto retry above"), ar);
                 ConfigEntryBase cr = SRApi.Ctl.FindEntry(Sec, "Cannon Auto Respawn");
                 if (cr != null) SRApi.Ctl.LabeledRow(SRApi.T("炮弹卡死自动重生", "Cannon auto respawn"),
                     SRApi.T("死了还卡在炮弹里超过 1.5 秒时自动重生\n挑战/自由模式", "respawns if you stay dead inside a cannon for over 1.5s\nchallenge and freeplay"), cr);
@@ -131,19 +124,6 @@ namespace SR_UCH.Tweaks {
                     _cannonStuckAt = -1f;
                 }
 
-                // 自由模式自动重生（挑战由 QuickAdjust 的自动重试负责）
-                if (_autoRespawn != null && _autoRespawn.Value) {
-                    GameSettings gs = GameSettings.GetInstance();
-                    if (gs != null && gs.GameMode == GameState.GameMode.FREEPLAY) {
-                        int num = c.networkNumber;
-                        float since;
-                        if (!_deadSince.TryGetValue(num, out since)) { _deadSince[num] = Time.unscaledTime; return; }
-                        if (Time.unscaledTime - since >= DelaySeconds) {
-                            _deadSince.Remove(num);
-                            RespawnNow(c, "自由模式自动重生");
-                        }
-                    }
-                }
             } catch (Exception __ex) { SRApi.Guard.Log("重生/轮询", __ex); }
         }
 

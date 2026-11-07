@@ -595,7 +595,8 @@ public partial class SR {
             // 只在指针位于内容区、且本帧滚轮还没被列表钩子/控件消费时接管，并设盾避免滚动区再吃一次。
             if (__wasWheel && !WheelShieldHit
                 && (Input.GetKey(KeyCode.LeftControl) == false && Input.GetKey(KeyCode.RightControl) == false)
-                && SRApi.ContentArea.Contains(__wheelMouse + SR.AreaOffset)) {
+                && SRApi.ContentArea.Contains(__wheelMouse + SR.AreaOffset)
+                && !SRApi.WheelAreaClaimed(__wheelMouse + SR.AreaOffset)) {   // 表格已声明这块滚轮归它
                 try {
                     float __vy = Mathf.Abs(__we.delta.y) > 0.001f ? __we.delta.y : __we.delta.x;
                     if (Mathf.Abs(__vy) > 0.0001f) {
@@ -605,6 +606,7 @@ public partial class SR {
                     }
                 } catch (Exception __vs) { Guard.Log("页面竖向滚动", __vs); }
             }
+            SRApi.ClearWheelClaims();   // 本帧渲染会重新声明表格滚轮领地（供下一帧判定）
             bool __noScroll = _noScrollDeclared || __overCtrlPrev || WheelShieldHit;
 
             // 设置页的页签画在滚动区**之外**：常驻顶部，不受滚动影响；

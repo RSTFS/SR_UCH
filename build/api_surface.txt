@@ -15,6 +15,7 @@ BlockInput
 BlockWindowDrag
 CanControlLocally
 CanDoHost
+ClaimWheelArea
 ClearableTextField
 CloseMenu
 ColorEdit
