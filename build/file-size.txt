@@ -11,3 +11,4 @@ Features/HUD.cs=988
 ../SR_UCH_EX/ExModule/ExModule.Core.cs=928
 Features/Online.cs=922
 Features/BuildingPresets.Io.cs=917
+Features/QuickAdjust.cs=901

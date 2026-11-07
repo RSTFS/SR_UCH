@@ -131,7 +131,20 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
 填充页的结构固定为 `固定头部 → 列表 → 底边拖拽条` 三段，新增列表页时照抄联机页/预设页的
 `RenderXxxHeader() + ComputeFillTableHeight() + RenderXxxTable()` 三段式，不要再让页面滚动与列表滚动并存。
 
-### 4.3d 列表滚动上限（maxY / maxX）的完整算法
+### 4.3e 实施约定（本轮收尾后新增，违反会重现老问题）
+
+1. **滚轮只有一条通道**：控件在**绘制期**调用 `SRApi.Ctl.WheelPoll(key, rect)` 读 `Input.mouseScrollDelta`
+   （为 0 时退回本趟 `ScrollWheel` 事件量），命中即改值并 `MarkWheelUsed()`。
+   不要再加"事件趟直处理""登记表兜底""claim→WheelDelta"等第二条路径——一帧会被消费两次（一次滚两格、顺序错乱）。
+2. **布局控件不得在 `try` 内创建**：`GUILayoutUtility.GetRect` / `GUILayout.Button` 等一旦某趟抛异常少建一个，
+   Layout 与 Repaint 控制数不一致就会抛 `Getting control N's position in a group with only N controls`。
+   计算可以包 try，**创建控件不行**。
+3. **表格几何必须同源**：`rowsH` 与 `maxY` 一律由**最终** `tableH` 计算（契约层纯函数
+   `SRApi.Ctl.TableRowsH / TableMaxScrollY`，已有单测覆盖），不得在 `tableH` 被修正前先算一次。
+4. **模式门控只失效、不灰显**：功能始终显示，非允许模式下不执行（自由模式页、仅挑战的重试类功能）。
+5. **不自作主张加诊断日志**：需要日志先经用户同意。
+
+### 4.3d 列表滚动上限（maxY / maxX）的完整算法### 4.3d 列表滚动上限（maxY / maxX）的完整算法
 
 #### 符号表（全部是**同一套布局坐标**，即 `OnGUI` 的像素单位，已乘过 `Sc()`）
 
