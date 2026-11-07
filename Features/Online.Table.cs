@@ -208,11 +208,9 @@ namespace SR_UCH.Tweaks {
                     // 表格区自注册：区域优先于页面钩子，滚轮一定能落到列表上
                     // 滚轮：绘制期直接用表格矩形取用
                 {
-                    // 唯一入口：WheelTake（审查 P0-1：不要再叠加"事件趟直处理"）
-                    if (_tableMaxY > 0.01f || _tableMaxX > 0.01f) {
-                        float __w = SRApi.Ctl.WheelTake(box);
-                        if (Mathf.Abs(__w) > 0.01f) ScrollTableByWheel(__w);
-                    }
+                    // 唯一入口：绘制期就地轮询（与下拉框同一套）
+                    float __w = SRApi.Ctl.WheelPoll("online.table", box);
+                    if (Mathf.Abs(__w) > 0.01f) ScrollTableByWheel(__w);
                 }
                 }
             } catch (Exception __tbox) { SRApi.Guard.Log("联机表格/命中框", __tbox); }

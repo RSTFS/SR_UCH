@@ -367,47 +367,12 @@ public partial class SR {
                         GUILayout.Space(Sc(2));
                         return written;
                     }
-                    // 控件级兜底（历史可用路径）：悬停声明 + Repaint 且仍悬停时取用
-                    try {
-                        Event __se4 = Event.current;
-                        if (__se4 != null && r.Contains(__se4.mousePosition)) {
-                            WheelClaim();
-                            if (__se4.type == EventType.Repaint) {
-                                float __dw5 = WheelDeltaTake();
-                                if (Mathf.Abs(__dw5) > 0.01f) {
-                                    float __sp5 = Mathf.Max(0.0001f, max - min);
-                                    float __st5 = Mathf.Max(__sp5 * 0.02f, 0.01f) * Mathf.Clamp(Mathf.Abs(__dw5), 1f, 8f);
-                                    float __nv5 = Mathf.Clamp(cur + (__dw5 > 0f ? -__st5 : __st5), min, max);
-                                    if (__sp5 >= 1f) __nv5 = Mathf.Round(__nv5 * 10f) / 10f;
-                                    if (Mathf.Abs(__nv5 - cur) > 0.000001f) SetValue(e, __nv5);
-                                }
-                            }
-                        }
-                    } catch (Exception __sw5) { Guard.Log("滑块/滚轮", __sw5); }
                     // 按下滑块时禁止拖窗口：我们放开了 hotControl 判定后，滑块按下会被当成"空白拖动"
                     try {
                         Event __md = Event.current;
                         if (__md != null && __md.type == EventType.MouseDown && __md.button == 0 && r.Contains(__md.mousePosition))
                             BlockWindowDrag = true;
                     } catch (Exception __bw) { Guard.Log("滑块/禁止拖窗口", __bw); }
-                    // 早期通道（下拉框那套）也用在滑块上：悬停声明 + Repaint 取 WheelDelta 调值。
-                    try {
-                        Event __se6 = Event.current;
-                        if (__se6 != null) {
-                            bool __hov = r.Contains(__se6.mousePosition);
-                            if (__hov) WheelClaim();
-                            if (__hov && __se6.type == EventType.Repaint) {
-                                float __dw6 = WheelDeltaTake();
-                                if (Mathf.Abs(__dw6) > 0.0001f) {
-                                    float __sp6 = Mathf.Max(0.0001f, max - min);
-                                    float __st6 = Mathf.Max(__sp6 * 0.02f, 0.01f) * Mathf.Clamp(Mathf.Abs(__dw6), 1f, 8f);
-                                    float __nv6 = Mathf.Clamp(cur + (__dw6 > 0f ? -__st6 : __st6), min, max);
-                                    if (__sp6 >= 1f) __nv6 = Mathf.Round(__nv6 * 10f) / 10f;
-                                    if (Mathf.Abs(__nv6 - cur) > 0.000001f) SetValue(e, __nv6);
-                                }
-                            }
-                        }
-                    } catch (Exception __sw6) { Guard.Log("滑块/滚轮(早期通道)", __sw6); }
                     float v = DrawSlider(r, cur, min, max, false);
                     v = Mathf.Round(Mathf.Clamp(v, min, max) * 10f) / 10f;
                     if (Mathf.Abs(v - cur) > 0.0001f) { SetValue(e, v); written = true; }

@@ -279,39 +279,6 @@ public partial class SR {
             Event e = Event.current;
             Vector2 mouse = e.mousePosition; // 无矩阵缩放，无需坐标换算
             SR.Wheel.FrameStart(e);          // 滚轮仲裁：只更新本趟事件信息（区域表跨趟持久）
-            WheelClaimNewFrame();            // 控件"上一帧声明过归属"的快照（早期可用的机制）
-            // 滚轮提前结算：页面/侧栏的滚动视图会先吃掉 ScrollWheel，控件（下拉框/滑块）永远等不到，
-            // 所以必须在建立任何滚动视图之前，用控件上一趟登记的矩形命中一次。
-            try {
-                Event __we0 = Event.current;
-                if (__we0 != null && __we0.type == EventType.ScrollWheel) {
-                    float __raw0 = Mathf.Abs(__we0.delta.y) > 0.001f ? __we0.delta.y : __we0.delta.x;
-                    if (SR.Wheel.TryHoverApply(-__raw0)) { __we0.Use(); }
-                }
-                // 早期验证可用的通道（按原样恢复）：上一帧控件声明过 hover -> 把滚轮量转成 WheelDelta，
-                // 控件在 Repaint 趟用 WheelDeltaTake 取用。先于任何滚动视图执行，事件直接 Use 掉。
-                if (WheelClaimedPrev && !SR.WheelTakenThisFrame) {
-                    float __cw = 0f;
-                    Event __ce5 = Event.current;
-                    if (__ce5 != null && __ce5.type == EventType.ScrollWheel) {
-                        float __rawc = Mathf.Abs(__ce5.delta.y) > 0.001f ? __ce5.delta.y : __ce5.delta.x;
-                        __cw = -__rawc;
-                        __ce5.Use();
-                    } else {
-                        try { __cw = Input.mouseScrollDelta.y; } catch (Exception __mi) { Guard.Log("滚轮/声明通道输入", __mi); }
-                    }
-                    if (Mathf.Abs(__cw) > 0.01f) { WheelDeltaSet(__cw); SR.MarkWheelUsed(); }
-                }
-                // 第二条通道：Unity 即时输入 Input.mouseScrollDelta。
-                // IMGUI 的 ScrollWheel 事件可能被滚动视图先吃掉，而这个是轮询值，不受事件顺序影响。
-                // 每帧只处理一次，命中控件后标记"本帧滚轮已用"，帧尾就不会再滚页面。
-                if (!SR.WheelTakenThisFrame) {
-                    float __inw = 0f;
-                    try { __inw = Input.mouseScrollDelta.y; } catch (Exception __ms) { Guard.Log("滚轮/即时输入", __ms); }
-                    if (Mathf.Abs(__inw) > 0.01f && SR.Wheel.TryHoverApply(__inw)) SR.MarkWheelUsed();
-                }
-            } catch (Exception __hw) { Guard.Log("滚轮/提前命中外层", __hw); }
-
             Rect winRect = new Rect(_winX, _winY, _winWidth, _winHeight);
             bool over = winRect.Contains(mouse);
             // 右下角自定义大小：热区略大于三角

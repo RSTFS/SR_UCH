@@ -1300,16 +1300,7 @@ public partial class SR {
                                 if (__md2 != null && __md2.type == EventType.MouseDown && __md2.button == 0 && sr.Contains(__md2.mousePosition))
                                     SRApi.BlockWindowDrag = true;
                             } catch (Exception __bw2) { Guard.Log("条目滑块/禁止拖窗口", __bw2); }
-                            float __w = SRApi.Ctl.WheelTake(sr);
-                            if (Mathf.Abs(__w) > 0.01f) {
-                                float __c = val is int ? (int)val : (float)val;
-                                float __span = Mathf.Max(0.0001f, hmax - hmin);
-                                float __st = val is int ? (hstep > 0f ? hstep : 1f) : Mathf.Max(__span * 0.02f, 0.01f);
-                                float __steps2 = Mathf.Clamp(Mathf.Abs(__w), 1f, 8f);
-                                float __nv2 = Mathf.Clamp(__c + (__w > 0f ? -__st : __st) * __steps2, hmin, hmax);
-                                if (val is int) __nv2 = Mathf.Round(__nv2);
-                                SR.SetValue(entry, val is int ? (object)(int)Mathf.Round(__nv2) : (object)__nv2);
-                            }
+                            // 用户要求：滑块不再支持滚轮调值（仅保留拖动）
                         }
                         //float 条目可选步进（范围由 SRApi.RowSliders 给出，粒度由 RowSliderSteps 给出）
                         float fstep;

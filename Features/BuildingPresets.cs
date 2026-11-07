@@ -1214,12 +1214,10 @@ namespace SR_UCH.Tweaks {
                 _tableBox = box;      // 供页面级滚轮钩子命中判定
                 // 滚轮：绘制期直接用表格矩形取用（同一坐标系，不存在换算错位）
                 {
-                    // 唯一入口：WheelTake（命中即取用并清待处理量）。不要再加"事件趟直处理"，
-                    // 否则同一次滚轮会被帧尾页面钩子再消费一次 = 一次滚两格（审查 P0-1）。
-                    if (_maxScrollY > 0.01f || _maxScrollX > 0.01f) {
-                        float __w = SRApi.Ctl.WheelTake(box);
-                        if (Mathf.Abs(__w) > 0.01f) ScrollTableBy(__w);
-                    }
+                    // 唯一入口：绘制期就地轮询（与下拉框同一套）。不经过 IMGUI 事件，
+                    // 因此不会被滚动视图提前吃掉，也不存在跨趟交接丢失。
+                    float __w = SRApi.Ctl.WheelPoll("presets.table", box);
+                    if (Mathf.Abs(__w) > 0.01f) ScrollTableBy(__w);
                 }
                 SRApi.TableDraw(_args);
                 // 拖列宽的结果在 _drawW 里（核心直接改传进去的数组）：除拉伸列外同步回持久化宽度

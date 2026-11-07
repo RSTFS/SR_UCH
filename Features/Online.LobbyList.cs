@@ -168,7 +168,7 @@ namespace SR_UCH.Tweaks {
                 if (li.isAFK) return false;
                 if (li.Players <= 0) return false;   // 0 人房不可加入（以前只判满员，空房被算成可加入）
                 if (IsFull(li)) return false;
-                if (IsStale(li)) return false;   // 心跳 10 秒没更新 = 房间大概率已死，别让玩家点进去（audit 14-P0-3）
+                // 心跳只作为「标识」列的显示信息，不参与能否加入的判定（用户要求）
                 return true;
             } catch { return false; }
         }
