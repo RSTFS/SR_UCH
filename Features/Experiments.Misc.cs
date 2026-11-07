@@ -188,8 +188,8 @@ public partial class Experiments : ITweak
         // 自由模式判定：自由相机只在该模式生效（其它模式相机由玩法控制）。
         internal static bool FreeplayMode() {
             try {
-                GameSettings gs = GameSettings.GetInstance();
-                return gs != null && gs.GameMode == GameState.GameMode.FREEPLAY;
+                // 走统一模式门控：开了"超级模式（无视模式限制）"后，非自由模式也能用自由相机
+                return SRApi.GateModeAllows(SRApi.ModeMask.Freeplay);
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机/判断自由模式", __ex); return false; }
         }
 

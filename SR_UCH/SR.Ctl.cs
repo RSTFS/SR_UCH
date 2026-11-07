@@ -876,6 +876,7 @@ public partial class SR {
             }
             return _tipText;
         }
+        private static int _tipNoteLine = -1;   // 注意色所在行（-1 = 本条没有注意内容）
         private static string _tipShownKey;
         private static float _tipShownAt = -999f;
 
@@ -892,7 +893,10 @@ public partial class SR {
                 _tipKey = tip;
                 _tipContent.text = tip;
                 _tipLines = tip.Split('\n');
-                for (int i = 0; i < _tipLines.Length; i++) if (_tipLines[i].StartsWith("\u0002")) _tipLines[i] = _tipLines[i].Substring(1);
+                _tipNoteLine = -1;
+                for (int i = 0; i < _tipLines.Length; i++) {
+                    if (_tipLines[i].StartsWith("\u0002")) { _tipNoteLine = i; _tipLines[i] = _tipLines[i].Substring(1); }
+                }
                 _tipContent.text = string.Join("\n", _tipLines);   // 测量用去掉标记后的文本
                 GUIStyle st = TipTextStyle();
                 float limit = Mathf.Min(Sc(600f), Screen.width * 0.62f);
@@ -921,7 +925,7 @@ public partial class SR {
                 float __ty = __tipRect.y + Sc(4f);
                 for (int li = 0; li < _tipLines.Length; li++) {
                     string __ln = _tipLines[li] ?? "";
-                    bool __note = li == 2 && _tipLines.Length >= 3;
+                    bool __note = li == _tipNoteLine;
                     GUIContent __gc = new GUIContent(__ln);
                     float __lh = __ts.CalcHeight(__gc, _tipInnerW);
                     Color __pc = GUI.color;

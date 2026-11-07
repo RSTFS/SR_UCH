@@ -567,6 +567,7 @@ public partial class SR {
             if (__wasWheel) {
                 try {
                     bool __consumed = SR.Wheel.Consume();
+                    if (!__consumed && _noScrollDeclared) { __consumed = true; }   // 页面明确不要滚动：吞掉，别落到世界
                     if (!__consumed) {
                         bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
                         if (__shift) {

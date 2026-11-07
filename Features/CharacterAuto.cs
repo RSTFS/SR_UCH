@@ -49,11 +49,12 @@ namespace SR_UCH.Tweaks {
             bool[] unlocked = UnlockedAnimals();
             foreach (Character.Animals a in Enum.GetValues(typeof(Character.Animals))) {
                 if (a == Character.Animals.NONE) continue;
-                try {
-                    if (unlocked != null && (int)a < unlocked.Length && !unlocked[(int)a]) continue;   // 只列已解锁
-                } catch (Exception __u) { SRApi.Guard.Log("角色/解锁过滤", __u); }
+                bool ok = true;
+                try { if (unlocked != null && (int)a < unlocked.Length) ok = unlocked[(int)a]; }
+                catch (Exception __u) { SRApi.Guard.Log("角色/解锁过滤", __u); ok = true; }
                 Animals.Add(a.ToString());
-                AnimalLabels.Add(AnimalZh(a.ToString()));
+                // 全量列出（解锁表可能缺项/DLC 不同步，以前过滤会把角色漏掉）；未解锁的加后缀
+                AnimalLabels.Add(AnimalZh(a.ToString()) + (ok ? "" : SRApi.T("（未解锁）", " (locked)")));
             }
             if (Animals.Count == 0) { Animals.Add("CHICKEN"); AnimalLabels.Add(AnimalZh("CHICKEN")); }
         }
@@ -154,7 +155,7 @@ namespace SR_UCH.Tweaks {
                 if (_animal != null && Animals.Count > 0)
                     SRApi.Ctl.RowCombo(SRApi.T("指定动物", "Target animal"),
                         SRApi.T("自动选择的目标角色\n从已解锁角色里选一个\n只有「选择方式=指定角色」时生效", "the animal auto-pick targets\nchosen from your unlocked animals\nonly used when pick mode is Specific"),
-                        _animal, Animals.ToArray(), AnimalLabels.ToArray(), 170f);
+                        _animal, Animals.ToArray(), AnimalLabels.ToArray(), 170f, 96f);   // 标签宽度与「选择方式」一致，控件左边缘对齐
                 } finally { GUI.enabled = oldEnabled; }
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动选择页", __ex); }
         }

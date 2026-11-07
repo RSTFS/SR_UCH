@@ -581,6 +581,7 @@ namespace SR_UCH.Tweaks {
         private static void Render() {
             try {
                 _renderFrame = Time.frameCount;
+                SRApi.NoPageScrollBars = true;   // 填充模式：列表占满剩余区域，页面本身不滚动
                 EnsureLoaded();
                 EnsureCols();
                 // 本帧开始前的二次确认状态：只有"之前已确认、本帧又没点中操作按钮"才在空白处取消，
@@ -1070,7 +1071,7 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                 _maxScrollX = Mathf.Max(0f, totalW - stripW);
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
                 _rowsHCache = rowsH;   // 缓存真实行区高：滚轮钩子在首帧/刚切页时用它兜底
-                _maxScrollY = Mathf.Max(0f, visible.Count * rowH - rowsH);
+                _maxScrollY = Mathf.Max(0f, visible.Count * rowH - rowsH + rowH * 0.5f);   // 半行余量：最后一行能完整露出来
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _maxScrollY);
                 Event e = Event.current;
                 Vector2 mp = e != null ? e.mousePosition : Vector2.zero;

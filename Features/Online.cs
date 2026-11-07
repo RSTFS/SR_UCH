@@ -459,6 +459,7 @@ namespace SR_UCH.Tweaks {
         private static int _renderFrame = -1000;   // 本页最近一次被渲染的帧（滚轮钩子只在自己页面上工作）
         private static float _lastLobbyAutoRefresh = -1000f;   // 列表自动刷新（房间条目会过期，久不刷新就"全失联"）
         private static void RenderOnlinePage() {
+            SRApi.NoPageScrollBars = true;   // 填充模式：列表占满剩余区域，页面本身不滚动
             _renderFrame = Time.frameCount;
             // 本页无页面级滚动：表头 / 筛选必须始终可见，房间只在下方框内滚动。
             // 页面滚动交给核心：不要每帧清零（清零会让"列表滚到底后交给页面滚动"永远不生效）。

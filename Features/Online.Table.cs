@@ -222,7 +222,7 @@ namespace SR_UCH.Tweaks {
             _joinXPage = box.x + viewW - joinW;
             _rowsClipPage = new Rect(box.x, box.y + headerH, stripW, rowsH);
             _tableMaxX = Mathf.Max(0f, totalW - stripW);
-            _tableMaxY = Mathf.Max(0f, contentH - rowsH);
+            _tableMaxY = Mathf.Max(0f, contentH - rowsH + rowH * 0.5f);   // 半行余量：最后一行能完整露出来
             _rowsHCache = rowsH;
             _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _tableMaxX);
             _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _tableMaxY);
