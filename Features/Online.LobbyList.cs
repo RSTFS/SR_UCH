@@ -190,14 +190,33 @@ namespace SR_UCH.Tweaks {
 
         // 房主是否已失联（僵尸房间）：房主每 10 秒上报一次心跳，断 10 秒即视为房间已死。
         // 仅用于显示标记，不参与 IsJoinable 与筛选。
+        // 心跳是否停更：**不跨时钟比较**。
+        // 游戏里 lastHearbeatTime 来自 Steam 房主数据 data_lastHostHeartbeat/1000（绝对时间），
+        // 而 GetServerTime() 在 Steam 后端是 SteamUtils.GetServerRealTime()（绝对）、
+        // 在 GameSparks 后端却是 serverTimeDifference + Time.realtimeSinceStartup（相对量）。
+        // 两者相减在有偏差时会"整页房间同时失联"（用户看到的 5 秒全失联就是这个）。
+        // 改为本地观察：记住每个房间第一次看到这个心跳值的时刻，值变了就刷新；
+        // 同一个值持续超过 StaleSeconds 才算失联 —— 与任何服务器时钟无关。
+        private const float StaleSeconds = 15f;
+        private static readonly Dictionary<string, float> _hbSeenAt = new Dictionary<string, float>();
+        private static readonly Dictionary<string, uint> _hbValue = new Dictionary<string, uint>();
+
         private static bool IsStale(Matchmaker.LobbyListInfo li) {
             try {
                 if (li == null || li.lastHearbeatTime == 0u) return false;   // 没上报过 / 字段缺时不猜
-                uint now = 0u;
-                var cl = Matchmaker.CurrentMatchmakingLobby;
-                if (cl != null) now = cl.GetServerTime();
-                if (now == 0u) return false;                                  // 拿不到服务器时间时不猜
-                return now > li.lastHearbeatTime + 10u;
+                string id = li.sLobbyID ?? "";
+                if (id.Length == 0) return false;
+                float now = Time.realtimeSinceStartup;
+                uint seen;
+                if (!_hbValue.TryGetValue(id, out seen) || seen != li.lastHearbeatTime) {
+                    _hbValue[id] = li.lastHearbeatTime;
+                    _hbSeenAt[id] = now;
+                    if (_hbValue.Count > 512) { _hbValue.Clear(); _hbSeenAt.Clear(); _hbValue[id] = li.lastHearbeatTime; _hbSeenAt[id] = now; }
+                    return false;                                            // 心跳刚更新
+                }
+                float first;
+                if (!_hbSeenAt.TryGetValue(id, out first)) { _hbSeenAt[id] = now; return false; }
+                return now - first > StaleSeconds;
             } catch { return false; }
         }
 
