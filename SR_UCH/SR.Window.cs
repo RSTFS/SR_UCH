@@ -287,6 +287,14 @@ public partial class SR {
                     float __raw0 = Mathf.Abs(__we0.delta.y) > 0.001f ? __we0.delta.y : __we0.delta.x;
                     if (SR.Wheel.TryHoverApply(-__raw0)) { __we0.Use(); }
                 }
+                // 第二条通道：Unity 即时输入 Input.mouseScrollDelta。
+                // IMGUI 的 ScrollWheel 事件可能被滚动视图先吃掉，而这个是轮询值，不受事件顺序影响。
+                // 每帧只处理一次，命中控件后标记"本帧滚轮已用"，帧尾就不会再滚页面。
+                if (!SR.WheelTakenThisFrame) {
+                    float __inw = 0f;
+                    try { __inw = Input.mouseScrollDelta.y; } catch (Exception __ms) { Guard.Log("滚轮/即时输入", __ms); }
+                    if (Mathf.Abs(__inw) > 0.01f && SR.Wheel.TryHoverApply(__inw)) SR.MarkWheelUsed();
+                }
             } catch (Exception __hw) { Guard.Log("滚轮/提前命中外层", __hw); }
 
             Rect winRect = new Rect(_winX, _winY, _winWidth, _winHeight);
@@ -646,7 +654,7 @@ public partial class SR {
             }
             // ---- 滚轮结算（帧尾）：控件没取走的才滚页面 ----
             try {
-                if (SR.Wheel.HasPending) {
+                if (SR.Wheel.HasPending && !SR.WheelTakenThisFrame) {   // 控件已通过即时输入消费：不许再滚页面
                     if (SR.Wheel.CtrlHeld) {
                         // Ctrl+滚轮 = 切页签（设置页在通用/自检之间切）
                         if (_mode == Mode.Internal) CyclePage(_selectedInternalSection, SR.Wheel.Value > 0f ? -1 : 1);
