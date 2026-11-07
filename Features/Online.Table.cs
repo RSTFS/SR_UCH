@@ -219,6 +219,17 @@ namespace SR_UCH.Tweaks {
             // 操作列钉在表格右边缘，不参与横向滚动，加入按钮始终可见可点。
             float joinW = SRApi.Ctl.Sc(_cw[JoinCol]);
             float stripW = Mathf.Max(SRApi.Ctl.Sc(40), viewW - joinW);     //可横向滚动的列区
+            // 列策略（对齐 ImGui 的 WidthStretch）：房主列做拉伸列——扣掉其余可见固定列后把剩余宽度给它，
+            // 窗口宽时不留空、窄时自动出现横向滚动。拉伸值每帧重算，用户拖它不会把值固化进配置。
+            float __fixedOther = 0f;
+            for (int i = 0; i < ColCount; i++) {
+                int __ci = _order != null && i < _order.Length ? _order[i] : i;
+                if (__ci == JoinCol || __ci == HostCol || _hiddenCols.Contains(__ci)) continue;
+                __fixedOther += SRApi.Ctl.Sc(_cw[__ci]);
+            }
+            float __hostW = Mathf.Max(SRApi.Ctl.Sc(70f), stripW - __fixedOther);
+            _cw[HostCol] = __hostW / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f));
+
             // 可见列由核心 TableDraw 按 order + hidden 自行推导（本页不再维护可见列副本），
             // 这里只按同一规则提前算横向滚动上限。
             float totalW = 0f;

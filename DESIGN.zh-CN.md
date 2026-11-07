@@ -127,6 +127,22 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
 填充页的结构固定为 `固定头部 → 列表 → 底边拖拽条` 三段，新增列表页时照抄联机页/预设页的
 `RenderXxxHeader() + ComputeFillTableHeight() + RenderXxxTable()` 三段式，不要再让页面滚动与列表滚动并存。
 
+### 4.3b 表格列策略
+
+对齐 ImGui 的 `ImGuiTableColumnFlags_WidthFixed/WidthStretch`：每列有自己的宽度策略。
+
+| 策略 | 列 | 行为 |
+|---|---|---|
+| **固定** | 其余数据列 | 宽度来自持久化配置，可拖动调整 |
+| **拉伸** | 预设页「名称」、联机页「房主」 | 每帧重算：扣掉其余可见固定列后占满剩余宽度，下限 80（联机 70）设计单位；窗口宽时不留空，窄时其余列溢出并出现横向滚动 |
+| **钉住** | 操作/加入列 | 固定在右侧、不参与横向滚动 |
+
+注意：
+
+- 拉伸列在**绘制副本**里计算（预设页 `_drawW`），不会把拉伸值写进配置；拖动固定列的宽度照常回写持久化值
+- 新增列表时给"最长文本"的那一列标为拉伸列，不要把宽度写死
+- 冻结**左侧多列**（ImGui 的 `TableSetupScrollFreeze`）尚未实现：目前只有右侧钉住列
+
 ### 4.4 滚轮（"待处理量"模型，对齐 Dear ImGui 的输入路由）
 
 ImGui 的 examples/ 目录里放的都是**后端接入**（把平台事件喂给 `io.AddMouseWheelEvent`）与

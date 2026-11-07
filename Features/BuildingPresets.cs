@@ -102,6 +102,7 @@ namespace SR_UCH.Tweaks {
 
         // 标准表格（核心 TableDraw）状态：列宽 / 列序 / 隐藏列 / 可见列 / 命中矩形缓存 / 滚动 / 拖拽。
         private static readonly float[] _colW = new float[ColCount];
+        private static float[] _drawW;   // 绘制用列宽副本（拉伸列只改它）
         // 初值必须与 ColCount 同长（曾经写成 5 项：DeriveVisibleCols 会因长度不符直接 return，表格一列不画）。
         // EnsureCols 里还会用 NormalizeOrder 归一再兜一层，但声明处就该是对的。
         private static int[] _order = new int[] { 0, 1, 2, 3, 4, 5 };
@@ -1055,12 +1056,27 @@ namespace SR_UCH.Tweaks {
                 float __pinMax = Mathf.Max(SRApi.Ctl.Sc(40f), box.width - SRApi.Ctl.Sc(80f));
                 if (pinW > __pinMax) pinW = __pinMax;
                 float stripW = Mathf.Max(0f, box.width - pinW - __sbW);
+                // 列策略（对齐 ImGui 的 WidthStretch）：名称列做"拉伸列"——先把其他可见固定列
+                // 的宽度扣掉，剩下的全给它（下限 80 设计单位）。这样窗口宽时不留空、窗口窄时
+                // 其他列溢出并自动出现横向滚动；用户拖名称列宽会被下一帧重新拉伸（与 ImGui 一致：
+                // 拉伸列不单独可调）。
+                // 拉伸列只在**绘制副本**里生效，不动持久化宽度（否则一次拖拽会把拉伸值写进配置）。
+                if (_drawW == null || _drawW.Length != _colW.Length) _drawW = new float[_colW.Length];
+                System.Array.Copy(_colW, _drawW, _colW.Length);
+                float __fixedOther = 0f;
+                for (int i = 0; i < _order.Length; i++) {
+                    int __ci = _order[i];
+                    if (__ci == ColAction || __ci == ColName || _hiddenCols.Contains(__ci)) continue;
+                    __fixedOther += SRApi.Ctl.Sc(_colW[__ci]);
+                }
+                float __nameW = Mathf.Max(SRApi.Ctl.Sc(80f), stripW - __fixedOther);
+                _drawW[ColName] = __nameW / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f));
                 float totalW = 0f;
                 for (int i = 0; i < _order.Length; i++) {
                     int ci = _order[i];
                     if (ci == ColAction) continue;
                     if (_hiddenCols.Contains(ci)) continue;   // 隐藏列不占宽度（否则能横向滚进空白）
-                    totalW += SRApi.Ctl.Sc(_colW[ci]);
+                    totalW += SRApi.Ctl.Sc(_drawW[ci]);
                 }
                 _maxScrollX = Mathf.Max(0f, totalW - stripW);
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
@@ -1075,7 +1091,7 @@ namespace SR_UCH.Tweaks {
                 _args.rowH = rowH;
                 _args.rowsH = rowsH;
                 _args.stripW = stripW;
-                _args.colW = _colW;
+                _args.colW = _drawW;
                 _args.vis = _vis;
                 _args.rowCount = visible.Count;
                 _args.pinCol = ColAction;
@@ -1136,6 +1152,11 @@ namespace SR_UCH.Tweaks {
                     if (Mathf.Abs(__w) > 0.01f) ScrollTableBy(__w);
                 }
                 SRApi.TableDraw(_args);
+                // 拖列宽的结果在 _drawW 里（核心直接改传进去的数组）：除拉伸列外同步回持久化宽度
+                for (int i = 0; i < _colW.Length && i < _drawW.Length; i++) {
+                    if (i == ColName) continue;
+                    if (Mathf.Abs(_colW[i] - _drawW[i]) > 0.01f) _colW[i] = _drawW[i];
+                }
                 HandlePresetCells();   // 数据列：悬浮预览 / 左键切三态 / 右键开界面；名称列：右键重命名
                 // 不画底边拖拽条：预设列表不需要手动调高（整块区域就是列表）。
                 // 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
