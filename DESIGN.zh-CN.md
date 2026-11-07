@@ -102,6 +102,10 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
 
 ### 4.3 三条硬约束（都踩过坑）
 
+0. **有守卫的 UI 约定**：`build/guards-text.ps1` 的 `Check-UiConventions` 对两件事做棘轮：
+   功能层手写 `GUILayout.BeginHorizontal` 的次数、手写 `GUI.enabled =` 的次数（基线见
+   `build/ui-raw-layout.txt` / `build/ui-enabled.txt`），**只允许减少**。需要新行时用 `SRApi.Ctl` 的行控件；
+   需要禁用时用 `using (SRApi.Ctl.Disabled(cond))`。
 0. **GUI 状态用作用域**：禁用/着色一律 `using (SRApi.Ctl.Disabled(cond))`、`using (SRApi.Ctl.Tint(c))`，
    不要手写 `GUI.enabled = old` 再还原（漏一次就整页变灰）。对应 ImGui 的 `BeginDisabled/PushStyleColor`。
    数值行支持 **Ctrl+点击滑块 → 直接输入数值**；下拉框展开后支持 **Up/Down 换项、Enter/Esc 收起**。

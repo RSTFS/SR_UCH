@@ -414,6 +414,38 @@ function Check-FileSize {
     }
 }
 
+# UI 约定棘轮：功能层"手写布局组/手写 GUI.enabled"的次数只允许减少。
+# 历史教训：手写 BeginHorizontal 漏 EndHorizontal、漏还原 GUI.enabled，会整页错位/变灰。
+# 新代码请用 SRApi.Ctl 的行控件与 using(SRApi.Ctl.Disabled(...))。
+function Check-UiConventions {
+    $checks = @(
+        @{ Name = '裸 GUILayout.BeginHorizontal'; File = 'ui-raw-layout.txt'; Pattern = 'GUILayout\.BeginHorizontal\(' },
+        @{ Name = '手写 GUI.enabled';            File = 'ui-enabled.txt';     Pattern = 'GUI\.enabled\s*=' }
+    )
+    foreach ($c in $checks) {
+        $basePath = Join-Path $PSScriptRoot $c.File
+        if (-not (Test-Path -LiteralPath $basePath)) { continue }
+        $base = @{}
+        foreach ($l in [System.IO.File]::ReadAllLines($basePath)) {
+            $x = $l.Trim()
+            if (-not $x -or $x.StartsWith('#')) { continue }
+            $i = $x.IndexOf('=')
+            if ($i -gt 0) { $base[$x.Substring(0, $i)] = [int]$x.Substring($i + 1) }
+        }
+        $bad = @()
+        foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $Root 'Features') -Filter '*.cs' -File)) {
+            $rel = 'Features/' + $f.Name
+            $n = ([regex]::Matches([System.IO.File]::ReadAllText($f.FullName), $c.Pattern)).Count
+            if ($n -eq 0) { continue }
+            $allowed = 0
+            if ($base.ContainsKey($rel)) { $allowed = $base[$rel] }
+            if ($n -gt $allowed) { $bad += ($rel + ' ' + $allowed + '->' + $n) }
+        }
+        if ($bad.Count -gt 0) { Bad ($c.Name + ' 变多：' + (($bad | Select-Object -First 3) -join '; ') + '（改用 SRApi.Ctl 的行控件 / Disabled 作用域）') }
+        else { Ok ($c.Name + ' 未增长') }
+    }
+}
+
 Write-Host '== SR_UCH 文本类守卫（不需要游戏 / 不需要 csc）=='
 Check-ApiSurface
 Check-ContractBoundary
@@ -428,6 +460,7 @@ Check-RegionFields
 Check-SilentCatch
 Check-TipComposer
 Check-FileSize
+Check-UiConventions
 if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); exit 1 }
 Write-Host '== 文本类守卫全部通过 ✅ =='
 exit 0

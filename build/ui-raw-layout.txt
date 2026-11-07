@@ -1,0 +1,11 @@
+# 功能层手写 GUILayout.BeginHorizontal 的次数基线（只允许减少）
+Features/BuildingPresets.cs=6
+Features/BuildingTools.cs=1
+Features/CharacterAuto.cs=3
+Features/Chat.Log.cs=3
+Features/Experiments.Misc.cs=1
+Features/HUD.cs=1
+Features/Level.PartyBox.cs=2
+Features/Level.Tool.cs=1
+Features/Online.cs=4
+Features/QuickAdjust.cs=4

@@ -1,0 +1,6 @@
+# 手写 GUI.enabled = 的次数基线（新代码请用 SRApi.Ctl.Disabled()，只允许减少）
+Features/BuildingTools.cs=2
+Features/CharacterAuto.cs=2
+Features/Online.cs=2
+SR_UCH/SR.Contracts.cs=3
+SR_UCH/SR.Settings.cs=2

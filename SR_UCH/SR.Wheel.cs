@@ -24,13 +24,13 @@ namespace SR_UCH.Tweaks {
             internal static bool HasPending { get { return _hasEvent && Mathf.Abs(_pending) > 0.5f; } }
             internal static string LastDecision = "none";   // 诊断：谁取走了这一格
 
-            private static int _frame = -1;
+            private static int _pendFrame = -1;
 
             // 事件趟：记下滚轮量并**立刻消费事件**，之后只由我们决定归属。
             // 与 ImGui 一致：同一帧内多次滚轮事件是**累加**的（io.MouseWheel += wheel），
             // 不是后一次覆盖前一次；否则连续两格只会生效一格。
             internal static void FrameStart(Event e) {
-                if (Time.frameCount != _frame) { _frame = Time.frameCount; _pending = 0f; _mouse = Vector2.zero; _shift = _ctrl = false; }
+                if (Time.frameCount != _pendFrame) { _pendFrame = Time.frameCount; _pending = 0f; _mouse = Vector2.zero; _shift = _ctrl = false; }
                 _hasEvent = e != null && e.type == EventType.ScrollWheel;
                 // 同一帧的后续 OnGUI 趟没有滚轮事件，但仍有未取走的量：鼠标/修饰键沿用事件趟的
                 if (!_hasEvent) { _hasEvent = Mathf.Abs(_pending) > 0.01f; return; }
