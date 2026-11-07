@@ -62,7 +62,6 @@ namespace SR_UCH.Tweaks {
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("重生", "Respawn") + " -",
                     SRApi.T("挑战/自由模式通用：重生延迟、出生无敌、炮弹卡死自动重生、挑战死亡不弹记分板。",
                             "Challenge and freeplay: respawn delay, spawn invincibility, cannon stuck respawn and no death scoreboard."));
-                GUILayout.Space(SRApi.Ctl.Sc(2));
                 if (_delay != null) SRApi.Ctl.RowSlider(SRApi.T("重生延迟", "Respawn delay"),
                     SRApi.T("死亡后等多少秒再自动重生\n0 = 立即\n挑战/自由模式", "seconds to wait after death\n0 = instant\nchallenge and freeplay"),
                     _delay, 0f, 3f, "0.0");

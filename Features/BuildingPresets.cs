@@ -572,7 +572,7 @@ namespace SR_UCH.Tweaks {
             try {
                 float wa = SRApi.Ctl.Label.CalcSize(SRApi.Ctl.Content(SRApi.T("预设名称", "Preset name"))).x;
                 float wb = SRApi.Ctl.Label.CalcSize(SRApi.Ctl.Content(SRApi.T("XML 路径", "XML path"))).x;
-                _formLabelW = Mathf.Max(SRApi.Ctl.Sc(52f), Mathf.Max(wa, wb) + SRApi.Ctl.Sc(10f));
+                _formLabelW = Mathf.Max(SRApi.Ctl.Sc(52f), Mathf.Max(wa, wb) + SRApi.Ctl.Sc(4f));   // 标签与输入框间距缩小约 1/3
                 _formLabelSig = sig;
                 return _formLabelW;
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/标签宽度", __ex); return SRApi.Ctl.Sc(90f); }

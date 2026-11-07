@@ -265,7 +265,7 @@ public partial class Experiments : ITweak
             try {
                 SelfReg();
                 _launchKey = plugin.Config.Bind("Scene", "Lobby Launch Key", KeyCode.None, "按此键立即开始关卡（None = 不绑）。优先你投过票的门，否则票数最高的门；仅房主或离线有效。");
-                SRApi.RegisterTick("树屋工具", Tick);
+                SRApi.RegisterTick("KEY_树屋立即开始", Tick);   // 名字以 KEY 开头 = 输入类钩子，预算降频时也不跳帧
                 SRApi.RegisterSceneHook(Reset);
             } catch (Exception __ex) { SRApi.Guard.Log("树屋工具 初始化", __ex); }
         }

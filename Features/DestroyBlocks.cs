@@ -274,7 +274,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc("Destroy Blocks", "Toggle Key", "删除模式按键\n按住高亮候选方块（房客同样可用）\n可改绑，支持组合键", "Delete-mode key\nhold to highlight candidates (guests can use it too)\nrebindable, combos supported");
             SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
             SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除按键\n删除当前选中的方块（仅房主）\n房客按下只提示，不做删除；滚轮换目标", "Delete key\ndeletes the selected block (host only)\nguests only get a hint; the wheel cycles targets");
-            SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏总开关", null);
+            SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏", null);
             SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n开启后本页功能才生效\n默认仅房主可删；房客可高亮标记", "Block breaking master switch\nthe page works only while this is on\nhost-only by default; guests can highlight");
             SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
             SRApi.LocDesc("Destroy Blocks", "Select Mode", "候选排序方式\n距离＝离你近的优先；放置顺序＝新放的优先\n只影响选择顺序", "Candidate ordering\ndistance = nearest first; placement = newest first\nselection order only");

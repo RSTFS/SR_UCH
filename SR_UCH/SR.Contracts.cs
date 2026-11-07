@@ -1085,6 +1085,14 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             public static GUIStyle ChatArea { get { return Style("ChatArea"); } }
             public static GUIStyle SecHeader { get { return Style("SecHeader"); } }
         // 分区标题：宽度收缩到文字实际宽度，悬浮提示只在标题文字上出现（不再整行生效）。
+        // 统一按钮：自带悬浮说明（页面里不要再写裸 GUILayout.Button）
+        private static Func<string, string, float, float, bool> _button;
+        public static void SetButtonSink(Func<string, string, float, float, bool> f) { _button = f; }
+        public static bool Button(string label, string tip, float width = 0f, float height = 0f) {
+            Func<string, string, float, float, bool> f = _button;
+            return f != null && f(label, tip, width, height);
+        }
+
         public static void SectionTitle(string title, string tip = null) {
             try {
                 GUIContent c = new GUIContent(title, tip);
@@ -1092,7 +1100,7 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
                 Vector2 sz = st.CalcSize(c);
                 // 缓冲做进标题自身高度（以前用 GUILayout.Space 追加，紧邻的条目会把这点间距吃掉，
                 // 观感上看不到 —— 用户反馈 10）。这里高度 = 文字高 + 3px，缓冲一定占位。
-                GUILayout.Label(c, st, GUILayout.Width(sz.x), GUILayout.Height(sz.y + Sc(3)));
+                GUILayout.Label(c, st, GUILayout.Width(sz.x), GUILayout.Height(sz.y + Sc(8)));   // 统一底部留白，页面不再各自加 Space
             } catch { try { GUILayout.Label(title, SecHeader); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         }
             public static GUIStyle Btn { get { return Style("Btn"); } }

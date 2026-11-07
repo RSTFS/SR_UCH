@@ -241,8 +241,10 @@ public partial class SR {
                 GUILayout.BeginHorizontal();
                 try {
                     float lw = labelWidth > 0f ? Sc(labelWidth)
-                        : Mathf.Max(Sc(60), SR.Ctl.Label.CalcSize(SRApi.Ctl.Content(label, tip)).x + Sc(10));
+                        // 默认 = 本区最长标签宽度（与方块破坏页同一套对齐规则），再留 6px 间距
+                        : Mathf.Max(Sc(60), EntryNameWidth() + Sc(12));
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
+                    GUILayout.Space(Sc(6));
                     if (e != null) RenderControl(e);
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
@@ -257,8 +259,10 @@ public partial class SR {
                 GUILayout.BeginHorizontal();
                 try {
                     float lw = labelWidth > 0f ? Sc(labelWidth)
-                        : Mathf.Max(Sc(60), SR.Ctl.Label.CalcSize(SRApi.Ctl.Content(label, tip)).x + Sc(10));
+                        // 默认 = 本区最长标签宽度（与方块破坏页同一套对齐规则），再留 6px 间距
+                        : Mathf.Max(Sc(60), EntryNameWidth() + Sc(12));
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
+                    GUILayout.Space(Sc(6));
                     string cur = e.BoxedValue as string ?? "";
                     int idx = 0;
                     for (int i = 0; i < vals.Length; i++) if (vals[i] == cur) { idx = i; break; }
@@ -288,8 +292,10 @@ public partial class SR {
                 GUILayout.BeginHorizontal();
                 try {
                     float lw = labelWidth > 0f ? Sc(labelWidth)
-                        : Mathf.Max(Sc(60), SR.Ctl.Label.CalcSize(SRApi.Ctl.Content(label, tip)).x + Sc(10));
+                        // 默认 = 本区最长标签宽度（与方块破坏页同一套对齐规则），再留 6px 间距
+                        : Mathf.Max(Sc(60), EntryNameWidth() + Sc(12));
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
+                    GUILayout.Space(Sc(6));
                     float cur = (float)e.BoxedValue;
                     Rect r = GUILayoutUtility.GetRect(Sc(150f), Sc(28f));
                     float v = DrawSlider(r, cur, min, max, false);
@@ -344,6 +350,15 @@ public partial class SR {
             // 左右内边距（与按钮同一套 FramePadding）+ 箭头区，宽度随缩放走。
             return Mathf.Clamp(maxText + Sc(FramePadX * 2 + 20f), minW, maxW);
         }
+        // 统一按钮：带悬浮说明（页面里不要再写裸 GUILayout.Button）
+        public static bool Button(string label, string tip, float width = 0f, float height = 0f) {
+            GUIContent c = string.IsNullOrEmpty(tip) ? new GUIContent(label) : new GUIContent(label, tip);
+            if (width > 0f && height > 0f) return GUILayout.Button(c, SR.Ctl.Btn, GUILayout.Width(Sc(width)), GUILayout.Height(Sc(height)));
+            if (width > 0f) return GUILayout.Button(c, SR.Ctl.Btn, GUILayout.Width(Sc(width)));
+            if (height > 0f) return GUILayout.Button(c, SR.Ctl.Btn, GUILayout.Height(Sc(height)));
+            return GUILayout.Button(c, SR.Ctl.Btn);
+        }
+
         public static void WrapLabel(string text) { SR.WrapLabel(text); }
         public static float SidebarWidth() { return SR.SidebarWidth(); }
         // 写配置值（会标记待保存）

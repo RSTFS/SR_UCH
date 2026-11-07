@@ -1109,7 +1109,7 @@ public partial class SR {
                     float wv = WheelDeltaTake();
                     if (Mathf.Abs(wv) > 0.0001f) {
                         float stepAmt = step > 0f ? step : (intStep ? 1f : Mathf.Max((max - min) * 0.02f, 0.001f));
-                        float adj = value + (wv > 0f ? stepAmt : -stepAmt);
+                        float adj = value + (wv > 0f ? -stepAmt : stepAmt);   // 上滚减小（用户要求反转）
                         adj = Mathf.Clamp(adj, min, max);
                         if (step > 0f) adj = Mathf.Round(adj / step) * step;
                         else if (intStep) adj = Mathf.Round(adj);

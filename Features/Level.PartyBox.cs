@@ -17,10 +17,10 @@ public partial class Level {
         SRApi.Ctl.SectionTitle("- " + SRApi.T("道具", "Items") + " -",
             SRApi.T("道具：开箱自动选择，以及放弃道具。",
                     "Items: auto-pick one when the box opens, plus the game's native drop-piece key."));
-        GUILayout.Space(SRApi.Ctl.Sc(2));
         // 分区内显式排序：自动道具 → 自动道具延迟 → 放弃道具 → 跳过炸弹
         float __itemCol = Mathf.Max(SRApi.Ctl.Sc(180), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(240));
         ConfigEntryBase __autoEntry = SRApi.Ctl.FindEntry("Level", "Auto Party Item");
+        GUILayout.Space(SRApi.Ctl.Sc(4));
         if (__autoEntry != null) SRApi.Ctl.LabeledRow(SRApi.T("自动道具", "Auto party item"),
             SRApi.T("开箱后自动随机挑一个\n与手动挑选同一条链路，服务端发放\n关闭则不自动挑", "Picks a random piece when the box opens\nSame path as picking by hand; the server hands it over\nOff = no auto pick"), __autoEntry, 120f);
 
@@ -33,10 +33,12 @@ public partial class Level {
                 __dl, 0f, 3f, "0.0");
         // 跳过炸弹（自动道具下面）
         ConfigEntryBase __skip = SRApi.Ctl.FindEntry("Level", "Auto Party Item Skip Bomb");
+        GUILayout.Space(SRApi.Ctl.Sc(4));
         if (__skip != null) SRApi.Ctl.LabeledRow(SRApi.T("跳过炸弹", "Skip bombs"),
             SRApi.T("自动挑道具时排除派对盒里的炸弹\n关闭后炸弹也可能被自动挑中\n只影响自动挑选", "Exclude party-box bombs when auto picking\nWhen off a bomb may be picked\nAuto pick only"), __skip, 120f);
         // 放弃道具（道具分区最下面）
         ConfigEntryBase __drop = SRApi.Ctl.FindEntry("Level", "Drop Held Piece");
+        GUILayout.Space(SRApi.Ctl.Sc(4));
         if (__drop != null) SRApi.Ctl.LabeledRow(SRApi.T("放弃道具", "Drop held piece"),
             SRApi.T("排队阶段丢弃手上的道具\n请勿删除边界墙和出生方块，一经删除无法复原\n仅排队阶段、走游戏原生通道", "Discards the held piece during the pick phase\nDo not delete boundary walls or spawn blocks; they cannot be restored\nPick phase only, uses the game channel"), __drop, 120f);
 

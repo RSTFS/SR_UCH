@@ -80,7 +80,6 @@ namespace SR_UCH.Tweaks {
             SRApi.Ctl.SectionTitle("- " + SRApi.T("建造", "Build") + " -",
                 SRApi.T("建造增强：让方块无视放置规则、按更细的网格自由微调摆放。",
                         "Build: place pieces ignoring the placement rules and snap on a finer grid."));
-            GUILayout.Space(SRApi.Ctl.Sc(2));
             for (int i = 0; i < entries.Count; i++) {
                 ConfigEntryBase e = entries[i];
                 if (!IsEnhanceKey(e.Definition.Key)) continue;
@@ -92,7 +91,6 @@ namespace SR_UCH.Tweaks {
             GUILayout.Space(SRApi.Ctl.Sc(6));
             SRApi.Ctl.SectionTitle("- " + SRApi.T("建造上限", "Build Limit") + " -", SRApi.T("建造上限（BuildUnlimiter）：解除树屋保存/发布界面的关卡满度限制，超满的关卡也能正常发布/上传。",
                      "Build Limit (BuildUnlimiter): lifts the treehouse save/publish fullness cap so over-full levels can be published."));
-            GUILayout.Space(SRApi.Ctl.Sc(2));
             // 该行为手工排版：标签占名称列宽度 + 间隔 6 + 主控件列，与下方两行的编辑框左边缘对齐。
             GUILayout.BeginHorizontal();
             // GUILayout.Label 不会像 RestoreLabel 那样收缩到文字宽度，宽度需按文字实测。

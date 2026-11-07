@@ -36,8 +36,16 @@ namespace SR_UCH.Tweaks {
         // 可用动物：优先读存档的解锁表（与实际解锁一致）；读不到时退回枚举全集。
         private static readonly List<string> Animals = new List<string>();
         private static readonly List<string> AnimalLabels = new List<string>();
+        private static string _animalLang;   // 上次构建列表时的游戏语言
+        private static string CurrentLang() {
+            try { return global::I2.Loc.LocalizationManager.CurrentLanguageCode ?? ""; } catch { return ""; }
+        }
         private static void EnsureAnimalList() {
-            if (Animals.Count > 0) return;
+            // 语言变了就重建：否则切语言后动物列表仍是旧语言的文字
+            string lang = CurrentLang();
+            if (Animals.Count > 0 && lang == _animalLang) return;
+            _animalLang = lang;
+            Animals.Clear(); AnimalLabels.Clear();
             bool[] unlocked = UnlockedAnimals();
             foreach (Character.Animals a in Enum.GetValues(typeof(Character.Animals))) {
                 if (a == Character.Animals.NONE) continue;
@@ -154,16 +162,16 @@ namespace SR_UCH.Tweaks {
                 GUILayout.Space(SRApi.Ctl.Sc(4f));
                 GUILayout.BeginHorizontal();
                 try {
-                    if (GUILayout.Button(SRApi.T("随机整套", "Randomize all"), SRApi.Ctl.Btn,
-                            GUILayout.Width(SRApi.Ctl.Sc(120f)), GUILayout.Height(SRApi.Ctl.Sc(26f))))
+                    if (SRApi.Ctl.Button(SRApi.T("随机整套", "Randomize all"),
+                            SRApi.T("只重抽当前角色的一套外观并覆盖它的记录\n其它角色不受影响", "rerolls only the current animal's look and overwrites its record\nother animals are untouched"), 120f, 26f))
                         RandomizeCurrent();
                     GUILayout.Space(SRApi.Ctl.Sc(8));
-                    if (GUILayout.Button(SRApi.T("清空时装", "Clear outfit"), SRApi.Ctl.Btn,
-                            GUILayout.Width(SRApi.Ctl.Sc(110f)), GUILayout.Height(SRApi.Ctl.Sc(26f))))
+                    if (SRApi.Ctl.Button(SRApi.T("清空时装", "Clear outfit"),
+                            SRApi.T("关闭当前角色的全部外观并标记为「不要自动穿」\n想恢复随机请点「随机整套」", "turns off every outfit on the current animal and marks it as do-not-auto-dress\nuse Randomize all to roll again"), 110f, 26f))
                         ClearCurrentOutfit();
                     GUILayout.Space(SRApi.Ctl.Sc(8));
-                    if (GUILayout.Button(SRApi.T("原地换装", "Dress here"), SRApi.Ctl.Btn,
-                            GUILayout.Width(SRApi.Ctl.Sc(110f)), GUILayout.Height(SRApi.Ctl.Sc(26f))))
+                    if (SRApi.Ctl.Button(SRApi.T("原地换装", "Dress here"),
+                            SRApi.T("在角色当前位置打开游戏原生的换装界面\n需要先选好角色；Accept/Back 关闭", "opens the game's own dresser at the character's position\npick an animal first; close with Accept/Back"), 110f, 26f))
                         OpenNativeDress();
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
@@ -324,8 +332,9 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("角色/自动时装", __ex); }
         }
 
-        // 原地换装：调用游戏自己的换装界面（树屋里的 OutfitChangeProp 预制体），
-        // 但把界面放在角色当前位置，而不是把角色传送到衣柜前。
+        // 原地换装：完全走游戏原生链路 —— 调场景里 OutfitChangeProp.Use()（它会置 InMenu、Freeze、
+        // 记录 usedInputKey、实例化并 Show OutfitController，之后 Accept/Back 走原生 Release），
+        // 唯一的额外处理是：Use 结束后把界面和角色位置都还原到角色原来的位置（原生会把人拉到衣柜前）。
         private static void OpenNativeDress() {
             try {
                 LobbyManager lm = LobbyManager.instance;
@@ -333,19 +342,25 @@ namespace SR_UCH.Tweaks {
                 LobbyPlayer lp = LocalLobbyPlayer(lm);
                 if (lp == null || lp.CharacterInstance == null) { SRApi.Notify(SRApi.T("先选一个角色", "Pick an animal first")); return; }
                 OutfitChangeProp prop = UnityEngine.Object.FindObjectOfType<OutfitChangeProp>();
-                if (prop == null || prop.outfitControllerPrefab == null) { SRApi.Notify(SRApi.T("当前场景没有换装对象", "No dresser in this scene")); return; }
+                if (prop == null || prop.OutfitManager == null) { SRApi.Notify(SRApi.T("当前场景没有换装对象", "No dresser in this scene")); return; }
+                // 原生 Show 依赖解锁表；表没建好会 KeyNotFound（原生 UI 打不开的常见原因）
+                try {
+                    if (prop.OutfitManager.characterOutfitsUnlocked == null || prop.OutfitManager.characterOutfitsUnlocked.Count == 0)
+                        prop.OutfitManager.RebuildDatabase();
+                } catch (Exception __rd) { SRApi.Guard.Log("角色/换装解锁表", __rd); }
                 Character ch = lp.CharacterInstance;
-                OutfitController ctrl = UnityEngine.Object.Instantiate(prop.outfitControllerPrefab);
-                ctrl.OutfitManager = prop.OutfitManager;
-                ctrl.outfitChangeProp = prop;
-                ctrl.player = lp;
-                ctrl.characterUsing = ch;
-                ctrl.transform.position = ch.transform.position;       // 原地
-                ctrl.UseController = lp.LocalPlayer != null ? lp.LocalPlayer.UseController : null;
-                ctrl.Show();
-                SRApi.Notify(SRApi.T("已打开换装界面", "Dresser opened"));
+                Vector3 keep = ch.transform.position;
+                if (!prop.Use(lp, InputEvent.InputKey.Accept)) { SRApi.Notify(SRApi.T("游戏当前不允许换装", "The game does not allow dressing right now")); return; }
+                OutfitController ctrl;
+                if (OutfitChangeProp.OutfitControllers.TryGetValue(ch, out ctrl) && ctrl != null) {
+                    ctrl.transform.position = keep;    // 界面留在原地
+                    ch.transform.position = keep;      // 角色不被传送到衣柜前
+                }
+                SRApi.Notify(SRApi.T("已打开换装界面（Accept/Back 关闭）", "Dresser opened (Accept/Back closes)"));
             } catch (Exception __ex) { SRApi.Guard.Log("角色/原地换装", __ex); }
         }
+
+
 
         // 清空当前角色的时装：四类全部关闭 + 删掉它的记录（下次会重新随机）。
         private static void ClearCurrentOutfit() {
@@ -364,7 +379,8 @@ namespace SR_UCH.Tweaks {
                     try { ch.OnOutfitsUpdated(all); } catch (Exception __uo) { SRApi.Guard.Log("角色/清空时装刷新", __uo); }
                     lp.CallCmdSetOutfitsFromArray(ch.GetOutfitsAsArray());
                 }
-                SetOutfitRecord(ch.CharacterSprite.ToString(), "");   // 删记录
+                // 标记为 none：清空后不要自动重穿（否则下一帧又会随机一套，看起来"清空没生效"）
+                SetOutfitRecord(ch.CharacterSprite.ToString(), "none");
                 _dressedFor = ch;
                 SRApi.Notify(SRApi.T("已清空该角色的时装", "Cleared this animal's outfit"));
             } catch (Exception __ex) { SRApi.Guard.Log("角色/清空时装", __ex); }
@@ -379,6 +395,8 @@ namespace SR_UCH.Tweaks {
                 if (all == null || all.Length == 0) return false;
                 string animal = ch.CharacterSprite.ToString();
                 string rec = reroll ? null : GetOutfitRecord(animal);
+                // "none" = 用户点过「清空时装」：不要自动再穿，等他手动随机
+                if (rec == "none") return true;
                 if (string.IsNullOrEmpty(rec)) {
                     rec = MakeRandomRecord(all);
                     SetOutfitRecord(animal, rec);
