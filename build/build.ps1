@@ -99,7 +99,8 @@ $rspFeatures = @(
     'feat_Online.rsp',
     'feat_BuildingPresets.rsp',
     'feat_HUD.rsp',
-    'feat_CharacterAuto.rsp'
+    'feat_CharacterAuto.rsp',
+    'feat_Respawn.rsp'
 )
 $outDir = Join-Path $Root 'bin\Release'
 

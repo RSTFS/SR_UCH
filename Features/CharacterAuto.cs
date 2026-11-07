@@ -60,25 +60,29 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("角色/读取解锁表", __ex); return null; }
         }
 
+        // 角色名直接用游戏自己的本地化表（ScriptLocalization.CharacterNames）；
+        // 取不到时退回枚举名，保证列表永远可用。
         private static string AnimalZh(string en) {
-            switch (en) {
-                case "CHICKEN": return SRApi.T("鸡", "Chicken");
-                case "HORSE": return SRApi.T("马", "Horse");
-                case "SHEEP": return SRApi.T("羊", "Sheep");
-                case "RACCOON": return SRApi.T("浣熊", "Raccoon");
-                case "CHAMELEON": return SRApi.T("变色龙", "Chameleon");
-                case "SQUIRREL": return SRApi.T("松鼠", "Squirrel");
-                case "ROBOT": return SRApi.T("机器人", "Robot");
-                case "ELEPHANT": return SRApi.T("大象", "Elephant");
-                case "MONKEY": return SRApi.T("猴子", "Monkey");
-                case "SNAKE": return SRApi.T("蛇", "Snake");
-                case "HIPPO": return SRApi.T("河马", "Hippo");
-                case "TURTLE": return SRApi.T("乌龟", "Turtle");
-                case "PANDA": return SRApi.T("熊猫", "Panda");
-                case "FOX": return SRApi.T("狐狸", "Fox");
-                case "PLATYPUS": return SRApi.T("鸭嘴兽", "Platypus");
-                default: return en;
-            }
+            try {
+                switch (en) {
+                    case "CHICKEN": return global::I2.Loc.ScriptLocalization.CharacterNames.Chicken;
+                    case "HORSE": return global::I2.Loc.ScriptLocalization.CharacterNames.Horse;
+                    case "SHEEP": return global::I2.Loc.ScriptLocalization.CharacterNames.Sheep;
+                    case "RACCOON": return global::I2.Loc.ScriptLocalization.CharacterNames.Raccoon;
+                    case "CHAMELEON": return global::I2.Loc.ScriptLocalization.CharacterNames.Chameleon;
+                    case "SQUIRREL": return global::I2.Loc.ScriptLocalization.CharacterNames.Squirrel;
+                    case "ROBOT": return global::I2.Loc.ScriptLocalization.CharacterNames.RobotMonkey;
+                    case "ELEPHANT": return global::I2.Loc.ScriptLocalization.CharacterNames.Elephant;
+                    case "MONKEY": return global::I2.Loc.ScriptLocalization.CharacterNames.Monkey;
+                    case "SNAKE": return global::I2.Loc.ScriptLocalization.CharacterNames.Snake;
+                    case "HIPPO": return global::I2.Loc.ScriptLocalization.CharacterNames.Hippo;
+                    case "TURTLE": return global::I2.Loc.ScriptLocalization.CharacterNames.Turtle;
+                    case "PANDA": return global::I2.Loc.ScriptLocalization.CharacterNames.Panda;
+                    case "FOX": return global::I2.Loc.ScriptLocalization.CharacterNames.Fox;
+                    case "PLATYPUS": return global::I2.Loc.ScriptLocalization.CharacterNames.Platypus;
+                }
+            } catch (Exception __gn) { SRApi.Guard.Log("角色/游戏角色名", __gn); }
+            return en;
         }
 
         private static Character.Animals ParseAnimal(string s) {
@@ -157,6 +161,10 @@ namespace SR_UCH.Tweaks {
                     if (GUILayout.Button(SRApi.T("清空时装", "Clear outfit"), SRApi.Ctl.Btn,
                             GUILayout.Width(SRApi.Ctl.Sc(110f)), GUILayout.Height(SRApi.Ctl.Sc(26f))))
                         ClearCurrentOutfit();
+                    GUILayout.Space(SRApi.Ctl.Sc(8));
+                    if (GUILayout.Button(SRApi.T("原地换装", "Dress here"), SRApi.Ctl.Btn,
+                            GUILayout.Width(SRApi.Ctl.Sc(110f)), GUILayout.Height(SRApi.Ctl.Sc(26f))))
+                        OpenNativeDress();
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动时装页", __ex); }
@@ -307,13 +315,36 @@ namespace SR_UCH.Tweaks {
                     lp.CallCmdSetOutfitsFromArray(ch.GetOutfitsAsArray());   // 同步给全场
                     _dressedFor = ch;
                     _dressRetry = 0;
-                } else if (++_dressRetry > 20) {
-                    // 20 次（约 2 秒）还没拿到外观组件：放弃这个角色，换角色/换场景会重置。
+                } else if (++_dressRetry > 1) {
+                    // 重试 1 次仍拿不到外观组件：放弃这个角色，换角色/换场景会重置。
                     _dressedFor = ch;
                     _dressRetry = 0;
                     SRApi.LogWarn("[角色] 该角色的外观组件一直没就绪，已跳过自动时装");
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("角色/自动时装", __ex); }
+        }
+
+        // 原地换装：调用游戏自己的换装界面（树屋里的 OutfitChangeProp 预制体），
+        // 但把界面放在角色当前位置，而不是把角色传送到衣柜前。
+        private static void OpenNativeDress() {
+            try {
+                LobbyManager lm = LobbyManager.instance;
+                if (lm == null) return;
+                LobbyPlayer lp = LocalLobbyPlayer(lm);
+                if (lp == null || lp.CharacterInstance == null) { SRApi.Notify(SRApi.T("先选一个角色", "Pick an animal first")); return; }
+                OutfitChangeProp prop = UnityEngine.Object.FindObjectOfType<OutfitChangeProp>();
+                if (prop == null || prop.outfitControllerPrefab == null) { SRApi.Notify(SRApi.T("当前场景没有换装对象", "No dresser in this scene")); return; }
+                Character ch = lp.CharacterInstance;
+                OutfitController ctrl = UnityEngine.Object.Instantiate(prop.outfitControllerPrefab);
+                ctrl.OutfitManager = prop.OutfitManager;
+                ctrl.outfitChangeProp = prop;
+                ctrl.player = lp;
+                ctrl.characterUsing = ch;
+                ctrl.transform.position = ch.transform.position;       // 原地
+                ctrl.UseController = lp.LocalPlayer != null ? lp.LocalPlayer.UseController : null;
+                ctrl.Show();
+                SRApi.Notify(SRApi.T("已打开换装界面", "Dresser opened"));
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/原地换装", __ex); }
         }
 
         // 清空当前角色的时装：四类全部关闭 + 删掉它的记录（下次会重新随机）。

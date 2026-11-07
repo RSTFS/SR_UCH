@@ -61,10 +61,10 @@ public partial class Experiments : ITweak
 }
 
     // 自由相机（实验）：经游戏自己的 ZoomCamera 生效，不直接写 Camera.fieldOfView（会被每帧覆盖）。
-    // 默认键 F3，滚轮调 FOV（1-32，每格 0.5）；仅开启时消费滚轮，每次启用从相机当前 FOV 起算，关闭时还原。
+    // 默认键 F3，滚轮调 FOV（1-64，每格 0.5）；仅开启时消费滚轮，每次启用从相机当前 FOV 起算，关闭时还原。
     [SrFeature("sr.freecam", "FreeCam", "1.0")]
     public class FreeCam : ITweak {
-        internal const float MinFov = 1f, MaxFov = 32f;
+        internal const float MinFov = 1f, MaxFov = 64f;   // 视野上限 64（用户要求）
         // 滚轮灵敏度：perspective 与 orthographic 两分支统一使用。
         private const float ZoomSensitivity = 0.5f;
         private static ConfigEntry<bool> _on;
@@ -77,7 +77,7 @@ public partial class Experiments : ITweak
             SRApi.LocKey("Experiments", "Free Camera", "自由相机", null);
             SRApi.LocDesc("Experiments", "Free Camera", "自由相机\n开启后可用滚轮缩放视野\n菜单与暂停界面不生效", "Free camera\nwheel zoom for the field of view\nnot applied in menus or the pause screen");
             SRApi.LocKey("Experiments", "Free Camera FOV", "视野大小", null);
-            SRApi.LocDesc("Experiments", "Free Camera FOV", "自由相机视野\n越小越近，越大越远\n范围 1-32；自由相机开启时滚轮也会改", "Free camera FOV\nsmaller is closer, larger is farther\n1-32; the wheel also changes it while on");
+            SRApi.LocDesc("Experiments", "Free Camera FOV", "自由相机视野\n越小越近，越大越远\n范围 1-64；自由相机开启时滚轮也会改", "Free camera FOV\nsmaller is closer, larger is farther\n1-64; the wheel also changes it while on");
             // 必须登记 LocKey/LocDesc，否则界面回退显示英文键名。
             SRApi.LocKey("Experiments", "Free Camera Speed", "相机移动速度", null);
             SRApi.LocDesc("Experiments", "Free Camera Speed", "相机跟随速度\n相机跟随角色的快慢\n范围 0.5-5，步长 0.5", "Camera follow speed\nhow fast the camera follows the character\n0.5-5 in steps of 0.5");
@@ -110,7 +110,7 @@ public partial class Experiments : ITweak
             try {
                 SelfReg2();
                 _on = plugin.Config.Bind("Experiments", "Free Camera", false, "自由相机：开启后滚轮缩放视野；关闭后完全恢复游戏默认相机（仅自由模式）。");
-                _fov = plugin.Config.Bind("Experiments", "Free Camera FOV", 10f, new ConfigDescription("视野 1-32", new AcceptableValueRange<float>(MinFov, MaxFov)));
+                _fov = plugin.Config.Bind("Experiments", "Free Camera FOV", 10f, new ConfigDescription("视野 1-64", new AcceptableValueRange<float>(MinFov, MaxFov)));
                 _key = plugin.Config.Bind("Experiments", "Free Camera Key", KeyCode.F3, "按键切换自由相机（组合键：点按钮后在按住 Shift/Ctrl/Alt 的同时按主键设置）。");
                 // 只受模组总开关限制，不受「自由相机」开关影响（它改的是游戏相机跟随速度）。
                 _followSpeed = plugin.Config.Bind("Experiments", "Free Camera Speed", 1f,
@@ -121,7 +121,7 @@ public partial class Experiments : ITweak
                 SRApi.RegisterWheelHook(WheelZoom);
                 // 启动时不再"强制重置并写盘"（评审 G8：会覆盖用户手动保存的设置，且每次启动都写 cfg）。
                 // 只修非法值：FOV 超出范围时回落到默认 10；开关状态完全交给用户/会话控制。
-                try { if (_fov.Value <= 0f || _fov.Value > 32f) _fov.Value = 10f; } catch (Exception __fv) { SRApi.Guard.Log("自由相机/修正FOV", __fv); }
+                try { if (_fov.Value <= 0f || _fov.Value > 64f) _fov.Value = 10f; } catch (Exception __fv) { SRApi.Guard.Log("自由相机/修正FOV", __fv); }
                 SRApi.RegisterCameraView(ApplyToCamera);
                 SRApi.RegisterTick("自由相机-移动速度", ApplyFollowSpeed);
             // 相机缓存只在换场景时失效：以前缓存为 null 就全场景 FindObjectsOfType，

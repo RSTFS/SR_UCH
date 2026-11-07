@@ -370,6 +370,22 @@ public class QuickAdjust : ITweak {
             catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.OverrideHoldTime", __ex); }
         }
 
+        // 重生延迟判定（读「重生」页写的配置条目，失败按"不等待"处理）
+        private static readonly Dictionary<int, float> _deadSinceMap = new Dictionary<int, float>();
+        private static bool ShouldWaitRespawnDelay(int num) {
+            try {
+                ConfigEntryBase e = SRApi.Ctl.FindEntry("Quick Adjust", "Respawn Delay");
+                float d = 0f;
+                try { if (e != null) d = System.Convert.ToSingle(e.BoxedValue); } catch (Exception __cv) { SRApi.Guard.Log("快速调整/读重生延迟", __cv); }
+                if (d <= 0.01f) { _deadSinceMap.Remove(num); return false; }
+                float since;
+                if (!_deadSinceMap.TryGetValue(num, out since)) { _deadSinceMap[num] = Time.unscaledTime; return true; }
+                if (Time.unscaledTime - since < d) return true;
+                _deadSinceMap.Remove(num);
+                return false;
+            } catch (Exception __ex) { SRApi.Guard.Log("快速调整/重生延迟判定", __ex); return false; }
+        }
+
         // 是否是"我这边的角色"：房主端 hasAuthority，房客端 hasAuthority 可能为 false，
         // 但 LocalPlayer.PlayerCharacter 指向的就是自己的角色。以前只判 hasAuthority，
         // 于是"在别人房间死后不自动重试"。两个补丁都用这个判定。
@@ -410,6 +426,9 @@ public class QuickAdjust : ITweak {
                 // 按 networkNumber 记录（同局多个 Character，单个 static bool 会被队友清掉而退化成每帧发包）。
                 if (_retrySentTo.Contains(num)) return;
                 if (!QuickRetryOn || __instance.WantsToRetry) return;
+                // 重生延迟：还在延迟窗口内就先不发送。
+                // 直接读配置条目（不引用「重生」功能的类型）：拆分构建下两者在不同 DLL，编译期不能互相引用。
+                if (ShouldWaitRespawnDelay(num)) return;
                 _retrySentTo.Add(num);
                 if (_retrySentTo.Count > 64) _retrySentTo.Clear();
                 try
