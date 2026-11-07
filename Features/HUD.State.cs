@@ -168,8 +168,9 @@ public partial class HUD {
                         float pt = ReadFloat(ref _fPlacementTimer, vs, "placementTimer", "HUD（建造剩余时间）");
                         if (pt >= 0f) { countdown = true; remaining = pt; break; }
                     }
-                    float partyTotal = gs != null ? gs.PlaceTime : 0f;
-                    if (partyTotal > 0.05f) { countdown = true; remaining = partyTotal - elapsed; }
+                    // 只有游戏真的在跑建造计时（placementTimer 可读）时才显示倒计时。
+                    // 以前这里还用 PlaceTime − 经过时间兜底，但自由模式/无计时的场景里 PlaceTime 仍是 30，
+                    // 于是明明没有倒计时也会一直显示 30 秒（用户报的就是这个）。
                     break;
                 }
                 // 建造倒计时：优先游戏自己的 placementTimer（暂停时不减），再用 PlaceTime − 经过时间兜底；
@@ -182,7 +183,9 @@ public partial class HUD {
                         if (_vsPlaceSeen) placeLeft = t;
                     }
                 }
-                if (gs != null && gs.UsePlaceTimer) {
+                // 兜底只用"游戏已经开始过建造计时"（_vsPlaceSeen）的场景：
+                // 没有这个前提时 PlaceTime 只是配置值，不代表正在倒计时。
+                if (gs != null && gs.UsePlaceTimer && _vsPlaceSeen) {
                     float total = gs.PlaceTime;
                     if (total > 0.05f) {
                         float byElapsed = total - elapsed;
