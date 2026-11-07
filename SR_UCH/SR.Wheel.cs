@@ -35,8 +35,11 @@ namespace SR_UCH.Tweaks {
                 // 同一帧的后续 OnGUI 趟没有滚轮事件，但仍有未取走的量：鼠标/修饰键沿用事件趟的
                 if (!_hasEvent) { _hasEvent = Mathf.Abs(_pending) > 0.01f; return; }
                 try {
+                    // 与 ImGui 后端一致：转发的是**幅度**（一次快速滚轮可能给 ±2、±3），
+                    // 不是只取符号；否则"滚三格只走一格"。
                     float v = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
-                    v = v > 0f ? -1f : (v < 0f ? 1f : 0f);   // 上滚为正
+                    v = -v;                                  // Unity 向下滚为正 → 取反成"上滚为正"
+                    if (Mathf.Abs(v) < 0.01f) return;
                     _mouse = e.mousePosition;
                     _shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
                     _ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);

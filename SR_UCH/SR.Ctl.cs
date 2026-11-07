@@ -345,7 +345,8 @@ public partial class SR {
                             float __c = System.Convert.ToSingle(e.BoxedValue);
                             float __span = Mathf.Max(0.0001f, max - min);
                             float __st = Mathf.Max(__span * 0.02f, 0.01f);
-                            float __nv = Mathf.Clamp(__c + (__w > 0f ? -__st : __st), min, max);
+                            float __steps = Mathf.Clamp(Mathf.Abs(__w), 1f, 8f);   // 一次给 3 格就走 3 步
+                            float __nv = Mathf.Clamp(__c + (__w > 0f ? -__st : __st) * __steps, min, max);
                             if (__span >= 1f) __nv = Mathf.Round(__nv * 10f) / 10f;
                             if (Mathf.Abs(__nv - __c) > 0.000001f) { SetValue(e, __nv); written = true; }
                         }

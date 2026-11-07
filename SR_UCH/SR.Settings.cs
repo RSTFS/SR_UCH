@@ -1299,7 +1299,8 @@ public partial class SR {
                                 float __c = val is int ? (int)val : (float)val;
                                 float __span = Mathf.Max(0.0001f, hmax - hmin);
                                 float __st = val is int ? (hstep > 0f ? hstep : 1f) : Mathf.Max(__span * 0.02f, 0.01f);
-                                float __nv2 = Mathf.Clamp(__c + (__w > 0f ? -__st : __st), hmin, hmax);
+                                float __steps2 = Mathf.Clamp(Mathf.Abs(__w), 1f, 8f);
+                                float __nv2 = Mathf.Clamp(__c + (__w > 0f ? -__st : __st) * __steps2, hmin, hmax);
                                 if (val is int) __nv2 = Mathf.Round(__nv2);
                                 SR.SetValue(entry, val is int ? (object)(int)Mathf.Round(__nv2) : (object)__nv2);
                             }
@@ -1473,7 +1474,8 @@ public partial class SR {
                 if (Mathf.Abs(__w) > 0.01f) {
                     int __cur = 0;
                     for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur = i; break; } }
-                    int __ni = __w > 0f ? __cur - 1 : __cur + 1;
+                    int __n2 = Mathf.Clamp(Mathf.RoundToInt(Mathf.Abs(__w)), 1, 5);
+                    int __ni = __w > 0f ? __cur - __n2 : __cur + __n2;
                     if (__ni < 0) __ni = options.Length - 1;
                     if (__ni >= options.Length) __ni = 0;
                     if (entry != null && vals != null && __ni < vals.Length) SR.SetValue(entry, vals.GetValue(__ni));
