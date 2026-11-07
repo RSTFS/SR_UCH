@@ -880,6 +880,8 @@ public partial class SR : ITweak {
                     // 按键类永远全速
                     h.Interval = IsInputHookName(h.Name) ? 0f : interval;
                 }
+                // 只在用户开了 Tick Profiling 时写这条：没开剖析就刷日志=噪音
+                if (_tickProf != null && _tickProf.Value)
                 LogInfo("[性能] 帧钩子预算档位 -> " + (want == 0 ? "全速（每帧）" : want == 1 ? "30Hz" : "10Hz")
                     + "（压力 " + _tickPressure.ToString("0.00") + "，预算 " + TickBudgetMs.ToString("0.0") + "ms/帧）");
             } catch (Exception __ex) { Guard.Log("帧钩子预算", __ex); }

@@ -327,7 +327,10 @@ public class LevelPartyBox : ITweak {
 
         // 派对盒正在重建/关闭的窗口（秒）：刷新或关闭后一小段时间内，自动道具不得动作，
         // 否则会对着已经被销毁的旧盒子取道具（表现为"自动道具和开关派对盒冲突"）。
+        internal static float _closeFlushAt = -1f;      // 关闭派对盒的边沿补发时刻
+        private static VersusControl _closeFlushVc;
         internal static float BoxBusyUntil;
+
         private const float BoxBusySeconds = 1.2f;
 
         public static ConfigEntry<KeyCode> RefreshPartyBoxKeyEntry { get { return _refreshPartyBoxKey; } }
@@ -355,6 +358,7 @@ public class LevelPartyBox : ITweak {
 
         // 快捷键轮询：与页面按钮共用同一批动作
         private static void Tick() {
+            TickCloseFlush();
             try {
                 if (!SRApi.GateMaster) return;
                 if (SRApi.ComboKeyDown(_refreshPartyBoxKey)) RefreshPartyBox();
@@ -364,6 +368,21 @@ public class LevelPartyBox : ITweak {
 
         // 刷新派对盒：完整重走游戏自己的流程（showPartyBox = SetupPartyBoxForRound(true) + ShowBox(IsSecondBox)）。
         // 房主端三步：广播销毁旧道具 -> showPartyBox() -> CallRpcShowPartyBox()，全员才能一致。
+        // 边沿补发：上一帧复位了 showingPlacementWarning，这里再置位一次让游戏重新推进相位。
+        private static void TickCloseFlush() {
+            try {
+                if (_closeFlushAt < 0f || Time.unscaledTime < _closeFlushAt) return;
+                _closeFlushAt = -1f;
+                VersusControl vc = _closeFlushVc; _closeFlushVc = null;
+                if (vc == null) return;
+                System.Reflection.FieldInfo pw = SRApi.Ref.Field(typeof(VersusControl), "showingPlacementWarning",
+                    "关卡派对盒：关闭（边沿补发）");
+                if (pw == null) return;
+                pw.SetValue(vc, true);
+                SRApi.LogInfo("[派对盒] 已补发关闭边沿（showingPlacementWarning=true）");
+            } catch (Exception __ex) { SRApi.Guard.Log("派对盒/关闭边沿补发", __ex); }
+        }
+
         public static void RefreshPartyBox() {
             try {
                 BoxBusyUntil = Time.unscaledTime + BoxBusySeconds;   // 重建期间喂自动道具"别动"
@@ -431,8 +450,20 @@ public class LevelPartyBox : ITweak {
                     return;
                 }
                 // 计时归零并进入警告窗口：下一帧游戏自己走完剩余原生流程。
+                // 边沿触发：卡在 0 时（计时已是 0、警告位已是 true）再次写同样的值是空操作，
+                // 游戏不会重新走相位切换 → "关闭派对盒失效"。先复位警告位，下一帧再置位。
+                bool wasWarn = false;
+                try { wasWarn = (bool)pw.GetValue(vc); } catch (Exception __pw) { SRApi.Guard.Log("派对盒/读警告位", __pw); }
+                float wasTimer = 0f;
+                try { wasTimer = (float)pt.GetValue(vc); } catch (Exception __pt) { SRApi.Guard.Log("派对盒/读计时", __pt); }
                 pt.SetValue(vc, 0f);
-                pw.SetValue(vc, true);
+                if (wasWarn || wasTimer <= 0.01f) {
+                    pw.SetValue(vc, false);                  // 复位，制造一次 0→1 的边沿
+                    _closeFlushAt = Time.unscaledTime + 0.05f;
+                    _closeFlushVc = vc;
+                } else {
+                    pw.SetValue(vc, true);
+                }
                 SRApi.Notify(SRApi.T("已关闭派对盒", "Party box closed"));
             } catch (Exception __ex) { SRApi.LogWarn("关闭派对盒失败: " + __ex.Message); }
         }
