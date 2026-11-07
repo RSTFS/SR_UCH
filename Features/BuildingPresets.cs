@@ -265,7 +265,6 @@ namespace SR_UCH.Tweaks {
             // 页面关掉了滚动，列表要自己吃滚轮：只有页面级钩子能在滚动区建立之前拿到事件。
             SRApi.RegisterPageWheel(OnPresetWheel);
             // 填充页兜底：帧尾若滚轮没被任何控件/钩子消费，直接滚本列表（不依赖命中框）
-            SRApi.Ctl.RegisterFillScroll(delegate (float __w) { ScrollTableBy(__w); });
             // 重载锁自愈：TickReloadLock 写好了却从未注册，等于"超时兜底"根本不存在，
             // 失败路径漏放锁只能等用户再点一次加载（audit 10-P0-2）。
             // 重载锁自愈 + levelPortalXml 兜底清理：两个 tick 都必须注册，否则兜底逻辑等于不存在。
@@ -604,7 +603,7 @@ namespace SR_UCH.Tweaks {
         private static void Render() {
             try {
                 _renderFrame = Time.frameCount;
-                SRApi.NoPageScrollBars = true;
+                SRApi.NoPageScrollBars = false;   // 页面滚动模式（表格只按内容高度铺开）
                 EnsureLoaded();
                 EnsureCols();
                 string pendingBefore = _pendingKey;
@@ -1093,7 +1092,7 @@ namespace SR_UCH.Tweaks {
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
                 _tableTopY = SRApi.ContentArea.y + box.y; _tableHCache = tableH;
                 _rowsHCache = rowsH;   // 缓存真实行区高：滚轮钩子在首帧/刚切页时用它兜底
-                _maxScrollY = Mathf.Max(0f, visible.Count * rowH - rowsH + rowH);   // 留一整行余量：最后一整行都能露出来
+                _maxScrollY = Mathf.Max(0f, visible.Count * rowH - rowsH);   // 页面滚动模式：内部不再留余量
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _maxScrollY);
                 Event e = Event.current;
                 Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
