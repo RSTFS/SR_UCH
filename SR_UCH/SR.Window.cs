@@ -589,6 +589,19 @@ public partial class SR {
             }
             // 选中文本色：绘制期间必须是我们的蓝，否则会沿用游戏皮肤的暖色（每个 OnGUI 趟都可能被还原）
             try { GUI.skin.settings.selectionColor = SR.TextSelectColor; } catch (Exception __sc) { Guard.Log("选中文本色", __sc); }
+            // 页面竖向滚动：由我们接管（Unity 自带步长偏小、不可配，表现为"滚了不走"）。
+            // 只在指针位于内容区、且本帧滚轮还没被列表钩子/控件消费时接管，并设盾避免滚动区再吃一次。
+            if (__wasWheel && !WheelShieldHit
+                && (Input.GetKey(KeyCode.LeftControl) == false && Input.GetKey(KeyCode.RightControl) == false)
+                && SRApi.ContentArea.Contains(__wheelMouse + SR.AreaOffset)) {
+                try {
+                    float __vy = Mathf.Abs(__we.delta.y) > 0.001f ? __we.delta.y : __we.delta.x;
+                    if (Mathf.Abs(__vy) > 0.0001f) {
+                        _scroll.y = Mathf.Max(0f, _scroll.y + __vy * Sc(58f));
+                        __we.Use(); __we.type = EventType.Used; WheelShieldHit = true; SR.MarkWheelUsed();
+                    }
+                } catch (Exception __vs) { Guard.Log("页面竖向滚动", __vs); }
+            }
             bool __noScroll = _noScrollDeclared || __overCtrlPrev || WheelShieldHit;
             // 设置页的页签画在滚动区**之外**：常驻顶部，不受滚动影响；
             // 「恢复默认」跟着页签排在最右侧（只对通用页有意义，自检页隐藏）。

@@ -104,6 +104,8 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterPageWheel(OnLobbyWheel);   // 页面关滚动，房间列表自己吃滚轮
             SRApi.RegisterTick("联机看门狗", TickOnline); // 每帧：回家看门狗 + 延时加入
             SRApi.RegisterTick("联机自动进入主菜单", TickAutoEnterMainMenu); // 加入成功后替玩家按一次确认
+            // 换场景/多次返回主界面后复位加入瞬时状态，避免下一次点加入被旧状态直接忽略。
+            SRApi.RegisterSceneHook(delegate { ResetJoinStateOnScene(); });
             // 加入流程本身要用 EventSystem，禁用会卡在"正在进入"：登记门控挂起，让核心不禁用 EventSystem。
             // 屏蔽输入上限 3 秒，超过即不再屏蔽（pending 最长可挂 30 秒）。
         SRApi.RegisterInputGateHold(() => !string.IsNullOrEmpty(_pendingJoin)

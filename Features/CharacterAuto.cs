@@ -23,7 +23,8 @@ namespace SR_UCH.Tweaks {
 
         // 每进一次房间只自动选一次：场景切换时复位。
         private static bool _triedThisRoom;
-        private static Character _dressedFor;          // 已经随机过时装的角色实例
+        private static Character _dressedFor;          // 已经成功套用时装的角色实例
+        private static int _dressRetry;                // 套用失败的重试计数（角色还没初始化完时会失败）
         private static float _nextTryAt;
 
         private static string ModeLabel(string v) {
@@ -152,6 +153,10 @@ namespace SR_UCH.Tweaks {
                     if (GUILayout.Button(SRApi.T("随机整套", "Randomize all"), SRApi.Ctl.Btn,
                             GUILayout.Width(SRApi.Ctl.Sc(120f)), GUILayout.Height(SRApi.Ctl.Sc(26f))))
                         RandomizeCurrent();
+                    GUILayout.Space(SRApi.Ctl.Sc(8));
+                    if (GUILayout.Button(SRApi.T("清空时装", "Clear outfit"), SRApi.Ctl.Btn,
+                            GUILayout.Width(SRApi.Ctl.Sc(110f)), GUILayout.Height(SRApi.Ctl.Sc(26f))))
+                        ClearCurrentOutfit();
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动时装页", __ex); }
@@ -296,19 +301,51 @@ namespace SR_UCH.Tweaks {
         private static void TryRandomOutfit(LobbyPlayer lp) {
             try {
                 Character ch = lp.CharacterInstance;
-                if (ch == null || ReferenceEquals(ch, _dressedFor)) return;
-                ApplyOutfitFor(ch, false);
-                if (lp != null) lp.CallCmdSetOutfitsFromArray(ch.GetOutfitsAsArray());   // 同步给全场
-                _dressedFor = ch;
+                if (ch == null) { _dressedFor = null; _dressRetry = 0; return; }
+                if (ReferenceEquals(ch, _dressedFor)) return;
+                if (ApplyOutfitFor(ch, false)) {
+                    lp.CallCmdSetOutfitsFromArray(ch.GetOutfitsAsArray());   // 同步给全场
+                    _dressedFor = ch;
+                    _dressRetry = 0;
+                } else if (++_dressRetry > 20) {
+                    // 20 次（约 2 秒）还没拿到外观组件：放弃这个角色，换角色/换场景会重置。
+                    _dressedFor = ch;
+                    _dressRetry = 0;
+                    SRApi.LogWarn("[角色] 该角色的外观组件一直没就绪，已跳过自动时装");
+                }
             } catch (Exception __ex) { SRApi.Guard.Log("角色/自动时装", __ex); }
         }
 
-        // 按角色应用：有记录就用记录，没有就随机一套并写进记录（每个角色各一套）。
-        private static void ApplyOutfitFor(Character ch, bool reroll) {
+        // 清空当前角色的时装：四类全部关闭 + 删掉它的记录（下次会重新随机）。
+        private static void ClearCurrentOutfit() {
             try {
-                if (ch == null) return;
+                LobbyManager lm = LobbyManager.instance;
+                if (lm == null) return;
+                LobbyPlayer lp = LocalLobbyPlayer(lm);
+                if (lp == null || lp.CharacterInstance == null) { SRApi.Notify(SRApi.T("还没选角色", "Pick an animal first")); return; }
+                Character ch = lp.CharacterInstance;
                 Outfit[] all = ch.GetComponentsInChildren<Outfit>(true);
-                if (all == null || all.Length == 0) return;
+                if (all != null) {
+                    for (int i = 0; i < all.Length; i++) {
+                        Outfit o = all[i];
+                        if (o != null && o.followThisOutfit == null) o.on = false;
+                    }
+                    try { ch.OnOutfitsUpdated(all); } catch (Exception __uo) { SRApi.Guard.Log("角色/清空时装刷新", __uo); }
+                    lp.CallCmdSetOutfitsFromArray(ch.GetOutfitsAsArray());
+                }
+                SetOutfitRecord(ch.CharacterSprite.ToString(), "");   // 删记录
+                _dressedFor = ch;
+                SRApi.Notify(SRApi.T("已清空该角色的时装", "Cleared this animal's outfit"));
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/清空时装", __ex); }
+        }
+
+        // 按角色应用：有记录就用记录，没有就随机一套并写进记录（每个角色各一套）。
+        private static bool ApplyOutfitFor(Character ch, bool reroll) {
+            try {
+                if (ch == null) return false;
+                Outfit[] all = ch.GetComponentsInChildren<Outfit>(true);
+                // 角色刚生成时外观组件可能还没挂好：返回失败，让调用方下一帧重试（快速换角色时的"概率无效"就是这个）
+                if (all == null || all.Length == 0) return false;
                 string animal = ch.CharacterSprite.ToString();
                 string rec = reroll ? null : GetOutfitRecord(animal);
                 if (string.IsNullOrEmpty(rec)) {
@@ -318,7 +355,8 @@ namespace SR_UCH.Tweaks {
                 }
                 ApplyRecord(all, rec);
                 try { ch.OnOutfitsUpdated(all); } catch (Exception __uo) { SRApi.Guard.Log("角色/时装刷新", __uo); }
-            } catch (Exception __ex) { SRApi.Guard.Log("角色/应用外观", __ex); }
+                return true;
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/应用外观", __ex); return false; }
         }
 
         // 记录格式：动物=配饰,身体,头部,皮肤|动物=...

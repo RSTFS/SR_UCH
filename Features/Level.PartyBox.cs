@@ -21,7 +21,8 @@ public partial class Level {
         // 分区内显式排序：自动道具 → 自动道具延迟 → 放弃道具 → 跳过炸弹
         float __itemCol = Mathf.Max(SRApi.Ctl.Sc(180), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(240));
         ConfigEntryBase __autoEntry = SRApi.Ctl.FindEntry("Level", "Auto Party Item");
-        if (__autoEntry != null) SRApi.Ctl.DrawEntryRow(__autoEntry, __itemCol);
+        if (__autoEntry != null) SRApi.Ctl.LabeledRow(SRApi.T("自动道具", "Auto party item"),
+            SRApi.T("开箱后自动随机挑一个\n与手动挑选同一条链路，服务端发放\n关闭则不自动挑", "Picks a random piece when the box opens\nSame path as picking by hand; the server hands it over\nOff = no auto pick"), __autoEntry, 120f);
 
         // 自动道具延迟：统一滑块行（0-3 秒，0.1 步进；格式与其它页面一致）
         ConfigEntryBase __dl = SRApi.Ctl.FindEntry("Level", "Auto Party Item Delay");
@@ -30,12 +31,14 @@ public partial class Level {
                 SRApi.T("开箱后等多久再自动挑\n范围 0-3 秒，步进 0.1",
                         "how long to wait before picking\n0-3 seconds in 0.1 steps"),
                 __dl, 0f, 3f, "0.0");
-        // 放弃道具（排队阶段手上拿着道具时才有意义）
-        ConfigEntryBase __drop = SRApi.Ctl.FindEntry("Level", "Drop Held Piece");
-        if (__drop != null) SRApi.Ctl.DrawEntryRow(__drop, __itemCol);
-        // 跳过炸弹
+        // 跳过炸弹（自动道具下面）
         ConfigEntryBase __skip = SRApi.Ctl.FindEntry("Level", "Auto Party Item Skip Bomb");
-        if (__skip != null) SRApi.Ctl.DrawEntryRow(__skip, __itemCol);
+        if (__skip != null) SRApi.Ctl.LabeledRow(SRApi.T("跳过炸弹", "Skip bombs"),
+            SRApi.T("自动挑道具时排除派对盒里的炸弹\n关闭后炸弹也可能被自动挑中\n只影响自动挑选", "Exclude party-box bombs when auto picking\nWhen off a bomb may be picked\nAuto pick only"), __skip, 120f);
+        // 放弃道具（道具分区最下面）
+        ConfigEntryBase __drop = SRApi.Ctl.FindEntry("Level", "Drop Held Piece");
+        if (__drop != null) SRApi.Ctl.LabeledRow(SRApi.T("放弃道具", "Drop held piece"),
+            SRApi.T("排队阶段丢弃手上的道具\n请勿删除边界墙和出生方块，一经删除无法复原\n仅排队阶段、走游戏原生通道", "Discards the held piece during the pick phase\nDo not delete boundary walls or spawn blocks; they cannot be restored\nPick phase only, uses the game channel"), __drop, 120f);
 
         // 派对盒炸弹：对局内所有成员都发过炸弹！快捷短语才生成
         SRApi.Ctl.SectionTitle(SRApi.T("- 派对盒子炸弹 -", "- Party-box bomb -"));
@@ -232,7 +235,7 @@ public partial class Level {
         public void Initialize(IFeatureHost plugin) {
             try {
                 SRApi.LocKey("Level", "Drop Held Piece", "放弃道具", "Drop held piece");
-                SRApi.LocDesc("Level", "Drop Held Piece", "放弃道具按键\n排队阶段丢弃手上的道具，走游戏原生通道\n未绑定时不生效", "Drop held piece\ndiscards the held piece during the pick phase via the game channel\nno effect while unbound");
+                SRApi.LocDesc("Level", "Drop Held Piece", "放弃道具按键\n排队阶段丢弃手上的道具（游戏原生通道）\n请勿删除边界墙和出生方块，删了无法复原", "Drop held piece\ndiscards the held piece during the pick phase via the game channel\nnever delete boundary walls or spawn blocks - it cannot be undone");
                 _key = plugin.Config.Bind("Level", "Drop Held Piece", KeyCode.None,
                     "按这个键就把手上拿着的那块丢掉（走游戏原生通道, 全员可见）, 填 None 就是不绑键.");
                 SRApi.RegisterKey("关卡-放弃道具", _key, "press");

@@ -643,6 +643,12 @@ public partial class SR {
             int evBtn = e != null ? e.button : 0;
             bool clicked = GUILayout.Button(new GUIContent(text, tooltip), capturing ? _capture : _btn,
                 GUILayout.Width(w), GUILayout.Height(Sc(30))); // 控件统一 30px
+            // 左键：未绑定 -> 进入录制；已绑定 -> 执行动作；Shift+左键 = 改绑（已绑定也能重设）。右键：绑定/清空。
+            bool __shiftClick = clicked && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
+            if (clicked && keyEntry != null && !capturing && (keyEntry.Value == KeyCode.None || __shiftClick)) {
+                EnterCapture(keyEntry);
+                clicked = false;
+            }
             if (clicked && evBtn != 0) clicked = false;
             if (bindable && keyEntry != null && e != null) {
                 TryBindByRightClick(keyEntry, GUILayoutUtility.GetLastRect()); //当帧判定（不跨帧存矩形）
@@ -665,6 +671,17 @@ public partial class SR {
                 _recHeld.Clear();
                 _dirty = true;
             } catch (Exception __ex) { Guard.Log("取消按键录制", __ex); }
+        }
+
+        // 进入录制（左键未绑定时与右键都用它，确保 CaptureStartedAt 一定被刷新）
+        private static void EnterCapture(ConfigEntry<KeyCode> key) {
+            if (key == null) return;
+            _prevBoxed = key.BoxedValue;
+            _capturing = key;
+            _captureStartFrame = Time.frameCount;
+            SR.CaptureStartedAt = Time.unscaledTime;
+            _recSeq.Clear();
+            _recHeld.Clear();
         }
 
         // 右键处理：未捕捉 -> 进入捕捉；捕捉中再右键 -> 删除快捷键（Esc 也可清空）。
@@ -703,6 +720,9 @@ public partial class SR {
             float bh = height > 0f ? height : Sc(30);
             bool clicked = GUILayout.Button(new GUIContent(label, tip + KeyTip(key)),
                 capturing ? _capture : _btn, GUILayout.Width(bw), GUILayout.Height(bh));
+            // 左键：未绑定 -> 进入录制；已绑定 -> 执行；Shift+左键 = 改绑。右键：绑定/清空。
+            bool __shiftClick2 = clicked && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
+            if (clicked && key != null && !capturing && (key.Value == KeyCode.None || __shiftClick2)) { EnterCapture(key); clicked = false; }
             if (clicked && evBtn != 0) clicked = false; //右键绝不触发左键动作
             if (key != null && e != null) TryBindByRightClick(key, GUILayoutUtility.GetLastRect());
             return clicked && !capturing;

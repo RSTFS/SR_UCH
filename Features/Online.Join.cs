@@ -257,6 +257,20 @@ namespace SR_UCH.Tweaks {
             return false;
         }
 
+        // 换场景（尤其多次返回主界面）后复位所有"加入瞬时状态"：
+        // 反复返回主界面时，旧的在途窗口 / 连点闸 / 待加入目标会残留，导致下一次点加入被直接忽略。
+        internal static void ResetJoinStateOnScene() {
+            try {
+                _joinInFlight = false;
+                _joinInFlightUntil = 0f;
+                _joinGuardUntil = 0f;
+                _pendingEscalated = false;
+                _pendingSteamId = 0;
+                _joinedLobbyId = "";
+                SRApi.LogInfo("[联机] 换场景：已复位加入瞬时状态");
+            } catch (Exception __ex) { SRApi.Guard.Log("联机/复位加入状态", __ex); }
+        }
+
         private static void DoJoin(string id, bool useCode) {
             try {
                 Matchmaker mm = MatchmakerOrNull();

@@ -1100,6 +1100,25 @@ public partial class SR {
             float trackH = Sc(4), handleD = Sc(16);
             float trackW = Mathf.Max(1f, rect.width - handleD);
 
+            // 悬停即声明滚轮所有权（和下拉框同一机制）：这样页面滚动不会跟着走，滚轮留给本滑块。
+            bool hovered = rect.Contains(Event.current != null ? Event.current.mousePosition : Vector2.zero);
+            if (hovered && Event.current != null) {
+                WheelClaim();
+                // Repaint 趟取用本帧滚轮量（盾在事件趟记入），滚轮调值：上滚增大。
+                if (Event.current.type == EventType.Repaint) {
+                    float wv = WheelDeltaTake();
+                    if (Mathf.Abs(wv) > 0.0001f) {
+                        float stepAmt = step > 0f ? step : (intStep ? 1f : Mathf.Max((max - min) * 0.02f, 0.001f));
+                        float adj = value + (wv > 0f ? stepAmt : -stepAmt);
+                        adj = Mathf.Clamp(adj, min, max);
+                        if (step > 0f) adj = Mathf.Round(adj / step) * step;
+                        else if (intStep) adj = Mathf.Round(adj);
+                        value = Mathf.Clamp(adj, min, max);
+                        MarkWheelUsed();
+                    }
+                }
+            }
+
             //输入层：不可见的原生 HorizontalSlider，只吃事件与热区，跨趟拖动稳定。
             if (_sliderNative == null || _sliderNativeThumb == null) {
                 _sliderNative = new GUIStyle();
@@ -1206,7 +1225,9 @@ public partial class SR {
                     text = ComboKeyDisplay(entry, kc);
                 }
                 if (GUILayout.Button(text, capturing ? _capture : _frame, GUILayout.Width(Sc(170)), GUILayout.Height(CtlH()))) {
-                    if (!capturing) { _prevBoxed = val; _capturing = entry; _captureStartFrame = Time.frameCount; _recSeq.Clear(); _recHeld.Clear(); }
+                    // 左键同样可以开始录制。这里必须同时记 CaptureStartedAt：以前只在右键路径设置，
+                    // 左键开始录制后超时判断立刻成立（12 秒前的旧时间戳），表现为"刚点就提示录制超时"。
+                    if (!capturing) { _prevBoxed = val; _capturing = entry; _captureStartFrame = Time.frameCount; CaptureStartedAt = Time.unscaledTime; _recSeq.Clear(); _recHeld.Clear(); }
                 }
                 //键位框同样支持右键绑定 / 解绑
                 ConfigEntry<KeyCode> kcRow = entry as ConfigEntry<KeyCode>;
@@ -1217,7 +1238,7 @@ public partial class SR {
                 //外部插件的 KeyboardShortcut 同样按"修饰键在前"格式显示
                 string text = capturing ? RecText() : KbShortcutText((BepInEx.Configuration.KeyboardShortcut)val);
                 if (GUILayout.Button(text, capturing ? _capture : _frame, GUILayout.Width(Sc(170)), GUILayout.Height(CtlH()))) {
-                    if (!capturing) { _prevBoxed = val; _capturing = entry; _captureStartFrame = Time.frameCount; _recSeq.Clear(); _recHeld.Clear(); }
+                    if (!capturing) { _prevBoxed = val; _capturing = entry; _captureStartFrame = Time.frameCount; CaptureStartedAt = Time.unscaledTime; _recSeq.Clear(); _recHeld.Clear(); }
                 }
             } else if (val is Enum) {
                 Type et = val.GetType();
