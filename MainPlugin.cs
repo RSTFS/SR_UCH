@@ -303,7 +303,17 @@ namespace SR_UCH {
             });
                 // P0-1：API 通道自检 —— 漏注入的 sink 会让对应功能静默失效，这里必须报错。
                 string[] __miss = SRApi.MissingSinks();
-                if (__miss.Length > 0) ModLogger.LogError("[SR.Api] 未注入的 API 通道 (" + __miss.Length + "): " + string.Join(", ", __miss));
+                // 有一批通道由 UI 初始化时注入（ManagerUI.Initialize），本自检跑在它之前，
+                // 那时必然是空的 —— 直接报 Error 会误导成"漏注入"。这里把它们剔除，
+                // 只对"启动期就该注入却没注入"的通道报错。
+                List<string> __lateInjected = new List<string> {
+                    "SRApi._wheelLayer", "SRApi._wheelTake", "SRApi._overlay", "SRApi._rounded", "SRApi._typing",
+                    "Ctl._labeledRow", "Ctl._rowCombo", "Ctl._rowSlider", "Ctl._button", "Ctl._labelCol",
+                    "Ctl._wheelFb", "Ctl._fillScroll", "Ctl._tableHighlight"
+                };
+                List<string> __real = new List<string>();
+                for (int __i = 0; __i < __miss.Length; __i++) if (!__lateInjected.Contains(__miss[__i])) __real.Add(__miss[__i]);
+                if (__real.Count > 0) ModLogger.LogError("[SR.Api] 未注入的 API 通道 (" + __real.Count + "): " + string.Join(", ", __real.ToArray()));
             if (ApiSinkFailures.Count > 0) ModLogger.LogError("[SR.Api] sink 注入失败的分组 (" + ApiSinkFailures.Count + "): " + string.Join(", ", ApiSinkFailures.ToArray()));
         }
 
