@@ -1228,10 +1228,19 @@ public partial class SR {
     }
 
     //文本框（右键清空）：命中该框的右键会清空内容并吃掉事件。
+    // 输入框：左键按在框内时必须禁止拖窗口（用户要求"只有空白处才能拖界面"）。
+    // 以前只有部分控件置 BlockWindowDrag，输入框没置，于是点输入框开始输入时会顺手把面板拖走。
+    private static void BlockDragOnField(Rect rr, Event e) {
+        try {
+            if (e != null && e.type == EventType.MouseDown && e.button == 0 && rr.Contains(e.mousePosition)) BlockWindowDrag = true;
+        } catch (Exception __bd) { Guard.Log("输入框/禁止拖窗口", __bd); }
+    }
+
     public static string ClearableTextField(string text, GUIStyle style, params GUILayoutOption[] options) {
         string r = GUILayout.TextField(text, style, options);
         Rect rr = GUILayoutUtility.GetLastRect();
         Event e = Event.current;
+        BlockDragOnField(rr, e);
         if (e != null && e.type == EventType.MouseDown && e.button == 1 && rr.Contains(e.mousePosition)) { r = ""; e.Use(); }
         return r;
     }
@@ -1240,6 +1249,7 @@ public partial class SR {
         string r = GUILayout.TextField(text, maxLength, style, options);
         Rect rr = GUILayoutUtility.GetLastRect();
         Event e = Event.current;
+        BlockDragOnField(rr, e);
         if (e != null && e.type == EventType.MouseDown && e.button == 1 && rr.Contains(e.mousePosition)) { r = ""; e.Use(); }
         return r;
     }
