@@ -1063,6 +1063,13 @@ namespace SR_UCH.Tweaks {
                     float __visibleRows = __bottomScreen - (__topScreen + headerH);
                     if (__visibleRows > SRApi.Ctl.TableRowH()) rowsH = Mathf.Min(rowsH, __visibleRows);
                 } catch (Exception __vr) { SRApi.Guard.Log("布局预设/行区实测", __vr); }
+                // 紧贴表格之前再探一次：探针与表格矩形只差 1px，用它的 yMax 定高不会有"探针比表格高 72px"的误差。
+                float __probeH;
+                try {
+                    Rect __probe = GUILayoutUtility.GetRect(1f, 0f);
+                    __probeH = SRApi.PageContentBottom - __probe.yMax;
+                    if (__probeH > headerH + rowH * 2f) tableH = Mathf.Max(headerH + rowH * 2f, __probeH);
+                } catch (Exception __ph) { SRApi.Guard.Log("布局预设/表格前探针", __ph); }
                 Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
                 // 用**实际** box.y 再修正一次：探针 y 与表格真实 y 之间还夹着布局，之前差 72px，
                 // 结果表格整体下移并伸出底栏（截图里 顶73+高950 越过了底界951）。
