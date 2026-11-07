@@ -34,10 +34,10 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Respawn Delay", "重生延迟\n死亡后等多少秒再自动重生\n挑战/自由模式；0 = 立即", "Respawn delay\nseconds to wait after death before respawning automatically\nchallenge and freeplay; 0 = instant");
             SRApi.LocKey(Sec, "Spawn Invincible", "出生无敌", null);
             SRApi.LocDesc(Sec, "Spawn Invincible", "出生无敌\n每次出生后无敌多少秒\n挑战/自由模式；0 = 不加无敌", "Spawn invincibility\nseconds of invincibility after each spawn\nchallenge and freeplay; 0 = none");
-            SRApi.LocKey(Sec, "Cannon Auto Respawn", "炮弹卡死自动重生", null);
-            SRApi.LocDesc(Sec, "Cannon Auto Respawn", "炮弹卡死自动重生\n死了还卡在炮弹里超过 1.5 秒时自动重生\n挑战/自由模式", "Respawn when stuck in a cannon\nrespawns if you stay dead inside a cannon for over 1.5s\nchallenge and freeplay");
-            SRApi.LocKey(Sec, "No Death Scoreboard", "挑战死亡不弹记分板", null);
-            SRApi.LocDesc(Sec, "No Death Scoreboard", "挑战死亡不弹记分板\n挑战模式死亡时不显示记分板\n只在死亡且尚未通关时生效", "No scoreboard on death\nskips the scoreboard when you die in challenge mode\nonly while dead and not yet succeeded");
+            SRApi.LocKey(Sec, "Cannon Auto Respawn", "炮弹卡死重生", null);
+            SRApi.LocDesc(Sec, "Cannon Auto Respawn", "炮弹卡死重生\n死了还卡在炮弹里超过 1.5 秒时自动重生\n挑战/自由模式", "Respawn when stuck in a cannon\nrespawns if you stay dead inside a cannon for over 1.5s\nchallenge and freeplay");
+            SRApi.LocKey(Sec, "No Death Scoreboard", "死亡无计分板", null);
+            SRApi.LocDesc(Sec, "No Death Scoreboard", "死亡无计分板\n挑战模式死亡时不显示记分板\n只在死亡且尚未通关时生效", "No scoreboard on death\nskips the scoreboard when you die in challenge mode\nonly while dead and not yet succeeded");
         }
 
         internal static void Initialize(IFeatureHost plugin) {
@@ -57,7 +57,7 @@ namespace SR_UCH.Tweaks {
         internal static void RenderNoScoreboardRow() {
             try {
                 ConfigEntryBase ns = SRApi.Ctl.FindEntry(Sec, "No Death Scoreboard");
-                if (ns != null) SRApi.Ctl.LabeledRow(SRApi.T("挑战死亡不弹记分板", "No death scoreboard"),
+                if (ns != null) SRApi.Ctl.LabeledRow(SRApi.T("死亡无计分板", "No death scoreboard"),
                     SRApi.T("挑战模式死亡时不显示记分板\n只在死亡且尚未通关时生效", "skips the scoreboard when you die in challenge only while dead and not yet succeeded"), ns);
             } catch (Exception __ex) { SRApi.Guard.Log("重生/记分板行", __ex); }
         }
@@ -75,7 +75,7 @@ namespace SR_UCH.Tweaks {
                     SRApi.T("每次出生后的无敌秒数\n游戏原生重生后是 1 秒\n挑战/自由模式", "seconds of invincibility after each spawn\nvanilla gives 1s after respawn\nchallenge and freeplay"),
                     _invincible, 0f, 10f, "0.0");
                 ConfigEntryBase cr = SRApi.Ctl.FindEntry(Sec, "Cannon Auto Respawn");
-                if (cr != null) SRApi.Ctl.LabeledRow(SRApi.T("炮弹卡死自动重生", "Cannon auto respawn"),
+                if (cr != null) SRApi.Ctl.LabeledRow(SRApi.T("炮弹卡死重生", "Cannon auto respawn"),
                     SRApi.T("死了还卡在炮弹里超过 1.5 秒时自动重生\n挑战/自由模式", "respawns if you stay dead inside a cannon for over 1.5s\nchallenge and freeplay"), cr);
             } catch (Exception __ex) { SRApi.Guard.Log("重生/分区渲染", __ex); }
         }
@@ -317,13 +317,13 @@ public class QuickAdjust : ITweak {
             if (qr != null) SRApi.Ctl.LabeledRow(SRApi.T("死后自动重试", "Auto retry on death"),
                 SRApi.T("仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n对局中开关立即生效。",
                         "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nTakes effect immediately."),
-                qr, 140f);
+                qr);   // 标签宽度交给核心按本页标签收敛，不再写死
 
             ConfigEntryBase qrf = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Fast");
             if (qrf != null) SRApi.Ctl.LabeledRow(SRApi.T("快速重试", "Quick retry"),
                 SRApi.T("仅挑战模式：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n长按时间在下方设置，对局中开关立即生效。",
                         "Challenge only: after death, hold B for the set seconds to auto-retry.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately."),
-                qrf, 140f);
+                qrf);   // 同上：写死会让本页各行左边缘不齐
 
             ConfigEntryBase qrh = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Hold");
             if (qrh != null) SRApi.Ctl.RowSlider(SRApi.T("等待秒数", "Hold s"),

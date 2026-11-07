@@ -254,7 +254,8 @@ public partial class SR {
                 // 面板已关：把自绘页声明的系统光标形状收掉，否则 <->/+ 光标会留在屏幕上
                 try { ClearTip(); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 RunFrameEndHooks();
-            SR.Wheel.PruneZones();   // 回收最近 5 帧未再注册的区域（换页后旧矩形不再吃滚轮）
+            SR.Wheel.PruneZones();
+            SR.Ctl.EndLabelColumnFrame();   // 标签列宽本帧收敛（下一帧生效）   // 回收最近 5 帧未再注册的区域（换页后旧矩形不再吃滚轮）
                 return;
             }
             _scaled = Mathf.Clamp(_uiScaleEntry.Value, Ui.ScaleMin, Ui.ScaleMax);
@@ -522,6 +523,7 @@ public partial class SR {
                 if (__sig != _lastPageSig) {
                     _lastPageSig = __sig;
                     SR.CloseOpenCombos();
+                    SR.Ctl.ResetLabelColumn();   // 换页：标签列宽重新按本页标签收敛
                     _scroll = Vector2.zero;     // 换页回到顶部：新页内容更短时不会停在空白处，看起来像"滚不动"
                 }
             } catch (Exception __cs) { Guard.Log("换页收起下拉框", __cs); }

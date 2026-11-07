@@ -1127,6 +1127,11 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             return f != null && f(label, tip, width, height);
         }
 
+        // 本页标签列宽（按本页实际出现的标签收敛）：自绘行用它对齐，不要自己写死宽度
+        private static Func<string, float> _labelCol;
+        public static void SetLabelColumnSink(Func<string, float> f) { _labelCol = f; }
+        public static float LabelColumnWidth(string label) { Func<string, float> f = _labelCol; return f != null ? f(label) : 0f; }
+
         public static void SectionTitle(string title, string tip = null) {
             try {
                 GUIContent c = new GUIContent(title, tip);

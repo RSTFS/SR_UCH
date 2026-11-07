@@ -166,12 +166,9 @@ namespace SR_UCH.Tweaks {
                 try {
                     GUI.enabled = oldEnabled && target;
                 EnsureAnimalList();
-                // 统一控件：用核心下拉框（全部角色；本房间没有的在选择时跳过）
-                if (_animal != null && Animals.Count > 0)
-                    SRApi.Ctl.RowCombo(SRApi.T("指定动物", "Target animal"),
-                        SRApi.T("自动选择的目标角色\n列出全部角色，本房间没有的不会被选\n只有「选择方式 = 指定角色」时生效",
-                                "the animal auto-pick targets\nlists every animal; ones missing in this room are skipped\nonly used when pick mode is Specific"),
-                        _animal, Animals.ToArray(), AnimalLabels.ToArray(), 170f, 96f);
+                // 全部角色直接一次列出来（不用下拉、不滚动），按宽度自动换行；本房间没有的照样列出，
+                // 只是在「自动挑选」时会被跳过（不会选中一个拿不到的角色）。
+                if (_animal != null) RowAnimalGrid(SRApi.T("指定动物", "Target animal"), _animal);
                 } finally { GUI.enabled = oldEnabled; }
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动选择页", __ex); }
         }
@@ -180,6 +177,43 @@ namespace SR_UCH.Tweaks {
 
 
 
+
+        // 全量角色按钮网格：一次显示全部，按可用宽度换行；列宽=最长名字，列对齐。
+        private static void RowAnimalGrid(string label, ConfigEntry<string> entry) {
+            try {
+                EnsureAnimalList();
+                GUILayout.BeginHorizontal();
+                try {
+                    float lw = SRApi.Ctl.LabelColumnWidth(label);
+                    GUILayout.Label(SRApi.Ctl.Content(label,
+                        SRApi.T("自动选择的目标角色\n直接列出全部角色，按宽度换行\n只有「选择方式 = 指定角色」时生效",
+                                "the animal auto-pick targets\nlists every animal in a wrapped grid\nonly used when pick mode is Specific")),
+                        SRApi.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(SRApi.Ctl.Sc(26)));
+                    GUILayout.Space(SRApi.Ctl.Sc(6));
+                    float bw = SRApi.Ctl.Sc(56f);
+                    for (int i = 0; i < AnimalLabels.Count; i++) {
+                        float w = SRApi.Ctl.Btn.CalcSize(new GUIContent(AnimalLabels[i])).x + SRApi.Ctl.Sc(18);
+                        if (w > bw) bw = w;
+                    }
+                    float avail = Mathf.Max(bw, SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - lw - SRApi.Ctl.Sc(90));
+                    int cols = Mathf.Clamp(Mathf.FloorToInt(avail / (bw + SRApi.Ctl.Sc(4))), 2, 12);
+                    string cur = entry != null ? entry.Value : "";
+                    for (int i = 0; i < Animals.Count; i++) {
+                        if (GUILayout.Button(AnimalLabels[i], Animals[i] == cur ? SRApi.Ctl.SelItem : SRApi.Ctl.Btn,
+                                GUILayout.Width(bw), GUILayout.Height(SRApi.Ctl.Sc(24)))) {
+                            if (entry != null) entry.Value = Animals[i];
+                        }
+                        if ((i + 1) % cols == 0) {
+                            GUILayout.FlexibleSpace();
+                            GUILayout.EndHorizontal();
+                            GUILayout.BeginHorizontal();
+                            GUILayout.Space(lw + SRApi.Ctl.Sc(6));
+                        }
+                    }
+                    GUILayout.FlexibleSpace();
+                } finally { GUILayout.EndHorizontal(); }
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/角色网格", __ex); }
+        }
 
         private static void RenderOutfit() {
             try {

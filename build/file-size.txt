@@ -3,10 +3,10 @@
 # 计数口径：与守卫一致（ReadAllLines 的行数）。触发脚本就是本文件。
 # 格式：相对仓库根的路径=行数
 SR_UCH/SR.Settings.cs=1522
-SR_UCH/SR.Contracts.cs=1489
-SR_UCH/SR.Core.cs=1482
+SR_UCH/SR.Contracts.cs=1494
+SR_UCH/SR.Core.cs=1483
 Features/BuildingPresets.cs=1414
-SR_UCH/SR.Ctl.cs=1307
-Features/HUD.cs=994
+SR_UCH/SR.Ctl.cs=1321
+Features/HUD.cs=988
 ../SR_UCH_EX/ExModule/ExModule.Core.cs=925
 Features/BuildingPresets.Io.cs=917

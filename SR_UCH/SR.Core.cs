@@ -1001,6 +1001,7 @@ public partial class SR : ITweak {
                     return SR.Ctl.RowSlider(__l, __t, __e, __min, __max, __w, __f);
                 });
                 SRApi.SetTypingSink(delegate { return SR.Typing; });
+                SRApi.Ctl.SetLabelColumnSink(delegate (string __l) { return SR.Ctl.LabelColumnWidth(__l); });
                 SRApi.SetWheelZoneSink(delegate (string __id, Rect __rect, Func<float, bool> __h, int __prio) {
                     SR.Wheel.Register(__id, __rect, __h, __prio);
                 });

@@ -68,7 +68,9 @@ namespace SR_UCH.Tweaks {
             // 返回 true = 本帧滚轮已处理
             internal static bool Consume(Event e, Vector2 areaOffset, bool shift) {
                 if (!_hasEvent || Mathf.Abs(_value) < 0.5f) return false;
-                Vector2 screen = (e != null ? e.mousePosition : Vector2.zero) + areaOffset;
+                // Event.mousePosition 本身就是屏幕坐标（只有 GUI 区域内的 rect 是局部坐标），
+                // 以前这里又加了一次 AreaOffset，鼠标永远对不上区域 → 列表/滑块/下拉框全都收不到滚轮。
+                Vector2 screen = e != null ? e.mousePosition : Vector2.zero;
                 // 1) 控件区：命中且优先级最高的那个
                 Zone win = null;
                 foreach (KeyValuePair<string, Zone> kv in _zones) {

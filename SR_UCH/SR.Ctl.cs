@@ -242,7 +242,7 @@ public partial class SR {
                 try {
                     float lw = labelWidth > 0f ? Sc(labelWidth)
                         // 默认 = 本区最长标签宽度（与方块破坏页同一套对齐规则），再留 6px 间距
-                        : Mathf.Min(Sc(200), Mathf.Max(Sc(60), EntryNameWidth() + Sc(12)));
+                        : LabelColumnWidth(label);
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
                     ResetOnLabelClick(GUILayoutUtility.GetLastRect(), e);
                     GUILayout.Space(Sc(6));
@@ -262,7 +262,7 @@ public partial class SR {
                 try {
                     float lw = labelWidth > 0f ? Sc(labelWidth)
                         // 默认 = 本区最长标签宽度（与方块破坏页同一套对齐规则），再留 6px 间距
-                        : Mathf.Min(Sc(200), Mathf.Max(Sc(60), EntryNameWidth() + Sc(12)));
+                        : LabelColumnWidth(label);
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
                     ResetOnLabelClick(GUILayoutUtility.GetLastRect(), e);
                     GUILayout.Space(Sc(6));
@@ -286,6 +286,20 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("统一下拉行", __ex); }
             GUILayout.Space(Sc(2));
             return picked;
+        }
+
+        // ================= 标签列宽（按页面收敛） =================
+        // 旧实现用 EntryNameWidth()：整个 section 里最长的那条配置名，哪怕本页根本没渲染它，
+        // 结果"标签比文字宽一大截"。这里改成"本页实际画过的标签"取最大值（上一帧值，两帧收敛）。
+        private static float _labelColPrev, _labelColCur;
+        internal static void ResetLabelColumn() { _labelColPrev = 0f; _labelColCur = 0f; }
+        internal static void EndLabelColumnFrame() { if (Mathf.Abs(_labelColCur - _labelColPrev) > 0.5f) _labelColPrev = _labelColCur; }
+        internal static float LabelColumnWidth(string label) {
+            try {
+                float w = SR.Ctl.Label.CalcSize(SRApi.Ctl.Content(label ?? "")).x + Sc(10);
+                if (w > _labelColCur) _labelColCur = w;
+                return Mathf.Max(Sc(48f), Mathf.Min(Sc(220f), Mathf.Max(_labelColPrev, w)));
+            } catch { return Sc(80f); }
         }
 
         // 稳定的区域 id（同一配置条目永远同一个 id，跨帧/跨趟都不会重复建表）
@@ -318,7 +332,7 @@ public partial class SR {
                 try {
                     float lw = labelWidth > 0f ? Sc(labelWidth)
                         // 默认 = 本区最长标签宽度（与方块破坏页同一套对齐规则），再留 6px 间距
-                        : Mathf.Min(Sc(200), Mathf.Max(Sc(60), EntryNameWidth() + Sc(12)));
+                        : LabelColumnWidth(label);
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
                     ResetOnLabelClick(GUILayoutUtility.GetLastRect(), e);
                     GUILayout.Space(Sc(6));
