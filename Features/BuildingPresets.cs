@@ -738,9 +738,9 @@ namespace SR_UCH.Tweaks {
             try {
                 // 主算法：**纯布局单位**，右栏总高减去页面内容起点到表格顶的距离。
                 // 同一坐标系，不会像屏幕坐标换算那样算溢出（"表格底边超出可见区"的根因）。
-                float __used = Mathf.Max(0f, last.yMax - SRApi.PageUsedTop);
-                float avail = SRApi.PageBodyHeight - __used;
-                tableH = Mathf.Max(minH, avail);
+                // 表高 = 表头 + 全部行（内容高度）：页面滚动负责把剩余行带到视野里。
+                float __rows = Mathf.Max(1, VisiblePresets().Count);
+                tableH = minH + (__rows - 1) * SRApi.Ctl.TableRowH();
             } catch (Exception __sh) {
                 SRApi.Guard.Log("布局预设/可视高度", __sh);
                 float used = Mathf.Max(0f, last.yMax - _pageTopY);
@@ -1049,8 +1049,8 @@ namespace SR_UCH.Tweaks {
                 // 行区 = 表格高 − 表头 − 拖拽条：把拖拽条算进来会让 maxY 恒为 0（列表因此永远滚不动）。
                 float rowsH = Mathf.Max(0f, tableH - headerH - __gripH);
                 // 行区不得超过内容高度：内容少时表格就短，不会在行结束处留下"空表体"。
-                float __contentH = Mathf.Max(rowH, visible.Count * rowH);
-                if (rowsH > __contentH) { rowsH = __contentH; tableH = rowsH + headerH; }
+                // 内部滚动关闭：行区=内容高度，滚轮交给页面
+                rowsH = Mathf.Max(rowH, visible.Count * rowH);
                 // 绘制这一刻按屏幕实测再夹一次：行区不得超出"表格顶到 底栏上沿"的可视区。
                 // 之前表格高度是提前算的，算大会让 rowsH 大于实际可见高度 → maxY 算成 0、下面几行被窗口裁掉，
                 // 表现就是"明明还有项目却划不动"。
@@ -1180,7 +1180,8 @@ namespace SR_UCH.Tweaks {
                 HandlePresetCells();   // 数据列：悬浮预览 / 左键切三态 / 右键开界面；名称列：右键重命名
                 // 不画底边拖拽条：预设列表不需要手动调高（整块区域就是列表）。
                 // 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
-                _sbHandled = SRApi.Ctl.TableScrollbarFor(_args, e, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);
+                _sbHandled = false;   // 页面滚动模式：不画内部滚动条
+                if (_sbGrabY < 0f) _sbGrabY = 0f;   // 保留状态字段（滚动条只在联机页用）
                 if (_hiddenCols.Count > _hiddenBeforeTable) {
                     // 核心在右键表头时把列加进 hidden 集合；这里落盘持久化（Shift+右键清空由 resetAll 回调处理）。
                     SaveCols();
