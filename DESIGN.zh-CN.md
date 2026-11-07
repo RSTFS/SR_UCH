@@ -131,6 +131,62 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
 填充页的结构固定为 `固定头部 → 列表 → 底边拖拽条` 三段，新增列表页时照抄联机页/预设页的
 `RenderXxxHeader() + ComputeFillTableHeight() + RenderXxxTable()` 三段式，不要再让页面滚动与列表滚动并存。
 
+### 4.3d 列表滚动上限（maxY / maxX）的完整算法
+
+#### 符号表（全部是**同一套布局坐标**，即 `OnGUI` 的像素单位，已乘过 `Sc()`）
+
+| 符号 | 含义 | 来源 |
+|---|---|---|
+| `rowH` | 行高 | `SRApi.Ctl.TableRowH()` = `Sc(26)` × 界面缩放 |
+| `hdrH` | 表头高 | `SRApi.Ctl.TableHeaderH()` = `Sc(24)` × 界面缩放 |
+| `N` | 当前**可见**行数（已过筛选/搜索） | `VisiblePresets().Count` |
+| `topY` | 表格矩形顶（布局 y，相对右栏内容原点） | `box.y`（`GUILayoutUtility.GetRect` 返回值） |
+| `bodyBottom` | 页面内容底界（布局 y）= 右栏底 = 底栏上沿 | `SRApi.PageContentBottom` |
+| `tableH` | 表高 | 见下 |
+| `rowsH` | 行区高（真正能显示行的高度） | `tableH − hdrH` |
+| `contentH` | 内容高 | `N × rowH` |
+| `stripW` | 横向可视宽度（扣掉钉住列） | `box.width − pinW` |
+| `totalW` | 所有可见非钉住列的宽度和 | `Σ Sc(colW[i])`，跳过隐藏列与钉住列 |
+
+#### 计算步骤
+
+```
+1) tableH  = clamp(bodyBottom − topY,  minH, +∞)      // 同一坐标系相减，绝不可能越过底栏
+   minH    = hdrH + 2 × rowH                          // 至少露出两行，避免 0/负高
+2) rowsH   = max(0, tableH − hdrH)
+3) contentH= N × rowH
+4) maxY    = max(0, contentH − rowsH)                 // 只有内容高于行区时才需要滚
+5) y       = clamp(y + Δ, 0, maxY)                    // Δ = −滚轮值 × rowH
+6) 可见行区间 = [ floor(y / rowH) ,  floor((y + rowsH) / rowH) ]
+```
+
+横向同理：`maxX = max(0, totalW − stripW)`。
+
+#### 不动点（必须恒成立的等式）
+
+```
+topY + tableH = bodyBottom          // 表格底边正好压在底栏上沿
+rowsH = contentH − maxY             // maxY 就是"内容比行区高出来的部分"
+y = maxY  ⟺  最后一行刚好完整露出
+```
+
+#### 用你的实测数字验算（缩放 1.3，rowH = 34）
+
+| 场景 | N | contentH | rowsH(应有) | maxY(应有) | 当时实测 | 结论 |
+|---|---|---|---|---|---|---|
+| 大窗口 | 17 | 578 | 918 | **0** | maxY 0 ✅ | 内容装得下，不该滚 |
+| 小窗口 | 17 | 578 | 572 | **6** | maxY 2 ≈ | 只差 4px，基本正确 |
+| 更小窗口 | 17 | 578 | 575 | **3** | maxY 34 ❌ | rowsH 少了 31（探针偏上） |
+| 早期 | 17 | 578 | 175 | **403** | maxY 0 ❌ | rowsH 被算成 918 但实际只有 ~175 |
+
+#### 为什么会算错（历史原因，已修）
+
+1. **探针离表格太远**：`last.yMax` 是在"工具行之后、表格之前"取的，中间还有 ~72px 布局（状态行/spacing），于是 `tableH = bodyBottom − 偏上的 topY` **多出 72**。
+2. **跨坐标系混算**：一度用 `ContentArea.y + last.yMax`（布局）去减 `ContentArea.yMax − FooterHeight`（屏幕），偏移被放大。
+3. **填充页的 `maxY` 还多加一整行余量**（`+ rowH`），让 `y` 永远到不了最后一条。
+
+现在的做法：探针**紧贴表格前一像素**再探一次 + 用真实 `box.y` 二次修正，且不再加行余量。
+
 ### 4.3c 搜索命中高亮
 
 预设页搜索框命中时，表格单元格里命中的**片段**会先画一层半透明底色（琥珀 22%），再画文字，
