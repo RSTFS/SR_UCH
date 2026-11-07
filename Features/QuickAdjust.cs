@@ -693,10 +693,14 @@ public class QuickAdjust : ITweak {
             catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
+        private static float _keepLastAt = -999f;
+
         private static void TickKeepHandicap() {
             try {
-                if (_keepHandicap <= 0 || _keepApplyAt < 0f || Time.unscaledTime < _keepApplyAt) return;
+                if (_keepHandicap <= 0) return;
+                if (Time.unscaledTime < _keepApplyAt && Time.unscaledTime - _keepLastAt < 1f) return;
                 _keepApplyAt = -1f;
+                _keepLastAt = Time.unscaledTime;
                 foreach (Player p in PlayerManager.GetInstance()) {
                     if (p == null) continue;
                     LobbyPlayer lp = null;
