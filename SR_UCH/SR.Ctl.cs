@@ -927,12 +927,13 @@ public partial class SR {
                     if (lw > maxLine) maxLine = lw;
                 }
                 float innerW = Mathf.Max(Sc(40f), Mathf.Min(limit, maxLine + 2f));
-                // 整块测量（含换行），样式零内边距 → 高度就是文字实际需要的高度，不多不少。
-                float h = st.CalcHeight(_tipContent, innerW);
+                // 逐行测量：每行底部 +1px 缓冲（中文字形下沿常被 CalcHeight 少算，末笔会被裁）。
+                // 整块高度 = 各行(高+1) 之和 + 上下内边距（各 3px），不再额外留 8px 的大空。
+                float h = 0f;
+                for (int i = 0; i < _tipLines.Length; i++) h += st.CalcHeight(new GUIContent(_tipLines[i]), innerW) + 1f;
                 _tipInnerW = innerW;
-                _tipW = innerW + Sc(12f);
-                // +3px 缓冲：末行中文字形下沿常被 CalcHeight 少算，缓冲留足才不裁最后一笔。
-                _tipH = h + Sc(8f) + 3f;
+                _tipW = innerW + Sc(10f);
+                _tipH = h + Sc(6f);
             }
             float x = Mathf.Clamp(mp.x + 16f, 2f, Mathf.Max(2f, Screen.width - _tipW - 6f));
             float y = Mathf.Clamp(mp.y + 16f, 2f, Mathf.Max(2f, Screen.height - _tipH - 10f));
@@ -943,15 +944,15 @@ public partial class SR {
             // 逐行绘制：desc 的第 3 行（注意）用醒目色；默认值/键行保持普通色
             {
                 GUIStyle __ts = TipTextStyle();
-                float __ty = __tipRect.y + Sc(4f);
+                float __ty = __tipRect.y + Sc(3f);
                 for (int li = 0; li < _tipLines.Length; li++) {
                     string __ln = _tipLines[li] ?? "";
                     bool __note = li < _tipNoteLines.Length && _tipNoteLines[li];
                     GUIContent __gc = new GUIContent(__ln);
-                    float __lh = __ts.CalcHeight(__gc, _tipInnerW);
+                    float __lh = __ts.CalcHeight(__gc, _tipInnerW) + 1f;   // 每行底部 1px 缓冲
                     Color __pc = GUI.color;
                     if (__note) GUI.color = new Color(1f, 0.83f, 0.35f, __alpha);   // 注意行：琥珀色
-                    GUI.Label(new Rect(__tipRect.x + Sc(6f), __ty, _tipInnerW, __lh), __gc, __ts);
+                    GUI.Label(new Rect(__tipRect.x + Sc(5f), __ty, _tipInnerW, __lh), __gc, __ts);
                     GUI.color = __pc;
                     __ty += __lh;
                 }
