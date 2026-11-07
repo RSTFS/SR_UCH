@@ -1061,17 +1061,9 @@ namespace SR_UCH.Tweaks {
                 // 的宽度扣掉，剩下的全给它（下限 80 设计单位）。这样窗口宽时不留空、窗口窄时
                 // 其他列溢出并自动出现横向滚动；用户拖名称列宽会被下一帧重新拉伸（与 ImGui 一致：
                 // 拉伸列不单独可调）。
-                // 拉伸列只在**绘制副本**里生效，不动持久化宽度（否则一次拖拽会把拉伸值写进配置）。
+                // 列宽完全按持久化配置（用户要求：表头宽度固定，不再做"拉伸列"每帧重算）。
                 if (_drawW == null || _drawW.Length != _colW.Length) _drawW = new float[_colW.Length];
                 System.Array.Copy(_colW, _drawW, _colW.Length);
-                float __fixedOther = 0f;
-                for (int i = 0; i < _order.Length; i++) {
-                    int __ci = _order[i];
-                    if (__ci == ColAction || __ci == ColName || _hiddenCols.Contains(__ci)) continue;
-                    __fixedOther += SRApi.Ctl.Sc(_colW[__ci]);
-                }
-                float __nameW = Mathf.Max(SRApi.Ctl.Sc(80f), stripW - __fixedOther);
-                _drawW[ColName] = __nameW / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f));
                 float totalW = 0f;
                 for (int i = 0; i < _order.Length; i++) {
                     int ci = _order[i];

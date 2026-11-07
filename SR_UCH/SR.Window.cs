@@ -636,9 +636,21 @@ public partial class SR {
                         else if (_mode == Mode.Settings) SR.SettingsTab = SR.Wheel.Value > 0f ? 0 : 1;
                         SR.Wheel.TakeRemaining(false);
                     } else {
-                        // 先试控件兜底（本趟刚画的矩形），再决定是否滚页面
-                        if (SR.Wheel.TryFallback()) { /* 已被控件消费 */ }
-                        else {
+                        // 兜底顺序：控件 → 页面级钩子（列表页自己滚） → 页面滚动
+                        bool __done = false;
+                        if (SR.Wheel.TryFallback()) __done = true;
+                        if (!__done) {
+                            // 页面级钩子（预设/联机列表）：两种坐标各试一次，命中即消费
+                            float __w0 = SR.Wheel.Value;
+                            Vector2 __mp0 = SR.Wheel.MouseScreen;
+                            try {
+                                if (SRApi.DispatchPageWheel(__mp0, __w0) || SRApi.DispatchPageWheel(__mp0 + SR.AreaOffset, __w0)) {
+                                    SR.Wheel.TakeRemaining(false);   // 已由列表消费，清掉待处理量
+                                    __done = true;
+                                }
+                            } catch (Exception __dh) { Guard.Log("滚轮/页面钩子", __dh); }
+                        }
+                        if (!__done) {
                         bool allow = !_noScrollDeclared;
                         float w = SR.Wheel.TakeRemaining(allow);
                         if (Mathf.Abs(w) > 0.01f) {

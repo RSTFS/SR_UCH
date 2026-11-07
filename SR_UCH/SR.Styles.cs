@@ -145,6 +145,15 @@ public partial class SR {
             try { if (_origSelColorSaved && GUI.skin != null) GUI.skin.settings.selectionColor = _origSelColor; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
+        // 文本标签底部 1px 缓冲：中文/字母的下沿常被样式高度裁掉一点，统一多给 1px 内边距。
+        private static void AddBottomBuffer(GUIStyle st) {
+            try {
+                if (st == null) return;
+                RectOffset po = st.padding;
+                if (po != null && po.bottom < 1) st.padding = new RectOffset(po.left, po.right, po.top, 1);
+            } catch (Exception __ex) { Guard.Log("样式/文本缓冲", __ex); }
+        }
+
         private static void EnsureStyles() {
             //样式仍在但纹理被卸载时重建
             if (_stylesReady && _win != null && _win.normal.background == null) _stylesReady = false;
@@ -200,6 +209,10 @@ public partial class SR {
         EnsureStylesPopups();
         EnsureStylesSliderChrome();
         EnsureStylesCursors();
+        // 所有文本样式统一加 1px 底部缓冲（只影响文字绘制区域，不改变控件高度）
+        AddBottomBuffer(_label); AddBottomBuffer(_labelWrap); AddBottomBuffer(_selItem);
+        AddBottomBuffer(SR.Ctl.LabelClip); AddBottomBuffer(SR.Ctl.LabelClipCenter); AddBottomBuffer(SR.Ctl.SecHeaderCenter);
+        AddBottomBuffer(_secHeader); AddBottomBuffer(_btn); AddBottomBuffer(_frame);
         SyncScaledStyles();   //记录当前缩放档并同步随缩放变化的样式
         }
 
