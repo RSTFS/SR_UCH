@@ -18,7 +18,8 @@ namespace SR_UCH {
                 // 侧栏栏目必须显式 Nav 注册：_navOrder 只由 SR.Nav 填充，
                 // 只调 RegisterPage 的栏目不会出现在左栏（这就是"加了但侧栏没有"的原因）。
                 SRApi.Nav(Sec, 85);
-                SRApi.RegisterPage(Sec, "freeplay", "自由模式", "Freeplay", 10, Render);
+                SRApi.RegisterPage(Sec, "self", "自身状态", "Self state", 10, Render);
+                SRApi.RegisterPage(Sec, "other", "其它", "Other", 20, RenderGridTab);
                 SRApi.RegisterTick("自由模式页", Tick);
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式页/初始化", __ex); }
         }
@@ -30,6 +31,17 @@ namespace SR_UCH {
             if (_probed) return;
             _probed = true;
             try { _render = Slots.Require<Action>(SlotRender); } catch (Exception __ex) { SRApi.Guard.Log("自由模式页/取渲染回调", __ex); }
+        }
+
+        // 「其它」子页：地图网格（SR 自己实现，不依赖 EX）
+        private static void RenderGridTab() {
+            try {
+                if (!SRApi.GateModeAllows(SRApi.ModeMask.Freeplay)) {
+                    GUILayout.Label(SRApi.T("本页只在自由模式下可用", "This page is available in freeplay only"), SRApi.Ctl.Label);
+                    return;
+                }
+                FreePlayGrid.RenderOtherPage();
+            } catch (Exception __ex) { SRApi.Guard.Log("自由模式页/其它", __ex); }
         }
 
         private static void Render() {
