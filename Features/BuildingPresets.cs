@@ -1064,6 +1064,17 @@ namespace SR_UCH.Tweaks {
                     if (__visibleRows > SRApi.Ctl.TableRowH()) rowsH = Mathf.Min(rowsH, __visibleRows);
                 } catch (Exception __vr) { SRApi.Guard.Log("布局预设/行区实测", __vr); }
                 Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
+                // 用**实际** box.y 再修正一次：探针 y 与表格真实 y 之间还夹着布局，之前差 72px，
+                // 结果表格整体下移并伸出底栏（截图里 顶73+高950 越过了底界951）。
+                try {
+                    float __minH = headerH + rowH * 2f;
+                    float __fix = SRApi.PageContentBottom - box.y;
+                    if (__fix > __minH && __fix < tableH) {
+                        tableH = __fix;
+                        box.height = __fix;
+                        rowsH = Mathf.Max(0f, tableH - headerH - __gripH);
+                    }
+                } catch (Exception __fx) { SRApi.Guard.Log("布局预设/表格高度修正", __fx); }
                 EnsureCols();
                 // 操作列宽始终跟随当前语言的按钮文字：语言热切换后也能立刻避免英文标签被截断。
                 // 操作列：默认按按钮文字实测，但最多占表格宽度的 30%（窗口变窄时不会把数据列挤没）

@@ -380,7 +380,7 @@ public partial class SR {
             // 直接按矩形画，不用 BeginClip：裁剪用的是布局坐标，窗口有偏移时会画到表格上方
             // （用户看到的"操作列上方那块遮罩"就是这个错位的裁剪矩形）。
             pinHeader = new Rect(pinX, box.y, pinW, headerH);
-            DrawFill(pinHeader, CurStyle.HeaderBg);
+            // 只画标题文字与左侧分隔线：不铺底色、不铺整块（那块底色在窗口偏移时会显示成一条遮罩）
             SR.Ctl.SecHeaderCenter.Draw(pinHeader, new GUIContent(pinTitle ?? ""), false, false, false, false);
             DrawLine(new Rect(pinX - 1f, box.y, 1f, headerH), CurStyle.LineStrong);
         }
