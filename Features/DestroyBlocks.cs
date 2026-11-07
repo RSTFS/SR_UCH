@@ -16,6 +16,7 @@ namespace SR_UCH.Tweaks {
     public class DestroyBlocks : ITweak {
         private static IFeatureHost _mp; // 仅用于读 Config（契约类型）
         private static int _index;
+        private static int _wheelFrame = -1;   // 上一帧吃掉滚轮的帧号（防同帧多次加）
         private static List<Placeable> Blocks = new List<Placeable>();
         private static bool _altDown;
         private static Placeable _selected;
@@ -487,10 +488,17 @@ namespace SR_UCH.Tweaks {
                 }
                 // 滚轮量必须取 SRApi.TakeWheelEvent()：Input.GetAxis("Mouse ScrollWheel") 在本环境恒为 0，滚轮切换永不生效。
                 // TakeWheelEvent 由每帧执行的 ManagerUI.OnGUI 从事件 delta 记录，面板关着也有效。
-                float wheel = SRApi.TakeWheelEvent();
-                if (wheel != 0f) {
-                    _index += wheel > 0f ? 1 : -1;
-                    SRApi.MarkWheelUsed(); // 滚轮已被选块器吃掉，地图/自由相机让路
+                // 每帧只吃一次：TakeWheelEvent 在某些趟里会重复给出同一个量，
+                // 一帧内连加两次会让索引来回跳（"只在两个之间切"的观感之一）。
+                if (_wheelFrame != Time.frameCount) {
+                    float wheel = SRApi.TakeWheelEvent();
+                    if (wheel != 0f) {
+                        _wheelFrame = Time.frameCount;
+                        int __before = _index;
+                        _index += wheel > 0f ? 1 : -1;
+                        SRApi.MarkWheelUsed(); // 滚轮已被选块器吃掉，地图/自由相机让路
+                        try { SRApi.Diag("方块破坏/滚轮 " + __before + "->" + _index + " 共" + Blocks.Count); } catch { /* 静默：诊断失败不影响 */ }
+                    }
                 }
                 if (_index >= Blocks.Count) _index = 0;
                 if (_index < 0) _index = Blocks.Count - 1;
