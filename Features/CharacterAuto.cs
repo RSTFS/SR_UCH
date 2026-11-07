@@ -24,6 +24,7 @@ namespace SR_UCH.Tweaks {
 
         // 每进一次房间只自动选一次：场景切换时复位。
         private static bool _triedThisRoom;
+        private static Character.Animals _lastWant = Character.Animals.NONE;   // 上次成功选中的动物
         private static float _sceneChangedAt = -999f;   // 最近一次换场景的时刻（宽限期用）
         private static Character _dressedFor;          // 已经成功套用时装的角色实例
         private static int _dressRetry;
@@ -325,13 +326,16 @@ namespace SR_UCH.Tweaks {
                 if (Time.unscaledTime - _sceneChangedAt < 2f) return;
                 LevelSelectController lsc = lm.CurrentLevelSelectController;
                 if (lsc == null) return;                                               // 还不在树屋里，下一帧再看
-                Character.Animals want = ChooseAnimal(lsc);
+                // B：优先选回上次那只（记忆），它不可用才按模式重新挑
+                Character.Animals want = _lastWant != Character.Animals.NONE && FindFreeCharacter(lsc, _lastWant) != null
+                    ? _lastWant : ChooseAnimal(lsc);
                 if (want == Character.Animals.NONE) { _triedThisRoom = true; return; }
                 Character target = FindFreeCharacter(lsc, want);
                 if (target == null) return;                                            // 被占了：下一帧再试（同一房间内仍只算一次）
                 if (lp.CursorInstance == null) { lp.CallCmdSwitchToCursor(); return; }  // 先切光标，下一帧再挑
                 if (lp.RequestPickCharacter(target)) {
                     _triedThisRoom = true;
+                    _lastWant = want;                     // 记住这次的选择
                     SRApi.LogInfo("[角色] 已请求挑选 " + want);
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("角色/自动挑选", __ex); }

@@ -795,6 +795,7 @@ public partial class SR : ITweak {
         private const float TickWarnMs = 0.30f;
         private const float TickBadMs = 1.00f;
         private static float _tickProfLastAt = -999f;
+        private static float _tickOverrunResetAt;   // 超限计数的 10 秒窗口起点
         private static readonly List<TickHook> _tickProfTop = new List<TickHook>(8);
 
         // 按键类钩子的命名约定：KEY_* / 含"键" / 含 Hotkey —— 它们只读输入状态，必须每帧执行。
@@ -901,6 +902,11 @@ public partial class SR : ITweak {
                 if (_tickProf == null || !_tickProf.Value) return;   // 开关关着不采样，不白算
                 if (now - _tickProfLastAt < 0.5f) return;
                 _tickProfLastAt = now;
+                // 超限计数改成 10 秒窗口：整局累计值会堆到几千，看不出"现在还好不好"。
+                if (now - _tickOverrunResetAt >= 10f) {
+                    _tickOverrunResetAt = now;
+                    for (int i = 0; i < _tickHooks.Count; i++) { if (_tickHooks[i] != null) _tickHooks[i].Overruns = 0; }
+                }
                 _tickProfTop.Clear();
                 for (int i = 0; i < _tickHooks.Count; i++) {
                     TickHook h = _tickHooks[i];
