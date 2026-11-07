@@ -124,10 +124,12 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
 填充页的结构固定为 `固定头部 → 列表 → 底边拖拽条` 三段，新增列表页时照抄联机页/预设页的
 `RenderXxxHeader() + ComputeFillTableHeight() + RenderXxxTable()` 三段式，不要再让页面滚动与列表滚动并存。
 
-### 4.4 滚轮（"待处理量"模型，参考 Dear ImGui 的输入路由）
+### 4.4 滚轮（"待处理量"模型，对齐 Dear ImGui 的输入路由）
 
-ImGui 的做法不是"事件发生时到处做命中判定"，而是：输入先进入 `io.MouseWheel`，
-控件在**自己绘制时**判断 `IsItemHovered()` 再消费，剩下的才由窗口滚动使用。
+ImGui 的 examples/ 目录里放的都是**后端接入**（把平台事件喂给 `io.AddMouseWheelEvent`）与
+`ShowDemoWindow` 演示；真正的滚轮路由在核心：`imgui.cpp` 的 `UpdateMouseWheel()` 把
+`io.MouseWheel` 一次性应用到悬停窗口的滚动，`imgui_widgets.cpp` 的 `DragBehaviorT` 等控件只在
+`g.HoveredId == id` 时消费 `io.MouseWheel` 改值。要点是**同一帧先累加、再按控件优先消费、剩下的给窗口滚动**。
 我们照这个模型实现（`SR_UCH/SR.Wheel.cs`）：
 
 ```
@@ -146,6 +148,7 @@ ImGui 的做法不是"事件发生时到处做命中判定"，而是：输入先
 
 - **不再有"区域表 + 坐标换算"**：控件用的是自己绘制期的矩形，与鼠标同源，换多少层容器都不会错位
 - **不再有"哪一层先命中"**：取用是显式的、一次性的（`WheelTake` 取走即清零）
+- 同一帧内多次滚轮事件**累加**（与 `io.MouseWheel += wheel` 一致），不会后一次覆盖前一次
 - 一次滚轮 = **±1**，页面步长固定 **64px**（不乘设备 delta，避免"一次滚很远、一次只走一点"）
 - 侧栏、表格、下拉框、滑块都按同一规则取用；页面只拿剩下的
 

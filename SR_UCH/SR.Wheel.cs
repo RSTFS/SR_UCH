@@ -24,19 +24,23 @@ namespace SR_UCH.Tweaks {
             internal static bool HasPending { get { return _hasEvent && Mathf.Abs(_pending) > 0.5f; } }
             internal static string LastDecision = "none";   // 诊断：谁取走了这一格
 
+            private static int _frame = -1;
+
             // 事件趟：记下滚轮量并**立刻消费事件**，之后只由我们决定归属。
+            // 与 ImGui 一致：同一帧内多次滚轮事件是**累加**的（io.MouseWheel += wheel），
+            // 不是后一次覆盖前一次；否则连续两格只会生效一格。
             internal static void FrameStart(Event e) {
+                if (Time.frameCount != _frame) { _frame = Time.frameCount; _pending = 0f; _mouse = Vector2.zero; _shift = _ctrl = false; }
                 _hasEvent = e != null && e.type == EventType.ScrollWheel;
-                _pending = 0f;
-                _mouse = Vector2.zero;
-                _shift = _ctrl = false;
-                if (!_hasEvent) return;
+                // 同一帧的后续 OnGUI 趟没有滚轮事件，但仍有未取走的量：鼠标/修饰键沿用事件趟的
+                if (!_hasEvent) { _hasEvent = Mathf.Abs(_pending) > 0.01f; return; }
                 try {
                     float v = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
-                    _pending = v > 0f ? -1f : (v < 0f ? 1f : 0f);
+                    v = v > 0f ? -1f : (v < 0f ? 1f : 0f);   // 上滚为正
                     _mouse = e.mousePosition;
                     _shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
                     _ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+                    _pending += v;   // 同帧累加
                     LastDecision = "pending";
                     e.Use();               // 不让任何滚动视图/其它控件再处理
                     e.type = EventType.Used;
