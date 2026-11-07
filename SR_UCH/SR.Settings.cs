@@ -1559,10 +1559,16 @@ public partial class SR {
                         if (Mathf.Abs(__cw2) > 0.0001f) {
                             int __cur = 0;
                             for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur = i; break; } }
-                            int __ni = __cw2 > 0f ? __cur - 1 : __cur + 1;
-                            if (__ni < 0) __ni = options.Length - 1;
-                            if (__ni >= options.Length) __ni = 0;
-                            if (entry != null && __ni < vals.Length) SR.SetValue(entry, vals.GetValue(__ni));
+                            // 顺序换项：一次滚轮严格走一格（上滚=上一项，下滚=下一项），到头回绕。
+                            // 索引只按 options 长度取模，**不再用 vals 长度截断**——后者会让末尾几项永远选不到。
+                            int __n = options.Length;
+                            int __stp = __cw2 > 0f ? -1 : 1;
+                            int __ni = ((__cur + __stp) % __n + __n) % __n;
+                            int __limit = Mathf.Min(__n, vals != null ? vals.Length : 0);
+                            if (entry != null && __limit > 0) {
+                                if (__ni >= __limit) __ni = __stp > 0 ? 0 : __limit - 1;   // 缺值时跳到有效端点
+                                SR.SetValue(entry, vals.GetValue(__ni));
+                            }
                         }
                     }
                 }
