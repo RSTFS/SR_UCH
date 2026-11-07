@@ -62,18 +62,6 @@ namespace SR_UCH {
                 SRApi.Ctl.SectionTitle(SRApi.T("- 地图网格 -", "- Map grid -"));
                 SRApi.Ctl.LabeledRow(SRApi.T("常显网格", "Always show grid"),
                     SRApi.T("自由模式下一直显示地面网格\n仅自由模式生效", "always draw a ground grid in freeplay\nfreeplay only"), _alwaysOn);
-                SRApi.Ctl.RowSlider(SRApi.T("网格亮度", "Grid max alpha"),
-                    SRApi.T("最近处格线的不透明度\n越低越不挡视线", "opacity of the nearest lines\nlower keeps the view clear"),
-                    _maxAlpha, 0.05f, 1f);
-                SRApi.Ctl.RowSlider(SRApi.T("网格淡出距离", "Grid fade distance"),
-                    SRApi.T("离相机越远越淡，到该距离归零\n单位：米", "lines fade with distance\nunit: metres"),
-                    _fadeTime, 5f, 200f);
-                if (_color != null) {
-                    SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("网格颜色", "Grid colour"),
-                        SRApi.T("格线颜色（含透明度）\n建议低透明度避免挡视线", "line colour including alpha\nkeep the alpha low to keep the view clear")),
-                        _color, SRApi.Ctl.Sc(120f), SRApi.Ctl.Sc(24f));
-                    SRApi.Ctl.RenderControl(_color);
-                }
             } catch (Exception __ex) { SRApi.Guard.Log("地图网格/渲染", __ex); }
         }
     }

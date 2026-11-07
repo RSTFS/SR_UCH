@@ -197,7 +197,7 @@ namespace SR_UCH.Tweaks {
         // 两者相减在有偏差时会"整页房间同时失联"（用户看到的 5 秒全失联就是这个）。
         // 改为本地观察：记住每个房间第一次看到这个心跳值的时刻，值变了就刷新；
         // 同一个值持续超过 StaleSeconds 才算失联 —— 与任何服务器时钟无关。
-        private const float StaleSeconds = 15f;
+        private const float StaleSeconds = 30f;   // 心跳停更 30 秒才标记失联（10 秒太容易误判）
         private static readonly Dictionary<string, float> _hbSeenAt = new Dictionary<string, float>();
         private static readonly Dictionary<string, uint> _hbValue = new Dictionary<string, uint>();
 

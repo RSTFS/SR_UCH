@@ -1563,7 +1563,7 @@ public partial class SR {
                             // 索引只按 options 长度取模，**不再用 vals 长度截断**——后者会让末尾几项永远选不到。
                             int __n = options.Length;
                             int __stp = __cw2 > 0f ? -1 : 1;
-                            int __ni = ((__cur + __stp) % __n + __n) % __n;
+                            int __ni = ((__cur + (__cw2 > 0f ? 1 : -1)) % __n + __n) % __n;   // 同样：上滚=下一项
                             int __limit = Mathf.Min(__n, vals != null ? vals.Length : 0);
                             if (entry != null && __limit > 0) {
                                 if (__ni >= __limit) __ni = __stp > 0 ? 0 : __limit - 1;   // 缺值时跳到有效端点
@@ -1582,7 +1582,7 @@ public partial class SR {
                         int __cur1 = 0;
                         for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur1 = i; break; } }
                         int __n1 = options.Length;
-                        int __ni1 = ((__cur1 + (__pw1 > 0f ? -1 : 1)) % __n1 + __n1) % __n1;
+                        int __ni1 = ((__cur1 + (__pw1 > 0f ? 1 : -1)) % __n1 + __n1) % __n1;   // 上滚=下一项（与用户预期一致）
                         if (__ni1 < vals.Length) SR.SetValue(entry, vals.GetValue(__ni1));
                     }
                 }

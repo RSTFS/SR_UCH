@@ -367,31 +367,6 @@ public partial class SR {
                         GUILayout.Space(Sc(2));
                         return written;
                     }
-                    // 滚轮调值：绘制期用本行滑块的矩形取用这一格（不依赖任何坐标换算）
-                    {
-                        float __w = SRApi.Ctl.WheelTake(r);
-                        if (true) {
-                            ConfigEntryBase __fe = e; float __fmin = min, __fmax = max;
-                            SRApi.Ctl.WheelFallback("slider:" + (e != null ? e.Definition.Section + "/" + e.Definition.Key : ""), r, delegate (float __fw) {
-                                float __fc = System.Convert.ToSingle(__fe.BoxedValue);
-                                float __fspan = Mathf.Max(0.0001f, __fmax - __fmin);
-                                float __fst = Mathf.Max(__fspan * 0.02f, 0.01f) * Mathf.Clamp(Mathf.Abs(__fw), 1f, 8f);
-                                float __fnv = Mathf.Clamp(__fc + (__fw > 0f ? -__fst : __fst), __fmin, __fmax);
-                                if (__fspan >= 1f) __fnv = Mathf.Round(__fnv * 10f) / 10f;
-                                if (Mathf.Abs(__fnv - __fc) > 0.000001f) SetValue(__fe, __fnv);
-                                return true;
-                            });
-                        }
-                        if (Mathf.Abs(__w) > 0.01f) {
-                            float __c = System.Convert.ToSingle(e.BoxedValue);
-                            float __span = Mathf.Max(0.0001f, max - min);
-                            float __st = Mathf.Max(__span * 0.02f, 0.01f);
-                            float __steps = Mathf.Clamp(Mathf.Abs(__w), 1f, 8f);   // 一次给 3 格就走 3 步
-                            float __nv = Mathf.Clamp(__c + (__w > 0f ? -__st : __st) * __steps, min, max);
-                            if (__span >= 1f) __nv = Mathf.Round(__nv * 10f) / 10f;
-                            if (Mathf.Abs(__nv - __c) > 0.000001f) { SetValue(e, __nv); written = true; }
-                        }
-                    }
                     // 控件级兜底（历史可用路径）：悬停声明 + Repaint 且仍悬停时取用
                     try {
                         Event __se4 = Event.current;
@@ -433,17 +408,6 @@ public partial class SR {
                             }
                         }
                     } catch (Exception __sw6) { Guard.Log("滑块/滚轮(早期通道)", __sw6); }
-                    // 最高优先：绘制期就地轮询
-                    try {
-                        float __pw2 = SRApi.Ctl.WheelPoll("slider:" + (e != null ? e.Definition.Section + "/" + e.Definition.Key : "?"), r);
-                        if (Mathf.Abs(__pw2) > 0.01f) {
-                            float __sp2 = Mathf.Max(0.0001f, max - min);
-                            float __st2 = Mathf.Max(__sp2 * 0.02f, 0.01f) * Mathf.Clamp(Mathf.Abs(__pw2), 1f, 8f);
-                            float __nv2 = Mathf.Clamp(cur + (__pw2 > 0f ? -__st2 : __st2), min, max);
-                            if (__sp2 >= 1f) __nv2 = Mathf.Round(__nv2 * 10f) / 10f;
-                            if (Mathf.Abs(__nv2 - cur) > 0.000001f) SetValue(e, __nv2);
-                        }
-                    } catch (Exception __pw2x) { Guard.Log("滑块/就地轮询", __pw2x); }
                     float v = DrawSlider(r, cur, min, max, false);
                     v = Mathf.Round(Mathf.Clamp(v, min, max) * 10f) / 10f;
                     if (Mathf.Abs(v - cur) > 0.0001f) { SetValue(e, v); written = true; }
