@@ -544,6 +544,8 @@ public class AutoPartyItem : ITweak {
     private static int _hpStage;          // 0=空闲 1=已移动光标等悬停 2=已触发挑选
     private static float _hpAt = -1f;
     private static float _hpClearAt = -1f;
+    private static float _hpVerifyAt = -1f;
+    private static int _hpAttempts;
 
     private static void SelfReg() {
         SRApi.LocKey("Level", "Auto Party Item", "自动道具", null);
@@ -584,7 +586,7 @@ public class AutoPartyItem : ITweak {
             if (!active) { _armedAt = -1f; _lastBoxId = 0; return; }
 
             int boxId = pb.GetInstanceID();
-            if (boxId != _lastBoxId) { _lastBoxId = boxId; _armedAt = -1f; _pickedBoxId = 0; }
+            if (boxId != _lastBoxId) { _lastBoxId = boxId; _armedAt = -1f; _pickedBoxId = 0; _hpAttempts = 0; }
             if (_pickedBoxId == boxId) return;      // 本次开箱已经自动挑过
 
             PartyPickCursor cur = LocalCursor();
@@ -701,6 +703,18 @@ public class AutoPartyItem : ITweak {
                     System.Reflection.FieldInfo hp2 = SRApi.Ref.Field(typeof(PartyPickCursor), "hoveredPick", "派对盒自动道具（清理伪造悬停）");
                     if (hp2 != null && _hpCur != null) hp2.SetValue(_hpCur, null);
                 } catch (Exception __hc) { SRApi.Guard.Log("自动道具/清理悬停字段", __hc); }
+                // 确认：光标已不再处于挑选态（Picking=false）视为成功；否则允许重试一次。
+                // 以前"发出即记账"，失败后本箱不再尝试 —— 这就是"时灵时不灵"。
+                bool ok = false;
+                try {
+                    PartyPickCursor c0 = _hpCur;
+                    if (c0 != null) ok = !c0.Picking;   // 协程成功会把 Picking 置 false
+                } catch (Exception __ok) { SRApi.Guard.Log("自动道具/确认挑选结果", __ok); }
+                if (!ok && _hpAttempts < 2) {
+                    _hpAttempts++;
+                    _pickedBoxId = 0;          // 允许本箱再挑一次
+                    _armedAt = Time.unscaledTime;   // 重新计时延迟
+                }
                 _hpStage = 0; _hpCur = null; _hpTarget = null;
                 return;
             }
@@ -721,6 +735,7 @@ public class AutoPartyItem : ITweak {
                 // 协程启动后把 hoveredPick 清回去，避免我们伪造的悬停状态留在光标上
                 // （它会影响 IHoveredCursors/后续手动挑选）。等一小拍让协程读到值再清。
                 _hpClearAt = Time.unscaledTime + 0.05f;
+                _hpVerifyAt = Time.unscaledTime + 0.35f;   // 之后确认是否真的挑中
                 _hpStage = 3;
                 return;
             }

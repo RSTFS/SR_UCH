@@ -14,18 +14,7 @@ public partial class Experiments : ITweak
         // 其它页：自由相机 / 加载后清理
         public static void RenderPage2() {
             try {
-                // 自由相机
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("自由相机", "Free camera") + " -", SRApi.T("开启后可以用滚轮自由缩放视野. 关闭后完全恢复游戏默认相机. 只在自由模式有效.",
-                     "While on, the wheel zooms the view freely. Off = fully restores the default camera. Freeplay only."));
-                SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
-                    // 相机移动速度归入自由相机分区（只对自由相机生效）。
-                    return e.Definition.Key == "Free Camera" || e.Definition.Key == "Free Camera FOV"
-                        || e.Definition.Key == "Free Camera Speed";
-                });
-                if (FreeCam.SpeedNote != null && FreeCam.SpeedNote.Length > 0) {
-                    GUILayout.Space(SRApi.Ctl.Sc(2));
-                    DrawStatus(FreeCam.SpeedNote);
-                }
+                // 「自由相机」分区已迁到侧栏「自由模式」页（用户要求），这里不再渲染。
 
                 // 跨平台联机：直接改游戏自己的 CrossPlatformToggle（反射定位，不绑版本）。
                 GUILayout.Space(SRApi.Ctl.Sc(6));
@@ -90,17 +79,17 @@ public partial class Experiments : ITweak
         }
         private static bool FovSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
             min = MinFov; max = MaxFov; fmt = "0";
-            try { return e.Definition.Section == "Experiments" && e.Definition.Key == "Free Camera FOV"; } catch { return false; }
+            try { return (e.Definition.Section == "自由模式" || e.Definition.Section == "Experiments") && e.Definition.Key == "Free Camera FOV"; } catch { return false; }
         }
         // 相机移动速度用滑块渲染（范围 0-10）。
         private static bool SpeedSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
             min = 0f; max = 10f; fmt = "0.0";
-            try { return e.Definition.Section == "Experiments" && e.Definition.Key == "Free Camera Speed"; } catch { return false; }
+            try { return (e.Definition.Section == "自由模式" || e.Definition.Section == "Experiments") && e.Definition.Key == "Free Camera Speed"; } catch { return false; }
         }
         // 量化到 0.5 一档（滑块本身按 0.1 粒度跟手）。
         private static float QuantSpeed(float v) { return Mathf.Round(v / 0.5f) * 0.5f; }
         private static string CameraCompanion(ConfigEntryBase e) {
-            try { if (e.Definition.Section != "Experiments") return null; return e.Definition.Key == "Free Camera" ? "Free Camera Key" : null; } catch { return null; }
+            try { if (e.Definition.Section != "自由模式" && e.Definition.Section != "Experiments") return null; return e.Definition.Key == "Free Camera" ? "Free Camera Key" : null; } catch { return null; }
         }
         private static bool CameraRowFilter(ConfigEntryBase e) {
             try { return e.Definition.Section != "Experiments" || e.Definition.Key != "Free Camera Key"; } catch { return true; }
@@ -109,11 +98,11 @@ public partial class Experiments : ITweak
         public void Initialize(IFeatureHost plugin) {
             try {
                 SelfReg2();
-                _on = plugin.Config.Bind("Experiments", "Free Camera", false, "自由相机：开启后滚轮缩放视野；关闭后完全恢复游戏默认相机（仅自由模式）。");
-                _fov = plugin.Config.Bind("Experiments", "Free Camera FOV", 10f, new ConfigDescription("视野 1-64", new AcceptableValueRange<float>(MinFov, MaxFov)));
+                _on = plugin.Config.Bind("自由模式", "Free Camera", false, "自由相机：开启后滚轮缩放视野；关闭后完全恢复游戏默认相机（仅自由模式）。");
+                _fov = plugin.Config.Bind("自由模式", "Free Camera FOV", 10f, new ConfigDescription("视野 1-64", new AcceptableValueRange<float>(MinFov, MaxFov)));
                 _key = plugin.Config.Bind("Experiments", "Free Camera Key", KeyCode.F3, "按键切换自由相机（组合键：点按钮后在按住 Shift/Ctrl/Alt 的同时按主键设置）。");
                 // 只受模组总开关限制，不受「自由相机」开关影响（它改的是游戏相机跟随速度）。
-                _followSpeed = plugin.Config.Bind("Experiments", "Free Camera Speed", 1f,
+                _followSpeed = plugin.Config.Bind("自由模式", "Free Camera Speed", 1f,
                     new ConfigDescription("相机跟随角色的速度倍数（0-10，每次 0.5，1 = 游戏原值；与自由相机开关无关）",
                         new AcceptableValueRange<float>(0f, 10f)));
                 SRApi.RegisterKey("实验-自由相机", _key, "press");

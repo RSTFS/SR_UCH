@@ -39,7 +39,7 @@ namespace SR_UCH {
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("自由相机", "Free camera") + " -",
                     SRApi.T("开启后可以用滚轮自由缩放视野\n关闭后完全恢复游戏默认相机\n只在自由模式有效",
                             "wheel zooms the view freely while on\noff restores the default camera\nfreeplay only"));
-                SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
+                SRApi.RenderSectionEntries("自由模式", delegate (ConfigEntryBase e) {
                     return e.Definition.Key == "Free Camera" || e.Definition.Key == "Free Camera FOV"
                         || e.Definition.Key == "Free Camera Speed";
                 });

@@ -712,6 +712,10 @@ namespace SR_UCH.Tweaks {
                 });
                 // 关卡背景功能已删除：这个键在两个曾用段名里都要清掉。
                 text = RemoveKeys(text, "Level", new[] { "Level Background", "Refresh Pieces Key" });
+            // 自由相机相关项迁入"自由模式"段（用户要求把该分区移到自由模式页）。
+            text = MoveKeyBetweenSections(text, "Experiments", "自由模式", "Free Camera");
+            text = MoveKeyBetweenSections(text, "Experiments", "自由模式", "Free Camera FOV");
+            text = MoveKeyBetweenSections(text, "Experiments", "自由模式", "Free Camera Speed");
             // 地图网格移入 SR 的"自由模式"段（早期在 [EX]/[Freeplay]）：搬值保证老配置继续生效。
             text = MoveKeyBetweenSections(text, "EX", "自由模式", "Grid Always On");
             text = MoveKeyBetweenSections(text, "EX", "自由模式", "Grid Max Alpha");
