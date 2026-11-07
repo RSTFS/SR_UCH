@@ -24,6 +24,7 @@ namespace SR_UCH.Tweaks {
 
         // 每进一次房间只自动选一次：场景切换时复位。
         private static bool _triedThisRoom;
+        private static float _sceneChangedAt = -999f;   // 最近一次换场景的时刻（宽限期用）
         private static Character _dressedFor;          // 已经成功套用时装的角色实例
         private static int _dressRetry;
         private static float _dressShowAt = -1f;
@@ -156,7 +157,7 @@ namespace SR_UCH.Tweaks {
                 _outfitData = plugin.Config.Bind(Sec, "Outfit Data", "",
                     "内部状态：每个角色第一次随机到的那套外观（键=动物枚举名，值=四类下标）。勿手动修改。");
                 SRApi.RegisterTick("角色-自动选择", Tick);
-                SRApi.RegisterSceneHook(delegate { _triedThisRoom = false; _dressedFor = null; _nextTryAt = 0f; });
+                SRApi.RegisterSceneHook(delegate { _triedThisRoom = false; _dressedFor = null; _nextTryAt = 0f; _sceneChangedAt = Time.unscaledTime; });
             } catch (Exception __ex) { SRApi.Guard.Log("角色/初始化", __ex); }
         }
 
@@ -295,6 +296,9 @@ namespace SR_UCH.Tweaks {
         private static void TryPickOnce(LobbyPlayer lp, LobbyManager lm) {
             try {
                 if (lp.CharacterInstance != null) { _triedThisRoom = true; return; }   // 已经有角色：不动
+                // 从对局/关卡回到树屋后的宽限期：游戏自己会恢复你上次的角色，
+                // 但这段时间 CharacterInstance 可能瞬时为空，贸然挑选会"重新选一次"。
+                if (Time.unscaledTime - _sceneChangedAt < 2f) return;
                 LevelSelectController lsc = lm.CurrentLevelSelectController;
                 if (lsc == null) return;                                               // 还不在树屋里，下一帧再看
                 Character.Animals want = ChooseAnimal(lsc);

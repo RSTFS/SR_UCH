@@ -590,7 +590,8 @@ namespace SR_UCH.Tweaks {
             // 兜底：放置/销毁事件未覆盖的变化（重载关卡、快照重建）靠固定间隔兜住，不由其它页面的开关决定。
             bool stale = (now - _lastListRebuildAt) >= RealtimeFallbackInterval;
             if (!_listDirty && !stale) return;
-            if (now - _lastListRebuildAt < RealtimeMinInterval) return; // 节流：最快 10Hz
+            // 用户要求"实时=每帧"：去掉重建节流（脏了或兜底到点就立刻重建）。
+            // 成本由调用点决定：只在按住切换键时调用，且期间只看计数变化/事件脏标记。
             _lastListRebuildAt = now;
             _listDirty = false;
             RefreshListKeepSelection();
