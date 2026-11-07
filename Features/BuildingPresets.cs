@@ -1058,10 +1058,17 @@ namespace SR_UCH.Tweaks {
 
         // 标准表格：核心 TableDraw 负责表头/行/拖列宽/换列位/钉住操作列；本页只提供列定义、单元格文本与操作按钮。
         private static void RenderPresetTable(float tableH, List<PresetInfo> visible) {
+            // 控件创建一律放在 try 之外：IMGUI 要求 Layout/Repaint 两趟创建同样多的控件，
+            // 一旦某趟在 try 里抛异常，后面的控件就少建 → "control N's position in a group with only N controls"。
+            Rect __probe = GUILayoutUtility.GetRect(1f, 0f);
+            float __rowH0 = SRApi.Ctl.TableRowH();
+            float __headerH0 = SRApi.Ctl.TableHeaderH();
+            Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true),
+                GUILayout.Height(Mathf.Max(SRApi.Ctl.TableRowH(), tableH)));
             try {
                 _visibleCache = visible;   // 悬浮预览按行号取预设时用（与 RowCells 同一份列表）
-                float rowH = SRApi.Ctl.TableRowH();
-                float headerH = SRApi.Ctl.TableHeaderH();
+                float rowH = __rowH0;
+                float headerH = __headerH0;
                 // Render() 传入的 tableH 是「分区标题 + 表格」可用的总高度；分区标题本身也占高，
                 // 这里扣掉它的实测高度，否则表格底部会超出可视区、最后一行被底栏裁掉且滚不到。
                 // 不再二次扣减：调用方给的 tableH 已经是"可用总高度"，而分区标题在 GetLastRect 里
@@ -1086,12 +1093,12 @@ namespace SR_UCH.Tweaks {
                 // 探针必须**无条件**创建：放在 try 里一旦抛异常，本趟就少一个控件，
                 // Layout 与 Repaint 的控制数量不一致会直接抛
                 // "Getting control N's position in a group with only N controls"。
-                Rect __probe = GUILayoutUtility.GetRect(1f, 0f);
+                float __probeH = 0f;
                 try {
-                    float __probeH = SRApi.PageContentBottom - __probe.yMax;
+                    __probeH = SRApi.PageContentBottom - __probe.yMax;
                     if (__probeH > headerH + rowH * 2f) tableH = Mathf.Max(headerH + rowH * 2f, __probeH);
                 } catch (Exception __ph) { SRApi.Guard.Log("布局预设/表格前探针", __ph); }
-                Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
+
                 // 用**实际** box.y 再修正一次：探针 y 与表格真实 y 之间还夹着布局，之前差 72px，
                 // 结果表格整体下移并伸出底栏（截图里 顶73+高950 越过了底界951）。
                 try {
