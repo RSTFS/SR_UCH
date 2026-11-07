@@ -296,6 +296,30 @@ namespace SR_UCH.Tweaks {
         private static void TryPickOnce(LobbyPlayer lp, LobbyManager lm) {
             try {
                 if (lp.CharacterInstance != null) { _triedThisRoom = true; return; }   // 已经有角色：不动
+                // 扫一遍树屋起点上的角色：
+                //  ① 已经属于本地玩家的 → 我们已经选过了，整局不再动（这是"回树屋又选一次"的硬判据）
+                //  ② 被标记为已选却没有任何归属 → 上一轮挑选残留的卡死状态，复位让它重新可选
+                try {
+                    LevelSelectController __lsc0 = lm.CurrentLevelSelectController;
+                    List<LobbyStartPoint> __pts0 = __lsc0 != null ? __lsc0.StartingPoints : null;
+                    if (__pts0 != null) {
+                        for (int __i = 0; __i < __pts0.Count; __i++) {
+                            LobbyStartPoint __sp = __pts0[__i];
+                            if (__sp == null) continue;
+                            Character __c = __sp.GetComponentInChildren<Character>(true);
+                            if (__c == null) continue;
+                            if (__c.AssociatedLobbyPlayer == lp) { _triedThisRoom = true; return; }
+                            if (__c.Picked && __c.AssociatedLobbyPlayer == null) {
+                                // 自愈：卡住的模型恢复可选（Picked 是只读属性，只能改背后的字段）
+                                System.Reflection.FieldInfo __fp = SRApi.Ref.Field(typeof(Character), "picked", "角色/自动选择（复位卡住的已选标记）");
+                                if (__fp != null) {
+                                    __fp.SetValue(__c, false);
+                                    SRApi.LogInfo("[角色] 复位了一个卡住的角色模型（已选但无归属）");
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception __sc0) { SRApi.Guard.Log("角色/扫描已选角色", __sc0); }
                 // 从对局/关卡回到树屋后的宽限期：游戏自己会恢复你上次的角色，
                 // 但这段时间 CharacterInstance 可能瞬时为空，贸然挑选会"重新选一次"。
                 if (Time.unscaledTime - _sceneChangedAt < 2f) return;
