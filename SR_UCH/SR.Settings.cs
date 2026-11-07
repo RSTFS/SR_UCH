@@ -1517,6 +1517,26 @@ public partial class SR {
                     }
                 }
             }
+            // 控件级兜底（历史可用路径）：悬停声明归属；Repaint 趟**且仍悬停**才取用转移来的量。
+            try {
+                Event __ce4 = Event.current;
+                if (__ce4 != null && boxRect.Contains(__ce4.mousePosition)) {
+                    WheelClaim();
+                    if (__ce4.type == EventType.Repaint) {
+                        float __dw4 = WheelDeltaTake();
+                        if (Mathf.Abs(__dw4) > 0.01f && entry != null && vals != null && options != null && options.Length > 1) {
+                            int __c4 = 0;
+                            for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __c4 = i; break; } }
+                            int __n4 = Mathf.Clamp(Mathf.RoundToInt(Mathf.Abs(__dw4)), 1, 5);
+                            int __i4 = __dw4 > 0f ? __c4 - __n4 : __c4 + __n4;
+                            if (__i4 < 0) __i4 = options.Length - 1;
+                            if (__i4 >= options.Length) __i4 = 0;
+                            if (__i4 < vals.Length) SR.SetValue(entry, vals.GetValue(__i4));
+                        }
+                    }
+                }
+            } catch (Exception __cw4) { Guard.Log("下拉框/滚轮", __cw4); }
+
             if (drew) {
                 //展开列表最多可见 8 项，其余经滚轮滚动。
                 int __visN = Mathf.Min(options.Length, 8);

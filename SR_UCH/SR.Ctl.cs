@@ -392,6 +392,23 @@ public partial class SR {
                             if (Mathf.Abs(__nv - __c) > 0.000001f) { SetValue(e, __nv); written = true; }
                         }
                     }
+                    // 控件级兜底（历史可用路径）：悬停声明 + Repaint 且仍悬停时取用
+                    try {
+                        Event __se4 = Event.current;
+                        if (__se4 != null && r.Contains(__se4.mousePosition)) {
+                            WheelClaim();
+                            if (__se4.type == EventType.Repaint) {
+                                float __dw5 = WheelDeltaTake();
+                                if (Mathf.Abs(__dw5) > 0.01f) {
+                                    float __sp5 = Mathf.Max(0.0001f, max - min);
+                                    float __st5 = Mathf.Max(__sp5 * 0.02f, 0.01f) * Mathf.Clamp(Mathf.Abs(__dw5), 1f, 8f);
+                                    float __nv5 = Mathf.Clamp(cur + (__dw5 > 0f ? -__st5 : __st5), min, max);
+                                    if (__sp5 >= 1f) __nv5 = Mathf.Round(__nv5 * 10f) / 10f;
+                                    if (Mathf.Abs(__nv5 - cur) > 0.000001f) SetValue(e, __nv5);
+                                }
+                            }
+                        }
+                    } catch (Exception __sw5) { Guard.Log("滑块/滚轮", __sw5); }
                     float v = DrawSlider(r, cur, min, max, false);
                     v = Mathf.Round(Mathf.Clamp(v, min, max) * 10f) / 10f;
                     if (Mathf.Abs(v - cur) > 0.0001f) { SetValue(e, v); written = true; }

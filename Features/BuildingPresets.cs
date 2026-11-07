@@ -134,6 +134,7 @@ namespace SR_UCH.Tweaks {
         private static Vector2 _scrollCols;   // 诊断：每帧只记一次滚轮事件
         private static Rect _tableBox;     // 表格在屏幕上的矩形（页面级滚轮钩子按它判断是否滚表格）
         private static float _rowsHCache;   // 表格真实行区高度（滚轮钩子兜底用）
+        private static float _tableTopY, _tableHCache;   // 诊断：表格顶（屏幕）与高度
         private static float _maxScrollX;
         private static float _maxScrollY;
         private static bool _sbDragging;
@@ -566,7 +567,8 @@ namespace SR_UCH.Tweaks {
                 // 若"滚不动"，这几个数字能直接指出是 maxY=0（内容没超出）、还是 layer=none（没收到滚轮）。
                 try {
                     count += "   ·   行" + shown + " 行区" + _rowsHCache.ToString("0") + " maxY" + _maxScrollY.ToString("0")
-                           + " y" + _scrollRows.y.ToString("0") + " 层:" + (SRApi.WheelLayer ?? "?");
+                           + " y" + _scrollRows.y.ToString("0") + " 层:" + (SRApi.WheelLayer ?? "?")
+                           + " 顶" + _tableTopY.ToString("0") + " 高" + _tableHCache.ToString("0");
                 } catch { /* 静默：诊断行失败不影响列表 */ }
                 // 工具行前面已有"跳过树屋 + 返回树屋"约 290 设计单位；不给状态栏设上限，
                 // 导出目录那种长路径会把 FlexibleSpace 挤没、整行撑出窗口。
@@ -1047,12 +1049,20 @@ namespace SR_UCH.Tweaks {
                 float __gripH = 0f;   // 已删除底边拖拽条
                 // 行区 = 表格高 − 表头 − 拖拽条：把拖拽条算进来会让 maxY 恒为 0（列表因此永远滚不动）。
                 float rowsH = Mathf.Max(0f, tableH - headerH - __gripH);
+                // 绘制这一刻按屏幕实测再夹一次：行区不得超出"表格顶到 底栏上沿"的可视区。
+                // 之前表格高度是提前算的，算大会让 rowsH 大于实际可见高度 → maxY 算成 0、下面几行被窗口裁掉，
+                // 表现就是"明明还有项目却划不动"。
+                try {
+                    float __topScreen = SRApi.ContentArea.y + (GUILayoutUtility.GetLastRect().y);
+                    float __bottomScreen = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);
+                    float __visibleRows = __bottomScreen - (__topScreen + headerH);
+                    if (__visibleRows > SRApi.Ctl.TableRowH()) rowsH = Mathf.Min(rowsH, __visibleRows);
+                } catch (Exception __vr) { SRApi.Guard.Log("布局预设/行区实测", __vr); }
                 Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
                 EnsureCols();
                 // 操作列宽始终跟随当前语言的按钮文字：语言热切换后也能立刻避免英文标签被截断。
                 // 操作列：默认按按钮文字实测，但最多占表格宽度的 30%（窗口变窄时不会把数据列挤没）
-                // 操作列宽度：至少 190 设计单位（与联机列表的加入列观感一致），最多占表格 40%
-                _colW[ColAction] = Mathf.Clamp(Mathf.Max(DefaultActionColW(), SRApi.Ctl.Sc(190f)), SRApi.Ctl.Sc(140f), box.width * 0.40f / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)));
+                _colW[ColAction] = Mathf.Min(DefaultActionColW(), Mathf.Max(SRApi.Ctl.Sc(96f), box.width * 0.30f));
                 if (_args == null) _args = new SRApi.TableArgs();
                 float pinW = SRApi.Ctl.Sc(_colW[ColAction]);
                 // 有纵向溢出时，在数据区与钉住列之间预留滚动条宽度（与联机列表一致）。
@@ -1079,6 +1089,7 @@ namespace SR_UCH.Tweaks {
                 }
                 _maxScrollX = Mathf.Max(0f, totalW - stripW);
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
+                _tableTopY = SRApi.ContentArea.y + box.y; _tableHCache = tableH;
                 _rowsHCache = rowsH;   // 缓存真实行区高：滚轮钩子在首帧/刚切页时用它兜底
                 _maxScrollY = Mathf.Max(0f, visible.Count * rowH - rowsH + rowH);   // 留一整行余量：最后一整行都能露出来
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _maxScrollY);
