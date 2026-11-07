@@ -1294,6 +1294,12 @@ public partial class SR {
                         nv = DrawSlider(sr, fv, hmin, hmax, val is int, hstep); //int 条目按整数步进，提交时由 SetValue 归一化类型
                         // 滚轮调值：绘制期用本行滑块矩形取用这一格（同一坐标系，不会错位）
                         {
+                            // 按下滑块时禁止拖窗口（同上）
+                            try {
+                                Event __md2 = Event.current;
+                                if (__md2 != null && __md2.type == EventType.MouseDown && __md2.button == 0 && sr.Contains(__md2.mousePosition))
+                                    SRApi.BlockWindowDrag = true;
+                            } catch (Exception __bw2) { Guard.Log("条目滑块/禁止拖窗口", __bw2); }
                             float __w = SRApi.Ctl.WheelTake(sr);
                             if (Mathf.Abs(__w) > 0.01f) {
                                 float __c = val is int ? (int)val : (float)val;

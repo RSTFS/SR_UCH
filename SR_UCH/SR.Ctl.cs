@@ -409,6 +409,12 @@ public partial class SR {
                             }
                         }
                     } catch (Exception __sw5) { Guard.Log("滑块/滚轮", __sw5); }
+                    // 按下滑块时禁止拖窗口：我们放开了 hotControl 判定后，滑块按下会被当成"空白拖动"
+                    try {
+                        Event __md = Event.current;
+                        if (__md != null && __md.type == EventType.MouseDown && __md.button == 0 && r.Contains(__md.mousePosition))
+                            BlockWindowDrag = true;
+                    } catch (Exception __bw) { Guard.Log("滑块/禁止拖窗口", __bw); }
                     float v = DrawSlider(r, cur, min, max, false);
                     v = Mathf.Round(Mathf.Clamp(v, min, max) * 10f) / 10f;
                     if (Mathf.Abs(v - cur) > 0.0001f) { SetValue(e, v); written = true; }
