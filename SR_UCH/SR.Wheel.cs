@@ -87,9 +87,14 @@ namespace SR_UCH.Tweaks {
                     if (!__used) continue;                 // 控件到头了：不算消费，留给后面
                     _pending = 0f;                         // 已消费：清待处理量，避免页面再滚一次
                     LastDecision = "hover";
+                    try { SRApi.Diag("滚轮/控件命中 " + _fbKeyOf(__f) + " Δ" + wheel.ToString("0.0")); } catch (Exception __dg) { SR.Guard.Log("滚轮/命中诊断", __dg); }
                     return true;
                 }
                 return false;
+            }
+
+            private static string _fbKeyOf(Fb f) {
+                try { return f != null ? (f.Rect.x.ToString("0") + "," + f.Rect.y.ToString("0")) : "?"; } catch { return "?"; }
             }
 
             internal static void ClearFallback() { _fb.Clear(); }
