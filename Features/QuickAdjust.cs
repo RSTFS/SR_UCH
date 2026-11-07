@@ -57,7 +57,7 @@ namespace SR_UCH.Tweaks {
         internal static void RenderNoScoreboardRow() {
             try {
                 ConfigEntryBase ns = SRApi.Ctl.FindEntry(Sec, "No Death Scoreboard");
-                if (ns != null) SRApi.Ctl.LabeledRow(SRApi.T("死亡无计分板", "No death scoreboard"),
+                if (ns != null) QuickAdjust.PageRow(SRApi.T("死亡无计分板", "No death scoreboard"),
                     SRApi.T("挑战模式死亡时不显示记分板\n只在死亡且尚未通关时生效", "skips the scoreboard when you die in challenge only while dead and not yet succeeded"), ns);
             } catch (Exception __ex) { SRApi.Guard.Log("重生/记分板行", __ex); }
         }
@@ -68,14 +68,14 @@ namespace SR_UCH.Tweaks {
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("重生", "Respawn") + " -",
                     SRApi.T("重生延迟、出生无敌、炮弹卡死自动重生（挑战/自由通用）。",
                             "Respawn delay, spawn invincibility and cannon-stuck respawn (challenge and freeplay)."));
-                if (_delay != null) SRApi.Ctl.RowSlider(SRApi.T("重生延迟", "Respawn delay"),
+                if (_delay != null) QuickAdjust.PageSlider(SRApi.T("重生延迟", "Respawn delay"),
                     SRApi.T("死亡后等多少秒再自动重生\n游戏原生长按阈值是 0.5 秒\n挑战/自由模式", "seconds to wait after death\nvanilla hold threshold is 0.5s\nchallenge and freeplay"),
                     _delay, 0f, 3f, "0.0");
-                if (_invincible != null) SRApi.Ctl.RowSlider(SRApi.T("出生无敌", "Spawn invincibility"),
+                if (_invincible != null) QuickAdjust.PageSlider(SRApi.T("出生无敌", "Spawn invincibility"),
                     SRApi.T("每次出生后的无敌秒数\n游戏原生重生后是 1 秒\n挑战/自由模式", "seconds of invincibility after each spawn\nvanilla gives 1s after respawn\nchallenge and freeplay"),
                     _invincible, 0f, 10f, "0.0");
                 ConfigEntryBase cr = SRApi.Ctl.FindEntry(Sec, "Cannon Auto Respawn");
-                if (cr != null) SRApi.Ctl.LabeledRow(SRApi.T("炮弹卡死重生", "Cannon auto respawn"),
+                if (cr != null) QuickAdjust.PageRow(SRApi.T("炮弹卡死重生", "Cannon auto respawn"),
                     SRApi.T("死了还卡在炮弹里超过 1.5 秒时自动重生\n挑战/自由模式", "respawns if you stay dead inside a cannon for over 1.5s\nchallenge and freeplay"), cr);
             } catch (Exception __ex) { SRApi.Guard.Log("重生/分区渲染", __ex); }
         }
@@ -306,6 +306,41 @@ public class QuickAdjust : ITweak {
     }
 
     // 第 2 页：挑战（自动重试 + 快速重试 + 等待秒数）。原来在「关卡 → 挑战」，现归到快速调整。
+        // 本页标签列宽：把本页所有标签一次性量出来取最大值，所有行共用。
+        // 不用核心的两帧收敛版（换页第一帧会差一截、看起来没对齐），这里确定性更强。
+        private static float _pageLabelW;
+        private static string _pageLabelLang;
+        internal static float PageLabelWidth() {
+            try {
+                string lang = SRApi.T("z", "e");
+                if (_pageLabelW > 0f && lang == _pageLabelLang) return _pageLabelW;
+                _pageLabelLang = lang;
+                string[] labels = new string[] {
+                    SRApi.T("死后自动重试", "Auto retry on death"),
+                    SRApi.T("快速重试", "Quick retry"),
+                    SRApi.T("等待秒数", "Hold s"),
+                    SRApi.T("死亡无计分板", "No death scoreboard"),
+                    SRApi.T("重生延迟", "Respawn delay"),
+                    SRApi.T("出生无敌", "Spawn invincibility"),
+                    SRApi.T("炮弹卡死重生", "Cannon auto respawn"),
+                };
+                float w = SRApi.Ctl.Sc(60f);
+                for (int i = 0; i < labels.Length; i++)
+                    w = Mathf.Max(w, SRApi.Ctl.Label.CalcSize(SRApi.Ctl.Content(labels[i])).x + SRApi.Ctl.Sc(10f));
+                _pageLabelW = Mathf.Min(w, SRApi.Ctl.Sc(220f));
+                return _pageLabelW;
+            } catch { return SRApi.Ctl.Sc(90f); }
+        }
+
+        // 行统一入口：自动带上本页标签列宽
+        internal static void PageRow(string label, string tip, ConfigEntryBase e) {
+            SRApi.Ctl.LabeledRow(label, tip, e, PageLabelWidth() / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)));
+        }
+        internal static void PageSlider(string label, string tip, ConfigEntryBase e, float min, float max, string fmt) {
+            // 契约签名：label, tip, entry, min, max, fmt, labelWidth
+            SRApi.Ctl.RowSlider(label, tip, e, min, max, fmt, PageLabelWidth() / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)));
+        }
+
     public static void RenderChallengePage() {
         try {
             SRApi.Ctl.SectionTitle("- " + SRApi.T("挑战", "Challenge") + " -",
@@ -314,19 +349,19 @@ public class QuickAdjust : ITweak {
             GUILayout.Space(SRApi.Ctl.Sc(2));
 
             ConfigEntryBase qr = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry");
-            if (qr != null) SRApi.Ctl.LabeledRow(SRApi.T("死后自动重试", "Auto retry on death"),
+            if (qr != null) PageRow(SRApi.T("死后自动重试", "Auto retry on death"),
                 SRApi.T("仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n对局中开关立即生效。",
                         "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nTakes effect immediately."),
                 qr);   // 标签宽度交给核心按本页标签收敛，不再写死
 
             ConfigEntryBase qrf = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Fast");
-            if (qrf != null) SRApi.Ctl.LabeledRow(SRApi.T("快速重试", "Quick retry"),
+            if (qrf != null) PageRow(SRApi.T("快速重试", "Quick retry"),
                 SRApi.T("仅挑战模式：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n长按时间在下方设置，对局中开关立即生效。",
                         "Challenge only: after death, hold B for the set seconds to auto-retry.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately."),
                 qrf);   // 同上：写死会让本页各行左边缘不齐
 
             ConfigEntryBase qrh = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Hold");
-            if (qrh != null) SRApi.Ctl.RowSlider(SRApi.T("等待秒数", "Hold s"),
+            if (qrh != null) PageSlider(SRApi.T("等待秒数", "Hold s"),
                 SRApi.T("长按 B 的等待阈值（Character.SuicideTime）：挑战模式重试游戏默认 0.5 秒。\n范围 0-2，0.1 步进",
                         "Hold-B threshold (Character.SuicideTime): vanilla 0.5s for challenge retry.\nrange 0-2 in 0.1 steps"),
                 qrh, 0f, 2f, "0.0");

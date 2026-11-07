@@ -563,7 +563,14 @@ public partial class SR {
                 try { SR.RenderSettingsTabBar(); }
                 catch (Exception __tb) { Guard.Log("设置页签", __tb); }
             }
-            _scroll = GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUIStyle.none, GUILayout.ExpandHeight(true));   // 弹性占满剩余高度
+            // 填充页（预设 / 联机）不建立滚动区：它们把列表高度算到"底栏上沿"，
+            // 再套一层滚动区只会把列表裁到视口内、而列表自己仍以为可见 → maxY 与实际不符（滑不到底）。
+            bool __useScrollView = !__noScroll;
+            if (__useScrollView) {
+                _scroll = GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUIStyle.none, GUILayout.ExpandHeight(true));
+            } else {
+                _scroll = Vector2.zero;   // 填充页没有页面滚动
+            }
             if (_scroll != pageBefore) WheelFrame = Time.frameCount; // 页面滚动区吃掉了滚轮
             ConfigFile curConfig = _mode == Mode.Internal
                 ? _internalConfig
@@ -615,17 +622,19 @@ public partial class SR {
                 }
                 if (!any) GUILayout.Label(T("（这个插件没有可显示的配置项）", "(this plugin has no visible settings)"), _label);
             }
-            GUILayout.EndScrollView();
-            // 实测滚动区高度：它就是页面可用视口（下一帧给表格算高度用）。
-            // 滚动区是弹性高度，不受页面内容影响，所以这个值不会形成抖动反馈。
-            try {
-                Rect __sv = GUILayoutUtility.GetLastRect();
-                // 硬上限：区域高 - 页头 - 底栏预留。Layout 趟 GetLastRect 可能返回"内容高度"，
-                // 不夹住的话表格会按几千像素取高，列表下方出现一大片空白。
-                float __vpMax = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
-                if (__sv.height > Sc(40f)) SRApi.PageViewportHeight = Mathf.Min(__sv.height, __vpMax);
-                else if (SRApi.PageViewportHeight > __vpMax) SRApi.PageViewportHeight = __vpMax;
-            } catch (Exception __vm) { Guard.Log("页面视口实测", __vm); }
+            if (__useScrollView) {
+                GUILayout.EndScrollView();
+                // 实测滚动区高度：它就是页面可用视口（下一帧给表格算高度用）。
+                try {
+                    Rect __sv = GUILayoutUtility.GetLastRect();
+                    float __vpMax = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
+                    if (__sv.height > Sc(40f)) SRApi.PageViewportHeight = Mathf.Min(__sv.height, __vpMax);
+                    else if (SRApi.PageViewportHeight > __vpMax) SRApi.PageViewportHeight = __vpMax;
+                } catch (Exception __vm) { Guard.Log("页面视口实测", __vm); }
+            } else {
+                // 没有滚动区：视口 = 区域高 − 页头 − 底栏预留（精确值，不依赖实测）
+                SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
+            }
             // 功能页外框部件（紧贴底栏条上方）：量它的高度并按栏目记住，供下一帧预留。
             float __pfTop = 0f;
             try { __pfTop = GUILayoutUtility.GetLastRect().yMax; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
