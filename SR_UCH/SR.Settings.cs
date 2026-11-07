@@ -352,28 +352,6 @@ public partial class SR {
                         try { AuditLabel(SR.AttributionReport()); } catch (Exception __at) { Guard.Log("自检/归因", __at); }
                     });
 
-                // ---- 功能总览卡 ----
-                IList<FeatureInfo> feats = Features.All;
-                int fCount = feats != null ? feats.Count : 0;
-                int fBad = Features.ProblemCount;
-                Card(fBad == 0, T("功能总览", "Features"),
-                    T(fCount + " 个功能 · 问题 " + fBad, fCount + " feature(s) · " + fBad + " problem(s)"),
-                    delegate {
-                        for (int i = 0; i < fCount; i++) {
-                            FeatureInfo fi = feats[i];
-                            if (fi == null) continue;
-                            bool ok = !fi.ContractTooNew && fi.MissingDeps.Count == 0 && fi.ConflictSlots.Count == 0;
-                            GUILayout.BeginHorizontal();
-                            GUILayout.Label(ok ? "✓" : "✗", _label, GUILayout.Width(Sc(20)), GUILayout.Height(Ctl.TableRowH()));
-                            GUILayout.Label(fi.Name ?? fi.Id, _label, GUILayout.Width(Sc(150)), GUILayout.Height(Ctl.TableRowH()));
-                            GUILayout.Label(fi.Id ?? "", _labelWrap, GUILayout.Width(Sc(190)), GUILayout.Height(Ctl.TableRowH()));
-                            GUILayout.Label("v" + (fi.Version ?? "0"), _label, GUILayout.Width(Sc(60)), GUILayout.Height(Ctl.TableRowH()));
-                            GUILayout.Label(ok ? T("正常", "ok") : fi.ToString(), _labelWrap, GUILayout.ExpandWidth(true), GUILayout.Height(Ctl.TableRowH()));
-                            GUILayout.EndHorizontal();
-                        }
-                        if (fCount == 0) AuditLabel(T("（还没有扫描到功能）", "(no features scanned yet)"));
-                    });
-
                 // ---- 键位冲突卡 ----
                 List<SR.KeyConflict> conflicts = SR.FindKeyConflicts();
                 Card(conflicts.Count == 0, T("键位冲突", "Key conflicts"),
@@ -1445,7 +1423,10 @@ public partial class SR {
             //控件在被 hover 时声明滚轮所有权
             Event ce0 = Event.current;
             if (ce0 != null && options != null) {
-                Rect listRect = new Rect(boxRect.x, boxRect.yMax, width, Sc(26) * options.Length);
+                // 只按实际画出来的项数算热区（展开列表最多可见 8 项）：以前用 options.Length，
+                // 选项多时热区会延伸到看不见的地方，滚轮在那里被吞掉、页面也滚不动。
+                int __vis = Mathf.Min(options.Length, 8);
+                Rect listRect = new Rect(boxRect.x, boxRect.yMax, width, CtlH() * __vis);
                 //框命中即赢；展开的列表用 AllowOverlap 抢下 hover（它叠放在下方各行之上）
                 bool won = HoverTest(boxRect) || (drew && HoverTest(listRect, true));
                 if (won) WheelClaim();   //仅赢得 hover 时声明，一帧内不会有两个控件同时声明

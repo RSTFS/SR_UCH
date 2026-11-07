@@ -569,6 +569,18 @@ public partial class SR {
                     }
                 } catch (Exception __pwx) { Guard.Log("页面级滚轮", __pwx); }
             }
+            // Shift+滚轮：页面横向滚动（内容比视口宽时有效）。必须在 BeginScrollView 之前改 _scroll，
+            // 并且设盾，避免同一次滚轮又被竖向滚动区吃掉。
+            if (__wasWheel && !WheelShieldHit
+                && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))) {
+                try {
+                    float __hx = Mathf.Abs(__we.delta.y) > 0.001f ? __we.delta.y : __we.delta.x;
+                    if (Mathf.Abs(__hx) > 0.0001f) {
+                        _scroll.x = Mathf.Max(0f, _scroll.x + __hx * Sc(60f));
+                        __we.Use(); __we.type = EventType.Used; WheelShieldHit = true; SR.MarkWheelUsed();
+                    }
+                } catch (Exception __hs) { Guard.Log("页面横向滚动", __hs); }
+            }
             // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
             // 设置页签常驻：画在滚动区之外，页面滚动不会带走页签（与底栏同级的固定区）。
             if (_mode == Mode.Settings) {

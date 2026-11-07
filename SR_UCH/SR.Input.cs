@@ -40,6 +40,9 @@ public partial class SR {
                 try { wheel = Mathf.Abs(e.delta.y) > 0.001f ? -e.delta.y : -e.delta.x; } catch { wheel = 0f; }
                 if (WheelTakenThisFrame) return;                            //本帧已被界面件吃掉
                 if (Mathf.Abs(wheel) < 0.0001f) return;
+                // 面板打开时界面优先：滚轮不再分发给地图/自由相机等世界内消费者，
+                // 否则页面没有可滚内容时，滚轮会"穿透"到背后的世界缩放。
+                if (SRApi.UiOpen) return;
                 try { WheelEventValue = wheel; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 //分发给已注册的滚轮消费者（地图缩放 / 自由相机缩放），消费逻辑由功能自己声明。
                 if (FireWheel(wheel)) MarkWheelUsed();

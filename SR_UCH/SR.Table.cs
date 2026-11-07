@@ -447,7 +447,10 @@ public partial class SR {
         float amt = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
         // Shift+滚轮横向滚动；无纵向余量时自动转横向。
         if (e.shift && maxX > 0f) {
+            float beforeX = scrollCols.x;
             scrollCols.x = Mathf.Clamp(scrollCols.x + amt * Sc(60), 0f, maxX);
+            // 已到左右边界：不消费，交给页面滚动（与竖向一致）
+            if (Mathf.Abs(scrollCols.x - beforeX) < 0.01f) return false;
             e.Use(); MarkWheelUsed(); WheelShieldHit = true; return true;
         }
         if (maxY > 0f) {

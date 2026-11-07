@@ -167,8 +167,9 @@ namespace SR_UCH.Tweaks {
             // Shift+滚轮 = 横向（与表格内部 TableWheelInput 同一约定），否则竖向。
             bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             if (__shift && _tableMaxX > 0f) {
-                _scrollCols.x = Mathf.Clamp(_scrollCols.x + wheel * SRApi.Ctl.Sc(60), 0f, _tableMaxX);
-                return true;
+                float beforeX = _scrollCols.x;
+                _scrollCols.x = Mathf.Clamp(_scrollCols.x - wheel * SRApi.Ctl.Sc(60), 0f, _tableMaxX);
+                if (Mathf.Abs(_scrollCols.x - beforeX) > 0.01f) return true;   // 到头不消费，交还页面
             }
             // 防御：_tableMaxY 为 0（首帧/刚切页）时用缓存行区重算，避免第一次滚没反应。
             float __maxY = _tableMaxY;
