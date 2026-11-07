@@ -537,6 +537,12 @@ public class AutoPartyItem : ITweak {
     private static int _lastBoxId;            // 已经处理过的派对盒实例
     private static int _pickedBoxId;          // 本次开箱已经挑过（防重复下发）
     private static float _nextAt = -999f;
+    // 悬停挑选流程：先把本地光标挪到目标道具上（让游戏自己算出 hoveredPick），
+    // 下一拍再调用游戏自己的 tryPickPiece 协程 —— 房主端只认游戏这条链路。
+    private static PartyPickCursor _hpCur;
+    private static PickableBlock _hpTarget;
+    private static int _hpStage;          // 0=空闲 1=已移动光标等悬停 2=已触发挑选
+    private static float _hpAt = -1f;
 
     private static void SelfReg() {
         SRApi.LocKey("Level", "Auto Party Item", "自动道具", null);
@@ -562,6 +568,7 @@ public class AutoPartyItem : ITweak {
 
     private static void Tick() {
         try {
+            TickHoverPick();   // 悬停挑选流程每帧推进（它自己有节流），不能被下面的 0.15s 轮询挡住
             if (_enabled == null || !_enabled.Value) { _armedAt = -1f; return; }
             if (!SRApi.GateMaster) return;
             if (Time.unscaledTime < _nextAt) return;
@@ -652,14 +659,55 @@ public class AutoPartyItem : ITweak {
     //   Picking=false → 记 NetworkpickedPiece → （有权威才）发 PiecePicked → Freeze → Disable()
     // 之前在房客端失效，就是因为少了 Picking=false 且用了不同的 Disable 重载：
     // 房主端的校验只认"光标已结束挑选"的状态，状态不对就当作无效挑选丢掉。
+    // 走游戏自己的挑选链路：光标必须先"悬停"在道具上（游戏靠碰撞体算 hoveredPick，
+    // 并从它取 netIdValue）。直接发 PiecePicked 在房客端会被房主判为无效。
     private static bool DoPick(PartyPickCursor cur, PickableBlock target) {
         try {
             if (cur == null || target == null) return false;
-            if (UnityEngine.Networking.NetworkManager.singleton == null || UnityEngine.Networking.NetworkManager.singleton.client == null) return false;
+            _hpCur = cur; _hpTarget = target; _hpStage = 1; _hpAt = Time.unscaledTime + 0.06f;
+            return true;
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/启动悬停挑选", __ex); return false; }
+    }
+
+    // 每帧推进悬停挑选流程
+    private static void TickHoverPick() {
+        try {
+            if (_hpStage == 0 || _hpCur == null || _hpTarget == null) return;
+            if (Time.unscaledTime < _hpAt) return;
+            if (_hpStage == 1) {
+                // 把光标移到道具上：位置取道具的 transform，稍高一点避免落进地面
+                Vector3 p = _hpTarget.transform.position;
+                _hpCur.transform.position = new Vector3(p.x, p.y + 0.2f, p.z);
+                _hpStage = 2;
+                _hpAt = Time.unscaledTime + 0.10f;   // 等游戏下一次 Update 算 hoveredPick
+                return;
+            }
+            if (_hpStage == 2) {
+                System.Reflection.MethodInfo mi = null;
+                try { mi = SRApi.Ref.Method(typeof(PartyPickCursor), "tryPickPiece", "派对盒自动道具（走游戏挑选协程）"); }
+                catch (Exception __rf) { SRApi.Guard.Log("自动道具/取挑选方法", __rf); }
+                if (mi != null) {
+                    try {
+                        System.Collections.IEnumerator co = mi.Invoke(_hpCur, null) as System.Collections.IEnumerator;
+                        if (co != null) _hpCur.StartCoroutine(co);
+                        SRApi.LogInfo("[自动道具] 已按游戏协程挑选：" + (_hpTarget != null ? _hpTarget.name : "?"));
+                    } catch (Exception __iv) { SRApi.Guard.Log("自动道具/启动协程", __iv); }
+                } else {
+                    SRApi.LogWarn("[自动道具] 找不到 tryPickPiece，改用消息下发");
+                    FallbackSendPick(_hpCur, _hpTarget);
+                }
+                _hpStage = 0; _hpCur = null; _hpTarget = null;
+            }
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/悬停挑选推进", __ex); }
+    }
+
+    // 兜底：与以前相同的直接发消息（仅当反射拿不到协程时）
+    private static void FallbackSendPick(PartyPickCursor cur, PickableBlock target) {
+        try {
+            if (cur == null || target == null) return;
+            if (UnityEngine.Networking.NetworkManager.singleton == null || UnityEngine.Networking.NetworkManager.singleton.client == null) return;
             cur.Picking = false;
-            UnityEngine.Networking.NetworkInstanceId netId = new UnityEngine.Networking.NetworkInstanceId(target.netIdValue);
-            UnityEngine.GameObject picked = UnityEngine.Networking.ClientScene.FindLocalObject(netId);
-            cur.NetworkpickedPiece = picked;
+            cur.NetworkpickedPiece = UnityEngine.Networking.ClientScene.FindLocalObject(new UnityEngine.Networking.NetworkInstanceId(target.netIdValue));
             if (cur.hasAuthority) {
                 MsgPiecePicked msg = new MsgPiecePicked();
                 msg.PickableNetID = target.netIdValue;
@@ -668,8 +716,7 @@ public class AutoPartyItem : ITweak {
             }
             cur.Freeze();
             cur.Disable();
-            return true;
-        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/下发挑选", __ex); return false; }
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/兜底下发", __ex); }
     }
 }
 
