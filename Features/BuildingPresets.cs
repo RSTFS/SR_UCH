@@ -261,8 +261,10 @@ namespace SR_UCH.Tweaks {
         private static void SelfReg() {
             SRApi.LocSec(Section, "布局预设", "Layout Presets");
             SRApi.Nav(Section, 45); // 关卡(40) 之后、构建工具(50) 之前
-            SRApi.RegisterPage(Section, Render);            // 页签一：预设保存
-            SRApi.RegisterPage(Section, RenderListPage);    // 页签二：预设列表（筛选 + 列表）
+            // 多页必须用 6 参重载：单页重载会覆盖 PageRenderers 并清掉 _pageLists，
+            // 两次单页注册的结果是"只剩最后一页、没有页签"——这就是之前"啥也没有"的原因。
+            SRApi.RegisterPage(Section, "save", "预设保存", "Save", 10, Render);
+            SRApi.RegisterPage(Section, "list", "预设列表", "List", 20, RenderListPage);
             // 页面关掉了滚动，列表要自己吃滚轮：只有页面级钩子能在滚动区建立之前拿到事件。
             SRApi.RegisterPageWheel(OnPresetWheel);
             // 填充页兜底：帧尾若滚轮没被任何控件/钩子消费，直接滚本列表（不依赖命中框）
