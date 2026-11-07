@@ -324,6 +324,11 @@ public class LevelPartyBox : ITweak {
         private static ConfigEntry<KeyCode> _refreshPartyBoxKey;
         private static ConfigEntry<KeyCode> _closePartyBoxKey;
 
+        // 派对盒正在重建/关闭的窗口（秒）：刷新或关闭后一小段时间内，自动道具不得动作，
+        // 否则会对着已经被销毁的旧盒子取道具（表现为"自动道具和开关派对盒冲突"）。
+        internal static float BoxBusyUntil;
+        private const float BoxBusySeconds = 1.2f;
+
         public static ConfigEntry<KeyCode> RefreshPartyBoxKeyEntry { get { return _refreshPartyBoxKey; } }
         public static ConfigEntry<KeyCode> ClosePartyBoxKeyEntry { get { return _closePartyBoxKey; } }
 
@@ -360,6 +365,7 @@ public class LevelPartyBox : ITweak {
         // 房主端三步：广播销毁旧道具 -> showPartyBox() -> CallRpcShowPartyBox()，全员才能一致。
         public static void RefreshPartyBox() {
             try {
+                BoxBusyUntil = Time.unscaledTime + BoxBusySeconds;   // 重建期间喂自动道具"别动"
                 VersusControl vc = UnityEngine.Object.FindObjectOfType<VersusControl>();
                 if (vc == null) { SRApi.Notify(SRApi.T("请先进入派对模式对局", "Not in a party match")); return; }
                 PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
@@ -409,6 +415,7 @@ public class LevelPartyBox : ITweak {
 
         internal static void ClosePartyBox() {
             try {
+                BoxBusyUntil = Time.unscaledTime + BoxBusySeconds;   // 关闭期间喂自动道具"别动"
                 VersusControl vc = UnityEngine.Object.FindObjectOfType<VersusControl>();
                 if (vc == null) { SRApi.Notify(SRApi.T("请先进入派对模式对局", "Not in a party match")); return; }
                 // 相位推进是服务器权限（原生 RPC 也只在房主侧发）。
@@ -526,6 +533,8 @@ public class AutoPartyItem : ITweak {
             if (_enabled == null || !_enabled.Value) { _armedAt = -1f; return; }
             if (!SRApi.GateMaster) return;
             if (Time.unscaledTime < _nextAt) return;
+            // 派对盒正在刷新/关闭：本帧不动作，避免对着已被销毁的旧盒子取道具（冲突修复）
+            if (Time.unscaledTime < LevelPartyBox.BoxBusyUntil) { _armedAt = -1f; _lastBoxId = 0; return; }
             _nextAt = Time.unscaledTime + 0.15f;   // 轮询节流：不抢游戏自己的逻辑，也不每帧全场景找
 
             PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
