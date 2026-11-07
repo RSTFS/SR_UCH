@@ -202,13 +202,12 @@ public partial class SR {
     // 相位 6：钉住列的按钮定位与派发（按钮内容由调用方给，本控件只负责矩形与命中）。
     private static void TableDrawPinned(SRApi.TableArgs a) {
         if (a.pinW <= 0f || a.pinDraw == null) return;
-        // 钉住列底：整条列区先垫不透明底（表头下方到行区底部），纵向滚动时下面的行不会透出来。
-        try {
-            float __h = Mathf.Max(0f, a.box.height - (a.headerH > 0f ? a.headerH : Sc(24)));
-            DrawFill(new Rect(a.pinX, a.box.y + (a.headerH > 0f ? a.headerH : Sc(24)), a.pinW, __h), CurStyle.RowBg);
-        } catch (Exception __pf) { Guard.Log("表格/钉住列底", __pf); }
+        // 钉住列底：只铺"实际有行的单元格"，不再整列铺一块（整列铺会在行结束处形成一条深色遮罩）
         for (int k = 0; k < a.pinRects.Count && k < a.pinRows.Count; k++) {
-            try { a.pinDraw(a.pinRows[k], a.pinRects[k], k); } catch (Exception __pd) { Guard.Log("钉住列按钮", __pd); }
+            try {
+                DrawFill(a.pinRects[k], CurStyle.RowBg);   // 每格自己铺底：纵向滚动时不透明，且不会延伸到空白区
+                a.pinDraw(a.pinRows[k], a.pinRects[k], k);
+            } catch (Exception __pd) { Guard.Log("钉住列按钮", __pd); }
         }
     }
 

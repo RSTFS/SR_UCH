@@ -568,7 +568,8 @@ namespace SR_UCH.Tweaks {
                 try {
                     count += "   ·   行" + shown + " 行区" + _rowsHCache.ToString("0") + " maxY" + _maxScrollY.ToString("0")
                            + " y" + _scrollRows.y.ToString("0") + " 层:" + (SRApi.WheelLayer ?? "?")
-                           + " 顶" + _tableTopY.ToString("0") + " 高" + _tableHCache.ToString("0");
+                           + " 顶" + _tableTopY.ToString("0") + " 高" + _tableHCache.ToString("0")
+                           + " 内容" + (shown * SRApi.Ctl.TableRowH()).ToString("0") + " 行高" + SRApi.Ctl.TableRowH().ToString("0");
                 } catch { /* 静默：诊断行失败不影响列表 */ }
                 // 工具行前面已有"跳过树屋 + 返回树屋"约 290 设计单位；不给状态栏设上限，
                 // 导出目录那种长路径会把 FlexibleSpace 挤没、整行撑出窗口。
