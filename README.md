@@ -103,6 +103,13 @@ The panel has sections on the left and pages on the right. Listed by section bel
 - **Auto pick** -- picks an animal once when you enter the treehouse or a room: specific animal / random free / smart (the one you use most according to your save); only unlocked animals are considered and nothing happens if you already picked one.
 - **Auto outfit** -- applies a random look as soon as the animal is picked (unlocked outfits only); reroll with the button.
 
+### Respawn (under Quick Adjust -> Respawn)
+
+- **Respawn delay** -- seconds to wait after death before auto-respawning (challenge and freeplay; default 0.5s, the game's own hold threshold).
+- **Spawn invincibility** -- seconds of invincibility after each spawn (default 1s, matching the game).
+- **Cannon-stuck respawn** -- respawns automatically when you stay dead inside a cannon for over 1.5s.
+- **No death scoreboard** -- skips the scoreboard when you die in challenge (only while dead and not yet succeeded).
+
 ### Layout Presets
 
 - Save the current block layout as a named preset and load it back later (host only).

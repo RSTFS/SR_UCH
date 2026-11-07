@@ -28,7 +28,7 @@ build/                        构建脚本 + rsp 清单 + 守卫 + 单元测试
 
 **方向约束（有守卫检查）**
 
-- 功能层只允许出现 `SRApi.*`（白名单 105 个符号），不得出现 `SR.*` 实现层标识
+- 功能层只允许出现 `SRApi.*`（白名单 110 个符号），不得出现 `SR.*` 实现层标识
 - 契约层不得引用实现层类型（`sr_uch_contracts.rsp` 独立编译验证）
 - 功能之间**不得编译期互相引用**：需要协作时用 `SRApi.Slots`（能力槽）或事件
 
@@ -231,12 +231,12 @@ SRApi.ComboKeyDown(keyEntry) / SRApi.ComboKeyHeld(keyEntry)
 ## 8. 构建 / 守卫 / 部署
 
 ```powershell
-cd D:\RS_TFS\CC\_tools
-.\build_sr_uch.ps1                  # 合并模式（默认发布形态）
-.\build_sr_uch.ps1 -All             # 合并 + EX + Others
-.\build_sr_uch.ps1 -Split           # 拆分模式：核心 + 每个功能一个 DLL
-.\build_sr_uch.ps1 -Check           # 守卫：契约独立编译 / rsp 精确覆盖 / csproj 可编
-.\build_sr_uch.ps1 -All -Deploy     # 构建并部署到游戏（游戏关着再跑）
+cd D:\RS_TFS\CC\SR_UCH\build
+.\build.ps1                  # 合并模式（默认发布形态）
+.\build.ps1 -All             # 合并 + EX + Others
+.\build.ps1 -Split           # 拆分模式：核心 + 每个功能一个 DLL
+.\build.ps1 -Check           # 守卫：契约独立编译 / rsp 精确覆盖 / csproj 可编
+.\build.ps1 -All -Deploy     # 构建并部署到游戏（游戏关着再跑）
 ```
 
 ```powershell
@@ -251,7 +251,7 @@ cd D:\RS_TFS\CC\SR_UCH\build
 
 1. `build/rsp/sr_uch.rsp` 加 `Features\X.cs`
 2. 若支持拆分：`build/rsp/feat_X.rsp`（照抄现有 rsp 改输出名与末行）+ 两个构建脚本的 `$rspFeatures` 都加
-3. `_tools/rsp/sr_uch.rsp` 加绝对路径（工具链用）
+3. `build/rsp/sr_uch.rsp` 加绝对路径（工具链用）
 
 ---
 

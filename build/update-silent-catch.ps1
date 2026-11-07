@@ -8,6 +8,7 @@ if (-not $Out) { $Out = Join-Path $here 'silent-catch.txt' }
 
 $dirs = @((Join-Path $root 'SR_UCH'),
           (Join-Path $root 'Features'),
+          $root,   # 仓库根：MainPlugin.cs 等也要进基线（与 guards-text 覆盖范围一致）
           (Join-Path (Split-Path $root -Parent) 'SR_UCH_EX'))
 $rootFiles = @(Get-ChildItem -LiteralPath $root -Filter '*.cs' -File)
 $rows = @()

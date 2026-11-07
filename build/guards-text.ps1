@@ -88,6 +88,23 @@ function Check-RspCoverage {
     if ($miss.Count -gt 0) { Bad ('sr_uch.rsp 漏了源文件: ' + (($miss | Select-Object -First 6) -join ', ')) }
     if ($extra.Count -gt 0) { Bad ('sr_uch.rsp 多出源文件: ' + (($extra | Select-Object -First 6) -join ', ')) }
     if ($miss.Count -eq 0 -and $extra.Count -eq 0) { Ok ('rsp 精确覆盖全部 ' + $disk.Count + ' 个源文件') }
+
+    # 拆分构建：feat_*.rsp 文件 与 构建脚本 $rspFeatures 必须双向一致。
+    # 以前只校验合并模式，导致「文件在、列表漏」时 -Split 静默少编一个功能（整栏消失）。
+    $buildPs1 = Join-Path $Root 'build\build.ps1'
+    if (Test-Path $buildPs1) {
+        $listTxt = Get-Content $buildPs1 -Raw
+        $m = [regex]::Match($listTxt, '(?s)\$rspFeatures\s*=\s*@\((.*?)\)')
+        if ($m.Success) {
+            $inList = @([regex]::Matches($m.Groups[1].Value, "'(feat_[^']+\.rsp)'") | ForEach-Object { $_.Groups[1].Value })
+            $onDisk = @(Get-ChildItem (Join-Path $Root 'build\rsp') -Filter 'feat_*.rsp' -File | ForEach-Object { $_.Name })
+            $listMiss = @($onDisk | Where-Object { $inList -notcontains $_ })
+            $listGhost = @($inList | Where-Object { $onDisk -notcontains $_ })
+            if ($listMiss.Count -gt 0) { Bad ('$rspFeatures 漏了 feat 文件: ' + ($listMiss -join ', ')) }
+            if ($listGhost.Count -gt 0) { Bad ('$rspFeatures 列了不存在的 feat 文件: ' + ($listGhost -join ', ')) }
+            if ($listMiss.Count -eq 0 -and $listGhost.Count -eq 0) { Ok ('拆分构建清单与 feat 文件一致（' + $inList.Count + ' 个）') }
+        }
+    }
 }
 
 # ---------- 5) 编码：全部文本文件必须是合法 UTF-8 ----------
@@ -286,6 +303,7 @@ function Check-SilentCatch {
     # 导致 99/153 处静默 catch 脱离棘轮（评审 B-2）。
     $dirs = @((Join-Path $Root 'SR_UCH'),
               (Join-Path $Root 'Features'),
+              $Root,   # 仓库根：MainPlugin.cs 等也要进棘轮（以前漏掉，注释与实现不符）
               (Join-Path (Split-Path $Root -Parent) 'SR_UCH_EX'))
     $bad = @()
     $total = 0

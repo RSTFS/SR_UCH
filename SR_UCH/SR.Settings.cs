@@ -954,6 +954,9 @@ public partial class SR {
                 try {
                     object av = entry.Description != null ? entry.Description.AcceptableValues : null;
                     if (av != null) {
+                        // 反射登记：BepInEx 公共 API，改名后自检会报出来
+                        SRApi.Ref.Override("AcceptableValueRange`1.Min", "悬浮条目：显示数值范围");
+                        SRApi.Ref.Override("AcceptableValueRange`1.Max", "悬浮条目：显示数值范围");
                         System.Reflection.PropertyInfo pmin = av.GetType().GetProperty("Min");
                         System.Reflection.PropertyInfo pmax = av.GetType().GetProperty("Max");
                         if (pmin != null && pmax != null) {

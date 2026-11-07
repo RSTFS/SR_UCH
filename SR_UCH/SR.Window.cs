@@ -254,8 +254,8 @@ public partial class SR {
                 // 面板已关：把自绘页声明的系统光标形状收掉，否则 <->/+ 光标会留在屏幕上
                 try { ClearTip(); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 RunFrameEndHooks();
-            SR.Wheel.PruneZones();
-            SR.Ctl.EndLabelColumnFrame();   // 标签列宽本帧收敛（下一帧生效）   // 回收最近 5 帧未再注册的区域（换页后旧矩形不再吃滚轮）
+                SR.Wheel.PruneZones();
+                SR.Ctl.EndLabelColumnFrame();
                 return;
             }
             _scaled = Mathf.Clamp(_uiScaleEntry.Value, Ui.ScaleMin, Ui.ScaleMax);
@@ -491,8 +491,6 @@ public partial class SR {
             Event __we = Event.current;
             bool __wasWheel = __we != null && __we.type == EventType.ScrollWheel;
             if (__wasWheel) {
-                try { SRApi.Diag("wheel mode=" + _mode + " sec=" + _selectedInternalSection + " noBars=" + _noScrollDeclared + " scrollY=" + _scroll.y.ToString("0.0") + " layer=" + SR.Wheel.LastDecision); }
-                catch (Exception __wd) { Guard.Log("滚轮诊断", __wd); }
                 try {
                     bool __ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
                     bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
@@ -513,6 +511,9 @@ public partial class SR {
                         }
                     }
                     if (__consumed) { __we.Use(); __we.type = EventType.Used; SR.MarkWheelUsed(); }
+                    // 诊断放在裁决之后：显示的是**本次**滚轮命中的层，而不是上一次
+                    try { SRApi.Diag("wheel mode=" + _mode + " sec=" + _selectedInternalSection + " noBars=" + _noScrollDeclared + " scrollY=" + _scroll.y.ToString("0.0") + " layer=" + SR.Wheel.LastDecision); }
+                    catch (Exception __wd) { Guard.Log("滚轮诊断", __wd); }
                 } catch (Exception __wc) { Guard.Log("滚轮仲裁", __wc); }
             }
             // 换栏目/换页签时收起所有下拉框：展开态一旦跨页残留，控件会一直声明"滚轮归我"，
@@ -720,6 +721,8 @@ public partial class SR {
             }
             // 自绘页本帧声明的鼠标形状在此统一应用并复位：未声明时回到"不强制"，特殊光标不会残留。
             RunFrameEndHooks();
+            SR.Wheel.PruneZones();          // 面板打开期间也回收：旧页矩形不会继续吃滚轮
+            SR.Ctl.EndLabelColumnFrame();   // 标签列宽本帧收敛（下一帧生效）
             }
             // 功能覆盖层最后绘制，保证在最上层（各功能自己判断该不该画）
             DrawOverlays();
