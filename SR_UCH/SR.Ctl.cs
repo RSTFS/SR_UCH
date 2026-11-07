@@ -370,7 +370,7 @@ public partial class SR {
                     // 滚轮调值：绘制期用本行滑块的矩形取用这一格（不依赖任何坐标换算）
                     {
                         float __w = SRApi.Ctl.WheelTake(r);
-                        if (Mathf.Abs(__w) < 0.01f) {
+                        if (true) {
                             ConfigEntryBase __fe = e; float __fmin = min, __fmax = max;
                             SRApi.Ctl.WheelFallback(r, delegate (float __fw) {
                                 float __fc = System.Convert.ToSingle(__fe.BoxedValue);

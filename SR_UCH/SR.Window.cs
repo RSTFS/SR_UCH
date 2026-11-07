@@ -279,6 +279,15 @@ public partial class SR {
             Vector2 mouse = e.mousePosition; // 无矩阵缩放，无需坐标换算
             SR.Wheel.FrameStart(e);          // 滚轮仲裁：只更新本趟事件信息（区域表跨趟持久）
             WheelClaimNewFrame();            // 控件"上一帧声明过归属"的快照（早期可用的机制）
+            // 滚轮提前结算：页面/侧栏的滚动视图会先吃掉 ScrollWheel，控件（下拉框/滑块）永远等不到，
+            // 所以必须在建立任何滚动视图之前，用控件上一趟登记的矩形命中一次。
+            try {
+                Event __we0 = Event.current;
+                if (__we0 != null && __we0.type == EventType.ScrollWheel) {
+                    float __raw0 = Mathf.Abs(__we0.delta.y) > 0.001f ? __we0.delta.y : __we0.delta.x;
+                    if (SR.Wheel.TryHoverApply(-__raw0)) { __we0.Use(); }
+                }
+            } catch (Exception __hw) { Guard.Log("滚轮/提前命中外层", __hw); }
 
             Rect winRect = new Rect(_winX, _winY, _winWidth, _winHeight);
             bool over = winRect.Contains(mouse);

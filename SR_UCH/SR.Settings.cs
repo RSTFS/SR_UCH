@@ -1462,7 +1462,8 @@ public partial class SR {
                 float __w = 0f;
                 if (!open) {
                     __w = SRApi.Ctl.WheelTake(boxRect);
-                    if (Mathf.Abs(__w) < 0.01f && entry != null && vals != null) {
+                    // 无论 take 是否命中都登记：滚动视图会先吃掉滚轮，靠这张表在窗口层提前命中
+                    if (entry != null && vals != null) {
                         ConfigEntryBase __ce = entry; Array __cv = vals; string[] __co = options; string __cc = current;
                         SRApi.Ctl.WheelFallback(boxRect, delegate (float __fw) {
                             int __ccur = 0;

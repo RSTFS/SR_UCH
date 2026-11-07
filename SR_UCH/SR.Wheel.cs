@@ -40,7 +40,7 @@ namespace SR_UCH.Tweaks {
             internal static void RegisterFallback(Rect rect, Func<float, bool> apply) {
                 try {
                     if (apply == null || rect.width < 2f || rect.height < 2f) return;
-                    if (_fbRects.Count >= 64) return;
+                    if (_fbRects.Count >= 256) { _fbRects.Clear(); _fbHandlers.Clear(); }   // 防无限增长
                     _fbRects.Add(rect); _fbHandlers.Add(apply);
                 } catch (Exception __ex) { SR.Guard.Log("滚轮/兜底登记", __ex); }
             }
@@ -68,6 +68,21 @@ namespace SR_UCH.Tweaks {
                 return false;
             }
 
+            // 在页面滚动视图建立**之前**命中：滚动视图会先吃掉滚轮，控件永远等不到事件。
+            internal static bool TryHoverApply(float wheel) {
+                if (Mathf.Abs(wheel) < 0.01f) return false;
+                for (int i = _fbRects.Count - 1; i >= 0; i--) {   // 后登记的优先（同一位置更具体的控件）
+                    Rect r = _fbRects[i];
+                    Vector2 mp = _mouse;
+                    try { if (Event.current != null) mp = Event.current.mousePosition; } catch (Exception __m) { SR.Guard.Log("滚轮/命中鼠标", __m); }
+                    if (!HitAny(r, mp)) continue;
+                    try { _fbHandlers[i](wheel); } catch (Exception __ex) { SR.Guard.Log("滚轮/提前命中", __ex); }
+                    LastDecision = "hover";
+                    return true;
+                }
+                return false;
+            }
+
             internal static void ClearFallback() { _fbRects.Clear(); _fbHandlers.Clear(); }
             internal static string LastDecision = "none";   // 诊断：谁取走了这一格
 
@@ -79,7 +94,7 @@ namespace SR_UCH.Tweaks {
             internal static void FrameStart(Event e) {
                 if (Time.frameCount != _pendFrame) { _pendFrame = Time.frameCount; _pending = 0f; _mouse = Vector2.zero; _shift = _ctrl = false; }
                 _hasEvent = e != null && e.type == EventType.ScrollWheel;
-                ClearFallback();   // 每次进入都清空：兜底列表只反映"本趟刚画"的控件
+                // 不再每趟清空：列表要跨趟保留（滚动视图在控件之前就吃掉滚轮，必须提前命中）
                 // 同一帧的后续 OnGUI 趟没有滚轮事件，但仍有未取走的量：鼠标/修饰键沿用事件趟的
                 if (!_hasEvent) { _hasEvent = Mathf.Abs(_pending) > 0.01f; return; }
                 try {
