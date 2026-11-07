@@ -212,10 +212,9 @@ namespace SR_UCH.Tweaks {
                     if (__tev != null && __tev.type == EventType.ScrollWheel && box.Contains(__tev.mousePosition)) {
                         float __raw = Mathf.Abs(__tev.delta.y) > 0.001f ? __tev.delta.y : __tev.delta.x;
                         if (ScrollTableByWheel(-__raw)) { __tev.Use(); }
-                    } else {
+                    } else if (_tableMaxY > 0.01f || _tableMaxX > 0.01f) {
                         float __w = SRApi.Ctl.WheelTake(box);
                         if (Mathf.Abs(__w) > 0.01f) ScrollTableByWheel(__w);
-                        else SRApi.Ctl.WheelFallback(box, delegate (float __fw) { ScrollTableByWheel(__fw); return true; });
                     }
                 }
                 }

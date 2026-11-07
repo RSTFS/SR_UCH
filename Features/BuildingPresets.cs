@@ -1165,10 +1165,10 @@ namespace SR_UCH.Tweaks {
                     if (__tev != null && __tev.type == EventType.ScrollWheel && box.Contains(__tev.mousePosition)) {
                         float __raw = Mathf.Abs(__tev.delta.y) > 0.001f ? __tev.delta.y : __tev.delta.x;
                         if (ScrollTableBy(-__raw)) { __tev.Use(); }
-                    } else {
+                    } else if (_maxScrollY > 0.01f || _maxScrollX > 0.01f) {
+                        // 只有表格自己能滚时才取用；否则保留事件给页面滚动（否则页面永远滚不动）
                         float __w = SRApi.Ctl.WheelTake(box);
                         if (Mathf.Abs(__w) > 0.01f) ScrollTableBy(__w);
-                        else SRApi.Ctl.WheelFallback(box, delegate (float __fw) { ScrollTableBy(__fw); return true; });
                     }
                 }
                 SRApi.TableDraw(_args);
