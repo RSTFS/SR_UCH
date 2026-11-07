@@ -26,6 +26,7 @@ namespace SR_UCH.Tweaks {
         private static bool _triedThisRoom;
         private static Character _dressedFor;          // 已经成功套用时装的角色实例
         private static int _dressRetry;
+        private static float _dressShowAt = -1f;
         private static OutfitController _dressCtrl;   // 我们打开的换装界面（用于关闭后自救）
         private static Character _dressChar;                // 套用失败的重试计数（角色还没初始化完时会失败）
         private static float _nextTryAt;
@@ -84,6 +85,15 @@ namespace SR_UCH.Tweaks {
                 string hit;
                 if (_animalNameCache.TryGetValue(en, out hit)) return hit;
                 string pascal = Pascal(en);
+                // 不规则的名字：枚举名与本地化 key 不同（Pascal 转换救不了）
+                switch (en) {
+                    case "ROBOT": pascal = "RobotMonkey"; break;
+                    case "REALBUNNY": pascal = "RealBunny"; break;
+                    case "DIREWOLF": pascal = "DireWolf"; break;
+                    case "REDPANDA": pascal = "RedPanda"; break;
+                    case "CHICKENARARA": pascal = "ChickenArara"; break;
+                    case "ROBOTMONKEY": pascal = "RobotMonkey"; break;
+                }
                 string name = null;
                 try { name = global::I2.Loc.LocalizationManager.GetTranslation("CharacterNames/" + pascal); }
                 catch (Exception __gt) { SRApi.Guard.Log("角色/游戏角色名", __gt); }
@@ -198,8 +208,8 @@ namespace SR_UCH.Tweaks {
                         float w = SRApi.Ctl.Btn.CalcSize(new GUIContent(AnimalLabels[i])).x + SRApi.Ctl.Sc(18);
                         if (w > bw) bw = w;
                     }
-                    float avail = Mathf.Max(bw, SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - lw - SRApi.Ctl.Sc(90));
-                    int cols = Mathf.Clamp(Mathf.FloorToInt(avail / (bw + SRApi.Ctl.Sc(4))), 2, 12);
+                    // 固定 5 列（15 只 = 5×3），不随窗口宽度自动换行
+                    const int cols = 5;
                     string cur = entry != null ? entry.Value : "";
                     for (int i = 0; i < Animals.Count; i++) {
                         if (GUILayout.Button(AnimalLabels[i], Animals[i] == cur ? SRApi.Ctl.SelItem : SRApi.Ctl.Btn,
@@ -264,6 +274,7 @@ namespace SR_UCH.Tweaks {
 
                 if (pick && !_triedThisRoom) TryPickOnce(lp, lm);
                 if (outfit) TryRandomOutfit(lp);
+                RefreshDresserOnce();
                 UnstickDresser();
             } catch (Exception __ex) { SRApi.Guard.Log("角色/轮询", __ex); }
         }
@@ -371,6 +382,18 @@ namespace SR_UCH.Tweaks {
         }
 
         // ---------------- 自动时装（随机整套） ----------------
+        // 刚打开的换装界面：克隆体的 Awake/Start 还没跑，立即 Show 会是空白（行与图片都没初始化）。
+        // 等一小段时间后补一次 Show()，与游戏原生衣柜的时序一致。
+        private static void RefreshDresserOnce() {
+            try {
+                if (_dressShowAt < 0f || Time.unscaledTime < _dressShowAt) return;
+                _dressShowAt = -1f;
+                OutfitController ctrl = _dressCtrl;
+                if (ctrl == null) return;
+                try { ctrl.Show(); } catch (Exception __sh) { SRApi.Guard.Log("角色/换装补显", __sh); }
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/换装补显外层", __ex); }
+        }
+
         // 换装界面关闭后自救：游戏原生 Close 有一条路径是 Release(unFreeze:false)（Esc/Start/记分板），
         // 它不会把 InMenu 置回 false、也不会 Unfreeze —— 于是角色关掉界面后动不了。
         // 这里检测"界面已不可见但角色还卡在 InMenu"，把它还原。
@@ -386,7 +409,7 @@ namespace SR_UCH.Tweaks {
                 } catch { uiAlive = false; }
                 if (uiAlive) return;                       // 界面还开着：别动
                 Character ch = _dressChar;
-                _dressCtrl = null; _dressChar = null;
+                _dressCtrl = null; _dressChar = null; _dressShowAt = -1f;
                 if (ch == null) return;
                 if (ch.InMenu) {
                     ch.InMenu = false;
@@ -439,6 +462,7 @@ namespace SR_UCH.Tweaks {
                     ch.transform.position = keep;      // 角色不被传送到衣柜前
                     _dressCtrl = ctrl;
                     _dressChar = ch;
+                    _dressShowAt = Time.unscaledTime + 0.05f;   // 下一帧补 Show（让 Awake/Start 先跑）
                 }
                 SRApi.Notify(SRApi.T("已打开换装界面（Accept/Back 关闭）", "Dresser opened (Accept/Back closes)"));
             } catch (Exception __ex) { SRApi.Guard.Log("角色/原地换装", __ex); }
