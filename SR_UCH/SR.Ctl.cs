@@ -1275,6 +1275,13 @@ public partial class SR {
             if (e == null || !rect.Contains(e.mousePosition)) return 0f;
             float d = 0f;
             try { d = Input.mouseScrollDelta.y; } catch (Exception __iw) { Guard.Log("滚轮/就地轮询", __iw); }
+            // 若该环境里 Input.mouseScrollDelta 恒为 0（早期源码注释提到过这种情况），
+            // 就地改用本趟的 ScrollWheel 事件量：同样在控件绘制期处理，不经过登记表。
+            if (Mathf.Abs(d) < 0.01f && e.type == EventType.ScrollWheel) {
+                float raw = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
+                d = -raw;
+                if (Mathf.Abs(d) > 0.01f) { try { e.Use(); } catch (Exception __ue) { Guard.Log("滚轮/就地消费事件", __ue); } }
+            }
             if (Mathf.Abs(d) < 0.01f) return 0f;
             int fr;
             if (_wheelPollFrame.TryGetValue(key ?? "", out fr) && fr == Time.frameCount) return 0f;
