@@ -488,26 +488,8 @@ namespace SR_UCH.Tweaks {
                 // 复用表格自身算出的滚动上限（由真实 rowsH 得出，帧间稳定），与联机列表同一套。
                 // 以前用 ContentArea 高度重算：那是整个右栏，远大于表格行区，maxY 被算成 0，滚轮就死了。
                 if (!hitBox.Contains(mouse)) return false;
-                // Shift+滚轮 = 横向优先（与核心 TableWheelInput 的约定一致）；
-                // 以前竖向分支先判断，Shift 被吞掉，表现就是"Shift 滚轮不能横滚"。
-                bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-                if (__shift && _maxScrollX > 0f) {
-                    float beforeX = _scrollCols.x;
-                    _scrollCols.x = Mathf.Clamp(_scrollCols.x - wheel * SRApi.Ctl.Sc(60), 0f, _maxScrollX);
-                    if (Mathf.Abs(_scrollCols.x - beforeX) > 0.01f) return true;
-                }
-                float maxY = _maxScrollY;
-                if (maxY <= 0f && _rowsHCache > 0f) {
-                    maxY = Mathf.Max(0f, VisiblePresets().Count * SRApi.Ctl.TableRowH() - _rowsHCache);
-                }
-                if (maxY > 0f) {
-                    float before = _scrollRows.y;
-                    _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, maxY);
-                    _maxScrollY = maxY;
-                    // 到位后不消费，滚轮继续交给页面滚动
-                    if (Mathf.Abs(_scrollRows.y - before) > 0.01f) return true;
-                }
-                return false;
+                // 交给统一实现：Shift = 横向滚列，否则竖向滚行；到头返回 false。
+                return ScrollTableBy(wheel);
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/页面滚轮", __ex); return false; }
         }
 
@@ -520,6 +502,26 @@ namespace SR_UCH.Tweaks {
                 float offY = SRApi.ContentArea.y - SRApi.PageScroll.y;
                 return new Vector2(layout.x + offX, layout.y + offY);
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/坐标换算", __ex); return layout; }
+        }
+
+        // 表格滚轮：Shift 横向、否则纵向；到头返回 false 让给下一层。页面钩子与区域注册共用。
+        private static bool ScrollTableBy(float wheel) {
+            try {
+                bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+                if (__shift && _maxScrollX > 0f) {
+                    float beforeX = _scrollCols.x;
+                    _scrollCols.x = Mathf.Clamp(_scrollCols.x - wheel * SRApi.Ctl.Sc(60), 0f, _maxScrollX);
+                    return Mathf.Abs(_scrollCols.x - beforeX) > 0.01f;
+                }
+                float maxY = _maxScrollY;
+                if (maxY <= 0f && _rowsHCache > 0f)
+                    maxY = Mathf.Max(0f, VisiblePresets().Count * SRApi.Ctl.TableRowH() - _rowsHCache);
+                if (maxY <= 0f) return false;
+                float before = _scrollRows.y;
+                _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, maxY);
+                _maxScrollY = maxY;
+                return Mathf.Abs(_scrollRows.y - before) > 0.01f;
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/表格滚动", __ex); return false; }
         }
 
         // 表格矩形（屏幕坐标）：_tableBox 是布局坐标，且 Layout 趟可能还是退化矩形。
@@ -1045,6 +1047,7 @@ namespace SR_UCH.Tweaks {
                 for (int i = 0; i < _order.Length; i++) {
                     int ci = _order[i];
                     if (ci == ColAction) continue;
+                    if (_hiddenCols.Contains(ci)) continue;   // 隐藏列不占宽度（否则能横向滚进空白）
                     totalW += SRApi.Ctl.Sc(_colW[ci]);
                 }
                 _maxScrollX = Mathf.Max(0f, totalW - stripW);
@@ -1115,6 +1118,9 @@ namespace SR_UCH.Tweaks {
                 };
                 _hiddenBeforeTable = _hiddenCols.Count;
                 _tableBox = box;      // 供页面级滚轮钩子命中判定
+                // 表格自己注册滚轮区域：页面钩子那条路要保持"每帧可见/命中"才生效，
+                // 这里再注册一份同语义的区域，滚轮一定能落到表格上（区域优先于页面钩子）。
+                SRApi.WheelArea("presets:table", box, delegate (float __w) { return ScrollTableBy(__w); });
                 SRApi.ClaimWheelArea(TableScreenBox());   // 滚轮归表格内部处理，页面滚动不抢这块
                 SRApi.TableDraw(_args);
                 HandlePresetCells();   // 数据列：悬浮预览 / 左键切三态 / 右键开界面；名称列：右键重命名

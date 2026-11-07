@@ -491,7 +491,7 @@ public partial class SR {
             Event __we = Event.current;
             bool __wasWheel = __we != null && __we.type == EventType.ScrollWheel;
             if (__wasWheel) {
-                try { SRApi.Diag("wheel mode=" + _mode + " sec=" + _selectedInternalSection + " noBars=" + _noScrollDeclared + " scrollY=" + _scroll.y.ToString("0.0")); }
+                try { SRApi.Diag("wheel mode=" + _mode + " sec=" + _selectedInternalSection + " noBars=" + _noScrollDeclared + " scrollY=" + _scroll.y.ToString("0.0") + " layer=" + SR.Wheel.LastDecision); }
                 catch (Exception __wd) { Guard.Log("滚轮诊断", __wd); }
                 try {
                     bool __ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);

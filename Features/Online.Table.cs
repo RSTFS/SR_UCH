@@ -164,26 +164,28 @@ namespace SR_UCH.Tweaks {
             Rect __box = _tableScreenBox;
             if (__box.width <= 2f || __box.height <= 2f) return false;
             if (!__box.Contains(mouse)) return false;
-            // Shift+滚轮 = 横向（与表格内部 TableWheelInput 同一约定），否则竖向。
+            return ScrollTableByWheel(wheel);
+        } catch (Exception __ex) { SRApi.Guard.Log("联机列表/页面滚轮", __ex); return false; }
+    }
+
+    // 表格滚轮：Shift 横向、否则纵向；到头返回 false 让给下一层。页面钩子与区域注册共用。
+    private static bool ScrollTableByWheel(float wheel) {
+        try {
             bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             if (__shift && _tableMaxX > 0f) {
                 float beforeX = _scrollCols.x;
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x - wheel * SRApi.Ctl.Sc(60), 0f, _tableMaxX);
-                if (Mathf.Abs(_scrollCols.x - beforeX) > 0.01f) return true;   // 到头不消费，交还页面
+                return Mathf.Abs(_scrollCols.x - beforeX) > 0.01f;
             }
-            // 防御：_tableMaxY 为 0（首帧/刚切页）时用缓存行区重算，避免第一次滚没反应。
             float __maxY = _tableMaxY;
-            if (__maxY <= 0f && _rowsHCache > 0f) {
+            if (__maxY <= 0f && _rowsHCache > 0f)
                 __maxY = Mathf.Max(0f, _shownLobbies != null ? _shownLobbies.Count * SRApi.Ctl.TableRowH() - _rowsHCache : 0f);
-            }
-            if (__maxY > 0f) {
-                float before = _scrollRows.y;
-                _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, __maxY);
-                _tableMaxY = __maxY;
-                if (Mathf.Abs(_scrollRows.y - before) > 0.01f) return true;
-            }
-            return false;
-        } catch (Exception __ex) { SRApi.Guard.Log("联机列表/页面滚轮", __ex); return false; }
+            if (__maxY <= 0f) return false;
+            float before = _scrollRows.y;
+            _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, __maxY);
+            _tableMaxY = __maxY;
+            return Mathf.Abs(_scrollRows.y - before) > 0.01f;
+        } catch (Exception __ex) { SRApi.Guard.Log("联机列表/表格滚动", __ex); return false; }
     }
 
     private static void TableDraw(Rect box) {
@@ -199,8 +201,11 @@ namespace SR_UCH.Tweaks {
                 float __offX = SRApi.ContentArea.x - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(2f);
                 // 页面可能已滚动：内容坐标比屏幕坐标多一个 -_scroll.y，命中框要同步减掉。
                 float __offY = SRApi.ContentArea.y - SRApi.PageScroll.y;
-                if (box.width > 2f && box.height > 2f)
+                if (box.width > 2f && box.height > 2f) {
                     _tableScreenBox = new Rect(box.x + __offX, box.y + __offY, box.width, box.height);
+                    // 表格区自注册：区域优先于页面钩子，滚轮一定能落到列表上
+                    SRApi.WheelArea("online:table", box, delegate (float __w) { return ScrollTableByWheel(__w); });
+                }
             } catch (Exception __tbox) { SRApi.Guard.Log("联机表格/命中框", __tbox); }
             float rowsH = Mathf.Max(SRApi.Ctl.Sc(20), box.height - headerH);
             float contentH = _shownLobbies.Count * rowH;

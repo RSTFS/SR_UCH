@@ -31,6 +31,7 @@ namespace SR_UCH.Tweaks {
 
             private static bool _hasEvent;
             private static float _value;
+            internal static string LastDecision = "none";   // 诊断：本帧滚轮被哪一层消费（zone:<id> / hook / none）
             private static Vector2 _offset;   // 本帧 AreaOffset（区域与鼠标统一换算到屏幕坐标）
 
             internal static float Value { get { return _value; } }   // 上滚为正，一次滚轮 = ±1
@@ -68,6 +69,7 @@ namespace SR_UCH.Tweaks {
             // 返回 true = 本帧滚轮已处理
             internal static bool Consume(Event e, Vector2 areaOffset, bool shift) {
                 if (!_hasEvent || Mathf.Abs(_value) < 0.5f) return false;
+                LastDecision = "none";
                 // Event.mousePosition 本身就是屏幕坐标（只有 GUI 区域内的 rect 是局部坐标），
                 // 以前这里又加了一次 AreaOffset，鼠标永远对不上区域 → 列表/滑块/下拉框全都收不到滚轮。
                 Vector2 screen = e != null ? e.mousePosition : Vector2.zero;
@@ -81,12 +83,15 @@ namespace SR_UCH.Tweaks {
                     if (win == null || z.Prio < win.Prio) win = z;
                 }
                 if (win != null) {
-                    try { if (win.Handler(_value)) return true; }
+                    try {
+                        if (win.Handler(_value)) { LastDecision = "zone"; return true; }
+                        LastDecision = "zone-miss";
+                    }
                     catch (Exception __ex) { SR.Guard.Log("滚轮仲裁/处理器", __ex); }
                 }
                 // 2) 页面钩子（表格等，屏幕坐标）
                 for (int i = 0; i < _pageHooks.Count; i++) {
-                    try { if (_pageHooks[i](screen, _value)) return true; }
+                    try { if (_pageHooks[i](screen, _value)) { LastDecision = "hook"; return true; } }
                     catch (Exception __ex) { SR.Guard.Log("滚轮仲裁/页面钩子", __ex); }
                 }
                 return false;
