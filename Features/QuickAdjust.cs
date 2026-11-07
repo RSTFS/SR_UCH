@@ -125,6 +125,28 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("重生/轮询", __ex); }
         }
 
+        // 重生延迟：游戏每次自动重都会走 Character.AttemptRespawn（反编译 61563）。
+        // 延迟窗口内直接抑制它，窗口过后放行由游戏自己重生；这样"重生延迟"才真的作用于重生本身，
+        // 而不只是自动重试的等待时间。
+        [HarmonyPatch(typeof(Character), "AttemptRespawn")]
+        [HarmonyPrefix]
+        private static bool HoldRespawn(Character __instance, ref bool __result) {
+            try {
+                if (!SRApi.GateMaster || !ModeOk()) return true;
+                float d = DelaySeconds;
+                if (d <= 0.01f) return true;
+                if (__instance == null) return true;
+                Character __lc = LocalCharacter();
+                if (__lc != null && __lc != __instance) return true;   // 只延迟本地角色
+                int num = __instance.networkNumber;
+                float since;
+                if (!_deadSince.TryGetValue(num, out since)) { _deadSince[num] = Time.unscaledTime; __result = false; return false; }
+                if (Time.unscaledTime - since < d) { __result = false; return false; }
+                _deadSince.Remove(num);
+                return true;
+            } catch (Exception __ex) { SRApi.Guard.Log("重生/延迟抑制", __ex); return true; }
+        }
+
         private static void RespawnNow(Character c, string why) {
             try {
                 if (c == null) return;
@@ -160,6 +182,7 @@ public class QuickAdjust : ITweak {
     private static int _draftFrame = -1;
     private static ConfigEntry<bool> _quickSwitchEnabled;
     private static ConfigEntry<float> _quickSwitchHold;
+    private static float _vanillaSuicideTime = -1f;   // 原版长按阈值（关闭快切时还原用）
     private static ConfigEntry<bool> _quickRetryEnabled;
     private static ConfigEntry<bool> _quickRetryFast;
     private static ConfigEntry<float> _quickRetryHoldTime;
@@ -527,6 +550,7 @@ public class QuickAdjust : ITweak {
             if (!SRApi.GateMaster || (SRApi.Typing) || !IsLocalCharacter(__instance)) return;
             try
             {
+                if (_vanillaSuicideTime <= 0f) { try { _vanillaSuicideTime = __instance.SuicideTime; } catch { /* 静默：非关键路径 */ } }
                 // 模式门控统一走 GateModeAllows（已含 IgnoreModeLimit 豁免）。
                 if (QuickSwitchOn && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay))
                 {
@@ -545,6 +569,11 @@ public class QuickAdjust : ITweak {
                 else if (QuickRetryFastOn && SRApi.GateModeAllows(SRApi.ModeMask.Challenge))
                 {
                     __instance.SuicideTime = QuickRetryHold;
+                }
+                else if (_vanillaSuicideTime > 0f)
+                {
+                    // 功能关掉后把阈值还原，避免"关了还在用上次的等待时间"。
+                    __instance.SuicideTime = _vanillaSuicideTime;
                 }
             }
             catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.OverrideHoldTime", __ex); }
@@ -606,6 +635,7 @@ public class QuickAdjust : ITweak {
                 // 按 networkNumber 记录（同局多个 Character，单个 static bool 会被队友清掉而退化成每帧发包）。
                 if (_retrySentTo.Contains(num)) return;
                 if (!QuickRetryOn || __instance.WantsToRetry) return;
+                if (!SRApi.GateModeAllows(SRApi.ModeMask.Challenge)) return;   // 用户要求：自动/快速重试仅挑战模式
                 // 重生延迟：还在延迟窗口内就先不发送。
                 // 直接读配置条目（不引用「重生」功能的类型）：拆分构建下两者在不同 DLL，编译期不能互相引用。
                 if (ShouldWaitRespawnDelay(num)) return;
