@@ -638,7 +638,9 @@ public partial class SR {
             try {
                 GUILayout.Label("Hex", Ctl.Label, GUILayout.Width(labelW), GUILayout.Height(rowH));
                 GUI.SetNextControlName(HexField);
-                s.HexEdit = GUILayout.TextField(s.HexEdit ?? "", 7, Ctl.SearchBox, GUILayout.Width(fieldW), GUILayout.Height(rowH));
+                // 不强制钳制输入：允许先输入（含 # / 简写 / 多余字符），
+                // 只在回车或失焦时解析；解析失败才回退到当前颜色（输入过程中只画红框提示）。
+                s.HexEdit = GUILayout.TextField(s.HexEdit ?? "", 16, Ctl.SearchBox, GUILayout.Width(fieldW), GUILayout.Height(rowH));
                 Rect fr = GUILayoutUtility.GetLastRect();
                 Color probe;
                 if (!SRApi.ColorHex.ParseHex(s.HexEdit, out probe)) Ring(fr, new Color(0.9f, 0.25f, 0.2f, 0.9f));
@@ -734,7 +736,9 @@ public partial class SR {
             try {
                 Color c;
                 if (IsFocused(HexField)) {
+                    // 合法才应用；不合法就**回退成当前颜色**（这就是"输入不正确才钳制"）。
                     if (SRApi.ColorHex.ParseHex(s.HexEdit, out c)) { PickFrom(s, c, true); s.Dirty = true; }
+                    else { s.HexEdit = SRApi.ColorHex.ToHex(PickerColor(s)); }
                     Commit(e, s);
                     s.HexEdit = SRApi.ColorHex.ToHex(PickerColor(s));
                 } else if (IsRgbFocused()) {
