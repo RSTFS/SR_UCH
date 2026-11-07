@@ -59,6 +59,7 @@ public partial class Experiments : ITweak
     public class SplashTools : ITweak {
         private static ConfigEntry<bool> _skipLoad;
         private static ConfigEntry<bool> _gentleLoad;
+        private static ConfigEntry<bool> _closeLoadUi;   // 关闭遮罩时是否顺带关掉加载界面
 
 
         internal static string Note = "";
@@ -70,6 +71,10 @@ public partial class Experiments : ITweak
             SRApi.Ref.Override("UISplashScreen.SkipBool", "关闭跳过加载动画需清此标志");
             SRApi.LocKey("Scene", "Splash Skip Load", "跳过加载动画", "Skip load animation");
             SRApi.LocDesc("Scene", "Splash Skip Load", "跳过加载动画\n加载画面一出现就跳过\n无副作用，只省等待", "Skip loading animation\nskips the splash as soon as it appears\nno side effects, only saves the wait");
+            SRApi.LocKey("Scene", "Close Load UI", "同时关闭加载界面", "Also close loading screen");
+            SRApi.LocDesc("Scene", "Close Load UI",
+                "同时关闭加载界面\n点「关闭遮罩」时把平板加载界面一起隐藏\n注意：加载并不会更快，界面消失后可能看起来像卡住",
+                "Also close loading screen\nhides the tablet loading screen when the mask is closed\nnote: loading is not faster, the game may look frozen without it");
             SRApi.LocKey("Scene", "Gentle Load", "温柔加载", "Gentle load");
             SRApi.LocDesc("Scene", "Gentle Load", "温和加载\n切换场景时走卸载加 GC 流程，减轻卡顿\n切到主菜单时交给游戏自身流程", "Gentle load\nunload plus GC when switching scenes to reduce stutter\nmain-menu transitions use the game's own path");
         }
@@ -78,6 +83,8 @@ public partial class Experiments : ITweak
             try {
                 SelfReg();
                 _skipLoad = plugin.Config.Bind("Scene", "Splash Skip Load", false, "加载画面一出现就立刻跳过。");
+                _closeLoadUi = plugin.Config.Bind("Scene", "Close Load UI", false,
+                    "关闭遮罩时把平板加载界面一起隐藏（默认关：加载本身不会变快）。");
                 _gentleLoad = plugin.Config.Bind("Scene", "Gentle Load", false,
                     "切场景时走游戏自己的 DoGentleSceneLoad（卸载+GC，能减轻卡顿）。");
                 SRApi.RegisterTick("加载遮罩", Tick);
@@ -160,10 +167,22 @@ public partial class Experiments : ITweak
                 // Skip 会把游戏的 SkipBool 置真且没有取消入口：这里立刻清回 false，
                 // 保证"只关这一次"，下一次加载照常走（与「跳过加载动画」开关互不影响）。
                 try { ClearSkip(sp); } catch (Exception __cs) { SRApi.Guard.Log("关闭遮罩/清SkipBool", __cs); }
+                if (_closeLoadUi != null && _closeLoadUi.Value) CloseLoadingUi();
                 Note = closed ? SRApi.T("已关闭一次遮罩", "Mask closed once")
                               : SRApi.T("遮罩不在可关闭状态", "Mask is not in a closable state");
                 SRApi.LogInfo("[实验.场景] " + Note);
             } catch (Exception __ex) { SRApi.Guard.Log("关闭遮罩", __ex); }
+        }
+
+        // 顺带关掉平板加载界面（TabletLoadingScreen）：只在用户显式开启"同时关闭加载界面"时执行。
+        // 注意这不会加快加载——界面只是进度显示，关掉后画面停住可能看起来像卡死。
+        private static void CloseLoadingUi() {
+            try {
+                TabletLoadingScreen ui = UnityEngine.Object.FindObjectOfType<TabletLoadingScreen>();
+                if (ui == null) return;
+                try { ui.gameObject.SetActive(false); } catch (Exception __ss) { SRApi.Guard.Log("关闭遮罩/隐藏加载界面", __ss); }
+                SRApi.LogInfo("[实验.场景] 已隐藏平板加载界面");
+            } catch (Exception __ex) { SRApi.Guard.Log("关闭遮罩/查找加载界面", __ex); }
         }
 
         internal static bool GentleOn() { return _gentleLoad != null && _gentleLoad.Value && SRApi.GateMaster; }
