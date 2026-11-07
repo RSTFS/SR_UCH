@@ -405,7 +405,10 @@ public partial class SR {
                 }
                 // 页面正在拖自己的东西时不要拖窗口（本函数先于页面绘制执行，页面来不及阻止）。
                 // 必须限定左键：侧栏排序用长按右键拖动。
-                if (e.type == EventType.MouseDrag && e.button == 0 && over && GUIUtility.hotControl == 0 && !_dragActive && !BlockWindowDrag) {
+                // 不能用 GUIUtility.hotControl == 0 当条件：侧栏/页面是滚动视图，按下时它们会立刻拿走 hotControl，
+                // 于是"按在空白处拖窗口"永远开始不了（长按后滑动没反应就是这个原因）。
+                // 真正该拦的是"按在控件上"——控件在 MouseDown 时会置 BlockWindowDrag。
+                if (e.type == EventType.MouseDrag && e.button == 0 && over && !_dragActive && !BlockWindowDrag) {
                     _dragActive = true;
                     _dragMoved = false;
                     _dragOffset = mouse - new Vector2(_winX, _winY);
