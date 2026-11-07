@@ -618,7 +618,6 @@ namespace SR_UCH.Tweaks {
                 _actionHitThisFrame = false;
                 RenderPresetTable(tableH, VisiblePresets());
                 DrawInlineRename();
-                SRApi.Ctl.TableHeightGripBar(_tableHEntry, tableH / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
                 CancelPendingOnBlank(pendingBefore);
             } catch (Exception __ex) { SRApi.Guard.Log("渲染布局预设页", __ex); }
         }
@@ -739,11 +738,9 @@ namespace SR_UCH.Tweaks {
                 float used = Mathf.Max(0f, last.yMax - _pageTopY);
                 tableH = Mathf.Max(minH, SRApi.PageViewportHeight - used);
             }
-            // 手动高度（底边拖拽条）仍然作为上限
-            try {
-                if (_tableHEntry != null && _tableHEntry.Value > 0)
-                    tableH = Mathf.Clamp(SRApi.Ctl.Sc(_tableHEntry.Value), minH, Mathf.Max(minH, tableH));
-            } catch (Exception __th) { SRApi.Guard.Log("布局预设/读取表格高度", __th); }
+            // 注意：不再套用「Table Height」里存的手动高度。
+            // 那个值一旦被拖过一次就会永久小于可用高度，列表底部便与底栏之间留出一条缝。
+            // 填充模式的原则是"列表始终占满到底栏上沿"。
             return tableH;
         }
 

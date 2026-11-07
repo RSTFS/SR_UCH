@@ -505,9 +505,13 @@ public partial class SR {
                         __consumed = SR.Wheel.Consume(__we, SR.AreaOffset, __shift);
                         if (!__consumed && _noScrollDeclared) __consumed = true;   // 填充页：页面不滚，也不落到世界
                         if (!__consumed) {
-                            if (__shift) _scroll.x = Mathf.Max(0f, _scroll.x - SR.Wheel.Value * Sc(64f));
-                            else _scroll.y = Mathf.Max(0f, _scroll.y - SR.Wheel.Value * Sc(64f));
-                            __consumed = true;
+                            // 只有指针在内容区里才滚页面（标题栏/底栏/侧栏上滚不应动页面）
+                            Vector2 __mpNow = (__we != null ? __we.mousePosition : Vector2.zero);   // 鼠标已是屏幕坐标
+                            if (SRApi.ContentArea.Contains(__mpNow)) {
+                                if (__shift) _scroll.x = Mathf.Max(0f, _scroll.x - SR.Wheel.Value * Sc(84f));
+                                else _scroll.y = Mathf.Max(0f, _scroll.y - SR.Wheel.Value * Sc(84f));
+                                __consumed = true;
+                            }
                         }
                     }
                     if (__consumed) { __we.Use(); __we.type = EventType.Used; SR.MarkWheelUsed(); }
@@ -525,6 +529,8 @@ public partial class SR {
                     _lastPageSig = __sig;
                     SR.CloseOpenCombos();
                     SR.Ctl.ResetLabelColumn();   // 换页：标签列宽重新按本页标签收敛
+                    SR.Wheel.ClearZones();       // 换页：旧页的控件滚轮区域立即作废（否则新旧页面重叠处会被旧区域吃掉）
+                    _noScrollDeclared = false;   // 旧页的"禁止页面滚动"声明不能带到新页（会吞掉换页后的第一格滚轮）
                     _scroll = Vector2.zero;     // 换页回到顶部：新页内容更短时不会停在空白处，看起来像"滚不动"
                 }
             } catch (Exception __cs) { Guard.Log("换页收起下拉框", __cs); }

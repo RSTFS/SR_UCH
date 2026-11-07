@@ -103,6 +103,9 @@ namespace SR_UCH.Tweaks {
                 return false;
             }
 
+            // 立即清空全部区域（换页时调用：旧页控件不需要等 5 帧过期）
+            internal static void ClearZones() { try { _zones.Clear(); } catch (Exception __ex) { SR.Guard.Log("滚轮仲裁/清空", __ex); } }
+
             // 清理长期未注册的区域（换页/窗口重建后旧矩形不会继续吃滚轮）。
             internal static void PruneZones() {
                 try {

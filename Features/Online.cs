@@ -560,8 +560,7 @@ namespace SR_UCH.Tweaks {
             TableDraw(box);
             TableInput(box, Event.current);
 
-            // 底边拖拽条：紧贴表格底边、正好在底栏之上；拖动改高度并持久化。
-            SRApi.Ctl.TableHeightGripBar(_tableH, boxH / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
+            // 不再画底边拖拽条：列表底边直接贴住底栏上沿（拖拽条会在两者之间留缝）。
         }
 
         // 表格底边拖动条；Shift+右键还原列宽 / 高度 / 列隐藏（房间行不再支持右键隐藏）。
