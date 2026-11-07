@@ -302,7 +302,8 @@ public partial class SR {
         // 面板宽度：默认 340 设计单位；窗口变窄时按可用宽度收缩（低于 240 时优先不撑破页面）。
         private static float PanelWidth() {
             float avail = AvailWidth();
-            float pw = Mathf.Min(Sc(340f), avail);
+            // 两列布局后需要更宽：左 150+24+8，右至少 150，加内边距
+            float pw = Mathf.Min(Sc(460f), avail);
             return Mathf.Max(Sc(120f), pw);
         }
 
@@ -355,21 +356,30 @@ public partial class SR {
                 try { GUILayout.Label(T("调色板", "Palette"), Ctl.SecHeader); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 DrawHeader(e, s, pw);
                 GUILayout.Space(Sc(6f));
-                DrawSvBlock(e, s, pw);
-                GUILayout.Space(Sc(6f));
-                DrawPaletteGrid(e, s, pw);
-                GUILayout.Space(Sc(4f));
 
-                // H/S/V 与 Hex 共用同一标签列：取当前语言里最宽的文本 + 8px。
-                float labelW = LabelCol(T("色相", "Hue"), T("饱和", "Sat"), T("明度", "Val"), "Hex");
-                DrawHsvRow(e, s, T("色相", "Hue"), 0, 0f, 360f, pw, labelW);
-                DrawHsvRow(e, s, T("饱和", "Sat"), 1, 0f, 100f, pw, labelW);
-                DrawHsvRow(e, s, T("明度", "Val"), 2, 0f, 100f, pw, labelW);
-                GUILayout.Space(Sc(4f));
-                DrawRgbRow(e, s, pw);
-                DrawHexRow(e, s, pw, labelW);
-                GUILayout.Space(Sc(2f));
-                DrawActions(e, s, pw);
+                // 两列：左边 SV 方块 + 色相条；右边 色板 / HSV / RGB / HEX
+                float hueW = Sc(24f), gap = Sc(8f);
+                float leftW = Mathf.Min(Sc(150f), Mathf.Max(Sc(72f), pw - hueW - gap - Sc(8f)));
+                float rightW = Mathf.Max(Sc(120f), pw - leftW - Sc(12f));
+                GUILayout.BeginHorizontal();
+                try {
+                    GUILayout.BeginVertical(GUILayout.Width(leftW + hueW + gap));
+                    try { DrawSvBlock(e, s, leftW + hueW + gap); } finally { GUILayout.EndVertical(); }
+                    GUILayout.Space(Sc(10f));
+                    GUILayout.BeginVertical(GUILayout.Width(rightW));
+                    try {
+                        DrawPaletteGrid(e, s, rightW);
+                        GUILayout.Space(Sc(4f));
+                        // H/S/V 与 Hex 共用同一标签列：取当前语言里最宽的文本 + 8px。
+                        float labelW = LabelCol(T("色相", "Hue"), T("饱和", "Sat"), T("明度", "Val"), "Hex");
+                        DrawHsvRow(e, s, T("色相", "Hue"), 0, 0f, 360f, rightW, labelW);
+                        DrawHsvRow(e, s, T("饱和", "Sat"), 1, 0f, 100f, rightW, labelW);
+                        DrawHsvRow(e, s, T("明度", "Val"), 2, 0f, 100f, rightW, labelW);
+                        GUILayout.Space(Sc(4f));
+                        DrawRgbRow(e, s, rightW);
+                        DrawHexRow(e, s, rightW, labelW);
+                    } finally { GUILayout.EndVertical(); }
+                } finally { GUILayout.EndHorizontal(); }
             } finally { GUILayout.EndVertical(); }
 
             // 回车提交（不吞其它按键）；失焦提交；方块/色相条/HSV 滑块松手提交。
@@ -395,6 +405,8 @@ public partial class SR {
                 PreviewBox(pv, Quant(PickerColor(s)));
                 GUILayout.Label(SRApi.ColorHex.ToHex(PickerColor(s)), Ctl.Label, GUILayout.Width(hexW), GUILayout.Height(h));
                 GUILayout.FlexibleSpace();
+                DrawActionsInline(e, s, h);          // 复制 / 粘贴 / 还原默认：在「收起」左边同一行
+                GUILayout.Space(Sc(6f));
                 if (GUILayout.Button(T("收起", "Collapse"), Ctl.Btn, GUILayout.Width(collapseW), GUILayout.Height(h))) Close(e, s);
             } catch (Exception __ex) { Guard.Log("调色板顶栏", __ex); }
             GUILayout.EndHorizontal();
@@ -666,6 +678,25 @@ public partial class SR {
                 GUILayout.FlexibleSpace();
             } catch (Exception __ex) { Guard.Log("调色板操作", __ex); }
             GUILayout.EndHorizontal();
+        }
+
+        // 复制 / 粘贴 / 还原默认（内联版：放在顶栏同一行、收起按钮左边）。
+        private static void DrawActionsInline(ConfigEntryBase e, State s, float h) {
+            string copy = T("复制", "Copy"), paste = T("粘贴", "Paste"), reset = T("还原默认", "Reset");
+            float gap = Sc(4f);
+            if (GUILayout.Button(new GUIContent(copy, T("把当前颜色复制到系统剪贴板", "copy the current color to the system clipboard")),
+                Ctl.Btn, GUILayout.Width(BtnW(copy)), GUILayout.Height(h))) {
+                try { GUIUtility.systemCopyBuffer = SRApi.ColorHex.ToHex(PickerColor(s)); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+            }
+            GUILayout.Space(gap);
+            if (GUILayout.Button(new GUIContent(paste, T("从剪贴板读取 #RRGGBB；格式非法则忽略", "paste #RRGGBB from the clipboard; invalid text is ignored")),
+                Ctl.Btn, GUILayout.Width(BtnW(paste)), GUILayout.Height(h))) {
+                Color c;
+                if (SRApi.ColorHex.ParseHex(GUIUtility.systemCopyBuffer, out c)) { Apply(e, s, c, true, true); SyncText(s, true); }
+            }
+            GUILayout.Space(gap);
+            if (GUILayout.Button(new GUIContent(reset, T("写回该颜色键的默认值", "write back the default value of this color key")),
+                Ctl.Btn, GUILayout.Width(BtnW(reset)), GUILayout.Height(h))) Reset(e);
         }
 
         // 当前 H 对应的 S/V 方块贴图：像素 (x,y) = HSV(H, x/(w-1), y/(h-1))。
