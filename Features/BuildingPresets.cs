@@ -570,7 +570,8 @@ namespace SR_UCH.Tweaks {
                     count += "   ·   行" + shown + " 行区" + _rowsHCache.ToString("0") + " maxY" + _maxScrollY.ToString("0")
                            + " y" + _scrollRows.y.ToString("0") + " 层:" + (SRApi.WheelLayer ?? "?")
                            + " 顶" + _tableTopY.ToString("0") + " 高" + _tableHCache.ToString("0")
-                           + " 内容" + (shown * SRApi.Ctl.TableRowH()).ToString("0") + " 行高" + SRApi.Ctl.TableRowH().ToString("0");
+                           + " 内容" + (shown * SRApi.Ctl.TableRowH()).ToString("0") + " 行高" + SRApi.Ctl.TableRowH().ToString("0")
+                           + " 底界" + SRApi.PageContentBottom.ToString("0");
                 } catch { /* 静默：诊断行失败不影响列表 */ }
                 // 工具行前面已有"跳过树屋 + 返回树屋"约 290 设计单位；不给状态栏设上限，
                 // 导出目录那种长路径会把 FlexibleSpace 挤没、整行撑出窗口。
@@ -737,8 +738,13 @@ namespace SR_UCH.Tweaks {
             try {
                 // 主算法：**纯布局单位**，右栏总高减去页面内容起点到表格顶的距离。
                 // 同一坐标系，不会像屏幕坐标换算那样算溢出（"表格底边超出可见区"的根因）。
-                // 表高 = 页面内容底界 − 表格顶，两者都是**布局坐标**，绝不会越过底栏。
-                tableH = Mathf.Max(minH, SRApi.PageContentBottom - last.yMax);
+                // 两种算法各算一次，取**较小值**：任一算法正确都能兜住，绝不会比实际可视区高。
+                float __byLayout = SRApi.PageContentBottom - last.yMax;                       // 页面内容底界（布局）
+                float __byScreen = (SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f))
+                                   - (SRApi.ContentArea.y + last.yMax);                        // 屏幕底 − 表格顶
+                float __avail = Mathf.Min(__byLayout, __byScreen);
+                if (__avail < minH || __avail > SRApi.Ctl.Sc(4000f)) __avail = Mathf.Max(minH, __byLayout);   // 异常时回退
+                tableH = Mathf.Max(minH, __avail);
             } catch (Exception __sh) {
                 SRApi.Guard.Log("布局预设/可视高度", __sh);
                 float used = Mathf.Max(0f, last.yMax - _pageTopY);
