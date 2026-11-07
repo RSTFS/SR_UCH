@@ -599,7 +599,8 @@ public class AutoPartyItem : ITweak {
             if (target == null) return;
             if (DoPick(cur, target)) {
                 _pickedBoxId = boxId;
-                SRApi.LogInfo("[自动道具] 已自动挑选：" + (target.placeablePrefab != null ? target.placeablePrefab.Name : target.name));
+                // 只在这里标记"本次已挑"，具体生效路径由 TickHoverPick 记一条日志，
+                // 避免两条日志一真一假、误以为跑了两遍。
             }
         } catch (Exception __ex) { SRApi.Guard.Log("自动道具/轮询", __ex); }
     }

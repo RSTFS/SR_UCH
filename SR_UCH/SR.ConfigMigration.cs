@@ -33,7 +33,8 @@ namespace SR_UCH.Tweaks {
             // HUD 原名 Round HUD（功能早已只剩 HUD），老 cfg 段头统一改名并保留全部键值。
             { "Round HUD", "HUD" },
             // 早期版本用过的中文段名（与各功能 LocSec 的中文名一致）：缺了它们对应段及其键都识别不出来。
-            { "自由模式", "Freeplay" },
+            // 注意：[自由模式] 现在是 SR 自己的活段（自由模式页），不要再把它当旧名改名到 Freeplay，
+            // 否则与"段改名规则撞上活段"自检冲突，且每次启动都会把该段的键搬走。
             { "联机", "Online" },
             { "建造", "build" },
             { "Builder Enhancements", "build" }, // 段名改名
@@ -711,6 +712,14 @@ namespace SR_UCH.Tweaks {
                 });
                 // 关卡背景功能已删除：这个键在两个曾用段名里都要清掉。
                 text = RemoveKeys(text, "Level", new[] { "Level Background", "Refresh Pieces Key" });
+            // 地图网格移入 SR 的"自由模式"段（早期在 [EX]/[Freeplay]）：搬值保证老配置继续生效。
+            text = MoveKeyBetweenSections(text, "EX", "自由模式", "Grid Always On");
+            text = MoveKeyBetweenSections(text, "EX", "自由模式", "Grid Max Alpha");
+            text = MoveKeyBetweenSections(text, "EX", "自由模式", "Grid Fade Time");
+            text = MoveKeyBetweenSections(text, "EX", "自由模式", "Grid Refresh Color");
+            // 「死亡无计分板」功能已删除：清掉它的遗留键。
+            text = RemoveKeys(text, "Quick Adjust", new[] { "No Death Scoreboard" });
+            text = RemoveKeys(text, "Freeplay", new[] { "Grid Always On", "Grid Max Alpha", "Grid Fade Time", "Grid Refresh Color" });
             text = RemoveKeys(text, "Online", new[] { "Filter Min Players", "Filter AFK" });
             text = RemoveKeys(text, "Hotkeys", new[] { "level.broadcast" });
                 text = RemoveKeys(text, "Scene", new[] { "Level Background" });
