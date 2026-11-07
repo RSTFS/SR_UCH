@@ -25,7 +25,10 @@ namespace SR_UCH.Tweaks {
         // 每进一次房间只自动选一次：场景切换时复位。
         private static bool _triedThisRoom;
         private static Character _dressedFor;          // 已经成功套用时装的角色实例
-        private static int _dressRetry;                // 套用失败的重试计数（角色还没初始化完时会失败）
+        private static int _dressRetry;
+        private static ConfigEntry<KeyCode> _dressKey;   // 原地换装快捷键（通用条目，右键绑定）
+        private static OutfitController _dressCtrl;   // 我们打开的换装界面（用于关闭后自救）
+        private static Character _dressChar;                // 套用失败的重试计数（角色还没初始化完时会失败）
         private static float _nextTryAt;
 
         private static string ModeLabel(string v) {
@@ -127,6 +130,8 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Mode", "选择方式\n指定 = 每次挑同一只\n随机 = 在已解锁的空闲动物里随机；智能 = 优先你用得最多的", "Pick mode\nSpecific = always the same animal\nRandom = any unlocked free one; Smart = your most used");
             SRApi.LocKey(Sec, "Animal", "指定动物", null);
             SRApi.LocDesc(Sec, "Animal", "指定动物\n「指定角色」方式下要挑的动物\n只列出存档里已解锁的动物", "Target animal\nthe animal used by the Specific mode\nonly unlocked animals are listed");
+            SRApi.LocKey(Sec, "Dress Key", "原地换装快捷键", null);
+            SRApi.LocDesc(Sec, "Dress Key", "原地换装快捷键\n按一下在角色当前位置打开游戏原生换装界面\n需要先选好角色；右键条目可改绑", "Dress-here hotkey\nopens the game's own dresser at your character\npick an animal first; right-click the row to rebind");
             SRApi.LocKey(Sec, "Outfit Enabled", "自动时装", null);
             SRApi.LocDesc(Sec, "Outfit Enabled", "自动时装\n每个角色第一次随机一套并记住，之后固定\n只使用已解锁的外观", "Auto outfit\neach animal rolls one look the first time and keeps it\nonly unlocked outfits are used");
             SRApi.LocKey(Sec, "Outfit Data", "外观记录", null);
@@ -140,6 +145,9 @@ namespace SR_UCH.Tweaks {
                 _mode = plugin.Config.Bind(Sec, "Mode", "target", "选择方式：target 指定 / random 随机空闲 / smart 智能。");
                 _animal = plugin.Config.Bind(Sec, "Animal", "CHICKEN", "指定方式下要挑的动物（枚举名）。");
                 _outfitOn = plugin.Config.Bind(Sec, "Outfit Enabled", false, "自动时装：角色选定后随机穿一套外观。");
+                _dressKey = plugin.Config.Bind(Sec, "Dress Key", KeyCode.None, "原地换装快捷键：在角色当前位置打开游戏原生换装界面（None = 不绑）。");
+                SRApi.RegisterKey("角色-原地换装", _dressKey, "press");
+                SRApi.RegisterTick("KEY_角色原地换装", TickDressKey);
                 _outfitData = plugin.Config.Bind(Sec, "Outfit Data", "",
                     "内部状态：每个角色第一次随机到的那套外观（键=动物枚举名，值=四类下标）。勿手动修改。");
                 SRApi.RegisterTick("角色-自动选择", Tick);
@@ -230,9 +238,15 @@ namespace SR_UCH.Tweaks {
                             SRApi.T("关闭当前角色的全部外观并标记为「不要自动穿」\n想恢复随机请点「随机整套」", "turns off every outfit on the current animal and marks it as do-not-auto-dress\nuse Randomize all to roll again"), 110f, 26f))
                         ClearCurrentOutfit();
                     GUILayout.Space(SRApi.Ctl.Sc(8));
-                    if (SRApi.Ctl.Button(SRApi.T("原地换装", "Dress here"),
-                            SRApi.T("在角色当前位置打开游戏原生的换装界面\n需要先选好角色；Accept/Back 关闭", "opens the game's own dresser at the character's position\npick an animal first; close with Accept/Back"), 110f, 26f))
-                        OpenNativeDress();
+                    // 通用条目：键位框本身支持右键绑定/解绑；左键点按钮打开界面
+                    if (_dressKey != null) {
+                        SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("原地换装", "Dress here"),
+                            SRApi.T("原地换装\n在角色当前位置打开游戏原生换装界面\n需要先选好角色；右键键位框可改绑", "dress here\nopens the game's own dresser at your character\npick an animal first; right-click the key box to rebind")),
+                            _dressKey, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(26));
+                        SRApi.Ctl.RenderControl(_dressKey);
+                        if (SRApi.Ctl.Button(SRApi.T("打开", "Open"), SRApi.T("立即打开换装界面（等同按上面的快捷键）", "open the dresser now (same as pressing the hotkey)"), 72f, 26f))
+                            OpenNativeDress();
+                    }
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动时装页", __ex); }
@@ -244,6 +258,15 @@ namespace SR_UCH.Tweaks {
 
 
         // ---------------- 逻辑 ----------------
+        // 原地换装快捷键：按键轮询放在输入类钩子里（预算降频不会漏帧）
+        private static void TickDressKey() {
+            try {
+                if (!SRApi.GateMaster || _dressKey == null || _dressKey.Value == KeyCode.None) return;
+                if (SRApi.Typing) return;
+                if (SRApi.ComboKeyDown(_dressKey)) OpenNativeDress();
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/换装快捷键", __ex); }
+        }
+
         private static void Tick() {
             try {
                 bool pick = _enabled != null && _enabled.Value;
@@ -259,6 +282,7 @@ namespace SR_UCH.Tweaks {
 
                 if (pick && !_triedThisRoom) TryPickOnce(lp, lm);
                 if (outfit) TryRandomOutfit(lp);
+                UnstickDresser();
             } catch (Exception __ex) { SRApi.Guard.Log("角色/轮询", __ex); }
         }
 
@@ -365,6 +389,27 @@ namespace SR_UCH.Tweaks {
         }
 
         // ---------------- 自动时装（随机整套） ----------------
+        // 换装界面关闭后自救：游戏原生 Close 有一条路径是 Release(unFreeze:false)（Esc/Start/记分板），
+        // 它不会把 InMenu 置回 false、也不会 Unfreeze —— 于是角色关掉界面后动不了。
+        // 这里检测"界面已不可见但角色还卡在 InMenu"，把它还原。
+        private static void UnstickDresser() {
+            try {
+                if (_dressCtrl == null || _dressChar == null) return;
+                bool uiAlive = false;
+                try { uiAlive = _dressCtrl != null && _dressCtrl.gameObject != null && _dressCtrl.gameObject.activeInHierarchy; }
+                catch { uiAlive = false; }
+                if (uiAlive) return;                       // 界面还开着：别动
+                Character ch = _dressChar;
+                _dressCtrl = null; _dressChar = null;
+                if (ch == null) return;
+                if (ch.InMenu) {
+                    ch.InMenu = false;
+                    try { ch.Unfreeze(); } catch (Exception __uf) { SRApi.Guard.Log("角色/换装后解冻", __uf); }
+                    SRApi.LogInfo("[角色] 换装界面已关闭：已还原角色可移动状态");
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/换装自救", __ex); }
+        }
+
         private static void TryRandomOutfit(LobbyPlayer lp) {
             try {
                 Character ch = lp.CharacterInstance;
@@ -406,6 +451,8 @@ namespace SR_UCH.Tweaks {
                 if (OutfitChangeProp.OutfitControllers.TryGetValue(ch, out ctrl) && ctrl != null) {
                     ctrl.transform.position = keep;    // 界面留在原地
                     ch.transform.position = keep;      // 角色不被传送到衣柜前
+                    _dressCtrl = ctrl;
+                    _dressChar = ch;
                 }
                 SRApi.Notify(SRApi.T("已打开换装界面（Accept/Back 关闭）", "Dresser opened (Accept/Back closes)"));
             } catch (Exception __ex) { SRApi.Guard.Log("角色/原地换装", __ex); }

@@ -479,7 +479,9 @@ public partial class SR {
                 if (SR.Wheel.HasPending) {
                     Vector2 mpSb = SR.Wheel.MouseScreen;   // 事件趟的屏幕坐标
                     if (mpSb.x < ContentArea.x) {
-                        float wSb = SR.Wheel.TakeRemaining(false);
+                        // 注意：TakeRemaining(false) 的语义是"丢弃"，会先把待处理量清零并返回 0，
+                        // 侧栏要用 true（取走），否则侧栏永远滚不动、还会顺手吞掉这次滚轮。
+                        float wSb = SR.Wheel.TakeRemaining(true);
                         if (Mathf.Abs(wSb) > 0.01f) _leftScroll.y = Mathf.Max(0f, _leftScroll.y - wSb * Sc(64f));
                     }
                 }
