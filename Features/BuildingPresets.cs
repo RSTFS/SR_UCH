@@ -1161,9 +1161,16 @@ namespace SR_UCH.Tweaks {
                 _tableBox = box;      // 供页面级滚轮钩子命中判定
                 // 滚轮：绘制期直接用表格矩形取用（同一坐标系，不存在换算错位）
                 {
-                    float __w = SRApi.Ctl.WheelTake(box);
-                    if (Mathf.Abs(__w) > 0.01f) ScrollTableBy(__w);
-                    else SRApi.Ctl.WheelFallback(box, delegate (float __fw) { ScrollTableBy(__fw); return true; });
+                    // 第一优先：当期滚动事件直接处理（老版联机列表的写法，最可靠）
+                    Event __tev = Event.current;
+                    if (__tev != null && __tev.type == EventType.ScrollWheel && box.Contains(__tev.mousePosition)) {
+                        float __raw = Mathf.Abs(__tev.delta.y) > 0.001f ? __tev.delta.y : __tev.delta.x;
+                        if (ScrollTableBy(-__raw)) { __tev.Use(); }
+                    } else {
+                        float __w = SRApi.Ctl.WheelTake(box);
+                        if (Mathf.Abs(__w) > 0.01f) ScrollTableBy(__w);
+                        else SRApi.Ctl.WheelFallback(box, delegate (float __fw) { ScrollTableBy(__fw); return true; });
+                    }
                 }
                 SRApi.TableDraw(_args);
                 // 拖列宽的结果在 _drawW 里（核心直接改传进去的数组）：除拉伸列外同步回持久化宽度

@@ -208,9 +208,15 @@ namespace SR_UCH.Tweaks {
                     // 表格区自注册：区域优先于页面钩子，滚轮一定能落到列表上
                     // 滚轮：绘制期直接用表格矩形取用
                 {
-                    float __w = SRApi.Ctl.WheelTake(box);
-                    if (Mathf.Abs(__w) > 0.01f) ScrollTableByWheel(__w);
-                    else SRApi.Ctl.WheelFallback(box, delegate (float __fw) { ScrollTableByWheel(__fw); return true; });
+                    Event __tev = Event.current;
+                    if (__tev != null && __tev.type == EventType.ScrollWheel && box.Contains(__tev.mousePosition)) {
+                        float __raw = Mathf.Abs(__tev.delta.y) > 0.001f ? __tev.delta.y : __tev.delta.x;
+                        if (ScrollTableByWheel(-__raw)) { __tev.Use(); }
+                    } else {
+                        float __w = SRApi.Ctl.WheelTake(box);
+                        if (Mathf.Abs(__w) > 0.01f) ScrollTableByWheel(__w);
+                        else SRApi.Ctl.WheelFallback(box, delegate (float __fw) { ScrollTableByWheel(__fw); return true; });
+                    }
                 }
                 }
             } catch (Exception __tbox) { SRApi.Guard.Log("联机表格/命中框", __tbox); }

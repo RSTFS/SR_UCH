@@ -92,10 +92,7 @@ namespace SR_UCH.Tweaks {
                     _shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
                     _ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
                     _pending += v;   // 同帧累加
-                    LastDecision = "pending";
-                    e.Use();               // 不让任何滚动视图/其它控件再处理
-                    e.type = EventType.Used;
-                    SR.MarkWheelUsed();
+                    LastDecision = "pending";   // 不在事件趟消费：控件在自己的绘制里直接取用
                 } catch (Exception __ex) { SR.Guard.Log("滚轮/事件", __ex); }
             }
 
@@ -105,7 +102,14 @@ namespace SR_UCH.Tweaks {
             // 控件绘制期调用：鼠标在 rect 内就把这一格取走（取走即清零）。rect 用绘制期自己的矩形。
             // 两种坐标空间都比一次，避免容器层级差异导致的错位。
             internal static float TakeIfInside(Rect rect) {
-                if (!HasPending) return 0f;
+                // 与控件同一趟同步处理：直接读这一趟的事件，命中就取走并标记已用。
+                Event ev = Event.current;
+                if (ev == null || ev.type != EventType.ScrollWheel) return 0f;
+                if (Mathf.Abs(_pending) < 0.01f) {
+                    float raw = Mathf.Abs(ev.delta.y) > 0.001f ? ev.delta.y : ev.delta.x;
+                    _pending = -raw;   // 上滚为正
+                }
+                if (!HasPending && Mathf.Abs(_pending) < 0.01f) return 0f;
                 // 两个鼠标来源：事件趟记录的 _mouse，以及调用这一刻的 Event.mousePosition。
                 // 控件判断"我是否悬停"时用的就是后者，所以两者都要试（不同趟/不同容器下可能不同）。
                 Vector2 nowMouse = _mouse;
@@ -125,9 +129,12 @@ namespace SR_UCH.Tweaks {
                     hit = r2.Contains(_mouse);
                 }
                 if (!hit) return 0f;
+                if (!HitAny(rect, nowMouse) && !HitAny(rect, _mouse)) return 0f;
                 float v = _pending;
                 _pending = 0f;
                 LastDecision = "taken";
+                try { Event ev2 = Event.current; if (ev2 != null) { ev2.Use(); } } catch (Exception __ue) { SR.Guard.Log("滚轮/标记已用", __ue); }
+                SR.MarkWheelUsed();
                 return v;
             }
 

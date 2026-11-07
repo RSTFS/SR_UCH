@@ -631,12 +631,6 @@ public partial class SR {
             // ---- 滚轮结算（帧尾）：控件没取走的才滚页面 ----
             try {
                 if (SR.Wheel.HasPending) {
-                    // 上一帧有控件声明"滚轮归我" → 把量转移给控件（它会在下一趟 Repaint 取用），
-                    // 页面不再滚动。消费端会再判一次悬浮，页面里有多个下拉框也只会有鼠标下那个取走。
-                    if (WheelClaimedPrev && !SR.Wheel.CtrlHeld) {
-                        WheelDeltaSet(SR.Wheel.Value);
-                        SR.Wheel.TakeRemaining(false);
-                    }
                     if (SR.Wheel.CtrlHeld) {
                         // Ctrl+滚轮 = 切页签（设置页在通用/自检之间切）
                         if (_mode == Mode.Internal) CyclePage(_selectedInternalSection, SR.Wheel.Value > 0f ? -1 : 1);
@@ -671,6 +665,7 @@ public partial class SR {
                         if (Mathf.Abs(w) > 0.01f) {
                             if (SR.Wheel.ShiftHeld) _scroll.x = Mathf.Max(0f, _scroll.x - w * Sc(64f));
                             else _scroll.y = Mathf.Max(0f, _scroll.y - w * Sc(64f));
+                            try { Event evp = Event.current; if (evp != null) evp.Use(); } catch (Exception __ep) { Guard.Log("滚轮/页面消费", __ep); }
                         }
                         }
                     }
