@@ -345,10 +345,13 @@ public partial class SR {
                             new Rect(r.x - Sc(2), r.y - Sc(2), r.width + Sc(4), r.height + Sc(4)),
                             delegate (float __w) {
                                 float __c = System.Convert.ToSingle(__e.BoxedValue);
-                                float __st = Mathf.Max((__mx - __mn) * 0.02f, 0.001f);
+                                // 步长：范围的 2%，但不小于 0.01；只有范围 >= 1 时才按 0.1 取整，
+                                // 否则 0–1 这种小范围会被取整成 0 → 滚轮看起来"完全没反应"。
+                                float __span = Mathf.Max(0.0001f, __mx - __mn);
+                                float __st = Mathf.Max(__span * 0.02f, 0.01f);
                                 float __nv = Mathf.Clamp(__c + (__w > 0f ? -__st : __st), __mn, __mx);
-                                __nv = Mathf.Round(__nv * 10f) / 10f;
-                                if (Mathf.Abs(__nv - __c) < 0.0001f) return false;
+                                if (__span >= 1f) __nv = Mathf.Round(__nv * 10f) / 10f;
+                                if (Mathf.Abs(__nv - __c) < 0.000001f) return false;
                                 SR.SetValue(__e, __nv);
                                 return true;
                             }, SR.Wheel.PrioControl);

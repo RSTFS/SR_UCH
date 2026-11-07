@@ -19,10 +19,14 @@ namespace SR_UCH.Tweaks {
             internal const int PrioPageHook = 2;
 
             private sealed class Zone {
-                public Rect Rect;                  // 窗口坐标
+                public Rect Local;                 // 注册时给的原始矩形（GUI 区域内坐标）
+                public Rect Screen;                // 加上 AreaOffset 后的屏幕坐标
                 public Func<float, bool> Handler;  // 上滚为正
                 public int Prio;
                 public int Stamp;                  // 最近一次注册的帧号
+                // 两种坐标空间都判一次：Unity 的 Event.mousePosition 在 GUI 区域内到底是局部还是
+                // 屏幕坐标，跨版本/跨上下文并不一致；只要任一空间命中就算命中，彻底绕开这个坑。
+                public bool Hit(Vector2 mp) { return Local.Contains(mp) || Screen.Contains(mp); }
             }
 
             private static readonly Dictionary<string, Zone> _zones = new Dictionary<string, Zone>(64);
@@ -57,7 +61,8 @@ namespace SR_UCH.Tweaks {
                     Zone z;
                     if (!_zones.TryGetValue(id, out z)) { z = new Zone(); _zones[id] = z; }
                     // 调用方给的是"布局坐标"（BeginArea 内），换算到屏幕坐标后再存
-                    z.Rect = new Rect(windowRect.x + _offset.x, windowRect.y + _offset.y, windowRect.width, windowRect.height);
+                    z.Local = windowRect;
+                    z.Screen = new Rect(windowRect.x + _offset.x, windowRect.y + _offset.y, windowRect.width, windowRect.height);
                     z.Handler = handler; z.Prio = prio; z.Stamp = Time.frameCount;
                 } catch (Exception __ex) { SR.Guard.Log("滚轮仲裁/注册", __ex); }
             }
@@ -73,26 +78,27 @@ namespace SR_UCH.Tweaks {
                 // Event.mousePosition 本身就是屏幕坐标（只有 GUI 区域内的 rect 是局部坐标），
                 // 以前这里又加了一次 AreaOffset，鼠标永远对不上区域 → 列表/滑块/下拉框全都收不到滚轮。
                 Vector2 screen = e != null ? e.mousePosition : Vector2.zero;
-                // 1) 控件区：命中且优先级最高的那个
-                Zone win = null;
-                foreach (KeyValuePair<string, Zone> kv in _zones) {
-                    Zone z = kv.Value;
-                    if (z == null || !z.Rect.Contains(screen)) continue;
-                    // Shift = 横向滚动：不经过控件区（滑块/下拉不吃 Shift+滚轮）
-                    if (shift && z.Prio == PrioControl) continue;
-                    if (win == null || z.Prio < win.Prio) win = z;
-                }
-                if (win != null) {
-                    try {
-                        if (win.Handler(_value)) { LastDecision = "zone"; return true; }
-                        LastDecision = "zone-miss";
+                // 1) 控件区：按优先级依次尝试**所有命中**的区域（高优先级的不消费时，允许下一层继续）
+                Vector2 mp = screen;
+                int total = _zones.Count, hitCount = 0;
+                for (int prio = PrioControl; prio <= PrioPageHook; prio++) {
+                    if (shift && prio == PrioControl) continue;   // Shift = 横向滚动：滑块/下拉不参与
+                    foreach (KeyValuePair<string, Zone> kv in _zones) {
+                        Zone z = kv.Value;
+                        if (z == null || z.Prio != prio || !z.Hit(mp)) continue;
+                        hitCount++;
+                        try {
+                            if (z.Handler(_value)) { LastDecision = "zone:" + kv.Key; return true; }
+                        } catch (Exception __ex) { SR.Guard.Log("滚轮仲裁/处理器", __ex); }
                     }
-                    catch (Exception __ex) { SR.Guard.Log("滚轮仲裁/处理器", __ex); }
                 }
-                // 2) 页面钩子（表格等，屏幕坐标）
+                LastDecision = "zone-miss(" + hitCount + "/" + total + ")";
+                // 2) 页面钩子（表格等）：坐标空间同样两种都试一次
                 for (int i = 0; i < _pageHooks.Count; i++) {
-                    try { if (_pageHooks[i](screen, _value)) { LastDecision = "hook"; return true; } }
-                    catch (Exception __ex) { SR.Guard.Log("滚轮仲裁/页面钩子", __ex); }
+                    try {
+                        if (_pageHooks[i](screen, _value)) { LastDecision = "hook"; return true; }
+                        if (_pageHooks[i](screen + areaOffset, _value)) { LastDecision = "hook+off"; return true; }
+                    } catch (Exception __ex) { SR.Guard.Log("滚轮仲裁/页面钩子", __ex); }
                 }
                 return false;
             }
