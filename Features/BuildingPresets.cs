@@ -1115,6 +1115,10 @@ namespace SR_UCH.Tweaks {
                         rowsH = Mathf.Max(0f, tableH - headerH - __gripH);
                     }
                 } catch (Exception __fx) { SRApi.Guard.Log("布局预设/表格高度修正", __fx); }
+                // 关键：tableH 在前面被探针/修正改过，行区与矩形必须**按最终 tableH 重算一次**。
+                // 以前 rowsH 用的是较早的 tableH，导致 maxY 与实际可视高度脱节（列表滚不到底/多滚）。
+                box.height = tableH;
+                rowsH = SRApi.Ctl.TableRowsH(tableH, headerH + __gripH);
                 EnsureCols();
                 // 操作列宽始终跟随当前语言的按钮文字：语言热切换后也能立刻避免英文标签被截断。
                 // 操作列：默认按按钮文字实测，但最多占表格宽度的 30%（窗口变窄时不会把数据列挤没）
@@ -1147,7 +1151,7 @@ namespace SR_UCH.Tweaks {
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
                 _tableTopY = SRApi.ContentArea.y + box.y; _tableHCache = tableH;
                 _rowsHCache = rowsH;   // 缓存真实行区高：滚轮钩子在首帧/刚切页时用它兜底
-                _maxScrollY = Mathf.Max(0f, visible.Count * rowH - rowsH);
+                _maxScrollY = SRApi.Ctl.TableMaxScrollY(visible.Count, rowH, rowsH);
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _maxScrollY);
                 Event e = Event.current;
                 Vector2 mp = e != null ? e.mousePosition : Vector2.zero;

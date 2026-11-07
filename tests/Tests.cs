@@ -25,11 +25,21 @@ namespace SR_UCH.Tests {
             Console.WriteLine("== SR_UCH 单元测试 ==");
             TestColorHex();
             TestContractVersion();
+            TestTableScrollMath();
 
             Console.WriteLine("  通过 " + _pass + " / 失败 " + _fail);
             if (_fail > 0) { Console.WriteLine("== 有失败 ❌ =="); return 1; }
             Console.WriteLine("== 全部通过 ✅ ==");
             return 0;
+        }
+
+        // 表格滚动几何：内容装得下 maxY 必须为 0；装不下必须等于高出的部分。
+        private static void TestTableScrollMath() {
+            Eq("RowsH(200,30)", 170f, (float)SRApi.Ctl.TableRowsH(200f, 30f));
+            Eq("RowsH 不为负", 0f, (float)SRApi.Ctl.TableRowsH(10f, 30f));
+            Eq("maxY 内容装得下=0", 0f, (float)SRApi.Ctl.TableMaxScrollY(17, 34f, 600f));
+            Eq("maxY 内容超出", 578f - 400f, (float)SRApi.Ctl.TableMaxScrollY(17, 34f, 400f));
+            Eq("maxY 空列表=0", 0f, (float)SRApi.Ctl.TableMaxScrollY(0, 34f, 400f));
         }
 
         // ColorHex：功能层所有颜色文本解析都走它，最容易在重构里被改坏。

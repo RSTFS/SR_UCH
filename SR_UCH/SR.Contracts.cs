@@ -917,7 +917,16 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             // 表格自适应高度助手（Ctl 侧别名；功能层统一从这里取）。
             public static float TableAutoHeight(float usedAbove, float minH) { return SRApi.TableAutoHeight(usedAbove, minH); }
             // 表格尺寸令牌（随 UI 缩放；页面不再写死 26/24/13 等字面量）。
-            public static float TableRowH() { return Sc(26f); }
+            // 表格滚动几何（纯函数，单测直接覆盖）：行区与纵向滚动上限。
+        public static float TableRowsH(float tableH, float headerH) {
+            return Mathf.Max(0f, tableH - headerH);
+        }
+        public static float TableMaxScrollY(int rows, float rowH, float rowsH) {
+            float content = Mathf.Max(0, rows) * Mathf.Max(0f, rowH);
+            return Mathf.Max(0f, content - Mathf.Max(0f, rowsH));
+        }
+
+        public static float TableRowH() { return Sc(26f); }
             // UI 主题令牌（功能层统一入口）。
             public static float ThemeRadius { get { return Sc(6f); } }
             public static float ThemeHoverFade { get { return 0.12f; } }
