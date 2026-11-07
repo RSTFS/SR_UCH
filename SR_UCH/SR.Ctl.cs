@@ -318,6 +318,20 @@ public partial class SR {
                     GUILayout.Space(Sc(6));
                     float cur = (float)e.BoxedValue;
                     Rect r = GUILayoutUtility.GetRect(Sc(150f), Sc(28f));
+                    // 滚轮调值：悬停即归本滑块（核心仲裁，优先级高于页面滚动）
+                    {
+                        ConfigEntryBase __e = e; float __mn = min, __mx = max;
+                        SR.Wheel.Register(new Rect(r.x - Sc(2), r.y - Sc(2), r.width + Sc(4), r.height + Sc(4)),
+                            delegate (float __w) {
+                                float __c = System.Convert.ToSingle(__e.BoxedValue);
+                                float __st = Mathf.Max((__mx - __mn) * 0.02f, 0.001f);
+                                float __nv = Mathf.Clamp(__c + (__w > 0f ? -__st : __st), __mn, __mx);
+                                __nv = Mathf.Round(__nv * 10f) / 10f;
+                                if (Mathf.Abs(__nv - __c) < 0.0001f) return false;
+                                SR.SetValue(__e, __nv);
+                                return true;
+                            }, SR.Wheel.PrioControl);
+                    }
                     float v = DrawSlider(r, cur, min, max, false);
                     v = Mathf.Round(Mathf.Clamp(v, min, max) * 10f) / 10f;
                     if (Mathf.Abs(v - cur) > 0.0001f) { SetValue(e, v); written = true; }

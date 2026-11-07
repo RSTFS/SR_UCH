@@ -1001,6 +1001,8 @@ public partial class SR : ITweak {
                     return SR.Ctl.RowSlider(__l, __t, __e, __min, __max, __w, __f);
                 });
                 SRApi.SetTypingSink(delegate { return SR.Typing; });
+                // 页面级滚轮钩子统一交给仲裁：控件 > 页面钩子 > 页面滚动
+                SR.Wheel.RegisterPageHook(delegate (Vector2 __m, float __w) { return SRApi.DispatchPageWheel(__m, __w); });
                 SRApi.Ctl.SetButtonSink(delegate (string __l, string __t, float __w, float __h) {
                     return SR.Ctl.Button(__l, __t, __w, __h);
                 });

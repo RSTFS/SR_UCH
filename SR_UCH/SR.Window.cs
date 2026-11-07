@@ -276,6 +276,7 @@ public partial class SR {
 
             Event e = Event.current;
             Vector2 mouse = e.mousePosition; // 无矩阵缩放，无需坐标换算
+            SR.Wheel.FrameStart(e);          // 滚轮仲裁：一帧只有一个决策点
 
             Rect winRect = new Rect(_winX, _winY, _winWidth, _winHeight);
             bool over = winRect.Contains(mouse);
@@ -560,60 +561,29 @@ public partial class SR {
                         + " scrollY=" + _scroll.y.ToString("0.0"));
                 } catch (Exception __wd) { Guard.Log("滚轮诊断", __wd); }
             }
-            bool __pageScrolled = false;   // 本帧的滚动是"页面自己滚的"（不是控件抢走）
-            // 页面级滚轮：页面可以在滚动区之前抢走滚轮（自绘固定高度列表靠这个滚动）。
-            if (__wasWheel && !WheelShieldHit) {
+            // ---- 滚轮仲裁（重写版）：控件 > 表格/页面钩子 > 页面滚动 ----
+            // 依据：ScrollWheel 一帧只能 Use 一次，滚动视图在 EndScrollView 才应用位移，
+            // 所以必须在绘制前统一裁决；不再使用"盾/撤销/接管"那套互相打架的机制。
+            if (__wasWheel) {
                 try {
-                    float __pw = -(Mathf.Abs(__we.delta.y) > 0.001f ? __we.delta.y : __we.delta.x);
-                    if (SRApi.DispatchPageWheel(__wheelMouse + SR.AreaOffset, __pw)) {   // 统一传屏幕坐标，页面才能和 ContentArea 比较
-                        __we.Use(); __we.type = EventType.Used; WheelShieldHit = true; SR.MarkWheelUsed();
+                    bool __consumed = SR.Wheel.Consume();
+                    if (!__consumed) {
+                        bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+                        if (__shift) {
+                            _scroll.x = Mathf.Max(0f, _scroll.x - SR.Wheel.Value * Sc(60f));   // 上滚向左
+                        } else {
+                            _scroll.y = Mathf.Max(0f, _scroll.y - SR.Wheel.Value * Sc(56f));   // 上滚向上
+                        }
+                        __consumed = true;
                     }
-                } catch (Exception __pwx) { Guard.Log("页面级滚轮", __pwx); }
+                    if (__consumed) { __we.Use(); __we.type = EventType.Used; SR.MarkWheelUsed(); }
+                } catch (Exception __wc) { Guard.Log("滚轮仲裁", __wc); }
             }
-            // Shift+滚轮：页面横向滚动（内容比视口宽时有效）。必须在 BeginScrollView 之前改 _scroll，
-            // 并且设盾，避免同一次滚轮又被竖向滚动区吃掉。
-            if (__wasWheel && !WheelShieldHit
-                && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))) {
-                try {
-                    float __hx = Mathf.Abs(__we.delta.y) > 0.001f ? __we.delta.y : __we.delta.x;
-                    if (Mathf.Abs(__hx) > 0.0001f) {
-                        _scroll.x = Mathf.Max(0f, _scroll.x + __hx * Sc(60f));
-                        __pageScrolled = true;
-                        __we.Use(); __we.type = EventType.Used; WheelShieldHit = true; SR.MarkWheelUsed();
-                    }
-                } catch (Exception __hs) { Guard.Log("页面横向滚动", __hs); }
-            }
-            // 鼠标悬浮在下拉框 / 滑块上时，本帧让滚动区当作没有可滚动内容（none 样式 + 盾改事件类型）。
-            // 设置页签常驻：画在滚动区之外，页面滚动不会带走页签（与底栏同级的固定区）。
-            if (_mode == Mode.Settings) {
-                try { SR.RenderSettingsTabBar(); }
-                catch (Exception __tb) { Guard.Log("设置页签", __tb); }
-            }
-            // 选中文本色：绘制期间必须是我们的蓝，否则会沿用游戏皮肤的暖色（每个 OnGUI 趟都可能被还原）
-            try { GUI.skin.settings.selectionColor = SR.TextSelectColor; } catch (Exception __sc) { Guard.Log("选中文本色", __sc); }
-            // 页面竖向滚动：由我们接管（Unity 自带步长偏小、不可配，表现为"滚了不走"）。
-            // 只在指针位于内容区、且本帧滚轮还没被列表钩子/控件消费时接管，并设盾避免滚动区再吃一次。
-            if (__wasWheel && !WheelShieldHit
-                && (Input.GetKey(KeyCode.LeftControl) == false && Input.GetKey(KeyCode.RightControl) == false)
-                && SRApi.ContentArea.Contains(__wheelMouse + SR.AreaOffset)
-                && !SRApi.WheelAreaClaimed(__wheelMouse + SR.AreaOffset)) {   // 表格已声明这块滚轮归它
-                try {
-                    float __vy = Mathf.Abs(__we.delta.y) > 0.001f ? __we.delta.y : __we.delta.x;
-                    if (Mathf.Abs(__vy) > 0.0001f) {
-                        _scroll.y = Mathf.Max(0f, _scroll.y + __vy * Sc(58f));
-                        __pageScrolled = true;
-                        __we.Use(); __we.type = EventType.Used; WheelShieldHit = true; SR.MarkWheelUsed();
-                    }
-                } catch (Exception __vs) { Guard.Log("页面竖向滚动", __vs); }
-            }
-            SRApi.ClearWheelClaims();   // 本帧渲染会重新声明表格滚轮领地（供下一帧判定）
-            bool __noScroll = _noScrollDeclared || __overCtrlPrev || WheelShieldHit;
+            bool __noScroll = _noScrollDeclared;
 
             // 设置页的页签画在滚动区**之外**：常驻顶部，不受滚动影响；
             // 「恢复默认」跟着页签排在最右侧（只对通用页有意义，自检页隐藏）。
-            _scroll = __noScroll
-                ? GUILayout.BeginScrollView(_scroll, false, false, GUIStyle.none, GUIStyle.none, GUIStyle.none, GUILayout.ExpandHeight(true))
-                : GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUIStyle.none, GUILayout.ExpandHeight(true));   // 弹性占满剩余高度
+            _scroll = GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUIStyle.none, GUILayout.ExpandHeight(true));   // 弹性占满剩余高度
             if (_scroll != pageBefore) WheelFrame = Time.frameCount; // 页面滚动区吃掉了滚轮
             ConfigFile curConfig = _mode == Mode.Internal
                 ? _internalConfig
@@ -676,13 +646,6 @@ public partial class SR {
                 if (__sv.height > Sc(40f)) SRApi.PageViewportHeight = Mathf.Min(__sv.height, __vpMax);
                 else if (SRApi.PageViewportHeight > __vpMax) SRApi.PageViewportHeight = __vpMax;
             } catch (Exception __vm) { Guard.Log("页面视口实测", __vm); }
-            // 滚轮被下拉框 / 滑块吃掉 -> 撤销本帧页面滚动。
-            // 两道判定：1) 盾（绘制前、上一帧矩形命中）；2) 本帧绘制后的控件矩形命中。
-            // 只撤销"被控件吃掉"的滚动；页面自己滚的不能撤（否则完全滚不动）。
-            if (!__pageScrolled && (WheelShieldHit || (__wasWheel && __overCtrlPrev))) {
-                _scroll = pageBefore;
-                WheelFrame = Time.frameCount;   // 让用 Input 读轴的缩放路径本帧让步
-            }
             // 功能页外框部件（紧贴底栏条上方）：量它的高度并按栏目记住，供下一帧预留。
             float __pfTop = 0f;
             try { __pfTop = GUILayoutUtility.GetLastRect().yMax; } catch { /* 静默：非关键路径，失败可直接忽略 */ }

@@ -1293,6 +1293,22 @@ public partial class SR {
                     try {
                         sr = GUILayoutUtility.GetRect(Sc(150), CtlH(), GUILayout.Width(SliderTrackWidth()));
                         nv = DrawSlider(sr, fv, hmin, hmax, val is int, hstep); //int 条目按整数步进，提交时由 SetValue 归一化类型
+                        // 滚轮调值：统一交给核心仲裁（悬停即归滑块，页面不会跟着滚）
+                        {
+                            Rect __zr = sr;
+                            float __mn = hmin, __mx = hmax; bool __int = val is int; float __st = hstep;
+                            ConfigEntryBase __e = entry;
+                            SR.Wheel.Register(new Rect(__zr.x - Sc(2), __zr.y - Sc(2), __zr.width + Sc(4), __zr.height + Sc(4)),
+                                delegate (float __w) {
+                                    float __cur = __e.BoxedValue is int ? (int)__e.BoxedValue : System.Convert.ToSingle(__e.BoxedValue);
+                                    float __step = __int ? (__st > 0f ? __st : 1f) : Mathf.Max((__mx - __mn) * 0.02f, 0.001f);
+                                    float __nv = Mathf.Clamp(__cur + (__w > 0f ? -__step : __step), __mn, __mx);
+                                    if (__int) __nv = (float)Math.Round(__nv);
+                                    if (Mathf.Abs(__nv - __cur) < 0.0001f) return false;
+                                    SR.SetValue(__e, __int ? (object)(int)Mathf.Round(__nv) : (object)__nv);
+                                    return true;
+                                }, SR.Wheel.PrioControl);
+                        }
                         //float 条目可选步进（范围由 SRApi.RowSliders 给出，粒度由 RowSliderSteps 给出）
                         float fstep;
                         if (RowSliderStep(entry, out fstep))
@@ -1444,8 +1460,32 @@ public partial class SR {
                 if (entry != null) _editOpen[entry] = open;   //null 保护：字典不接受 null 键
                 if (entry != null) _comboSkipFrame[entry] = Time.frameCount; //展开当帧不绘制列表
             }
-            //悬停滚轮换选项：在 Repaint 阶段落值，此时改配置不会打断本帧 Layout（下拉框宽度固定）。
+            // 滚轮统一交给核心仲裁：收起时滚轮换选项，展开时滚轮滚列表（下一帧生效，一帧滞后无感）。
             Rect boxRect = GUILayoutUtility.GetLastRect();
+            if (options != null && options.Length > 1) {
+                if (!open) {
+                    SR.Wheel.Register(boxRect, delegate (float __w) {
+                        int __cur = 0;
+                        for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur = i; break; } }
+                        int __ni = __w > 0f ? __cur - 1 : __cur + 1;
+                        if (__ni < 0) __ni = options.Length - 1;
+                        if (__ni >= options.Length) __ni = 0;
+                        if (entry != null && vals != null && __ni < vals.Length) SR.SetValue(entry, vals.GetValue(__ni));
+                        return true;
+                    }, SR.Wheel.PrioControl);
+                } else if (drew && options.Length > 8 && entry != null) {
+                    int __vis2 = Mathf.Min(options.Length, 8);
+                    Rect __lr2 = new Rect(boxRect.x, boxRect.yMax, width, CtlH() * __vis2);
+                    SR.Wheel.Register(__lr2, delegate (float __w) {
+                        int __sc;
+                        if (!_comboScroll.TryGetValue(entry, out __sc)) __sc = 0;
+                        int __nv = Mathf.Clamp(__sc + (__w > 0f ? -2 : 2), 0, options.Length - 8);
+                        if (__nv == __sc) return false;
+                        _comboScroll[entry] = __nv;
+                        return true;
+                    }, SR.Wheel.PrioControl);
+                }
+            }
             //控件在被 hover 时声明滚轮所有权
             Event ce0 = Event.current;
             if (ce0 != null && options != null) {
