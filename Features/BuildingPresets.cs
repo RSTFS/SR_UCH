@@ -1083,10 +1083,12 @@ namespace SR_UCH.Tweaks {
                     if (__visibleRows > SRApi.Ctl.TableRowH()) rowsH = Mathf.Min(rowsH, __visibleRows);
                 } catch (Exception __vr) { SRApi.Guard.Log("布局预设/行区实测", __vr); }
                 // 紧贴表格之前再探一次：探针与表格矩形只差 1px，用它的 yMax 定高不会有"探针比表格高 72px"的误差。
-                float __probeH;
+                // 探针必须**无条件**创建：放在 try 里一旦抛异常，本趟就少一个控件，
+                // Layout 与 Repaint 的控制数量不一致会直接抛
+                // "Getting control N's position in a group with only N controls"。
+                Rect __probe = GUILayoutUtility.GetRect(1f, 0f);
                 try {
-                    Rect __probe = GUILayoutUtility.GetRect(1f, 0f);
-                    __probeH = SRApi.PageContentBottom - __probe.yMax;
+                    float __probeH = SRApi.PageContentBottom - __probe.yMax;
                     if (__probeH > headerH + rowH * 2f) tableH = Mathf.Max(headerH + rowH * 2f, __probeH);
                 } catch (Exception __ph) { SRApi.Guard.Log("布局预设/表格前探针", __ph); }
                 Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true), GUILayout.Height(tableH));
