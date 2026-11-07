@@ -246,7 +246,8 @@ public partial class Level {
         }
 
         private static void Tick() {
-                if (Time.frameCount % 6 != 0) return;   // 按键轮询降到 ~10Hz
+                // 不做帧取模节流：一次点按可能只有 50-100ms，取模会整段漏掉（"不跟手"）。
+                // ComboKeyDown 内部已按帧缓存，每帧调用开销可忽略。
             if (_key == null || _key.Value == KeyCode.None) return;
             if (!SRApi.ComboKeyDown(_key)) return;
             Perform();
