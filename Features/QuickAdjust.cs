@@ -389,6 +389,11 @@ public class QuickAdjust : ITweak {
             try { SRApi.RegisterTick("评分百分比-保持", TickKeepHandicap); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             try { Harmony.CreateAndPatchAll(typeof(QuickAdjust), (string)null); }
             catch (Exception e) { SRApi.LogError("快速调整 补丁注册失败: " + e.Message); }
+            // GamePlayer 的两个补丁独立注册：目标成员在新版游戏里可能改名/消失，不能连累上面的补丁
+            try { Harmony.CreateAndPatchAll(typeof(QuickAdjustStartClientPatch)); }
+            catch (Exception __p1) { SRApi.LogWarn("快速调整/OnStartClient 补丁跳过（该成员不存在）: " + __p1.Message); }
+            try { Harmony.CreateAndPatchAll(typeof(QuickAdjustStartServerPatch)); }
+            catch (Exception __p2) { SRApi.LogWarn("快速调整/OnStartServer 补丁跳过（该成员不存在）: " + __p2.Message); }
     }
 
         public static bool QuickSwitchOn => _quickSwitchEnabled != null && _quickSwitchEnabled.Value;
@@ -664,13 +669,10 @@ public class QuickAdjust : ITweak {
         // 不常驻轮询，也不反复改数值；切关卡/重开一局都会重新触发一次。
         private static float _keepApplyAt = -1f;
 
-        [HarmonyPatch(typeof(GamePlayer), "OnStartClient")]
-        [HarmonyPostfix]
-        private static void OnStartClientQueueKeep(GamePlayer __instance) { QueueKeepIfLocal(__instance); }
-
-        [HarmonyPatch(typeof(GamePlayer), "OnStartServer")]
-        [HarmonyPostfix]
-        private static void OnStartServerQueueKeep(GamePlayer __instance) { QueueKeepIfLocal(__instance); }
+        // 这两个补丁单独成类：CreateAndPatchAll 是"一个方法找不到就整类失败"，
+        // 之前 GamePlayer.OnStartClient 在游戏更新后消失，导致快速调整的**全部**补丁一起注册失败
+        // （重生延迟 / 快速切换全失效）。拆开后单个目标失效只丢这一条。
+        internal static void QueueKeep(GamePlayer gp) { QueueKeepIfLocal(gp); }
 
         private static void QueueKeepIfLocal(GamePlayer gp) {
             try { if (_keepHandicap > 0 && gp != null && gp.isLocalPlayer) _keepApplyAt = Time.unscaledTime + 0.8f; }
@@ -860,6 +862,20 @@ public class QuickAdjust : ITweak {
                 SRApi.LogWarn((object)("恢复评分折扣失败: " + ex.Message));
             }
         }
+}
+
+
+// GamePlayer 生成时的"保持设置"补发：单独成类，目标缺失时只丢这一条补丁。
+internal static class QuickAdjustStartClientPatch {
+    [HarmonyPatch(typeof(GamePlayer), "OnStartClient")]
+    [HarmonyPostfix]
+    private static void Postfix(GamePlayer __instance) { QuickAdjust.QueueKeep(__instance); }
+}
+
+internal static class QuickAdjustStartServerPatch {
+    [HarmonyPatch(typeof(GamePlayer), "OnStartServer")]
+    [HarmonyPostfix]
+    private static void Postfix(GamePlayer __instance) { QuickAdjust.QueueKeep(__instance); }
 }
 
 }
