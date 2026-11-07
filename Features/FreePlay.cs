@@ -36,10 +36,7 @@ namespace SR_UCH {
         // 「其它」子页：地图网格（SR 自己实现，不依赖 EX）
         private static void RenderGridTab() {
             try {
-                if (!SRApi.GateModeAllows(SRApi.ModeMask.Freeplay)) {
-                    GUILayout.Label(SRApi.T("本页只在自由模式下可用", "This page is available in freeplay only"), SRApi.Ctl.Label);
-                    return;
-                }
+                // 不按模式隐藏/灰显：照常显示，效果由各功能自己在非自由模式下跳过
                 FreePlayGrid.RenderOtherPage();
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式页/其它", __ex); }
         }
@@ -48,10 +45,6 @@ namespace SR_UCH {
             try {
                 if (!_probed) Tick();
                 SRApi.Ctl.SectionTitle(SRApi.T("- 自由模式 -", "- Freeplay -"));
-                if (!SRApi.GateModeAllows(SRApi.ModeMask.Freeplay)) {
-                    GUILayout.Label(SRApi.T("本页只在自由模式下可用", "This page is available in freeplay only"), SRApi.Ctl.Label);
-                    return;
-                }
                 if (_render == null) {
                     GUILayout.Label(SRApi.T("未检测到 EX 模块（自身状态等功能由它提供）", "EX module not detected (it provides these options)"), SRApi.Ctl.Label);
                     return;
