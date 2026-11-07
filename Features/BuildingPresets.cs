@@ -1092,7 +1092,12 @@ namespace SR_UCH.Tweaks {
                 // 结果表格整体下移并伸出底栏（截图里 顶73+高950 越过了底界951）。
                 try {
                     float __minH = headerH + rowH * 2f;
-                    float __fix = SRApi.PageContentBottom - box.y;
+                    // 两种底界取较小值：PageContentBottom 可能把页脚预留也算进去了（偏大 400 量级），
+                    // 屏幕底（底栏上沿）永远是对的，所以用它兜底。
+                    float __fixLayout = SRApi.PageContentBottom - box.y;
+                    float __fixScreen = (SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f))
+                                        - (SRApi.ContentArea.y + box.y);
+                    float __fix = Mathf.Min(__fixLayout, __fixScreen);
                     if (__fix > __minH && __fix < tableH) {
                         tableH = __fix;
                         box.height = __fix;
