@@ -1025,6 +1025,13 @@ public partial class SR : ITweak {
                 SRApi.Ctl.SetRowSliderSink(delegate (string __l, string __t, ConfigEntryBase __e, float __min, float __max, float __w, string __f) {
                     return SR.Ctl.RowSlider(__l, __t, __e, __min, __max, __w, __f);
                 });
+                // 之前漏了这一个：_rowCombo 从未注入 → 所有 RowCombo 行(模式/关卡/类型下拉)拿不到值。
+                // 契约里的 sink 是 7 参（不含 cur），别写成 8 参。
+                try {
+                    SRApi.Ctl.SetRowComboSink(delegate (string __l, string __t, ConfigEntryBase __e, string[] __vals, string[] __labels, float __w, float __ls) {
+                        return SR.Ctl.RowCombo(__l, __t, __e, __vals, __labels, __w, __ls);
+                    });
+                } catch (Exception __rc) { Guard.Log("注入 RowCombo 通道", __rc); }
                 SRApi.SetTypingSink(delegate { return SR.Typing; });
                 SRApi.Ctl.SetLabelColumnSink(delegate (string __l) { return SR.Ctl.LabelColumnWidth(__l); });
                 SRApi.SetWheelLayerSink(delegate { return SR.Wheel.LastDecision; });
