@@ -300,6 +300,11 @@ namespace SR_UCH {
         // 覆盖层（画在窗口最上层，不受页面裁剪）：功能的弹出列表用
         // 滚轮区域（功能自绘控件用）：id 稳定、矩形为布局坐标，处理器返回 true = 已消费
         private static Action<string, Rect, Func<float, bool>, int> _wheelZone;
+        // 诊断：最近一次滚轮被哪一层消费（zone:xxx / hook / hook+off / zone-miss(n/m) / none）
+        private static Func<string> _wheelLayer;
+        public static void SetWheelLayerSink(Func<string> f) { _wheelLayer = f; }
+        public static string WheelLayer { get { Func<string> f = _wheelLayer; return f != null ? f() : ""; } }
+
         public static void SetWheelZoneSink(Action<string, Rect, Func<float, bool>, int> f) { _wheelZone = f; }
         public static void WheelArea(string id, Rect layoutRect, Func<float, bool> handler) {
             Action<string, Rect, Func<float, bool>, int> f = _wheelZone;

@@ -558,6 +558,12 @@ namespace SR_UCH.Tweaks {
                     if (Time.unscaledTime - _statusShownAt > 8f) status = null;
                 }
                 if (!string.IsNullOrEmpty(status)) count += "   ·   " + status;
+                // 诊断（一直显示，不写日志也能看）：行数/行区/滚动上限/当前偏移/滚轮命中的层。
+                // 若"滚不动"，这几个数字能直接指出是 maxY=0（内容没超出）、还是 layer=none（没收到滚轮）。
+                try {
+                    count += "   ·   行" + shown + " 行区" + _rowsHCache.ToString("0") + " maxY" + _maxScrollY.ToString("0")
+                           + " y" + _scrollRows.y.ToString("0") + " 层:" + (SRApi.WheelLayer ?? "?");
+                } catch { /* 静默：诊断行失败不影响列表 */ }
                 // 工具行前面已有"跳过树屋 + 返回树屋"约 290 设计单位；不给状态栏设上限，
                 // 导出目录那种长路径会把 FlexibleSpace 挤没、整行撑出窗口。
                 float maxW = Mathf.Max(SRApi.Ctl.Sc(120f), SRApi.ContentArea.width - SRApi.Ctl.Sc(380f));
@@ -715,16 +721,23 @@ namespace SR_UCH.Tweaks {
             } finally { GUILayout.EndHorizontal(); }
         }
 
-        // 填满剩余高度（与联机页同一公式）：页面视口 − 头部已用高度 − 拖拽条，再按可视底与手动高度夹取
+        // 填满剩余高度：以**屏幕可视底**为准（不再依赖"页面视口高度"的估算）。
+        // 底栏是固定条，列表底边必须正好落在它上沿：多一点就被遮住最后一行，少一点就留空。
         private static float ComputeFillTableHeight(Rect last) {
             float minH = SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH();
-            float used = Mathf.Max(0f, last.yMax - _pageTopY);
-            float tableH = Mathf.Max(minH, SRApi.PageViewportHeight - used - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));
+            float grip = SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f;
+            float tableH;
             try {
-                float screenTop = SRApi.ContentArea.y + last.yMax;
-                float visible = (SRApi.ContentArea.yMax - SRApi.FooterHeight - W(2f)) - screenTop;
-                if (visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(minH, visible));
-            } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
+                float screenTop = SRApi.ContentArea.y + last.yMax;                       // 列表顶（屏幕坐标）
+                float bottom = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);   // 底栏上沿
+                float avail = bottom - screenTop - grip;
+                tableH = Mathf.Max(minH, avail);
+            } catch (Exception __sh) {
+                SRApi.Guard.Log("布局预设/可视高度", __sh);
+                float used = Mathf.Max(0f, last.yMax - _pageTopY);
+                tableH = Mathf.Max(minH, SRApi.PageViewportHeight - used - grip);
+            }
+            // 手动高度（底边拖拽条）仍然作为上限
             try {
                 if (_tableHEntry != null && _tableHEntry.Value > 0)
                     tableH = Mathf.Clamp(SRApi.Ctl.Sc(_tableHEntry.Value), minH, Mathf.Max(minH, tableH));

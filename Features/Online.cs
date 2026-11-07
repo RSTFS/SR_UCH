@@ -542,17 +542,18 @@ namespace SR_UCH.Tweaks {
             // 最后一行不会再被底栏吃掉（预设列表用同一公式）。
             float __used = Mathf.Max(0f, last.yMax - _pageTopY);
             float __fill = SRApi.PageViewportHeight - __used - __gripTotal;
-            float boxH = Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(),
-                                   Mathf.Min(availH, __fill > 0f ? __fill : availH));
-            // 再按"屏幕可视底"夹一次：底栏是固定条，视口估大时最后几行会被它压住
-            // （用户反馈：联机列表最下面几项被底栏遮住）。与预设页同一套夹取。
+            // 以屏幕可视底为准：列表底边正好贴在底栏上沿（多一分被遮、少一分留空）。
+            float __minH = SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH();
+            float boxH;
             try {
                 float __screenTop = SRApi.ContentArea.y + last.yMax;
-                float __visible = (SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f)) - __screenTop
-                                  - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f);
-                if (__visible > 0f)
-                    boxH = Mathf.Min(boxH, Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(), __visible));
-            } catch (Exception __vh) { SRApi.Guard.Log("联机/可视高度夹取", __vh); }
+                float __bottom = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);
+                boxH = Mathf.Max(__minH, __bottom - __screenTop - __gripTotal);
+            } catch (Exception __bh) {
+                SRApi.Guard.Log("联机/可视高度", __bh);
+                boxH = Mathf.Max(__minH, Mathf.Min(availH, __fill > 0f ? __fill : availH));
+            }
+
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
 
