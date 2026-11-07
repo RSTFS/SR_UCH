@@ -1517,27 +1517,6 @@ public partial class SR {
                     }
                 }
             }
-            // 早期机制兜底：悬停即声明归属（下一帧 Window 会把待处理量转成 WheelDelta），
-            // Repaint 趟取用一次 —— 这是重构前验证过可用的下拉框滚轮切换路径。
-            try {
-                Event __ce3 = Event.current;
-                if (__ce3 != null) {
-                    if (boxRect.Contains(__ce3.mousePosition)) WheelClaim();
-                    if (__ce3.type == EventType.Repaint && !open) {
-                        float __dw = WheelDeltaTake();
-                        if (Mathf.Abs(__dw) > 0.01f && entry != null && vals != null && options != null && options.Length > 1) {
-                            int __cc3 = 0;
-                            for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cc3 = i; break; } }
-                            int __cn3 = Mathf.Clamp(Mathf.RoundToInt(Mathf.Abs(__dw)), 1, 5);
-                            int __ni3 = __dw > 0f ? __cc3 - __cn3 : __cc3 + __cn3;
-                            if (__ni3 < 0) __ni3 = options.Length - 1;
-                            if (__ni3 >= options.Length) __ni3 = 0;
-                            if (__ni3 < vals.Length) SR.SetValue(entry, vals.GetValue(__ni3));
-                        }
-                    }
-                }
-            } catch (Exception __cw3) { Guard.Log("下拉框/滚轮兜底", __cw3); }
-
             if (drew) {
                 //展开列表最多可见 8 项，其余经滚轮滚动。
                 int __visN = Mathf.Min(options.Length, 8);

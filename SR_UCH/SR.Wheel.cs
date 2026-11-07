@@ -27,6 +27,16 @@ namespace SR_UCH.Tweaks {
             // 再按这些**本趟刚画的**矩形命中一次。纯 take 路径若因坐标系差异没取到，这里一定能补上。
             private static readonly System.Collections.Generic.List<Rect> _fbRects = new System.Collections.Generic.List<Rect>(16);
             private static readonly System.Collections.Generic.List<Func<float, bool>> _fbHandlers = new System.Collections.Generic.List<Func<float, bool>>(16);
+            // 矩形三种坐标候选（原始 / +区域偏移 / +区域偏移−页面滚动）各判一次
+            private static bool HitAny(Rect rect, Vector2 mouse) {
+                if (rect.Contains(mouse)) return true;
+                Rect r1 = new Rect(rect.x + SR.AreaOffset.x, rect.y + SR.AreaOffset.y, rect.width, rect.height);
+                if (r1.Contains(mouse)) return true;
+                Vector2 ps = SRApi.PageScroll;
+                Rect r2 = new Rect(rect.x + SR.AreaOffset.x - ps.x, rect.y + SR.AreaOffset.y - ps.y, rect.width, rect.height);
+                return r2.Contains(mouse);
+            }
+
             internal static void RegisterFallback(Rect rect, Func<float, bool> apply) {
                 try {
                     if (apply == null || rect.width < 2f || rect.height < 2f) return;
@@ -96,6 +106,11 @@ namespace SR_UCH.Tweaks {
             // 两种坐标空间都比一次，避免容器层级差异导致的错位。
             internal static float TakeIfInside(Rect rect) {
                 if (!HasPending) return 0f;
+                // 两个鼠标来源：事件趟记录的 _mouse，以及调用这一刻的 Event.mousePosition。
+                // 控件判断"我是否悬停"时用的就是后者，所以两者都要试（不同趟/不同容器下可能不同）。
+                Vector2 nowMouse = _mouse;
+                try { if (Event.current != null) nowMouse = Event.current.mousePosition; } catch (Exception __nm) { SR.Guard.Log("滚轮/实时鼠标", __nm); }
+                if (!HitAny(rect, nowMouse) && !HitAny(rect, _mouse)) return 0f;
                 // 控件矩形通常处在"页面滚动内容"坐标里：屏幕坐标 = 矩形 + 区域偏移 − 页面滚动。
                 // 三种候选各比一次（原始 / +区域偏移 / +区域偏移−页面滚动），命中任一即可：
                 // 不同容器层级下 Unity 给的 mousePosition 空间并不统一，多比一次没有副作用。

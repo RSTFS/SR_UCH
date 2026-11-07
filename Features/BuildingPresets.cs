@@ -1051,7 +1051,8 @@ namespace SR_UCH.Tweaks {
                 EnsureCols();
                 // 操作列宽始终跟随当前语言的按钮文字：语言热切换后也能立刻避免英文标签被截断。
                 // 操作列：默认按按钮文字实测，但最多占表格宽度的 30%（窗口变窄时不会把数据列挤没）
-                _colW[ColAction] = Mathf.Min(DefaultActionColW(), Mathf.Max(SRApi.Ctl.Sc(96f), box.width * 0.30f));
+                // 操作列宽度：至少 190 设计单位（与联机列表的加入列观感一致），最多占表格 40%
+                _colW[ColAction] = Mathf.Clamp(Mathf.Max(DefaultActionColW(), SRApi.Ctl.Sc(190f)), SRApi.Ctl.Sc(140f), box.width * 0.40f / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)));
                 if (_args == null) _args = new SRApi.TableArgs();
                 float pinW = SRApi.Ctl.Sc(_colW[ColAction]);
                 // 有纵向溢出时，在数据区与钉住列之间预留滚动条宽度（与联机列表一致）。

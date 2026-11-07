@@ -385,7 +385,6 @@ public partial class SR {
             try {
             // 钉住列表头：统一表头底上叠一层淡 accent，保留可辨识度。
             DrawFill(new Rect(0f, 0f, pinW, headerH), CurStyle.HeaderBg);
-            DrawRect(new Rect(0f, 0f, pinW, headerH), 0.10f);
             SR.Ctl.SecHeaderCenter.Draw(new Rect(0f, 0f, pinW, headerH),
                 new GUIContent(pinTitle ?? ""), false, false, false, false);
             } finally { GUI.EndClip(); GUI.color = __pinSaved; }
