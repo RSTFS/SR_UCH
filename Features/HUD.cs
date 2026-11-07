@@ -24,12 +24,6 @@ namespace SR_UCH.Tweaks {
             Custom
         }
 
-        // 显示键的工作方式。
-        public enum ShowMode {
-            Hold,
-            Toggle
-        }
-
         // 显示方案：堆叠（每项一行）/ 平铺（全部内容用分隔符连成一行）。
         public enum DisplayMode {
             Stack,
@@ -90,7 +84,6 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<bool> _enabled;
         private static ConfigEntry<bool> _fade;
         private static ConfigEntry<KeyCode> _showKey;
-        private static ConfigEntry<ShowMode> _showMode;
         private static ConfigEntry<HudLayout> _layout;
         private static ConfigEntry<int> _fontSize;
         private static ConfigEntry<float> _opacity;
@@ -121,7 +114,6 @@ namespace SR_UCH.Tweaks {
         private static bool _eventSeen;
         private static bool _hasGame;
         private static bool _wasEnabled;
-        private static bool _toggleOn;          // 切换显示模式的运行期状态
         private static float _hudAlpha;         // 淡入淡出后的总透明度（ease-out）
         private static string _timerText = "00:00";
         private static int _warnLevel;
@@ -221,10 +213,6 @@ namespace SR_UCH.Tweaks {
             try { return _fade != null && _fade.Value; } catch { return true; }
         }
 
-        private static ShowMode ModeValue() {
-            try { return _showMode != null ? _showMode.Value : ShowMode.Hold; } catch { return ShowMode.Hold; }
-        }
-
         private static HudLayout LayoutValue() {
             try { return _layout != null ? _layout.Value : HudLayout.TopLeft; } catch { return HudLayout.TopLeft; }
         }
@@ -302,11 +290,8 @@ namespace SR_UCH.Tweaks {
                 "淡入淡出\nHUD 显示或隐藏时平滑过渡\n关闭则立即显示或隐藏",
                 "fade in/out\nsmoothly transitions the HUD when showing or hiding\nwhen off the HUD appears/disappears instantly");
             Loc("Show Key", "显示按键", "Show key",
-                "显示按键\n按住或切换用于显示 HUD 的按键\n点右侧键框后按新键改绑，Esc 取消",
-                "show key\nkey used to show the HUD by holding or toggling\nclick the key box, then press a new key (Esc cancels)");
-            Loc("Show Mode", "显示方式", "Show mode",
-                "显示方式\n按住显示：按住显示键期间显示 HUD\n切换显示：按一下在显示与隐藏之间切换",
-                "show mode\nHold = visible while the show key is held\nToggle = tap the show key to switch visibility");
+                "显示按键\n按一下直接开/关「显示 HUD」复选框\n点右侧键框后按新键改绑，Esc 取消",
+                "show key\ntoggles the Show HUD checkbox directly\nclick the key box, then press a new key (Esc cancels)");
             Loc("Layout", "布局", "Layout",
                 "HUD 布局\n左上/右上/左下/右下按固定边距贴边\n自定义用拖动后的位置，仅本次会话有效",
                 "HUD layout\nthe four corner modes stick to the screen edges with a fixed margin\ncustom uses the dragged position, kept for this session only");
@@ -368,7 +353,6 @@ namespace SR_UCH.Tweaks {
             try {
                 if (!IsSec(e)) return true;
                 string k = e.Definition.Key;
-                if (k == "Show Mode") return false;
                 if (k.StartsWith("Color ")) return false;
                 return true;
             } catch { return true; }
@@ -378,7 +362,7 @@ namespace SR_UCH.Tweaks {
         private static string RowExtra(ConfigEntryBase e) {
             try {
                 if (!IsSec(e)) return null;
-                return e.Definition.Key == "Show Key" ? "Show Mode" : null;
+                return null;   // 显示方式已删除：快捷键直接开关「显示 HUD」
             } catch { return null; }
         }
 
@@ -471,12 +455,6 @@ namespace SR_UCH.Tweaks {
                 _enabled = cfg.Bind(Sec, "Enabled", false, "显示HUD：总开关（默认关闭）。");
                 _fade = cfg.Bind(Sec, "Fade", false, "淡入淡出：HUD 显示/隐藏时平滑过渡。");
                 _showKey = cfg.Bind(Sec, "Show Key", KeyCode.F5, "显示按键：用于显示 HUD 的按键（默认 F5）。");
-            // 默认就是"显示"状态：以前 _toggleOn 初始为 false，每次重开游戏都得先按一下显示键才出现，
-            // 现在开局即有 HUD，按键只用来切换隐藏/显示。
-            _toggleOn = true;
-                // 默认用"切换"而不是"按住"：Hold 模式下没按切换键时 HUD 不可见，
-            // 与"开局即有 HUD、按键只用来切换"的意图相反（audit 16-P0-1）。
-            _showMode = cfg.Bind(Sec, "Show Mode", ShowMode.Toggle, "显示方式：按住显示 / 切换显示。");
                 _layout = cfg.Bind(Sec, "Layout", HudLayout.TopLeft, "HUD 布局：四角贴边或自定义拖动位置。");
                 _fontSize = cfg.Bind(Sec, "Font Size", 18,
                     new ConfigDescription("字体大小（10-48）。", new AcceptableValueRange<int>(10, 48)));

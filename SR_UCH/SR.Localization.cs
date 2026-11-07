@@ -154,27 +154,38 @@ public partial class SR {
             return tip;
         }
 
-        // 悬浮条目统一组装（用户要求：是什么 → 做什么 → 注意事项 → 默认值 → 按键）：
-        //   desc 是本模组登记的 3 行说明（LocDesc），默认值与按键由核心按 entry 自动补，
-        //   所以 174 条说明不需要各写一遍默认值，顺序也永远一致。
+        // ================= 悬浮条目：按语义组装（不按"第几行"硬编码） =================
+        // 一个条目的悬浮框由若干"语义段"组成，段是否存在取决于这个参数本身：
+        //   1) 是什么      —— 参数名的自然语言解释（LocDesc 第 1 行）
+        //   2) 做什么      —— 打开/调大之后会发生什么（LocDesc 第 2 行）
+        //   3) 注意        —— 可选，LocDesc 第 3 行起（有几行写几行，没有就整段省略、也不着色）
+        //   4) 默认        —— 由参数类型决定：开关=开/关；数值=值（+范围/步进）；枚举=选项名；
+        //                     文本=内容或"空"；键位=键名/未绑定
+        //   5) 按键        —— 只有该条目真的绑定了快捷键（KeyCode / KeyboardShortcut）才出现
+        // 所以不是"固定第 3 行染成注意色"，而是"有注意内容的行才染色"，行号随参数变化。
         internal static string ComposeTip(ConfigEntryBase entry, string desc, ConfigEntry<KeyCode> hk) {
-            StringBuilder sb = new StringBuilder(160);
+            StringBuilder sb = new StringBuilder(180);
             string body = NormalizeTip(desc);
-            // 第 3 行统一加"注意："前缀，让注意事项在悬浮框里一眼可见（是什么/做什么/注意/默认值/键）
             try {
                 if (!string.IsNullOrEmpty(body)) {
                     string[] bl = body.Split('\n');
-                    // 第 3 行加不可见标记：绘制时这一行用醒目色（不显示前缀文字）
-                    if (bl.Length >= 3 && !bl[2].StartsWith("\u0002")) bl[2] = "\u0002" + bl[2];
+                    // 第 1、2 行是"是什么/做什么"，第 3 行起全部是"注意"：逐行加不可见标记（绘制时染醒目色）
+                    for (int i = 2; i < bl.Length; i++) {
+                        if (!bl[i].StartsWith("\u0002")) bl[i] = "\u0002" + bl[i];
+                    }
                     body = string.Join("\n", bl);
                 }
-            } catch (Exception __nt) { Guard.Log("悬浮条目/注意前缀", __nt); }
+            } catch (Exception __nt) { Guard.Log("悬浮条目/注意标记", __nt); }
             if (body.Length > 0) sb.Append(body);
+            // 默认段：按类型生成，含范围/选项等参数自身的信息
             if (entry != null) {
                 string dft = DefaultSuffix(entry);
                 if (!string.IsNullOrEmpty(dft)) { if (sb.Length > 0) sb.Append('\n'); sb.Append(dft); }
             }
-            if (hk != null) { if (sb.Length > 0) sb.Append('\n'); sb.Append(KeyTipLine(hk)); }
+            // 按键段：只有键位类条目才出现
+            ConfigEntry<KeyCode> keyEntry = hk;
+            if (keyEntry == null && entry is ConfigEntry<KeyCode>) keyEntry = (ConfigEntry<KeyCode>)entry;
+            if (keyEntry != null) { if (sb.Length > 0) sb.Append('\n'); sb.Append(KeyTipLine(keyEntry)); }
             return sb.ToString();
         }
 

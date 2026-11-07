@@ -883,7 +883,7 @@ public partial class SR {
             }
             return _tipText;
         }
-        private static int _tipNoteLine = -1;   // 注意色所在行（-1 = 本条没有注意内容）
+        private static bool[] _tipNoteLines = new bool[0];   // 逐行标记：true = 这一行是"注意"（染醒目色）
         private static string _tipShownKey;
         private static float _tipShownAt = -999f;
 
@@ -900,9 +900,9 @@ public partial class SR {
                 _tipKey = tip;
                 _tipContent.text = tip;
                 _tipLines = tip.Split('\n');
-                _tipNoteLine = -1;
+                _tipNoteLines = new bool[_tipLines.Length];
                 for (int i = 0; i < _tipLines.Length; i++) {
-                    if (_tipLines[i].StartsWith("\u0002")) { _tipNoteLine = i; _tipLines[i] = _tipLines[i].Substring(1); }
+                    if (_tipLines[i].StartsWith("\u0002")) { _tipNoteLines[i] = true; _tipLines[i] = _tipLines[i].Substring(1); }
                 }
                 _tipContent.text = string.Join("\n", _tipLines);   // 测量用去掉标记后的文本
                 GUIStyle st = TipTextStyle();
@@ -932,7 +932,7 @@ public partial class SR {
                 float __ty = __tipRect.y + Sc(4f);
                 for (int li = 0; li < _tipLines.Length; li++) {
                     string __ln = _tipLines[li] ?? "";
-                    bool __note = li == _tipNoteLine;
+                    bool __note = li < _tipNoteLines.Length && _tipNoteLines[li];
                     GUIContent __gc = new GUIContent(__ln);
                     float __lh = __ts.CalcHeight(__gc, _tipInnerW);
                     Color __pc = GUI.color;

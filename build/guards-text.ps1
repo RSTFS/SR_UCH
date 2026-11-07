@@ -108,7 +108,7 @@ function Check-Encoding {
 
 
 # ---------- 6) 悬浮条目统一格式：每条 LocDesc 说明恰好 3 行（无行首标签、不写默认值行）----------
-# 说明固定 3 行（是什么 / 干什么 / 注意事项）；默认值或按键由核心在生成悬浮提示时追加第 4 行。
+# 说明：前两行固定是「是什么 / 做什么」，第 3 行起是可选的多行「注意」；默认值与按键由核心按参数类型追加。
 function Split-Args([string]$body) {
     # body 形如 "(a, b, c)"；按顶层逗号切分，忽略字符串内的逗号与嵌套括号。
     $inner = $body.Substring(1, $body.Length - 2)
@@ -169,7 +169,7 @@ function Check-DescFormat {
                 $s = $arg.Substring(1, $arg.Length - 2)
                 $total++
                 $parts = $s -split '\\n'
-                if ($parts.Count -ne 3) { $bad++; continue }
+                if ($parts.Count -lt 2 -or $parts.Count -gt 4) { $bad++; continue }
                 $empty = $false
                 foreach ($p in $parts) { if ([string]::IsNullOrWhiteSpace($p)) { $empty = $true; break } }
                 if ($empty) { $bad++; continue }
@@ -179,9 +179,9 @@ function Check-DescFormat {
         }
     }
     if ($bad -gt 0) {
-        Bad ('悬浮条目格式不合规（LocDesc 必须正好 3 行且无行首标签）: ' + $bad + ' 条')
+        Bad ('悬浮条目格式不合规（LocDesc 需要 2-4 行：是什么/做什么/可选注意，且无行首标签）: ' + $bad + ' 条')
     } else {
-        Ok ('悬浮条目格式统一（' + $total + ' 条：正好 3 行、无行首标签；跳过动态文案 ' + $skipped + ' 处）')
+        Ok ('悬浮条目格式统一（' + $total + ' 条：2-4 行、无行首标签；跳过动态文案 ' + $skipped + ' 处）')
     }
 }
 

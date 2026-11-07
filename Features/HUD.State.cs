@@ -42,6 +42,15 @@ public partial class HUD {
         }
         private static void Tick() {
             try {
+                // 快捷键直接控制「显示 HUD」复选框：关闭时也能用它重新打开，所以放在 IsEnabled 判断之前。
+                try {
+                    if (SRApi.GateMaster && _showKey != null && SRApi.ComboKeyDown(_showKey)) {
+                        if (_enabled != null) {
+                            _enabled.Value = !_enabled.Value;
+                            SRApi.Notify(_enabled.Value ? SRApi.T("HUD：开", "HUD: ON") : SRApi.T("HUD：关", "HUD: OFF"));
+                        }
+                    }
+                } catch (Exception __hk) { SRApi.Guard.Log("HUD/显示键", __hk); }
                 if (!IsEnabled()) {
                     _hasGame = false;
                     _inLobby = false;
@@ -104,15 +113,8 @@ public partial class HUD {
             } catch (Exception __ex) { SRApi.Guard.Log("HUD 状态更新", __ex); }
         }
         private static void UpdateVisible() {
-            bool keyVis;
-            try {
-                if (SRApi.UiOpen) keyVis = true;
-                else if (ModeValue() == ShowMode.Hold) keyVis = SRApi.ComboKeyHeld(_showKey);
-                else {
-                    if (SRApi.ComboKeyDown(_showKey)) _toggleOn = !_toggleOn;
-                    keyVis = _toggleOn;
-                }
-            } catch { keyVis = false; }
+            // 开关由「显示 HUD」复选框（及其快捷键）决定，打开即显示；面板打开时始终可预览。
+            bool keyVis = true;
             StepAlpha(IsEnabled() && (_hasGame || _inLobby) && keyVis);
         }
         private static void StepAlpha(bool target) {

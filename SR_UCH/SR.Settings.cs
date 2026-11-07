@@ -949,10 +949,25 @@ public partial class SR {
             try {
                 if (entry == null || entry.DefaultValue == null) return "";
                 object dv = entry.DefaultValue;
+                // 数值类：默认值后面补上"范围"，这是参数自身的信息，不是另一行固定文案
+                string range = "";
+                try {
+                    object av = entry.Description != null ? entry.Description.AcceptableValues : null;
+                    if (av != null) {
+                        System.Reflection.PropertyInfo pmin = av.GetType().GetProperty("Min");
+                        System.Reflection.PropertyInfo pmax = av.GetType().GetProperty("Max");
+                        if (pmin != null && pmax != null) {
+                            object mn = pmin.GetValue(av, null), mx = pmax.GetValue(av, null);
+                            if (mn != null && mx != null)
+                                range = "（" + Convert.ToString(mn, System.Globalization.CultureInfo.InvariantCulture)
+                                      + "–" + Convert.ToString(mx, System.Globalization.CultureInfo.InvariantCulture) + "）";
+                        }
+                    }
+                } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 //开关文本须用 UseEn：语言包 FallbackId="English" 时 _langEn 为 false，写死会造成中英混排。
                 if (dv is bool) return ((bool)dv) ? (UseEn ? "ON" : "开") : (UseEn ? "OFF" : "关");
-                if (dv is float) return ((float)dv).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-                if (dv is int) return ((int)dv).ToString();
+                if (dv is float) return ((float)dv).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + range;
+                if (dv is int) return ((int)dv).ToString() + range;
                 //KeyCode 也是 Enum，必须先判；未绑定（None）视为无默认值，不追加默认行。
                 if (dv is KeyCode) { KeyCode kc = (KeyCode)dv; return kc == KeyCode.None ? "" : KeyDisplayName(kc); }
                 if (dv is System.Enum) return EnumDisplayName(dv.ToString());
