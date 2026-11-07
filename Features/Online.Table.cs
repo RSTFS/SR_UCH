@@ -179,10 +179,10 @@ namespace SR_UCH.Tweaks {
             }
             float __maxY = _tableMaxY;
             if (__maxY <= 0f && _rowsHCache > 0f)
-                __maxY = Mathf.Max(0f, _shownLobbies != null ? _shownLobbies.Count * SRApi.Ctl.TableRowH() - _rowsHCache : 0f);
+                __maxY = Mathf.Max(0f, _shownLobbies != null ? _shownLobbies.Count * SRApi.Ctl.TableRowH() - _rowsHCache + SRApi.Ctl.TableRowH() : 0f);
             if (__maxY <= 0f) return false;
             float before = _scrollRows.y;
-            _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, __maxY);
+            _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(56), 0f, __maxY);
             _tableMaxY = __maxY;
             return Mathf.Abs(_scrollRows.y - before) > 0.01f;
         } catch (Exception __ex) { SRApi.Guard.Log("联机列表/表格滚动", __ex); return false; }
@@ -227,7 +227,7 @@ namespace SR_UCH.Tweaks {
             _joinXPage = box.x + viewW - joinW;
             _rowsClipPage = new Rect(box.x, box.y + headerH, stripW, rowsH);
             _tableMaxX = Mathf.Max(0f, totalW - stripW);
-            _tableMaxY = Mathf.Max(0f, contentH - rowsH + rowH * 0.5f);   // 半行余量：最后一行能完整露出来
+            _tableMaxY = Mathf.Max(0f, contentH - rowsH + rowH);   // 留一整行余量：最后一整行都能露出来
             _rowsHCache = rowsH;
             _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _tableMaxX);
             _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _tableMaxY);

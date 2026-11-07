@@ -548,7 +548,7 @@ namespace SR_UCH.Tweaks {
             try {
                 float __screenTop = SRApi.ContentArea.y + last.yMax;
                 float __bottom = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);
-                boxH = Mathf.Max(__minH, __bottom - __screenTop - __gripTotal);
+                boxH = Mathf.Max(__minH, __bottom - __screenTop);   // 不再扣拖拽条：列表底边直接与底栏相接
             } catch (Exception __bh) {
                 SRApi.Guard.Log("联机/可视高度", __bh);
                 boxH = Mathf.Max(__minH, Mathf.Min(availH, __fill > 0f ? __fill : availH));

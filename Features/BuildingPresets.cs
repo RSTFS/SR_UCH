@@ -515,10 +515,10 @@ namespace SR_UCH.Tweaks {
                 }
                 float maxY = _maxScrollY;
                 if (maxY <= 0f && _rowsHCache > 0f)
-                    maxY = Mathf.Max(0f, VisiblePresets().Count * SRApi.Ctl.TableRowH() - _rowsHCache);
+                    maxY = Mathf.Max(0f, VisiblePresets().Count * SRApi.Ctl.TableRowH() - _rowsHCache + SRApi.Ctl.TableRowH());
                 if (maxY <= 0f) return false;
                 float before = _scrollRows.y;
-                _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(40), 0f, maxY);
+                _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(56), 0f, maxY);
                 _maxScrollY = maxY;
                 return Mathf.Abs(_scrollRows.y - before) > 0.01f;
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/表格滚动", __ex); return false; }
@@ -536,8 +536,11 @@ namespace SR_UCH.Tweaks {
         }
 
         // 筛选行的标签统一宽度：两行控件的左边缘才能对齐成两列网格。
+        // 搜索/筛选区的标签列：比保存区的表单标签窄 1/3（那里是输入框对齐，这里是短标签）
+        private static float FilterLabelWidth() { return Mathf.Max(SRApi.Ctl.Sc(40f), FormLabelWidth() * (2f / 3f)); }
+
         private static void RowLabel(string text) {
-            GUILayout.Label(text, SRApi.Ctl.Label, GUILayout.Width(FormLabelWidth()), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+            GUILayout.Label(text, SRApi.Ctl.Label, GUILayout.Width(FilterLabelWidth()), GUILayout.Height(SRApi.Ctl.Sc(24f)));
         }
 
         // 列表状态栏：条数 / 筛选结果 + 最近一次操作反馈。
@@ -725,17 +728,16 @@ namespace SR_UCH.Tweaks {
         // 底栏是固定条，列表底边必须正好落在它上沿：多一点就被遮住最后一行，少一点就留空。
         private static float ComputeFillTableHeight(Rect last) {
             float minH = SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH();
-            float grip = SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f;
             float tableH;
             try {
                 float screenTop = SRApi.ContentArea.y + last.yMax;                       // 列表顶（屏幕坐标）
                 float bottom = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);   // 底栏上沿
-                float avail = bottom - screenTop - grip;
+                float avail = bottom - screenTop;   // 不再扣拖拽条：列表底边与底栏上沿直接相接
                 tableH = Mathf.Max(minH, avail);
             } catch (Exception __sh) {
                 SRApi.Guard.Log("布局预设/可视高度", __sh);
                 float used = Mathf.Max(0f, last.yMax - _pageTopY);
-                tableH = Mathf.Max(minH, SRApi.PageViewportHeight - used - grip);
+                tableH = Mathf.Max(minH, SRApi.PageViewportHeight - used);
             }
             // 手动高度（底边拖拽条）仍然作为上限
             try {
@@ -1066,7 +1068,7 @@ namespace SR_UCH.Tweaks {
                 _maxScrollX = Mathf.Max(0f, totalW - stripW);
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
                 _rowsHCache = rowsH;   // 缓存真实行区高：滚轮钩子在首帧/刚切页时用它兜底
-                _maxScrollY = Mathf.Max(0f, visible.Count * rowH - rowsH + rowH * 0.5f);   // 半行余量：最后一行能完整露出来
+                _maxScrollY = Mathf.Max(0f, visible.Count * rowH - rowsH + rowH);   // 留一整行余量：最后一整行都能露出来
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _maxScrollY);
                 Event e = Event.current;
                 Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
