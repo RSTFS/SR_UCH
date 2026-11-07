@@ -55,6 +55,7 @@ namespace SR_UCH.Tweaks {
                 SRApi.Ref.Override(tn + ".shortName", "联机列表：区域短名");
                 SRApi.Ref.Override(tn + ".name", "联机列表：区域名");
                 SRApi.Ref.Override(tn + ".id", "联机列表：区域编号");
+                SRApi.Ref.Override(tn + ".LocalizedShortName", "联机列表：区域本地化短名（属性）");
             } catch (Exception __ro) { SRApi.Guard.Log("联机/登记区域字段", __ro); }
             m.Short = SRApi.Ref.Field(t, "shortName", "联机列表");
             m.Name = SRApi.Ref.Field(t, "name", "联机列表");

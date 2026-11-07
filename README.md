@@ -96,7 +96,12 @@ The panel has sections on the left and pages on the right. Listed by section bel
 
 - **Score Discount** -- sets your handicap to 100 minus the discount; it takes effect in that round immediately and is visible on the balance board; restore the original value with one click.
 - **Quick Toggle** -- hold `B` to switch back and forth between action and build.
-- **Auto Retry After Death** / **Quick Retry** -- automatically retry when you die in challenge mode.
+- **Challenge** (page 2) -- auto retry after death / hold-to-retry plus its wait time; retries automatically in challenge mode.
+
+### Character
+
+- **Auto pick** -- picks an animal once when you enter the treehouse or a room: specific animal / random free / smart (the one you use most according to your save); only unlocked animals are considered and nothing happens if you already picked one.
+- **Auto outfit** -- applies a random look as soon as the animal is picked (unlocked outfits only); reroll with the button.
 
 ### Layout Presets
 
@@ -129,6 +134,7 @@ The panel has sections on the left and pages on the right. Listed by section bel
 
 - **Free Camera** -- scroll to zoom the view; both the view size and the camera move speed are adjustable.
 - **Camera Follow** -- adjustable camera move speed.
+- **Camera Pan** -- middle-drag to pan, edge scrolling, double middle-click to reset; freeplay only and disabled while the panel is open.
 - **Cross-play** -- turns the game's own cross-platform matchmaking switch on or off (the value is
   also written into the save file, so it survives a restart).
 

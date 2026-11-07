@@ -97,6 +97,9 @@ namespace SR_UCH.Tweaks {
 
         // 追踪玩家仅在列表模式 = 普通时显示。
         public static bool TrackPlayerVisible { get { return _listMode == null || _listMode.Value == ListMode.Normal; } }
+        private static PlacementListener _listener;
+        private static NetworkPlacementListener _netListener;
+
         // 以 Placeable 为键（Unity 对象作字典键）：对象被 OnDisable/Destroy 掉却没走 DestroyPieceEvent 时会永久留在表里，
         // 既拖住 GC，又让 PlayerPlacedBlocks 返回「假存活」的对象（audit P0-17）。这里加周期修剪。
         private static Dictionary<Placeable, PlacementInfo> _placements = new Dictionary<Placeable, PlacementInfo>();
@@ -354,6 +357,8 @@ namespace SR_UCH.Tweaks {
             NetworkPlacementListener netListener = new NetworkPlacementListener();
             GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(netListener, true);
             SceneManager.activeSceneChanged += OnSceneChanged;
+            _listener = listener;
+            _netListener = netListener;
 
             // 归属登记同样走槽位，避免与关卡功能产生编译期引用（拆分编译会 CS0103）。
             // 三个槽位必须在这里 Provide：Level.Snapshot 经 Slots.Require 取 AttributeToHost，
@@ -364,6 +369,19 @@ namespace SR_UCH.Tweaks {
             // 关机时把自己提供的槽位摘掉：否则宿主代码仍能 Require 到已失效的实现。
             SRApi.OnShutdown("方块破坏/槽位", delegate {
                 try {
+                    // 事件与场景订阅一并注销：模组重载后不会留下第二份闭包（审查 P2-7）。
+                    try {
+                        if (_listener != null) {
+                            GameEventManager.ChangeListener<GameEvent.PiecePlacedEvent>(_listener, false);
+                            GameEventManager.ChangeListener<GameEvent.DestroyPieceEvent>(_listener, false);
+                            _listener = null;
+                        }
+                        if (_netListener != null) {
+                            GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(_netListener, false);
+                            _netListener = null;
+                        }
+                        SceneManager.activeSceneChanged -= OnSceneChanged;
+                    } catch (Exception __ul) { SRApi.Guard.Log("方块破坏/注销监听", __ul); }
                     Slots.Retract(SlotIsPlayerPlaced, null);
                     Slots.Retract(SlotPlayerPlacedBlocks, null);
                     Slots.Retract(SlotAttributeToHost, null);

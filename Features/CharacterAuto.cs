@@ -89,7 +89,7 @@ namespace SR_UCH.Tweaks {
         // ---------------- 注册 ----------------
         private static void SelfReg() {
             SRApi.LocSec(Sec, "角色", null);
-            SRApi.Nav(Sec, 30);
+            SRApi.Nav(Sec, 35);
             SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderPick);
             SRApi.RegisterPage(Sec, "outfit", "自动时装", "Auto outfit", 20, RenderOutfit);
 
@@ -121,7 +121,9 @@ namespace SR_UCH.Tweaks {
                 SRApi.Ctl.SectionTitle(SRApi.T("- 自动选择 -", "- Auto pick -"));
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) { return e.Definition.Key == "Enabled"; });
                 EnsureAnimalList();
-                RowCombo(SRApi.T("选择方式", "Pick mode"), ModeLabel(_mode != null ? _mode.Value : "target"),
+                // 传原始枚举值：以前传 ModeLabel(...)（本地化显示名），与 ModeVals 永远不相等，
+                // 于是 cur 恒 0，下拉永远显示第一项（配置其实已改）。
+                RowCombo(SRApi.T("选择方式", "Pick mode"), (_mode != null ? _mode.Value : "target"),
                     ModeVals, new string[] { ModeLabel("target"), ModeLabel("random"), ModeLabel("smart") }, ref _comboOpenMode, _mode);
                 // 结构固定：非「指定」时置灰，不变更控件数量（否则 IMGUI 会报 LayoutGroup 不匹配）。
                 bool target = (_mode == null || string.IsNullOrEmpty(_mode.Value) || _mode.Value == "target");

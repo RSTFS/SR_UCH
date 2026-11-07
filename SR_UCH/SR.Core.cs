@@ -791,7 +791,7 @@ public partial class SR : ITweak {
         // 每帧收尾（面板关闭的早退分支也要调，否则光标形状会留在屏幕上）
         private static void RunFrameEndHooks() { RunHooks(_frameEndHooks, "每帧收尾:"); }
 
-        // 性能剖析阈值：单 tick 超过 WarnMs 记一次告警（每 tick 每 10 秒最多一条），超过 BadMs 在浮层里标红。
+        // 性能剖析阈值：单 tick 超过 WarnMs 记一次告警（每 tick 每 10 秒最多一条），超过 BadMs 在日志摘要里标 !。
         private const float TickWarnMs = 0.30f;
         private const float TickBadMs = 1.00f;
         private static float _tickProfLastAt = -999f;
@@ -841,7 +841,8 @@ public partial class SR : ITweak {
                 // 否则钩子列表里会堆出几千上万条"超限"，掩盖真正每帧变慢的钩子。
                 if (h.Hz > 0f && h.Hz < 30f) h.Overruns = 0;
                 spentMs += ms;
-                if (!input && spentMs > TickBudgetMs * 2f) sliced = true;
+                // 只对每帧 Tick 钩子做时间片；帧尾钩子（光标形状复位 / 滚轮收口）必须每帧执行。
+                if (!input && ReferenceEquals(hooks, _tickHooks) && spentMs > TickBudgetMs * 2f) sliced = true;
                 if (ms >= TickWarnMs && h.Hz >= 30f) {
                     h.Overruns++;
                     if (now - h.WarnedAt > 10f) {
@@ -855,12 +856,12 @@ public partial class SR : ITweak {
                     }
                 }
             }
-            if (ReferenceEquals(hooks, _tickHooks)) UpdateTickBudget(spentMs, spentMs / TickBudgetMs);
+            if (ReferenceEquals(hooks, _tickHooks)) UpdateTickBudget(spentMs / TickBudgetMs);
             PublishTickProfile(now);
         }
 
         // 预算压力平滑 + 防抖换档：压力大就降频，压力小且持续才恢复；两次切换至少隔 TierSwitchFrames 帧。
-        private static void UpdateTickBudget(float spentMs, float rawPressure) {
+        private static void UpdateTickBudget(float rawPressure) {
             try {
                 // 指数平滑（0.1 权重 ≈ 最近十帧），避免单帧尖峰导致档位来回跳。
                 _tickPressure = _tickPressure * 0.9f + rawPressure * 0.1f;
@@ -895,6 +896,7 @@ public partial class SR : ITweak {
         // 每 0.5 秒把"最慢的 5 个"写进 F9 浮层 + 一段日志，方便用户直接贴出来。
         private static void PublishTickProfile(float now) {
             try {
+                if (_tickProf == null || !_tickProf.Value) return;   // 开关关着不采样，不白算
                 if (now - _tickProfLastAt < 0.5f) return;
                 _tickProfLastAt = now;
                 _tickProfTop.Clear();
@@ -908,14 +910,18 @@ public partial class SR : ITweak {
                 int n = Mathf.Min(5, _tickProfTop.Count);
                 float total = 0f;
                 for (int i = 0; i < _tickProfTop.Count; i++) total += _tickProfTop[i].AvgMs;
-                // 浮层已删除：剖析结果只进日志，不再往 DiagLines 里堆
-                _ = ("帧钩子合计 " + total.ToString("0.00") + "ms（" + _tickProfTop.Count + " 个）");
+                // 剖析结果只进日志（F9 浮层已删除），一行摘要方便直接贴出来。
+                StringBuilder sb = new StringBuilder();
+                sb.Append("[性能] 帧钩子合计 ").Append(total.ToString("0.00")).Append("ms（")
+                  .Append(_tickProfTop.Count).Append(" 个）预算档位 ").Append(_tickTier);
                 for (int i = 0; i < n; i++) {
                     TickHook h = _tickProfTop[i];
-                    string mark = h.AvgMs >= TickBadMs ? "!!" : (h.AvgMs >= TickWarnMs ? "!" : "  ");
-                    _ = mark + " " + h.Name + " " + h.AvgMs.ToString("0.00") + "ms"
-                        + (h.Overruns > 0 ? "（超限 " + h.Overruns + "）" : "");
+                    string mark = h.AvgMs >= TickBadMs ? " !!" : (h.AvgMs >= TickWarnMs ? " !" : "");
+                    sb.Append(" | ").Append(h.Name).Append(' ').Append(h.AvgMs.ToString("0.00")).Append("ms")
+                      .Append(mark)
+                      .Append(h.Overruns > 0 ? "×" + h.Overruns : "");
                 }
+                LogInfo(sb.ToString());
             } catch (Exception __ex) { Guard.Log("帧钩子性能剖析", __ex); }
         }
 
@@ -1366,6 +1372,11 @@ public partial class SR : ITweak {
                 ApplyEventSystemGate();
                 EnsureStyles();
             } catch (Exception __ex) { Guard.Log("OpenMenuExternal", __ex); }
+            finally {
+                // EnsureStyles 会写 GUI.skin.settings.selectionColor（共享皮肤）：这里不在绘制期，必须马上还原，
+                // 否则游戏/其它插件界面会沿用我们的选中色。
+                try { RestoreSkinSelectionColor(); } catch (Exception __rc) { Guard.Log("OpenMenuExternal/还原选中色", __rc); }
+            }
         }
 
         private static void CloseMenu() {
@@ -1377,8 +1388,9 @@ public partial class SR : ITweak {
             // 关闭菜单时保存配置，失败记日志（逐个保存，一个失败不影响其它）
             for (int __i = 0; __i < __dcs.Length; __i++) {
                 ConfigFile __dc = __dcs[__i];
-                Guard.Try("关闭菜单时保存配置", () => __dc.Save());
-                _dirtyConfigs.Remove(__dc);
+                // 成功才移除：写盘失败（占用/只读/磁盘满）时保留脏标记，下一次 Tick 会重试。
+                try { __dc.Save(); _dirtyConfigs.Remove(__dc); }
+                catch (Exception __se) { Guard.Log("关闭菜单时保存配置 " + (__dc.ConfigFilePath ?? "?"), __se); }
             }
             ApplyEventSystemGate();
             try { ResetWheelState(); } catch (Exception __ex) { Guard.Log("CloseMenu", __ex); }   // 清掉滑块 / 滚轮盾的跨帧残留
