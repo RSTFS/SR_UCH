@@ -578,197 +578,176 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/标签宽度", __ex); return SRApi.Ctl.Sc(90f); }
         }
 
+        // ================= 布局预设页（重写：与联机页同一套"填充模式"结构） =================
+        // 结构固定为三段：
+        //   1) 固定头部（保存/导入/导出 + 搜索/排序/筛选 + 工具行）—— 永远可见，不随列表滚动
+        //   2) 列表区：高度 = 页面视口 − 头部已用高度，占满剩余区域，只有列表本身滚动
+        //   3) 底边拖拽条
+        // 页面本身声明 NoPageScrollBars：整页不滚，滚轮只可能落在列表里（由页面级滚轮钩子消费）。
         private static void Render() {
             try {
                 _renderFrame = Time.frameCount;
-                SRApi.NoPageScrollBars = true;   // 填充模式：列表占满剩余区域，页面本身不滚动
+                SRApi.NoPageScrollBars = true;
                 EnsureLoaded();
                 EnsureCols();
-                // 本帧开始前的二次确认状态：只有"之前已确认、本帧又没点中操作按钮"才在空白处取消，
-                // 避免把本帧其它按钮（保存/导入）刚点出来的二次确认立刻清掉。
                 string pendingBefore = _pendingKey;
-                // v2：删掉 SRApi.PageScroll = Vector2.zero。
-                // 上一版一边声明"光标不在列表上时交给页面滚动"，一边每帧把 _scroll 强制归零，
-                // 两套机制互相抵消 —— 列表滚到底后滚轮确实谁也没滚。现在页面滚动真正可用：
-                // 表格内由 OnPresetWheel 消费，表格外（保存/导入/筛选区）由页面滚动接管。
-                // 命中框已在 LayoutToScreen 里减去 PageScroll.y，滚过页面后仍然精确。
-                // 换栏目/换页的归零由核心 SR.Window 负责，不需要页面自己每帧清。
+
+                // Layout 趟记录内容原点（表格高度/命中框都相对它计算）
                 Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
-                if (Event.current != null && Event.current.type == EventType.Layout) { _pageTopY = topProbe.y; }
+                if (Event.current != null && Event.current.type == EventType.Layout) _pageTopY = topProbe.y;
 
-                // 分区 1：保存（名称 + 保存，紧凑一行）。
-                SRApi.Ctl.SectionTitle(SRApi.T("- 保存 / 导入 / 导出 -", "- Save / Import / Export -"));
-                GUILayout.BeginHorizontal();
-                try {
-                    GUILayout.Label(SRApi.T("预设名称", "Preset name"), SRApi.Ctl.Label,
-                        GUILayout.Width(FormLabelWidth()), GUILayout.Height(SRApi.Ctl.Sc(24f)));
-                    string typed = SRApi.ClearableTextField(_newName ?? "", 40, SRApi.Ctl.SearchBox,
-                        GUILayout.Width(W(220)), GUILayout.Height(W(24)));
-                    if (typed != null && typed != _newName) _newName = typed;
-                    if (GUILayout.Button(SaveButtonText(), SRApi.Ctl.Btn, GUILayout.Width(W(120)), GUILayout.Height(W(24)))) SaveCurrent();
-                    GUILayout.FlexibleSpace();
-                } finally {
-                    GUILayout.EndHorizontal();
-                }
+                RenderSaveImportHeader();
+                RenderFilterHeader();
+                RenderListToolbar();
+                ApplyFilterChange();
 
-                // 分区 2：导入 / 导出（XML 路径单独一行；下一行为 路径导入 / 剪贴板导入 / 全部导出）。
-                GUILayout.BeginHorizontal();
-                try {
-                    GUILayout.Label(SRApi.T("XML 路径", "XML path"), SRApi.Ctl.Label,
-                        GUILayout.Width(FormLabelWidth()), GUILayout.Height(SRApi.Ctl.Sc(24f)));
-                    string path = SRApi.ClearableTextField(_importPath ?? "", 260, SRApi.Ctl.SearchBox,
-                        GUILayout.Width(W(220)), GUILayout.Height(W(24)));
-                    if (path != null && path != _importPath) _importPath = path;
-                    GUILayout.FlexibleSpace();
-                } finally {
-                    GUILayout.EndHorizontal();
-                }
-                GUILayout.BeginHorizontal();
-                try {
-                    GUILayout.Space(FormLabelWidth());   // 与上面两个输入框左边缘对齐
-                    if (GUILayout.Button(SRApi.T("从路径导入", "Import path"), SRApi.Ctl.Btn,
-                        GUILayout.Width(W(110)), GUILayout.Height(W(24)))) ImportFromPath();
-                    if (GUILayout.Button(SRApi.T("从剪贴板导入", "Import clipboard"), SRApi.Ctl.Btn,
-                        GUILayout.Width(W(120)), GUILayout.Height(W(24)))) ImportFromClipboard();
-                    if (GUILayout.Button(SRApi.Ctl.Content(SRApi.T("全部导出到目录", "Export all to folder"),
+                // 零高度探针：Layout 趟 GetLastRect 可能是退化矩形，用它拿布局游标的真实 y
+                Rect last = GUILayoutUtility.GetRect(1f, 0f);
+                float tableH = ComputeFillTableHeight(last);
+                _actionHitThisFrame = false;
+                RenderPresetTable(tableH, VisiblePresets());
+                DrawInlineRename();
+                SRApi.Ctl.TableHeightGripBar(_tableHEntry, tableH / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
+                CancelPendingOnBlank(pendingBefore);
+            } catch (Exception __ex) { SRApi.Guard.Log("渲染布局预设页", __ex); }
+        }
+
+        // 头部一：保存 / 导入 / 导出（固定 3 行）
+        private static void RenderSaveImportHeader() {
+            SRApi.Ctl.SectionTitle(SRApi.T("- 保存 / 导入 / 导出 -", "- Save / Import / Export -"));
+            GUILayout.BeginHorizontal();
+            try {
+                GUILayout.Label(SRApi.T("预设名称", "Preset name"), SRApi.Ctl.Label,
+                    GUILayout.Width(FormLabelWidth()), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+                string typed = SRApi.ClearableTextField(_newName ?? "", 40, SRApi.Ctl.SearchBox,
+                    GUILayout.Width(W(220)), GUILayout.Height(W(24)));
+                if (typed != null && typed != _newName) _newName = typed;
+                if (SRApi.Ctl.Button(SaveButtonText(), SRApi.T("把当前方块布局保存成一条命名预设\n保存到预设目录，之后可一键加载", "saves the current block layout as a named preset\nstored in the presets folder for one-click loading"), 120f, 24f)) SaveCurrent();
+                GUILayout.FlexibleSpace();
+            } finally { GUILayout.EndHorizontal(); }
+
+            GUILayout.BeginHorizontal();
+            try {
+                GUILayout.Label(SRApi.T("XML 路径", "XML path"), SRApi.Ctl.Label,
+                    GUILayout.Width(FormLabelWidth()), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+                string path = SRApi.ClearableTextField(_importPath ?? "", 260, SRApi.Ctl.SearchBox,
+                    GUILayout.Width(W(220)), GUILayout.Height(W(24)));
+                if (path != null && path != _importPath) _importPath = path;
+                GUILayout.FlexibleSpace();
+            } finally { GUILayout.EndHorizontal(); }
+
+            GUILayout.BeginHorizontal();
+            try {
+                GUILayout.Space(FormLabelWidth());
+                if (SRApi.Ctl.Button(SRApi.T("从路径导入", "Import path"), SRApi.T("读取上面填写的 XML 路径并导入成一条预设", "imports the XML file at the path above as a preset"), 110f, 24f)) ImportFromPath();
+                if (SRApi.Ctl.Button(SRApi.T("从剪贴板导入", "Import clipboard"), SRApi.T("把剪贴板里的预设文本导入成一条预设", "imports preset text from the clipboard as a preset"), 120f, 24f)) ImportFromClipboard();
+                if (SRApi.Ctl.Button(SRApi.T("全部导出到目录", "Export all to folder"),
                         SRApi.T("把所有预设 XML 复制到 预设目录/exports/<时间>/ 下（按模式分子目录），并复制一份 index.json",
-                            "copies every preset XML into presets/exports/<time>/ (grouped by mode) and copies index.json as well")),
-                        SRApi.Ctl.Btn, GUILayout.Width(W(140)), GUILayout.Height(W(24)))) ExportAllToDirectory();
-                    GUILayout.FlexibleSpace();
-                } finally {
-                    GUILayout.EndHorizontal();
-                }
-                GUILayout.Space(W(4));
+                            "copies every preset XML into presets/exports/<time>/ (grouped by mode) and copies index.json as well"), 140f, 24f)) ExportAllToDirectory();
+                GUILayout.FlexibleSpace();
+            } finally { GUILayout.EndHorizontal(); }
+        }
 
-                // 分区 3：列表工具。分两行避免窗口变窄时控件被挤出页面：
-                // 第一行搜索 / 排序 / 刷新，第二行关卡 / 模式筛选 / 加载模式；标签统一 LabelAuto，下拉宽度自适应。
-                SRApi.Ctl.SectionTitle(SRApi.T("- 搜索 / 排序 / 筛选 -", "- Search / sort / filter -"));
-                GUILayout.BeginHorizontal();
-                try {
-                    // 搜索标签：LabelAuto 绘制 + 命中区域判定，点击清空搜索框。
-                    RowLabel(SRApi.T("搜索", "Search"));
-                    Rect searchRect = GUILayoutUtility.GetLastRect();
-                    Event evSearch = Event.current;
-                    if (evSearch != null && evSearch.type == EventType.MouseDown && evSearch.button == 0
-                        && searchRect.Contains(evSearch.mousePosition)) {
-                        _search = "";
-                        evSearch.Use();
-                    }
-                    string q = SRApi.ClearableTextField(_search ?? "", 40, SRApi.Ctl.SearchBox,
-                        GUILayout.Width(W(110)), GUILayout.Height(W(24)));
-                    if (q != null && q != _search) _search = q;
-                    GUILayout.Space(W(8));
-                    RowLabel(SRApi.T("排序", "Sort"));
-                    RenderSortCombo();
-                    GUILayout.Space(W(8));
-                    RowLabel(SRApi.T("加载", "Load"));
-                    RenderLoadModeCombo();
-                    GUILayout.Space(W(7));
-                    if (GUILayout.Button(SRApi.Ctl.Content(SRApi.T("刷新", "Refresh"),
-                            SRApi.T("重新扫描预设目录",
-                                "rescan the presets folder")),
-                        SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Btn.CalcSize(SRApi.Ctl.Content(SRApi.T("刷新", "Refresh"))).x + SRApi.Ctl.Sc(18)), GUILayout.Height(W(24)))) {
-                        try { _loaded = false; LoadFromDisk(true); } catch (Exception __rx) { SRApi.Guard.Log("布局预设/刷新列表", __rx); }
-                    }
-                    GUILayout.FlexibleSpace();
-                } finally {
-                    GUILayout.EndHorizontal();
+        // 头部二：搜索 / 排序 / 筛选（固定 2 行 + 标签列对齐）
+        private static void RenderFilterHeader() {
+            SRApi.Ctl.SectionTitle(SRApi.T("- 搜索 / 排序 / 筛选 -", "- Search / sort / filter -"));
+            GUILayout.BeginHorizontal();
+            try {
+                RowLabel(SRApi.T("搜索", "Search"));
+                Rect searchRect = GUILayoutUtility.GetLastRect();
+                Event evSearch = Event.current;
+                if (evSearch != null && evSearch.type == EventType.MouseDown && evSearch.button == 0
+                    && searchRect.Contains(evSearch.mousePosition)) {
+                    _search = "";   // 点标签清空搜索
+                    evSearch.Use();
                 }
-                GUILayout.BeginHorizontal();
-                try {
-                    RowLabel(SRApi.T("类型", "Type"));
-                    RenderTypeFilterCombo();
-                    GUILayout.Space(W(8));
-                    RowLabel(SRApi.T("关卡", "Level"));
-                    RenderLevelFilterCombo();
-                    GUILayout.Space(W(8));
-                    RowLabel(SRApi.T("模式", "Mode"));
-                    RenderModeFilterCombo();
-                    GUILayout.FlexibleSpace();
-                } finally {
-                    GUILayout.EndHorizontal();
+                string q = SRApi.ClearableTextField(_search ?? "", 40, SRApi.Ctl.SearchBox,
+                    GUILayout.Width(W(110)), GUILayout.Height(W(24)));
+                if (q != null && q != _search) _search = q;
+                GUILayout.Space(W(8));
+                RowLabel(SRApi.T("排序", "Sort"));
+                RenderSortCombo();
+                GUILayout.Space(W(8));
+                RowLabel(SRApi.T("加载", "Load"));
+                RenderLoadModeCombo();
+                GUILayout.Space(W(7));
+                if (SRApi.Ctl.Button(SRApi.T("刷新", "Refresh"), SRApi.T("重新扫描预设目录", "rescan the presets folder"), 0f, 24f)) {
+                    try { _loaded = false; LoadFromDisk(true); } catch (Exception __rx) { SRApi.Guard.Log("布局预设/刷新列表", __rx); }
                 }
-                // 底部工具：跳过树屋流程（标准配置勾选框）+ 返回树屋（普通核心按钮）+ 条数状态。
-                // 状态与按钮同一行（用户要求），不再单独占一行。
-                List<PresetInfo> visible = VisiblePresets();
-                GUILayout.BeginHorizontal();
-                try {
-                    if (_skipTreehouse != null) {
-                        // 标准配置行 = 可点击标签（点名称还原默认）+ 核心开关控件
-                        SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("跳过树屋流程", "Skip treehouse"),
-                            SRApi.T("跳过树屋流程\n联机替换关卡时直接替换场景，不先回树屋\n房客的关卡状态可能不同步（风险自负）",
-                                "skip the treehouse flow\nreplaces the level scene directly online instead of returning to the treehouse first\nclients' level state may be out of sync (at your own risk)")),
-                            _skipTreehouse, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(26));
-                        SRApi.Ctl.RenderControl(_skipTreehouse);
-                    }
-                    GUILayout.Space(SRApi.Ctl.Sc(8));
-if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "Back to treehouse"),
+                GUILayout.FlexibleSpace();
+            } finally { GUILayout.EndHorizontal(); }
+
+            GUILayout.BeginHorizontal();
+            try {
+                RowLabel(SRApi.T("类型", "Type"));
+                RenderTypeFilterCombo();
+                GUILayout.Space(W(8));
+                RowLabel(SRApi.T("关卡", "Level"));
+                RenderLevelFilterCombo();
+                GUILayout.Space(W(8));
+                RowLabel(SRApi.T("模式", "Mode"));
+                RenderModeFilterCombo();
+                GUILayout.FlexibleSpace();
+            } finally { GUILayout.EndHorizontal(); }
+        }
+
+        // 头部三：工具行（跳过树屋 / 返回树屋 / 条数状态），固定一行
+        private static void RenderListToolbar() {
+            List<PresetInfo> visible = VisiblePresets();
+            GUILayout.BeginHorizontal();
+            try {
+                if (_skipTreehouse != null) {
+                    SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("跳过树屋流程", "Skip treehouse"),
+                        SRApi.T("跳过树屋流程\n联机替换关卡时直接替换场景，不先回树屋\n房客的关卡状态可能不同步（风险自负）",
+                            "skip the treehouse flow\nreplaces the level scene directly online instead of returning to the treehouse first\nclients' level state may be out of sync (at your own risk)")),
+                        _skipTreehouse, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(26));
+                    SRApi.Ctl.RenderControl(_skipTreehouse);
+                }
+                GUILayout.Space(SRApi.Ctl.Sc(8));
+                if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "Back to treehouse"),
                         SRApi.T("走游戏原生的结束对局流程回到树屋（房主有效）", "ends the current match through the game's native flow and returns to the treehouse (host only)"),
                         delegate { ReturnToTreehouse(); }, SRApi.Ctl.Sc(150), SRApi.Ctl.Sc(26))) ReturnToTreehouse();
-                    GUILayout.Space(SRApi.Ctl.Sc(10));
-                    RenderListStatus(visible.Count, _presets.Count);
-                    GUILayout.FlexibleSpace();
-                } finally {
-                    GUILayout.EndHorizontal();
-                }
-                // 重命名改为表格内联编辑（右键名称单元格直接变输入框），不再有独立的编辑条。
-                GUILayout.Space(W(2));
-                // 高度：核心统一公式（页面顶部已用高度 + 表格高度 = 底栏之上可用高度），窗口变化实时跟随。
-                // 关键：GetLastRect() 在 Layout 趟里可能是退化矩形（诊断日志里 lastYMax=1.0），
-            // 用它算"已用高度"会得到 ~0，表格于是按整个视口取高、直接溢出页面底部。
-            // 这里放一个零高度探针，拿到当前布局游标的真实 y。
-            // 筛选 / 排序变化：滚动回到顶部并清掉二次确认。
-            // 必须放在工具行之后，才能读到本帧 ComboBox / TextField 的最终值（放开头会差一帧）。
-            int fSig = FilterSignature();
-            if (fSig != _filterSigLast) {
-                _filterSigLast = fSig;
-                _scrollRows.y = 0f;
-                if (!string.IsNullOrEmpty(_pendingKey)) ClearPending();
-            }
-            // 条数状态已在上面工具行里渲染（与返回树屋同一行）；探针仍放在它之后，
-            // 这样工具行的高度会被计入 __used，表格不会被底栏裁掉。
-            Rect last = GUILayoutUtility.GetRect(1f, 0f);
-                // 直接以“页面内容底界 - 当前布局 Y”为表格高度：窗口大小/栏高变化都自动跟随，不再依赖预留估算。
-                // 表格高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
-            // 高度与联机列表逐字一致：fillViewport=true、minH=Sc(140)、grip=0；
-            // 可用高度 = PageViewportHeight − 表格上方已用高度（两种页面同一套公式）。
-            // 与联机列表逐字一致：fillViewport=true、minH=Sc(140)、grip=0。
-            // 高度直接取"页面视口 − 表格上方已用高度"：底边正好落在底栏上沿（原拖拽条的位置），
-            // 不再经过 ListTableHeight 的 minH/内容夹取，避免留出 2~140px 的缝。
-            float __used = Mathf.Max(0f, last.yMax - _pageTopY);
-            float tableH = Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(),
-                                     SRApi.PageViewportHeight - __used - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));   // 让出拖拽条位置
-            // 可视底夹取：内容/视口算大时，行会画到窗口外面（看起来溢出且滚不动）。
+                GUILayout.Space(SRApi.Ctl.Sc(10));
+                RenderListStatus(visible.Count, _presets.Count);
+                GUILayout.FlexibleSpace();
+            } finally { GUILayout.EndHorizontal(); }
+        }
+
+        // 填满剩余高度（与联机页同一公式）：页面视口 − 头部已用高度 − 拖拽条，再按可视底与手动高度夹取
+        private static float ComputeFillTableHeight(Rect last) {
+            float minH = SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH();
+            float used = Mathf.Max(0f, last.yMax - _pageTopY);
+            float tableH = Mathf.Max(minH, SRApi.PageViewportHeight - used - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f));
             try {
-                float __screenTop = SRApi.ContentArea.y + last.yMax;
-                float __visible = (SRApi.ContentArea.yMax - SRApi.FooterHeight - W(2f)) - __screenTop;
-                if (__visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(), __visible));
+                float screenTop = SRApi.ContentArea.y + last.yMax;
+                float visible = (SRApi.ContentArea.yMax - SRApi.FooterHeight - W(2f)) - screenTop;
+                if (visible > 0f) tableH = Mathf.Min(tableH, Mathf.Max(minH, visible));
             } catch (Exception __vh) { SRApi.Guard.Log("布局预设/可视高度夹取", __vh); }
-            // 底边拖拽条写进 "Table Height" 的值必须真正参与高度计算（0 = 自动）。
-            // 以前 tableH 完全由视口算出，配置只在拖拽时被写入、从不读取 —— 用户拖了没反应。
-            // 与核心 TableFitHeight 同语义：配置值作为上限夹取，不会把表格撑出可视区。
             try {
-                if (_tableHEntry != null && _tableHEntry.Value > 0) {
-                    float manual = SRApi.Ctl.Sc(_tableHEntry.Value);
-                    float minH = SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH();
-                    tableH = Mathf.Clamp(manual, minH, Mathf.Max(minH, tableH));
-                }
+                if (_tableHEntry != null && _tableHEntry.Value > 0)
+                    tableH = Mathf.Clamp(SRApi.Ctl.Sc(_tableHEntry.Value), minH, Mathf.Max(minH, tableH));
             } catch (Exception __th) { SRApi.Guard.Log("布局预设/读取表格高度", __th); }
-            _actionHitThisFrame = false;
-            RenderPresetTable(tableH, visible);   // 空列表由表格自带的 emptyHint 显示提示
-            DrawInlineRename();   // 右键名称格：该格就地变输入框
-            // 底边拖拽条：紧贴表格底边、正好在底栏之上（与联机列表同一处理）。
-            SRApi.Ctl.TableHeightGripBar(_tableHEntry, (tableH) / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)), 120, 1000);
-            // 二次确认取消：本帧左键 MouseUp 没有命中任何操作按钮 = 点了空白处
+            return tableH;
+        }
+
+        // 筛选/排序变化：回顶并清掉二次确认（必须在本帧控件画完之后读，否则差一帧）
+        private static void ApplyFilterChange() {
+            int sig = FilterSignature();
+            if (sig == _filterSigLast) return;
+            _filterSigLast = sig;
+            _scrollRows.y = 0f;
+            if (!string.IsNullOrEmpty(_pendingKey)) ClearPending();
+        }
+
+        // 点空白处取消二次确认（点中操作按钮的帧不清）
+        private static void CancelPendingOnBlank(string pendingBefore) {
             try {
                 if (!string.IsNullOrEmpty(_pendingKey) && _pendingKey == pendingBefore && !_actionHitThisFrame
                     && Event.current != null && Event.current.type == EventType.MouseUp && Event.current.button == 0)
                     ClearPending();
             } catch (Exception __pe) { SRApi.Guard.Log("布局预设/空白处取消确认", __pe); }
-            } catch (Exception __ex) {
-                SRApi.Guard.Log("渲染布局预设页", __ex);
-            }
         }
+
 
         // 关卡筛选下拉：全部 + 当前预设里出现过的关卡（显示为游戏本地化关卡名，值为 XML levelSceneName）。
         private static void RenderLevelFilterCombo() {

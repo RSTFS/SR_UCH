@@ -107,6 +107,16 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
 2. **下拉框/滑块的展开状态必须交给核心**（用配置条目做 key）。自己维护 `ref open` 会出现"关不掉、并持续吃掉滚轮"，表现为整页滚不动。
 3. **Begin/End 必须成对**，中间可能抛异常的段落用 `try/finally { EndHorizontal }`。
 
+### 4.3a 两种页面布局：滚动页 / 填充页
+
+| 布局 | 适用 | 做法 |
+|---|---|---|
+| **滚动页**（默认） | 配置型页面 | 内容随页面滚动；控件在页面内正常排版 |
+| **填充页** | 列表为主的页面（联机、布局预设） | 每帧 `NoPageScrollBars = true`；页头（保存/筛选/工具行）固定，列表高度 = `PageViewportHeight − 头部已用高度 − 拖拽条`；**整页不滚，只有列表滚** |
+
+填充页的结构固定为 `固定头部 → 列表 → 底边拖拽条` 三段，新增列表页时照抄联机页/预设页的
+`RenderXxxHeader() + ComputeFillTableHeight() + RenderXxxTable()` 三段式，不要再让页面滚动与列表滚动并存。
+
 ### 4.4 滚轮归属（重写后的仲裁模型）
 
 一整帧只有**一个决策点**：`SR.Wheel`（`SR_UCH/SR.Wheel.cs`）。原理来自 IMGUI 的唯一消费规则：
