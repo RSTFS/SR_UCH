@@ -102,7 +102,11 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
 
 ### 4.3 三条硬约束（都踩过坑）
 
-0. **优先用统一行控件**：`Row` / `RowSlider` / `RowCombo`。标签宽度实测、悬浮说明、控件类型分派只有一份实现，页面不再手写 `BeginHorizontal + RestoreLabel + RenderControl`；只有确实需要自定义排版的行（如带草稿输入的评分百分比）才手写。
+0. **只用核心控件**：页面里不要自己写按钮/下拉框/滑块/列表。统一走
+   `SRApi.Ctl.Row`（自动按类型选控件）、`RowSlider`、`RowCombo`、`Ctl.Button`、`Ctl.TableDraw`。
+   自绘控件会绕过滚轮仲裁、悬浮提示、标签对齐和缩放，属于缺陷来源（动物下拉曾自绘，导致"列表不全"）。
+   核心控件不够用时，先给核心加能力，再在页面调用——不要复制一份到功能层。
+：`Row` / `RowSlider` / `RowCombo`。标签宽度实测、悬浮说明、控件类型分派只有一份实现，页面不再手写 `BeginHorizontal + RestoreLabel + RenderControl`；只有确实需要自定义排版的行（如带草稿输入的评分百分比）才手写。
 1. **Layout 趟与 Repaint 趟的控件数量必须一致**。任何"按某个值决定画不画"的行，如果那个值可能在同一帧被下拉框改写，就会 `Mismatched LayoutGroup.repaint`。做法：结构固定，值不满足时**置灰**（`GUI.enabled=false`）而不是不画。
 2. **下拉框/滑块的展开状态必须交给核心**（用配置条目做 key）。自己维护 `ref open` 会出现"关不掉、并持续吃掉滚轮"，表现为整页滚不动。
 3. **Begin/End 必须成对**，中间可能抛异常的段落用 `try/finally { EndHorizontal }`。
@@ -124,8 +128,8 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
 
 ```
 本帧滚轮（方向 ±1）
-  ├─ 1) 控件区域（下拉框 / 滑块）        PrioControl
-  ├─ 2) 页面钩子（表格等，屏幕坐标）      PrioPageHook
+  ├─ 1) 控件区域（下拉框 / 滑块）        PrioControl（按住 Shift 时跳过）
+  ├─ 2) 页面钩子（表格等，屏幕坐标）      PrioPageHook（表格内 Shift = 横向滚列）
   └─ 3) 页面滚动（Shift = 横向，否则竖向）
 未命中 → 页面滚动兜底；页面声明 NoPageScrollBars 时吞掉，绝不落到世界缩放
 ```

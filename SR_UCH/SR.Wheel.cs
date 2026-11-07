@@ -66,7 +66,7 @@ namespace SR_UCH.Tweaks {
             }
 
             // 返回 true = 本帧滚轮已处理
-            internal static bool Consume(Event e, Vector2 areaOffset) {
+            internal static bool Consume(Event e, Vector2 areaOffset, bool shift) {
                 if (!_hasEvent || Mathf.Abs(_value) < 0.5f) return false;
                 Vector2 screen = (e != null ? e.mousePosition : Vector2.zero) + areaOffset;
                 // 1) 控件区：命中且优先级最高的那个
@@ -74,6 +74,8 @@ namespace SR_UCH.Tweaks {
                 foreach (KeyValuePair<string, Zone> kv in _zones) {
                     Zone z = kv.Value;
                     if (z == null || !z.Rect.Contains(screen)) continue;
+                    // Shift = 横向滚动：不经过控件区（滑块/下拉不吃 Shift+滚轮）
+                    if (shift && z.Prio == PrioControl) continue;
                     if (win == null || z.Prio < win.Prio) win = z;
                 }
                 if (win != null) {

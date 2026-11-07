@@ -544,6 +544,15 @@ namespace SR_UCH.Tweaks {
             float __fill = SRApi.PageViewportHeight - __used - __gripTotal;
             float boxH = Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(),
                                    Mathf.Min(availH, __fill > 0f ? __fill : availH));
+            // 再按"屏幕可视底"夹一次：底栏是固定条，视口估大时最后几行会被它压住
+            // （用户反馈：联机列表最下面几项被底栏遮住）。与预设页同一套夹取。
+            try {
+                float __screenTop = SRApi.ContentArea.y + last.yMax;
+                float __visible = (SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f)) - __screenTop
+                                  - (SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f);
+                if (__visible > 0f)
+                    boxH = Mathf.Min(boxH, Mathf.Max(SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH(), __visible));
+            } catch (Exception __vh) { SRApi.Guard.Log("联机/可视高度夹取", __vh); }
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
 

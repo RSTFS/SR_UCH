@@ -1105,25 +1105,6 @@ public partial class SR {
             float trackH = Sc(4), handleD = Sc(16);
             float trackW = Mathf.Max(1f, rect.width - handleD);
 
-            // 悬停即声明滚轮所有权（和下拉框同一机制）：这样页面滚动不会跟着走，滚轮留给本滑块。
-            bool hovered = rect.Contains(Event.current != null ? Event.current.mousePosition : Vector2.zero);
-            if (hovered && Event.current != null) {
-                WheelClaim();
-                // Repaint 趟取用本帧滚轮量（盾在事件趟记入），滚轮调值：上滚增大。
-                if (Event.current.type == EventType.Repaint) {
-                    float wv = WheelDeltaTake();
-                    if (Mathf.Abs(wv) > 0.0001f) {
-                        float stepAmt = step > 0f ? step : (intStep ? 1f : Mathf.Max((max - min) * 0.02f, 0.001f));
-                        float adj = value + (wv > 0f ? -stepAmt : stepAmt);   // 上滚减小（用户要求反转）
-                        adj = Mathf.Clamp(adj, min, max);
-                        if (step > 0f) adj = Mathf.Round(adj / step) * step;
-                        else if (intStep) adj = Mathf.Round(adj);
-                        value = Mathf.Clamp(adj, min, max);
-                        MarkWheelUsed();
-                    }
-                }
-            }
-
             //输入层：不可见的原生 HorizontalSlider，只吃事件与热区，跨趟拖动稳定。
             if (_sliderNative == null || _sliderNativeThumb == null) {
                 _sliderNative = new GUIStyle();
@@ -1487,48 +1468,6 @@ public partial class SR {
                         _comboScroll[entry] = __nv;
                         return true;
                     }, SR.Wheel.PrioControl);
-                }
-            }
-            //控件在被 hover 时声明滚轮所有权
-            Event ce0 = Event.current;
-            if (ce0 != null && options != null) {
-                // 只按实际画出来的项数算热区（展开列表最多可见 8 项）：以前用 options.Length，
-                // 选项多时热区会延伸到看不见的地方，滚轮在那里被吞掉、页面也滚不动。
-                int __vis = Mathf.Min(options.Length, 8);
-                Rect listRect = new Rect(boxRect.x, boxRect.yMax, width, CtlH() * __vis);
-                //框命中即赢；展开的列表用 AllowOverlap 抢下 hover（它叠放在下方各行之上）
-                bool won = HoverTest(boxRect) || (drew && HoverTest(listRect, true));
-                if (won) WheelClaim();   //仅赢得 hover 时声明，一帧内不会有两个控件同时声明
-            }
-            // 滚轮换选项仅在收起时生效：展开时滚轮留给列表与页面滚动。
-            Event ce = Event.current;
-            if (!open && ce != null && ce.type == EventType.Repaint && options != null && options.Length > 1
-                && boxRect.Contains(ce.mousePosition)) {
-                //取滚轮盾在事件中记下的量：本环境下 Input.GetAxis("Mouse ScrollWheel") 恒为 0。
-                float cw = WheelDeltaTake();
-                if (Mathf.Abs(cw) > 0.0001f) {
-                    int cur = 0;
-                    for (int i = 0; i < options.Length; i++) { if (options[i] == current) { cur = i; break; } }
-                    int ni = cw > 0f ? cur - 1 : cur + 1; //上滚为上一项
-                    if (ni < 0) ni = options.Length - 1;
-                    if (ni >= options.Length) ni = 0;
-                    clicked = ni;
-                    SR.MarkWheelUsed();   //标记滚轮已消费，地图 / 自由相机不再缩放
-                }
-            }
-            //展开状态下滚轮滚列表；WheelClaim 已登记，滚动区不会抢占。
-            if (open && drew && ce != null && ce.type == EventType.Repaint && options != null && options.Length > 8
-                && entry != null) {
-                Rect __lr = new Rect(boxRect.x, boxRect.yMax, width, CtlH() * 8f);
-                if (__lr.Contains(ce.mousePosition)) {
-                    float __wv = WheelDeltaTake();
-                    if (Mathf.Abs(__wv) > 0.0001f) {
-                        int __sc;
-                        if (!_comboScroll.TryGetValue(entry, out __sc)) __sc = 0;
-                        __sc = Mathf.Clamp(__sc + (__wv > 0f ? -2 : 2), 0, options.Length - 8);
-                        _comboScroll[entry] = __sc;
-                        SR.MarkWheelUsed();
-                    }
                 }
             }
             if (drew) {

@@ -483,37 +483,37 @@ public partial class SR {
             // 页签必须画在页面外框（顶栏）之前，否则顶栏会压在上面。
             if (_mode == Mode.Internal) SR.RenderPageTabs(_selectedInternalSection);
             if (_mode == Mode.Internal) SR.RenderPageHeader(_selectedInternalSection);
-            // 鼠标悬停在下拉框上滚轮 = 换选项：先于滚动区吞掉滚轮事件，免得页面跟着滚
-            WheelShieldHit = false;   // 每帧先复位（仲裁命中时置 true）
-            // 这两项必须在盾之前取值：盾命中时会把 e.type 改成 Used，之后再读恒为 false。
+            // ================= 滚轮：唯一入口（仲裁器） =================
+            // 旧实现这里还有一套"Hover 盾 / WheelClaim / WheelDeltaSet"的并行机制，它会先把事件
+            // 改成 Used，导致仲裁器收不到滚轮（列表、滑块因此"有时灵有时不灵"）。整套已删除。
+            WheelShieldHit = false;
             Event __we = Event.current;
             bool __wasWheel = __we != null && __we.type == EventType.ScrollWheel;
-            Vector2 __wheelMouse = __we != null ? __we.mousePosition : Vector2.zero;
-            // 帧首：本帧声明 -> 上一帧声明（ImGui 的 HoveredIdPreviousFrameUsingMouseWheel）
-            WheelClaimNewFrame();
-            bool __overCtrlPrev = WheelClaimedPrev;
-            if (__wasWheel && __overCtrlPrev) {
-                __we.Use(); __we.type = EventType.Used; WheelShieldHit = true;
-                // 记下本帧滚轮量：下拉框在 Repaint 趟取用一次后清掉（滚轮轴在该环境恒为 0，不能依赖它）
-                WheelDeltaSet(-(Mathf.Abs(__we.delta.y) > 0.001f ? __we.delta.y : __we.delta.x));   // Unity 的 delta.y向下滚为正，取反以符合 ImGui 约定（向上为正）
-                SR.MarkWheelUsed();
+            if (__wasWheel) {
+                try { SRApi.Diag("wheel mode=" + _mode + " sec=" + _selectedInternalSection + " noBars=" + _noScrollDeclared + " scrollY=" + _scroll.y.ToString("0.0")); }
+                catch (Exception __wd) { Guard.Log("滚轮诊断", __wd); }
+                try {
+                    bool __ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+                    bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+                    bool __consumed = false;
+                    if (__ctrl) {
+                        // Ctrl+滚轮 = 切页签（栏目内翻页；设置页在通用/自检之间切）
+                        if (_mode == Mode.Internal) CyclePage(_selectedInternalSection, SR.Wheel.Value > 0f ? -1 : 1);
+                        else if (_mode == Mode.Settings) SR.SettingsTab = SR.Wheel.Value > 0f ? 0 : 1;
+                        __consumed = true;
+                    } else {
+                        // 控件 > 表格/页面钩子（Shift 时跳过控件，交给横向滚动）
+                        __consumed = SR.Wheel.Consume(__we, SR.AreaOffset, __shift);
+                        if (!__consumed && _noScrollDeclared) __consumed = true;   // 填充页：页面不滚，也不落到世界
+                        if (!__consumed) {
+                            if (__shift) _scroll.x = Mathf.Max(0f, _scroll.x - SR.Wheel.Value * Sc(64f));
+                            else _scroll.y = Mathf.Max(0f, _scroll.y - SR.Wheel.Value * Sc(64f));
+                            __consumed = true;
+                        }
+                    }
+                    if (__consumed) { __we.Use(); __we.type = EventType.Used; SR.MarkWheelUsed(); }
+                } catch (Exception __wc) { Guard.Log("滚轮仲裁", __wc); }
             }
-            // Ctrl + 滚轮：只切当前栏目的页签（第一 / 第二 / …页），不调整侧栏。
-            if (__wasWheel && !SR.WheelShieldHit
-                && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))) {
-                // 取用即清：Ctrl + 滚轮语义是切页，拿走后下拉框本帧取不到滚轮量。
-                float cw = WheelDeltaTake();
-                if (Mathf.Abs(cw) < 0.0001f) { try { cw = Input.GetAxis("Mouse ScrollWheel"); } catch { cw = 0f; } }
-                // 核心化：栏目页切页签，设置页切「通用/自检」两个页签，走同一条 Ctrl+滚轮。
-                if (Mathf.Abs(cw) > 0.0001f && (_mode == Mode.Internal || _mode == Mode.Settings)) {
-                    if (_mode == Mode.Settings) SR.SettingsTab = cw > 0f ? 0 : 1;
-                    else CyclePage(_selectedInternalSection, cw > 0f ? -1 : 1);   // 向上滚 = 前一页
-                    if (__we != null) { __we.Use(); __we.type = EventType.Used; }
-                    WheelShieldHit = true;   // 本帧页面不跟着滚
-                    SR.MarkWheelUsed();
-                }
-            }
-
             // 换栏目/换页签时收起所有下拉框：展开态一旦跨页残留，控件会一直声明"滚轮归我"，
             // 页面滚动就表现为"一开始能用、切几次页后失效"。
             try {
@@ -554,31 +554,6 @@ public partial class SR {
             SRApi.Diag("mode=" + _mode + " section=" + _selectedInternalSection);
             SRApi.Diag("areaH=" + __areaH.ToString("0.0") + " usedTop=" + __usedTop.ToString("0.0") + " barH=" + __barH.ToString("0.0"));
             SRApi.Diag("viewport=" + SRApi.PageViewportHeight.ToString("0.0") + " footerTop=" + (__areaH - __barH).ToString("0.0") + " scrollY=" + _scroll.y.ToString("0.0"));
-            // 滚轮诊断（只在有滚轮事件时写）：遇到"滚不动"时这行能直接指出是盾、控件悬停还是页面声明了关滚动。
-            if (__wasWheel) {
-                try {
-                    SRApi.Diag("wheel mode=" + _mode + " sec=" + _selectedInternalSection
-                        + " shield=" + WheelShieldHit + " overCtrl=" + __overCtrlPrev + " noBars=" + _noScrollDeclared
-                        + " scrollY=" + _scroll.y.ToString("0.0"));
-                } catch (Exception __wd) { Guard.Log("滚轮诊断", __wd); }
-            }
-            // ---- 滚轮仲裁（重写版）：控件 > 表格/页面钩子 > 页面滚动 ----
-            // 依据：ScrollWheel 一帧只能 Use 一次，滚动视图在 EndScrollView 才应用位移，
-            // 所以必须在绘制前统一裁决；不再使用"盾/撤销/接管"那套互相打架的机制。
-            if (__wasWheel) {
-                try {
-                    bool __consumed = SR.Wheel.Consume(__we, SR.AreaOffset);
-                    if (!__consumed && _noScrollDeclared) { __consumed = true; }   // 页面明确不要滚动：吞掉，别落到世界
-                    if (!__consumed) {
-                        bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-                        // 一次滚轮 = 固定一格（上滚为正 → 内容下移，看起来是往上滚）
-                        if (__shift) _scroll.x = Mathf.Max(0f, _scroll.x - SR.Wheel.Value * Sc(64f));
-                        else _scroll.y = Mathf.Max(0f, _scroll.y - SR.Wheel.Value * Sc(64f));
-                        __consumed = true;
-                    }
-                    if (__consumed) { __we.Use(); __we.type = EventType.Used; SR.MarkWheelUsed(); }
-                } catch (Exception __wc) { Guard.Log("滚轮仲裁", __wc); }
-            }
             bool __noScroll = _noScrollDeclared;
 
             // 设置页签常驻顶部（画在滚动区之外，不受滚动影响）：「恢复默认」跟在同一行最右侧。

@@ -143,7 +143,6 @@ namespace SR_UCH.Tweaks {
                 _outfitData = plugin.Config.Bind(Sec, "Outfit Data", "",
                     "内部状态：每个角色第一次随机到的那套外观（键=动物枚举名，值=四类下标）。勿手动修改。");
                 SRApi.RegisterTick("角色-自动选择", Tick);
-                SRApi.RegisterOverlay(DrawAnimalListOverlay);
                 SRApi.RegisterSceneHook(delegate { _triedThisRoom = false; _dressedFor = null; _nextTryAt = 0f; });
             } catch (Exception __ex) { SRApi.Guard.Log("角色/初始化", __ex); }
         }
@@ -167,106 +166,20 @@ namespace SR_UCH.Tweaks {
                 try {
                     GUI.enabled = oldEnabled && target;
                 EnsureAnimalList();
-                if (_animal != null) RowAnimalCombo(SRApi.T("指定动物", "Target animal"), _animal);
+                // 统一控件：用核心下拉框（全部角色；本房间没有的在选择时跳过）
+                if (_animal != null && Animals.Count > 0)
+                    SRApi.Ctl.RowCombo(SRApi.T("指定动物", "Target animal"),
+                        SRApi.T("自动选择的目标角色\n列出全部角色，本房间没有的不会被选\n只有「选择方式 = 指定角色」时生效",
+                                "the animal auto-pick targets\nlists every animal; ones missing in this room are skipped\nonly used when pick mode is Specific"),
+                        _animal, Animals.ToArray(), AnimalLabels.ToArray(), 170f, 96f);
                 } finally { GUI.enabled = oldEnabled; }
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动选择页", __ex); }
         }
 
         // ================= 指定动物：自绘下拉（全量列出 + 滚轮滚动 + 不可用标记） =================
-        // 为什么不用核心 RowCombo：角色数量 > 核心下拉可见的 8 行，且需要标注"本房间没有这只"。
-        // 这里自己做：按钮 + 覆盖式列表（画在 Overlay 层，不受父级裁剪），滚轮由滚轮仲裁驱动。
-        private static bool _animalOpen;
-        private static int _animalScroll;
-        private const int AnimalVisibleRows = 10;
 
-        private static void RowAnimalCombo(string label, ConfigEntry<string> entry) {
-            try {
-                GUILayout.BeginHorizontal();
-                try {
-                    float lw = Mathf.Min(SRApi.Ctl.Sc(200f), SRApi.Ctl.Label.CalcSize(SRApi.Ctl.Content(label)).x + SRApi.Ctl.Sc(10f));
-                    GUILayout.Label(SRApi.Ctl.Content(label,
-                        SRApi.T("自动选择的目标角色\n列出全部角色；本房间没有的会标注\n只有「选择方式 = 指定角色」时生效",
-                                "the animal auto-pick targets\nlists every animal; ones missing in this room are marked\nonly used when pick mode is Specific")),
-                        SRApi.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(SRApi.Ctl.Sc(26)));
-                    GUILayout.Space(SRApi.Ctl.Sc(6));
-                    string cur = entry != null ? entry.Value : "";
-                    int curIdx = Animals.IndexOf(cur);
-                    string show = curIdx >= 0 ? AnimalLabels[curIdx] : SRApi.T("（未选择）", "(none)");
-                    if (SRApi.Ctl.Button(show + "   v", SRApi.T("点击展开角色列表\n滚轮可滚动列表\n点空白处关闭", "click to open the animal list\nwheel scrolls the list\nclick elsewhere to close"), 170f, 26f)) {
-                        _animalOpen = !_animalOpen;
-                        if (_animalOpen) EnsureAnimalScrollTo(curIdx);
-                    }
-                    GUILayout.FlexibleSpace();
-                } finally { GUILayout.EndHorizontal(); }
 
-                Rect anchorRect = GUILayoutUtility.GetLastRect();
-                if (_animalOpen) {
-                    // 列表矩形：按钮下方，最多 AnimalVisibleRows 行
-                    int vis = Mathf.Min(Animals.Count, AnimalVisibleRows);
-                    int maxScroll = Mathf.Max(0, Animals.Count - vis);
-                    _animalScroll = Mathf.Clamp(_animalScroll, 0, maxScroll);
-                    float w = Mathf.Max(SRApi.Ctl.Sc(170f), anchorRect.width * 0.55f);
-                    Rect list = new Rect(anchorRect.x + anchorRect.width * 0.45f, anchorRect.yMax, w, SRApi.Ctl.Sc(26f) * vis + SRApi.Ctl.Sc(4f));
-                    _animalListRect = list;
-                    // 滚轮：由滚轮仲裁驱动（区域 id 固定）
-                    SRApi.WheelArea("animal:list", list, delegate (float __w) {
-                        int __max = Mathf.Max(0, Animals.Count - AnimalVisibleRows);
-                        int __nv = Mathf.Clamp(_animalScroll + (__w > 0f ? -1 : 1), 0, __max);
-                        if (__nv == _animalScroll) return false;
-                        _animalScroll = __nv;
-                        return true;
-                    });
-                    // 点空白关闭（左键）
-                    Event ev = Event.current;
-                    if (ev != null && ev.type == EventType.MouseDown && ev.button == 0 && !list.Contains(ev.mousePosition)) {
-                        _animalOpen = false;
-                    }
-                }
-            } catch (Exception __ex) { SRApi.Guard.Log("角色/指定动物下拉", __ex); }
-        }
 
-        private static Rect _animalListRect;
-
-        private static void EnsureAnimalScrollTo(int idx) {
-            try {
-                if (idx < 0) { _animalScroll = 0; return; }
-                if (idx < _animalScroll) _animalScroll = idx;
-                else if (idx >= _animalScroll + AnimalVisibleRows) _animalScroll = idx - AnimalVisibleRows + 1;
-            } catch (Exception __ex) { SRApi.Guard.Log("角色/下拉定位", __ex); }
-        }
-
-        // 列表画在 Overlay 层：不受页面布局/裁剪影响，任何窗口大小都能完整显示。
-        private static void DrawAnimalListOverlay() {
-            try {
-                if (!_animalOpen || _animal == null) return;
-                float w = _animalListRect.width, h = _animalListRect.height;
-                if (w < 2f || h < 2f) return;
-                SRApi.DrawPanel(_animalListRect, SRApi.Ctl.ThemePanelBg, SRApi.Ctl.ThemeRadius);
-                int vis = Mathf.Min(Animals.Count, AnimalVisibleRows);
-                GameSettings gs = GameSettings.GetInstance();
-                LobbyManager lm = LobbyManager.instance;
-                LevelSelectController lsc = null;
-                try { lsc = lm != null ? lm.CurrentLevelSelectController : null; } catch { /* 静默：非关键路径 */ }
-                string cur = _animal.Value;
-                for (int row = 0; row < vis; row++) {
-                    int i = _animalScroll + row;
-                    if (i >= Animals.Count) break;
-                    Rect r = new Rect(_animalListRect.x + SRApi.Ctl.Sc(2), _animalListRect.y + SRApi.Ctl.Sc(2) + row * SRApi.Ctl.Sc(26f),
-                                      w - SRApi.Ctl.Sc(4), SRApi.Ctl.Sc(24f));
-                    bool taken = false;
-                    try {
-                        Character.Animals en = ParseAnimal(Animals[i]);
-                        if (lsc != null && en != Character.Animals.NONE) taken = lsc.IsCharacterTaken(en);
-                    } catch { /* 静默：非关键路径 */ }
-                    string text = AnimalLabels[i] + (taken ? SRApi.T("（本房间没有）", " (not here)") : "");
-                    GUIStyle st = Animals[i] == cur ? SRApi.Ctl.SelItem : (taken ? SRApi.Ctl.Label : SRApi.Ctl.Btn);
-                    if (GUI.Button(r, text, st)) {
-                        _animal.Value = Animals[i];
-                        _animalOpen = false;
-                    }
-                }
-            } catch (Exception __ex) { SRApi.Guard.Log("角色/下拉列表绘制", __ex); }
-        }
 
         private static void RenderOutfit() {
             try {
