@@ -41,6 +41,8 @@ namespace SR_UCH.Tweaks {
         private static int _lobbyCbCount;           // 本次搜索收到的回调数
         private static float _lobbyCbFirst = -1f;   // 首个回调时刻
         private static float _lobbyCbLast = -1f;    // 最近一次回调时刻
+        private static string _textFilter = "";   // 房间列表文本搜索（只匹配当前显示内容，不落配置）
+
         private static bool _lobbySearching;
         private static float _lobbySearchAt = -999f;
         private static string _lobbyMsg = "";
@@ -515,6 +517,25 @@ namespace SR_UCH.Tweaks {
                                "(click 'Refresh' to query) Header: left-click = sort by that column (asc/desc/default), drag a separator = resize (<->), drag a header = reorder (+), Shift+click 'Quality' = show/hide the skill-match coefficient, right-click = hide that column, Shift+right-click = reset; wheel = up/down, Ctrl+wheel = left/right; drag the table's bottom edge to resize height");
             GUILayout.Label(string.IsNullOrEmpty(_lobbyMsg) ? hint : _lobbyMsg, SRApi.Ctl.Label);
 
+            // 搜索：按当前显示内容做子串匹配（房主/区域/模式/标签/标识…），命中片段在表格里高亮。
+            GUILayout.Space(SRApi.Ctl.Sc(2));
+            GUILayout.BeginHorizontal();
+            try {
+                GUIContent __sl = SRApi.Ctl.Content(SRApi.T("搜索", "Search"),
+                    SRApi.T("按显示内容过滤房间\n房主 / 区域 / 模式 / 标签 / 标识\n命中片段会在表格里高亮", "filter lobbies by their visible text\nhost / region / mode / tag / flags\nmatching parts are highlighted in the table"));
+                float __slw = Mathf.Max(SRApi.Ctl.Sc(44f), SRApi.Ctl.Label.CalcSize(new GUIContent(SRApi.T("搜索", "Search"))).x + SRApi.Ctl.Sc(10f));
+                GUILayout.Label(__sl, SRApi.Ctl.Label, GUILayout.Width(__slw), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+                Rect __sr = GUILayoutUtility.GetLastRect();
+                Event __se = Event.current;
+                if (__se != null && __se.type == EventType.MouseDown && __se.button == 0 && __sr.Contains(__se.mousePosition)) {
+                    _textFilter = ""; __se.Use();   // 点标签清空
+                }
+                string __nt = SRApi.ClearableTextField(_textFilter ?? "", 64, SRApi.Ctl.SearchBox,
+                    GUILayout.Width(SRApi.Ctl.Sc(220f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+                if (__nt != null && __nt != _textFilter) _textFilter = __nt;
+                GUILayout.FlexibleSpace();
+            } finally { GUILayout.EndHorizontal(); }
+
             // 筛选：单行 区域 / 模式 / 标签 / 状态（状态下沉到标签右面）；下拉框宽度按 4 个均分。
             float cellW = Mathf.Max(SRApi.Ctl.Sc(96), (SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40)) / 4f - SRApi.Ctl.Sc(8));
             GUILayout.Space(SRApi.Ctl.Sc(2));
@@ -557,6 +578,7 @@ namespace SR_UCH.Tweaks {
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
 
+            SRApi.Ctl.SetTableHighlight(_textFilter ?? "");   // 命中片段在表格里高亮
             TableDraw(box);
             TableInput(box, Event.current);
 
