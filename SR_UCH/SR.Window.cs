@@ -157,6 +157,7 @@ public partial class SR {
 
         // 页面正在拖自己的控件时置 true：窗口拖动判定在页面绘制之前执行，页面的 Event.Use() 拦不住。
         public static bool BlockWindowDrag;
+        private static bool _downOnControl;   // 本次手势的起点是否落在控件上（拖滑块不该拖窗口）
 
         // 右栏内容区（屏幕坐标），每帧刷新；自绘页用它铺满窗口
         public static Rect ContentArea;
@@ -422,7 +423,14 @@ public partial class SR {
             // 松手即解除"别拖窗口"：页面没机会清时也不会卡住窗口拖动
             if (e.type == EventType.MouseUp) BlockWindowDrag = false;
             if (!_resizing) {
-                if (e.type == EventType.MouseDown && over && e.button == 0) _downPos = mouse;
+                if (e.type == EventType.MouseDown && over && e.button == 0) {
+                    _downPos = mouse;
+                    // 记下"这次按下是不是落在控件上"：BlockWindowDrag 只在 MouseDown 那一帧为真，
+                    // 后续 MouseDrag 帧会变回 false，于是拖滑块时窗口照样被拖走。
+                    // 用一次性标志记住整个手势，MouseUp 才清。
+                    _downOnControl = BlockWindowDrag;
+                }
+                if (e.type == EventType.MouseUp) _downOnControl = false;
                 if (_dragActive && e.type == EventType.MouseDrag) {
                     if (!_dragMoved && (mouse - _downPos).magnitude > 4f) _dragMoved = true;
                     if (_dragMoved) {
@@ -439,7 +447,7 @@ public partial class SR {
                 // 不能用 GUIUtility.hotControl == 0 当条件：侧栏/页面是滚动视图，按下时它们会立刻拿走 hotControl，
                 // 于是"按在空白处拖窗口"永远开始不了（长按后滑动没反应就是这个原因）。
                 // 真正该拦的是"按在控件上"——控件在 MouseDown 时会置 BlockWindowDrag。
-                if (e.type == EventType.MouseDrag && e.button == 0 && over && !_dragActive && !BlockWindowDrag) {
+                if (e.type == EventType.MouseDrag && e.button == 0 && over && !_dragActive && !BlockWindowDrag && !_downOnControl) {
                     _dragActive = true;
                     _dragMoved = false;
                     _dragOffset = mouse - new Vector2(_winX, _winY);
