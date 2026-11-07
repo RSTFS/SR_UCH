@@ -544,6 +544,8 @@ public partial class SR {
             // 本帧结束再按滚动区实测高度刷新；滚动区本身是弹性高度，页面高度变化不会反过来改变它。
             if (SRApi.PageViewportHeight <= Sc(60f))
                 SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __footerReserve);
+            SRApi.PageBodyHeight = __bodyH;                 // 右栏可用高度（布局单位）
+            SRApi.PageUsedTop = __usedTop;                  // 页面内容起点（页头之后）
             // 页面内容必须以这条 y 为底界（= 滚动区顶 + 视口高 = 底栏条上沿）：列表高度按它算，随窗口大小自适应。
             SRApi.PageContentBottomY = __usedTop + SRApi.PageViewportHeight;
             SRApi.Diag("mode=" + _mode + " section=" + _selectedInternalSection);

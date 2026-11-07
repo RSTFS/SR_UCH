@@ -66,9 +66,11 @@ Notify
 NotifyT
 OnShutdown
 OpenMenu
+PageBodyHeight
 PageContentBottomY
 PageScroll
 PageScrollTopY
+PageUsedTop
 PageViewportHeight
 ParseHex
 PreviewColor

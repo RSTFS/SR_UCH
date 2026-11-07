@@ -689,6 +689,10 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static Rect ContentArea { get { Func<Rect> f = _contentArea; return f != null ? f() : default(Rect); } set { Action<Rect> a = _setContentArea; if (a != null) a(value); } }
         // 页面可视高度（滚动区真实视口，已扣除窗口标题/页头/底栏）：功能页的表格高度应以它为准。
         public static float PageViewportHeight;
+        // 右栏在布局坐标里的总高（不含标题栏），以及页面内容起点（页头之后的 y）。
+        // 页面用这两个值算"我还能用多少高度"，全程同一坐标系，不会像屏幕换算那样算溢出。
+        public static float PageBodyHeight;
+        public static float PageUsedTop;
         // 同帧对象查询缓存：一帧内同类型只真正 FindObjectsOfType 一次（多个钩子同帧查询合并）。
         // 调用方仍应保留自己的节流；返回数组是共享的，不要修改其内容。
         private static readonly System.Collections.Generic.Dictionary<Type, object> _frameObjCache = new System.Collections.Generic.Dictionary<Type, object>();

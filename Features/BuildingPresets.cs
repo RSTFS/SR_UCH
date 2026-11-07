@@ -736,14 +736,10 @@ namespace SR_UCH.Tweaks {
             float minH = SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH();
             float tableH;
             try {
-                float screenTop = SRApi.ContentArea.y + last.yMax;                       // 列表顶（屏幕坐标）
-                float bottom = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);   // 底栏上沿
-                float avail = bottom - screenTop;   // 列表底边与底栏上沿直接相接
-                // 再与"页面视口"取 min：页面视口是实测/精确算出来的可用高度，
-                // 屏幕底那一版有时会把列表算得比实际可视区还高（表现为下面还有行却滚不动）。
-                float used = Mathf.Max(0f, last.yMax - _pageTopY);
-                float byViewport = SRApi.PageViewportHeight - used;
-                if (byViewport > 0f) avail = Mathf.Min(avail, byViewport);
+                // 主算法：**纯布局单位**，右栏总高减去页面内容起点到表格顶的距离。
+                // 同一坐标系，不会像屏幕坐标换算那样算溢出（"表格底边超出可见区"的根因）。
+                float __used = Mathf.Max(0f, last.yMax - SRApi.PageUsedTop);
+                float avail = SRApi.PageBodyHeight - __used;
                 tableH = Mathf.Max(minH, avail);
             } catch (Exception __sh) {
                 SRApi.Guard.Log("布局预设/可视高度", __sh);
