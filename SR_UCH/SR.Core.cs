@@ -421,7 +421,7 @@ public partial class SR : ITweak {
                 // 内存表同步清理：否则文件已删、界面仍按旧表显示"还有孤儿"
                 try {
                     for (int i = 0; i < pairs.Count; i++) {
-                        string[] __kv = pairs[i].Split(ConfigMigration.AuditSep);
+                        string[] __kv = pairs[i].Split(new[] { ConfigMigration.AuditSep }, StringSplitOptions.None);
                         if (__kv.Length == 2) {
                             try { dict.Remove(new ConfigDefinition(__kv[0], __kv[1])); } catch (Exception __rm) { Guard.Log("孤儿键/移出内存表", __rm); }
                         }
