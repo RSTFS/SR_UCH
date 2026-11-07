@@ -196,7 +196,8 @@ namespace SR_UCH.Tweaks {
             // 记录本帧表格的屏幕矩形（box 是布局坐标，加区域偏移即屏幕坐标）
             try {
                 float __offX = SRApi.ContentArea.x - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(2f);
-                float __offY = SRApi.ContentArea.y;
+                // 页面可能已滚动：内容坐标比屏幕坐标多一个 -_scroll.y，命中框要同步减掉。
+                float __offY = SRApi.ContentArea.y - SRApi.PageScroll.y;
                 if (box.width > 2f && box.height > 2f)
                     _tableScreenBox = new Rect(box.x + __offX, box.y + __offY, box.width, box.height);
             } catch (Exception __tbox) { SRApi.Guard.Log("联机表格/命中框", __tbox); }

@@ -176,7 +176,7 @@ public partial class SR {
                         __e.Use();
                     }
                 } catch (Exception __sw) { Guard.Log("设置页/Ctrl 滚轮切页", __sw); }
-                // 页面滚动恢复：联机/预设页每帧把 NoPageScrollBars 置真，切到本页必须复位，
+                // 页面滚动恢复：NoPageScrollBars 现在是"每帧声明、用后清零"（见 SR.Window），
                 // 否则设置页也会被当成"页面不滚动"——这是自检页滚不动的直接原因。
                 SRApi.NoPageScrollBars = false;
                 GUILayout.Space(Sc(4));

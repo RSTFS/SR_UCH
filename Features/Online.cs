@@ -441,7 +441,7 @@ namespace SR_UCH.Tweaks {
         private static void RenderOnlinePage() {
             _renderFrame = Time.frameCount;
             // 本页无页面级滚动：表头 / 筛选必须始终可见，房间只在下方框内滚动。
-            SRApi.PageScroll = Vector2.zero;
+            // 页面滚动交给核心：不要每帧清零（清零会让"列表滚到底后交给页面滚动"永远不生效）。
             // 页面滚动保持可用：光标不在列表上时由页面滚动接管（列表钩子只在表格矩形内生效）。
             // 列宽拖动 / 表格高度拖动的收尾都由核心处理，这里无需再收尾。
             EnsureWidths();

@@ -160,6 +160,16 @@ namespace SR_UCH.Tweaks {
         private static readonly Dictionary<string, CellCacheEntry> _presetCellCache = new Dictionary<string, CellCacheEntry>(64);
         // 筛选签名上一帧值：变化后复位滚动与二次确认，避免"滚到一半改搜索"或误触旧行的确认态。
         private static int _filterSigLast = int.MinValue;
+        // v2：标签宽度缓存（按语言签名）。FormLabelWidth 每帧被 7 处调用，原实现每次新建
+        // 2 个 GUIContent 并做 2 次 CalcSize —— 一帧 14 次分配 + 字形测量。
+        private static int _formLabelSig = int.MinValue;
+        private static float _formLabelW = 90f;
+        // v2：状态栏反馈的显示起点。_status 由 10 处赋值且永不清除，上屏后会一直挂着
+        // "已删除预设：X"；这里只控制【显示】，不改任何写入方。
+        private static string _statusShown;
+        private static float _statusShownAt = -1000f;
+        // v2：两个筛选下拉每帧各遍历一次 _presets 算签名，合并为每帧一次遍历。
+        private static int _optSigFrame = -1, _optSigLevel, _optSigMode;
         // 关卡列显示模式：false = 关卡名称（本地化），true = 关卡代码（快照码/场景名）；运行期状态，不落配置。
         private static bool _levelShowCode;
 
@@ -296,6 +306,12 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Section, ColHiddenKey,
                 "预设列表隐藏列\n右键表头隐藏后自动写入\nShift+右键表头可恢复全部",
                 "Preset hidden columns\nwritten after hiding with a header right-click\nShift+right-click the header restores all");
+            // v2：Initialize 新增的 "Table Height Migrated" 与另外三个内部键同段，却没有本地化，
+            // 设置页会显示成原生英文 key。补齐，且同样标注"勿手动修改"。
+            SRApi.LocKey(Section, "Table Height Migrated", "列表高度迁移标记（内部）", "List height migration flag (internal)");
+            SRApi.LocDesc(Section, "Table Height Migrated",
+                "内部状态：是否已完成旧版无效的表格高度复位\n由模组自动维护，勿手动修改\n改动后需要重开设置页才会重新判断",
+                "Internal: whether the legacy ineffective table height has been reset\nmaintained by the mod automatically; do not edit\na change is re-evaluated the next time the settings page opens");
         }
 
         // ---------- 配置读取 ----------
@@ -405,18 +421,28 @@ namespace SR_UCH.Tweaks {
         }
 
         // 筛选下拉选项的签名：只依赖预设集合里的 Level/Mode 与当前语言。
-        private static int FilterOptionsSignature(bool level) {
+        // 两个下拉同帧各调一次；这里一次遍历同时算出两份签名并按帧缓存。
+        private static void EnsureOptionSignatures() {
+            if (_optSigFrame == Time.frameCount) return;
             unchecked {
-                int h = level ? 3 : 5;
-                h = h * 31 + _presets.Count;
-                h = h * 31 + (SRApi.Ctl.LangEn ? 1 : 0);
+                int hl = 3, hm = 5;
+                hl = hl * 31 + _presets.Count; hm = hm * 31 + _presets.Count;
+                hl = hl * 31 + (SRApi.Ctl.LangEn ? 1 : 0);
+                hm = hm * 31 + (SRApi.Ctl.LangEn ? 1 : 0);
                 for (int i = 0; i < _presets.Count; i++) {
                     PresetInfo p = _presets[i];
-                    if (p == null) { h = h * 31; continue; }
-                    h = h * 31 + (level ? (p.Level ?? "") : (p.Mode ?? "")).GetHashCode();
+                    if (p == null) { hl *= 31; hm *= 31; continue; }
+                    hl = hl * 31 + (p.Level ?? "").GetHashCode();
+                    hm = hm * 31 + (p.Mode ?? "").GetHashCode();
                 }
-                return h;
+                _optSigLevel = hl; _optSigMode = hm;
+                _optSigFrame = Time.frameCount;
             }
+        }
+
+        private static int FilterOptionsSignature(bool level) {
+            EnsureOptionSignatures();
+            return level ? _optSigLevel : _optSigMode;
         }
 
         // 过滤条件（原 VisiblePresets 内的判断，原样保留语义）。
@@ -483,16 +509,19 @@ namespace SR_UCH.Tweaks {
         }
 
         // 布局坐标 -> 屏幕坐标：页面布局原点在 BeginArea(winRect+Sc(4))，与 ContentArea 只差"侧栏宽 + 2"。
-        internal static Vector2 LayoutToScreen(Vector2 layout) {
+        // v2：页面滚动现在真正可用（Render 不再每帧把 PageScroll 清零），BeginScrollView 内容坐标
+        // 比屏幕坐标多一个 -_scroll.y，命中框必须同步减掉，否则滚过页面后滚轮会"点在别的行上"。
+        private static Vector2 LayoutToScreen(Vector2 layout) {
             try {
                 float offX = SRApi.ContentArea.x - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(2f);
-                float offY = SRApi.ContentArea.y;
+                float offY = SRApi.ContentArea.y - SRApi.PageScroll.y;
                 return new Vector2(layout.x + offX, layout.y + offY);
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/坐标换算", __ex); return layout; }
         }
 
         // 表格矩形（屏幕坐标）：_tableBox 是布局坐标，且 Layout 趟可能还是退化矩形。
-        internal static Rect TableScreenBox() {
+        // private：拆分构建下本文件单独成 DLL，internal 跨程序集不可见；当前也只在本文件使用。
+        private static Rect TableScreenBox() {
             try {
                 Rect b = _tableBox;
                 if (b.width <= 2f || b.height <= 2f) return b;
@@ -513,19 +542,36 @@ namespace SR_UCH.Tweaks {
                 string count = (shown == total)
                     ? SRApi.T("共 ", "Total ") + total + SRApi.T(" 条", " items")
                     : SRApi.T("显示 ", "Showing ") + shown + SRApi.T(" / ", " / ") + total + SRApi.T(" 条", " items");
-                if (!string.IsNullOrEmpty(_status)) count += "   ·   " + _status;
-                // 状态文本可能很长（导出路径），单行放不下时用 tooltip 给全文。
-                GUILayout.Label(SRApi.Ctl.Content(count, string.IsNullOrEmpty(_status) ? null : _status), SRApi.Ctl.Label,
-                    GUILayout.Height(SRApi.Ctl.Sc(26f)));
+                // v2：_status 永不清除，上屏后会一直挂着上次的"已删除预设：X"。
+                // 只控制显示：值变化时重新计时，8 秒后不再拼接（不动任何写入方）。
+                string status = _status;
+                if (!string.IsNullOrEmpty(status)) {
+                    if (!string.Equals(status, _statusShown, StringComparison.Ordinal)) {
+                        _statusShown = status;
+                        _statusShownAt = Time.unscaledTime;
+                    }
+                    if (Time.unscaledTime - _statusShownAt > 8f) status = null;
+                }
+                if (!string.IsNullOrEmpty(status)) count += "   ·   " + status;
+                // 工具行前面已有"跳过树屋 + 返回树屋"约 290 设计单位；不给状态栏设上限，
+                // 导出目录那种长路径会把 FlexibleSpace 挤没、整行撑出窗口。
+                float maxW = Mathf.Max(SRApi.Ctl.Sc(120f), SRApi.ContentArea.width - SRApi.Ctl.Sc(380f));
+                GUILayout.Label(SRApi.Ctl.Content(count, string.IsNullOrEmpty(status) ? null : status), SRApi.Ctl.Label,
+                    GUILayout.Height(SRApi.Ctl.Sc(26f)), GUILayout.MaxWidth(maxW));
             } catch (Exception __ls) { SRApi.Guard.Log("布局预设/列表状态栏", __ls); }
         }
 
         // 保存区的两个标签（预设名称 / XML 路径）按实测宽度取最大值，两行输入框左边缘保持对齐。
         private static float FormLabelWidth() {
+            // v2：只依赖语言 + 字号缩放，签名不变直接复用（每帧 7 处调用，原实现 14 次分配）。
+            int sig = (SRApi.Ctl.LangEn ? 1 : 0) * 31 + Mathf.RoundToInt(SRApi.Ctl.Sc(100f));
+            if (sig == _formLabelSig) return _formLabelW;
             try {
-                float wa = SRApi.Ctl.Label.CalcSize(new GUIContent(SRApi.T("预设名称", "Preset name"))).x;
-                float wb = SRApi.Ctl.Label.CalcSize(new GUIContent(SRApi.T("XML 路径", "XML path"))).x;
-                return Mathf.Max(SRApi.Ctl.Sc(52f), Mathf.Max(wa, wb) + SRApi.Ctl.Sc(10f));
+                float wa = SRApi.Ctl.Label.CalcSize(SRApi.Ctl.Content(SRApi.T("预设名称", "Preset name"))).x;
+                float wb = SRApi.Ctl.Label.CalcSize(SRApi.Ctl.Content(SRApi.T("XML 路径", "XML path"))).x;
+                _formLabelW = Mathf.Max(SRApi.Ctl.Sc(52f), Mathf.Max(wa, wb) + SRApi.Ctl.Sc(10f));
+                _formLabelSig = sig;
+                return _formLabelW;
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/标签宽度", __ex); return SRApi.Ctl.Sc(90f); }
         }
 
@@ -537,10 +583,12 @@ namespace SR_UCH.Tweaks {
                 // 本帧开始前的二次确认状态：只有"之前已确认、本帧又没点中操作按钮"才在空白处取消，
                 // 避免把本帧其它按钮（保存/导入）刚点出来的二次确认立刻清掉。
                 string pendingBefore = _pendingKey;
-                // 与联机列表一致：页面级滚动关闭，上方筛选/工具行恒可见，表格占据剩余高度。
-                SRApi.PageScroll = Vector2.zero;
-                // 页面滚动保持可用：光标不在列表上时由页面滚动接管（列表自己的钩子只在表格矩形内生效）。
-                // 页面滚动保持可用（滚动条已统一隐藏）：表格内部滚轮失效时也能靠页面滚动看到全部内容。
+                // v2：删掉 SRApi.PageScroll = Vector2.zero。
+                // 上一版一边声明"光标不在列表上时交给页面滚动"，一边每帧把 _scroll 强制归零，
+                // 两套机制互相抵消 —— 列表滚到底后滚轮确实谁也没滚。现在页面滚动真正可用：
+                // 表格内由 OnPresetWheel 消费，表格外（保存/导入/筛选区）由页面滚动接管。
+                // 命中框已在 LayoutToScreen 里减去 PageScroll.y，滚过页面后仍然精确。
+                // 换栏目/换页的归零由核心 SR.Window 负责，不需要页面自己每帧清。
                 Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
                 if (Event.current != null && Event.current.type == EventType.Layout) { _pageTopY = topProbe.y; }
 
@@ -738,6 +786,10 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
                     _levelOptLabels = labels;
                 }
+                // v2：LevelFilterValues 走异常分支会返回空列表，此时 labels[cur] 越界被外层 catch 吞掉，
+                // 表现为下拉框闪一下消失。空数组时直接跳过本帧渲染。
+                if (labels.Length == 0 || _levelOptVals == null || _levelOptVals.Length == 0) return;
+                cur = Mathf.Clamp(cur, 0, labels.Length - 1);
                 bool open = _levelFilterOpen;
                 int sel = SRApi.Ctl.ComboBox(null, labels[cur], _levelOptVals, labels, ref open, W(110));
                 _levelFilterOpen = open;
@@ -794,6 +846,8 @@ if (SRApi.Ctl.HotkeyButtonNoHint("presets.treehouse", SRApi.T("返回树屋", "B
                     for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
                     _modeOptLabels = labels;
                 }
+                if (labels.Length == 0 || _modeOptVals == null || _modeOptVals.Length == 0) return;
+                cur = Mathf.Clamp(cur, 0, labels.Length - 1);
                 bool open = _modeFilterOpen;
                 int sel = SRApi.Ctl.ComboBox(null, labels[cur], _modeOptVals, labels, ref open, W(110));
                 _modeFilterOpen = open;
