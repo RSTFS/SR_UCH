@@ -25,6 +25,7 @@ public partial class Chat : ITweak {
 
         public static List<ChatEntry> Entries { get { return _log; } }
 
+        private static ConfigEntry<bool> _chatLogSystemEntry;   // 记录系统消息
         private static ConfigEntry<bool> _chatFilterQuickEntry;
         private static bool _chatFilterQuick;   //过滤快捷消息（表情/预设消息）
         private static ConfigEntry<bool> _chatShowTimeEntry;
@@ -363,6 +364,9 @@ public partial class Chat : ITweak {
             SelfRegLog();
             // 本功能的配置随本功能绑在 Chat 段。
             _chatFilterQuickEntry = plugin.Config.Bind("Chat", "Filter Quick Msgs", false, "会话内容页：过滤快捷消息（表情/预设消息不显示）");
+            _chatLogSystemEntry = plugin.Config.Bind("Chat", "Log System Msgs", true, "会话内容页：记录系统消息（加入/离开/踢人/回合提示等）。关掉只记录玩家发言。");
+            SRApi.LocKey("Chat", "Log System Msgs", "记录系统消息", "Log system messages");
+            SRApi.LocDesc("Chat", "Log System Msgs", "记录系统消息\n把加入/离开/踢人/回合提示这类系统事件也记进会话内容\n关掉则只记玩家发言", "Log system messages\nalso record system events such as joins, leaves, kicks and round notices\noff records player chat only");
             _chatFilterQuick = _chatFilterQuickEntry.Value;
             _chatFilterQuickEntry.SettingChanged += (s, e) => _chatFilterQuick = _chatFilterQuickEntry.Value;
             _chatShowTimeEntry = plugin.Config.Bind("Chat", "Show Time", false, "会话内容页：每条消息前显示具体时间。默认开启。");
@@ -384,9 +388,10 @@ public partial class Chat : ITweak {
                 if (!(__args[0] is ChatMessageDetails)) return;
                 ChatMessageDetails details = (ChatMessageDetails)__args[0];
                 // 按游戏自己的判据区分玩家消息与系统消息：isChatMessage 为假的是系统事件/系统提示。
-                if (!details.isChatMessage) return;
-                // 系统事件常常没有发送者名（如 PlayerVotedToKick），同样不记录。
-                if (string.IsNullOrEmpty(details.UserName)) return;
+                // 以前这里两行都直接 return，所以"会话内容"里永远看不到系统信息；
+                // 现在由「记录系统消息」开关决定（默认开），系统事件统一署名"系统"。
+                bool __system = !details.isChatMessage || string.IsNullOrEmpty(details.UserName);
+                if (__system && !(_chatLogSystemEntry != null && _chatLogSystemEntry.Value)) return;
                 bool isQuick = false;
                 string text = details.Message;
                 if (string.IsNullOrEmpty(text)) {
@@ -397,7 +402,8 @@ public partial class Chat : ITweak {
                 }
                 _log.Add(new ChatEntry {
                     time = DateTime.Now.ToString("HH:mm:ss"),
-                    sender = string.IsNullOrEmpty(details.UserName) ? SRApi.T("未知", "Unknown") : details.UserName,
+                    sender = __system ? SRApi.T("系统", "System")
+                             : (string.IsNullOrEmpty(details.UserName) ? SRApi.T("未知", "Unknown") : details.UserName),
                     color = details.UserNameColor,
                     text = text,
                     isQuick = isQuick
