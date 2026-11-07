@@ -540,7 +540,12 @@ public partial class SR {
                 //只认左键：右键用于绑定快捷键，不可同时重置默认值
                 Event evLbl = Event.current;
                 if (evLbl == null || evLbl.button == 0) {
-                    if (entry != null) { try { entry.BoxedValue = entry.DefaultValue; } catch (Exception __ex) { Guard.Log("恢复条目默认值", __ex); } }
+                    if (entry != null) {
+                        try {
+                            // 编辑框（字符串）点标签 = 清空；其余条目 = 恢复默认值/默认键
+                            entry.BoxedValue = entry.SettingType == typeof(string) ? (object)"" : entry.DefaultValue;
+                        } catch (Exception __ex) { Guard.Log("恢复条目默认值", __ex); }
+                    }
                     MarkKeyChanged();   //重置可能改动键位，令序列监听列表失效
                     _editText.Remove(entry);
                     _editOpen.Remove(entry);

@@ -250,7 +250,7 @@ public partial class SR {
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
             } catch (Exception __ex) { Guard.Log("统一行控件", __ex); }
-            GUILayout.Space(Sc(4));
+            GUILayout.Space(Sc(2));
         }
 
         // 统一下拉行：标签按文字实测，entry 作为稳定 ID 交给核心管理展开态，选中即写值并收起。
@@ -284,7 +284,7 @@ public partial class SR {
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
             } catch (Exception __ex) { Guard.Log("统一下拉行", __ex); }
-            GUILayout.Space(Sc(4));
+            GUILayout.Space(Sc(2));
             return picked;
         }
 
@@ -294,8 +294,9 @@ public partial class SR {
                 Event ev = Event.current;
                 if (e == null || ev == null || ev.type != EventType.MouseDown || ev.button != 0) return;
                 if (!labelRect.Contains(ev.mousePosition)) return;
-                if (!object.Equals(e.BoxedValue, e.DefaultValue)) {
-                    SetValue(e, e.DefaultValue);
+                object dv = e.SettingType == typeof(string) ? (object)"" : e.DefaultValue;
+                if (!object.Equals(e.BoxedValue, dv)) {
+                    SetValue(e, dv);
                     SRApi.Notify(T("已恢复默认值", "Reset to default"));
                 }
                 ev.Use();
@@ -324,7 +325,7 @@ public partial class SR {
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
             } catch (Exception __ex) { Guard.Log("统一滑块行", __ex); }
-            GUILayout.Space(Sc(4));
+            GUILayout.Space(Sc(2));
             return written;
         }
         public static void RenderEntryRow(ConfigEntryBase entry, bool isInternal, float colWidth) { SR.RenderEntryRow(entry, isInternal, colWidth); }
@@ -788,11 +789,11 @@ public partial class SR {
                     WrapLabelTight(T(" 有 " + SR.AuditIssueCount + " 项按名绑定的目标失效，对应功能不会生效 - 详见 设置 -> 自检。",
                         " " + SR.AuditIssueCount + " name-bound target(s) are broken; those features will not work - see Settings > Self-check."));
                 } finally { GUI.color = __pc; }
-                GUILayout.Space(Sc(4));
+                GUILayout.Space(Sc(2));
             }
             WrapLabel(T("Ultimate Chicken Horse 模组整合增强包。", "An enhancement pack for Ultimate Chicken Horse."));
             WrapLabel(T("本 mod 参考了 BetterFreeplay，BuildingPlus，BuildUnlimiter，UCH Freeplay Spawn Setter，UCH Tweaks，UCH-PlayerTracker-Mod，UltimateBuilder，向这些 mod 的制作者表示感谢。", "This mod references BetterFreeplay, BuildingPlus, BuildUnlimiter, UCH Freeplay Spawn Setter, UCH Tweaks, UCH-PlayerTracker-Mod and UltimateBuilder. Thanks to their authors."));
-            GUILayout.Space(Sc(4));
+            GUILayout.Space(Sc(2));
 
             GUILayout.Label(T("- 开源地址 -", "- Source -"), _secHeader);
             GUILayout.BeginHorizontal();
@@ -801,7 +802,7 @@ public partial class SR {
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-            GUILayout.Space(Sc(4));
+            GUILayout.Space(Sc(2));
 
             GUILayout.Space(Sc(8));
             GUILayout.Label(T("- 操作提示 -", "- Tips -"), _secHeader);
@@ -817,10 +818,10 @@ public partial class SR {
 
             GUILayout.Label(T("- 请共同维护游戏体验 -", "- Keep the game fun for everyone -"), _secHeader);
             WrapLabel(T("请不要使用本模组破坏别人的游戏体验。", "Please do not use this mod to ruin other players' experience."));
-            GUILayout.Space(Sc(4));
+            GUILayout.Space(Sc(2));
 
             GUILayout.FlexibleSpace();
-            GUILayout.Space(Sc(4));
+            GUILayout.Space(Sc(2));
         }
 
         //换行标签：按实际可用宽度测量高度，保证最后一行文字不被裁切
@@ -1212,7 +1213,7 @@ public partial class SR {
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
-            GUILayout.Space(Sc(4));
+            GUILayout.Space(Sc(2));
         } catch (Exception __ex) { Guard.Log("页签(" + section + ")", __ex); }
     }
 

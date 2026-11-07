@@ -365,7 +365,7 @@ public partial class Chat : ITweak {
             _chatFilterQuickEntry = plugin.Config.Bind("Chat", "Filter Quick Msgs", false, "会话内容页：过滤快捷消息（表情/预设消息不显示）");
             _chatFilterQuick = _chatFilterQuickEntry.Value;
             _chatFilterQuickEntry.SettingChanged += (s, e) => _chatFilterQuick = _chatFilterQuickEntry.Value;
-            _chatShowTimeEntry = plugin.Config.Bind("Chat", "Show Time", true, "会话内容页：每条消息前显示具体时间。默认开启。");
+            _chatShowTimeEntry = plugin.Config.Bind("Chat", "Show Time", false, "会话内容页：每条消息前显示具体时间。默认开启。");
             // 保留条数可配，默认 500。
             _chatLogLimitEntry = plugin.Config.Bind("Chat", "Log Limit", 500,
                 new ConfigDescription("会话内容页保留多少条消息（100-5000，超出后滚动淘汰最旧的）。调大可翻更久的历史。",

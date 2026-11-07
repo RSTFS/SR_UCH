@@ -1105,7 +1105,8 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
                 Vector2 sz = st.CalcSize(c);
                 // 缓冲做进标题自身高度（以前用 GUILayout.Space 追加，紧邻的条目会把这点间距吃掉，
                 // 观感上看不到 —— 用户反馈 10）。这里高度 = 文字高 + 3px，缓冲一定占位。
-                GUILayout.Label(c, st, GUILayout.Width(sz.x), GUILayout.Height(sz.y + Sc(8)));   // 统一底部留白，页面不再各自加 Space
+                GUILayout.Space(Sc(2));
+                GUILayout.Label(c, st, GUILayout.Width(sz.x), GUILayout.Height(sz.y + Sc(2)));   // 分区标题：上下各 2px
             } catch { try { GUILayout.Label(title, SecHeader); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         }
             public static GUIStyle Btn { get { return Style("Btn"); } }

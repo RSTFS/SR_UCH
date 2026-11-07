@@ -160,6 +160,14 @@ public partial class SR {
         internal static string ComposeTip(ConfigEntryBase entry, string desc, ConfigEntry<KeyCode> hk) {
             StringBuilder sb = new StringBuilder(160);
             string body = NormalizeTip(desc);
+            // 第 3 行统一加"注意："前缀，让注意事项在悬浮框里一眼可见（是什么/做什么/注意/默认值/键）
+            try {
+                if (!string.IsNullOrEmpty(body)) {
+                    string[] bl = body.Split('\n');
+                    if (bl.Length >= 3 && !bl[2].StartsWith("注意")) bl[2] = "注意：" + bl[2];
+                    body = string.Join("\n", bl);
+                }
+            } catch (Exception __nt) { Guard.Log("悬浮条目/注意前缀", __nt); }
             if (body.Length > 0) sb.Append(body);
             if (entry != null) {
                 string dft = DefaultSuffix(entry);

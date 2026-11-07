@@ -397,6 +397,15 @@ namespace SR_UCH.Tweaks {
 
 
         public static void TickOnline() {
+            // 房间列表自动刷新：页面开着且不在搜索时，每 15 秒重新查一次；
+            // 房间条目过期后加入会失败（看起来"全失联"），所以不能只靠手动刷新。
+            try {
+                bool pageVisible = Time.frameCount - _renderFrame <= 3;
+                if (pageVisible && !_lobbySearching && Time.unscaledTime - _lastLobbyAutoRefresh > 15f) {
+                    _lastLobbyAutoRefresh = Time.unscaledTime;
+                    RefreshLobbies();
+                }
+            } catch (Exception __ar) { SRApi.Guard.Log("联机/自动刷新", __ar); }
             TickWatchdog();
             TickPendingJoin();
             TickJoinState();
@@ -448,6 +457,7 @@ namespace SR_UCH.Tweaks {
 
         // 游戏本地化小工具：用游戏自己的 I2 术语表，取不到则退回默认值。
         private static int _renderFrame = -1000;   // 本页最近一次被渲染的帧（滚轮钩子只在自己页面上工作）
+        private static float _lastLobbyAutoRefresh = -1000f;   // 列表自动刷新（房间条目会过期，久不刷新就"全失联"）
         private static void RenderOnlinePage() {
             _renderFrame = Time.frameCount;
             // 本页无页面级滚动：表头 / 筛选必须始终可见，房间只在下方框内滚动。

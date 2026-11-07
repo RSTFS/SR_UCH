@@ -341,7 +341,7 @@ namespace SR_UCH.Tweaks {
                 "Refresh Mode",
                 RefreshMode.Realtime,
                 "列表刷新：实时 = 按住切换键期间候选表持续保持最新（已节流，只在按住时有开销）；暂存 = 只在按下切换键那一刻重建一次。");
-            _useSmoke = _mp.Config.Bind("Destroy Blocks", "Use Smoke", true,
+            _useSmoke = _mp.Config.Bind("Destroy Blocks", "Use Smoke", false,
                 "破坏动画：删除方块时播放烟雾与破碎效果；关闭后方块直接消失。");
 
             // 过滤条件变了：实时模式下候选表要重新过滤一次。

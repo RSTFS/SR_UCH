@@ -150,7 +150,11 @@ namespace SR_UCH.Tweaks {
                 bool oldEnabled = GUI.enabled;
                 try {
                     GUI.enabled = oldEnabled && target;
-                    RowAnimal(SRApi.T("指定动物", "Target animal"), _animal);
+                EnsureAnimalList();
+                if (_animal != null && Animals.Count > 0)
+                    SRApi.Ctl.RowCombo(SRApi.T("指定动物", "Target animal"),
+                        SRApi.T("自动选择的目标角色\n从已解锁角色里选一个\n只有「选择方式=指定角色」时生效", "the animal auto-pick targets\nchosen from your unlocked animals\nonly used when pick mode is Specific"),
+                        _animal, Animals.ToArray(), AnimalLabels.ToArray(), 170f);
                 } finally { GUI.enabled = oldEnabled; }
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动选择页", __ex); }
         }

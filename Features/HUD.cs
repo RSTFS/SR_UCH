@@ -469,7 +469,7 @@ namespace SR_UCH.Tweaks {
                 ConfigFile cfg = plugin.Config;
                 // 第一页：配置 / 外观 / 行为。
                 _enabled = cfg.Bind(Sec, "Enabled", false, "显示HUD：总开关（默认关闭）。");
-                _fade = cfg.Bind(Sec, "Fade", true, "淡入淡出：HUD 显示/隐藏时平滑过渡。");
+                _fade = cfg.Bind(Sec, "Fade", false, "淡入淡出：HUD 显示/隐藏时平滑过渡。");
                 _showKey = cfg.Bind(Sec, "Show Key", KeyCode.F5, "显示按键：用于显示 HUD 的按键（默认 F5）。");
             // 默认就是"显示"状态：以前 _toggleOn 初始为 false，每次重开游戏都得先按一下显示键才出现，
             // 现在开局即有 HUD，按键只用来切换隐藏/显示。
@@ -487,7 +487,7 @@ namespace SR_UCH.Tweaks {
                 _warnSeconds = cfg.Bind(Sec, "Warning Seconds", 10,
                     new ConfigDescription("警告秒数（5-60）。", new AcceptableValueRange<int>(5, 60)));
                 _blink = cfg.Bind(Sec, "Blink", false, "闪烁提醒：最后 5 秒倒计时文字闪烁。");
-                _roundNotice = cfg.Bind(Sec, "Round Notice", true, "回合提示：回合数变化时以放大闪烁动画显示当前回合。");
+                _roundNotice = cfg.Bind(Sec, "Round Notice", false, "回合提示：回合数变化时以放大闪烁动画显示当前回合。");
                 // 第二页：显示方案 + 显示内容 + 颜色。
                 _displayMode = cfg.Bind(Sec, "Display Mode", DisplayMode.Inline, "显示方案：平铺（小段横向排列，自动换行，默认）/ 堆叠（每项一行）。");
                 _showPhase = cfg.Bind(Sec, "Show Phase", false, "显示阶段名（默认关闭）。");

@@ -115,7 +115,7 @@ public partial class Chat : ITweak {
             SRApi.LocDesc(Sec, "Pos Y", "垂直偏移（像素）\n负值把聊天框向下移\n仅在位置调整开启时生效", "Vertical offset (px)\nnegative values move the window down\nonly applies while position tweaks are on");
 
             //绑定顺序 = 页面显示顺序
-            _enabled = plugin.Config.Bind(Sec, "Enabled", true, "会话窗口总开关：关掉后本页的聊天框改动全部不生效。");
+            _enabled = plugin.Config.Bind(Sec, "Enabled", false, "会话窗口总开关：关掉后本页的聊天框改动全部不生效。");
             _noAutoShow = plugin.Config.Bind(Sec, "No Auto Show", false, "关闭自动弹出：新消息不再自动显示聊天窗口。");
             _noFade = plugin.Config.Bind(Sec, "No Fade", false, "关闭淡入淡出动画：出现/消失都瞬切。");
             _key = plugin.Config.Bind(Sec, "Window Key", KeyCode.Z, "显示聊天窗口的按键（默认 Z）");
@@ -125,7 +125,7 @@ public partial class Chat : ITweak {
                 "聊天文字字号（1 - 50）。游戏自带的默认是 20，模组默认 18；填什么值我们就按什么值改，"
                 + "现存消息也会一起改。", new AcceptableValueRange<int>(1, 50)));
             //字号键是聊天文字大小行的同伴控件（同排 = 标签 + 滑块 + 按键）
-            _crisp = plugin.Config.Bind(Sec, "Crisp Text", true, "文字清晰度：pixelPerfect。");
+            _crisp = plugin.Config.Bind(Sec, "Crisp Text", false, "文字清晰度：pixelPerfect。");
             //字号键（默认 C）：按住 + 滚轮 = 调字号
             _fontKey = plugin.Config.Bind(Sec, "Font Key", KeyCode.C, "按住 + 滚轮 = 调字号（默认 C）");
             _posEnabled = plugin.Config.Bind(Sec, "Pos Enabled", false, "位置调整总开关。");

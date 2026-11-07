@@ -40,7 +40,7 @@ public partial class Level {
         ConfigEntryBase __drop = SRApi.Ctl.FindEntry("Level", "Drop Held Piece");
         GUILayout.Space(SRApi.Ctl.Sc(4));
         if (__drop != null) SRApi.Ctl.LabeledRow(SRApi.T("放弃道具", "Drop held piece"),
-            SRApi.T("排队阶段丢弃手上的道具\n请勿删除边界墙和出生方块，一经删除无法复原\n仅排队阶段、走游戏原生通道", "Discards the held piece during the pick phase\nDo not delete boundary walls or spawn blocks; they cannot be restored\nPick phase only, uses the game channel"), __drop, 120f);
+            SRApi.T("派对阶段丢弃手上的道具\n请勿删除边界墙和出生方块，一经删除无法复原\n仅派对阶段、走游戏原生通道", "Discards the held piece during the pick phase\nDo not delete boundary walls or spawn blocks; they cannot be restored\nPick phase only, uses the game channel"), __drop, 120f);
 
         // 派对盒炸弹：对局内所有成员都发过炸弹！快捷短语才生成
         SRApi.Ctl.SectionTitle(SRApi.T("- 派对盒子炸弹 -", "- Party-box bomb -"));
@@ -237,7 +237,7 @@ public partial class Level {
         public void Initialize(IFeatureHost plugin) {
             try {
                 SRApi.LocKey("Level", "Drop Held Piece", "放弃道具", "Drop held piece");
-                SRApi.LocDesc("Level", "Drop Held Piece", "放弃道具按键\n排队阶段丢弃手上的道具（游戏原生通道）\n请勿删除边界墙和出生方块，删了无法复原", "Drop held piece\ndiscards the held piece during the pick phase via the game channel\nnever delete boundary walls or spawn blocks - it cannot be undone");
+                SRApi.LocDesc("Level", "Drop Held Piece", "放弃道具按键\n派对阶段丢弃手上的道具（游戏原生通道）\n请勿删除边界墙和出生方块，删了无法复原", "Drop held piece\ndiscards the held piece during the pick phase via the game channel\nnever delete boundary walls or spawn blocks - it cannot be undone");
                 _key = plugin.Config.Bind("Level", "Drop Held Piece", KeyCode.None,
                     "按这个键就把手上拿着的那块丢掉（走游戏原生通道, 全员可见）, 填 None 就是不绑键.");
                 SRApi.RegisterKey("关卡-放弃道具", _key, "press");
@@ -515,7 +515,7 @@ public class AutoPartyItem : ITweak {
                 "自动道具：派对盒开启后自动随机挑一个道具（与手动挑选同一条链路）。");
             _delay = plugin.Config.Bind("Level", "Auto Party Item Delay", 0.5f,
                 new ConfigDescription("自动道具延迟（0-3 秒，步进 0.1）：开箱后等多久再自动挑。", new AcceptableValueRange<float>(0f, 3f)));
-            _skipBomb = plugin.Config.Bind("Level", "Auto Party Item Skip Bomb", true,
+            _skipBomb = plugin.Config.Bind("Level", "Auto Party Item Skip Bomb", false,
                 "跳过炸弹：自动挑道具时不挑派对盒里的炸弹。");
             SRApi.RegisterTick("派对盒-自动道具", Tick);
         } catch (Exception __ex) { SRApi.Guard.Log("自动道具/初始化", __ex); }

@@ -560,6 +560,7 @@ public partial class SR {
                         + " scrollY=" + _scroll.y.ToString("0.0"));
                 } catch (Exception __wd) { Guard.Log("滚轮诊断", __wd); }
             }
+            bool __pageScrolled = false;   // 本帧的滚动是"页面自己滚的"（不是控件抢走）
             // 页面级滚轮：页面可以在滚动区之前抢走滚轮（自绘固定高度列表靠这个滚动）。
             if (__wasWheel && !WheelShieldHit) {
                 try {
@@ -577,6 +578,7 @@ public partial class SR {
                     float __hx = Mathf.Abs(__we.delta.y) > 0.001f ? __we.delta.y : __we.delta.x;
                     if (Mathf.Abs(__hx) > 0.0001f) {
                         _scroll.x = Mathf.Max(0f, _scroll.x + __hx * Sc(60f));
+                        __pageScrolled = true;
                         __we.Use(); __we.type = EventType.Used; WheelShieldHit = true; SR.MarkWheelUsed();
                     }
                 } catch (Exception __hs) { Guard.Log("页面横向滚动", __hs); }
@@ -598,11 +600,13 @@ public partial class SR {
                     float __vy = Mathf.Abs(__we.delta.y) > 0.001f ? __we.delta.y : __we.delta.x;
                     if (Mathf.Abs(__vy) > 0.0001f) {
                         _scroll.y = Mathf.Max(0f, _scroll.y + __vy * Sc(58f));
+                        __pageScrolled = true;
                         __we.Use(); __we.type = EventType.Used; WheelShieldHit = true; SR.MarkWheelUsed();
                     }
                 } catch (Exception __vs) { Guard.Log("页面竖向滚动", __vs); }
             }
             bool __noScroll = _noScrollDeclared || __overCtrlPrev || WheelShieldHit;
+
             // 设置页的页签画在滚动区**之外**：常驻顶部，不受滚动影响；
             // 「恢复默认」跟着页签排在最右侧（只对通用页有意义，自检页隐藏）。
             _scroll = __noScroll
@@ -672,7 +676,8 @@ public partial class SR {
             } catch (Exception __vm) { Guard.Log("页面视口实测", __vm); }
             // 滚轮被下拉框 / 滑块吃掉 -> 撤销本帧页面滚动。
             // 两道判定：1) 盾（绘制前、上一帧矩形命中）；2) 本帧绘制后的控件矩形命中。
-            if (WheelShieldHit || (__wasWheel && __overCtrlPrev)) {
+            // 只撤销"被控件吃掉"的滚动；页面自己滚的不能撤（否则完全滚不动）。
+            if (!__pageScrolled && (WheelShieldHit || (__wasWheel && __overCtrlPrev))) {
                 _scroll = pageBefore;
                 WheelFrame = Time.frameCount;   // 让用 Input 读轴的缩放路径本帧让步
             }
