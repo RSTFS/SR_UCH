@@ -55,10 +55,18 @@ namespace SR_UCH.Tweaks {
             // 两种坐标空间都比一次，避免容器层级差异导致的错位。
             internal static float TakeIfInside(Rect rect) {
                 if (!HasPending) return 0f;
+                // 控件矩形通常处在"页面滚动内容"坐标里：屏幕坐标 = 矩形 + 区域偏移 − 页面滚动。
+                // 三种候选各比一次（原始 / +区域偏移 / +区域偏移−页面滚动），命中任一即可：
+                // 不同容器层级下 Unity 给的 mousePosition 空间并不统一，多比一次没有副作用。
                 bool hit = rect.Contains(_mouse);
                 if (!hit) {
-                    Rect screenRect = new Rect(rect.x + SR.AreaOffset.x, rect.y + SR.AreaOffset.y, rect.width, rect.height);
-                    hit = screenRect.Contains(_mouse);
+                    Rect r1 = new Rect(rect.x + SR.AreaOffset.x, rect.y + SR.AreaOffset.y, rect.width, rect.height);
+                    hit = r1.Contains(_mouse);
+                }
+                if (!hit) {
+                    Vector2 ps = SRApi.PageScroll;
+                    Rect r2 = new Rect(rect.x + SR.AreaOffset.x - ps.x, rect.y + SR.AreaOffset.y - ps.y, rect.width, rect.height);
+                    hit = r2.Contains(_mouse);
                 }
                 if (!hit) return 0f;
                 float v = _pending;
