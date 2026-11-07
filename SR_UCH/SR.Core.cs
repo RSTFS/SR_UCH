@@ -418,6 +418,16 @@ public partial class SR : ITweak {
                 string path = cfg.ConfigFilePath;
                 if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) return 0;
                 string text = System.IO.File.ReadAllText(path, System.Text.Encoding.UTF8);
+                // 内存表同步清理：否则文件已删、界面仍按旧表显示"还有孤儿"
+                try {
+                    for (int i = 0; i < pairs.Count; i++) {
+                        string[] __kv = pairs[i].Split(ConfigMigration.AuditSep);
+                        if (__kv.Length == 2) {
+                            try { dict.Remove(new ConfigDefinition(__kv[0], __kv[1])); } catch (Exception __rm) { Guard.Log("孤儿键/移出内存表", __rm); }
+                        }
+                    }
+                } catch (Exception __cm) { Guard.Log("孤儿键/内存表清理", __cm); }
+                OrphanAudit();   // 重新统计，界面与清理结果一致
                 string newText = ConfigMigration.RemovePairs(text, pairs);
                 if (newText == text) return 0;
                 if (!ConfigMigration.WriteCfgAtomic(path, newText, "清理孤儿键")) return 0;
@@ -441,6 +451,13 @@ public partial class SR : ITweak {
                 System.Text.StringBuilder real = new System.Text.StringBuilder();
                 foreach (System.Collections.DictionaryEntry de in dict) {
                     ConfigDefinition def = de.Key is ConfigDefinition ? (ConfigDefinition)de.Key : default(ConfigDefinition);
+                    // 页签记忆键（[UI] Page XXX）是动态键名：界面按"Page " + 栏目名读取，
+                    // 静态扫描看不到 Bind → 会被误判成孤儿。以前提示"8 个孤儿"、点清理却说没有，
+                    // 就是因为显示与清理用的不是同一份名单。
+                    if (def.Section == "UI" && def.Key != null && def.Key.StartsWith("Page ", StringComparison.Ordinal)) {
+                        OrphanPendingCount++;
+                        continue;
+                    }
                     // 快捷键条目是按需生成的（新建快捷键时才 Bind），审计跑在生成之前 → 它们只是"尚未生成"，不是孤儿键。
                     if (def.Section == "Hotkeys"
                         || (def.Section == "Settings" && def.Key != null && def.Key.StartsWith("组合键", StringComparison.Ordinal))) {
