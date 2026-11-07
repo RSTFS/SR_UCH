@@ -32,6 +32,7 @@ CursorResize
 Diag
 DrawFill
 DrawLine
+DrawPanel
 Env
 FlushConfig
 FooterHeight
@@ -77,6 +78,7 @@ RegisterDismissHook
 RegisterFooterButton
 RegisterInputGateHold
 RegisterKey
+RegisterOverlay
 RegisterPage
 RegisterPageChrome
 RegisterPageWheel
@@ -117,4 +119,5 @@ ToColor32
 ToHex
 Typing
 UiOpen
+WheelArea
 WheelFrame

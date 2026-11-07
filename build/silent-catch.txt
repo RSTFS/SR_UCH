@@ -14,6 +14,7 @@ Features/BuildingPresets.Io.cs=7
 Features/BuildingPresets.Load.cs=4
 Features/BuildingPresets.Mods.cs=2
 Features/BuildingPresets.Util.cs=4
+Features/CharacterAuto.cs=2
 Features/Chat.Log.cs=2
 Features/Chat.Window.cs=1
 Features/DestroyBlocks.cs=1

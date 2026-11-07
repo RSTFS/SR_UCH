@@ -196,7 +196,7 @@ public class QuickAdjust : ITweak {
         SRApi.LocSec("Quick Adjust", "快速调整", null);
         SRApi.Nav("Quick Adjust", 30); // 侧栏栏目顺序 30
         SRApi.RegisterPage("Quick Adjust", "qa", "快速调整", "Quick adjust", 10, Render);   // 第 1 页：本功能页自绘
-        SRApi.RegisterPage("Quick Adjust", "challenge", "挑战", "Challenge", 20, RenderChallengePage);   // 第 2 页：挑战重试（从关卡移过来）
+        SRApi.RegisterPage("Quick Adjust", "challenge", "重生", "Respawn", 20, RenderChallengePage);   // 第 2 页：挑战 + 重生两个分区
         SRApi.LocKey("Quick Adjust", "Quick Switch", "快速切换", null);
         SRApi.LocDesc("Quick Adjust", "Quick Switch", "快速切换\n自由模式下长按切换键在行动与建造间切换\n仅自由模式生效", "Quick switch\nin freeplay, hold the key to swap action and build\nfreeplay only");
         SRApi.LocKey("Quick Adjust", "Quick Switch Hold", "等待秒数", null);
@@ -249,7 +249,6 @@ public class QuickAdjust : ITweak {
             _draftText = null;   // 滑块模式以配置为准
             GUILayout.Label(nslide + "%", SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(56)), GUILayout.Height(SRApi.Ctl.Sc(26)));
         }
-        GUILayout.Space(SRApi.Ctl.Sc(10));
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(2));
@@ -274,11 +273,6 @@ public class QuickAdjust : ITweak {
         }
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
-        GUILayout.Space(SRApi.Ctl.Sc(8));
-        GUILayout.Space(SRApi.Ctl.Sc(6));
-
-        // 重试相关内容已迁出：自动重试在「挑战」栏目，快速重试在「关卡 → 重试」页。
-        GUILayout.Space(SRApi.Ctl.Sc(6));
 
         SRApi.Ctl.SectionTitle(SRApi.T("- 快速切换 -", "- Quick switch -"));
         GUILayout.BeginHorizontal();
@@ -287,7 +281,6 @@ public class QuickAdjust : ITweak {
         if (qs != null) SRApi.Ctl.RenderControl(qs);
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
-        GUILayout.Space(SRApi.Ctl.Sc(2));
         GUILayout.BeginHorizontal();
         ConfigEntryBase qsh = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Switch Hold");
         string vanillaSwitch = QuickAdjust.VanillaHoldBText(true);
@@ -340,7 +333,6 @@ public class QuickAdjust : ITweak {
             // 挑战分区的最后一条：死亡不弹记分板
             RespawnTools.RenderNoScoreboardRow();
             // 分区二：重生（与挑战合并到同一页，分区在挑战下面）
-            GUILayout.Space(SRApi.Ctl.Sc(6));
             RespawnTools.RenderRespawnSection();
         } catch (Exception __ex) { SRApi.Guard.Log("快速调整/挑战页", __ex); }
     }

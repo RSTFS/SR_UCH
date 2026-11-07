@@ -254,6 +254,7 @@ public partial class SR {
                 // 面板已关：把自绘页声明的系统光标形状收掉，否则 <->/+ 光标会留在屏幕上
                 try { ClearTip(); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 RunFrameEndHooks();
+            SR.Wheel.PruneZones();   // 回收最近 5 帧未再注册的区域（换页后旧矩形不再吃滚轮）
                 return;
             }
             _scaled = Mathf.Clamp(_uiScaleEntry.Value, Ui.ScaleMin, Ui.ScaleMax);
@@ -276,7 +277,7 @@ public partial class SR {
 
             Event e = Event.current;
             Vector2 mouse = e.mousePosition; // 无矩阵缩放，无需坐标换算
-            SR.Wheel.FrameStart(e);          // 滚轮仲裁：一帧只有一个决策点
+            SR.Wheel.FrameStart(e);          // 滚轮仲裁：只更新本趟事件信息（区域表跨趟持久）
 
             Rect winRect = new Rect(_winX, _winY, _winWidth, _winHeight);
             bool over = winRect.Contains(mouse);
@@ -566,15 +567,13 @@ public partial class SR {
             // 所以必须在绘制前统一裁决；不再使用"盾/撤销/接管"那套互相打架的机制。
             if (__wasWheel) {
                 try {
-                    bool __consumed = SR.Wheel.Consume();
+                    bool __consumed = SR.Wheel.Consume(__we, SR.AreaOffset);
                     if (!__consumed && _noScrollDeclared) { __consumed = true; }   // 页面明确不要滚动：吞掉，别落到世界
                     if (!__consumed) {
                         bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-                        if (__shift) {
-                            _scroll.x = Mathf.Max(0f, _scroll.x - SR.Wheel.Value * Sc(60f));   // 上滚向左
-                        } else {
-                            _scroll.y = Mathf.Max(0f, _scroll.y - SR.Wheel.Value * Sc(56f));   // 上滚向上
-                        }
+                        // 一次滚轮 = 固定一格（上滚为正 → 内容下移，看起来是往上滚）
+                        if (__shift) _scroll.x = Mathf.Max(0f, _scroll.x - SR.Wheel.Value * Sc(64f));
+                        else _scroll.y = Mathf.Max(0f, _scroll.y - SR.Wheel.Value * Sc(64f));
                         __consumed = true;
                     }
                     if (__consumed) { __we.Use(); __we.type = EventType.Used; SR.MarkWheelUsed(); }
@@ -582,8 +581,11 @@ public partial class SR {
             }
             bool __noScroll = _noScrollDeclared;
 
-            // 设置页的页签画在滚动区**之外**：常驻顶部，不受滚动影响；
-            // 「恢复默认」跟着页签排在最右侧（只对通用页有意义，自检页隐藏）。
+            // 设置页签常驻顶部（画在滚动区之外，不受滚动影响）：「恢复默认」跟在同一行最右侧。
+            if (_mode == Mode.Settings) {
+                try { SR.RenderSettingsTabBar(); }
+                catch (Exception __tb) { Guard.Log("设置页签", __tb); }
+            }
             _scroll = GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUIStyle.none, GUILayout.ExpandHeight(true));   // 弹性占满剩余高度
             if (_scroll != pageBefore) WheelFrame = Time.frameCount; // 页面滚动区吃掉了滚轮
             ConfigFile curConfig = _mode == Mode.Internal

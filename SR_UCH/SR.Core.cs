@@ -1001,6 +1001,11 @@ public partial class SR : ITweak {
                     return SR.Ctl.RowSlider(__l, __t, __e, __min, __max, __w, __f);
                 });
                 SRApi.SetTypingSink(delegate { return SR.Typing; });
+                SRApi.SetWheelZoneSink(delegate (string __id, Rect __rect, Func<float, bool> __h, int __prio) {
+                    SR.Wheel.Register(__id, __rect, __h, __prio);
+                });
+                SRApi.SetOverlaySink(delegate (Action __d) { SR.RegisterOverlay(__d); });
+                SRApi.SetRoundedSink(delegate (Rect __r, Color __c, float __rad) { SR.DrawRounded(__r, __c, __rad); });
                 // 页面级滚轮钩子统一交给仲裁：控件 > 页面钩子 > 页面滚动
                 SR.Wheel.RegisterPageHook(delegate (Vector2 __m, float __w) { return SRApi.DispatchPageWheel(__m, __w); });
                 SRApi.Ctl.SetButtonSink(delegate (string __l, string __t, float __w, float __h) {

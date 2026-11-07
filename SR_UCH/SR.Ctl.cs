@@ -288,6 +288,12 @@ public partial class SR {
             return picked;
         }
 
+        // 稳定的区域 id（同一配置条目永远同一个 id，跨帧/跨趟都不会重复建表）
+        private static string RowKey(ConfigEntryBase e) {
+            try { return e == null ? "?" : (e.Definition.Section + "/" + e.Definition.Key); }
+            catch { return "?"; }
+        }
+
         // 点标签恢复默认值（复选框/滑块/编辑框/下拉通用）：只处理左键 MouseDown，且指针在标签矩形内。
         private static void ResetOnLabelClick(Rect labelRect, ConfigEntryBase e) {
             try {
@@ -321,7 +327,8 @@ public partial class SR {
                     // 滚轮调值：悬停即归本滑块（核心仲裁，优先级高于页面滚动）
                     {
                         ConfigEntryBase __e = e; float __mn = min, __mx = max;
-                        SR.Wheel.Register(new Rect(r.x - Sc(2), r.y - Sc(2), r.width + Sc(4), r.height + Sc(4)),
+                        SR.Wheel.Register("slider:" + RowKey(__e),
+                            new Rect(r.x - Sc(2), r.y - Sc(2), r.width + Sc(4), r.height + Sc(4)),
                             delegate (float __w) {
                                 float __c = System.Convert.ToSingle(__e.BoxedValue);
                                 float __st = Mathf.Max((__mx - __mn) * 0.02f, 0.001f);

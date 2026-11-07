@@ -1298,7 +1298,8 @@ public partial class SR {
                             Rect __zr = sr;
                             float __mn = hmin, __mx = hmax; bool __int = val is int; float __st = hstep;
                             ConfigEntryBase __e = entry;
-                            SR.Wheel.Register(new Rect(__zr.x - Sc(2), __zr.y - Sc(2), __zr.width + Sc(4), __zr.height + Sc(4)),
+                            SR.Wheel.Register("rowslider:" + (__e.Definition.Section + "/" + __e.Definition.Key),
+                                new Rect(__zr.x - Sc(2), __zr.y - Sc(2), __zr.width + Sc(4), __zr.height + Sc(4)),
                                 delegate (float __w) {
                                     float __cur = __e.BoxedValue is int ? (int)__e.BoxedValue : System.Convert.ToSingle(__e.BoxedValue);
                                     float __step = __int ? (__st > 0f ? __st : 1f) : Mathf.Max((__mx - __mn) * 0.02f, 0.001f);
@@ -1464,7 +1465,8 @@ public partial class SR {
             Rect boxRect = GUILayoutUtility.GetLastRect();
             if (options != null && options.Length > 1) {
                 if (!open) {
-                    SR.Wheel.Register(boxRect, delegate (float __w) {
+                    SR.Wheel.Register("combo:" + (entry != null ? entry.Definition.Section + "/" + entry.Definition.Key : current),
+                        boxRect, delegate (float __w) {
                         int __cur = 0;
                         for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur = i; break; } }
                         int __ni = __w > 0f ? __cur - 1 : __cur + 1;
@@ -1476,7 +1478,8 @@ public partial class SR {
                 } else if (drew && options.Length > 8 && entry != null) {
                     int __vis2 = Mathf.Min(options.Length, 8);
                     Rect __lr2 = new Rect(boxRect.x, boxRect.yMax, width, CtlH() * __vis2);
-                    SR.Wheel.Register(__lr2, delegate (float __w) {
+                    SR.Wheel.Register("combolist:" + (entry != null ? entry.Definition.Section + "/" + entry.Definition.Key : current),
+                        __lr2, delegate (float __w) {
                         int __sc;
                         if (!_comboScroll.TryGetValue(entry, out __sc)) __sc = 0;
                         int __nv = Mathf.Clamp(__sc + (__w > 0f ? -2 : 2), 0, options.Length - 8);

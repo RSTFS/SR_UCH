@@ -297,6 +297,23 @@ namespace SR_UCH {
 
         // 关掉管理器：功能页要打开游戏自己的界面（规则书/修改器/积分）时必须先收起本面板，
         // 否则输入被本面板冻结，游戏界面点不动。
+        // 覆盖层（画在窗口最上层，不受页面裁剪）：功能的弹出列表用
+        // 滚轮区域（功能自绘控件用）：id 稳定、矩形为布局坐标，处理器返回 true = 已消费
+        private static Action<string, Rect, Func<float, bool>, int> _wheelZone;
+        public static void SetWheelZoneSink(Action<string, Rect, Func<float, bool>, int> f) { _wheelZone = f; }
+        public static void WheelArea(string id, Rect layoutRect, Func<float, bool> handler) {
+            Action<string, Rect, Func<float, bool>, int> f = _wheelZone;
+            if (f != null) f(id, layoutRect, handler, 0);   // 0 = 控件优先级
+        }
+
+        private static Action<Action> _overlay;
+        public static void SetOverlaySink(Action<Action> f) { _overlay = f; }
+        public static void RegisterOverlay(Action draw) { Action<Action> f = _overlay; if (f != null) f(draw); }
+        // 圆角面板（与核心同一套主题色）
+        private static Action<Rect, Color, float> _rounded;
+        public static void SetRoundedSink(Action<Rect, Color, float> f) { _rounded = f; }
+        public static void DrawPanel(Rect r, Color c, float radius) { Action<Rect, Color, float> f = _rounded; if (f != null) f(r, c, radius); }
+
         private static Action _closeMenu;
         public static void SetCloseMenuSink(Action closeMenu) { _closeMenu = closeMenu; }
         public static void CloseMenu() { Action a = _closeMenu; if (a != null) a(); }
