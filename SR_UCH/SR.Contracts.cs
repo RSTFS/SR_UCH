@@ -1025,6 +1025,19 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
                 if (f != null) f(label, tip, e, labelWidth);
             }
 
+            // 统一入口：Row = 带标签的条目行（按控件类型自动选控件），新页面只用这一个 API。
+            public static void Row(string label, string tip, ConfigEntryBase e, float labelWidth = 0f) {
+                LabeledRow(label, tip, e, labelWidth);
+            }
+
+            // 带标签的下拉行：entry 作为稳定 ID 交给核心管理展开态；选中即写值并收起。
+            private static Func<string, string, ConfigEntryBase, string[], string[], float, float, int> _rowCombo;
+            public static void SetRowComboSink(Func<string, string, ConfigEntryBase, string[], string[], float, float, int> f) { _rowCombo = f; }
+            public static int RowCombo(string label, string tip, ConfigEntryBase e, string[] vals, string[] labels, float width = 160f, float labelWidth = 0f) {
+                Func<string, string, ConfigEntryBase, string[], string[], float, float, int> f = _rowCombo;
+                return f != null ? f(label, tip, e, vals, labels, width, labelWidth) : -1;
+            }
+
             // 带标签的滑块行：统一 0.1 步进、数值右对齐（以前每个页面各抄一份，格式与宽度容易走样）。
             private static Func<string, string, ConfigEntryBase, float, float, float, string, bool> _rowSlider;
             public static void SetRowSliderSink(Func<string, string, ConfigEntryBase, float, float, float, string, bool> f) { _rowSlider = f; }

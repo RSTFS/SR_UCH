@@ -11,31 +11,20 @@ namespace SR_UCH.Tweaks {
 [SrFeature("sr.experiments", "Experiments", "1.0")]
 public partial class Experiments : ITweak
     {
-        //进阶条目行：标签在左、控件紧贴其右（全项目复选框统一排版，见 SR 设置页.RenderEntryRow）。
+        // 统一控件：标签 + 控件由核心排版（标签宽度按文字实测），页面不再各写一份水平布局。
         private static void AdvRow(string key, string zh, string en, string zhTip, string enTip) {
             try {
                 ConfigEntryBase e = SRApi.Ctl.FindEntry("Experiments", key);
                 if (e == null) return;
-                GUILayout.BeginHorizontal();
-                SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T(zh, en), SRApi.T(zhTip, enTip)), e, SRApi.Ctl.Sc(200), SRApi.Ctl.Sc(26));
-                GUILayout.Space(SRApi.Ctl.Sc(6));
-                SRApi.Ctl.RenderControl(e);
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
+                SRApi.Ctl.Row(SRApi.T(zh, en), SRApi.T(zhTip, enTip), e, 200f);
             } catch (Exception __ex) { SRApi.Guard.Log("渲染进阶条目", __ex); }
         }
 
-        // 条目行统一排版（全项目约定）：标签在左、控件紧贴其右，其余空间留白。
         private static void Row(string zh, string en, string zhTip, string enTip, string key) {
             try {
                 ConfigEntryBase e = SRApi.Ctl.FindEntry("Experiments", key);
                 if (e == null) return;
-                GUILayout.BeginHorizontal();
-                SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T(zh, en), SRApi.T(zhTip, enTip)), e, SRApi.Ctl.Sc(200), SRApi.Ctl.Sc(26));
-                GUILayout.Space(SRApi.Ctl.Sc(6));
-                SRApi.Ctl.RenderControl(e);
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
+                SRApi.Ctl.Row(SRApi.T(zh, en), SRApi.T(zhTip, enTip), e, 200f);
             } catch (Exception __ex) { SRApi.Guard.Log("渲染关卡边界条目", __ex); }
         }
 

@@ -1000,6 +1000,9 @@ public partial class SR : ITweak {
                 SRApi.Ctl.SetRowSliderSink(delegate (string __l, string __t, ConfigEntryBase __e, float __min, float __max, float __w, string __f) {
                     return SR.Ctl.RowSlider(__l, __t, __e, __min, __max, __w, __f);
                 });
+                SRApi.Ctl.SetRowComboSink(delegate (string __l, string __t, ConfigEntryBase __e, string[] __vals, string[] __labels, float __cw, float __lw) {
+                    return SR.Ctl.RowCombo(__l, __t, __e, __vals, __labels, __cw, __lw);
+                });
                 SRApi.Ctl.SetCheckStylesSink(delegate () { return SR.Ctl.CheckOn; }, delegate () { return SR.Ctl.CheckOff; });
                 SRApi.SetTableColMoveSink(delegate (Event __e, Rect __c, int __ci, int __k, List<int> __cols, Vector2 __mp, bool __in,
                     List<Rect> __hc, int[] __ord, Action<int[]> __ao, Action __sv, Action<int> __ck,

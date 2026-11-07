@@ -249,6 +249,33 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("统一行控件", __ex); }
         }
 
+        // 统一下拉行：标签按文字实测，entry 作为稳定 ID 交给核心管理展开态，选中即写值并收起。
+        public static int RowCombo(string label, string tip, ConfigEntryBase e, string[] vals, string[] labels, float width, float labelWidth) {
+            if (e == null || vals == null || labels == null || vals.Length == 0 || labels.Length == 0) return -1;
+            int picked = -1;
+            try {
+                GUILayout.BeginHorizontal();
+                try {
+                    float lw = labelWidth > 0f ? Sc(labelWidth)
+                        : Mathf.Max(Sc(60), SR.Ctl.Label.CalcSize(SRApi.Ctl.Content(label, tip)).x + Sc(10));
+                    GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
+                    string cur = e.BoxedValue as string ?? "";
+                    int idx = 0;
+                    for (int i = 0; i < vals.Length; i++) if (vals[i] == cur) { idx = i; break; }
+                    idx = Mathf.Clamp(idx, 0, labels.Length - 1);
+                    bool open = false;
+                    int sel = ComboBox(e, labels[idx], vals, labels, ref open, Sc(width));
+                    if (sel >= 0 && sel < vals.Length) {
+                        SetValue(e, vals[sel]);
+                        picked = sel;
+                        if (SRApi.Ctl.EditOpen != null) SRApi.Ctl.EditOpen[e] = false;   // 选中后明确收起
+                    }
+                    GUILayout.FlexibleSpace();
+                } finally { GUILayout.EndHorizontal(); }
+            } catch (Exception __ex) { Guard.Log("统一下拉行", __ex); }
+            return picked;
+        }
+
         // 统一滑块行：0.1 步进 + 数值右对齐；返回本帧是否写入了新值。
         public static bool RowSlider(string label, string tip, ConfigEntryBase e, float min, float max, float labelWidth, string fmt) {
             if (e == null || max <= min) return false;

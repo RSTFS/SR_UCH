@@ -19,7 +19,6 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<bool> _outfitOn;    // 自动时装（随机整套）
 
         private static readonly string[] ModeVals = { "target", "random", "smart" };
-        private static bool _comboOpenMode;
 
         // 每进一次房间只自动选一次：场景切换时复位。
         private static bool _triedThisRoom;
@@ -121,10 +120,13 @@ namespace SR_UCH.Tweaks {
                 SRApi.Ctl.SectionTitle(SRApi.T("- 自动选择 -", "- Auto pick -"));
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) { return e.Definition.Key == "Enabled"; });
                 EnsureAnimalList();
-                // 传原始枚举值：以前传 ModeLabel(...)（本地化显示名），与 ModeVals 永远不相等，
-                // 于是 cur 恒 0，下拉永远显示第一项（配置其实已改）。
-                RowCombo(SRApi.T("选择方式", "Pick mode"), (_mode != null ? _mode.Value : "target"),
-                    ModeVals, new string[] { ModeLabel("target"), ModeLabel("random"), ModeLabel("smart") }, ref _comboOpenMode, _mode);
+                // 统一控件：核心的 RowCombo 用配置条目当稳定 ID 管理展开态，选中即写值并收起。
+                // 注意传原始枚举值（以前传本地化显示名，与 ModeVals 永不相等 → 永远显示第一项）。
+                if (_mode != null)
+                    SRApi.Ctl.RowCombo(SRApi.T("选择方式", "Pick mode"),
+                        SRApi.T("选择方式\n指定 = 每次挑同一只\n随机 = 已解锁空闲里随机；智能 = 优先你用得最多的",
+                                "Pick mode\nSpecific = always the same animal\nRandom = any unlocked free one; Smart = your most used"),
+                        _mode, ModeVals, new string[] { ModeLabel("target"), ModeLabel("random"), ModeLabel("smart") }, 160f, 96f);
                 // 结构固定：非「指定」时置灰，不变更控件数量（否则 IMGUI 会报 LayoutGroup 不匹配）。
                 bool target = (_mode == null || string.IsNullOrEmpty(_mode.Value) || _mode.Value == "target");
                 bool oldEnabled = GUI.enabled;
@@ -152,17 +154,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动时装页", __ex); }
         }
 
-        private static void RowCombo(string label, string current, string[] vals, string[] labels, ref bool open, ConfigEntry<string> entry) {
-            GUILayout.BeginHorizontal();
-            try {
-                GUILayout.Label(label, SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(96f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
-                int cur = 0;
-                for (int i = 0; i < vals.Length; i++) if (vals[i] == current) { cur = i; break; }
-                int sel = SRApi.Ctl.ComboBox(entry, labels[cur], vals, labels, ref open, SRApi.Ctl.Sc(160f));
-                if (sel >= 0 && sel < vals.Length && entry != null && entry.Value != vals[sel]) entry.Value = vals[sel];
-                GUILayout.FlexibleSpace();
-            } finally { GUILayout.EndHorizontal(); }
-        }
+
 
         // 指定动物：直接排成按钮网格，全部可见（下拉框装不下时会被裁掉）。
         private static void RowAnimal(string label, ConfigEntry<string> entry) {
