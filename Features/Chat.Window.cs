@@ -84,9 +84,9 @@ public partial class Chat : ITweak {
             SRApi.RowSliders.Add(FontSizeSlider);
             SRApi.RowSliders.Add(PosSlider); //位置 X/Y：滑块范围按当前分辨率给
 
-        // 总开关已删除：清掉可能残留在配置里的旧键。
-        try { SRApi.Migration.Remove(Sec, "Enabled"); }
-        catch (Exception __cx) { SRApi.Guard.Log("对话窗口/淘汰总开关键", __cx); }
+        // 注意：这里**不能**再登记 Remove(Sec, "Enabled")——本页第 118 行仍在 Bind 这个键，
+        // 登了就会"每次启动删一次、永远保存不下来"（启动自检的迁移规则冲突告警就是它）。
+        // 总开关确实存在的功能不要再往清理名单里放。
             SRApi.LocKey(Sec, "Enabled", "启用增强", "Enable tweaks");
             SRApi.LocDesc(Sec, "Enabled", "聊天窗口增强总开关\n开启后本页各项修改才生效\n关闭即回到游戏原版行为", "Chat window master switch\nthe options here apply only while on\noff returns to vanilla behaviour");
             SRApi.LocKey(Sec, "No Auto Show", "关闭自动弹出", "Suppress auto show");
