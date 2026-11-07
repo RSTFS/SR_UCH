@@ -428,7 +428,7 @@ namespace SR_UCH.Tweaks {
             try { PrunePlacementsIfDue(); } catch (Exception __pp) { SRApi.Guard.Log("方块破坏/归属表修剪", __pp); }
             if (!SRApi.GateMaster) return;
             if (!Enabled) return;
-            if (SRApi.UiOpen && SRApi.BlockInput) return; 
+            if (SRApi.Typing) return; 
             // 仅派对 / 创意 / 自由建造模式；已接入 IgnoreModeLimit 豁免。
             if (!SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay)) return;
             // 权限：只有房主能真正删除；房客照样可以按住切换键高亮、滚轮换目标、看信息条（只读）。

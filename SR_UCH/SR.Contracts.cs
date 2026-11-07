@@ -693,6 +693,11 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static bool NoPageScrollBars { get { Func<bool> f = _noPageScrollBars; return f != null && f(); } set { Action<bool> a = _setNoPageScrollBars; if (a != null) a(value); } }
         public static bool CursorResize { get { Func<bool> f = _cursorResize; return f != null && f(); } set { Action<bool> a = _setCursorResize; if (a != null) a(value); } }
         public static bool CursorMove { get { Func<bool> f = _cursorMove; return f != null && f(); } set { Action<bool> a = _setCursorMove; if (a != null) a(value); } }
+        private static Func<bool> _typing;
+        public static void SetTypingSink(Func<bool> f) { _typing = f; }
+        // 正在输入文字（聊天/文本框）：键位轮询一律让路。面板打开本身不再拦功能快捷键。
+        public static bool Typing { get { Func<bool> f = _typing; return f != null && f(); } }
+
         public static void RegisterTypingProvider(Func<bool> provider) { Action<Func<bool>> f = _typingProvider; if (f != null) f(provider); }
         public static void RegisterInputGateHold(Func<bool> hold) { Action<Func<bool>> f = _inputGateHold; if (f != null) f(hold); }
         public static void RegisterCameraView(Action<Camera> apply) { Action<Action<Camera>> f = _cameraView; if (f != null) f(apply); }

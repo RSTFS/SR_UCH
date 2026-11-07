@@ -167,7 +167,7 @@ namespace SR_UCH.Tweaks {
         static void ToggleKeys() {
             if (!SRApi.GateMaster) return;
             if (!Enabled) return;
-            if (SRApi.UiOpen && SRApi.BlockInput) return; 
+            if (SRApi.Typing) return; 
             if (SRApi.ComboKeyDown(_toggleCollisionKey)) { _collisionEntry.Value = !_collisionEntry.Value; Notify(SRApi.T("无视碰撞", "Collision Override"), _collisionEntry.Value); }
             if (SRApi.ComboKeyDown(_toggleGridKey)) { _gridEntry.Value = !_gridEntry.Value; Notify(SRApi.T("自由放置", "Free Placement"), _gridEntry.Value); }
         }
@@ -183,7 +183,7 @@ namespace SR_UCH.Tweaks {
             try {
                         if (!SRApi.GateMaster) return;
                         if (!Enabled) return;
-                        if (SRApi.UiOpen && SRApi.BlockInput) return; 
+                        if (SRApi.Typing) return; 
                         if (__instance.Piece == null) return;
                         __instance.Piece.IgnorePlacementRules = _collisionOverride;
             } catch (Exception __ex) { SRApi.Guard.Log("自由放置：忽略放置规则", __ex); }

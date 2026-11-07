@@ -1,43 +1,51 @@
-# SR 功能层 API 白名单（微内核棘轮 / SMAPI 式 API 表面）
-# 规则：SR_UCH\Features\*.cs 只允许使用本文件列出的 SRApi.* 成员；新增 API 必须同时改代码与本清单（-Check / CI 会拦）。
-# 演进方向（只减不增）：功能层只走契约层门面，实现层随便改都不破坏功能。
-# 分组只是阅读顺序，# 开头为注释；解析器只认非 # 行，组内按字母序。
-
 # ---- 一、门面与子命名空间（功能层只经这些入口访问核心） ----
-ColorHex
-Ctl
-Env
-Guard
-Migration
-ModeMask
-Ref
-
+# ---- 七、页面几何（自绘页按这些量算视口，避免写死高度） ----
+# ---- 三、提示 / 日志 / 本地化 ----
+# ---- 九、绘制与对象查询原语（少量基础图元 + 帧内对象缓存） ----
 # ---- 二、生命周期与运行状态（只读查询 / 门控 / 输入占用） ----
+# ---- 五、通用控件（控件外观与命中一律走这里，不要自绘） ----
+# ---- 八、颜色：统一调色板与颜色文本（核心实现，功能层不再自带解析） ----
+# ---- 六、表格（表头/行/滚动条/动作列/高度自适应与列偏好） ----
+# ---- 四、注册扩展点（栏目 / 页 / 键 / 钩子 / 行扩展） ----
+# SR 功能层 API 白名单（微内核棘轮 / SMAPI 式 API 表面）
+# 分组只是阅读顺序，# 开头为注释；解析器只认非 # 行，组内按字母序。
+# 演进方向（只减不增）：功能层只走契约层门面，实现层随便改都不破坏功能。
+# 规则：SR_UCH\Features\*.cs 只允许使用本文件列出的 SRApi.* 成员；新增 API 必须同时改代码与本清单（-Check / CI 会拦）。
 BlockInput
 BlockWindowDrag
 CanControlLocally
 CanDoHost
+ClearableTextField
+CloseMenu
+ColorEdit
+ColorHex
+ColorPanel
+ColorSwatch
+ComboKeyDown
+ComboKeyHeld
+ContentArea
+Ctl
 CurrentLanguageId
 CursorMove
 CursorResize
+Diag
+DrawFill
+DrawLine
+Env
 FlushConfig
+FooterHeight
 ForceResetUiState
+FrameObjects
+FromColor32
 GateHost
 GateMaster
 GateModeAllows
+Guard
 HasServer
+HotkeyAction
+HotkeyButtonNoHint
 LangVer
-MarkWheelUsed
-MsgMasterOff
-TakeWheelEvent
-UiOpen
-WheelFrame
-
-# ---- 三、提示 / 日志 / 本地化 ----
-CloseMenu
-OpenMenu
-RegisterPageWheel
-Diag
+ListTableHeight
 LocDesc
 LocEnum
 LocKey
@@ -45,27 +53,38 @@ LocSec
 LogError
 LogInfo
 LogWarn
-Notify
-NotifyT
-T
-
-# ---- 四、注册扩展点（栏目 / 页 / 键 / 钩子 / 行扩展） ----
-HotkeyAction
+MarkWheelUsed
+Migration
+ModeMask
+MsgMasterOff
 Nav
 NavHide
-RegisterCameraView
+NoPageScrollBars
+Notify
+NotifyT
 OnShutdown
+OpenMenu
+PageContentBottomY
+PageScroll
+PageScrollTopY
+PageViewportHeight
+ParseHex
+PreviewColor
+Ref
+RegisterCameraView
 RegisterDismissHook
 RegisterFooterButton
 RegisterInputGateHold
 RegisterKey
 RegisterPage
 RegisterPageChrome
+RegisterPageWheel
 RegisterSceneHook
 RegisterTick
 RegisterTypingProvider
 RegisterWheelHook
 RenderSectionEntries
+ResetColor
 RowCompact
 RowCompanions
 RowExtras
@@ -73,14 +92,7 @@ RowFilters
 RowSliders
 SectionEntries
 SelectedPageId
-
-# ---- 五、通用控件（控件外观与命中一律走这里，不要自绘） ----
-ClearableTextField
-ComboKeyDown
-ComboKeyHeld
-HotkeyButtonNoHint
-
-# ---- 六、表格（表头/行/滚动条/动作列/高度自适应与列偏好） ----
+T
 TableAction
 TableActionButtons
 TableActionColumnWidth
@@ -91,7 +103,6 @@ TableAutoHeight
 TableDragWatchdog
 TableDraw
 TableFitHeight
-ListTableHeight
 TableHeightGripBar
 TableLineStrong
 TableScrollbar
@@ -100,28 +111,9 @@ TableScrollbarInput
 TableSource
 TableState
 TableWheelInput
-
-# ---- 七、页面几何（自绘页按这些量算视口，避免写死高度） ----
-ContentArea
-FooterHeight
-NoPageScrollBars
-PageContentBottomY
-PageScroll
-PageScrollTopY
-PageViewportHeight
-
-# ---- 八、颜色：统一调色板与颜色文本（核心实现，功能层不再自带解析） ----
-ColorEdit
-ColorPanel
-ColorSwatch
-FromColor32
-ParseHex
-PreviewColor
-ResetColor
+TakeWheelEvent
 ToColor32
 ToHex
-
-# ---- 九、绘制与对象查询原语（少量基础图元 + 帧内对象缓存） ----
-DrawFill
-DrawLine
-FrameObjects
+Typing
+UiOpen
+WheelFrame

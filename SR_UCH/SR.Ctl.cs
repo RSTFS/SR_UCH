@@ -242,13 +242,15 @@ public partial class SR {
                 try {
                     float lw = labelWidth > 0f ? Sc(labelWidth)
                         // 默认 = 本区最长标签宽度（与方块破坏页同一套对齐规则），再留 6px 间距
-                        : Mathf.Max(Sc(60), EntryNameWidth() + Sc(12));
+                        : Mathf.Min(Sc(200), Mathf.Max(Sc(60), EntryNameWidth() + Sc(12)));
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
+                    ResetOnLabelClick(GUILayoutUtility.GetLastRect(), e);
                     GUILayout.Space(Sc(6));
                     if (e != null) RenderControl(e);
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
             } catch (Exception __ex) { Guard.Log("统一行控件", __ex); }
+            GUILayout.Space(Sc(4));
         }
 
         // 统一下拉行：标签按文字实测，entry 作为稳定 ID 交给核心管理展开态，选中即写值并收起。
@@ -260,8 +262,9 @@ public partial class SR {
                 try {
                     float lw = labelWidth > 0f ? Sc(labelWidth)
                         // 默认 = 本区最长标签宽度（与方块破坏页同一套对齐规则），再留 6px 间距
-                        : Mathf.Max(Sc(60), EntryNameWidth() + Sc(12));
+                        : Mathf.Min(Sc(200), Mathf.Max(Sc(60), EntryNameWidth() + Sc(12)));
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
+                    ResetOnLabelClick(GUILayoutUtility.GetLastRect(), e);
                     GUILayout.Space(Sc(6));
                     string cur = e.BoxedValue as string ?? "";
                     int idx = 0;
@@ -281,7 +284,22 @@ public partial class SR {
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
             } catch (Exception __ex) { Guard.Log("统一下拉行", __ex); }
+            GUILayout.Space(Sc(4));
             return picked;
+        }
+
+        // 点标签恢复默认值（复选框/滑块/编辑框/下拉通用）：只处理左键 MouseDown，且指针在标签矩形内。
+        private static void ResetOnLabelClick(Rect labelRect, ConfigEntryBase e) {
+            try {
+                Event ev = Event.current;
+                if (e == null || ev == null || ev.type != EventType.MouseDown || ev.button != 0) return;
+                if (!labelRect.Contains(ev.mousePosition)) return;
+                if (!object.Equals(e.BoxedValue, e.DefaultValue)) {
+                    SetValue(e, e.DefaultValue);
+                    SRApi.Notify(T("已恢复默认值", "Reset to default"));
+                }
+                ev.Use();
+            } catch (Exception __ex) { Guard.Log("统一行/恢复默认", __ex); }
         }
 
         // 统一滑块行：0.1 步进 + 数值右对齐；返回本帧是否写入了新值。
@@ -293,8 +311,9 @@ public partial class SR {
                 try {
                     float lw = labelWidth > 0f ? Sc(labelWidth)
                         // 默认 = 本区最长标签宽度（与方块破坏页同一套对齐规则），再留 6px 间距
-                        : Mathf.Max(Sc(60), EntryNameWidth() + Sc(12));
+                        : Mathf.Min(Sc(200), Mathf.Max(Sc(60), EntryNameWidth() + Sc(12)));
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
+                    ResetOnLabelClick(GUILayoutUtility.GetLastRect(), e);
                     GUILayout.Space(Sc(6));
                     float cur = (float)e.BoxedValue;
                     Rect r = GUILayoutUtility.GetRect(Sc(150f), Sc(28f));
@@ -305,6 +324,7 @@ public partial class SR {
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
             } catch (Exception __ex) { Guard.Log("统一滑块行", __ex); }
+            GUILayout.Space(Sc(4));
             return written;
         }
         public static void RenderEntryRow(ConfigEntryBase entry, bool isInternal, float colWidth) { SR.RenderEntryRow(entry, isInternal, colWidth); }
@@ -658,9 +678,8 @@ public partial class SR {
             int evBtn = e != null ? e.button : 0;
             bool clicked = GUILayout.Button(new GUIContent(text, tooltip), capturing ? _capture : _btn,
                 GUILayout.Width(w), GUILayout.Height(Sc(30))); // 控件统一 30px
-            // 左键：未绑定 -> 进入录制；已绑定 -> 执行动作；Shift+左键 = 改绑（已绑定也能重设）。右键：绑定/清空。
-            bool __shiftClick = clicked && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
-            if (clicked && keyEntry != null && !capturing && (keyEntry.Value == KeyCode.None || __shiftClick)) {
+            // 按钮：左键永远执行动作；绑定快捷键用右键（快捷键"框"才用左键开始录制）。
+            if (clicked && keyEntry != null && !capturing && false) {
                 EnterCapture(keyEntry);
                 clicked = false;
             }
@@ -676,7 +695,7 @@ public partial class SR {
         internal static float CaptureStartedAt;
         // 供窗口层判断是否正在录键（失焦/切场景时用它决定要不要取消）。
         internal static bool IsCapturingKey { get { return _capturing != null; } }
-        private const float CaptureTimeoutSeconds = 12f;
+        private const float CaptureTimeoutSeconds = 5f;
 
         /// 超时/异常时的兜底取消：清状态并丢弃未提交的录制序列。
         internal static void CancelCapture() {
@@ -735,9 +754,7 @@ public partial class SR {
             float bh = height > 0f ? height : Sc(30);
             bool clicked = GUILayout.Button(new GUIContent(label, tip + KeyTip(key)),
                 capturing ? _capture : _btn, GUILayout.Width(bw), GUILayout.Height(bh));
-            // 左键：未绑定 -> 进入录制；已绑定 -> 执行；Shift+左键 = 改绑。右键：绑定/清空。
-            bool __shiftClick2 = clicked && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
-            if (clicked && key != null && !capturing && (key.Value == KeyCode.None || __shiftClick2)) { EnterCapture(key); clicked = false; }
+            // 按钮：左键永远执行动作；绑定用右键。
             if (clicked && evBtn != 0) clicked = false; //右键绝不触发左键动作
             if (key != null && e != null) TryBindByRightClick(key, GUILayoutUtility.GetLastRect());
             return clicked && !capturing;

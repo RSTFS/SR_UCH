@@ -470,7 +470,7 @@ namespace SR_UCH.Tweaks {
                 // 第一页：配置 / 外观 / 行为。
                 _enabled = cfg.Bind(Sec, "Enabled", false, "显示HUD：总开关（默认关闭）。");
                 _fade = cfg.Bind(Sec, "Fade", true, "淡入淡出：HUD 显示/隐藏时平滑过渡。");
-                _showKey = cfg.Bind(Sec, "Show Key", KeyCode.BackQuote, "显示按键：用于显示 HUD 的按键（默认 ~）。");
+                _showKey = cfg.Bind(Sec, "Show Key", KeyCode.F5, "显示按键：用于显示 HUD 的按键（默认 F5）。");
             // 默认就是"显示"状态：以前 _toggleOn 初始为 false，每次重开游戏都得先按一下显示键才出现，
             // 现在开局即有 HUD，按键只用来切换隐藏/显示。
             _toggleOn = true;

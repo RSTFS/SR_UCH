@@ -284,7 +284,7 @@ public partial class SR {
             // 外部模块页按钮右键绑键由按钮绘制当帧自判（跨帧登记矩形会因行数变化而位移，绑错键）。
             // 快捷键录制：单键 / 修饰键 + 主键 / 多普通键序列；整块只在非 Layout 事件里跑（Layout 阶段 Use() 会打断布局）。
             // 捕获自愈：录制期间若事件被别处消费（或行被切走），_capturing 会一直挂着并让所有热键失效。
-            if (_capturing != null && Time.unscaledTime - SR.CaptureStartedAt > 12f) {
+            if (_capturing != null && Time.unscaledTime - SR.CaptureStartedAt > 5f) {
                 // CancelCapture 原子清 _capturing/_recSeq/_recHeld，所以同一帧后面的提交分支不会跑，
                 // 不会写入半截序列（audit 04-P0-2 的结论）。这里只把日志改成不会误报"失败: 未知错误"。
                 Guard.Log("按键录制超时，已自动取消", null);

@@ -185,15 +185,25 @@ namespace SR_UCH.Tweaks {
             EnsureAnimalList();
             GUILayout.BeginHorizontal();
             try {
-                GUILayout.Label(label, SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(96f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+                float lw = Mathf.Min(SRApi.Ctl.Sc(200f), SRApi.Ctl.Label.CalcSize(SRApi.Ctl.Content(label)).x + SRApi.Ctl.Sc(10f));
+                GUILayout.Label(label, SRApi.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+                GUILayout.Space(SRApi.Ctl.Sc(6));
+                // 自适应宽度：取所有名字里最宽的那个（+内边距），整行按钮同宽，列才对得齐
+                float bw = SRApi.Ctl.Sc(56f);
+                for (int i = 0; i < AnimalLabels.Count; i++) {
+                    string t = AnimalLabels[i] ?? "";
+                    bw = Mathf.Max(bw, SRApi.Ctl.Btn.CalcSize(new GUIContent(t)).x + SRApi.Ctl.Sc(16f));
+                }
+                int cols = Mathf.Max(1, Mathf.FloorToInt((SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - lw - SRApi.Ctl.Sc(60f)) / bw));
+                cols = Mathf.Clamp(cols, 3, 12);
                 string cur = entry != null ? entry.Value : "";
                 for (int i = 0; i < Animals.Count; i++) {
                     bool on = Animals[i] == cur;
                     if (GUILayout.Button(AnimalLabels[i], on ? SRApi.Ctl.SelItem : SRApi.Ctl.Btn,
-                            GUILayout.Width(SRApi.Ctl.Sc(78f)), GUILayout.Height(SRApi.Ctl.Sc(24f)))) {
+                            GUILayout.Width(bw), GUILayout.Height(SRApi.Ctl.Sc(24f)))) {
                         if (entry != null) entry.Value = Animals[i];
                     }
-                    if (i % 6 == 5) { GUILayout.FlexibleSpace(); GUILayout.EndHorizontal(); GUILayout.BeginHorizontal(); GUILayout.Space(SRApi.Ctl.Sc(96f)); }
+                    if ((i + 1) % cols == 0) { GUILayout.FlexibleSpace(); GUILayout.EndHorizontal(); GUILayout.BeginHorizontal(); GUILayout.Space(lw + SRApi.Ctl.Sc(6)); }
                 }
                 GUILayout.FlexibleSpace();
             } finally { GUILayout.EndHorizontal(); }

@@ -1000,6 +1000,7 @@ public partial class SR : ITweak {
                 SRApi.Ctl.SetRowSliderSink(delegate (string __l, string __t, ConfigEntryBase __e, float __min, float __max, float __w, string __f) {
                     return SR.Ctl.RowSlider(__l, __t, __e, __min, __max, __w, __f);
                 });
+                SRApi.SetTypingSink(delegate { return SR.Typing; });
                 SRApi.Ctl.SetButtonSink(delegate (string __l, string __t, float __w, float __h) {
                     return SR.Ctl.Button(__l, __t, __w, __h);
                 });
