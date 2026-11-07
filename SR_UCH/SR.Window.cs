@@ -278,6 +278,7 @@ public partial class SR {
             Event e = Event.current;
             Vector2 mouse = e.mousePosition; // 无矩阵缩放，无需坐标换算
             SR.Wheel.FrameStart(e);          // 滚轮仲裁：只更新本趟事件信息（区域表跨趟持久）
+            WheelClaimNewFrame();            // 控件"上一帧声明过归属"的快照（早期可用的机制）
 
             Rect winRect = new Rect(_winX, _winY, _winWidth, _winHeight);
             bool over = winRect.Contains(mouse);
@@ -630,6 +631,12 @@ public partial class SR {
             // ---- 滚轮结算（帧尾）：控件没取走的才滚页面 ----
             try {
                 if (SR.Wheel.HasPending) {
+                    // 早期机制（验证过可用）：上一帧有控件声明"滚轮归我"，就把量记进 WheelDelta，
+                    // 该控件在自己的 Repaint 里 WheelDeltaTake 取用；页面不再跟着滚。
+                    if (WheelClaimedPrev && !SR.Wheel.CtrlHeld) {
+                        WheelDeltaSet(SR.Wheel.Value);
+                        SR.Wheel.TakeRemaining(false);   // 从待处理量里清掉，避免又滚页面
+                    }
                     if (SR.Wheel.CtrlHeld) {
                         // Ctrl+滚轮 = 切页签（设置页在通用/自检之间切）
                         if (_mode == Mode.Internal) CyclePage(_selectedInternalSection, SR.Wheel.Value > 0f ? -1 : 1);

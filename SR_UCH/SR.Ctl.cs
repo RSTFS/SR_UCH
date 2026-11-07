@@ -392,6 +392,21 @@ public partial class SR {
                             if (Mathf.Abs(__nv - __c) > 0.000001f) { SetValue(e, __nv); written = true; }
                         }
                     }
+                    // 早期机制兜底：悬停声明归属，Repaint 取 WheelDelta 调值
+                    try {
+                        Event __se3 = Event.current;
+                        if (__se3 != null && r.Contains(__se3.mousePosition)) WheelClaim();
+                        if (__se3 != null && __se3.type == EventType.Repaint) {
+                            float __dw2 = WheelDeltaTake();
+                            if (Mathf.Abs(__dw2) > 0.01f) {
+                                float __span2 = Mathf.Max(0.0001f, max - min);
+                                float __st2 = Mathf.Max(__span2 * 0.02f, 0.01f) * Mathf.Clamp(Mathf.Abs(__dw2), 1f, 8f);
+                                float __nv3 = Mathf.Clamp(cur + (__dw2 > 0f ? -__st2 : __st2), min, max);
+                                if (__span2 >= 1f) __nv3 = Mathf.Round(__nv3 * 10f) / 10f;
+                                if (Mathf.Abs(__nv3 - cur) > 0.000001f) SetValue(e, __nv3);
+                            }
+                        }
+                    } catch (Exception __sw3) { Guard.Log("滑块/滚轮兜底", __sw3); }
                     float v = DrawSlider(r, cur, min, max, false);
                     v = Mathf.Round(Mathf.Clamp(v, min, max) * 10f) / 10f;
                     if (Mathf.Abs(v - cur) > 0.0001f) { SetValue(e, v); written = true; }

@@ -733,7 +733,12 @@ namespace SR_UCH.Tweaks {
             try {
                 float screenTop = SRApi.ContentArea.y + last.yMax;                       // 列表顶（屏幕坐标）
                 float bottom = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);   // 底栏上沿
-                float avail = bottom - screenTop;   // 不再扣拖拽条：列表底边与底栏上沿直接相接
+                float avail = bottom - screenTop;   // 列表底边与底栏上沿直接相接
+                // 再与"页面视口"取 min：页面视口是实测/精确算出来的可用高度，
+                // 屏幕底那一版有时会把列表算得比实际可视区还高（表现为下面还有行却滚不动）。
+                float used = Mathf.Max(0f, last.yMax - _pageTopY);
+                float byViewport = SRApi.PageViewportHeight - used;
+                if (byViewport > 0f) avail = Mathf.Min(avail, byViewport);
                 tableH = Mathf.Max(minH, avail);
             } catch (Exception __sh) {
                 SRApi.Guard.Log("布局预设/可视高度", __sh);
