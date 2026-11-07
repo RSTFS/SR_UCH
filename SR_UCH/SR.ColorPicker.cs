@@ -396,18 +396,16 @@ public partial class SR {
         // 预览色块 + #RRGGBB + 收起：ImGui ColorPicker 的顶部预览行。
         private static void DrawHeader(ConfigEntryBase e, State s, float pw) {
             float h = Ctl.ControlH();
-            float collapseW = BtnW(T("收起", "Collapse"));
             float hexW = TextW("#FFFFFF", Ctl.Label) + Sc(8f);
-            float previewW = Mathf.Clamp(pw - hexW - collapseW - Sc(16f), Sc(44f), Sc(84f));
+            float previewW = Mathf.Clamp(pw - hexW - Sc(16f), Sc(44f), Sc(84f));
             GUILayout.BeginHorizontal();
             try {
                 Rect pv = GUILayoutUtility.GetRect(previewW, h);
                 PreviewBox(pv, Quant(PickerColor(s)));
                 GUILayout.Label(SRApi.ColorHex.ToHex(PickerColor(s)), Ctl.Label, GUILayout.Width(hexW), GUILayout.Height(h));
                 GUILayout.FlexibleSpace();
-                DrawActionsInline(e, s, h);          // 复制 / 粘贴 / 还原默认：在「收起」左边同一行
-                GUILayout.Space(Sc(6f));
-                if (GUILayout.Button(T("收起", "Collapse"), Ctl.Btn, GUILayout.Width(collapseW), GUILayout.Height(h))) Close(e, s);
+                // 用户要求：不再提供 复制 / 粘贴 / 还原默认 / 收起。
+                // 面板的开合仍由色块点击控制（与列表里的开关行为一致）。
             } catch (Exception __ex) { Guard.Log("调色板顶栏", __ex); }
             GUILayout.EndHorizontal();
         }
