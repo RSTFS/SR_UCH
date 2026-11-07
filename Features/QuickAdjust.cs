@@ -14,7 +14,6 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<float> _delay;          // 重生延迟（0-3 秒）
         private static ConfigEntry<float> _invincible;     // 出生无敌（0-10 秒）
         private static ConfigEntry<bool> _cannonRespawn;   // 炮弹卡死自动重生
-        private static ConfigEntry<bool> _noScoreboard;    // 挑战死亡不弹记分板
         private static readonly Dictionary<int, float> _deadSince = new Dictionary<int, float>();
         private static float _cannonStuckAt = -1f;
 
@@ -36,8 +35,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Spawn Invincible", "出生无敌\n每次出生后无敌多少秒\n挑战/自由模式；0 = 不加无敌", "Spawn invincibility\nseconds of invincibility after each spawn\nchallenge and freeplay; 0 = none");
             SRApi.LocKey(Sec, "Cannon Auto Respawn", "炮弹卡死重生", null);
             SRApi.LocDesc(Sec, "Cannon Auto Respawn", "炮弹卡死重生\n死了还卡在炮弹里超过 1.5 秒时自动重生\n挑战/自由模式", "Respawn when stuck in a cannon\nrespawns if you stay dead inside a cannon for over 1.5s\nchallenge and freeplay");
-            SRApi.LocKey(Sec, "No Death Scoreboard", "死亡无计分板", null);
-            SRApi.LocDesc(Sec, "No Death Scoreboard", "死亡无计分板\n挑战模式死亡时不显示记分板\n只在死亡且尚未通关时生效", "No scoreboard on death\nskips the scoreboard when you die in challenge mode\nonly while dead and not yet succeeded");
         }
 
         internal static void Initialize(IFeatureHost plugin) {
@@ -46,15 +43,16 @@ namespace SR_UCH.Tweaks {
                 _delay = plugin.Config.Bind(Sec, "Respawn Delay", 0.5f, new ConfigDescription("重生延迟（0-3 秒）", new AcceptableValueRange<float>(0f, 3f)));
                 _invincible = plugin.Config.Bind(Sec, "Spawn Invincible", 1f, new ConfigDescription("出生无敌（0-10 秒）", new AcceptableValueRange<float>(0f, 10f)));
                 _cannonRespawn = plugin.Config.Bind(Sec, "Cannon Auto Respawn", false, "炮弹卡死：死亡且卡在炮弹里超过 1.5 秒自动重生。");
-                _noScoreboard = plugin.Config.Bind(Sec, "No Death Scoreboard", false, "挑战模式死亡时不弹记分板。");
                 SRApi.RegisterTick("重生-轮询", Tick);
                 try { Harmony.CreateAndPatchAll(typeof(RespawnTools)); }
                 catch (Exception __h) { SRApi.Guard.Log("重生/补丁注册", __h); }
             } catch (Exception __ex) { SRApi.Guard.Log("重生/初始化", __ex); }
         }
 
-        // 单独的"死亡不弹记分板"行：由「挑战」分区调用
-        internal static void RenderNoScoreboardRow() {
+        // 「死亡无计分板」功能已删除（用户要求），这里保留空实现以免改动调用点。
+        internal static void RenderNoScoreboardRow() { return; }
+
+        private static void RenderNoScoreboardRowOld() {
             try {
                 ConfigEntryBase ns = SRApi.Ctl.FindEntry(Sec, "No Death Scoreboard");
                 if (ns != null) QuickAdjust.PageRow(SRApi.T("死亡无计分板", "No death scoreboard"),
@@ -150,20 +148,6 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("重生/出生无敌", __ex); }
         }
 
-        // 挑战死亡不弹记分板：只在"挑战模式 + 本地角色死亡且未通关"时跳过
-        [HarmonyPatch(typeof(BaseScoreboard), "Show")]
-        [HarmonyPrefix]
-        private static bool SkipDeathScoreboard() {
-            try {
-                if (_noScoreboard == null || !_noScoreboard.Value || !SRApi.GateMaster) return true;
-                GameSettings gs = GameSettings.GetInstance();
-                if (gs == null || gs.GameMode != GameState.GameMode.CHALLENGE) return true;
-                Character c = LocalCharacter();
-                if (c == null) return true;
-                bool dead = c.Dead || c.Dying || c.LocallyDead;
-                return !(dead && !c.Success);
-            } catch (Exception __ex) { SRApi.Guard.Log("重生/跳过记分板", __ex); return true; }
-        }
     }
 
 [SrFeature("sr.quickadjust", "QuickAdjust", "1.0")]
