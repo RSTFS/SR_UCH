@@ -204,7 +204,11 @@ namespace SR_UCH.Tweaks {
                 if (box.width > 2f && box.height > 2f) {
                     _tableScreenBox = new Rect(box.x + __offX, box.y + __offY, box.width, box.height);
                     // 表格区自注册：区域优先于页面钩子，滚轮一定能落到列表上
-                    SRApi.WheelArea("online:table", box, delegate (float __w) { return ScrollTableByWheel(__w); });
+                    // 滚轮：绘制期直接用表格矩形取用
+                {
+                    float __w = SRApi.Ctl.WheelTake(box);
+                    if (Mathf.Abs(__w) > 0.01f) ScrollTableByWheel(__w);
+                }
                 }
             } catch (Exception __tbox) { SRApi.Guard.Log("联机表格/命中框", __tbox); }
             float rowsH = Mathf.Max(SRApi.Ctl.Sc(20), box.height - headerH);

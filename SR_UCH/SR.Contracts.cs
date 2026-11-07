@@ -299,17 +299,18 @@ namespace SR_UCH {
         // 否则输入被本面板冻结，游戏界面点不动。
         // 覆盖层（画在窗口最上层，不受页面裁剪）：功能的弹出列表用
         // 滚轮区域（功能自绘控件用）：id 稳定、矩形为布局坐标，处理器返回 true = 已消费
-        private static Action<string, Rect, Func<float, bool>, int> _wheelZone;
         // 诊断：最近一次滚轮被哪一层消费（zone:xxx / hook / hook+off / zone-miss(n/m) / none）
         private static Func<string> _wheelLayer;
         public static void SetWheelLayerSink(Func<string> f) { _wheelLayer = f; }
         public static string WheelLayer { get { Func<string> f = _wheelLayer; return f != null ? f() : ""; } }
 
-        public static void SetWheelZoneSink(Action<string, Rect, Func<float, bool>, int> f) { _wheelZone = f; }
-        public static void WheelArea(string id, Rect layoutRect, Func<float, bool> handler) {
-            Action<string, Rect, Func<float, bool>, int> f = _wheelZone;
-            if (f != null) f(id, layoutRect, handler, 0);   // 0 = 控件优先级
-        }
+        // 绘制期取用滚轮量：控件/表格在自己画的时候用自己的矩形问一句"这格滚轮归我吗"。
+        // 返回 0 = 不归我；非 0 = 上滚为正的一格，已从队列取走。
+        private static Func<Rect, float> _wheelTake;
+        public static void SetWheelTakeSink(Func<Rect, float> f) { _wheelTake = f; }
+        public static float WheelTake(Rect layoutRect) { Func<Rect, float> f = _wheelTake; return f != null ? f(layoutRect) : 0f; }
+        // 兼容旧调用：新模型不需要注册区域（空实现，保留签名）
+        public static void WheelArea(string id, Rect layoutRect, Func<float, bool> handler) { }
 
         private static Action<Action> _overlay;
         public static void SetOverlaySink(Action<Action> f) { _overlay = f; }
@@ -1124,6 +1125,8 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         private static Func<string, float> _labelCol;
         public static void SetLabelColumnSink(Func<string, float> f) { _labelCol = f; }
         public static float LabelColumnWidth(string label) { Func<string, float> f = _labelCol; return f != null ? f(label) : 0f; }
+        // 绘制期取用滚轮量（转发到 SRApi.WheelTake，供页面内控件/表格调用）
+        public static float WheelTake(Rect layoutRect) { return SRApi.WheelTake(layoutRect); }
 
         public static void SectionTitle(string title, string tip = null) {
             try {

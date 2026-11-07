@@ -254,7 +254,6 @@ public partial class SR {
                 // 面板已关：把自绘页声明的系统光标形状收掉，否则 <->/+ 光标会留在屏幕上
                 try { ClearTip(); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 RunFrameEndHooks();
-                SR.Wheel.PruneZones();
                 SR.Ctl.EndLabelColumnFrame();
                 return;
             }
@@ -474,6 +473,17 @@ public partial class SR {
                 }
             }
             GUILayout.EndScrollView();
+            // 侧栏滚轮：指针在侧栏区域时，剩余的滚轮量归侧栏（面板滚轮由我们统一接管，
+            // Unity 的滚动视图收不到事件，必须自己应用）
+            try {
+                if (SR.Wheel.HasPending) {
+                    Vector2 mpSb = SR.Wheel.MouseScreen;   // 事件趟的屏幕坐标
+                    if (mpSb.x < ContentArea.x) {
+                        float wSb = SR.Wheel.TakeRemaining(false);
+                        if (Mathf.Abs(wSb) > 0.01f) _leftScroll.y = Mathf.Max(0f, _leftScroll.y - wSb * Sc(64f));
+                    }
+                }
+            } catch (Exception __sb) { Guard.Log("侧栏滚轮", __sb); }
             GUILayout.EndVertical();
             GUILayout.Space(Sc(2));
             GUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.Height(__bodyH));
@@ -487,39 +497,12 @@ public partial class SR {
             // ================= 滚轮：唯一入口（仲裁器） =================
             // 旧实现这里还有一套"Hover 盾 / WheelClaim / WheelDeltaSet"的并行机制，它会先把事件
             // 改成 Used，导致仲裁器收不到滚轮（列表、滑块因此"有时灵有时不灵"）。整套已删除。
-            WheelShieldHit = false;
+            // ================= 滚轮 =================
+            // 事件已在 FrameStart 里被记成"待处理量"并 e.Use()（没有别的控件会再滚）。
+            // 页面内控件在自己的绘制处用 SRApi.Ctl.WheelTake(rect) 取用；剩下的才归页面滚动。
+            // 结算放在页面绘制之后（帧尾），因为控件要先画完才有机会取走它。
             Event __we = Event.current;
-            bool __wasWheel = __we != null && __we.type == EventType.ScrollWheel;
-            if (__wasWheel) {
-                try {
-                    bool __ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-                    bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-                    bool __consumed = false;
-                    if (__ctrl) {
-                        // Ctrl+滚轮 = 切页签（栏目内翻页；设置页在通用/自检之间切）
-                        if (_mode == Mode.Internal) CyclePage(_selectedInternalSection, SR.Wheel.Value > 0f ? -1 : 1);
-                        else if (_mode == Mode.Settings) SR.SettingsTab = SR.Wheel.Value > 0f ? 0 : 1;
-                        __consumed = true;
-                    } else {
-                        // 控件 > 表格/页面钩子（Shift 时跳过控件，交给横向滚动）
-                        __consumed = SR.Wheel.Consume(__we, SR.AreaOffset, __shift);
-                        if (!__consumed && _noScrollDeclared) __consumed = true;   // 填充页：页面不滚，也不落到世界
-                        if (!__consumed) {
-                            // 只有指针在内容区里才滚页面（标题栏/底栏/侧栏上滚不应动页面）
-                            Vector2 __mpNow = (__we != null ? __we.mousePosition : Vector2.zero);   // 鼠标已是屏幕坐标
-                            if (SRApi.ContentArea.Contains(__mpNow)) {
-                                if (__shift) _scroll.x = Mathf.Max(0f, _scroll.x - SR.Wheel.Value * Sc(84f));
-                                else _scroll.y = Mathf.Max(0f, _scroll.y - SR.Wheel.Value * Sc(84f));
-                                __consumed = true;
-                            }
-                        }
-                    }
-                    if (__consumed) { __we.Use(); __we.type = EventType.Used; SR.MarkWheelUsed(); }
-                    // 诊断放在裁决之后：显示的是**本次**滚轮命中的层，而不是上一次
-                    try { SRApi.Diag("wheel mode=" + _mode + " sec=" + _selectedInternalSection + " noBars=" + _noScrollDeclared + " scrollY=" + _scroll.y.ToString("0.0") + " layer=" + SR.Wheel.LastDecision); }
-                    catch (Exception __wd) { Guard.Log("滚轮诊断", __wd); }
-                } catch (Exception __wc) { Guard.Log("滚轮仲裁", __wc); }
-            }
+            bool __wasWheel = SR.Wheel.HasPending || (__we != null && __we.type == EventType.ScrollWheel);
             // 换栏目/换页签时收起所有下拉框：展开态一旦跨页残留，控件会一直声明"滚轮归我"，
             // 页面滚动就表现为"一开始能用、切几次页后失效"。
             try {
@@ -529,7 +512,6 @@ public partial class SR {
                     _lastPageSig = __sig;
                     SR.CloseOpenCombos();
                     SR.Ctl.ResetLabelColumn();   // 换页：标签列宽重新按本页标签收敛
-                    SR.Wheel.ClearZones();       // 换页：旧页的控件滚轮区域立即作废（否则新旧页面重叠处会被旧区域吃掉）
                     _noScrollDeclared = false;   // 旧页的"禁止页面滚动"声明不能带到新页（会吞掉换页后的第一格滚轮）
                     _scroll = Vector2.zero;     // 换页回到顶部：新页内容更短时不会停在空白处，看起来像"滚不动"
                 }
@@ -642,6 +624,25 @@ public partial class SR {
                 // 没有滚动区：视口 = 区域高 − 页头 − 底栏预留（精确值，不依赖实测）
                 SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __usedTop - __footerReserve);
             }
+            // ---- 滚轮结算（帧尾）：控件没取走的才滚页面 ----
+            try {
+                if (SR.Wheel.HasPending) {
+                    if (SR.Wheel.CtrlHeld) {
+                        // Ctrl+滚轮 = 切页签（设置页在通用/自检之间切）
+                        if (_mode == Mode.Internal) CyclePage(_selectedInternalSection, SR.Wheel.Value > 0f ? -1 : 1);
+                        else if (_mode == Mode.Settings) SR.SettingsTab = SR.Wheel.Value > 0f ? 0 : 1;
+                        SR.Wheel.TakeRemaining(false);
+                    } else {
+                        bool allow = !_noScrollDeclared;
+                        float w = SR.Wheel.TakeRemaining(allow);
+                        if (Mathf.Abs(w) > 0.01f) {
+                            if (SR.Wheel.ShiftHeld) _scroll.x = Mathf.Max(0f, _scroll.x - w * Sc(64f));
+                            else _scroll.y = Mathf.Max(0f, _scroll.y - w * Sc(64f));
+                        }
+                    }
+                }
+            } catch (Exception __ws) { Guard.Log("滚轮结算", __ws); }
+
             // 功能页外框部件（紧贴底栏条上方）：量它的高度并按栏目记住，供下一帧预留。
             float __pfTop = 0f;
             try { __pfTop = GUILayoutUtility.GetLastRect().yMax; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -727,7 +728,6 @@ public partial class SR {
             }
             // 自绘页本帧声明的鼠标形状在此统一应用并复位：未声明时回到"不强制"，特殊光标不会残留。
             RunFrameEndHooks();
-            SR.Wheel.PruneZones();          // 面板打开期间也回收：旧页矩形不会继续吃滚轮
             SR.Ctl.EndLabelColumnFrame();   // 标签列宽本帧收敛（下一帧生效）
             }
             // 功能覆盖层最后绘制，保证在最上层（各功能自己判断该不该画）

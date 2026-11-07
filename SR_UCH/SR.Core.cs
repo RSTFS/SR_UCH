@@ -1003,13 +1003,9 @@ public partial class SR : ITweak {
                 SRApi.SetTypingSink(delegate { return SR.Typing; });
                 SRApi.Ctl.SetLabelColumnSink(delegate (string __l) { return SR.Ctl.LabelColumnWidth(__l); });
                 SRApi.SetWheelLayerSink(delegate { return SR.Wheel.LastDecision; });
-                SRApi.SetWheelZoneSink(delegate (string __id, Rect __rect, Func<float, bool> __h, int __prio) {
-                    SR.Wheel.Register(__id, __rect, __h, __prio);
-                });
+                SRApi.SetWheelTakeSink(delegate (Rect __rect) { return SR.Wheel.TakeIfInside(__rect); });
                 SRApi.SetOverlaySink(delegate (Action __d) { SR.RegisterOverlay(__d); });
                 SRApi.SetRoundedSink(delegate (Rect __r, Color __c, float __rad) { SR.DrawRounded(__r, __c, __rad); });
-                // 页面级滚轮钩子统一交给仲裁：控件 > 页面钩子 > 页面滚动
-                SR.Wheel.RegisterPageHook(delegate (Vector2 __m, float __w) { return SRApi.DispatchPageWheel(__m, __w); });
                 SRApi.Ctl.SetButtonSink(delegate (string __l, string __t, float __w, float __h) {
                     return SR.Ctl.Button(__l, __t, __w, __h);
                 });
@@ -1076,7 +1072,7 @@ public partial class SR : ITweak {
             _openKey = plugin.Config.Bind(Keys.Settings, Keys.OpenKey, KeyCode.Insert, "打开和关闭管理器用, 默认 Insert. 组合键的绑法: 点按钮, 按住 Shift 或 Ctrl 或 Alt, 再按主键.");
             RegisterKey("管理器-开关", _openKey, "press");
             RegisterFrameEnd("滑块残留状态清理", SliderFrameEndCleanup);   // 滑块残留状态清理挂在每帧收尾
-            _blockInputEntry = plugin.Config.Bind(Keys.Settings, Keys.BlockInput, false, "管理器打开时冻结游戏输入, 免得误操作角色.");
+            _blockInputEntry = plugin.Config.Bind(Keys.Settings, Keys.BlockInput, true, "管理器打开时冻结游戏输入, 免得误操作角色.（默认开启）");
             _uiScaleEntry = plugin.Config.Bind(Keys.Settings, Keys.UiScale, 1.3f, "整个界面放大多少, 1.0 到 1.8, 默认 1.3.");
             // 界面语言：中文 / English（运行时立即生效；外部模块页面始终中文）
             _langEntry = plugin.Config.Bind(Keys.Settings, Keys.Language, "English", "界面用哪种语言. 装了语言包 DLL 的话, 它也会自动出现在这个下拉里. 外部插件的页面始终是中文.");

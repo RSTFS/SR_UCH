@@ -1292,22 +1292,17 @@ public partial class SR {
                     try {
                         sr = GUILayoutUtility.GetRect(Sc(150), CtlH(), GUILayout.Width(SliderTrackWidth()));
                         nv = DrawSlider(sr, fv, hmin, hmax, val is int, hstep); //int 条目按整数步进，提交时由 SetValue 归一化类型
-                        // 滚轮调值：统一交给核心仲裁（悬停即归滑块，页面不会跟着滚）
+                        // 滚轮调值：绘制期用本行滑块矩形取用这一格（同一坐标系，不会错位）
                         {
-                            Rect __zr = sr;
-                            float __mn = hmin, __mx = hmax; bool __int = val is int; float __st = hstep;
-                            ConfigEntryBase __e = entry;
-                            SR.Wheel.Register("rowslider:" + (__e.Definition.Section + "/" + __e.Definition.Key),
-                                new Rect(__zr.x - Sc(2), __zr.y - Sc(2), __zr.width + Sc(4), __zr.height + Sc(4)),
-                                delegate (float __w) {
-                                    float __cur = __e.BoxedValue is int ? (int)__e.BoxedValue : System.Convert.ToSingle(__e.BoxedValue);
-                                    float __step = __int ? (__st > 0f ? __st : 1f) : Mathf.Max((__mx - __mn) * 0.02f, 0.001f);
-                                    float __nv = Mathf.Clamp(__cur + (__w > 0f ? -__step : __step), __mn, __mx);
-                                    if (__int) __nv = (float)Math.Round(__nv);
-                                    if (Mathf.Abs(__nv - __cur) < 0.0001f) return false;
-                                    SR.SetValue(__e, __int ? (object)(int)Mathf.Round(__nv) : (object)__nv);
-                                    return true;
-                                }, SR.Wheel.PrioControl);
+                            float __w = SRApi.Ctl.WheelTake(sr);
+                            if (Mathf.Abs(__w) > 0.01f) {
+                                float __c = val is int ? (int)val : (float)val;
+                                float __span = Mathf.Max(0.0001f, hmax - hmin);
+                                float __st = val is int ? (hstep > 0f ? hstep : 1f) : Mathf.Max(__span * 0.02f, 0.01f);
+                                float __nv2 = Mathf.Clamp(__c + (__w > 0f ? -__st : __st), hmin, hmax);
+                                if (val is int) __nv2 = Mathf.Round(__nv2);
+                                SR.SetValue(entry, val is int ? (object)(int)Mathf.Round(__nv2) : (object)__nv2);
+                            }
                         }
                         //float 条目可选步进（范围由 SRApi.RowSliders 给出，粒度由 RowSliderSteps 给出）
                         float fstep;
@@ -1460,32 +1455,28 @@ public partial class SR {
                 if (entry != null) _editOpen[entry] = open;   //null 保护：字典不接受 null 键
                 if (entry != null) _comboSkipFrame[entry] = Time.frameCount; //展开当帧不绘制列表
             }
-            // 滚轮统一交给核心仲裁：收起时滚轮换选项，展开时滚轮滚列表（下一帧生效，一帧滞后无感）。
             Rect boxRect = GUILayoutUtility.GetLastRect();
+            // 滚轮：绘制期直接问"这一格归我吗"（收起=换选项；展开=滚列表）
             if (options != null && options.Length > 1) {
-                if (!open) {
-                    SR.Wheel.Register("combo:" + (entry != null ? entry.Definition.Section + "/" + entry.Definition.Key : current),
-                        boxRect, delegate (float __w) {
-                        int __cur = 0;
-                        for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur = i; break; } }
-                        int __ni = __w > 0f ? __cur - 1 : __cur + 1;
-                        if (__ni < 0) __ni = options.Length - 1;
-                        if (__ni >= options.Length) __ni = 0;
-                        if (entry != null && vals != null && __ni < vals.Length) SR.SetValue(entry, vals.GetValue(__ni));
-                        return true;
-                    }, SR.Wheel.PrioControl);
-                } else if (drew && options.Length > 8 && entry != null) {
+                float __w = 0f;
+                if (!open) __w = SRApi.Ctl.WheelTake(boxRect);
+                else if (drew && options.Length > 8 && entry != null) {
                     int __vis2 = Mathf.Min(options.Length, 8);
-                    Rect __lr2 = new Rect(boxRect.x, boxRect.yMax, width, CtlH() * __vis2);
-                    SR.Wheel.Register("combolist:" + (entry != null ? entry.Definition.Section + "/" + entry.Definition.Key : current),
-                        __lr2, delegate (float __w) {
+                    __w = SRApi.Ctl.WheelTake(new Rect(boxRect.x, boxRect.yMax, width, CtlH() * __vis2));
+                    if (Mathf.Abs(__w) > 0.01f) {
                         int __sc;
                         if (!_comboScroll.TryGetValue(entry, out __sc)) __sc = 0;
-                        int __nv = Mathf.Clamp(__sc + (__w > 0f ? -2 : 2), 0, options.Length - 8);
-                        if (__nv == __sc) return false;
-                        _comboScroll[entry] = __nv;
-                        return true;
-                    }, SR.Wheel.PrioControl);
+                        _comboScroll[entry] = Mathf.Clamp(__sc + (__w > 0f ? -2 : 2), 0, options.Length - 8);
+                        __w = 0f;
+                    }
+                }
+                if (Mathf.Abs(__w) > 0.01f) {
+                    int __cur = 0;
+                    for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur = i; break; } }
+                    int __ni = __w > 0f ? __cur - 1 : __cur + 1;
+                    if (__ni < 0) __ni = options.Length - 1;
+                    if (__ni >= options.Length) __ni = 0;
+                    if (entry != null && vals != null && __ni < vals.Length) SR.SetValue(entry, vals.GetValue(__ni));
                 }
             }
             if (drew) {

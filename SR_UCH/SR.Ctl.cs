@@ -338,23 +338,17 @@ public partial class SR {
                     GUILayout.Space(Sc(6));
                     float cur = (float)e.BoxedValue;
                     Rect r = GUILayoutUtility.GetRect(Sc(150f), Sc(28f));
-                    // 滚轮调值：悬停即归本滑块（核心仲裁，优先级高于页面滚动）
+                    // 滚轮调值：绘制期用本行滑块的矩形取用这一格（不依赖任何坐标换算）
                     {
-                        ConfigEntryBase __e = e; float __mn = min, __mx = max;
-                        SR.Wheel.Register("slider:" + RowKey(__e),
-                            new Rect(r.x - Sc(2), r.y - Sc(2), r.width + Sc(4), r.height + Sc(4)),
-                            delegate (float __w) {
-                                float __c = System.Convert.ToSingle(__e.BoxedValue);
-                                // 步长：范围的 2%，但不小于 0.01；只有范围 >= 1 时才按 0.1 取整，
-                                // 否则 0–1 这种小范围会被取整成 0 → 滚轮看起来"完全没反应"。
-                                float __span = Mathf.Max(0.0001f, __mx - __mn);
-                                float __st = Mathf.Max(__span * 0.02f, 0.01f);
-                                float __nv = Mathf.Clamp(__c + (__w > 0f ? -__st : __st), __mn, __mx);
-                                if (__span >= 1f) __nv = Mathf.Round(__nv * 10f) / 10f;
-                                if (Mathf.Abs(__nv - __c) < 0.000001f) return false;
-                                SR.SetValue(__e, __nv);
-                                return true;
-                            }, SR.Wheel.PrioControl);
+                        float __w = SRApi.Ctl.WheelTake(r);
+                        if (Mathf.Abs(__w) > 0.01f) {
+                            float __c = System.Convert.ToSingle(e.BoxedValue);
+                            float __span = Mathf.Max(0.0001f, max - min);
+                            float __st = Mathf.Max(__span * 0.02f, 0.01f);
+                            float __nv = Mathf.Clamp(__c + (__w > 0f ? -__st : __st), min, max);
+                            if (__span >= 1f) __nv = Mathf.Round(__nv * 10f) / 10f;
+                            if (Mathf.Abs(__nv - __c) > 0.000001f) { SetValue(e, __nv); written = true; }
+                        }
                     }
                     float v = DrawSlider(r, cur, min, max, false);
                     v = Mathf.Round(Mathf.Clamp(v, min, max) * 10f) / 10f;

@@ -1130,9 +1130,11 @@ namespace SR_UCH.Tweaks {
                 };
                 _hiddenBeforeTable = _hiddenCols.Count;
                 _tableBox = box;      // 供页面级滚轮钩子命中判定
-                // 表格自己注册滚轮区域：页面钩子那条路要保持"每帧可见/命中"才生效，
-                // 这里再注册一份同语义的区域，滚轮一定能落到表格上（区域优先于页面钩子）。
-                SRApi.WheelArea("presets:table", box, delegate (float __w) { return ScrollTableBy(__w); });
+                // 滚轮：绘制期直接用表格矩形取用（同一坐标系，不存在换算错位）
+                {
+                    float __w = SRApi.Ctl.WheelTake(box);
+                    if (Mathf.Abs(__w) > 0.01f) ScrollTableBy(__w);
+                }
                 SRApi.TableDraw(_args);
                 HandlePresetCells();   // 数据列：悬浮预览 / 左键切三态 / 右键开界面；名称列：右键重命名
                 // 不画底边拖拽条：预设列表不需要手动调高（整块区域就是列表）。
