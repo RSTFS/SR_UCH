@@ -497,7 +497,6 @@ namespace SR_UCH.Tweaks {
                         int __before = _index;
                         _index += wheel > 0f ? 1 : -1;
                         SRApi.MarkWheelUsed(); // 滚轮已被选块器吃掉，地图/自由相机让路
-                        try { SRApi.Diag("方块破坏/滚轮 " + __before + "->" + _index + " 共" + Blocks.Count); } catch { /* 静默：诊断失败不影响 */ }
                     }
                 }
                 if (_index >= Blocks.Count) _index = 0;

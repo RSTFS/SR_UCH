@@ -200,13 +200,17 @@ namespace SR_UCH.Tweaks {
         // 自由放置：SetPiece/FixedUpdate 后用 Postfix 把方块位置改为未取整的光标位置。
         [HarmonyPatch]
         static class FreePlacementPatch {
-            private static float _fpLogAt = -999f;
             private static FieldInfo _heldOffsetField;
             static IEnumerable<MethodBase> TargetMethods() {
                 // 逐个判空后再 yield：Harmony 遍历到 null 会抛异常，导致自由放置整体失效。
                 MethodInfo m = SRApi.Ref.Method(typeof(PiecePlacementCursor), "SetPiece", "自由放置（改写放置结果）");
                 if (m != null) yield return m;
                 m = SRApi.Ref.Method(typeof(PiecePlacementCursor), "FixedUpdate", "自由放置（补丁目标）");
+                if (m != null) yield return m;
+                // 游戏里有子类覆盖了 FixedUpdate（PartyCursor）。Harmony 打在基类方法上时，
+                // 子类用 override 调 base 的情况能覆盖到；但若子类**不再调 base**就会漏掉，
+                // 这里把子类也列为目标（拿不到方法就跳过），保证派生光标同样生效。
+                m = SRApi.Ref.Method(typeof(PartyCursor), "FixedUpdate", "自由放置（派生光标）");
                 if (m != null) yield return m;
             }
             static void Postfix(PiecePlacementCursor __instance) {
@@ -236,13 +240,6 @@ namespace SR_UCH.Tweaks {
                     if (__instance.Piece.ConstrainX) freePos = new Vector2(cur.x, freePos.y);
                     else if (__instance.Piece.ConstrainY) freePos = new Vector2(freePos.x, cur.y);
                     __instance.Piece.transform.position = new Vector3(freePos.x, freePos.y, cur.z);
-                    // 诊断：每 2 秒最多一条，确认补丁真的在执行、且写入了未取整坐标。
-                    // 若日志里只有"自由放置：开"而没有这行，说明补丁没跑到（目标方法没命中被调用）。
-                    if (Time.unscaledTime - _fpLogAt > 2f) {
-                        _fpLogAt = Time.unscaledTime;
-                        SRApi.Diag("自由放置/已写入 " + freePos.x.ToString("0.000") + "," + freePos.y.ToString("0.000")
-                            + " 当前=" + cur.x.ToString("0.000") + "," + cur.y.ToString("0.000"));
-                    }
                 } catch (Exception __ex) { SRApi.Guard.Log("BuildingTools.Vector3", __ex); }
             }
 
