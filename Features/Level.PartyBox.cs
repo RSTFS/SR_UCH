@@ -543,6 +543,7 @@ public class AutoPartyItem : ITweak {
     private static PickableBlock _hpTarget;
     private static int _hpStage;          // 0=空闲 1=已移动光标等悬停 2=已触发挑选
     private static float _hpAt = -1f;
+    private static float _hpClearAt = -1f;
 
     private static void SelfReg() {
         SRApi.LocKey("Level", "Auto Party Item", "自动道具", null);
@@ -693,6 +694,15 @@ public class AutoPartyItem : ITweak {
                 _hpAt = Time.unscaledTime + 0.10f;
                 return;
             }
+            if (_hpStage == 3) {
+                if (Time.unscaledTime < _hpClearAt) return;
+                try {
+                    System.Reflection.FieldInfo hp2 = SRApi.Ref.Field(typeof(PartyPickCursor), "hoveredPick", "派对盒自动道具（清理伪造悬停）");
+                    if (hp2 != null && _hpCur != null) hp2.SetValue(_hpCur, null);
+                } catch (Exception __hc) { SRApi.Guard.Log("自动道具/清理悬停字段", __hc); }
+                _hpStage = 0; _hpCur = null; _hpTarget = null;
+                return;
+            }
             if (_hpStage == 2) {
                 System.Reflection.MethodInfo mi = null;
                 try { mi = SRApi.Ref.Method(typeof(PartyPickCursor), "tryPickPiece", "派对盒自动道具（走游戏挑选协程）"); }
@@ -707,7 +717,11 @@ public class AutoPartyItem : ITweak {
                     SRApi.LogWarn("[自动道具] 找不到 tryPickPiece，改用消息下发");
                     FallbackSendPick(_hpCur, _hpTarget);
                 }
-                _hpStage = 0; _hpCur = null; _hpTarget = null;
+                // 协程启动后把 hoveredPick 清回去，避免我们伪造的悬停状态留在光标上
+                // （它会影响 IHoveredCursors/后续手动挑选）。等一小拍让协程读到值再清。
+                _hpClearAt = Time.unscaledTime + 0.05f;
+                _hpStage = 3;
+                return;
             }
         } catch (Exception __ex) { SRApi.Guard.Log("自动道具/悬停挑选推进", __ex); }
     }
