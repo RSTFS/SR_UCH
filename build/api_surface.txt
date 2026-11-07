@@ -67,6 +67,7 @@ NotifyT
 OnShutdown
 OpenMenu
 PageBodyHeight
+PageContentBottom
 PageContentBottomY
 PageScroll
 PageScrollTopY

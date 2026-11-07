@@ -545,6 +545,8 @@ public partial class SR {
             if (SRApi.PageViewportHeight <= Sc(60f))
                 SRApi.PageViewportHeight = Mathf.Max(Sc(120f), __areaH - __footerReserve);
             SRApi.PageBodyHeight = __bodyH;                 // 右栏可用高度（布局单位）
+            // 右栏底界（布局 y）：左/右栏都从 barH+2 开始，高度 __bodyH
+            SRApi.PageContentBottom = barH + Sc(2f) + __bodyH;
             SRApi.PageUsedTop = __usedTop;                  // 页面内容起点（页头之后）
             // 页面内容必须以这条 y 为底界（= 滚动区顶 + 视口高 = 底栏条上沿）：列表高度按它算，随窗口大小自适应。
             SRApi.PageContentBottomY = __usedTop + SRApi.PageViewportHeight;

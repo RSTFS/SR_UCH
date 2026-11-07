@@ -693,6 +693,9 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         // 页面用这两个值算"我还能用多少高度"，全程同一坐标系，不会像屏幕换算那样算溢出。
         public static float PageBodyHeight;
         public static float PageUsedTop;
+        // 页面内容在布局坐标里的底界（右栏底部 = 底栏上沿）：页面用它算"还能用多少高度"，
+        // 与 last.yMax 同坐标系，算出来的表高不可能越过底栏。
+        public static float PageContentBottom;
         // 同帧对象查询缓存：一帧内同类型只真正 FindObjectsOfType 一次（多个钩子同帧查询合并）。
         // 调用方仍应保留自己的节流；返回数组是共享的，不要修改其内容。
         private static readonly System.Collections.Generic.Dictionary<Type, object> _frameObjCache = new System.Collections.Generic.Dictionary<Type, object>();
