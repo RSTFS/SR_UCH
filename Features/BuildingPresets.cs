@@ -264,6 +264,8 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterPage(Section, Render);
             // 页面关掉了滚动，列表要自己吃滚轮：只有页面级钩子能在滚动区建立之前拿到事件。
             SRApi.RegisterPageWheel(OnPresetWheel);
+            // 填充页兜底：帧尾若滚轮没被任何控件/钩子消费，直接滚本列表（不依赖命中框）
+            SRApi.Ctl.RegisterFillScroll(delegate (float __w) { ScrollTableBy(__w); });
             // 重载锁自愈：TickReloadLock 写好了却从未注册，等于"超时兜底"根本不存在，
             // 失败路径漏放锁只能等用户再点一次加载（audit 10-P0-2）。
             // 重载锁自愈 + levelPortalXml 兜底清理：两个 tick 都必须注册，否则兜底逻辑等于不存在。

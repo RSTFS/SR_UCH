@@ -169,6 +169,8 @@ namespace SR_UCH.Tweaks {
     }
 
     // 表格滚轮：Shift 横向、否则纵向；到头返回 false 让给下一层。页面钩子与区域注册共用。
+    internal static bool ScrollTableByWheelPublic(float wheel) { return ScrollTableByWheel(wheel); }
+
     private static bool ScrollTableByWheel(float wheel) {
         try {
             bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);

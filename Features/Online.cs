@@ -117,6 +117,8 @@ namespace SR_UCH.Tweaks {
             SRApi.Nav(SecOnline, 90);   // 侧栏顺序 90：会话(80) 之后、实验(100) 之前
             SRApi.RegisterPage(SecOnline, RenderOnlinePage);
             SRApi.RegisterPageWheel(OnLobbyWheel);   // 页面关滚动，房间列表自己吃滚轮
+            // 填充页兜底：帧尾若滚轮没被消费，直接滚房间列表
+            SRApi.Ctl.RegisterFillScroll(delegate (float __w) { ScrollTableByWheelPublic(__w); });
             SRApi.RegisterTick("联机看门狗", TickOnline); // 每帧：回家看门狗 + 延时加入
             SRApi.RegisterTick("联机自动进入主菜单", TickAutoEnterMainMenu); // 加入成功后替玩家按一次确认
             // 换场景/多次返回主界面后复位加入瞬时状态，避免下一次点加入被旧状态直接忽略。

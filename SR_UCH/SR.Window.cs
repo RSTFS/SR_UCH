@@ -657,6 +657,14 @@ public partial class SR {
                                 }
                             } catch (Exception __dh) { Guard.Log("滚轮/页面钩子", __dh); }
                         }
+                        if (!__done && _noScrollDeclared) {
+                            // 填充页：直接交给列表自己滚（不依赖命中框）
+                            float __wf = SR.Wheel.Value;
+                            if (SRApi.Ctl.FillScrollAll(__wf)) {
+                                SR.Wheel.TakeRemaining(false);
+                                __done = true;
+                            }
+                        }
                         if (!__done) {
                         bool allow = !_noScrollDeclared;
                         float w = SR.Wheel.TakeRemaining(allow);

@@ -1130,6 +1130,23 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         // 兜底：绘制期取用失败时登记"矩形 + 应用函数"，帧尾若还有滚轮量再命中一次
         private static Action<Rect, Func<float, bool>> _wheelFb;
         public static void SetWheelFallbackSink(Action<Rect, Func<float, bool>> f) { _wheelFb = f; }
+        // 填充页的列表滚动回调：页面注册一次，帧尾若滚轮没被任何控件/钩子消费，
+        // 且指针在内容区，就直接交给它（不依赖命中框，保证列表一定能滚）。
+        private static Action<Action<float>> _fillScroll;
+        private static readonly System.Collections.Generic.List<Action<float>> _fillHandlers = new System.Collections.Generic.List<Action<float>>();
+        public static void SetFillScrollSink(Action<Action<float>> f) { _fillScroll = f; }
+        public static void RegisterFillScroll(Action<float> scroll) {
+            Action<Action<float>> f = _fillScroll;
+            if (f != null) f(scroll);
+        }
+        public static bool FillScrollAll(float wheel) {
+            for (int i = 0; i < _fillHandlers.Count; i++) {
+                try { _fillHandlers[i](wheel); return true; } catch { /* 静默：单个页面失败不影响其它 */ }
+            }
+            return false;
+        }
+        internal static void AddFillHandler(Action<float> h) { if (h != null) _fillHandlers.Add(h); }
+
         public static void WheelFallback(Rect layoutRect, Func<float, bool> apply) { Action<Rect, Func<float, bool>> f = _wheelFb; if (f != null) f(layoutRect, apply); }
         // 表格搜索高亮：页面每帧传入当前搜索串（空串 = 不高亮）
         private static Action<string> _tableHighlight;
