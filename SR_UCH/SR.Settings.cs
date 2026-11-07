@@ -1466,24 +1466,9 @@ public partial class SR {
             // 滚轮：绘制期直接问"这一格归我吗"（收起=换选项；展开=滚列表）
             if (options != null && options.Length > 1) {
                 float __w = 0f;
-                if (!open) {
-                    __w = SRApi.Ctl.WheelTake(boxRect);
-                    // 无论 take 是否命中都登记：滚动视图会先吃掉滚轮，靠这张表在窗口层提前命中
-                    if (entry != null && vals != null) {
-                        ConfigEntryBase __ce = entry; Array __cv = vals; string[] __co = options; string __cc = current;
-                        SRApi.Ctl.WheelFallback("combo:" + (entry != null ? entry.Definition.Section + "/" + entry.Definition.Key : ""), boxRect, delegate (float __fw) {
-                            int __ccur = 0;
-                            for (int i = 0; i < __co.Length; i++) { if (__co[i] == __cc) { __ccur = i; break; } }
-                            int __cn = Mathf.Clamp(Mathf.RoundToInt(Mathf.Abs(__fw)), 1, 5);
-                            int __ci2 = __fw > 0f ? __ccur - __cn : __ccur + __cn;
-                            if (__ci2 < 0) __ci2 = __co.Length - 1;
-                            if (__ci2 >= __co.Length) __ci2 = 0;
-                            if (__ci2 < __cv.Length) SR.SetValue(__ce, __cv.GetValue(__ci2));
-                            return true;
-                        });
-                    }
-                }
-                else if (drew && options.Length > 8 && entry != null) {
+                // 滚轮只保留"绘制期就地轮询"这一条路径（见上方 WheelPoll）。
+                // 展开列表的滚动仍需要：保留它在展开态下的处理。
+                if (drew && options.Length > 8 && entry != null) {
                     int __vis2 = Mathf.Min(options.Length, 8);
                     __w = SRApi.Ctl.WheelTake(new Rect(boxRect.x, boxRect.yMax, width, CtlH() * __vis2));
                     if (Mathf.Abs(__w) > 0.01f) {
@@ -1524,70 +1509,6 @@ public partial class SR {
                     }
                 }
             }
-            // 控件级兜底（历史可用路径）：悬停声明归属；Repaint 趟**且仍悬停**才取用转移来的量。
-            try {
-                Event __ce4 = Event.current;
-                if (__ce4 != null && boxRect.Contains(__ce4.mousePosition)) {
-                    WheelClaim();
-                    if (__ce4.type == EventType.Repaint) {
-                        float __dw4 = WheelDeltaTake();
-                        if (Mathf.Abs(__dw4) > 0.01f && entry != null && vals != null && options != null && options.Length > 1) {
-                            int __c4 = 0;
-                            for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __c4 = i; break; } }
-                            int __n4 = Mathf.Clamp(Mathf.RoundToInt(Mathf.Abs(__dw4)), 1, 5);
-                            int __i4 = __dw4 > 0f ? __c4 - __n4 : __c4 + __n4;
-                            if (__i4 < 0) __i4 = options.Length - 1;
-                            if (__i4 >= options.Length) __i4 = 0;
-                            if (__i4 < vals.Length) SR.SetValue(entry, vals.GetValue(__i4));
-                        }
-                    }
-                }
-            } catch (Exception __cw4) { Guard.Log("下拉框/滚轮", __cw4); }
-
-            // 早期写法原样恢复：悬停即 WheelClaim（下一帧由窗口转成 WheelDelta），
-            // Repaint 趟且仍在框内时 WheelDeltaTake 换一项 —— 这是历史上确实可用的组合。
-            try {
-                Event __ce6 = Event.current;
-                if (__ce6 != null && options != null) {
-                    bool __won = boxRect.Contains(__ce6.mousePosition)
-                        || (drew && new Rect(boxRect.x, boxRect.yMax, boxRect.width,
-                                             SRApi.Ctl.Sc(26f) * options.Length).Contains(__ce6.mousePosition));
-                    if (__won) WheelClaim();
-                    if (!open && __ce6.type == EventType.Repaint && options.Length > 1
-                        && boxRect.Contains(__ce6.mousePosition)) {
-                        float __cw2 = WheelDeltaTake();
-                        if (Mathf.Abs(__cw2) > 0.0001f) {
-                            int __cur = 0;
-                            for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur = i; break; } }
-                            // 顺序换项：一次滚轮严格走一格（上滚=上一项，下滚=下一项），到头回绕。
-                            // 索引只按 options 长度取模，**不再用 vals 长度截断**——后者会让末尾几项永远选不到。
-                            int __n = options.Length;
-                            int __stp = __cw2 > 0f ? -1 : 1;
-                            int __ni = ((__cur + (__cw2 > 0f ? 1 : -1)) % __n + __n) % __n;   // 同样：上滚=下一项
-                            int __limit = Mathf.Min(__n, vals != null ? vals.Length : 0);
-                            if (entry != null && __limit > 0) {
-                                if (__ni >= __limit) __ni = __stp > 0 ? 0 : __limit - 1;   // 缺值时跳到有效端点
-                                SR.SetValue(entry, vals.GetValue(__ni));
-                            }
-                        }
-                    }
-                }
-            } catch (Exception __cw6) { Guard.Log("下拉框/滚轮(早期通道)", __cw6); }
-
-            // 最高优先：绘制期就地轮询（不经过事件、不依赖登记表）
-            try {
-                if (!open && options != null && options.Length > 1 && entry != null) {
-                    float __pw1 = SRApi.Ctl.WheelPoll("combo:" + entry.Definition.Section + "/" + entry.Definition.Key, boxRect);
-                    if (Mathf.Abs(__pw1) > 0.01f) {
-                        int __cur1 = 0;
-                        for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur1 = i; break; } }
-                        int __n1 = options.Length;
-                        int __ni1 = ((__cur1 + (__pw1 > 0f ? 1 : -1)) % __n1 + __n1) % __n1;   // 上滚=下一项（与用户预期一致）
-                        if (__ni1 < vals.Length) SR.SetValue(entry, vals.GetValue(__ni1));
-                    }
-                }
-            } catch (Exception __pw1x) { Guard.Log("下拉框/就地轮询", __pw1x); }
-
             if (drew) {
                 //展开列表最多可见 8 项，其余经滚轮滚动。
                 int __visN = Mathf.Min(options.Length, 8);
