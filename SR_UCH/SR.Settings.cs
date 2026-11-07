@@ -1481,6 +1481,27 @@ public partial class SR {
                     if (entry != null && vals != null && __ni < vals.Length) SR.SetValue(entry, vals.GetValue(__ni));
                 }
             }
+            // 键盘导航（对齐 ImGui BeginCombo）：展开时 Up/Down 换项、Enter/Esc 收起。
+            if (open && entry != null && options != null && options.Length > 1) {
+                Event __ke2 = Event.current;
+                if (__ke2 != null && __ke2.type == EventType.KeyDown) {
+                    int __cur2 = 0;
+                    for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur2 = i; break; } }
+                    if (__ke2.keyCode == KeyCode.DownArrow) {
+                        int __n3 = (__cur2 + 1) % options.Length;
+                        if (vals != null && __n3 < vals.Length) SR.SetValue(entry, vals.GetValue(__n3));
+                        __ke2.Use();
+                    } else if (__ke2.keyCode == KeyCode.UpArrow) {
+                        int __n3 = (__cur2 - 1 + options.Length) % options.Length;
+                        if (vals != null && __n3 < vals.Length) SR.SetValue(entry, vals.GetValue(__n3));
+                        __ke2.Use();
+                    } else if (__ke2.keyCode == KeyCode.Return || __ke2.keyCode == KeyCode.KeypadEnter || __ke2.keyCode == KeyCode.Escape) {
+                        open = false;
+                        if (entry != null) _editOpen[entry] = false;
+                        __ke2.Use();
+                    }
+                }
+            }
             if (drew) {
                 //展开列表最多可见 8 项，其余经滚轮滚动。
                 int __visN = Mathf.Min(options.Length, 8);

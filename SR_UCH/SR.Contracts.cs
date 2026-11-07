@@ -1128,6 +1128,25 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         // 绘制期取用滚轮量（转发到 SRApi.WheelTake，供页面内控件/表格调用）
         public static float WheelTake(Rect layoutRect) { return SRApi.WheelTake(layoutRect); }
 
+        // ================= 作用域化 GUI 状态（对齐 ImGui 的 BeginDisabled/PushStyleColor） =================
+        // 用法：using (SRApi.Ctl.Disabled(cond)) { ... }
+        // 以前到处手写 bool old = GUI.enabled; try { } finally { GUI.enabled = old; }，
+        // 漏写一次就会让后面整页变灰 —— 作用域写法不可能漏。
+        public sealed class GuiScope : System.IDisposable {
+            private readonly bool _enabled;
+            private readonly bool _hasColor;
+            private readonly Color _color;
+            internal GuiScope(bool enabled, bool hasColor, Color color) {
+                _enabled = GUI.enabled; _hasColor = hasColor; _color = GUI.color;
+                if (!enabled) GUI.enabled = false;
+                if (hasColor) GUI.color = color;
+            }
+            public void Dispose() { GUI.enabled = _enabled; if (_hasColor) GUI.color = _color; }
+        }
+        public static System.IDisposable Disabled(bool disabled) { return new GuiScope(!disabled, false, default(Color)); }
+        public static System.IDisposable Tint(Color color) { return new GuiScope(true, true, color); }
+        public static System.IDisposable Tint(Color color, bool useIt) { return new GuiScope(true, useIt, color); }
+
         public static void SectionTitle(string title, string tip = null) {
             try {
                 GUIContent c = new GUIContent(title, tip);

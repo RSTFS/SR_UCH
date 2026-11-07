@@ -302,6 +302,10 @@ public partial class SR {
             } catch { return Sc(80f); }
         }
 
+        // Ctrl+点击滑块后的输入态（同一时刻只编辑一个数值）
+        private static ConfigEntryBase _numEdit;
+        private static string _numText;
+
         // 稳定的区域 id（同一配置条目永远同一个 id，跨帧/跨趟都不会重复建表）
         private static string RowKey(ConfigEntryBase e) {
             try { return e == null ? "?" : (e.Definition.Section + "/" + e.Definition.Key); }
@@ -338,6 +342,31 @@ public partial class SR {
                     GUILayout.Space(Sc(6));
                     float cur = (float)e.BoxedValue;
                     Rect r = GUILayoutUtility.GetRect(Sc(150f), Sc(28f));
+                    // Ctrl+点击滑块 → 变成输入框（ImGui 的 Ctrl+Click to input 做法）：
+                    // 精确数值不用再靠一个"更多数值"开关，平时仍是滑块。
+                    Event __ev = Event.current;
+                    if (__ev != null && __ev.type == EventType.MouseDown && __ev.button == 0 && __ev.control && r.Contains(__ev.mousePosition)) {
+                        _numEdit = e; _numText = cur.ToString("0.###"); __ev.Use();
+                    }
+                    if (ReferenceEquals(_numEdit, e)) {
+                        string __t = SRApi.ClearableTextField(_numText ?? "", SRApi.Ctl.SearchBox, GUILayout.Width(Sc(90)), GUILayout.Height(Sc(26)));
+                        if (__t != _numText) _numText = __t;
+                        Event __ke = Event.current;
+                        if (__ke != null && __ke.type == EventType.KeyDown) {
+                            if (__ke.keyCode == KeyCode.Return || __ke.keyCode == KeyCode.KeypadEnter) {
+                                float __nv2;
+                                if (float.TryParse(_numText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out __nv2)) {
+                                    SetValue(e, Mathf.Clamp(__nv2, min, max));
+                                    written = true;
+                                }
+                                _numEdit = null; _numText = null; __ke.Use();
+                            } else if (__ke.keyCode == KeyCode.Escape) { _numEdit = null; _numText = null; __ke.Use(); }
+                        }
+                        GUILayout.FlexibleSpace();
+                        GUILayout.EndHorizontal();
+                        GUILayout.Space(Sc(2));
+                        return written;
+                    }
                     // 滚轮调值：绘制期用本行滑块的矩形取用这一格（不依赖任何坐标换算）
                     {
                         float __w = SRApi.Ctl.WheelTake(r);

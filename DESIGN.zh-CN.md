@@ -102,6 +102,9 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
 
 ### 4.3 三条硬约束（都踩过坑）
 
+0. **GUI 状态用作用域**：禁用/着色一律 `using (SRApi.Ctl.Disabled(cond))`、`using (SRApi.Ctl.Tint(c))`，
+   不要手写 `GUI.enabled = old` 再还原（漏一次就整页变灰）。对应 ImGui 的 `BeginDisabled/PushStyleColor`。
+   数值行支持 **Ctrl+点击滑块 → 直接输入数值**；下拉框展开后支持 **Up/Down 换项、Enter/Esc 收起**。
 0. **标签列宽由核心按页收敛**：统一行的标签宽度取"本页实际出现过的标签"的最大值
    （两帧收敛，换页重置），不要自己传固定宽度、也不要用整段最长条目名——那会让标签比文字宽一大截。
    需要自定义行时用 `SRApi.Ctl.LabelColumnWidth(label)` 取同一列宽。

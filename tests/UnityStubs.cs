@@ -75,6 +75,11 @@ namespace UnityEngine {
         public static Event current { get { return null; } }
     }
 
+    public static class GUI {
+        public static bool enabled = true;
+        public static Color color = new Color(1f, 1f, 1f, 1f);
+    }
+
     public static class GUILayout {
         public static GUILayoutOption Width(float v) { return null; }
         public static GUILayoutOption Height(float v) { return null; }
