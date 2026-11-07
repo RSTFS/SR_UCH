@@ -127,6 +127,15 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
 填充页的结构固定为 `固定头部 → 列表 → 底边拖拽条` 三段，新增列表页时照抄联机页/预设页的
 `RenderXxxHeader() + ComputeFillTableHeight() + RenderXxxTable()` 三段式，不要再让页面滚动与列表滚动并存。
 
+### 4.3c 搜索命中高亮
+
+预设页搜索框命中时，表格单元格里命中的**片段**会先画一层半透明底色（琥珀 22%），再画文字，
+对应 ImGui demo 的 filtering 视觉反馈。实现：
+
+- 页面每帧 `SRApi.Ctl.SetTableHighlight(查询串)`（空串 = 关闭）
+- 核心 `DrawTableCells` 用**同一字体**测量前缀宽度来定位高亮矩形（左对齐列从左侧 4px 起，其余列按居中偏移）
+- 换页时核心自动清空查询串，避免旧查询串染到别的列表
+
 ### 4.3b 表格列策略
 
 对齐 ImGui 的 `ImGuiTableColumnFlags_WidthFixed/WidthStretch`：每列有自己的宽度策略。

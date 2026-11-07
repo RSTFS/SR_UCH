@@ -617,7 +617,8 @@ namespace SR_UCH.Tweaks {
                 Rect last = GUILayoutUtility.GetRect(1f, 0f);
                 float tableH = ComputeFillTableHeight(last);
                 _actionHitThisFrame = false;
-                RenderPresetTable(tableH, VisiblePresets());
+                SRApi.Ctl.SetTableHighlight(_search ?? "");   // 搜索命中在表格里高亮显示
+            RenderPresetTable(tableH, VisiblePresets());
                 DrawInlineRename();
                 CancelPendingOnBlank(pendingBefore);
             } catch (Exception __ex) { SRApi.Guard.Log("渲染布局预设页", __ex); }

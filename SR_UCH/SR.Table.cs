@@ -389,6 +389,11 @@ public partial class SR {
     }
 
     // 数组版（TableDraw 走这条）：直接索引取值、零分配；越界列按空串处理。
+    // 搜索命中高亮（对齐 ImGui demo 的 filtering 视觉反馈）：页面每帧设置查询串，
+    // 单元格里命中的片段先画一层半透明底色，再画文字。
+    internal static string HighlightQuery;
+    internal static readonly Color HighlightColor = new Color(1f, 0.84f, 0.30f, 0.22f);
+
     public static void DrawTableCells(List<int> vis, int skipCol, int alignLeftCol, float rowH, float scrollX, float y,
         float[] colW, string[] cells) {
         float x = -scrollX;
@@ -399,6 +404,22 @@ public partial class SR {
             Rect r = new Rect(x, y, w, rowH);
             GUIStyle st = ci == alignLeftCol ? SR.Ctl.LabelClip : SR.Ctl.LabelClipCenter;
             string s = (cells != null && ci >= 0 && ci < cells.Length) ? cells[ci] : null;
+            // 命中片段底色：用同一字体的前缀宽度定位（左侧列左对齐、其余居中）
+            try {
+                string q = HighlightQuery;
+                if (!string.IsNullOrEmpty(q) && !string.IsNullOrEmpty(s)) {
+                    int idx = s.IndexOf(q, StringComparison.OrdinalIgnoreCase);
+                    if (idx >= 0) {
+                        float total = SR.Ctl.Label.CalcSize(new GUIContent(s)).x;
+                        float pre = idx > 0 ? SR.Ctl.Label.CalcSize(new GUIContent(s.Substring(0, idx))).x : 0f;
+                        float mid = SR.Ctl.Label.CalcSize(new GUIContent(s.Substring(idx, q.Length))).x;
+                        float baseX = (ci == alignLeftCol) ? r.x + Sc(4f) : r.x + Mathf.Max(Sc(2f), (r.width - total) * 0.5f);
+                        float hx = Mathf.Clamp(baseX + pre, r.x, r.xMax);
+                        float hw = Mathf.Min(mid, r.xMax - hx);
+                        if (hw > 0.5f) DrawFill(new Rect(hx, r.y + Sc(2f), hw, r.height - Sc(4f)), HighlightColor);
+                    }
+                }
+            } catch (Exception __hl) { Guard.Log("表格/命中高亮", __hl); }
             st.Draw(r, CellContent(s), false, false, false, false);
             DrawLine(new Rect(r.xMax - 1f, r.y, 1f, r.height), CurStyle.LineLight);   //格内线用弱线
             x += w;

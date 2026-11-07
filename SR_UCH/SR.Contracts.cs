@@ -1127,6 +1127,10 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static float LabelColumnWidth(string label) { Func<string, float> f = _labelCol; return f != null ? f(label) : 0f; }
         // 绘制期取用滚轮量（转发到 SRApi.WheelTake，供页面内控件/表格调用）
         public static float WheelTake(Rect layoutRect) { return SRApi.WheelTake(layoutRect); }
+        // 表格搜索高亮：页面每帧传入当前搜索串（空串 = 不高亮）
+        private static Action<string> _tableHighlight;
+        public static void SetTableHighlightSink(Action<string> f) { _tableHighlight = f; }
+        public static void SetTableHighlight(string query) { Action<string> f = _tableHighlight; if (f != null) f(query ?? ""); }
 
         // ================= 作用域化 GUI 状态（对齐 ImGui 的 BeginDisabled/PushStyleColor） =================
         // 用法：using (SRApi.Ctl.Disabled(cond)) { ... }

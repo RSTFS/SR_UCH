@@ -513,6 +513,7 @@ public partial class SR {
                     SR.CloseOpenCombos();
                     SR.Ctl.ResetLabelColumn();   // 换页：标签列宽重新按本页标签收敛
                     _noScrollDeclared = false;   // 旧页的"禁止页面滚动"声明不能带到新页（会吞掉换页后的第一格滚轮）
+                    SR.HighlightQuery = "";      // 换页清掉表格搜索高亮（否则旧查询串会染到别的列表）
                     _scroll = Vector2.zero;     // 换页回到顶部：新页内容更短时不会停在空白处，看起来像"滚不动"
                 }
             } catch (Exception __cs) { Guard.Log("换页收起下拉框", __cs); }
