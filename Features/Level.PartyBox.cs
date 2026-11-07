@@ -675,11 +675,22 @@ public class AutoPartyItem : ITweak {
             if (_hpStage == 0 || _hpCur == null || _hpTarget == null) return;
             if (Time.unscaledTime < _hpAt) return;
             if (_hpStage == 1) {
-                // 把光标移到道具上：位置取道具的 transform，稍高一点避免落进地面
+                // 优先：直接把光标的 hoveredPick 字段设成目标（协程只读这个字段，不需要真的碰撞）。
+                // 这样**不移动光标、不等帧**，用户看不到任何位移。
+                System.Reflection.FieldInfo hp = null;
+                try { hp = SRApi.Ref.Field(typeof(PartyPickCursor), "hoveredPick", "派对盒自动道具（直接指定悬停对象）"); }
+                catch (Exception __hf) { SRApi.Guard.Log("自动道具/取悬停字段", __hf); }
+                if (hp != null) {
+                    try { hp.SetValue(_hpCur, _hpTarget); } catch (Exception __hs) { SRApi.Guard.Log("自动道具/写悬停字段", __hs); }
+                    _hpStage = 2;
+                    _hpAt = Time.unscaledTime;          // 立刻进入下一步
+                    return;
+                }
+                // 兜底：字段名对不上时，才退回"挪光标 + 等游戏自己算悬停"
                 Vector3 p = _hpTarget.transform.position;
                 _hpCur.transform.position = new Vector3(p.x, p.y + 0.2f, p.z);
                 _hpStage = 2;
-                _hpAt = Time.unscaledTime + 0.10f;   // 等游戏下一次 Update 算 hoveredPick
+                _hpAt = Time.unscaledTime + 0.10f;
                 return;
             }
             if (_hpStage == 2) {
