@@ -287,6 +287,20 @@ public partial class SR {
                     float __raw0 = Mathf.Abs(__we0.delta.y) > 0.001f ? __we0.delta.y : __we0.delta.x;
                     if (SR.Wheel.TryHoverApply(-__raw0)) { __we0.Use(); }
                 }
+                // 早期验证可用的通道（按原样恢复）：上一帧控件声明过 hover -> 把滚轮量转成 WheelDelta，
+                // 控件在 Repaint 趟用 WheelDeltaTake 取用。先于任何滚动视图执行，事件直接 Use 掉。
+                if (WheelClaimedPrev && !SR.WheelTakenThisFrame) {
+                    float __cw = 0f;
+                    Event __ce5 = Event.current;
+                    if (__ce5 != null && __ce5.type == EventType.ScrollWheel) {
+                        float __rawc = Mathf.Abs(__ce5.delta.y) > 0.001f ? __ce5.delta.y : __ce5.delta.x;
+                        __cw = -__rawc;
+                        __ce5.Use();
+                    } else {
+                        try { __cw = Input.mouseScrollDelta.y; } catch (Exception __mi) { Guard.Log("滚轮/声明通道输入", __mi); }
+                    }
+                    if (Mathf.Abs(__cw) > 0.01f) { WheelDeltaSet(__cw); SR.MarkWheelUsed(); }
+                }
                 // 第二条通道：Unity 即时输入 Input.mouseScrollDelta。
                 // IMGUI 的 ScrollWheel 事件可能被滚动视图先吃掉，而这个是轮询值，不受事件顺序影响。
                 // 每帧只处理一次，命中控件后标记"本帧滚轮已用"，帧尾就不会再滚页面。

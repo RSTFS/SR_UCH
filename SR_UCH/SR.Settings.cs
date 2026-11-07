@@ -1544,6 +1544,30 @@ public partial class SR {
                 }
             } catch (Exception __cw4) { Guard.Log("下拉框/滚轮", __cw4); }
 
+            // 早期写法原样恢复：悬停即 WheelClaim（下一帧由窗口转成 WheelDelta），
+            // Repaint 趟且仍在框内时 WheelDeltaTake 换一项 —— 这是历史上确实可用的组合。
+            try {
+                Event __ce6 = Event.current;
+                if (__ce6 != null && options != null) {
+                    bool __won = boxRect.Contains(__ce6.mousePosition)
+                        || (drew && new Rect(boxRect.x, boxRect.yMax, boxRect.width,
+                                             SRApi.Ctl.Sc(26f) * options.Length).Contains(__ce6.mousePosition));
+                    if (__won) WheelClaim();
+                    if (!open && __ce6.type == EventType.Repaint && options.Length > 1
+                        && boxRect.Contains(__ce6.mousePosition)) {
+                        float __cw2 = WheelDeltaTake();
+                        if (Mathf.Abs(__cw2) > 0.0001f) {
+                            int __cur = 0;
+                            for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur = i; break; } }
+                            int __ni = __cw2 > 0f ? __cur - 1 : __cur + 1;
+                            if (__ni < 0) __ni = options.Length - 1;
+                            if (__ni >= options.Length) __ni = 0;
+                            if (entry != null && __ni < vals.Length) SR.SetValue(entry, vals.GetValue(__ni));
+                        }
+                    }
+                }
+            } catch (Exception __cw6) { Guard.Log("下拉框/滚轮(早期通道)", __cw6); }
+
             if (drew) {
                 //展开列表最多可见 8 项，其余经滚轮滚动。
                 int __visN = Mathf.Min(options.Length, 8);
