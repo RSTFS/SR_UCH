@@ -1052,6 +1052,9 @@ namespace SR_UCH.Tweaks {
                 float __gripH = 0f;   // 已删除底边拖拽条
                 // 行区 = 表格高 − 表头 − 拖拽条：把拖拽条算进来会让 maxY 恒为 0（列表因此永远滚不动）。
                 float rowsH = Mathf.Max(0f, tableH - headerH - __gripH);
+                // 行区不得超过内容高度：内容少时表格就短，不会在行结束处留下"空表体"。
+                float __contentH = Mathf.Max(rowH, visible.Count * rowH);
+                if (rowsH > __contentH) { rowsH = __contentH; tableH = rowsH + headerH; }
                 // 绘制这一刻按屏幕实测再夹一次：行区不得超出"表格顶到 底栏上沿"的可视区。
                 // 之前表格高度是提前算的，算大会让 rowsH 大于实际可见高度 → maxY 算成 0、下面几行被窗口裁掉，
                 // 表现就是"明明还有项目却划不动"。

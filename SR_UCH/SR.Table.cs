@@ -205,7 +205,6 @@ public partial class SR {
         // 钉住列底：只铺"实际有行的单元格"，不再整列铺一块（整列铺会在行结束处形成一条深色遮罩）
         for (int k = 0; k < a.pinRects.Count && k < a.pinRows.Count; k++) {
             try {
-                DrawFill(a.pinRects[k], CurStyle.RowBg);   // 每格自己铺底：纵向滚动时不透明，且不会延伸到空白区
                 a.pinDraw(a.pinRows[k], a.pinRects[k], k);
             } catch (Exception __pd) { Guard.Log("钉住列按钮", __pd); }
         }
