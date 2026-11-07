@@ -27,16 +27,6 @@ public partial class Experiments : ITweak
                     DrawStatus(FreeCam.SpeedNote);
                 }
 
-                // 相机平移（移植自 BuildingPlus 的 2D Camera Controller）
-                GUILayout.Space(SRApi.Ctl.Sc(6));
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("相机平移", "Camera pan") + " -",
-                    SRApi.T("中键拖拽平移画面，鼠标贴边自动滚动，双击中键复位；仅自由模式。",
-                            "Middle-drag to move the view, edge scrolling, double middle-click resets; freeplay only."));
-                SRApi.RenderSectionEntries("Experiments", delegate (ConfigEntryBase e) {
-                    return e.Definition.Key == "Camera Pan" || e.Definition.Key == "Camera Pan Speed"
-                        || e.Definition.Key == "Camera Edge Scroll";
-                });
-
                 // 跨平台联机：直接改游戏自己的 CrossPlatformToggle（反射定位，不绑版本）。
                 GUILayout.Space(SRApi.Ctl.Sc(6));
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("跨平台联机", "Cross-play") + " -",

@@ -134,7 +134,6 @@ The panel has sections on the left and pages on the right. Listed by section bel
 
 - **Free Camera** -- scroll to zoom the view; both the view size and the camera move speed are adjustable.
 - **Camera Follow** -- adjustable camera move speed.
-- **Camera Pan** -- middle-drag to pan, edge scrolling, double middle-click to reset; freeplay only and disabled while the panel is open.
 - **Cross-play** -- turns the game's own cross-platform matchmaking switch on or off (the value is
   also written into the save file, so it survives a restart).
 
