@@ -617,17 +617,26 @@ public class AutoPartyItem : ITweak {
     }
 
     // 与游戏 PartyPickCursor.tryPickPiece 完全一致：记下选中的对象 -> 发 PiecePicked -> 冻结并关闭光标。
+    // 严格照抄游戏 PartyPickCursor.tryPickPiece 的**每一步**（顺序也要一致）：
+    //   Picking=false → 记 NetworkpickedPiece → （有权威才）发 PiecePicked → Freeze → Disable()
+    // 之前在房客端失效，就是因为少了 Picking=false 且用了不同的 Disable 重载：
+    // 房主端的校验只认"光标已结束挑选"的状态，状态不对就当作无效挑选丢掉。
     private static bool DoPick(PartyPickCursor cur, PickableBlock target) {
         try {
+            if (cur == null || target == null) return false;
             if (UnityEngine.Networking.NetworkManager.singleton == null || UnityEngine.Networking.NetworkManager.singleton.client == null) return false;
+            cur.Picking = false;
             UnityEngine.Networking.NetworkInstanceId netId = new UnityEngine.Networking.NetworkInstanceId(target.netIdValue);
-            cur.NetworkpickedPiece = UnityEngine.Networking.ClientScene.FindLocalObject(netId);
-            MsgPiecePicked msg = new MsgPiecePicked();
-            msg.PickableNetID = target.netIdValue;
-            msg.PlayerNumber = cur.networkNumber;
-            UnityEngine.Networking.NetworkManager.singleton.client.Send(NetMsgTypes.PiecePicked, msg);
+            UnityEngine.GameObject picked = UnityEngine.Networking.ClientScene.FindLocalObject(netId);
+            cur.NetworkpickedPiece = picked;
+            if (cur.hasAuthority) {
+                MsgPiecePicked msg = new MsgPiecePicked();
+                msg.PickableNetID = target.netIdValue;
+                msg.PlayerNumber = cur.networkNumber;
+                UnityEngine.Networking.NetworkManager.singleton.client.Send(NetMsgTypes.PiecePicked, msg);
+            }
             cur.Freeze();
-            cur.Disable(false, false);
+            cur.Disable();
             return true;
         } catch (Exception __ex) { SRApi.Guard.Log("自动道具/下发挑选", __ex); return false; }
     }
