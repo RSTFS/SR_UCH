@@ -261,7 +261,8 @@ namespace SR_UCH.Tweaks {
         private static void SelfReg() {
             SRApi.LocSec(Section, "布局预设", "Layout Presets");
             SRApi.Nav(Section, 45); // 关卡(40) 之后、构建工具(50) 之前
-            SRApi.RegisterPage(Section, Render);
+            SRApi.RegisterPage(Section, Render);            // 页签一：预设保存
+            SRApi.RegisterPage(Section, RenderListPage);    // 页签二：预设列表（筛选 + 列表）
             // 页面关掉了滚动，列表要自己吃滚轮：只有页面级钩子能在滚动区建立之前拿到事件。
             SRApi.RegisterPageWheel(OnPresetWheel);
             // 填充页兜底：帧尾若滚轮没被任何控件/钩子消费，直接滚本列表（不依赖命中框）
@@ -614,19 +615,35 @@ namespace SR_UCH.Tweaks {
                 if (Event.current != null && Event.current.type == EventType.Layout) _pageTopY = topProbe.y;
 
                 RenderSaveImportHeader();
+                CancelPendingOnBlank(pendingBefore);
+            } catch (Exception __ex) { SRApi.Guard.Log("渲染布局预设页", __ex); }
+        }
+
+        // ================= 页面二：预设列表（筛选 + 工具行 + 列表） =================
+        // 结构照联机列表：页面自身不滚（NoPageScrollBars），列表占满剩余高度，只有列表自己滚。
+        private static void RenderListPage() {
+            try {
+                _renderFrame = Time.frameCount;
+                SRApi.NoPageScrollBars = true;    // 填充模式
+                EnsureLoaded();
+                EnsureCols();
+                string pendingBefore = _pendingKey;
+
+                Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
+                if (Event.current != null && Event.current.type == EventType.Layout) _pageTopY = topProbe.y;
+
                 RenderFilterHeader();
                 RenderListToolbar();
                 ApplyFilterChange();
 
-                // 零高度探针：Layout 趟 GetLastRect 可能是退化矩形，用它拿布局游标的真实 y
                 Rect last = GUILayoutUtility.GetRect(1f, 0f);
                 float tableH = ComputeFillTableHeight(last);
                 _actionHitThisFrame = false;
-                SRApi.Ctl.SetTableHighlight(_search ?? "");   // 搜索命中在表格里高亮显示
-            RenderPresetTable(tableH, VisiblePresets());
+                SRApi.Ctl.SetTableHighlight(_search ?? "");   // 搜索命中在表格里高亮
+                RenderPresetTable(tableH, VisiblePresets());
                 DrawInlineRename();
                 CancelPendingOnBlank(pendingBefore);
-            } catch (Exception __ex) { SRApi.Guard.Log("渲染布局预设页", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("渲染预设列表页", __ex); }
         }
 
         // 头部一：保存 / 导入 / 导出（固定 3 行）
