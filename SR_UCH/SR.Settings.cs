@@ -449,7 +449,7 @@ public partial class SR {
         private static GUIStyle _cdDot, _cdTitle, _cdSum;
         private static void EnsureCardStyles() {
             if (_cdSum != null) return;
-            _cdDot = new GUIStyle(_label); _cdDot.alignment = TextAnchor.MiddleLeft;
+            _cdDot = new GUIStyle(_label); _cdDot.alignment = TextAnchor.MiddleCenter;   // 圆点按行高垂直居中，才能和标题同一基线
             _cdTitle = new GUIStyle(_labelWrap); _cdTitle.alignment = TextAnchor.MiddleLeft;
             _cdSum = new GUIStyle(_label); _cdSum.alignment = TextAnchor.MiddleLeft;
         }

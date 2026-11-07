@@ -17,8 +17,9 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<string> _animal;    // 指定动物
         // ---------------- 自动时装 ----------------
         private static ConfigEntry<bool> _outfitOn;    // 自动时装（随机整套）
+        private static ConfigEntry<string> _outfitData; // 每个角色一套：CHICKEN=0,1,2,3|HORSE=...
 
-        private static readonly string[] ModeVals = { "target", "random", "smart" };
+        private static readonly string[] ModeVals = { "smart", "target", "random" };   // 顺序：智能 / 指定 / 随机
 
         // 每进一次房间只自动选一次：场景切换时复位。
         private static bool _triedThisRoom;
@@ -99,7 +100,9 @@ namespace SR_UCH.Tweaks {
             SRApi.LocKey(Sec, "Animal", "指定动物", null);
             SRApi.LocDesc(Sec, "Animal", "指定动物\n「指定角色」方式下要挑的动物\n只列出存档里已解锁的动物", "Target animal\nthe animal used by the Specific mode\nonly unlocked animals are listed");
             SRApi.LocKey(Sec, "Outfit Enabled", "自动时装", null);
-            SRApi.LocDesc(Sec, "Outfit Enabled", "自动时装\n角色选定后自动随机穿一套外观\n只使用已解锁的外观", "Auto outfit\napplies a random look once an animal is picked\nonly unlocked outfits are used");
+            SRApi.LocDesc(Sec, "Outfit Enabled", "自动时装\n每个角色第一次随机一套并记住，之后固定\n只使用已解锁的外观", "Auto outfit\neach animal rolls one look the first time and keeps it\nonly unlocked outfits are used");
+            SRApi.LocKey(Sec, "Outfit Data", "外观记录", null);
+            SRApi.LocDesc(Sec, "Outfit Data", "外观记录\n内部状态：每个角色记住的那一套外观\n由本功能自动写入，勿手动修改", "Outfit records\ninternal state: the look remembered per animal\nwritten automatically; do not edit");
         }
 
         public void Initialize(IFeatureHost plugin) {
@@ -109,6 +112,8 @@ namespace SR_UCH.Tweaks {
                 _mode = plugin.Config.Bind(Sec, "Mode", "target", "选择方式：target 指定 / random 随机空闲 / smart 智能。");
                 _animal = plugin.Config.Bind(Sec, "Animal", "CHICKEN", "指定方式下要挑的动物（枚举名）。");
                 _outfitOn = plugin.Config.Bind(Sec, "Outfit Enabled", false, "自动时装：角色选定后随机穿一套外观。");
+                _outfitData = plugin.Config.Bind(Sec, "Outfit Data", "",
+                    "内部状态：每个角色第一次随机到的那套外观（键=动物枚举名，值=四类下标）。勿手动修改。");
                 SRApi.RegisterTick("角色-自动选择", Tick);
                 SRApi.RegisterSceneHook(delegate { _triedThisRoom = false; _dressedFor = null; _nextTryAt = 0f; });
             } catch (Exception __ex) { SRApi.Guard.Log("角色/初始化", __ex); }
@@ -126,7 +131,7 @@ namespace SR_UCH.Tweaks {
                     SRApi.Ctl.RowCombo(SRApi.T("选择方式", "Pick mode"),
                         SRApi.T("选择方式\n指定 = 每次挑同一只\n随机 = 已解锁空闲里随机；智能 = 优先你用得最多的",
                                 "Pick mode\nSpecific = always the same animal\nRandom = any unlocked free one; Smart = your most used"),
-                        _mode, ModeVals, new string[] { ModeLabel("target"), ModeLabel("random"), ModeLabel("smart") }, 160f, 96f);
+                        _mode, ModeVals, new string[] { ModeLabel("smart"), ModeLabel("target"), ModeLabel("random") }, 160f, 96f);
                 // 结构固定：非「指定」时置灰，不变更控件数量（否则 IMGUI 会报 LayoutGroup 不匹配）。
                 bool target = (_mode == null || string.IsNullOrEmpty(_mode.Value) || _mode.Value == "target");
                 bool oldEnabled = GUI.enabled;
@@ -134,7 +139,6 @@ namespace SR_UCH.Tweaks {
                     GUI.enabled = oldEnabled && target;
                     RowAnimal(SRApi.T("指定动物", "Target animal"), _animal);
                 } finally { GUI.enabled = oldEnabled; }
-                SRApi.Ctl.LabelAuto(BuildStatus());
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动选择页", __ex); }
         }
 
@@ -150,7 +154,6 @@ namespace SR_UCH.Tweaks {
                         RandomizeCurrent();
                     GUILayout.FlexibleSpace();
                 } finally { GUILayout.EndHorizontal(); }
-                SRApi.Ctl.LabelAuto(SRApi.T("角色选定后会自动随机一套；也可以手动点上面的按钮重摇。", "A random look is applied once an animal is picked; use the button to reroll."));
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动时装页", __ex); }
         }
 
@@ -294,26 +297,115 @@ namespace SR_UCH.Tweaks {
             try {
                 Character ch = lp.CharacterInstance;
                 if (ch == null || ReferenceEquals(ch, _dressedFor)) return;
-                Outfit[] all = ch.GetComponentsInChildren<Outfit>(true);
-                if (all == null || all.Length == 0) return;
-                Outfit.OutfitType[] types = { Outfit.OutfitType.Accessory, Outfit.OutfitType.Body, Outfit.OutfitType.Head, Outfit.OutfitType.Skin };
-                for (int t = 0; t < types.Length; t++) ApplyRandom(all, types[t]);
-                try { ch.OnOutfitsUpdated(all); } catch (Exception __uo) { SRApi.Guard.Log("角色/时装刷新", __uo); }
-                lp.CallCmdSetOutfitsFromArray(ch.GetOutfitsAsArray());   // 同步给全场
+                ApplyOutfitFor(ch, false);
+                if (lp != null) lp.CallCmdSetOutfitsFromArray(ch.GetOutfitsAsArray());   // 同步给全场
                 _dressedFor = ch;
-                SRApi.LogInfo("[角色] 已随机穿好外观");
-            } catch (Exception __ex) { SRApi.Guard.Log("角色/随机时装", __ex); }
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/自动时装", __ex); }
         }
 
+        // 按角色应用：有记录就用记录，没有就随机一套并写进记录（每个角色各一套）。
+        private static void ApplyOutfitFor(Character ch, bool reroll) {
+            try {
+                if (ch == null) return;
+                Outfit[] all = ch.GetComponentsInChildren<Outfit>(true);
+                if (all == null || all.Length == 0) return;
+                string animal = ch.CharacterSprite.ToString();
+                string rec = reroll ? null : GetOutfitRecord(animal);
+                if (string.IsNullOrEmpty(rec)) {
+                    rec = MakeRandomRecord(all);
+                    SetOutfitRecord(animal, rec);
+                    SRApi.LogInfo("[角色] 已为 " + animal + " 记住一套外观");
+                }
+                ApplyRecord(all, rec);
+                try { ch.OnOutfitsUpdated(all); } catch (Exception __uo) { SRApi.Guard.Log("角色/时装刷新", __uo); }
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/应用外观", __ex); }
+        }
+
+        // 记录格式：动物=配饰,身体,头部,皮肤|动物=...
+        private static string GetOutfitRecord(string animal) {
+            try {
+                string raw = _outfitData != null ? (_outfitData.Value ?? "") : "";
+                string[] parts = raw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < parts.Length; i++) {
+                    int eq = parts[i].IndexOf('=');
+                    if (eq > 0 && parts[i].Substring(0, eq) == animal) return parts[i].Substring(eq + 1);
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/读取外观记录", __ex); }
+            return null;
+        }
+
+        private static void SetOutfitRecord(string animal, string rec) {
+            try {
+                if (_outfitData == null || string.IsNullOrEmpty(animal)) return;
+                Dictionary<string, string> map = new Dictionary<string, string>(StringComparer.Ordinal);
+                string raw = _outfitData.Value ?? "";
+                string[] parts = raw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < parts.Length; i++) {
+                    int eq = parts[i].IndexOf('=');
+                    if (eq > 0) map[parts[i].Substring(0, eq)] = parts[i].Substring(eq + 1);
+                }
+                map[animal] = rec;
+                List<string> keep = new List<string>();
+                foreach (KeyValuePair<string, string> kv in map) keep.Add(kv.Key + "=" + kv.Value);
+                _outfitData.Value = string.Join("|", keep.ToArray());
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/写入外观记录", __ex); }
+        }
+
+        private static readonly Outfit.OutfitType[] Types = { Outfit.OutfitType.Accessory, Outfit.OutfitType.Body, Outfit.OutfitType.Head, Outfit.OutfitType.Skin };
+
+        // 生成一套随机记录：每类取"候选列表下标"，没有候选写 -1。
+        private static string MakeRandomRecord(Outfit[] all) {
+            int[] pick = new int[Types.Length];
+            for (int t = 0; t < Types.Length; t++) {
+                List<Outfit> cand = Candidates(all, Types[t]);
+                pick[t] = cand.Count > 0 ? UnityEngine.Random.Range(0, cand.Count) : -1;
+            }
+            return pick[0] + "," + pick[1] + "," + pick[2] + "," + pick[3];
+        }
+
+        // 按记录应用：-1 = 该类别不干预（保持游戏默认）。
+        private static void ApplyRecord(Outfit[] all, string rec) {
+            try {
+                if (string.IsNullOrEmpty(rec)) return;
+                string[] parts = rec.Split(',');
+                for (int t = 0; t < Types.Length && t < parts.Length; t++) {
+                    int idx;
+                    if (!int.TryParse(parts[t], out idx) || idx < 0) continue;
+                    List<Outfit> cand = Candidates(all, Types[t]);
+                    if (cand.Count == 0) continue;
+                    Outfit sel = cand[Mathf.Clamp(idx, 0, cand.Count - 1)];
+                    for (int i = 0; i < all.Length; i++) {
+                        Outfit o = all[i];
+                        if (o != null && o.outfitType == Types[t] && o.followThisOutfit == null) o.on = ReferenceEquals(o, sel);
+                    }
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("角色/应用外观记录", __ex); }
+        }
+
+        private static List<Outfit> Candidates(Outfit[] all, Outfit.OutfitType type) {
+            List<Outfit> cand = new List<Outfit>();
+            for (int i = 0; i < all.Length; i++) {
+                Outfit o = all[i];
+                if (o == null || o.outfitType != type || o.followThisOutfit != null) continue;
+                if (!o.Unlocked && !o.TempUnlocked) continue;
+                cand.Add(o);
+            }
+            cand.Sort(delegate (Outfit a, Outfit b) { return string.Compare(a.name, b.name, StringComparison.Ordinal); });
+            return cand;
+        }
+
+        // 按钮：只重抽"当前角色"的那一套，并覆盖它的记录（其它角色不受影响）。
         private static void RandomizeCurrent() {
             try {
                 LobbyManager lm = LobbyManager.instance;
                 if (lm == null) return;
                 LobbyPlayer lp = LocalLobbyPlayer(lm);
                 if (lp == null || lp.CharacterInstance == null) { SRApi.Notify(SRApi.T("还没选角色", "Pick an animal first")); return; }
-                _dressedFor = null;
-                TryRandomOutfit(lp);
-                SRApi.Notify(SRApi.T("已随机整套外观", "Random look applied"));
+                Character ch = lp.CharacterInstance;
+                ApplyOutfitFor(ch, true);                       // reroll：重新随机并写记录
+                lp.CallCmdSetOutfitsFromArray(ch.GetOutfitsAsArray());
+                _dressedFor = ch;
+                SRApi.Notify(SRApi.T("已重抽该角色的外观", "Rerolled this animal's look"));
             } catch (Exception __ex) { SRApi.Guard.Log("角色/随机整套", __ex); }
         }
 

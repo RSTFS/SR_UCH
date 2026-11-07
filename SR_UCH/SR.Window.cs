@@ -575,6 +575,8 @@ public partial class SR {
                 try { SR.RenderSettingsTabBar(); }
                 catch (Exception __tb) { Guard.Log("设置页签", __tb); }
             }
+            // 选中文本色：绘制期间必须是我们的蓝，否则会沿用游戏皮肤的暖色（每个 OnGUI 趟都可能被还原）
+            try { GUI.skin.settings.selectionColor = SR.TextSelectColor; } catch (Exception __sc) { Guard.Log("选中文本色", __sc); }
             bool __noScroll = _noScrollDeclared || __overCtrlPrev || WheelShieldHit;
             // 设置页的页签画在滚动区**之外**：常驻顶部，不受滚动影响；
             // 「恢复默认」跟着页签排在最右侧（只对通用页有意义，自检页隐藏）。

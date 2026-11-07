@@ -345,6 +345,14 @@ namespace SR_UCH.Tweaks {
                     _lobbyErr = true;
                     return;
                 }
+                // 游戏自己正在搜索时不要抢回调：Matchmaker 只保存一个列表回调，
+                // 我们覆盖后游戏自己的联机列表就再也收不到数据（用户看到"刷新后全失联"）。
+                bool gameSearching = false;
+                try { gameSearching = Matchmaker.Instance.Searching; } catch (Exception __gs) { SRApi.Guard.Log("联机/查询游戏搜索状态", __gs); }
+                if (gameSearching) {
+                    _lobbyMsg = SRApi.T("游戏正在搜索房间，稍后再刷新", "The game is already searching; refresh again in a moment");
+                    return;
+                }
                 _lobbies.Clear();
                 ClearRegionCodeCache();
                 _lobbySearching = true;

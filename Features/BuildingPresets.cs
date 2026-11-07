@@ -488,6 +488,14 @@ namespace SR_UCH.Tweaks {
                 // 复用表格自身算出的滚动上限（由真实 rowsH 得出，帧间稳定），与联机列表同一套。
                 // 以前用 ContentArea 高度重算：那是整个右栏，远大于表格行区，maxY 被算成 0，滚轮就死了。
                 if (!hitBox.Contains(mouse)) return false;
+                // Shift+滚轮 = 横向优先（与核心 TableWheelInput 的约定一致）；
+                // 以前竖向分支先判断，Shift 被吞掉，表现就是"Shift 滚轮不能横滚"。
+                bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+                if (__shift && _maxScrollX > 0f) {
+                    float beforeX = _scrollCols.x;
+                    _scrollCols.x = Mathf.Clamp(_scrollCols.x - wheel * SRApi.Ctl.Sc(60), 0f, _maxScrollX);
+                    if (Mathf.Abs(_scrollCols.x - beforeX) > 0.01f) return true;
+                }
                 float maxY = _maxScrollY;
                 if (maxY <= 0f && _rowsHCache > 0f) {
                     maxY = Mathf.Max(0f, VisiblePresets().Count * SRApi.Ctl.TableRowH() - _rowsHCache);
@@ -498,11 +506,6 @@ namespace SR_UCH.Tweaks {
                     _maxScrollY = maxY;
                     // 到位后不消费，滚轮继续交给页面滚动
                     if (Mathf.Abs(_scrollRows.y - before) > 0.01f) return true;
-                }
-                // 竖向没有余量时，Shift+滚轮横向滚（列比可视区宽时）。
-                if (_maxScrollX > 0f && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))) {
-                    _scrollCols.x = Mathf.Clamp(_scrollCols.x + wheel * SRApi.Ctl.Sc(60), 0f, _maxScrollX);
-                    return true;
                 }
                 return false;
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/页面滚轮", __ex); return false; }

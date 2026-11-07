@@ -126,8 +126,10 @@ public partial class SR {
         private static readonly Color _cBtnActive = new Color(0.16f, 0.17f, 0.2f, 1f);
         private static readonly Color _cFrame = new Color(0.24f, 0.25f, 0.28f, 1f);
         private static readonly Color _cFrameHover = new Color(0.3f, 0.32f, 0.36f, 1f);
-        private static readonly Color _cCapture = new Color(0.16f, 0.23f, 0.38f, 1f);   // 键位框：与编辑框同一套蓝色
+        private static readonly Color _cCapture = new Color(0.5f, 0.3f, 0.12f, 1f);
         private static readonly Color _cText = new Color(0.92f, 0.92f, 0.95f, 1f);
+        // 输入框里被选中文本的高亮色（用户要求：蓝色，不要游戏默认的暖色）
+        private static readonly Color _cTextSelect = new Color(0.30f, 0.55f, 1f, 1f);
 
         //保存原始选择色：必须在第一次改写之前调用。
         private static void EnsureOrigSelColor() {
@@ -136,6 +138,9 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("保存原始选择色", __ex); }
         }
         //绘制结束后还原全局选择色（GUI.skin 为全局共享皮肤）。
+        // 供 SR.Window 在每次 OnGUI 趟写回（共享皮肤可能被别的插件改回暖色）
+        internal static Color TextSelectColor { get { return _cTextSelect; } }
+
         internal static void RestoreSkinSelectionColor() {
             try { if (_origSelColorSaved && GUI.skin != null) GUI.skin.settings.selectionColor = _origSelColor; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
@@ -353,16 +358,14 @@ public partial class SR {
 
             _searchBox = new GUIStyle(GUI.skin.textField);
             CleanStyle(_searchBox, new RectOffset(0, 0, 0, 0));            //各状态都须有实底，否则会透出游戏皮肤的悬停贴图
-            // 编辑框统一蓝色系（用户要求：以前偏红，之后一律蓝色）
-            Color fieldBg = new Color(0.12f, 0.17f, 0.28f, 1f);
-            Color fieldHot = new Color(0.16f, 0.23f, 0.38f, 1f);
-            _searchBox.normal.background = Solid(fieldBg);
+            // 背景保持原有灰（用户要改的是"选中文本的颜色"，不是输入框底色）
+            _searchBox.normal.background = Solid(_cFrame);
             _searchBox.normal.textColor = _cText;
-            _searchBox.hover.background = Solid(fieldHot);
+            _searchBox.hover.background = Solid(_cFrameHover);
             _searchBox.hover.textColor = _cText;
-            _searchBox.active.background = Solid(fieldHot);
+            _searchBox.active.background = Solid(_cFrameHover);
             _searchBox.active.textColor = _cText;
-            _searchBox.focused.background = Solid(fieldHot);
+            _searchBox.focused.background = Solid(_cFrameHover);
             _searchBox.focused.textColor = _cText;
             // 输入框与按钮同一套内边距：同排控件里的文字基线一致。
             _searchBox.padding = new RectOffset(FramePadX, FramePadX, FramePadTop, FramePadBottom);

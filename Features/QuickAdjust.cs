@@ -344,7 +344,7 @@ public class QuickAdjust : ITweak {
         [HarmonyPostfix]
         private static void OverrideHoldTime(Character __instance)
         {
-            if (!SRApi.GateMaster || (SRApi.UiOpen && SRApi.BlockInput) || !__instance.hasAuthority) return;
+            if (!SRApi.GateMaster || (SRApi.UiOpen && SRApi.BlockInput) || !IsLocalCharacter(__instance)) return;
             try
             {
                 // 模式门控统一走 GateModeAllows（已含 IgnoreModeLimit 豁免）。
@@ -370,6 +370,18 @@ public class QuickAdjust : ITweak {
             catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.OverrideHoldTime", __ex); }
         }
 
+        // 是否是"我这边的角色"：房主端 hasAuthority，房客端 hasAuthority 可能为 false，
+        // 但 LocalPlayer.PlayerCharacter 指向的就是自己的角色。以前只判 hasAuthority，
+        // 于是"在别人房间死后不自动重试"。两个补丁都用这个判定。
+        private static bool IsLocalCharacter(Character c) {
+            try {
+                if (c == null) return false;
+                if (c.hasAuthority) return true;
+                Player lp = c.LocalPlayer;
+                return lp != null && lp.PlayerCharacter == c;
+            } catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust/本地角色判定", __ex); return false; }
+        }
+
         // 快速重试已发标记（闩锁）：按 networkNumber 记，见 ForceSuicidalState。
         private static readonly HashSet<int> _retrySentTo = new HashSet<int>();
 
@@ -377,7 +389,7 @@ public class QuickAdjust : ITweak {
         [HarmonyPostfix]
         private static void ForceSuicideState(Character __instance)
         {
-            if (!SRApi.GateMaster || (SRApi.UiOpen && SRApi.BlockInput) || !__instance.hasAuthority)
+            if (!SRApi.GateMaster || (SRApi.UiOpen && SRApi.BlockInput) || !IsLocalCharacter(__instance))
             {
                 return;
             }

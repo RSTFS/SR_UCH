@@ -263,8 +263,12 @@ public partial class SR {
                     int idx = 0;
                     for (int i = 0; i < vals.Length; i++) if (vals[i] == cur) { idx = i; break; }
                     idx = Mathf.Clamp(idx, 0, labels.Length - 1);
+                    // 展开态存在核心的 _editOpen（以配置条目为 key）：每帧必须以它为准，
+                    // 否则局部变量恒 false，点击写进 EditOpen 后列表框永远不会被画出来（"下拉打不开"）。
                     bool open = false;
+                    if (SRApi.Ctl.EditOpen != null) SRApi.Ctl.EditOpen.TryGetValue(e, out open);
                     int sel = ComboBox(e, labels[idx], vals, labels, ref open, Sc(width));
+                    if (SRApi.Ctl.EditOpen != null) SRApi.Ctl.EditOpen[e] = open;
                     if (sel >= 0 && sel < vals.Length) {
                         SetValue(e, vals[sel]);
                         picked = sel;
