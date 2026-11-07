@@ -1139,20 +1139,27 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static void SetWheelFallbackSink(Action<Rect, Func<float, bool>> f) { _wheelFb = f; }
         // 填充页的列表滚动回调：页面注册一次，帧尾若滚轮没被任何控件/钩子消费，
         // 且指针在内容区，就直接交给它（不依赖命中框，保证列表一定能滚）。
-        private static Action<Action<float>> _fillScroll;
+        // 带页面标识：只有当前页面的回调会被调用（审查 P1-1：以前会跨页面误滚联机列表）
+        private static Action<string, Action<float>> _fillScroll;
+        private static readonly System.Collections.Generic.List<string> _fillIds = new System.Collections.Generic.List<string>();
         private static readonly System.Collections.Generic.List<Action<float>> _fillHandlers = new System.Collections.Generic.List<Action<float>>();
-        public static void SetFillScrollSink(Action<Action<float>> f) { _fillScroll = f; }
-        public static void RegisterFillScroll(Action<float> scroll) {
-            Action<Action<float>> f = _fillScroll;
-            if (f != null) f(scroll);
+        public static void SetFillScrollSink(Action<string, Action<float>> f) { _fillScroll = f; }
+        public static void RegisterFillScroll(string pageId, Action<float> scroll) {
+            Action<string, Action<float>> f = _fillScroll;
+            if (f != null) f(pageId ?? "", scroll);
         }
-        public static bool FillScrollAll(float wheel) {
+        public static bool FillScrollAll(string pageId, float wheel) {
+            if (string.IsNullOrEmpty(pageId)) return false;
             for (int i = 0; i < _fillHandlers.Count; i++) {
+                if (!string.Equals(_fillIds[i], pageId, StringComparison.Ordinal)) continue;
                 try { _fillHandlers[i](wheel); return true; } catch { /* 静默：单个页面失败不影响其它 */ }
             }
             return false;
         }
-        internal static void AddFillHandler(Action<float> h) { if (h != null) _fillHandlers.Add(h); }
+        internal static void AddFillHandler(string id, Action<float> h) {
+            if (h == null) return;
+            _fillIds.Add(id ?? ""); _fillHandlers.Add(h);
+        }
 
         public static void WheelFallback(Rect layoutRect, Func<float, bool> apply) { Action<Rect, Func<float, bool>> f = _wheelFb; if (f != null) f(layoutRect, apply); }
         // 表格搜索高亮：页面每帧传入当前搜索串（空串 = 不高亮）

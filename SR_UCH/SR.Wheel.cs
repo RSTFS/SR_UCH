@@ -61,8 +61,11 @@ namespace SR_UCH.Tweaks {
                         hit = r2.Contains(_mouse);
                     }
                     if (!hit) continue;
-                    float v = _pending; _pending = 0f; LastDecision = "fallback";
-                    try { _fbHandlers[i](v); } catch (Exception __ex) { SR.Guard.Log("滚轮/兜底应用", __ex); }
+                    float v = _pending;
+                    bool __used2 = false;
+                    try { __used2 = _fbHandlers[i](v); } catch (Exception __ex) { SR.Guard.Log("滚轮/兜底应用", __ex); }
+                    if (!__used2) continue;                // 到头/未消费：保留 pending，继续尝试
+                    _pending = 0f; LastDecision = "fallback";
                     return true;
                 }
                 return false;
@@ -76,7 +79,10 @@ namespace SR_UCH.Tweaks {
                     Vector2 mp = _mouse;
                     try { if (Event.current != null) mp = Event.current.mousePosition; } catch (Exception __m) { SR.Guard.Log("滚轮/命中鼠标", __m); }
                     if (!HitAny(r, mp)) continue;
-                    try { _fbHandlers[i](wheel); } catch (Exception __ex) { SR.Guard.Log("滚轮/提前命中", __ex); }
+                    bool __used = false;
+                    try { __used = _fbHandlers[i](wheel); } catch (Exception __ex) { SR.Guard.Log("滚轮/提前命中", __ex); }
+                    if (!__used) continue;                 // 控件到头了：不算消费，留给后面
+                    _pending = 0f;                         // 已消费：清待处理量，避免页面再滚一次
                     LastDecision = "hover";
                     return true;
                 }

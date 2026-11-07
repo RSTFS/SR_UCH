@@ -670,7 +670,7 @@ public partial class SR {
                         if (!__done && _noScrollDeclared) {
                             // 填充页：直接交给列表自己滚（不依赖命中框）
                             float __wf = SR.Wheel.Value;
-                            if (SRApi.Ctl.FillScrollAll(__wf)) {
+                            if (SRApi.Ctl.FillScrollAll(_selectedInternalSection, __wf)) {
                                 SR.Wheel.TakeRemaining(false);
                                 __done = true;
                             }

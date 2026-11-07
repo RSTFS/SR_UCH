@@ -1181,13 +1181,9 @@ namespace SR_UCH.Tweaks {
                 _tableBox = box;      // 供页面级滚轮钩子命中判定
                 // 滚轮：绘制期直接用表格矩形取用（同一坐标系，不存在换算错位）
                 {
-                    // 第一优先：当期滚动事件直接处理（老版联机列表的写法，最可靠）
-                    Event __tev = Event.current;
-                    if (__tev != null && __tev.type == EventType.ScrollWheel && box.Contains(__tev.mousePosition)) {
-                        float __raw = Mathf.Abs(__tev.delta.y) > 0.001f ? __tev.delta.y : __tev.delta.x;
-                        if (ScrollTableBy(-__raw)) { __tev.Use(); }
-                    } else if (_maxScrollY > 0.01f || _maxScrollX > 0.01f) {
-                        // 只有表格自己能滚时才取用；否则保留事件给页面滚动（否则页面永远滚不动）
+                    // 唯一入口：WheelTake（命中即取用并清待处理量）。不要再加"事件趟直处理"，
+                    // 否则同一次滚轮会被帧尾页面钩子再消费一次 = 一次滚两格（审查 P0-1）。
+                    if (_maxScrollY > 0.01f || _maxScrollX > 0.01f) {
                         float __w = SRApi.Ctl.WheelTake(box);
                         if (Mathf.Abs(__w) > 0.01f) ScrollTableBy(__w);
                     }
