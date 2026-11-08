@@ -2,6 +2,7 @@
 // 从 BuildingPresets.cs 拆出来只为控制单文件规模，行为不变。
 using System;
 using System.Collections.Generic;
+using BepInEx.Configuration;
 using UnityEngine;
 
 namespace SR_UCH.Tweaks {
@@ -111,6 +112,194 @@ namespace SR_UCH.Tweaks {
         private static bool ContainsText(string text, string query) {
             try { return text != null && query != null && text.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0; }
             catch { return false; }
+        }
+
+
+        // 关卡筛选下拉：全部 + 当前预设里出现过的关卡（显示为游戏本地化关卡名，值为 XML levelSceneName）。
+        private static void RenderLevelFilterCombo() {
+            try {
+                List<string> vals = LevelFilterValues();
+                if (!string.IsNullOrEmpty(_levelFilter) && !vals.Contains(_levelFilter)) _levelFilter = "";
+                int cur = 0;
+                for (int i = 0; i < vals.Count; i++) {
+                    if (string.Equals(vals[i], _levelFilter, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
+                }
+                // 选项数组由 LevelFilterValues 一并缓存：以前每帧 vals.ToArray() + 新建 labels[]。
+                if (_levelOptVals == null || _levelOptVals.Length != vals.Count) {
+                    _levelOptVals = vals.ToArray();
+                    _levelOptLabels = null;
+                }
+                string[] labels = _levelOptLabels;
+                if (labels == null || labels.Length != vals.Count) {
+                    labels = new string[vals.Count];
+                    for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
+                    _levelOptLabels = labels;
+                }
+                // v2：LevelFilterValues 走异常分支会返回空列表，此时 labels[cur] 越界被外层 catch 吞掉，
+                // 表现为下拉框闪一下消失。空数组时直接跳过本帧渲染。
+                if (labels.Length == 0 || _levelOptVals == null || _levelOptVals.Length == 0) return;
+                cur = Mathf.Clamp(cur, 0, labels.Length - 1);
+                bool open = _levelFilterOpen;
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], _levelOptVals, labels, ref open, W(110));
+                _levelFilterOpen = open;
+                if (sel >= 0 && sel < vals.Count) _levelFilter = vals[sel];
+            } catch (Exception __ex) {
+                SRApi.Guard.Log("布局预设/渲染关卡筛选", __ex);
+            }
+        }
+
+        // 关卡筛选选项：第一项为空（全部），其余为当前预设里出现过的关卡场景名，按本地化关卡名排序。
+        private static List<string> LevelFilterValues() {
+            int sig = FilterOptionsSignature(true);
+            if (sig == _levelOptSig && _levelOpts.Count > 0) return _levelOpts;
+            List<string> vals = new List<string>();
+            try {
+                HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < _presets.Count; i++) {
+                    PresetInfo p = _presets[i];
+                    if (p == null || string.IsNullOrEmpty(p.Level)) continue;
+                    if (seen.Add(p.Level)) vals.Add(p.Level);
+                }
+                vals.Sort(delegate(string a, string c) {
+                    return string.Compare(LevelDisplayNameForScene(a), LevelDisplayNameForScene(c), StringComparison.OrdinalIgnoreCase);
+                });
+                vals.Insert(0, "");
+                _levelOptVals = vals.ToArray();
+                string[] labels = new string[vals.Count];
+                for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
+                _levelOptLabels = labels;
+                _levelOptSig = sig;
+                _levelOpts = vals;
+            } catch (Exception __ex) {
+                SRApi.Guard.Log("布局预设/关卡筛选项", __ex);
+            }
+            return vals;
+        }
+
+        // 模式筛选下拉：全部 + 当前预设里出现过的模式（显示为游戏本地化模式名，值为预设目录名 p.Mode）。
+        private static void RenderModeFilterCombo() {
+            try {
+                List<string> vals = ModeFilterValues();
+                if (!string.IsNullOrEmpty(_modeFilter) && !vals.Contains(_modeFilter)) _modeFilter = "";
+                int cur = 0;
+                for (int i = 0; i < vals.Count; i++) {
+                    if (string.Equals(vals[i], _modeFilter, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
+                }
+                if (_modeOptVals == null || _modeOptVals.Length != vals.Count) {
+                    _modeOptVals = vals.ToArray();
+                    _modeOptLabels = null;
+                }
+                string[] labels = _modeOptLabels;
+                if (labels == null || labels.Length != vals.Count) {
+                    labels = new string[vals.Count];
+                    for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
+                    _modeOptLabels = labels;
+                }
+                if (labels.Length == 0 || _modeOptVals == null || _modeOptVals.Length == 0) return;
+                cur = Mathf.Clamp(cur, 0, labels.Length - 1);
+                bool open = _modeFilterOpen;
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], _modeOptVals, labels, ref open, W(110));
+                _modeFilterOpen = open;
+                if (sel >= 0 && sel < vals.Count) _modeFilter = vals[sel];
+            } catch (Exception __ex) {
+                SRApi.Guard.Log("布局预设/渲染模式筛选", __ex);
+            }
+        }
+
+        // 模式筛选选项：第一项为空（全部），其余为当前预设里出现过的模式目录名，按本地化模式名排序。
+        private static List<string> ModeFilterValues() {
+            int sig = FilterOptionsSignature(false);
+            if (sig == _modeOptSig && _modeOpts.Count > 0) return _modeOpts;
+            List<string> vals = new List<string>();
+            try {
+                HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < _presets.Count; i++) {
+                    PresetInfo p = _presets[i];
+                    if (p == null || string.IsNullOrEmpty(p.Mode)) continue;
+                    if (seen.Add(p.Mode)) vals.Add(p.Mode);
+                }
+                vals.Sort(delegate(string a, string c) {
+                    return string.Compare(ModeText(a), ModeText(c), StringComparison.OrdinalIgnoreCase);
+                });
+                vals.Insert(0, "");
+                _modeOptVals = vals.ToArray();
+                string[] labels = new string[vals.Count];
+                for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
+                _modeOptLabels = labels;
+                _modeOptSig = sig;
+                _modeOpts = vals;
+            } catch (Exception __ex) {
+                SRApi.Guard.Log("布局预设/模式筛选项", __ex);
+            }
+            return vals;
+        }
+
+        // 类型筛选下拉：全部 / 预设 / 本地（游戏保存的自定义关卡）。运行期状态，不落配置。
+        private static void RenderTypeFilterCombo() {
+            try {
+                string[] vals = new string[] { "", "preset", "local" };
+                string[] labels = new string[] {
+                    SRApi.T("全部", "All"),
+                    SRApi.T("预设", "Presets"),
+                    SRApi.T("本地", "Local")
+                };
+                int cur = 1; // 默认「预设」
+                for (int i = 0; i < vals.Length; i++) {
+                    if (string.Equals(vals[i], _typeFilter, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
+                }
+                // 运行期状态被外部改坏时回退到默认「预设」（与下拉索引 1 对应）。
+                if (!string.Equals(vals[cur], _typeFilter, StringComparison.OrdinalIgnoreCase)) _typeFilter = "preset";
+                bool open = _typeFilterOpen;
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(110));
+                _typeFilterOpen = open;
+                if (sel >= 0 && sel < vals.Length) _typeFilter = vals[sel];
+            } catch (Exception __ex) {
+                SRApi.Guard.Log("布局预设/渲染类型筛选", __ex);
+            }
+        }
+
+        // 加载模式下拉：默认 + 游戏四模式（派对 / 创意 / 挑战 / 自由）。运行期状态，不落配置。
+        // 值为 "" 或 GameState.GameMode 的 ToString；显示名复用 ModeText（游戏本地化 / 中文回退）。
+        private static void RenderLoadModeCombo() {
+            try {
+                string[] vals = new string[] { "", "PARTY", "CREATIVE", "CHALLENGE", "FREEPLAY" };
+                int cur = 0;
+                for (int i = 0; i < vals.Length; i++) {
+                    if (string.Equals(vals[i], _loadMode, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
+                }
+                // 运行期状态被外部改坏时回退到默认，避免下拉框显示空白。
+                if (cur == 0 && !string.IsNullOrEmpty(_loadMode)) _loadMode = "";
+                string[] labels = new string[vals.Length];
+                labels[0] = SRApi.T("默认", "Default");
+                for (int i = 1; i < vals.Length; i++) labels[i] = ModeText(vals[i]);
+                bool open = _loadModeOpen;
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(110));
+                _loadModeOpen = open;
+                if (sel >= 0 && sel < vals.Length) _loadMode = vals[sel];
+            } catch (Exception __ex) {
+                SRApi.Guard.Log("布局预设/渲染加载模式", __ex);
+            }
+        }
+
+        // 排序下拉：只有 时间 / 名称 两项。
+        private static void RenderSortCombo() {
+            try {
+                ConfigEntryBase e = SRApi.Ctl.FindEntry(Section, "Sort Mode");
+                string[] opts = new[] { SRApi.T("时间", "Time"), SRApi.T("名称", "Name") };
+                int[] vals = new int[] { 0, 1 };
+                int cur = Mathf.Clamp(SortMode, 0, opts.Length - 1);
+                bool open;
+                if (e == null || !SRApi.Ctl.EditOpen.TryGetValue(e, out open)) open = false;
+                int sel = SRApi.Ctl.ComboBox(e, opts[cur], vals, opts, ref open, W(110));
+                if (sel >= 0) {
+                    if (e != null) SRApi.Ctl.SetValue(e, vals[sel]);
+                    if (e != null) SRApi.Ctl.EditOpen[e] = false;
+                } else if (e != null) {
+                    SRApi.Ctl.EditOpen[e] = open;
+                }
+            } catch (Exception __ex) {
+                SRApi.Guard.Log("布局预设/渲染排序下拉", __ex);
+            }
         }
     }
 }
