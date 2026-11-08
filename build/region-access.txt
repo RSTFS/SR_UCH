@@ -76,3 +76,5 @@ _patchAudited
 _refAudited
 _refWarned
 _startupAudited
+_numEdit
+_numText
