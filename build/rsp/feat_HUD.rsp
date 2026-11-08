@@ -24,6 +24,8 @@
 /r:"%GAME%\BepInEx\core\0Harmony.dll"
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 /r:"bin\Release\SR_UCH.dll"
+Features\HUD.Draw.cs
+Features\HUD.Page.cs
 Features\HUD.Content.cs
 Features\HUD.cs
 Features\HUD.State.cs

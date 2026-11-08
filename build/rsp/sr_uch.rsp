@@ -79,6 +79,8 @@ Features\BuildingPresets.Mods.cs
 Features\BuildingPresets.Load.cs
 Features\BuildingPresets.Io.cs
 Features\BuildingPresets.Util.cs
+Features\HUD.Draw.cs
+Features\HUD.Page.cs
 Features\HUD.Content.cs
 Features\HUD.cs
 Features\HUD.State.cs
