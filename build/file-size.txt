@@ -6,4 +6,3 @@ SR_UCH/SR.Contracts.cs=1575
 SR_UCH/SR.Settings.cs=1574
 SR_UCH/SR.Core.cs=1516
 SR_UCH/SR.Ctl.cs=1396
-Features/BuildingPresets.Io.cs=917
