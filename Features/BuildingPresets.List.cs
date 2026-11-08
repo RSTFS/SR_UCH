@@ -18,7 +18,6 @@ namespace SR_UCH.Tweaks {
 
         // ================= 页面二：预设列表 =================
         private static void RenderListPage() {
-            _renderFrame = Time.frameCount;
             SRApi.NoPageScrollBars = true;   // 填充模式：页头固定，只有列表自己滚
             string pendingBefore = _pendingKey;
             try {
@@ -37,41 +36,53 @@ namespace SR_UCH.Tweaks {
             CancelPendingOnBlank(pendingBefore);
         }
 
-        // 取本帧滚轮量（不做命中测试）。三条来源：
-        //   ScrollWheel 事件（最可靠）→ Input.mouseScrollDelta → 都没有就当 0。
+        // 滚轮：**唯一来源 = ScrollWheel 事件**，唯一方向约定 = 「向下滚 = notches 为正」。
+        // 教训（见 列表滚动问题深度分析.md）：
+        //   · Input.mouseScrollDelta.y 的正负号与 IMGUI Event.delta.y 相反，混用会让方向反掉；
+        //   · Layout 趟读 Input 会抢在真正的 ScrollWheel 趟之前，再用帧锁把正确路径挡掉，
+        //     结果每格滚轮只被方向反的那条路消费 → 永远滚不动。
+        // 现在只在 ScrollWheel 趟取量、无条件 e.Use()、再判帧锁。
         private static float TakeListWheel() {
             try {
                 Event e = Event.current;
-                float d = 0f;
-                if (e != null && e.type == EventType.ScrollWheel) {
-                    float raw = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
-                    d = -raw;
-                } else {
-                    try { d = Input.mouseScrollDelta.y; } catch { /* 静默：该环境没有滚轮轴 */ }
-                }
-                if (Mathf.Abs(d) < 0.01f) return 0f;
-                // 归一成"格"：有的驱动一格只报 0.1 / 0.33，照原值乘会让滚动几乎不动（用户反馈滚不动）。
-                float notches = Mathf.Abs(d) < 0.5f ? 1f : Mathf.Round(Mathf.Abs(d));
-                d = Mathf.Sign(d) * Mathf.Max(1f, notches);
-                if (_listWheelFrame == Time.frameCount) return 0f;   // 本帧只应用一次（Layout/Repaint 各一趟）
+                if (e == null || e.type != EventType.ScrollWheel) return 0f;
+                float raw = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
+                if (Mathf.Abs(raw) < 0.0001f) return 0f;
+                try { e.Use(); } catch { /* 静默：已被别处消费 */ }
+                if (_listWheelFrame == Time.frameCount) return 0f;
                 _listWheelFrame = Time.frameCount;
-                if (e != null && e.type == EventType.ScrollWheel) { try { e.Use(); } catch { /* 静默：已被消费 */ } }
-                try { SRApi.MarkWheelUsed(); } catch { /* 静默：非关键路径 */ }
-                return d;
+                // delta.y > 0 = 向下滚 = 内容上移 = scrollY 增加
+                float notches = Mathf.Abs(raw) < 0.5f ? 1f : Mathf.Round(Mathf.Abs(raw));
+                return Mathf.Sign(raw) * Mathf.Max(1f, notches);
             } catch (Exception __ex) { SRApi.Guard.Log("预设列表/取滚轮", __ex); return 0f; }
         }
 
-        // 窗口在帧尾派发的页面级滚轮：绘制期没取到（比如那帧没有 ScrollWheel 事件）时兜底。
+        // 唯一应用入口：notches > 0 = 向下滚。
+        private static void ApplyListWheel(float notches) {
+            if (Mathf.Abs(notches) < 0.01f) { _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _listMaxY); return; }
+            float rowH = SRApi.Ctl.TableRowH();
+            float before = _scrollRows.y;
+            _scrollRows.y = Mathf.Clamp(_scrollRows.y + notches * rowH * 3f, 0f, _listMaxY);
+            if (Mathf.Abs(_scrollRows.y - before) > 0.01f) {
+                try { SRApi.MarkWheelUsed(); } catch { /* 静默：非关键路径 */ }
+            }
+        }
+
+        // 窗口在帧尾派发的页面级滚轮（兜底）：只有绘制期没消费时才生效。
+        // 窗口传进来的 wheel 符号约定未知 → 统一按"和 Event.delta.y 一致（向下为正）"处理，
+        // 若实测相反只改这一个符号。
+        private const float PageWheelSign = 1f;
+        private static int _listPageFrame = -1;   // 只有列表页刷新它（保存页不写，避免误判）
+
         private static bool OnListPageWheel(Vector2 mouse, float wheel) {
             try {
-                if (Time.frameCount - _renderFrame > 2) return false;   // 不是本页
-                if (Mathf.Abs(wheel) < 0.01f) return false;
-                if (_listWheelFrame == Time.frameCount) return true;    // 绘制期已经滚过：吃掉但不再滚
+                if (Time.frameCount - _listPageFrame > 2) return false;   // 不是本页
+                if (Mathf.Abs(wheel) < 0.0001f) return false;
+                if (_listWheelFrame == Time.frameCount) return true;      // 绘制期已经滚过
                 _listWheelFrame = Time.frameCount;
-                float rowH = SRApi.Ctl.TableRowH();
-                float before = _scrollRows.y;
-                _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * rowH * 3f, 0f, _listMaxY);
-                return Mathf.Abs(_scrollRows.y - before) > 0.01f || _listMaxY > 0f;
+                float notches = Mathf.Abs(wheel) < 0.5f ? 1f : Mathf.Round(Mathf.Abs(wheel));
+                ApplyListWheel(PageWheelSign * Mathf.Sign(wheel) * Mathf.Max(1f, notches));
+                return true;
             } catch (Exception __ex) { SRApi.Guard.Log("预设列表/页面滚轮", __ex); return false; }
         }
 
@@ -97,14 +108,16 @@ namespace SR_UCH.Tweaks {
             _maxScrollY = _listMaxY;
             _rowsHCache = rowsH;
 
-            float wheel = TakeListWheel();
-            if (Mathf.Abs(wheel) > 0.01f) _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * rowH * 3f, 0f, _listMaxY);
-            else _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _listMaxY);
+            _listPageFrame = Time.frameCount;
+            ApplyListWheel(TakeListWheel());
 
             try {
                 _visibleCache = visible;
                 EnsureCols();
-                _colW[ColAction] = Mathf.Min(DefaultActionColW(), Mathf.Max(SRApi.Ctl.Sc(96f), box.width * 0.30f));
+                // 操作列宽 = 三个按钮实际需要的宽度（不再按 30% 上限硬夹：窗口一窄就把"加载/导出/删除"切掉）。
+                // 只有"别把数据区挤没"这一条上限。
+                float __need = DefaultActionColW();
+                _colW[ColAction] = Mathf.Min(__need, Mathf.Max(SRApi.Ctl.Sc(96f), box.width - SRApi.Ctl.Sc(140f)));
                 if (_args == null) _args = new SRApi.TableArgs();
                 float pinW = SRApi.Ctl.Sc(_colW[ColAction]);
                 float __pinMax = Mathf.Max(SRApi.Ctl.Sc(40f), box.width - SRApi.Ctl.Sc(80f));
@@ -178,8 +191,12 @@ namespace SR_UCH.Tweaks {
                         : SRApi.T("没有匹配当前搜索的预设。", "No presets match the current search.");
                 };
                 _hiddenBeforeTable = _hiddenCols.Count;
-                _sbHandled = false;
                 SRApi.TableDraw(_args);
+                // 核心把拖列宽的结果写进 _drawW：同步回持久化宽度（漏了这段 = 表头宽度永远改不动）。
+                for (int i = 0; i < _colW.Length && i < _drawW.Length; i++) {
+                    if (i == ColAction) continue;
+                    if (Mathf.Abs(_colW[i] - _drawW[i]) > 0.01f) _colW[i] = _drawW[i];
+                }
                 HandlePresetCells();
                 if (_hiddenCols.Count > _hiddenBeforeTable) SaveCols();
                 if (e != null) {

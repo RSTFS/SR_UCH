@@ -300,7 +300,7 @@ namespace SR_UCH.Tweaks {
                 if (col == ColName && e.type == EventType.MouseDown && e.button == 1) {
                     // IsLocal=true 才是"你自己存在 snapshots 目录里的预设"——正是可改名的那些。
                     // 之前条件写成 !p.IsLocal，等于只允许给内置预设改名，所以右键自己的项没反应。
-                    if (p.IsLocal) { ClearPending(); _renameKey = p.Key; _renameText = p.Name; e.Use(); }
+                    if (p.IsLocal) { ClearPending(); _renameKey = p.Key; _renameText = p.Name; _renameAutoScrolled = false; e.Use(); }
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/行内单元格", __ex); }
         }

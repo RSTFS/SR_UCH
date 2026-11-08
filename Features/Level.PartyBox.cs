@@ -678,92 +678,92 @@ public class AutoPartyItem : ITweak {
         } catch (Exception __ex) { SRApi.Guard.Log("自动道具/启动悬停挑选", __ex); return false; }
     }
 
-    // 每帧推进挑选流程，三个阶段：
-    //   1) 写悬停 + 清残留：把目标写进光标的 hoveredPick（游戏协程只读这个字段），
-    //      同时把光标上可能残留的 pickedPiece 清掉。游戏协程开头是
-    //      `if (pickedPiece == null && hoveredPick != null)` —— 上一轮挑中后 pickedPiece
-    //      还留着时，这一轮的协程会**静默什么都不做**，表现就是"日志说挑了，道具没到手，
-    //      而且只有第一次成功"。
-    //   2) 启动游戏自己的 tryPickPiece 协程（房主端只认这条链路）。
-    //   3) 验收：Picking 变 false 或已记录 pickedPiece = 成功；否则清掉伪造的悬停、
-    //      允许本箱再来一次（最多 2 次）。
+    // 每帧推进挑选流程。优先"直接选择"（把目标写进 hoveredPick 后**同一瞬间**启动协程，
+    // 中间不留任何等待，游戏没机会把它清掉）；失败才退回复刻手动挑选（挪光标让物理自己算悬停）。
+    //
+    // 以前"直接写字段"不生效的原因：写完等了一拍再启动协程，中间跑了一个物理帧，
+    // 光标没压在道具上 → OnTriggerExit2D → ClearHoverPick 把字段清成了 null。
     private static void TickHoverPick() {
         try {
             if (_hpStage == 0 || _hpCur == null || _hpTarget == null) return;
             if (Time.unscaledTime < _hpAt) return;
+
             if (_hpStage == 1) {
-                // 游戏只认"光标真的压在道具上"：它靠 OnTriggerStay2D → checkHoveredPickAdd 算 hoveredPick。
-                // 上一版直接往字段里塞目标，看起来"挑成功"了，实际上离开真实悬停就无效
-                // （用户反馈：必须光标停在方块上才会自动拿）。所以这里照手动挑选的做法，
-                // 先把光标挪到道具位置，让游戏自己算悬停；字段注入只作为兜底。
-                if (_hpCur != null && _hpTarget != null) {
+                // 直接选择：清残留 → 写悬停 → 立刻启动协程（同一调用栈内）。
+                bool started = false;
+                try { _hpCur.NetworkpickedPiece = null; } catch (Exception __cp) { SRApi.Guard.Log("自动道具/清挑选记录", __cp); }
+                System.Reflection.FieldInfo hp = null;
+                try { hp = SRApi.Ref.Field(typeof(PartyPickCursor), "hoveredPick", "派对盒自动道具（直接选择）"); }
+                catch (Exception __hf) { SRApi.Guard.Log("自动道具/取悬停字段", __hf); }
+                if (hp != null) {
+                    try { hp.SetValue(_hpCur, _hpTarget); } catch (Exception __hs) { SRApi.Guard.Log("自动道具/写悬停字段", __hs); }
+                    started = StartPickCoroutine();
+                }
+                _hpStage = started ? 3 : 2;
+                _hpAt = started ? Time.unscaledTime + 0.45f : Time.unscaledTime + 0.12f;
+                return;
+            }
+
+            if (_hpStage == 2) {
+                // 兜底：复刻手动挑选 —— 把光标挪到道具上，等物理帧把 hoveredPick 填上再启动协程。
+                if (!_hpMoved && _hpCur != null && _hpTarget != null) {
                     _hpSavedPos = _hpCur.transform.position;
                     _hpMoved = true;
                     Vector3 p = _hpTarget.transform.position;
                     _hpCur.transform.position = new Vector3(p.x, p.y + 0.15f, p.z);
+                    _hpAt = Time.unscaledTime + 0.12f;
+                    return;
                 }
-                _hpStage = 2;
-                _hpAt = Time.unscaledTime + 0.12f;   // 等 1~2 个物理帧让触发体把 hoveredPick 填上
-                return;
-            }
-            if (_hpStage == 2) {
-                // 清掉上一轮留下的 pickedPiece：不清的话协程开头 `pickedPiece == null` 不成立，
-                // 整段逻辑会被静默跳过（日志说挑了、道具没到手）。
-                try { _hpCur.NetworkpickedPiece = null; } catch (Exception __cp) { SRApi.Guard.Log("自动道具/清挑选记录", __cp); }
-                // 让游戏自己算出来的悬停优先；物理没来得及算上时再兜底写字段。
-                System.Reflection.FieldInfo hp = null;
-                try { hp = SRApi.Ref.Field(typeof(PartyPickCursor), "hoveredPick", "派对盒自动道具（兜底悬停）"); }
-                catch (Exception __hf) { SRApi.Guard.Log("自动道具/取悬停字段", __hf); }
-                if (hp != null) {
-                    object cur = null;
-                    try { cur = hp.GetValue(_hpCur); } catch { /* 静默：读不到就按 null 处理 */ }
-                    if (cur == null) {
-                        try { hp.SetValue(_hpCur, _hpTarget); } catch (Exception __hs) { SRApi.Guard.Log("自动道具/写悬停字段", __hs); }
-                    }
-                }
-                System.Reflection.MethodInfo mi = null;
-                try { mi = SRApi.Ref.Method(typeof(PartyPickCursor), "tryPickPiece", "派对盒自动道具（走游戏挑选协程）"); }
-                catch (Exception __rf) { SRApi.Guard.Log("自动道具/取挑选方法", __rf); }
-                if (mi != null) {
-                    try {
-                        System.Collections.IEnumerator co = mi.Invoke(_hpCur, null) as System.Collections.IEnumerator;
-                        if (co != null) _hpCur.StartCoroutine(co);
-                    } catch (Exception __iv) { SRApi.Guard.Log("自动道具/启动协程", __iv); }
-                } else {
-                    SRApi.LogWarn("[自动道具] 找不到 tryPickPiece，改用消息下发");
-                    FallbackSendPick(_hpCur, _hpTarget);
-                }
+                try { _hpCur.NetworkpickedPiece = null; } catch (Exception __cp2) { SRApi.Guard.Log("自动道具/清挑选记录", __cp2); }
+                bool ok = StartPickCoroutine();
                 _hpStage = 3;
-                _hpAt = Time.unscaledTime + 0.45f;   // 验收窗口
+                _hpAt = Time.unscaledTime + 0.45f;
+                if (!ok) { _hpStage = 0; _hpCur = null; _hpTarget = null; }
                 return;
             }
+
             if (_hpStage == 3) {
                 bool ok = false;
                 try {
                     PartyPickCursor c0 = _hpCur;
-                    if (c0 != null) ok = !c0.Picking || c0.Pick != null;   // 协程会把 Picking 置 false 并记下 pickedPiece
+                    if (c0 != null) ok = !c0.Picking || c0.Pick != null;   // 协程成功会把 Picking 置 false
                 } catch (Exception __ok) { SRApi.Guard.Log("自动道具/确认挑选结果", __ok); }
                 if (ok) {
                     _hpAttempts = 0;
-                    SRApi.LogInfo("[自动道具] 已按游戏协程挑选：" + (_hpTarget != null ? _hpTarget.name : "?"));
+                    SRApi.LogInfo("[自动道具] 已挑选：" + (_hpTarget != null ? _hpTarget.name : "?"));
                 } else if (_hpAttempts < 2) {
                     _hpAttempts++;
-                    _pickedSeq = -1;                   // 允许本箱再挑一次
-                    _armedAt = Time.unscaledTime;      // 重新计时延迟
+                    _pickedSeq = -1;                 // 允许本箱再挑一次
+                    _armedAt = Time.unscaledTime;    // 重新计时延迟
                 }
-                // 光标还回原位：只在"我们挪过"时才还，避免影响玩家自己的位置。
-                if (_hpMoved && _hpCur != null) {
-                    try { _hpCur.transform.position = _hpSavedPos; } catch { /* 静默：光标可能已被销毁 */ }
-                }
-                _hpMoved = false;
-                // 无论成败都清掉伪造的悬停，避免影响后续手动挑选（Disable 时游戏也会清）。
+                RestoreCursorPos();
                 try {
                     System.Reflection.FieldInfo hp2 = SRApi.Ref.Field(typeof(PartyPickCursor), "hoveredPick", "派对盒自动道具（清理伪造悬停）");
                     if (hp2 != null && _hpCur != null) hp2.SetValue(_hpCur, null);
                 } catch (Exception __hc) { SRApi.Guard.Log("自动道具/清理悬停字段", __hc); }
                 _hpStage = 0; _hpCur = null; _hpTarget = null;
             }
-        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/悬停挑选推进", __ex); }
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/挑选推进", __ex); }
+    }
+
+    // 启动游戏自己的 tryPickPiece 协程（房主端只认这条链路）。
+    private static bool StartPickCoroutine() {
+        try {
+            System.Reflection.MethodInfo mi = null;
+            try { mi = SRApi.Ref.Method(typeof(PartyPickCursor), "tryPickPiece", "派对盒自动道具（走游戏挑选协程）"); }
+            catch (Exception __rf) { SRApi.Guard.Log("自动道具/取挑选方法", __rf); }
+            if (mi == null) { FallbackSendPick(_hpCur, _hpTarget); return true; }
+            System.Collections.IEnumerator co = mi.Invoke(_hpCur, null) as System.Collections.IEnumerator;
+            if (co == null) return false;
+            _hpCur.StartCoroutine(co);
+            return true;
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/启动协程", __ex); return false; }
+    }
+
+    private static void RestoreCursorPos() {
+        if (!_hpMoved || _hpCur == null) { _hpMoved = false; return; }
+        try { _hpCur.transform.position = _hpSavedPos; } catch { /* 静默：光标可能已销毁 */ }
+        _hpMoved = false;
     }
 
     // 兜底：与以前相同的直接发消息（仅当反射拿不到协程时）

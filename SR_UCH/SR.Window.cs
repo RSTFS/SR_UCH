@@ -774,7 +774,10 @@ public partial class SR {
             GUILayout.EndArea();
 
             DrawResizeGripAndCursor(winRect, mouse, gripRect);
-            DrawTooltip(mouse);
+            // 悬浮说明只在指针位于窗口内时绘制：控件命中用 rect.Contains(鼠标)，坐标一错位就会在
+            // 窗口外的游戏画面上弹出说明（用户反馈）。这里统一按"窗口内"门控一次。
+            if (over) DrawTooltip(mouse);
+            else { try { GUI.tooltip = ""; } catch { /* 静默：清提示失败不影响绘制 */ } }
             // 手势级"按在控件上"标记，必须在本趟**末尾**补记：控件是在页面绘制时才置
             // BlockWindowDrag 的，而拖窗口的判定在函数开头（早于页面）。
             // 以前只在开头记，滑块/表格这类"按下后才置标记"的控件永远记不到 →

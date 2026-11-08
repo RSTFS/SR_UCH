@@ -86,6 +86,7 @@ namespace SR_UCH.Tweaks {
         // 条件控件的"本帧是否显示"锁存（Layout / Repaint 必须一致，见 DrawInlineRename）。
         private static int _renameLatchFrame = -1;
         private static bool _renameLatch;
+        private static bool _renameAutoScrolled;   // 进入重命名后是否已经自动滚过
         private static string _search = "";
         private static string _importPath = "";
         // 关卡筛选（运行期状态，不落配置）："" = 全部；否则为预设 XML 里的 levelSceneName。
@@ -140,8 +141,6 @@ namespace SR_UCH.Tweaks {
         private static float _maxScrollX;
         private static float _maxScrollY;
         private static bool _sbDragging;
-        private static float _sbGrabY;
-        private static bool _sbHandled;    // 本帧核心滚动条是否已处理鼠标事件
         private static bool _dragH;
         private static float _dragWatchdog;
 
@@ -487,7 +486,6 @@ namespace SR_UCH.Tweaks {
         //   1) Insert 轮询（与下拉框同一套，读 Input.mouseScrollDelta / 本趟 ScrollWheel）；
         //   2) 直接读本趟 ScrollWheel 事件（某些环境把 delta 吃掉时兜底）；
         //   3) 都没有就放弃。
-        private static int _wheelFallbackFrame = -1;
 
         // 页面级滚轮：鼠标在表格矩形内就把滚轮换算成行滚动（与核心 TableWheelInput 同一套系数）。
         // 本页最近一次被渲染的帧（新实现用）
@@ -903,9 +901,12 @@ namespace SR_UCH.Tweaks {
                     if (_args.rowRows[k] == row) { rowRect = _args.rowRects[k]; onScreen = true; break; }
                 }
                 if (!onScreen) {
-                    // 目标滚出视口：把它滚回来再画，不让编辑框凭空消失或卡住。
-                    // 不在这里 clamp 到上一帧的 _maxScrollY：交给下一帧 RenderPresetTable 用真实值夹取。
-                    _scrollRows.y = Mathf.Max(0f, row * SRApi.Ctl.TableRowH());
+                    // 目标滚出视口：**只在刚进入编辑时**把它滚回来一次。
+                    // 以前每帧都写 _scrollRows.y，只要目标行不在视口里，列表就被永久钉死（划不动）。
+                    if (!_renameAutoScrolled) {
+                        _renameAutoScrolled = true;
+                        _scrollRows.y = Mathf.Max(0f, row * SRApi.Ctl.TableRowH());
+                    }
                     return;
                 }
 

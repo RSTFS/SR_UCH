@@ -1449,6 +1449,14 @@ public partial class SR {
         // 须显式 GUILayout.Width 锁定；仍经 Sc() 随 UI 缩放，但不随窗口宽度变化。
         public static float SliderTrackWidth() { try { return Sc(150); } catch { return 150f; } }
 
+        // 本帧内 ComboBox 的调用序号（每帧第一趟从 0 开始）。
+        private static int _comboSeqFrame = -1;
+        private static int _comboSeq;
+        private static int NextComboSeq() {
+            if (_comboSeqFrame != Time.frameCount) { _comboSeqFrame = Time.frameCount; _comboSeq = 0; }
+            return _comboSeq++;
+        }
+
         private static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width = -1f) {
             if (width <= 0f) width = Sc(170);
             int clicked = -1;
@@ -1471,10 +1479,10 @@ public partial class SR {
             // 一个页面里多个 entry=null、同宽度的下拉框会共用同一份锁存值 ——
             // 点开其中一个，其它几个也跟着把自己的列表画出来（用户反馈：点一个全都展开了）。
             // 现在把命中矩形的位置也算进键里。
-            string __latchKey = "combo:"
-                + (entry != null ? entry.Definition.Section + "/" + entry.Definition.Key : "?")
-                + ":" + Mathf.RoundToInt(boxRect.x) + "," + Mathf.RoundToInt(boxRect.y)
-                + ":" + width.ToString("0.0");
+            // 键必须"每帧每下拉框唯一且逐趟稳定"。entry 可能为 null（页面直接传 null），
+            // 用矩形坐标又会受到控件数变化的影响 → 改用**本帧内的调用序号**：
+            // 同一帧各趟的调用顺序一致，序号就一致；不同下拉框序号不同，不会互相串。
+            string __latchKey = "combo#" + NextComboSeq() + ":" + (entry != null ? entry.Definition.Section + "/" + entry.Definition.Key : "?");
             bool drew = SR.Ctl.FrameLatch(__latchKey, delegate () { return __openNow && !__skipNow; });
             // 滚轮：绘制期就地轮询（唯一路径）。收起 = 换选项（一格一项，循环）；
             // 展开 = 滚列表（一格一项）。以前收起态根本没取滚轮量（__w 恒 0），所以"有的下拉框能用、

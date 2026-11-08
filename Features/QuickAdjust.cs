@@ -140,7 +140,7 @@ namespace SR_UCH.Tweaks {
         //   3) 延迟到点后由我们调用游戏自己的 FreePlayControl.resetPlayerCharacter(角色, true)。
         // 现在只补第 2/3 步：AttemptRespawn 前缀只挡住"死亡瞬间就复活"的那条路，
         // 自由模式的 Update 每帧还会再调一次 resetPlayerCharacter，不拦住就表现为"延迟无效"。
-        internal static readonly Dictionary<Character, float> _respawnDue = new Dictionary<Character, float>();
+        internal static readonly Dictionary<int, float> _respawnDueByNum = new Dictionary<int, float>();
         internal static bool _selfRespawn;
 
         // 死亡时登记：见文件末尾的 RespawnDelayDeathPatch（独立注册，单个失败不影响其它补丁）。
@@ -149,33 +149,28 @@ namespace SR_UCH.Tweaks {
 
         // 到点：用游戏自己的 resetPlayerCharacter 复活（不绕过任何网络校验）。
         private static void TickDelayedRespawn() {
-            if (_respawnDue.Count == 0) return;
-            float now = Time.unscaledTime;
-            List<Character> done = null;
-            foreach (KeyValuePair<Character, float> kv in _respawnDue) {
-                if (kv.Key == null) { if (done == null) done = new List<Character>(); done.Add(kv.Key); continue; }
-                if (now < kv.Value) continue;
-                if (done == null) done = new List<Character>();
-                done.Add(kv.Key);
-            }
-            if (done == null) return;
-            for (int i = 0; i < done.Count; i++) {
-                Character c = done[i];
-                _respawnDue.Remove(c);
-                if (c == null) continue;
-                // 游戏可能已经自己复活了（到点后前缀放行）：别对活人再调一次重生（会瞬移回出生点）。
-                try { if (!(c.Dead || c.LocallyDead || c.Dying)) continue; } catch { continue; }
-                try {
-                    FreePlayControl fc = LobbyManager.instance != null ? LobbyManager.instance.CurrentGameController as FreePlayControl : null;
-                    if (fc == null) continue;
-                    System.Reflection.MethodInfo mi = SRApi.Ref.Method(typeof(FreePlayControl), "resetPlayerCharacter", "重生延迟：调用游戏自己的重生");
-                    if (mi == null) continue;
-                    _selfRespawn = true;
-                    try { mi.Invoke(fc, new object[] { c, true }); }
-                    finally { _selfRespawn = false; }
-                    _deadSince.Remove(c.networkNumber);
-                } catch (Exception __ex) { _selfRespawn = false; SRApi.Guard.Log("重生/延迟复活", __ex); }
-            }
+            if (_respawnDueByNum.Count == 0) return;
+            Character lc = LocalCharacter();
+            if (lc == null) return;
+            int num = lc.networkNumber;
+            float due;
+            if (!_respawnDueByNum.TryGetValue(num, out due)) return;
+            // 已经活了：清账（游戏自己的重生已经发生）。
+            bool dead = false;
+            try { dead = lc.Dead || lc.LocallyDead || lc.Dying; } catch { dead = false; }
+            if (!dead) { _respawnDueByNum.Remove(num); return; }
+            if (Time.unscaledTime < due) return;
+            _respawnDueByNum.Remove(num);
+            try {
+                FreePlayControl fc = LobbyManager.instance != null ? LobbyManager.instance.CurrentGameController as FreePlayControl : null;
+                if (fc == null) return;
+                System.Reflection.MethodInfo mi = SRApi.Ref.Method(typeof(FreePlayControl), "resetPlayerCharacter", "重生延迟：调用游戏自己的重生");
+                if (mi == null) return;
+                _selfRespawn = true;
+                try { mi.Invoke(fc, new object[] { lc, true }); }
+                finally { _selfRespawn = false; }
+                _deadSince.Remove(num);
+            } catch (Exception __ex) { _selfRespawn = false; SRApi.Guard.Log("重生/延迟复活", __ex); }
         }
 
         // 重生延迟：游戏每次自动重都会走 Character.AttemptRespawn（反编译 61563）。
@@ -235,7 +230,6 @@ public class QuickAdjust : ITweak {
     private static int _draftFrame = -1;
     private static ConfigEntry<bool> _quickSwitchEnabled;
     private static ConfigEntry<float> _quickSwitchHold;
-    private static float _vanillaSuicideTime = -1f;   // 原版长按阈值（仅供界面显示"游戏默认"）
     // 我们改过的 SwitchTime 原值：功能关掉时逐个还原成 prefab 序列化值，做到"像没改过"。
     private static readonly Dictionary<PiecePlacementCursor, float> _switchTimeOrig = new Dictionary<PiecePlacementCursor, float>();
     private static void RestoreSwitchTime() {
@@ -952,14 +946,18 @@ internal static class RespawnDelayDeathPatch {
             if (!SRApi.GateMaster) return;
             float d = RespawnTools.RespawnDelaySeconds;
             if (d <= 0.01f) return;
-            if (!RespawnTools._respawnDue.ContainsKey(__instance)) RespawnTools._respawnDue[__instance] = Time.unscaledTime + d;
+            int num = __instance.networkNumber;
+            // 按玩家编号记账（不按 Character 实例）：单人自由模式死亡会走"关卡重置"，
+            // 之后是新实例，用实例记账就永远等不到"到点"。
+            if (!RespawnTools._respawnDueByNum.ContainsKey(num))
+                RespawnTools._respawnDueByNum[num] = Time.unscaledTime + d;
         } catch (Exception __ex) { SRApi.Guard.Log("重生/登记死亡", __ex); }
     }
 }
 
 internal static class RespawnDelayHoldPatch {
     // 自由模式的自动重生走 FreePlayControl.Update → resetPlayerCharacter（反编译 124101），
-    // 根本不经过 Character.AttemptRespawn；延迟窗口内把它拦掉，到点放行。
+    // 不经过 Character.AttemptRespawn；延迟窗口内把它拦掉，到点放行。
     [HarmonyPatch(typeof(FreePlayControl), "resetPlayerCharacter")]
     [HarmonyPrefix]
     private static bool Prefix(FreePlayControl __instance, Character c) {
@@ -971,12 +969,14 @@ internal static class RespawnDelayHoldPatch {
             if (c == null || !c.hasAuthority) return true;
             if (c.Success) return true;
             if (!(c.Dead || c.LocallyDead || c.Dying)) return true;   // 换阶段等流程里角色是活的：放行
+            int num = c.networkNumber;
             float due;
-            if (!RespawnTools._respawnDue.TryGetValue(c, out due)) {
+            if (!RespawnTools._respawnDueByNum.TryGetValue(num, out due)) {
                 due = Time.unscaledTime + d;
-                RespawnTools._respawnDue[c] = due;
+                RespawnTools._respawnDueByNum[num] = due;
             }
-            return Time.unscaledTime >= due;
+            if (Time.unscaledTime >= due) { RespawnTools._respawnDueByNum.Remove(num); return true; }
+            return false;
         } catch (Exception __ex) { SRApi.Guard.Log("重生/自由模式延迟", __ex); return true; }
     }
 }
