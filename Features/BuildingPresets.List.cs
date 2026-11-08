@@ -183,7 +183,9 @@ namespace SR_UCH.Tweaks {
                 // box 命中、maxY>0 才滚、到边界不消费）。**在绘制前**调用，先改 scrollY 再绘制。
                 if (e != null) {
                     try {
-                        SRApi.TableWheelInput(e, box, mp, _maxScrollX, _listMaxY, ref _scrollCols, ref _scrollRows);
+                        // 核心吃掉滚轮后必须打帧锁：否则同一帧的帧尾 page hook 会再滚一次（一格滚两倍）。
+                        if (SRApi.TableWheelInput(e, box, mp, _maxScrollX, _listMaxY, ref _scrollCols, ref _scrollRows))
+                            _listWheelFrame = Time.frameCount;
                     } catch (Exception __wh) { SRApi.Guard.Log("预设列表/核心滚轮", __wh); }
                 }
                 _args.scrollY = _scrollRows.y;
