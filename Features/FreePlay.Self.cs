@@ -69,8 +69,14 @@ namespace SR_UCH {
                 SRApi.RegisterTick("自身状态-快捷键", TickKeys);
                 SRApi.RegisterTick("自身状态-穿模", TickIgnore);
                 SRApi.RegisterSceneHook(OnSceneChanged);
-                try { Harmony.CreateAndPatchAll(typeof(SelfState), (string)null); }
-                catch (Exception __hp) { SRApi.LogWarn("自身状态/补丁注册失败: " + __hp.Message); }
+                // 三个补丁类各自独立注册：一个目标不存在只丢那一条，
+                // 也不会依赖"CreateAndPatchAll 会不会递归嵌套类型"这种不保险的行为。
+                try { Harmony.CreateAndPatchAll(typeof(KillPatch), (string)null); }
+                catch (Exception __h1) { SRApi.LogWarn("自身状态/死亡拦截补丁跳过: " + __h1.Message); }
+                try { Harmony.CreateAndPatchAll(typeof(SetupDeathPatch), (string)null); }
+                catch (Exception __h2) { SRApi.LogWarn("自身状态/广播死亡补丁跳过: " + __h2.Message); }
+                try { Harmony.CreateAndPatchAll(typeof(FixedPatch), (string)null); }
+                catch (Exception __h3) { SRApi.LogWarn("自身状态/物理帧补丁跳过: " + __h3.Message); }
             } catch (Exception __ex) { SRApi.Guard.Log("自身状态/初始化", __ex); }
         }
 
