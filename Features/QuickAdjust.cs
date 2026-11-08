@@ -9,7 +9,7 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
 // 分数折扣、记分板 handicap 刷新、快速切换、快速重试（含两个 Character 补丁）；ITweak 由 MainPlugin 反射初始化。
     // 重生相关逻辑并入 QuickAdjust（同一个 DLL / 同一页），所以不再单独注册成功能。
-    internal static class RespawnTools {
+    internal static partial class RespawnTools {
         private const string Sec = "Quick Adjust";
         private static ConfigEntry<float> _delay;          // 重生延迟（0-3 秒）
         private static ConfigEntry<float> _invincible;     // 出生无敌（0-10 秒）
@@ -19,9 +19,6 @@ namespace SR_UCH.Tweaks {
 
         // 顶层补丁类（RespawnDelayTimingPatch）读它。
         internal static float RespawnDelaySeconds { get { return DelaySeconds; } }
-
-        // 首次同步标记：把游戏原版的重生延迟填进配置（只做一次，之后以用户的值为主）。
-        internal static bool _respawnDelaySynced;
 
         // QuickAdjust 的自动重试用来判断"还要等多久"。
         internal static float DelaySeconds { get { try { return _delay != null ? Mathf.Clamp(_delay.Value, 0f, 3f) : 0f; } catch { return 0f; } } }
@@ -905,59 +902,4 @@ public class QuickAdjust : ITweak {
             }
         }
 }
-
-
-
-// 自由模式重生延迟（参考 RespawnControl）：改死亡计时阈值，由游戏自己按这个时间重生。
-//   死亡后 Character 会等到 deathTimer > maxDeathDelay（或 minDeathDelay + 落地静置）才真正判死，
-//   随后 FreePlayControl.Update 立刻复活 —— 所以把这三个值设成目标秒数就是原生延迟。
-// 关闭时把首次读到的原值写回去（不同模式的原值不同，不能写死）。
-internal static class RespawnDelayTimingPatch {
-    private static readonly Dictionary<Character, float[]> _orig = new Dictionary<Character, float[]>();
-
-    [HarmonyPatch(typeof(Character), "Update")]
-    [HarmonyPrefix]
-    private static void Prefix(Character __instance) {
-        try {
-            if (__instance == null || !__instance.hasAuthority) return;
-            if (!SRApi.GateMaster) { Restore(__instance); return; }
-            float d = RespawnTools.RespawnDelaySeconds;
-            // 还没同步：把这个人物的原版 maxDeathDelay 当作"原版数值"写进配置（只做一次）。
-            if (d < 0f) {
-                if (!RespawnTools._respawnDelaySynced) {
-                    RespawnTools._respawnDelaySynced = true;
-                    // 实际决定"多久复活"的是 minDeathDelay（maxDeathDelay 是"无聊死亡"的硬上限，
-                    // 通常是个大得多的数：用它当默认值会显示成 5 秒，与实际手感不符）。
-                    float vanilla = __instance.minDeathDelay;
-                    if (vanilla >= 0f && vanilla <= 3f) {
-                        try { RespawnTools.SetDelayFromVanilla(vanilla); } catch { /* 静默：写配置失败不影响功能 */ }
-                    }
-                }
-                Restore(__instance);
-                return;
-            }
-            bool want = !__instance.Success
-                && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay | SRApi.ModeMask.Challenge);
-            if (!want) { Restore(__instance); return; }
-            float[] o;
-            if (!_orig.TryGetValue(__instance, out o)) {
-                o = new float[] { __instance.maxDeathDelay, __instance.minDeathDelay, __instance.minSkipDeathTime };
-                _orig[__instance] = o;
-            }
-            __instance.maxDeathDelay = d;
-            __instance.minDeathDelay = d;
-            __instance.minSkipDeathTime = d;
-        } catch (Exception __ex) { SRApi.Guard.Log("重生延迟/计时阈值", __ex); }
-    }
-
-    private static void Restore(Character c) {
-        float[] o;
-        if (c == null || !_orig.TryGetValue(c, out o)) return;
-        _orig.Remove(c);
-        if (o == null || o.Length < 3) return;
-        try { c.maxDeathDelay = o[0]; c.minDeathDelay = o[1]; c.minSkipDeathTime = o[2]; }
-        catch { /* 静默：角色销毁中，无需还原 */ }
-    }
 }
-}
-

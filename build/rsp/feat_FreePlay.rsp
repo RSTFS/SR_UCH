@@ -25,5 +25,6 @@
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 /r:"bin\Release\SR_UCH.dll"
 Features\FreePlay.Grid.cs
+Features\FreePlay.Self.Collision.cs
 Features\FreePlay.Self.cs
 Features\FreePlay.cs

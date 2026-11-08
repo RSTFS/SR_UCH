@@ -43,6 +43,7 @@ SR_UCH\SR.ConfigMigration.cs
 SR_UCH\SR.Ext.cs
 SR_UCH\SR.Notify.cs
 Features\PlayerTracker.cs
+Features\QuickAdjust.Respawn.cs
 Features\QuickAdjust.cs
 Features\BuildingTools.cs
 Features\DestroyBlocks.cs
@@ -60,6 +61,7 @@ Features\Online.LobbyList.cs
 Features\Online.Join.cs
 Features\Online.Watchdog.cs
 Features\FreePlay.Grid.cs
+Features\FreePlay.Self.Collision.cs
 Features\FreePlay.Self.cs
 Features\FreePlay.cs
 Features\Experiments.cs
