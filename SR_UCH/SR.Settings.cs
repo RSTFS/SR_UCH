@@ -1504,11 +1504,16 @@ public partial class SR {
                 if (Mathf.Abs(__w) > 0.01f) {
                     int __cur = 0;
                     for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur = i; break; } }
-                    int __n2 = Mathf.Clamp(Mathf.RoundToInt(Mathf.Abs(__w)), 1, 3);
+                    // 一格 = 一项（不做幅度钳制：以前 Clamp(…,1,3) 会让大 delta 也最多走 3 项，
+                    // 且多个 delta 叠在同一帧时被压成一次）。
+                    int __n2 = Mathf.Abs(__w) < 0.5f ? 1 : Mathf.Max(1, Mathf.RoundToInt(Mathf.Abs(__w)));
                     int __ni = __w > 0f ? __cur - __n2 : __cur + __n2;
-                    if (__ni < 0) __ni = options.Length - 1;
-                    if (__ni >= options.Length) __ni = 0;
+                    while (__ni < 0) __ni += options.Length;
+                    while (__ni >= options.Length) __ni -= options.Length;
                     if (entry != null && vals != null && __ni < vals.Length) SR.SetValue(entry, vals.GetValue(__ni));
+                    // **关键**：把结果当作"选中项"返回。页面自持状态的下拉框（entry == null，
+                    // 例如"加载"）拿不到 SetValue，只能靠返回值更新 → 以前滚轮改了等于没改（"钳制"）。
+                    clicked = __ni;
                 }
             }
             // 键盘导航（对齐 ImGui BeginCombo）：展开时 Up/Down 换项、Enter/Esc 收起。

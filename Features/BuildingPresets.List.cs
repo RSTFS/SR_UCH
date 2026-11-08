@@ -59,7 +59,9 @@ namespace SR_UCH.Tweaks {
 
         // 唯一应用入口：notches > 0 = 向下滚。
         private static void ApplyListWheel(float notches) {
-            if (Mathf.Abs(notches) < 0.01f) { _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _listMaxY); return; }
+            // 没有滚轮时**不做任何夹取**：Layout / Repaint 两趟算出的 box.height 可能不同，
+            // 每帧无条件 Clamp 会把刚滚到的位置夹回去（表现为"滚一下弹回顶部/滚不动"）。
+            if (Mathf.Abs(notches) < 0.01f) return;
             float rowH = SRApi.Ctl.TableRowH();
             float before = _scrollRows.y;
             _scrollRows.y = Mathf.Clamp(_scrollRows.y + notches * rowH * 3f, 0f, _listMaxY);

@@ -48,7 +48,7 @@ namespace SR_UCH.Tweaks {
                 // 默认 -1 = "还没同步"：第一次进入游戏时会把**游戏原版数值**填进来（见 RespawnDelayTimingPatch）。
                 // 用户明确要求：这个功能的默认值就是原版数值，而不是"0 = 原版"。
                 _delay = plugin.Config.Bind(Sec, "Respawn Delay", -1f,
-                    new ConfigDescription("重生延迟（0-10 秒）。默认值会自动取游戏原版数值；0 = 立即重生", new AcceptableValueRange<float>(-1f, 10f)));
+                    new ConfigDescription("重生延迟（0-3 秒）。默认值会自动取游戏原版数值；0 = 立即重生", new AcceptableValueRange<float>(-1f, 3f)));
                 _invincible = plugin.Config.Bind(Sec, "Spawn Invincible", 1f, new ConfigDescription("出生无敌（0-10 秒）", new AcceptableValueRange<float>(0f, 10f)));
                 _cannonRespawn = plugin.Config.Bind(Sec, "Cannon Auto Respawn", false, "炮弹卡死：死亡且卡在炮弹里超过 1.5 秒自动重生。");
                 SRApi.RegisterTick("重生-轮询", Tick);
@@ -79,7 +79,7 @@ namespace SR_UCH.Tweaks {
                             "Respawn delay, spawn invincibility and cannon-stuck respawn (challenge and freeplay)."));
                 if (_delay != null) QuickAdjust.PageSlider(SRApi.T("重生延迟", "Respawn delay"),
                     SRApi.T("死亡后等多少秒再自动重生\n默认值就是游戏原版数值，可自行调大调小\n0 = 立即重生", "seconds to wait after death before respawning\ndefaults to the game's own value; adjust freely\n0 = respawn instantly"),
-                    _delay, 0f, 10f, "0.0");
+                    _delay, 0f, 3f, "0.0");
                 if (_invincible != null) QuickAdjust.PageSlider(SRApi.T("出生无敌", "Spawn invincibility"),
                     SRApi.T("每次出生后的无敌秒数\n游戏原生重生后是 1 秒\n挑战/自由模式", "seconds of invincibility after each spawn\nvanilla gives 1s after respawn\nchallenge and freeplay"),
                     _invincible, 0f, 10f, "0.0");
@@ -138,7 +138,7 @@ namespace SR_UCH.Tweaks {
 
         internal static void SetDelayFromVanilla(float v) {
             if (_delay == null) return;
-            _delay.Value = Mathf.Clamp(Mathf.Round(v * 10f) / 10f, 0f, 10f);
+            _delay.Value = Mathf.Clamp(Mathf.Round(v * 10f) / 10f, 0f, 3f);
         }
 
         // 自由模式的重生延迟：见文件末尾 RespawnDelayTimingPatch。
@@ -926,8 +926,10 @@ internal static class RespawnDelayTimingPatch {
             if (d < 0f) {
                 if (!RespawnTools._respawnDelaySynced) {
                     RespawnTools._respawnDelaySynced = true;
-                    float vanilla = __instance.maxDeathDelay;
-                    if (vanilla >= 0f && vanilla <= 10f) {
+                    // 实际决定"多久复活"的是 minDeathDelay（maxDeathDelay 是"无聊死亡"的硬上限，
+                    // 通常是个大得多的数：用它当默认值会显示成 5 秒，与实际手感不符）。
+                    float vanilla = __instance.minDeathDelay;
+                    if (vanilla >= 0f && vanilla <= 3f) {
                         try { RespawnTools.SetDelayFromVanilla(vanilla); } catch { /* 静默：写配置失败不影响功能 */ }
                     }
                 }

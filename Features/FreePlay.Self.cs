@@ -117,9 +117,15 @@ namespace SR_UCH {
             } catch (Exception __ex) { SRApi.Guard.Log("自身状态/快捷键", __ex); }
         }
 
+        // 直接写 ConfigEntry.Value 不会自动落盘（宿主关掉了自动保存），必须显式标记脏文件。
+        internal static void MarkDirty(ConfigEntryBase e) {
+            try { if (e != null) SRApi.Ctl.MarkConfigDirty(e.ConfigFile); } catch { /* 静默：保存失败不影响功能 */ }
+        }
+
         private static void Toggle(ConfigEntry<bool> e, string zh, string en) {
             if (e == null) return;
             e.Value = !e.Value;
+            MarkDirty(e);
             // 开关照常可开可关；受模式限制时**只提示「仅自由模式」**（用户要求：不要后缀）。
             bool inMode = true;
             try { inMode = SRApi.GateModeAllows(SRApi.ModeMask.Freeplay); } catch { inMode = true; }

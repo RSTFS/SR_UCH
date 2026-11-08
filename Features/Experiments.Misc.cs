@@ -208,7 +208,7 @@ public partial class Experiments : ITweak
                 if (!SRApi.ComboKeyDown(_key)) return;
                 // 开关始终可以切换；是否生效由 ApplyToCamera 里的模式门控决定
                 // （非自由模式 = 开了也不动相机，超级模式可无视）。
-                if (_on != null) _on.Value = !_on.Value;
+                if (_on != null) { _on.Value = !_on.Value; try { SRApi.Ctl.MarkConfigDirty(_on.ConfigFile); } catch { /* 静默：保存失败不影响功能 */ } }
                 if (_on != null && _on.Value && !FreeplayMode()) SRApi.Notify(SRApi.T("仅自由模式", "Freeplay only"));
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 快捷键", __ex); }
         }
