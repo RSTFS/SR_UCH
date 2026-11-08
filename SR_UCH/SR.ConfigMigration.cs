@@ -725,6 +725,9 @@ namespace SR_UCH.Tweaks {
                 "Invincible Key", "God Mode Key", "Fly Key", "Crouch Move Key", "Ignore Objects Key", "Ignore Collision Key" }) {
                 text = MoveKeyBetweenSections(text, "EX", "自由模式", __sk);
             }
+            // 「无视对象」已删除（用户要求）：清掉它的两个键（开关 + 快捷键）。
+            text = RemoveKeys(text, "自由模式", new[] { "Ignore Objects", "Ignore Objects Key" });
+            text = RemoveKeys(text, "EX", new[] { "Ignore Objects", "Ignore Objects Key" });
             // 地图网格移入 SR 的"自由模式"段（早期在 [EX]/[Freeplay]）：搬值保证老配置继续生效。
             // 2.0 起改回"复用游戏自带的 Graphpaper"，只保留「常显网格」一个开关——
             // 亮度/淡出距离/颜色三个键随自制网格一起删除，老配置里的残留值在这里清掉。

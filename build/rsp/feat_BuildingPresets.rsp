@@ -24,6 +24,7 @@
 /r:"%GAME%\BepInEx\core\0Harmony.dll"
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 /r:"bin\Release\SR_UCH.dll"
+Features\BuildingPresets.Ui.cs
 Features\BuildingPresets.List.cs
 Features\BuildingPresets.cs
 Features\BuildingPresets.Mods.cs

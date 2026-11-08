@@ -15,8 +15,8 @@ namespace SR_UCH {
         private const string Sec = "自由模式";
         private const string SlotIsPlayerPlaced = "DestroyBlocks.IsPlayerPlaced";
 
-        private static ConfigEntry<bool> _invincible, _godMode, _fly, _crouch, _ignoreObjects, _ignoreCollision;
-        private static ConfigEntry<KeyCode> _invincibleKey, _godModeKey, _flyKey, _crouchKey, _ignoreObjectsKey, _ignoreCollisionKey;
+        private static ConfigEntry<bool> _invincible, _godMode, _fly, _crouch, _ignoreCollision;
+        private static ConfigEntry<KeyCode> _invincibleKey, _godModeKey, _flyKey, _crouchKey, _ignoreCollisionKey;
 
         // 统一门控：EX 的"总开关"语义在 SR 侧就是 GateMaster（设置页 All Enabled）。
         // 自由模式的功能只在自由模式生效（超级模式经由 GateModeAllows 的豁免自动放行）；
@@ -42,20 +42,17 @@ namespace SR_UCH {
                 _godMode = plugin.Config.Bind(Sec, "God Mode", false, "完美无敌：在无敌之上再拦强制死亡（深坑、掉出判死线）。");
                 _fly = plugin.Config.Bind(Sec, "Fly", false, "飞天：方向键自由飞行（上/下升降，左/右平移，按住 Shift 加速）。");
                 _crouch = plugin.Config.Bind(Sec, "Crouch Move", false, "蹲移：蹲下状态下也能左右移动。");
-                _ignoreObjects = plugin.Config.Bind(Sec, "Ignore Objects", false, "无视对象：自己穿过玩家放置的道具（关卡自带布局仍实心）。");
                 _ignoreCollision = plugin.Config.Bind(Sec, "Ignore Collision", false, "无视碰撞：自己穿过所有实体碰撞（道具 + 场景/地面/墙体）。");
                 _invincibleKey = plugin.Config.Bind(Sec, "Invincible Key", KeyCode.None, "无敌的快捷键（EX 页右键按钮可绑）。");
                 _godModeKey = plugin.Config.Bind(Sec, "God Mode Key", KeyCode.None, "完美无敌的快捷键。");
                 _flyKey = plugin.Config.Bind(Sec, "Fly Key", KeyCode.None, "飞天的快捷键。");
                 _crouchKey = plugin.Config.Bind(Sec, "Crouch Move Key", KeyCode.None, "蹲移的快捷键。");
-                _ignoreObjectsKey = plugin.Config.Bind(Sec, "Ignore Objects Key", KeyCode.None, "无视对象的快捷键。");
                 _ignoreCollisionKey = plugin.Config.Bind(Sec, "Ignore Collision Key", KeyCode.None, "无视碰撞的快捷键。");
 
                 SRApi.RegisterKey("自身状态-无敌", _invincibleKey, "toggle");
                 SRApi.RegisterKey("自身状态-完美无敌", _godModeKey, "toggle");
                 SRApi.RegisterKey("自身状态-飞天", _flyKey, "toggle");
                 SRApi.RegisterKey("自身状态-蹲移", _crouchKey, "toggle");
-                SRApi.RegisterKey("自身状态-无视对象", _ignoreObjectsKey, "toggle");
                 SRApi.RegisterKey("自身状态-无视碰撞", _ignoreCollisionKey, "toggle");
 
                 SRApi.RegisterTick("自身状态-快捷键", TickKeys);
@@ -85,8 +82,6 @@ namespace SR_UCH {
             SRApi.LocDesc(Sec, "Fly", "飞天\n方向键自由飞行，Shift 加速\n不按键则悬停在空中", "Fly\nfly freely with the arrow keys; hold Shift to speed up\nstays hovering when no key is held");
             SRApi.LocKey(Sec, "Crouch Move", "蹲移", "Duck move");
             SRApi.LocDesc(Sec, "Crouch Move", "蹲移\n蹲下状态也能左右移动（A/D 或方向键）", "Duck move\nmove left/right while ducking (A/D or arrow keys)");
-            SRApi.LocKey(Sec, "Ignore Objects", "无视对象", "Ignore objects");
-            SRApi.LocDesc(Sec, "Ignore Objects", "无视对象\n自己穿过玩家放置的道具\n关卡自带布局仍然实心", "Ignore objects\npass through player-placed props\nthe level layout stays solid");
             SRApi.LocKey(Sec, "Ignore Collision", "无视碰撞", "Ignore collision");
             SRApi.LocDesc(Sec, "Ignore Collision", "无视碰撞\n自己穿过所有实体碰撞\n可能掉出地图", "Ignore collision\npass through every solid collider\nmay fall out of the map");
         }
@@ -100,7 +95,6 @@ namespace SR_UCH {
                 if (SRApi.ComboKeyDown(_godModeKey)) Toggle(_godMode, "完美无敌", "God mode");
                 if (SRApi.ComboKeyDown(_flyKey)) Toggle(_fly, "飞天", "Fly");
                 if (SRApi.ComboKeyDown(_crouchKey)) Toggle(_crouch, "蹲移", "Duck move");
-                if (SRApi.ComboKeyDown(_ignoreObjectsKey)) Toggle(_ignoreObjects, "无视对象", "Ignore objects");
                 if (SRApi.ComboKeyDown(_ignoreCollisionKey)) Toggle(_ignoreCollision, "无视碰撞", "Ignore collision");
             } catch (Exception __ex) { SRApi.Guard.Log("自身状态/快捷键", __ex); }
         }
@@ -132,7 +126,7 @@ namespace SR_UCH {
                     if (On(_godMode)) return false;                       // 完美无敌：连强制死亡一起拦
                     if (force) return true;                               // 原版语义：强制死亡生效
                     if (_deathBypass > 0) return true;
-                    bool ignoreMode = On(_ignoreObjects) || On(_ignoreCollision);
+                    bool ignoreMode = On(_ignoreCollision);
                     if (!On(_invincible) && !ignoreMode) return true;
                     if (cause == CauseFalling) {
                         // 深渊：普通无敌不拦。用计数放行一次 force 死亡，避免无限递归。
@@ -154,7 +148,7 @@ namespace SR_UCH {
                     if (__instance == null || !__instance.hasAuthority) return true;
                     if (_deathBypass > 0) return true;
                     if (On(_godMode)) return false;
-                    bool ignoreMode = On(_ignoreObjects) || On(_ignoreCollision);
+                    bool ignoreMode = On(_ignoreCollision);
                     if (!On(_invincible) && !ignoreMode) return true;
                     if (cause == CauseFalling) return true;                 // 深渊允许死亡（与上面一致）
                     return false;
@@ -261,7 +255,6 @@ namespace SR_UCH {
                 try {
                     if (SRApi.Ctl.SelfToggleButton(SRApi.T("完美无敌：", "God mode: "), SRApi.T("连强制死亡、深坑、掉出判死线都拦", "Also blocks forced deaths (pits, death line)"), On(_godMode), _godModeKey, w, true)) Toggle(_godMode, "完美无敌", "God mode");
                     GUILayout.Space(gap);
-                    if (SRApi.Ctl.SelfToggleButton(SRApi.T("无视对象：", "Ignore objects: "), SRApi.T("自己穿过玩家放置的道具", "Pass through player-placed props"), On(_ignoreObjects), _ignoreObjectsKey, w, true)) Toggle(_ignoreObjects, "无视对象", "Ignore objects");
                     GUILayout.Space(gap);
                     if (SRApi.Ctl.SelfToggleButton(SRApi.T("无视碰撞：", "Ignore collision: "), SRApi.T("自己穿过所有实体碰撞", "Pass through every solid collider"), On(_ignoreCollision), _ignoreCollisionKey, w, true)) Toggle(_ignoreCollision, "无视碰撞", "Ignore collision");
                     GUILayout.FlexibleSpace();

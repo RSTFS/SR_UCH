@@ -1,4 +1,4 @@
-// 自由模式 · 自身状态 · 穿模子系统（无视对象 / 无视碰撞）。
+// 自由模式 · 自身状态 · 穿模子系统（无视碰撞）。
 // 从 FreePlay.Self.cs 拆出来只为控制单文件规模；行为与原实现完全一致。
 // 只对本地自己的角色生效：关闭碰撞对 + 临时禁用目标碰撞体 + 每帧清危险标记。
 using System;
@@ -35,16 +35,15 @@ namespace SR_UCH {
 
         private static void TickIgnore() {
             try {
-                bool wantObjects = On(_ignoreObjects);
                 bool wantCollision = On(_ignoreCollision);
-                if (!wantObjects && !wantCollision) { RestoreIgnored(); return; }
+                if (!wantCollision) { RestoreIgnored(); return; }
                 if (_ignoreChar == null || !_ignoreChar.hasAuthority) _ignoreChar = LocalCharacter();
                 Character c = _ignoreChar;
                 if (c == null) return;
                 if (Time.unscaledTime - _ignoreRefreshAt > 0.5f) {
                     _ignoreRefreshAt = Time.unscaledTime;
                     RestoreIgnored();
-                    Rebuild(c, wantObjects, wantCollision);
+                    Rebuild(c, wantCollision);
                 }
                 PressIgnored();
                 ClearHazards(c);
@@ -93,24 +92,11 @@ namespace SR_UCH {
             if (_pressCache.Length != 0) _pressCache = new Collider2D[0];
         }
 
-        private static void Rebuild(Character c, bool wantObjects, bool wantCollision) {
+        private static void Rebuild(Character c, bool wantCollision) {
             Collider2D[] mine = c.GetComponentsInChildren<Collider2D>(true);
             HashSet<int> mineIds = new HashSet<int>();
             for (int i = 0; i < mine.Length; i++) if (mine[i] != null) mineIds.Add(mine[i].GetInstanceID());
             HashSet<int> seen = new HashSet<int>();
-            if (wantObjects) {
-                List<Placeable> all = Placeable.AllPlaceables;
-                if (all != null) {
-                    // 拆分成多个 DLL 后不能直接调 DestroyBlocks（不同程序集）→ 走它提供的槽位。
-                    Func<Placeable, bool> isPlaced = Slots.Require<Func<Placeable, bool>>(SlotIsPlayerPlaced);
-                    for (int i = 0; i < all.Count; i++) {
-                        Placeable p = all[i];
-                        if (p == null) continue;
-                        if (isPlaced != null && !isPlaced(p)) continue;   // 关卡自带布局保持实心
-                        AddTargets(p.GetComponentsInChildren<Collider2D>(true), mineIds, seen);
-                    }
-                }
-            }
             if (wantCollision) AddTargets(UnityEngine.Object.FindObjectsOfType<Collider2D>(), mineIds, seen);
             _ignoredMine.Clear();
             for (int i = 0; i < mine.Length; i++) {

@@ -9,15 +9,14 @@ using UnityEngine;
 
 namespace SR_UCH.Tweaks {
     internal static partial class RespawnTools {
-        // 首次同步标记：把游戏原版的重生延迟填进配置（只做一次，之后以用户的值为主）。
+        // 首次同步标记：把游戏原版的重生延迟填进配置
         internal static bool _respawnDelaySynced;
 
     }
 
-// 自由模式重生延迟（参考 RespawnControl）：改死亡计时阈值，由游戏自己按这个时间重生。
-//   死亡后 Character 会等到 deathTimer > maxDeathDelay（或 minDeathDelay + 落地静置）才真正判死，
-//   随后 FreePlayControl.Update 立刻复活 —— 所以把这三个值设成目标秒数就是原生延迟。
-// 关闭时把首次读到的原值写回去（不同模式的原值不同，不能写死）。
+//   死亡后 Character 会等到 deathTimer > maxDeathDelay（或 minDeathDelay + 落地静置）才真正判死
+//   随后 FreePlayControl.Update 立刻复活 —— 所以把这三个值设成目标秒数就是原生延迟
+// 关闭时把首次读到的原值写回去
 internal static class RespawnDelayTimingPatch {
     private static readonly Dictionary<Character, float[]> _orig = new Dictionary<Character, float[]>();
 
@@ -32,8 +31,6 @@ internal static class RespawnDelayTimingPatch {
             if (d < 0f) {
                 if (!RespawnTools._respawnDelaySynced) {
                     RespawnTools._respawnDelaySynced = true;
-                    // 实际决定"多久复活"的是 minDeathDelay（maxDeathDelay 是"无聊死亡"的硬上限，
-                    // 通常是个大得多的数：用它当默认值会显示成 5 秒，与实际手感不符）。
                     float vanilla = __instance.minDeathDelay;
                     if (vanilla >= 0f && vanilla <= 3f) {
                         try { RespawnTools.SetDelayFromVanilla(vanilla); } catch { /* 静默：写配置失败不影响功能 */ }
