@@ -120,13 +120,11 @@ namespace SR_UCH {
         private static void Toggle(ConfigEntry<bool> e, string zh, string en) {
             if (e == null) return;
             e.Value = !e.Value;
-            // 开关照常可开可关；受模式限制的功能在非自由模式下要明确提示"开了不生效"。
+            // 开关照常可开可关；受模式限制时**只提示「仅自由模式」**（用户要求：不要后缀）。
             bool inMode = true;
             try { inMode = SRApi.GateModeAllows(SRApi.ModeMask.Freeplay); } catch { inMode = true; }
-            string suffix = e.Value
-                ? (inMode ? SRApi.T("：开", ": on") : SRApi.T("：开（当前模式不生效，仅自由模式可用）", ": on (inactive in this mode; freeplay only)"))
-                : SRApi.T("：关", ": off");
-            SRApi.Notify(SRApi.T(zh, en) + suffix);
+            if (e.Value && !inMode) { SRApi.Notify(SRApi.T("仅自由模式", "Freeplay only")); return; }
+            SRApi.Notify(SRApi.T(zh, en) + (e.Value ? SRApi.T("：开", ": on") : SRApi.T("：关", ": off")));
         }
 
         // ================= 死亡拦截 =================
