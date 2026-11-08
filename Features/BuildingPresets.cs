@@ -482,6 +482,44 @@ namespace SR_UCH.Tweaks {
         // 预设列表在固定高度区域内用自己的滚轮滚动。
         // 页面内容在布局空间里的起点 y（零高度探针），用于计算表格上方已用高度（同联机列表）。
 
+        // 本页唯一的滚动目标就是列表：只要指针在右栏里就返回滚轮量（含表格上下沿几像素）。
+        // 三条来源依次尝试，同一帧只应用一次：
+        //   1) Insert 轮询（与下拉框同一套，读 Input.mouseScrollDelta / 本趟 ScrollWheel）；
+        //   2) 直接读本趟 ScrollWheel 事件（某些环境把 delta 吃掉时兜底）；
+        //   3) 都没有就放弃。
+        private static int _wheelFallbackFrame = -1;
+        private static float TakePageWheel(Rect box) {
+            try {
+                float w = SRApi.Ctl.WheelPoll("presets.table", box);
+                if (Mathf.Abs(w) > 0.01f) {
+                    // 本帧后续趟（Repaint）不再走兜底：否则 Input.mouseScrollDelta 整帧都有值，
+                    // 一次滚轮会被 Layout 和 Repaint 各应用一次（一格滚两倍）。
+                    _wheelFallbackFrame = Time.frameCount;
+                    return w;
+                }
+                if (_wheelFallbackFrame == Time.frameCount) return 0f;
+                // 本帧已经被别的控件取走（下拉框展开列表、滑块…）：不要再滚列表，
+                // 否则"在表头的下拉框上滚一格，列表也跟着动"。
+                try { if (SRApi.WheelFrame == Time.frameCount) return 0f; } catch { /* 静默：查询失败按未消费处理 */ }
+                Event e = Event.current;
+                if (e == null) return 0f;
+                Vector2 mp = e.mousePosition;
+                bool inside = box.Contains(mp) || SRApi.ContentArea.Contains(mp);
+                if (!inside) return 0f;
+                float d = 0f;
+                try { d = Input.mouseScrollDelta.y; } catch { /* 静默：该环境没有鼠标滚轮轴 */ }
+                if (Mathf.Abs(d) < 0.01f && e.type == EventType.ScrollWheel) {
+                    float raw = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
+                    d = -raw;
+                    if (Mathf.Abs(d) > 0.01f) { try { e.Use(); } catch { /* 静默：事件已被别处消费 */ } }
+                }
+                if (Mathf.Abs(d) < 0.01f) return 0f;
+                _wheelFallbackFrame = Time.frameCount;
+                try { SRApi.MarkWheelUsed(); } catch { /* 静默：非关键路径 */ }
+                return d;
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/取滚轮", __ex); return 0f; }
+        }
+
         // 页面级滚轮：鼠标在表格矩形内就把滚轮换算成行滚动（与核心 TableWheelInput 同一套系数）。
         private static int _renderFrame = -1000;   // 本页最近一次被渲染的帧（滚轮钩子只在自己页面上工作）
         private static bool OnPresetWheel(Vector2 mouse, float wheel) {
@@ -1038,7 +1076,13 @@ namespace SR_UCH.Tweaks {
             float rowH = SRApi.Ctl.TableRowH();
             float headerH = SRApi.Ctl.TableHeaderH();
             float minH = headerH + rowH * 2f;
-            float tableH = Mathf.Max(minH, SRApi.PageContentBottom - probe.y);
+            // 底界只用"右栏高度 − 底栏"这一条纯尺寸算（和 probe.y 同坐标系，且不依赖任何页面状态）：
+            //   ContentArea.y 就是 BeginArea 的原点，所以 localY = screenY − ContentArea.y。
+            // 之前用 SRApi.PageContentBottom，一旦那个值算偏（多算/少算都会）就会出现
+            // "表格比可视区高 → maxY 变成 0 → 列表滚不动"。
+            float __bottomLocal = SRApi.ContentArea.height - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);
+            if (__bottomLocal <= minH) __bottomLocal = Mathf.Max(minH, SRApi.PageContentBottom);
+            float tableH = Mathf.Max(minH, __bottomLocal - probe.y);
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true),
                 GUILayout.Height(tableH));
             float rowsH = SRApi.Ctl.TableRowsH(tableH, headerH);
@@ -1076,6 +1120,14 @@ namespace SR_UCH.Tweaks {
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
                 _rowsHCache = rowsH;   // 缓存真实行区高：滚轮钩子在首帧/刚切页时用它兜底
                 _maxScrollY = SRApi.Ctl.TableMaxScrollY(visible.Count, rowH, rowsH);
+                // 滚轮：本页只有列表一个滚动目标，所以"指针在右栏里"就滚列表（与联机列表同一手感），
+                // 不再依赖命中框坐标换算。先滚、再把 scrollY 交给绘制，同一帧就能看到位移。
+                float __wheel = TakePageWheel(box);
+                if (Mathf.Abs(__wheel) > 0.01f) {
+                    float __before = _scrollRows.y;
+                    _scrollRows.y = Mathf.Clamp(_scrollRows.y - __wheel * SRApi.Ctl.Sc(56f), 0f, _maxScrollY);
+                    if (Mathf.Abs(_scrollRows.y - __before) < 0.01f && _maxScrollY > 0f) _scrollRows.y = __before;
+                }
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _maxScrollY);
                 Event e = Event.current;
                 Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
@@ -1140,13 +1192,6 @@ namespace SR_UCH.Tweaks {
                 };
                 _hiddenBeforeTable = _hiddenCols.Count;
                 _tableBox = box;      // 供页面级滚轮钩子命中判定
-                // 滚轮：绘制期直接用表格矩形取用（同一坐标系，不存在换算错位）
-                {
-                    // 唯一入口：绘制期就地轮询（与下拉框同一套）。不经过 IMGUI 事件，
-                    // 因此不会被滚动视图提前吃掉，也不存在跨趟交接丢失。
-                    float __w = SRApi.Ctl.WheelPoll("presets.table", box);
-                    if (Mathf.Abs(__w) > 0.01f) ScrollTableBy(__w);
-                }
                 SRApi.TableDraw(_args);
                 // 拖列宽的结果在 _drawW 里（核心直接改传进去的数组）：除拉伸列外同步回持久化宽度
                 for (int i = 0; i < _colW.Length && i < _drawW.Length; i++) {

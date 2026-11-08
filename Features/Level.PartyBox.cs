@@ -545,7 +545,9 @@ public class AutoPartyItem : ITweak {
     // 下一拍再调用游戏自己的 tryPickPiece 协程 —— 房主端只认游戏这条链路。
     private static PartyPickCursor _hpCur;
     private static PickableBlock _hpTarget;
-    private static int _hpStage;          // 0=空闲 1=写悬停 2=启动协程 3=等待验收
+    private static int _hpStage;          // 0=空闲 1=把光标挪到目标上 2=启动协程 3=等待验收
+    private static Vector3 _hpSavedPos;   // 光标原位（挑完还回去，用户看不到位移）
+    private static bool _hpMoved;
     private static float _hpAt = -1f;
     private static int _hpAttempts;
 
@@ -690,23 +692,35 @@ public class AutoPartyItem : ITweak {
             if (_hpStage == 0 || _hpCur == null || _hpTarget == null) return;
             if (Time.unscaledTime < _hpAt) return;
             if (_hpStage == 1) {
-                System.Reflection.FieldInfo hp = null;
-                try { hp = SRApi.Ref.Field(typeof(PartyPickCursor), "hoveredPick", "派对盒自动道具（直接指定悬停对象）"); }
-                catch (Exception __hf) { SRApi.Guard.Log("自动道具/取悬停字段", __hf); }
-                // 清掉上一轮留下的 pickedPiece：不清的话协程开头就跳过整段逻辑。
-                try { _hpCur.NetworkpickedPiece = null; } catch (Exception __cp) { SRApi.Guard.Log("自动道具/清挑选记录", __cp); }
-                if (hp != null) {
-                    try { hp.SetValue(_hpCur, _hpTarget); } catch (Exception __hs) { SRApi.Guard.Log("自动道具/写悬停字段", __hs); }
-                } else {
-                    // 字段名对不上时退回"挪光标 + 等游戏自己算悬停"
+                // 游戏只认"光标真的压在道具上"：它靠 OnTriggerStay2D → checkHoveredPickAdd 算 hoveredPick。
+                // 上一版直接往字段里塞目标，看起来"挑成功"了，实际上离开真实悬停就无效
+                // （用户反馈：必须光标停在方块上才会自动拿）。所以这里照手动挑选的做法，
+                // 先把光标挪到道具位置，让游戏自己算悬停；字段注入只作为兜底。
+                if (_hpCur != null && _hpTarget != null) {
+                    _hpSavedPos = _hpCur.transform.position;
+                    _hpMoved = true;
                     Vector3 p = _hpTarget.transform.position;
-                    _hpCur.transform.position = new Vector3(p.x, p.y + 0.2f, p.z);
+                    _hpCur.transform.position = new Vector3(p.x, p.y + 0.15f, p.z);
                 }
                 _hpStage = 2;
-                _hpAt = Time.unscaledTime + 0.06f;
+                _hpAt = Time.unscaledTime + 0.12f;   // 等 1~2 个物理帧让触发体把 hoveredPick 填上
                 return;
             }
             if (_hpStage == 2) {
+                // 清掉上一轮留下的 pickedPiece：不清的话协程开头 `pickedPiece == null` 不成立，
+                // 整段逻辑会被静默跳过（日志说挑了、道具没到手）。
+                try { _hpCur.NetworkpickedPiece = null; } catch (Exception __cp) { SRApi.Guard.Log("自动道具/清挑选记录", __cp); }
+                // 让游戏自己算出来的悬停优先；物理没来得及算上时再兜底写字段。
+                System.Reflection.FieldInfo hp = null;
+                try { hp = SRApi.Ref.Field(typeof(PartyPickCursor), "hoveredPick", "派对盒自动道具（兜底悬停）"); }
+                catch (Exception __hf) { SRApi.Guard.Log("自动道具/取悬停字段", __hf); }
+                if (hp != null) {
+                    object cur = null;
+                    try { cur = hp.GetValue(_hpCur); } catch { /* 静默：读不到就按 null 处理 */ }
+                    if (cur == null) {
+                        try { hp.SetValue(_hpCur, _hpTarget); } catch (Exception __hs) { SRApi.Guard.Log("自动道具/写悬停字段", __hs); }
+                    }
+                }
                 System.Reflection.MethodInfo mi = null;
                 try { mi = SRApi.Ref.Method(typeof(PartyPickCursor), "tryPickPiece", "派对盒自动道具（走游戏挑选协程）"); }
                 catch (Exception __rf) { SRApi.Guard.Log("自动道具/取挑选方法", __rf); }
@@ -737,6 +751,11 @@ public class AutoPartyItem : ITweak {
                     _pickedSeq = -1;                   // 允许本箱再挑一次
                     _armedAt = Time.unscaledTime;      // 重新计时延迟
                 }
+                // 光标还回原位：只在"我们挪过"时才还，避免影响玩家自己的位置。
+                if (_hpMoved && _hpCur != null) {
+                    try { _hpCur.transform.position = _hpSavedPos; } catch { /* 静默：光标可能已被销毁 */ }
+                }
+                _hpMoved = false;
                 // 无论成败都清掉伪造的悬停，避免影响后续手动挑选（Disable 时游戏也会清）。
                 try {
                     System.Reflection.FieldInfo hp2 = SRApi.Ref.Field(typeof(PartyPickCursor), "hoveredPick", "派对盒自动道具（清理伪造悬停）");

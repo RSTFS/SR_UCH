@@ -22,7 +22,8 @@ namespace SR_UCH {
         // 功能是否正在生效（patch 与 Tick 共用的唯一判据）。
         internal static bool Active {
             get {
-                try { return SRApi.GateMaster && _alwaysOn != null && _alwaysOn.Value; }
+                // 只在自由模式生效（超级模式可无视模式限制）；开关照常可开，非自由模式下无效。
+                try { return SRApi.GateMaster && _alwaysOn != null && _alwaysOn.Value && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay); }
                 catch { return false; }
             }
         }

@@ -1469,25 +1469,27 @@ public partial class SR {
                 if (entry != null) _comboSkipFrame[entry] = Time.frameCount; //展开当帧不绘制列表
             }
             Rect boxRect = GUILayoutUtility.GetLastRect();
-            // 滚轮：绘制期直接问"这一格归我吗"（收起=换选项；展开=滚列表）
+            // 滚轮：绘制期就地轮询（唯一路径）。收起 = 换选项（一格一项，循环）；
+            // 展开 = 滚列表（一格一项）。以前收起态根本没取滚轮量（__w 恒 0），所以"有的下拉框能用、
+            // 有的不能用"——能用的那几个是自带滚轮逻辑的页面控件。
             if (options != null && options.Length > 1) {
                 float __w = 0f;
-                // 滚轮只保留"绘制期就地轮询"这一条路径（见上方 WheelPoll）。
-                // 展开列表的滚动仍需要：保留它在展开态下的处理。
-                if (drew && options.Length > 8 && entry != null) {
+                if (drew) {
                     int __vis2 = Mathf.Min(options.Length, 8);
-                    __w = SRApi.Ctl.WheelTake(new Rect(boxRect.x, boxRect.yMax, width, CtlH() * __vis2));
+                    __w = WheelPoll(__latchKey + ":list", new Rect(boxRect.x, boxRect.yMax, width, CtlH() * __vis2));
                     if (Mathf.Abs(__w) > 0.01f) {
                         int __sc;
                         if (!_comboScroll.TryGetValue(entry, out __sc)) __sc = 0;
-                        _comboScroll[entry] = Mathf.Clamp(__sc + (__w > 0f ? -2 : 2), 0, options.Length - 8);
+                        _comboScroll[entry] = Mathf.Clamp(__sc + (__w > 0f ? -1 : 1), 0, Mathf.Max(0, options.Length - 8));
                         __w = 0f;
                     }
+                } else {
+                    __w = WheelPoll(__latchKey, boxRect);
                 }
                 if (Mathf.Abs(__w) > 0.01f) {
                     int __cur = 0;
                     for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur = i; break; } }
-                    int __n2 = Mathf.Clamp(Mathf.RoundToInt(Mathf.Abs(__w)), 1, 5);
+                    int __n2 = Mathf.Clamp(Mathf.RoundToInt(Mathf.Abs(__w)), 1, 3);
                     int __ni = __w > 0f ? __cur - __n2 : __cur + __n2;
                     if (__ni < 0) __ni = options.Length - 1;
                     if (__ni >= options.Length) __ni = 0;

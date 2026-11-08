@@ -77,6 +77,17 @@ public partial class Experiments : ITweak
             SRApi.RowCompanions.Add(CameraCompanion);              // 自由相机行右侧并排快捷键框
             SRApi.RowFilters.Add(CameraRowFilter);                 // 快捷键不单独成行
         }
+        // 自由模式页的"自由相机"分区：快捷键单独一行（原来靠 EX 页的行 companion 显示，
+        // EX 不再提供自身状态/页面后这行就消失了 —— 用户问"快捷键去哪了"）。
+        internal static void RenderKeyRow() {
+            try {
+                if (_key == null) return;
+                SRApi.Ctl.Row(SRApi.T("视野快捷键", "Camera key"),
+                    SRApi.T("按下开关自由相机\n可改绑，支持组合键", "toggles the free camera\nrebindable, combos supported"),
+                    _key);
+            } catch (Exception __ex) { SRApi.Guard.Log("自由相机/快捷键行", __ex); }
+        }
+
         private static bool FovSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
             min = MinFov; max = MaxFov; fmt = "0";
             try { return (e.Definition.Section == "自由模式" || e.Definition.Section == "Experiments") && e.Definition.Key == "Free Camera FOV"; } catch { return false; }

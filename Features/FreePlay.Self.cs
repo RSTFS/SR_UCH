@@ -19,7 +19,11 @@ namespace SR_UCH {
         private static ConfigEntry<KeyCode> _invincibleKey, _godModeKey, _flyKey, _crouchKey, _ignoreObjectsKey, _ignoreCollisionKey;
 
         // 统一门控：EX 的"总开关"语义在 SR 侧就是 GateMaster（设置页 All Enabled）。
-        private static bool On(ConfigEntry<bool> e) { return e != null && e.Value && SRApi.GateMaster; }
+        // 自由模式的功能只在自由模式生效（超级模式经由 GateModeAllows 的豁免自动放行）；
+        // 开关本身照常可以打开/关闭，只是非自由模式下"开了无效"。
+        private static bool On(ConfigEntry<bool> e) {
+            return e != null && e.Value && SRApi.GateMaster && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay);
+        }
 
         // ================= 无敌 / 完美无敌 =================
         private static System.Reflection.FieldInfo _invTimerField;

@@ -135,30 +135,38 @@ namespace SR_UCH.Tweaks {
         private static readonly Dictionary<Character, float> _respawnDue = new Dictionary<Character, float>();
         private static bool _selfRespawn;
 
+        // 死亡时登记：这是唯一可靠的"刚死"时机（setupDeath 一定会在本地角色上跑一次）。
+        [HarmonyPatch(typeof(Character), "setupDeath")]
+        [HarmonyPostfix]
+        private static void NoteDeath(Character __instance) {
+            try {
+                if (__instance == null || !__instance.hasAuthority) return;
+                if (!SRApi.GateMaster) return;
+                float d = DelaySeconds;
+                if (d <= 0.01f) return;
+                if (!_respawnDue.ContainsKey(__instance)) _respawnDue[__instance] = Time.unscaledTime + d;
+            } catch (Exception __ex) { SRApi.Guard.Log("重生/登记死亡", __ex); }
+        }
+
         [HarmonyPatch(typeof(FreePlayControl), "resetPlayerCharacter")]
         [HarmonyPrefix]
         private static bool HoldFreePlayAutoRespawn(FreePlayControl __instance, Character c) {
             try {
                 if (_selfRespawn) return true;                       // 我们自己的延迟重生：放行
-                if (!SRApi.GateMaster || !ModeOk()) return true;
+                if (!SRApi.GateMaster) return true;
                 float d = DelaySeconds;
                 if (d <= 0.01f) return true;                          // 延迟 0 = 原生行为
-                if (c == null) return true;
-                Character lc = LocalCharacter();
-                if (lc != null && lc != c) return true;               // 只延迟本地角色
-                if (!c.hasAuthority) return true;
+                if (c == null || !c.hasAuthority) return true;        // 只延迟本地角色
                 if (c.Success) return true;
                 // 只有"死亡后的重生"才拦：换阶段等流程里角色是活的，照常放行。
                 if (!(c.Dead || c.LocallyDead || c.Dying)) return true;
                 float due;
                 if (!_respawnDue.TryGetValue(c, out due)) {
-                    // 首次拦截：从死亡时刻（AttemptRespawn 记过就用它）起算
-                    float since;
-                    int num = c.networkNumber;
-                    due = (_deadSince.TryGetValue(num, out since) ? since : Time.unscaledTime) + d;
+                    // 没登记到（例如不是 setupDeath 那条路）：从这一刻起算，别把这次重生吞掉。
+                    due = Time.unscaledTime + d;
                     _respawnDue[c] = due;
                 }
-                return false;                                          // 拦下游戏自己的立即重生
+                return Time.unscaledTime >= due;                       // 到点就放行游戏的这次重生，未到点拦掉
             } catch (Exception __ex) { SRApi.Guard.Log("重生/自由模式延迟", __ex); return true; }
         }
 
@@ -178,6 +186,8 @@ namespace SR_UCH.Tweaks {
                 Character c = done[i];
                 _respawnDue.Remove(c);
                 if (c == null) continue;
+                // 游戏可能已经自己复活了（到点后前缀放行）：别对活人再调一次重生（会瞬移回出生点）。
+                try { if (!(c.Dead || c.LocallyDead || c.Dying)) continue; } catch { continue; }
                 try {
                     FreePlayControl fc = LobbyManager.instance != null ? LobbyManager.instance.CurrentGameController as FreePlayControl : null;
                     if (fc == null) continue;
@@ -248,7 +258,20 @@ public class QuickAdjust : ITweak {
     private static int _draftFrame = -1;
     private static ConfigEntry<bool> _quickSwitchEnabled;
     private static ConfigEntry<float> _quickSwitchHold;
-    private static float _vanillaSuicideTime = -1f;   // 原版长按阈值（关闭快切时还原用）
+    private static float _vanillaSuicideTime = -1f;   // 原版长按阈值（仅供界面显示"游戏默认"）
+    // 我们改过的 SwitchTime 原值：功能关掉时逐个还原成 prefab 序列化值，做到"像没改过"。
+    private static readonly Dictionary<PiecePlacementCursor, float> _switchTimeOrig = new Dictionary<PiecePlacementCursor, float>();
+    private static void RestoreSwitchTime() {
+        if (_switchTimeOrig.Count == 0) return;
+        List<PiecePlacementCursor> done = null;
+        foreach (KeyValuePair<PiecePlacementCursor, float> kv in _switchTimeOrig) {
+            PiecePlacementCursor pc = kv.Key;
+            if (pc != null && Mathf.Abs(pc.SwitchTime - kv.Value) > 0.001f) pc.SwitchTime = kv.Value;
+            if (done == null) done = new List<PiecePlacementCursor>();
+            done.Add(pc);
+        }
+        if (done != null) for (int i = 0; i < done.Count; i++) _switchTimeOrig.Remove(done[i]);
+    }
     private static ConfigEntry<bool> _quickRetryEnabled;
     private static ConfigEntry<bool> _quickRetryFast;
     private static ConfigEntry<float> _quickRetryHoldTime;
@@ -614,9 +637,10 @@ public class QuickAdjust : ITweak {
             if (!SRApi.GateMaster || (SRApi.Typing) || !IsLocalCharacter(__instance)) return;
             try
             {
-                if (_vanillaSuicideTime <= 0f) { try { _vanillaSuicideTime = __instance.SuicideTime; } catch { /* 静默：非关键路径 */ } }
                 // 模式门控统一走 GateModeAllows（已含 IgnoreModeLimit 豁免）。
-                if (QuickSwitchOn && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay))
+                bool freeplayHold = QuickSwitchOn && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay);
+                bool challengeHold = !freeplayHold && QuickRetryFastOn && SRApi.GateModeAllows(SRApi.ModeMask.Challenge);
+                if (freeplayHold)
                 {
                     __instance.SuicideTime = QuickSwitchHold; // 自由模式长按 B 的切换等待
                     // 建造态切回行动用 PiecePlacementCursor.SwitchTime，须每帧同步。
@@ -626,18 +650,22 @@ public class QuickAdjust : ITweak {
                         foreach (Player p in PlayerManager.GetInstance()) {
                             if (p == null || p.AssociatedGamePlayer == null) continue;
                             PiecePlacementCursor pc = p.AssociatedGamePlayer.CursorInstance as PiecePlacementCursor;
-                            if (pc != null) pc.SwitchTime = QuickSwitchHold;
+                            if (pc == null) continue;
+                            if (!_switchTimeOrig.ContainsKey(pc)) _switchTimeOrig[pc] = pc.SwitchTime;
+                            pc.SwitchTime = QuickSwitchHold;
                         }
                     }
                 }
-                else if (QuickRetryFastOn && SRApi.GateModeAllows(SRApi.ModeMask.Challenge))
+                else if (challengeHold)
                 {
                     __instance.SuicideTime = QuickRetryHold;
                 }
-                else if (_vanillaSuicideTime > 0f)
+                else
                 {
-                    // 功能关掉后把阈值还原，避免"关了还在用上次的等待时间"。
-                    __instance.SuicideTime = _vanillaSuicideTime;
+                    // 两个功能都没生效时**一个字都不写**：SuicideTime 是游戏按模式自己设的
+                    // （自由模式 2 秒、挑战 0.5 秒…），以前这里无条件写回首次抓到的"原值"，
+                    // 结果所有模式都被钉成同一个数（用户反馈：各模式长按 B 全变成 2 秒）。
+                    RestoreSwitchTime();
                 }
             }
             catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.OverrideHoldTime", __ex); }
