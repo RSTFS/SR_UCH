@@ -9,5 +9,4 @@ SR_UCH/SR.Ctl.cs=1396
 Features/BuildingPresets.cs=1009
 Features/HUD.cs=988
 Features/BuildingPresets.Io.cs=917
-Features/QuickAdjust.cs=905
 Features/Online.cs=901

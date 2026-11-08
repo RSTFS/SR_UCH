@@ -43,6 +43,7 @@ SR_UCH\SR.ConfigMigration.cs
 SR_UCH\SR.Ext.cs
 SR_UCH\SR.Notify.cs
 Features\PlayerTracker.cs
+Features\QuickAdjust.QuickSwitch.cs
 Features\QuickAdjust.Respawn.cs
 Features\QuickAdjust.cs
 Features\BuildingTools.cs
