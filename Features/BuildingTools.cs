@@ -156,18 +156,13 @@ namespace SR_UCH.Tweaks {
                 "Key to toggle free placement (grid override) in-game");
             SRApi.RegisterKey("建造增强-自由放置开关", _toggleGridKey, "toggle");
 
-            // 注意：Harmony 的 CreateAndPatchAll(外层类型) 会连**嵌套类型**一起打补丁（FreePlacementPatch 是嵌套类），
-            // 再显式注册一次会让它的 Prefix/Postfix 每帧执行两遍（位置写入两次、反射翻倍）。
-            // 所以这里只调一次外层；FreePlacementPatch 若哪天提成顶层类，再把下面那行显式注册放回来。
+            // 补丁分两次独立注册（旧版就是这么做的，也是自由放置能生效的关键）：
+            // FreePlacementPatch 是**顶层**类，不会被下面这行连带注册，必须自己注册一次；
+            // 反过来，它能独立失败——某个目标在新版游戏里消失时，"整批"失败也不会连累自由放置。
             try { Harmony.CreateAndPatchAll(typeof(BuildingTools)); }
-            catch (Exception e) {
-                // 某个补丁目标在新版游戏里消失时，Harmony 会让**整批**失败（与快速调整同样的坑），
-                // 自由放置就是被这样一起拖下水的。这里退一步单独注册自由放置补丁，
-                // 保证"其它补丁失败"不会连累它。
-                SRApi.LogWarn("BuildingTools 补丁失败（改为单独注册自由放置）: " + e.Message);
-                try { Harmony.CreateAndPatchAll(typeof(FreePlacementPatch)); }
-                catch (Exception __fp) { SRApi.LogWarn("自由放置 补丁失败: " + __fp.Message); }
-            }
+            catch (Exception e) { SRApi.LogWarn("BuildingTools 补丁失败: " + e.Message); }
+            try { Harmony.CreateAndPatchAll(typeof(FreePlacementPatch)); }
+            catch (Exception __fp) { SRApi.LogError("自由放置 补丁注册失败: " + __fp.Message); }
         }
 
         [HarmonyPatch(typeof(GameState), "Update")]
@@ -197,9 +192,12 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("自由放置：忽略放置规则", __ex); }
         }
 
-        // 自由放置：SetPiece/FixedUpdate 后用 Postfix 把方块位置改为未取整的光标位置。
-        [HarmonyPatch]
-        static class FreePlacementPatch {
+    }
+
+    // 自由放置：SetPiece/FixedUpdate 后用 Postfix 把方块位置改为未取整的光标位置。
+    // 独立成顶层类：既能单独注册（失败只丢它自己），也不会被外层 CreateAndPatchAll 重复注册。
+    [HarmonyPatch]
+    internal static class FreePlacementPatch {
             private static FieldInfo _heldOffsetField;
             static IEnumerable<MethodBase> TargetMethods() {
                 // 逐个判空后再 yield：Harmony 遍历到 null 会抛异常，导致自由放置整体失效。
@@ -216,7 +214,7 @@ namespace SR_UCH.Tweaks {
             static void Postfix(PiecePlacementCursor __instance) {
                 try {
                     if (!SRApi.GateMaster) return; // 总开关关闭时失效
-                    if (!GridOverride) return;
+                    if (!BuildingTools.GridOverride) return;
                     if (__instance == null || __instance.Piece == null) return;
                     // 复刻游戏 FixedUpdate 的守卫：这些状态下游戏刻意不动位置，照写会把方块拽到非法位置。
                     // disabled 等为 protected，经 SafeBool 读取。
@@ -252,7 +250,6 @@ namespace SR_UCH.Tweaks {
                     return v is bool && (bool)v;
                 } catch { return false; }
             }
-        }
     }
 }
 

@@ -716,6 +716,13 @@ namespace SR_UCH.Tweaks {
             text = MoveKeyBetweenSections(text, "Experiments", "自由模式", "Free Camera");
             text = MoveKeyBetweenSections(text, "Experiments", "自由模式", "Free Camera FOV");
             text = MoveKeyBetweenSections(text, "Experiments", "自由模式", "Free Camera Speed");
+            // 自身状态（无敌/完美无敌/飞天/蹲移/无视对象/无视碰撞 + 6 个快捷键）从 EX 搬到 SR 的"自由模式"段：
+            // 用户要求 SR 的自身状态完全独立于 EX，值搬过来保证已有开关与快捷键继续生效。
+            foreach (string __sk in new[] {
+                "Invincible", "God Mode", "Fly", "Crouch Move", "Ignore Objects", "Ignore Collision",
+                "Invincible Key", "God Mode Key", "Fly Key", "Crouch Move Key", "Ignore Objects Key", "Ignore Collision Key" }) {
+                text = MoveKeyBetweenSections(text, "EX", "自由模式", __sk);
+            }
             // 地图网格移入 SR 的"自由模式"段（早期在 [EX]/[Freeplay]）：搬值保证老配置继续生效。
             // 2.0 起改回"复用游戏自带的 Graphpaper"，只保留「常显网格」一个开关——
             // 亮度/淡出距离/颜色三个键随自制网格一起删除，老配置里的残留值在这里清掉。

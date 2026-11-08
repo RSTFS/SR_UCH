@@ -191,6 +191,10 @@ public partial class Experiments : ITweak
                 bool on = _on.Value && SRApi.GateMaster;
                 if (on) {
                     _applied = true;
+                    // 刚打开就立刻解一次 UI3（不等边界重放的节拍）。
+                    if (RemoveUI3.WantOn) {
+                        try { RemoveUI3.Tick(); } catch (Exception __ui0) { SRApi.Guard.Log("解除UI3/即时", __ui0); }
+                    }
                     if (WallsOn) EnsureWalls();
                     OpenSolidWalls(WallsOn);
                     ApplyHardBounds();
@@ -225,6 +229,11 @@ public partial class Experiments : ITweak
                 _nextApplyAt = __now + 0.5f;
                 _tick++;
                 _applied = true;
+                // 解除 UI3 覆盖：以前挂在"每 30 次边界重放"（≈15 秒）里，所以开启后要等十几秒才生效。
+                // 它自己内部有扫描节流（每 2.5 秒、每场景最多 6 次），这里每次重放都给它一次机会即可。
+                if (RemoveUI3.WantOn) {
+                    try { RemoveUI3.Tick(); } catch (Exception __ui) { SRApi.Guard.Log("解除UI3/并入", __ui); }
+                }
                 ApplyCursorPiece(true);
                 // 墙引用缺失时扫描一次。
                 if (WallsOn) EnsureWalls();
@@ -236,11 +245,6 @@ public partial class Experiments : ITweak
                 // 相机项开启时才压制 FixCameraToBoundaries（其 Update 会关闭 ZoomCamera 并按 boundaryCollider 重算）。
                 SuppressFixCamera(CameraOn);
                 if (_tick % 30 != 0) return;
-                // 解除UI3 并入本钩子：每 30 次边界重放（约 15 秒）扫一次。
-                // 开关关着就完全不调用：否则即使内部会早退，也白白多一次函数调用与状态检查。
-                if (RemoveUI3.WantOn) {
-                    try { RemoveUI3.Tick(); } catch (Exception __ui) { SRApi.Guard.Log("解除UI3/并入", __ui); }
-                }
                 ApplyAllPiecesIgnore();
                 BuildStatus();
             } catch (Exception __ex) { SRApi.Guard.Log("关卡边界 Tick", __ex); }

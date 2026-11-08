@@ -1,5 +1,4 @@
-// 自由模式页：只在自由模式可用，内容由 EX 模块通过槽位提供（自身状态等）。
-// 归属：SR_UCH 主体；EX 未安装时给出提示而不是空白页。
+// 自由模式页：单页三分区（自由相机 / 自身状态 / 其它），全部由 SR 自己实现，不依赖 EX。
 
 using System;
 using BepInEx.Configuration;
@@ -10,7 +9,6 @@ namespace SR_UCH {
     [SrFeature("sr.freeplay", "FreePlay", "1.0")]
     public class FreePlayPage : ITweak {
         private const string Sec = "自由模式";
-        private const string SlotRender = "ex.freeplay.render";   // EX 注册的页面渲染回调（Action）
 
         public void Initialize(IFeatureHost plugin) {
             try {
@@ -20,17 +18,7 @@ namespace SR_UCH {
                 SRApi.Nav(Sec, 85);
                 // 单页三分区（用户要求：不要页签）
                 SRApi.RegisterPage(Sec, RenderAll);
-                SRApi.RegisterTick("自由模式页", Tick);
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式页/初始化", __ex); }
-        }
-
-        private static Action _render;
-        private static bool _probed;
-
-        private static void Tick() {
-            if (_probed) return;
-            _probed = true;
-            try { _render = Slots.Require<Action>(SlotRender); } catch (Exception __ex) { SRApi.Guard.Log("自由模式页/取渲染回调", __ex); }
         }
 
         // 单页三分区：自由相机 → 自身状态 → 其它
@@ -46,7 +34,8 @@ namespace SR_UCH {
                 GUILayout.Space(SRApi.Ctl.Sc(4));
 
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("自身状态", "Self state") + " -");
-                if (_render != null) _render(); else GUILayout.Label(SRApi.T("未检测到 EX 模块", "EX module not detected"), SRApi.Ctl.Label);
+                // 自身状态由 SR 自己实现（完全独立于 EX）：无敌 / 完美无敌 / 飞天 / 蹲移 / 无视对象 / 无视碰撞。
+                SelfState.RenderRows();
                 GUILayout.Space(SRApi.Ctl.Sc(4));
 
                 FreePlayGrid.RenderOtherPage();
@@ -61,16 +50,5 @@ namespace SR_UCH {
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式页/其它", __ex); }
         }
 
-        private static void Render() {
-            try {
-                if (!_probed) Tick();
-                SRApi.Ctl.SectionTitle(SRApi.T("- 自由模式 -", "- Freeplay -"));
-                if (_render == null) {
-                    GUILayout.Label(SRApi.T("未检测到 EX 模块（自身状态等功能由它提供）", "EX module not detected (it provides these options)"), SRApi.Ctl.Label);
-                    return;
-                }
-                _render();
-            } catch (Exception __ex) { SRApi.Guard.Log("自由模式页/渲染", __ex); }
-        }
     }
 }

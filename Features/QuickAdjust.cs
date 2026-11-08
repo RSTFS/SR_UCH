@@ -104,6 +104,7 @@ namespace SR_UCH.Tweaks {
 
         private static void Tick() {
             try {
+                TickDelayedRespawn();   // 自由模式的延迟重生：到点由我们调游戏自己的重生
                 if (!SRApi.GateMaster || !ModeOk()) { _cannonStuckAt = -1f; return; }
                 Character c = LocalCharacter();
                 if (c == null) return;
@@ -122,6 +123,72 @@ namespace SR_UCH.Tweaks {
                 }
 
             } catch (Exception __ex) { SRApi.Guard.Log("重生/轮询", __ex); }
+        }
+
+        // ===== 自由模式的重生延迟（照旧版做法）=====
+        // 旧版（SR_UCH-SR_UCH.zip / RespawnDelay.cs）的做法：
+        //   1) 死亡时（Character.setupDeath 之后）登记角色；
+        //   2) 游戏自己的自动重生（FreePlayControl.Update → resetPlayerCharacter）在我们的延迟窗口内被拦掉；
+        //   3) 延迟到点后由我们调用游戏自己的 FreePlayControl.resetPlayerCharacter(角色, true)。
+        // 现在只补第 2/3 步：AttemptRespawn 前缀只挡住"死亡瞬间就复活"的那条路，
+        // 自由模式的 Update 每帧还会再调一次 resetPlayerCharacter，不拦住就表现为"延迟无效"。
+        private static readonly Dictionary<Character, float> _respawnDue = new Dictionary<Character, float>();
+        private static bool _selfRespawn;
+
+        [HarmonyPatch(typeof(FreePlayControl), "resetPlayerCharacter")]
+        [HarmonyPrefix]
+        private static bool HoldFreePlayAutoRespawn(FreePlayControl __instance, Character c) {
+            try {
+                if (_selfRespawn) return true;                       // 我们自己的延迟重生：放行
+                if (!SRApi.GateMaster || !ModeOk()) return true;
+                float d = DelaySeconds;
+                if (d <= 0.01f) return true;                          // 延迟 0 = 原生行为
+                if (c == null) return true;
+                Character lc = LocalCharacter();
+                if (lc != null && lc != c) return true;               // 只延迟本地角色
+                if (!c.hasAuthority) return true;
+                if (c.Success) return true;
+                // 只有"死亡后的重生"才拦：换阶段等流程里角色是活的，照常放行。
+                if (!(c.Dead || c.LocallyDead || c.Dying)) return true;
+                float due;
+                if (!_respawnDue.TryGetValue(c, out due)) {
+                    // 首次拦截：从死亡时刻（AttemptRespawn 记过就用它）起算
+                    float since;
+                    int num = c.networkNumber;
+                    due = (_deadSince.TryGetValue(num, out since) ? since : Time.unscaledTime) + d;
+                    _respawnDue[c] = due;
+                }
+                return false;                                          // 拦下游戏自己的立即重生
+            } catch (Exception __ex) { SRApi.Guard.Log("重生/自由模式延迟", __ex); return true; }
+        }
+
+        // 到点：用游戏自己的 resetPlayerCharacter 复活（不绕过任何网络校验）。
+        private static void TickDelayedRespawn() {
+            if (_respawnDue.Count == 0) return;
+            float now = Time.unscaledTime;
+            List<Character> done = null;
+            foreach (KeyValuePair<Character, float> kv in _respawnDue) {
+                if (kv.Key == null) { if (done == null) done = new List<Character>(); done.Add(kv.Key); continue; }
+                if (now < kv.Value) continue;
+                if (done == null) done = new List<Character>();
+                done.Add(kv.Key);
+            }
+            if (done == null) return;
+            for (int i = 0; i < done.Count; i++) {
+                Character c = done[i];
+                _respawnDue.Remove(c);
+                if (c == null) continue;
+                try {
+                    FreePlayControl fc = LobbyManager.instance != null ? LobbyManager.instance.CurrentGameController as FreePlayControl : null;
+                    if (fc == null) continue;
+                    System.Reflection.MethodInfo mi = SRApi.Ref.Method(typeof(FreePlayControl), "resetPlayerCharacter", "重生延迟：调用游戏自己的重生");
+                    if (mi == null) continue;
+                    _selfRespawn = true;
+                    try { mi.Invoke(fc, new object[] { c, true }); }
+                    finally { _selfRespawn = false; }
+                    _deadSince.Remove(c.networkNumber);
+                } catch (Exception __ex) { _selfRespawn = false; SRApi.Guard.Log("重生/延迟复活", __ex); }
+            }
         }
 
         // 重生延迟：游戏每次自动重都会走 Character.AttemptRespawn（反编译 61563）。
