@@ -115,27 +115,6 @@ namespace SR_UCH.Tweaks {
         }
 
 
-        // 筛选下拉的**唯一**实现：候选、标签、当前值读写、展开态全部由调用方给。
-        // 以前三路筛选（关卡/模式/类型）各抄一份"找当前项 + ComboBox + 落值 + try/catch"，
-        // 差异只有标签映射函数，重复了约 60 行。
-        private static void RenderFilterCombo(string tag, string[] vals, string[] labels,
-                Func<string> get, Action<string> set, ref bool open, string fallback, float width) {
-            try {
-                if (vals == null || labels == null || vals.Length == 0 || vals.Length != labels.Length) return;
-                string curVal = get();
-                if (!string.IsNullOrEmpty(curVal) && Array.IndexOf(vals, curVal) < 0) { set(fallback); curVal = fallback; }
-                int cur = 0;
-                for (int i = 0; i < vals.Length; i++) {
-                    if (string.Equals(vals[i], curVal, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
-                }
-                cur = Mathf.Clamp(cur, 0, labels.Length - 1);
-                bool o = open;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref o, width);
-                open = o;
-                if (sel >= 0 && sel < vals.Length) set(vals[sel]);
-            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/筛选-" + tag, __ex); }
-        }
-
         private static void RenderLevelFilterCombo() {
             try {
                 List<string> vals = LevelFilterValues();
@@ -145,7 +124,7 @@ namespace SR_UCH.Tweaks {
                     for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
                     _levelOptLabels = labels;
                 }
-                RenderFilterCombo("关卡", _levelOptVals, _levelOptLabels,
+                SRApi.Ctl.FilterCombo("关卡", _levelOptVals, _levelOptLabels,
                     delegate { return _levelFilter; }, delegate(string v) { _levelFilter = v; },
                     ref _levelFilterOpen, "", W(110));
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/渲染关卡筛选", __ex); }
@@ -188,7 +167,7 @@ namespace SR_UCH.Tweaks {
                     for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
                     _modeOptLabels = labels;
                 }
-                RenderFilterCombo("模式", _modeOptVals, _modeOptLabels,
+                SRApi.Ctl.FilterCombo("模式", _modeOptVals, _modeOptLabels,
                     delegate { return _modeFilter; }, delegate(string v) { _modeFilter = v; },
                     ref _modeFilterOpen, "", W(110));
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/渲染模式筛选", __ex); }
@@ -230,7 +209,7 @@ namespace SR_UCH.Tweaks {
                     SRApi.T("预设", "Presets"),
                     SRApi.T("本地", "Local")
                 };
-                RenderFilterCombo("类型", vals, labels,
+                SRApi.Ctl.FilterCombo("类型", vals, labels,
                     delegate { return _typeFilter; }, delegate(string v) { _typeFilter = v; },
                     ref _typeFilterOpen, "preset", W(110));
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/渲染类型筛选", __ex); }

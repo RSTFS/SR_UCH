@@ -1046,6 +1046,27 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             public static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width) { ComboBoxFn f = _comboBox; return f != null ? f(entry, current, vals, options, ref open, width) : 0; }
             // 省略宽度 = 自适应（等价 width <= 0）。
             public static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open) { return ComboBox(entry, current, vals, options, ref open, -1f); }
+        // 筛选下拉的统一实现：候选、标签、当前值 get/set、展开态、默认回退都在一处。
+        // 页面只需描述"有哪些候选、怎么读/写当前值"，不再各抄一份"找当前项 + ComboBox + 落值"。
+        // 规则：当前值不在候选里 → 写回 fallback（避免运行期状态被改坏后下拉显示空白）。
+        public static void FilterCombo(string tag, string[] vals, string[] labels,
+                Func<string> get, Action<string> set, ref bool open, string fallback, float width) {
+            try {
+                if (vals == null || labels == null || vals.Length == 0 || vals.Length != labels.Length) return;
+                string curVal = get != null ? get() : null;
+                if (!string.IsNullOrEmpty(curVal) && Array.IndexOf(vals, curVal) < 0) { if (set != null) set(fallback); curVal = fallback; }
+                int cur = 0;
+                for (int i = 0; i < vals.Length; i++) {
+                    if (string.Equals(vals[i], curVal, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
+                }
+                cur = Mathf.Clamp(cur, 0, labels.Length - 1);
+                bool o = open;
+                int sel = ComboBox(null, labels[cur], vals, labels, ref o, width);
+                open = o;
+                if (sel >= 0 && sel < vals.Length && set != null) set(vals[sel]);
+            } catch { /* 静默：下拉渲染失败不影响本帧其它控件 */ }
+        }
+
             public static float SidebarWidth() { Func<float> f = _sidebarWidth; return f != null ? f() : 0f; }
             public static float WinWidth { get { Func<float> f = _winWidth; return f != null ? f() : 0f; } }
             public static void SetValue(ConfigEntryBase entry, object value) { Action<ConfigEntryBase, object> f = _setValue; if (f != null) f(entry, value); }
