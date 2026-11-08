@@ -1453,8 +1453,14 @@ public partial class SR {
             if (width <= 0f) width = Sc(170);
             int clicked = -1;
             //"本帧是否展开"按进入时的状态决定，保证 Layout 与 Repaint 的控件结构一致
-            int skipFrame;
-            bool drew = open && !(entry != null && _comboSkipFrame.TryGetValue(entry, out skipFrame) && skipFrame == Time.frameCount);
+            // "本帧是否展开列表"按帧锁存：关闭/展开都发生在输入事件趟（Layout 之后、Repaint 之前），
+            // 逐趟按实时 open 决定就会让 Repaint 比 Layout 少建（或多建）一串列表按钮，
+            // 抛 "Getting control N's position in a group with only N controls"。
+            // 注意 lambda 不能捕获 ref 参数 open，先拷到局部变量。
+            bool __openNow = open;
+            bool __skipNow = entry != null && _comboSkipFrame.TryGetValue(entry, out int __sf) && __sf == Time.frameCount;
+            string __latchKey = "combo:" + (entry != null ? entry.Definition.Section + "/" + entry.Definition.Key : "?") + ":" + width.ToString("0.0");
+            bool drew = SR.Ctl.FrameLatch(__latchKey, delegate () { return __openNow && !__skipNow; });
             GUILayout.BeginVertical(GUILayout.Width(width));
             if (GUILayout.Button(current + "   v", _frame, GUILayout.Width(width), GUILayout.Height(CtlH()))) {
                 ComboMouseDownSeen();   //本下拉框被点击

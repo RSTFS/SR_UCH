@@ -397,6 +397,24 @@ public partial class SR {
         // 下拉框（自绘：列表紧跟按钮下方）；返回选中下标，-1 = 未选。
         // width <= 0 = 宽度自动：取全部选项 + 当前显示文本的最大 CalcSize，加箭头/内边距；
         // 下限 80、上限为可用宽度的 60%（优先内容区，其次窗口宽度），长选项不截断也不会撑破页面。
+        // 每帧锁存的布尔决策：同一帧里 OnGUI 会跑多趟（Layout → 输入事件 → Repaint），
+        // 凡是由输入改变、又决定"建不建控件"的状态（下拉框展开、内联编辑框…），
+        // 逐趟读实时值会让 Repaint 比 Layout 多建/少建控件，直接抛
+        // "Getting control N's position in a group with only N controls"。统一按帧锁存。
+        private static readonly Dictionary<string, bool> _frameLatch = new Dictionary<string, bool>(32);
+        private static int _frameLatchFrame = -1;
+        public static bool FrameLatch(string key, Func<bool> live) {
+            try {
+                if (_frameLatchFrame != Time.frameCount) { _frameLatchFrame = Time.frameCount; _frameLatch.Clear(); }
+                if (string.IsNullOrEmpty(key)) return live != null && live();
+                bool v;
+                if (_frameLatch.TryGetValue(key, out v)) return v;
+                v = live != null && live();
+                _frameLatch[key] = v;
+                return v;
+            } catch { return live != null && live(); }
+        }
+
         public static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width = -1f) {
             if (width <= 0f) width = AutoComboBoxWidth(options, current);
             // 高度由 SR.ComboBox 统一取 ControlH()（与按钮/输入框同高），这里只管宽度与命中。

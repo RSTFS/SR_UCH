@@ -151,10 +151,13 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
 7. **所有文本标签底部额外 1px 缓冲**（用户硬性要求）：样式侧由 `SR.Styles.AddBottomBuffer` 在
    `EnsureStyles()` 末尾**遍历 `_styleList` 全部样式**统一加（不要再手工挑样式，新加的会漏）；
    按文字算高的地方（`SRApi.Ctl.LabelAuto`）高度也 +`Sc(1)`。
-8. **同一帧内 Layout / Repaint 必须做同样的决定**：凡是会进入/退出布局组的状态
-   （`NoPageScrollBars` → `BeginScrollView`），一帧只锁存一次（`SR.Window.ScrollViewLatchedForThisFrame`）。
-   页面是在渲染过程中才声明它的，逐趟重读会让两趟的滚动区进出不配对，
-   直接抛 `Getting control N's position in a group with only N controls`。
+8. **同一帧内 Layout / Repaint 必须做同样的决定**：凡是会进入/退出布局组、或决定"建不建控件"的状态
+   （`NoPageScrollBars` → `BeginScrollView`、下拉框展开列表、内联编辑框…），一帧只锁存一次。
+   - 滚动区：`SR.Window.ScrollViewLatchedForThisFrame()`（页面是在渲染过程中才声明它的）。
+   - 条件控件：核心用 `SR.Ctl.FrameLatch(key, live)`；功能页自行按帧锁存（见预设页 `DrawInlineRename`
+     的 `_renameLatch`）。原因：这些状态是在**输入事件趟**（Layout 之后、Repaint 之前）改变的，
+     逐趟读实时值必然让 Repaint 多建/少建控件，直接抛
+     `Getting control N's position in a group with only N controls`。
 9. **"按在控件上"的手势标记必须在 MouseDown 趟末尾记录**（`SR.Window` 的 `_downOnControl`）：
    控件是在页面绘制时才置 `BlockWindowDrag` 的，而拖窗口判定在页面之前；
    滑块/输入框/表格都要在按下时置 `BlockWindowDrag`，否则拖它们会把整块面板一起拖走。

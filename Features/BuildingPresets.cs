@@ -83,6 +83,9 @@ namespace SR_UCH.Tweaks {
         private static float _pendingAt = -1f;
         private static string _renameKey;
         private static string _renameText;
+        // 条件控件的"本帧是否显示"锁存（Layout / Repaint 必须一致，见 DrawInlineRename）。
+        private static int _renameLatchFrame = -1;
+        private static bool _renameLatch;
         private static string _search = "";
         private static string _importPath = "";
         // 关卡筛选（运行期状态，不落配置）："" = 全部；否则为预设 XML 里的 levelSceneName。
@@ -941,6 +944,15 @@ namespace SR_UCH.Tweaks {
         // 提交：回车 / 点击别处；取消：Esc。
         private static void DrawInlineRename() {
             try {
+                // 内联重命名框是**条件控件**：开始/结束编辑都发生在输入事件趟（Layout 之后、
+                // Repaint 之前），如果逐趟按实时状态建控件，Repaint 会比 Layout 多/少建一个，
+                // 直接抛 "Getting control N's position in a group with only N controls"。
+                // 所以"本帧是否显示编辑框"只在当帧第一趟锁存，下一帧才真正显示/收起。
+                if (_renameLatchFrame != Time.frameCount) {
+                    _renameLatchFrame = Time.frameCount;
+                    _renameLatch = !string.IsNullOrEmpty(_renameKey) && _args != null;
+                }
+                if (!_renameLatch) return;
                 if (string.IsNullOrEmpty(_renameKey) || _args == null) return;
                 if (_args.rowRects == null || _args.rowRows == null || _args.vis == null) return;
                 List<PresetInfo> vis = _visibleCache;
