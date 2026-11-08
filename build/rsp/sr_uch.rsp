@@ -25,6 +25,7 @@
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 MainPlugin.cs
 SR_UCH\SR.Contracts.cs
+SR_UCH\SR.Core.Audit.cs
 SR_UCH\SR.Core.cs
 SR_UCH\SR.Ctl.Table.cs
 SR_UCH\SR.Ctl.cs

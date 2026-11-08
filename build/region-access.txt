@@ -70,3 +70,9 @@ _wheelClaimCur
 _wheelClaimFrame
 _wheelClaimPrev
 _wheelDelta
+_auditIssues
+_navHidden
+_patchAudited
+_refAudited
+_refWarned
+_startupAudited
