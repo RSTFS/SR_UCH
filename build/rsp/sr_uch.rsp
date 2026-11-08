@@ -79,6 +79,7 @@ Features\BuildingPresets.Mods.cs
 Features\BuildingPresets.Load.cs
 Features\BuildingPresets.Io.cs
 Features\BuildingPresets.Util.cs
+Features\HUD.Content.cs
 Features\HUD.cs
 Features\HUD.State.cs
 Features\CharacterAuto.cs
