@@ -1459,8 +1459,6 @@ public partial class SR {
             // 注意 lambda 不能捕获 ref 参数 open，先拷到局部变量。
             bool __openNow = open;
             bool __skipNow = entry != null && _comboSkipFrame.TryGetValue(entry, out int __sf) && __sf == Time.frameCount;
-            string __latchKey = "combo:" + (entry != null ? entry.Definition.Section + "/" + entry.Definition.Key : "?") + ":" + width.ToString("0.0");
-            bool drew = SR.Ctl.FrameLatch(__latchKey, delegate () { return __openNow && !__skipNow; });
             GUILayout.BeginVertical(GUILayout.Width(width));
             if (GUILayout.Button(current + "   v", _frame, GUILayout.Width(width), GUILayout.Height(CtlH()))) {
                 ComboMouseDownSeen();   //本下拉框被点击
@@ -1469,6 +1467,15 @@ public partial class SR {
                 if (entry != null) _comboSkipFrame[entry] = Time.frameCount; //展开当帧不绘制列表
             }
             Rect boxRect = GUILayoutUtility.GetLastRect();
+            // 锁存键必须**每个下拉框唯一**：以前 entry 为 null 时键是 "combo:?:宽度"，
+            // 一个页面里多个 entry=null、同宽度的下拉框会共用同一份锁存值 ——
+            // 点开其中一个，其它几个也跟着把自己的列表画出来（用户反馈：点一个全都展开了）。
+            // 现在把命中矩形的位置也算进键里。
+            string __latchKey = "combo:"
+                + (entry != null ? entry.Definition.Section + "/" + entry.Definition.Key : "?")
+                + ":" + Mathf.RoundToInt(boxRect.x) + "," + Mathf.RoundToInt(boxRect.y)
+                + ":" + width.ToString("0.0");
+            bool drew = SR.Ctl.FrameLatch(__latchKey, delegate () { return __openNow && !__skipNow; });
             // 滚轮：绘制期就地轮询（唯一路径）。收起 = 换选项（一格一项，循环）；
             // 展开 = 滚列表（一格一项）。以前收起态根本没取滚轮量（__w 恒 0），所以"有的下拉框能用、
             // 有的不能用"——能用的那几个是自带滚轮逻辑的页面控件。

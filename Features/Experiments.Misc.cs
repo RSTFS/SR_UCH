@@ -70,8 +70,8 @@ public partial class Experiments : ITweak
             // 必须登记 LocKey/LocDesc，否则界面回退显示英文键名。
             SRApi.LocKey("自由模式", "Free Camera Speed", "相机移动速度", null);
             SRApi.LocDesc("自由模式", "Free Camera Speed", "相机跟随速度\n相机跟随角色的快慢\n范围 0.5-5，步长 0.5", "Camera follow speed\nhow fast the camera follows the character\n0.5-5 in steps of 0.5");
-            SRApi.LocKey("Experiments", "Free Camera Key", "视野快捷键", null);
-            SRApi.LocDesc("Experiments", "Free Camera Key", "自由相机按键\n按下开关自由相机\n可改绑，支持组合键", "Free camera key\ntoggles the free camera\nrebindable, combos supported");
+            SRApi.LocKey("自由模式", "Free Camera Key", "视野快捷键", null);
+            SRApi.LocDesc("自由模式", "Free Camera Key", "自由相机按键\n按下开关自由相机\n可改绑，支持组合键", "Free camera key\ntoggles the free camera\nrebindable, combos supported");
             SRApi.RowSliders.Add(FovSlider);                       // FOV 用滑块渲染
             SRApi.RowSliders.Add(SpeedSlider);                     // 相机移动速度用滑块渲染
             SRApi.RowCompanions.Add(CameraCompanion);              // 自由相机行右侧并排快捷键框
@@ -103,7 +103,10 @@ public partial class Experiments : ITweak
             try { if (e.Definition.Section != "自由模式" && e.Definition.Section != "Experiments") return null; return e.Definition.Key == "Free Camera" ? "Free Camera Key" : null; } catch { return null; }
         }
         private static bool CameraRowFilter(ConfigEntryBase e) {
-            try { return e.Definition.Section != "Experiments" || e.Definition.Key != "Free Camera Key"; } catch { return true; }
+            try {
+                if (e.Definition.Key != "Free Camera Key") return true;
+                return e.Definition.Section != "Experiments" && e.Definition.Section != "自由模式";
+            } catch { return true; }
         }
     
         public void Initialize(IFeatureHost plugin) {
@@ -111,7 +114,7 @@ public partial class Experiments : ITweak
                 SelfReg2();
                 _on = plugin.Config.Bind("自由模式", "Free Camera", false, "自由相机：开启后滚轮缩放视野；关闭后完全恢复游戏默认相机（仅自由模式）。");
                 _fov = plugin.Config.Bind("自由模式", "Free Camera FOV", 10f, new ConfigDescription("视野 1-64", new AcceptableValueRange<float>(MinFov, MaxFov)));
-                _key = plugin.Config.Bind("Experiments", "Free Camera Key", KeyCode.F3, "按键切换自由相机（组合键：点按钮后在按住 Shift/Ctrl/Alt 的同时按主键设置）。");
+                _key = plugin.Config.Bind("自由模式", "Free Camera Key", KeyCode.F3, "按键切换自由相机（组合键：点按钮后在按住 Shift/Ctrl/Alt 的同时按主键设置）。");
                 // 只受模组总开关限制，不受「自由相机」开关影响（它改的是游戏相机跟随速度）。
                 _followSpeed = plugin.Config.Bind("自由模式", "Free Camera Speed", 1f,
                     new ConfigDescription("相机跟随角色的速度倍数（0-10，每次 0.5，1 = 游戏原值；与自由相机开关无关）",

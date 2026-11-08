@@ -50,9 +50,10 @@ namespace SR_UCH.Tweaks {
                     try { d = Input.mouseScrollDelta.y; } catch { /* 静默：该环境没有滚轮轴 */ }
                 }
                 if (Mathf.Abs(d) < 0.01f) return 0f;
+                // 归一成"格"：有的驱动一格只报 0.1 / 0.33，照原值乘会让滚动几乎不动（用户反馈滚不动）。
+                float notches = Mathf.Abs(d) < 0.5f ? 1f : Mathf.Round(Mathf.Abs(d));
+                d = Mathf.Sign(d) * Mathf.Max(1f, notches);
                 if (_listWheelFrame == Time.frameCount) return 0f;   // 本帧只应用一次（Layout/Repaint 各一趟）
-                // 本帧已被别的控件取走（展开的下拉框、滑块…）：列表不再跟着滚。
-                try { if (SRApi.WheelFrame == Time.frameCount) return 0f; } catch { /* 静默：查询失败按未消费处理 */ }
                 _listWheelFrame = Time.frameCount;
                 if (e != null && e.type == EventType.ScrollWheel) { try { e.Use(); } catch { /* 静默：已被消费 */ } }
                 try { SRApi.MarkWheelUsed(); } catch { /* 静默：非关键路径 */ }
@@ -83,7 +84,8 @@ namespace SR_UCH.Tweaks {
             // 控件创建全部在 try 之外：Layout / Repaint 两趟必须创建同样多的控件。
             Rect probe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
             // 底界：右栏纯尺寸 − 底栏。probe.y 与它是同一坐标系（都在 BeginArea 里）。
-            float bottomLocal = SRApi.ContentArea.height - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);
+            // 底界 = 右栏高度 − 底栏高度（**不再额外留缝**：用户要求列表底边直接连到底栏上沿）。
+            float bottomLocal = SRApi.ContentArea.height - SRApi.FooterHeight;
             float tableH = Mathf.Max(minH, bottomLocal - probe.y);
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true),
                 GUILayout.Height(tableH));

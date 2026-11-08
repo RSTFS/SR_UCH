@@ -31,14 +31,8 @@ namespace SR_UCH {
                     return e.Definition.Key == "Free Camera" || e.Definition.Key == "Free Camera FOV"
                         || e.Definition.Key == "Free Camera Speed";
                 });
-                // 视野快捷键（原来由 EX 页的行 companion 提供，EX 那份删掉后这行消失）。
-                // 拆分成多个 DLL 后不能直接引用 Experiments 里的 FreeCam 类型 → 按配置项名字取。
-                ConfigEntryBase camKey = SRApi.Ctl.FindEntry("Experiments", "Free Camera Key");
-                if (camKey != null) {
-                    SRApi.Ctl.Row(SRApi.T("视野快捷键", "Camera key"),
-                        SRApi.T("按下开关自由相机\n可改绑，支持组合键", "toggles the free camera\nrebindable, combos supported"),
-                        camKey);
-                }
+                // 视野快捷键与自由相机开关同一行：由核心的"行 companion"机制画在复选框右边
+                // （Free Camera Key 已随自由相机一起放进「自由模式」段，companion 才找得到它）。
                 GUILayout.Space(SRApi.Ctl.Sc(4));
 
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("自身状态", "Self state") + "-");

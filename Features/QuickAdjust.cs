@@ -17,6 +17,9 @@ namespace SR_UCH.Tweaks {
         private static readonly Dictionary<int, float> _deadSince = new Dictionary<int, float>();
         private static float _cannonStuckAt = -1f;
 
+        // 顶层补丁类（RespawnDelayDeathPatch / RespawnDelayHoldPatch）读它。
+        internal static float RespawnDelaySeconds { get { return DelaySeconds; } }
+
         // QuickAdjust 的自动重试用来判断"还要等多久"。
         internal static float DelaySeconds { get { try { return _delay != null ? Mathf.Clamp(_delay.Value, 0f, 3f) : 0f; } catch { return 0f; } } }
 
@@ -45,6 +48,11 @@ namespace SR_UCH.Tweaks {
                 SRApi.RegisterTick("重生-轮询", Tick);
                 try { Harmony.CreateAndPatchAll(typeof(RespawnTools)); }
                 catch (Exception __h) { SRApi.Guard.Log("重生/补丁注册", __h); }
+                // 延迟重生的两个补丁单独注册（失败只丢那一条，且各自留一条可定位的警告）。
+                try { Harmony.CreateAndPatchAll(typeof(RespawnDelayDeathPatch)); }
+                catch (Exception __h1) { SRApi.LogWarn("重生延迟/死亡登记补丁跳过: " + __h1.Message); }
+                try { Harmony.CreateAndPatchAll(typeof(RespawnDelayHoldPatch)); }
+                catch (Exception __h2) { SRApi.LogWarn("重生延迟/自由模式拦截补丁跳过: " + __h2.Message); }
             } catch (Exception __ex) { SRApi.Guard.Log("重生/初始化", __ex); }
         }
 
@@ -132,43 +140,12 @@ namespace SR_UCH.Tweaks {
         //   3) 延迟到点后由我们调用游戏自己的 FreePlayControl.resetPlayerCharacter(角色, true)。
         // 现在只补第 2/3 步：AttemptRespawn 前缀只挡住"死亡瞬间就复活"的那条路，
         // 自由模式的 Update 每帧还会再调一次 resetPlayerCharacter，不拦住就表现为"延迟无效"。
-        private static readonly Dictionary<Character, float> _respawnDue = new Dictionary<Character, float>();
-        private static bool _selfRespawn;
+        internal static readonly Dictionary<Character, float> _respawnDue = new Dictionary<Character, float>();
+        internal static bool _selfRespawn;
 
-        // 死亡时登记：这是唯一可靠的"刚死"时机（setupDeath 一定会在本地角色上跑一次）。
-        [HarmonyPatch(typeof(Character), "setupDeath")]
-        [HarmonyPostfix]
-        private static void NoteDeath(Character __instance) {
-            try {
-                if (__instance == null || !__instance.hasAuthority) return;
-                if (!SRApi.GateMaster) return;
-                float d = DelaySeconds;
-                if (d <= 0.01f) return;
-                if (!_respawnDue.ContainsKey(__instance)) _respawnDue[__instance] = Time.unscaledTime + d;
-            } catch (Exception __ex) { SRApi.Guard.Log("重生/登记死亡", __ex); }
-        }
+        // 死亡时登记：见文件末尾的 RespawnDelayDeathPatch（独立注册，单个失败不影响其它补丁）。
 
-        [HarmonyPatch(typeof(FreePlayControl), "resetPlayerCharacter")]
-        [HarmonyPrefix]
-        private static bool HoldFreePlayAutoRespawn(FreePlayControl __instance, Character c) {
-            try {
-                if (_selfRespawn) return true;                       // 我们自己的延迟重生：放行
-                if (!SRApi.GateMaster) return true;
-                float d = DelaySeconds;
-                if (d <= 0.01f) return true;                          // 延迟 0 = 原生行为
-                if (c == null || !c.hasAuthority) return true;        // 只延迟本地角色
-                if (c.Success) return true;
-                // 只有"死亡后的重生"才拦：换阶段等流程里角色是活的，照常放行。
-                if (!(c.Dead || c.LocallyDead || c.Dying)) return true;
-                float due;
-                if (!_respawnDue.TryGetValue(c, out due)) {
-                    // 没登记到（例如不是 setupDeath 那条路）：从这一刻起算，别把这次重生吞掉。
-                    due = Time.unscaledTime + d;
-                    _respawnDue[c] = due;
-                }
-                return Time.unscaledTime >= due;                       // 到点就放行游戏的这次重生，未到点拦掉
-            } catch (Exception __ex) { SRApi.Guard.Log("重生/自由模式延迟", __ex); return true; }
-        }
+        // 自由模式自动重生的拦截：见文件末尾的 RespawnDelayHoldPatch。
 
         // 到点：用游戏自己的 resetPlayerCharacter 复活（不绕过任何网络校验）。
         private static void TickDelayedRespawn() {
@@ -963,6 +940,44 @@ public class QuickAdjust : ITweak {
 }
 
 
+
+// 重生延迟的两个补丁各自成类、各自注册：一个目标在新版游戏里消失时，
+// 只丢那一条，不会像 CreateAndPatchAll(整类) 那样把所有其它补丁一起拖下水。
+internal static class RespawnDelayDeathPatch {
+    [HarmonyPatch(typeof(Character), "setupDeath")]
+    [HarmonyPostfix]
+    private static void Postfix(Character __instance) {
+        try {
+            if (__instance == null || !__instance.hasAuthority) return;
+            if (!SRApi.GateMaster) return;
+            float d = RespawnTools.RespawnDelaySeconds;
+            if (d <= 0.01f) return;
+            if (!RespawnTools._respawnDue.ContainsKey(__instance)) RespawnTools._respawnDue[__instance] = Time.unscaledTime + d;
+        } catch (Exception __ex) { SRApi.Guard.Log("重生/登记死亡", __ex); }
+    }
 }
 
-
+internal static class RespawnDelayHoldPatch {
+    // 自由模式的自动重生走 FreePlayControl.Update → resetPlayerCharacter（反编译 124101），
+    // 根本不经过 Character.AttemptRespawn；延迟窗口内把它拦掉，到点放行。
+    [HarmonyPatch(typeof(FreePlayControl), "resetPlayerCharacter")]
+    [HarmonyPrefix]
+    private static bool Prefix(FreePlayControl __instance, Character c) {
+        try {
+            if (RespawnTools._selfRespawn) return true;
+            if (!SRApi.GateMaster) return true;
+            float d = RespawnTools.RespawnDelaySeconds;
+            if (d <= 0.01f) return true;
+            if (c == null || !c.hasAuthority) return true;
+            if (c.Success) return true;
+            if (!(c.Dead || c.LocallyDead || c.Dying)) return true;   // 换阶段等流程里角色是活的：放行
+            float due;
+            if (!RespawnTools._respawnDue.TryGetValue(c, out due)) {
+                due = Time.unscaledTime + d;
+                RespawnTools._respawnDue[c] = due;
+            }
+            return Time.unscaledTime >= due;
+        } catch (Exception __ex) { SRApi.Guard.Log("重生/自由模式延迟", __ex); return true; }
+    }
+}
+}

@@ -716,6 +716,8 @@ namespace SR_UCH.Tweaks {
             text = MoveKeyBetweenSections(text, "Experiments", "自由模式", "Free Camera");
             text = MoveKeyBetweenSections(text, "Experiments", "自由模式", "Free Camera FOV");
             text = MoveKeyBetweenSections(text, "Experiments", "自由模式", "Free Camera Speed");
+            // 快捷键也搬进「自由模式」段：这样它才会作为"自由相机"行的 companion 显示在同一行。
+            text = MoveKeyBetweenSections(text, "Experiments", "自由模式", "Free Camera Key");
             // 自身状态（无敌/完美无敌/飞天/蹲移/无视对象/无视碰撞 + 6 个快捷键）从 EX 搬到 SR 的"自由模式"段：
             // 用户要求 SR 的自身状态完全独立于 EX，值搬过来保证已有开关与快捷键继续生效。
             foreach (string __sk in new[] {
