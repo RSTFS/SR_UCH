@@ -115,37 +115,40 @@ namespace SR_UCH.Tweaks {
         }
 
 
-        // 关卡筛选下拉：全部 + 当前预设里出现过的关卡（显示为游戏本地化关卡名，值为 XML levelSceneName）。
+        // 筛选下拉的**唯一**实现：候选、标签、当前值读写、展开态全部由调用方给。
+        // 以前三路筛选（关卡/模式/类型）各抄一份"找当前项 + ComboBox + 落值 + try/catch"，
+        // 差异只有标签映射函数，重复了约 60 行。
+        private static void RenderFilterCombo(string tag, string[] vals, string[] labels,
+                Func<string> get, Action<string> set, ref bool open, string fallback, float width) {
+            try {
+                if (vals == null || labels == null || vals.Length == 0 || vals.Length != labels.Length) return;
+                string curVal = get();
+                if (!string.IsNullOrEmpty(curVal) && Array.IndexOf(vals, curVal) < 0) { set(fallback); curVal = fallback; }
+                int cur = 0;
+                for (int i = 0; i < vals.Length; i++) {
+                    if (string.Equals(vals[i], curVal, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
+                }
+                cur = Mathf.Clamp(cur, 0, labels.Length - 1);
+                bool o = open;
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref o, width);
+                open = o;
+                if (sel >= 0 && sel < vals.Length) set(vals[sel]);
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/筛选-" + tag, __ex); }
+        }
+
         private static void RenderLevelFilterCombo() {
             try {
                 List<string> vals = LevelFilterValues();
-                if (!string.IsNullOrEmpty(_levelFilter) && !vals.Contains(_levelFilter)) _levelFilter = "";
-                int cur = 0;
-                for (int i = 0; i < vals.Count; i++) {
-                    if (string.Equals(vals[i], _levelFilter, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
-                }
-                // 选项数组由 LevelFilterValues 一并缓存：以前每帧 vals.ToArray() + 新建 labels[]。
-                if (_levelOptVals == null || _levelOptVals.Length != vals.Count) {
-                    _levelOptVals = vals.ToArray();
-                    _levelOptLabels = null;
-                }
-                string[] labels = _levelOptLabels;
-                if (labels == null || labels.Length != vals.Count) {
-                    labels = new string[vals.Count];
+                if (_levelOptVals == null || _levelOptVals.Length != vals.Count) { _levelOptVals = vals.ToArray(); _levelOptLabels = null; }
+                if (_levelOptLabels == null || _levelOptLabels.Length != vals.Count) {
+                    string[] labels = new string[vals.Count];
                     for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
                     _levelOptLabels = labels;
                 }
-                // v2：LevelFilterValues 走异常分支会返回空列表，此时 labels[cur] 越界被外层 catch 吞掉，
-                // 表现为下拉框闪一下消失。空数组时直接跳过本帧渲染。
-                if (labels.Length == 0 || _levelOptVals == null || _levelOptVals.Length == 0) return;
-                cur = Mathf.Clamp(cur, 0, labels.Length - 1);
-                bool open = _levelFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], _levelOptVals, labels, ref open, W(110));
-                _levelFilterOpen = open;
-                if (sel >= 0 && sel < vals.Count) _levelFilter = vals[sel];
-            } catch (Exception __ex) {
-                SRApi.Guard.Log("布局预设/渲染关卡筛选", __ex);
-            }
+                RenderFilterCombo("关卡", _levelOptVals, _levelOptLabels,
+                    delegate { return _levelFilter; }, delegate(string v) { _levelFilter = v; },
+                    ref _levelFilterOpen, "", W(110));
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/渲染关卡筛选", __ex); }
         }
 
         // 关卡筛选选项：第一项为空（全部），其余为当前预设里出现过的关卡场景名，按本地化关卡名排序。
@@ -176,34 +179,19 @@ namespace SR_UCH.Tweaks {
             return vals;
         }
 
-        // 模式筛选下拉：全部 + 当前预设里出现过的模式（显示为游戏本地化模式名，值为预设目录名 p.Mode）。
         private static void RenderModeFilterCombo() {
             try {
                 List<string> vals = ModeFilterValues();
-                if (!string.IsNullOrEmpty(_modeFilter) && !vals.Contains(_modeFilter)) _modeFilter = "";
-                int cur = 0;
-                for (int i = 0; i < vals.Count; i++) {
-                    if (string.Equals(vals[i], _modeFilter, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
-                }
-                if (_modeOptVals == null || _modeOptVals.Length != vals.Count) {
-                    _modeOptVals = vals.ToArray();
-                    _modeOptLabels = null;
-                }
-                string[] labels = _modeOptLabels;
-                if (labels == null || labels.Length != vals.Count) {
-                    labels = new string[vals.Count];
+                if (_modeOptVals == null || _modeOptVals.Length != vals.Count) { _modeOptVals = vals.ToArray(); _modeOptLabels = null; }
+                if (_modeOptLabels == null || _modeOptLabels.Length != vals.Count) {
+                    string[] labels = new string[vals.Count];
                     for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
                     _modeOptLabels = labels;
                 }
-                if (labels.Length == 0 || _modeOptVals == null || _modeOptVals.Length == 0) return;
-                cur = Mathf.Clamp(cur, 0, labels.Length - 1);
-                bool open = _modeFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], _modeOptVals, labels, ref open, W(110));
-                _modeFilterOpen = open;
-                if (sel >= 0 && sel < vals.Count) _modeFilter = vals[sel];
-            } catch (Exception __ex) {
-                SRApi.Guard.Log("布局预设/渲染模式筛选", __ex);
-            }
+                RenderFilterCombo("模式", _modeOptVals, _modeOptLabels,
+                    delegate { return _modeFilter; }, delegate(string v) { _modeFilter = v; },
+                    ref _modeFilterOpen, "", W(110));
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/渲染模式筛选", __ex); }
         }
 
         // 模式筛选选项：第一项为空（全部），其余为当前预设里出现过的模式目录名，按本地化模式名排序。
@@ -234,7 +222,6 @@ namespace SR_UCH.Tweaks {
             return vals;
         }
 
-        // 类型筛选下拉：全部 / 预设 / 本地（游戏保存的自定义关卡）。运行期状态，不落配置。
         private static void RenderTypeFilterCombo() {
             try {
                 string[] vals = new string[] { "", "preset", "local" };
@@ -243,19 +230,10 @@ namespace SR_UCH.Tweaks {
                     SRApi.T("预设", "Presets"),
                     SRApi.T("本地", "Local")
                 };
-                int cur = 1; // 默认「预设」
-                for (int i = 0; i < vals.Length; i++) {
-                    if (string.Equals(vals[i], _typeFilter, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
-                }
-                // 运行期状态被外部改坏时回退到默认「预设」（与下拉索引 1 对应）。
-                if (!string.Equals(vals[cur], _typeFilter, StringComparison.OrdinalIgnoreCase)) _typeFilter = "preset";
-                bool open = _typeFilterOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(110));
-                _typeFilterOpen = open;
-                if (sel >= 0 && sel < vals.Length) _typeFilter = vals[sel];
-            } catch (Exception __ex) {
-                SRApi.Guard.Log("布局预设/渲染类型筛选", __ex);
-            }
+                RenderFilterCombo("类型", vals, labels,
+                    delegate { return _typeFilter; }, delegate(string v) { _typeFilter = v; },
+                    ref _typeFilterOpen, "preset", W(110));
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/渲染类型筛选", __ex); }
         }
 
         // 加载模式下拉：默认 + 游戏四模式（派对 / 创意 / 挑战 / 自由）。运行期状态，不落配置。
