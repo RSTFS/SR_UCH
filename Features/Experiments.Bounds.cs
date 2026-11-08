@@ -193,9 +193,11 @@ public partial class Experiments : ITweak
                     _applied = true;
                     // 刚打开就立刻解一次 UI3（不等边界重放的节拍）。
                     if (RemoveUI3.WantOn) {
-                        try { RemoveUI3.Tick(); } catch (Exception __ui0) { SRApi.Guard.Log("解除UI3/即时", __ui0); }
+                        try { RemoveUI3.Tick(true); } catch (Exception __ui0) { SRApi.Guard.Log("解除UI3/即时", __ui0); }
                     }
-                    if (WallsOn) EnsureWalls();
+                    ResetScanCounters();
+                    BeginScan();          // 打开就全速扫，扫到即停 / 超时自停
+                    if (WallsOn) EnsureWalls(true);
                     OpenSolidWalls(WallsOn);
                     ApplyHardBounds();
                     SuppressFixCamera(CameraOn);
@@ -208,79 +210,109 @@ public partial class Experiments : ITweak
             } catch (Exception __ex) { SRApi.Guard.Log("关卡边界 重评估", __ex); }
         }
 
-        // 每帧总入口：所有分支双向幂等（开写目标值、关写回原值），可任意次切换。
-        // 重活（墙/光标/相机/边界）只按 5Hz 重放：这些都是幂等写值，人眼看不出 200ms 的差别，
-        // 但每帧跑一遍实测要 4ms+（tick 剖析里 关卡边界-应用 常年超限）。
-        private static float _nextApplyAt;
+        // 扫描策略（用户指定）：
+        //   打开开关 / 换场景 → 立刻开始**全速扫描**（每帧都扫），一帧也不等；
+        //   扫到了（三面墙全部拿到，或确认本关没有）→ 立刻停止扫描；
+        //   没扫到 → 超时（ScanTimeout 秒）自动停止，之后只维持已生效的解绑，不再扫；
+        //   换场景 → 重新全速扫描一次。
+        private const float ScanTimeout = 3f;
+        private static float _scanDeadline = -1f;
+        private static bool _scanRunning;
+        private static int _scanScene = -9999;
+
+        private static void BeginScan() {
+            _scanRunning = true;
+            _scanDeadline = Time.unscaledTime + ScanTimeout;
+        }
 
         internal static void Tick() {
             try {
                 if (_on == null) return;
                 bool on = _on.Value && SRApi.GateMaster;
                 if (!on) {
+                    if (_scanRunning) { _scanRunning = false; }
                     ApplyCursorPiece(false);
                     if (_applied) { Restore(); _applied = false; }
                     return;
                 }
-                // 门限放在最前面：以前 ApplyCursorPiece 在门限之前，每帧照样跑一遍
-                // （tick 剖析里 关卡边界-应用 一直报 2~4ms 就是它）。
-                float __now = Time.unscaledTime;
-                if (_tick > 0 && __now < _nextApplyAt) return;
-                _nextApplyAt = __now + 0.5f;
+                // 换场景：清掉旧引用并重新全速扫描。
+                int __scene = -9999;
+                try { __scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle; } catch { /* 静默：取不到场景就沿用上一次 */ }
+                if (__scene != _scanScene) {
+                    _scanScene = __scene;
+                    for (int i = 0; i < _wallCol.Length; i++) _wallCol[i] = null;
+                    ResetScanCounters();
+                    BeginScan();
+                }
+                if (_scanDeadline < 0f) BeginScan();   // 刚打开开关
+                bool scanning = _scanRunning && Time.unscaledTime <= _scanDeadline;
+                if (!scanning && _scanRunning) { _scanRunning = false; }
+
                 _tick++;
                 _applied = true;
-                // 解除 UI3 覆盖：以前挂在"每 30 次边界重放"（≈15 秒）里，所以开启后要等十几秒才生效。
-                // 它自己内部有扫描节流（每 2.5 秒、每场景最多 6 次），这里每次重放都给它一次机会即可。
-                if (RemoveUI3.WantOn) {
-                    try { RemoveUI3.Tick(); } catch (Exception __ui) { SRApi.Guard.Log("解除UI3/并入", __ui); }
+                // 全速扫描阶段：每帧都扫墙 / 都试一次 UI3；扫到就停。
+                if (WallsOn) {
+                    EnsureWalls(scanning);
+                    if (scanning && WallsResolved()) { _scanRunning = false; }
                 }
-                ApplyCursorPiece(true);
-                // 墙引用缺失时扫描一次。
-                if (WallsOn) EnsureWalls();
-                // 三面实体墙：size 置 0 = 碰撞面消失，这是能走出原关卡的前提；双向，关闭时写回原值。
-                // 此调用必须保持生效。
-                OpenSolidWalls(WallsOn);
-                // 光标/相机的边界快照，各自看自己的子开关。
-                ApplyHardBounds();
-                // 相机项开启时才压制 FixCameraToBoundaries（其 Update 会关闭 ZoomCamera 并按 boundaryCollider 重算）。
-                SuppressFixCamera(CameraOn);
-                if (_tick % 30 != 0) return;
-                ApplyAllPiecesIgnore();
-                BuildStatus();
+                if (RemoveUI3.WantOn) {
+                    try { RemoveUI3.Tick(scanning); } catch (Exception __ui) { SRApi.Guard.Log("解除UI3/并入", __ui); }
+                }
+                // 解绑本身是幂等写值：扫描阶段每帧一次，之后 4Hz 维持（开销只有几次字段赋值）。
+                if (scanning || _tick % 15 == 0) {
+                    ApplyCursorPiece(true);
+                    OpenSolidWalls(WallsOn);
+                    ApplyHardBounds();
+                    SuppressFixCamera(CameraOn);
+                }
+                if (!scanning && (_tick % 30 == 0)) {
+                    ApplyAllPiecesIgnore();
+                    BuildStatus();
+                }
             } catch (Exception __ex) { SRApi.Guard.Log("关卡边界 Tick", __ex); }
         }
 
-        // 三面实体墙：只在引用缺失时扫场景；两道闸限制扫描次数 —— 换场景清零、单场景累计上限 WallScanMaxTries 后放弃。
+        // 三面实体墙：只在引用缺失时扫场景。
+        // fullSpeed = 扫描阶段：每帧都扫，不节流（用户要求"打开就全速扫"）；
+        // 否则低频维持（场景里后生成的情形兜底）。
         private static int _wallScanTries;
         private static int _wallScanScene = -1;
-        private const int WallScanMaxTries = 20;   // 20 × 5 帧 ≈ 1.7 秒内没找到就放弃（多数关卡没有这三面墙）
+        private const int WallScanMaxTries = 240;   // 全速时约 4 秒；仍找不到就认为本关没有这三面墙
 
-        private static void EnsureWalls() {
+        private static void ResetScanCounters() {
+            _wallScanTries = 0;
+            _wallScanScene = -1;
+            _wallScanAt = -9999;
+        }
+
+        // "扫到了"：三面墙都有引用，或已确认本关没有（扫描次数用尽）。
+        private static bool WallsResolved() {
+            for (int i = 0; i < _wallCol.Length; i++) if (_wallCol[i] == null) return _wallScanTries >= WallScanMaxTries;
+            return true;
+        }
+
+        private static void EnsureWalls(bool fullSpeed = false) {
             bool miss = false;
             for (int i = 0; i < 3; i++) if (_wallCol[i] == null) { miss = true; break; }
             if (!miss) return;
-            // 换场景重新计数（墙对象会重建）。
             int sceneHandle = -1;
-            try { sceneHandle = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle; } catch { sceneHandle = -1; }
+            try { sceneHandle = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle; } catch { /* 静默：取不到场景沿用上次 */ }
             if (sceneHandle != _wallScanScene) { _wallScanScene = sceneHandle; _wallScanTries = 0; }
             if (_wallScanTries >= WallScanMaxTries) return;   //本场景已放弃：它没有这三面墙
-            if (Time.frameCount - _wallScanAt < 5) return;   //独立时钟，5 帧节流
+            if (!fullSpeed && Time.frameCount - _wallScanAt < 15) return;   //维持态才节流
             _wallScanAt = Time.frameCount;
             _wallScanTries++;
-            bool any = false;
             try {
                 // 墙名是已知常量：直接按名查找，避免 FindObjectsOfType<GameObject>() 的
                 // "全场景数组分配 + 数千对象遍历"（进关卡卡顿尖峰的主要来源）。
-                // GameObject.Find 与 FindObjectsOfType 一样只返回 active 对象，语义一致。
                 for (int k = 0; k < SolidWallNames.Length; k++) {
                     if (_wallCol[k] != null) continue;
                     GameObject g = GameObject.Find(SolidWallNames[k]);
                     if (g == null) continue;
                     BoxCollider2D bc = g.GetComponent<BoxCollider2D>();
-                    if (bc != null) { _wallCol[k] = bc; any = true; }
+                    if (bc != null) _wallCol[k] = bc;
                 }
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-            if (!any) { /* 扫不到留待下次：场景可能未加载完，或本关卡没有这三面墙 */ }
         }
 
         // 双向：want=true 置零、false 写回原值；原值记在 _colOrig，Restore 会整体清空。
@@ -765,7 +797,8 @@ public partial class Experiments : ITweak
         // 换场景必须清 _wasOn：其为强引用字典，旧 Renderer 已随场景销毁，原值无意义且会逐场累积。
         private static void Reset() { _hitCount = -1; _scanScene = null; _nextScanAt = 0f; _ui3ScanTries = 0; Note = ""; _wasOn.Clear(); }
 
-        internal static void Tick() {
+        // fullSpeed = 边界扫描阶段：每帧都扫（扫到即停，由 Apply 内部的 _hitCount 控制）。
+        internal static void Tick(bool fullSpeed = false) {
             try {
                 if (_frame == Time.frameCount) return;
                 _frame = Time.frameCount;
@@ -773,11 +806,11 @@ public partial class Experiments : ITweak
                 bool want = WantOn;
                 if (!want) { Restore(); return; }
                 if (!SRApi.GateMaster) { Restore(); return; }
-                Apply();
+                Apply(fullSpeed);
             } catch (Exception __ex) { SRApi.Guard.Log("解除UI3 Tick", __ex); }
         }
 
-        private static void Apply() {
+        private static void Apply(bool fullSpeed = false) {
             try {
                 // 扫描时机：首次 / 换场景立即全扫，之后按 unscaled 时间每 2.5 秒复查一次（覆盖加载后才生成的对象）。
                 string sc = "";
@@ -785,8 +818,10 @@ public partial class Experiments : ITweak
                 float now = Time.unscaledTime;
                 // 次数上限：换场景清零，本场景最多扫 Ui3ScanMaxTries 次（≈15 秒）后放弃，避免无限期全场景扫描。
                 if (sc != _scanScene) { _scanScene = sc; _ui3ScanTries = 0; }
-                if (_hitCount >= 0 && now < _nextScanAt) return;
-                if (_ui3ScanTries >= Ui3ScanMaxTries) return;
+                // 全速阶段：不按 2.5 秒节流；扫到过（_hitCount>0）就直接停。
+                if (_hitCount > 0) return;
+                if (!fullSpeed) { if (_hitCount >= 0 && now < _nextScanAt) return; }
+                if (_ui3ScanTries >= (fullSpeed ? 240 : Ui3ScanMaxTries)) return;
                 _ui3ScanTries++;
                 _nextScanAt = now + 2.5f;
                 Renderer[] all = UnityEngine.Object.FindObjectsOfType<Renderer>();

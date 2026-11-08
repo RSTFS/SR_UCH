@@ -267,8 +267,8 @@ namespace SR_UCH.Tweaks {
             // 两次单页注册的结果是"只剩最后一页、没有页签"——这就是之前"啥也没有"的原因。
             SRApi.RegisterPage(Section, "save", "预设保存", "Save", 10, Render);
             SRApi.RegisterPage(Section, "list", "预设列表", "List", 20, RenderListPage);
+            SRApi.RegisterPageWheel(OnListPageWheel);   // 帧尾兜底：绘制期没取到滚轮时由窗口派发
             // 页面关掉了滚动，列表要自己吃滚轮：只有页面级钩子能在滚动区建立之前拿到事件。
-            SRApi.RegisterPageWheel(OnPresetWheel);
             // 填充页兜底：帧尾若滚轮没被任何控件/钩子消费，直接滚本列表（不依赖命中框）
             // 重载锁自愈：TickReloadLock 写好了却从未注册，等于"超时兜底"根本不存在，
             // 失败路径漏放锁只能等用户再点一次加载（audit 10-P0-2）。
@@ -488,97 +488,10 @@ namespace SR_UCH.Tweaks {
         //   2) 直接读本趟 ScrollWheel 事件（某些环境把 delta 吃掉时兜底）；
         //   3) 都没有就放弃。
         private static int _wheelFallbackFrame = -1;
-        private static float TakePageWheel(Rect box) {
-            try {
-                float w = SRApi.Ctl.WheelPoll("presets.table", box);
-                if (Mathf.Abs(w) > 0.01f) {
-                    // 本帧后续趟（Repaint）不再走兜底：否则 Input.mouseScrollDelta 整帧都有值，
-                    // 一次滚轮会被 Layout 和 Repaint 各应用一次（一格滚两倍）。
-                    _wheelFallbackFrame = Time.frameCount;
-                    return w;
-                }
-                if (_wheelFallbackFrame == Time.frameCount) return 0f;
-                // 本帧已经被别的控件取走（下拉框展开列表、滑块…）：不要再滚列表，
-                // 否则"在表头的下拉框上滚一格，列表也跟着动"。
-                try { if (SRApi.WheelFrame == Time.frameCount) return 0f; } catch { /* 静默：查询失败按未消费处理 */ }
-                Event e = Event.current;
-                if (e == null) return 0f;
-                Vector2 mp = e.mousePosition;
-                bool inside = box.Contains(mp) || SRApi.ContentArea.Contains(mp);
-                if (!inside) return 0f;
-                float d = 0f;
-                try { d = Input.mouseScrollDelta.y; } catch { /* 静默：该环境没有鼠标滚轮轴 */ }
-                if (Mathf.Abs(d) < 0.01f && e.type == EventType.ScrollWheel) {
-                    float raw = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
-                    d = -raw;
-                    if (Mathf.Abs(d) > 0.01f) { try { e.Use(); } catch { /* 静默：事件已被别处消费 */ } }
-                }
-                if (Mathf.Abs(d) < 0.01f) return 0f;
-                _wheelFallbackFrame = Time.frameCount;
-                try { SRApi.MarkWheelUsed(); } catch { /* 静默：非关键路径 */ }
-                return d;
-            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/取滚轮", __ex); return 0f; }
-        }
 
         // 页面级滚轮：鼠标在表格矩形内就把滚轮换算成行滚动（与核心 TableWheelInput 同一套系数）。
+        // 本页最近一次被渲染的帧（新实现用）
         private static int _renderFrame = -1000;   // 本页最近一次被渲染的帧（滚轮钩子只在自己页面上工作）
-        private static bool OnPresetWheel(Vector2 mouse, float wheel) {
-            try {
-                // 页面级滚轮钩子是全局注册的：不判"本页是否可见"的话，离开本页后仍会吃掉别的页面的滚轮。
-                if (Time.frameCount - _renderFrame > 2) return false;
-                // 命中框 = 表格真实矩形（布局坐标转屏幕坐标）：光标在列表里才滚列表，在界面上就交给页面滚动。
-                Rect hitBox = TableScreenBox();
-                if (hitBox.width <= 2f || hitBox.height <= 2f) return false;   // 表格还没画出来：本帧不抢
-
-                // 复用表格自身算出的滚动上限（由真实 rowsH 得出，帧间稳定），与联机列表同一套。
-                // 以前用 ContentArea 高度重算：那是整个右栏，远大于表格行区，maxY 被算成 0，滚轮就死了。
-                if (!hitBox.Contains(mouse)) return false;
-                // 交给统一实现：Shift = 横向滚列，否则竖向滚行；到头返回 false。
-                return ScrollTableBy(wheel);
-            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/页面滚轮", __ex); return false; }
-        }
-
-        // 布局坐标 -> 屏幕坐标：页面布局原点在 BeginArea(winRect+Sc(4))，与 ContentArea 只差"侧栏宽 + 2"。
-        // v2：页面滚动现在真正可用（Render 不再每帧把 PageScroll 清零），BeginScrollView 内容坐标
-        // 比屏幕坐标多一个 -_scroll.y，命中框必须同步减掉，否则滚过页面后滚轮会"点在别的行上"。
-        private static Vector2 LayoutToScreen(Vector2 layout) {
-            try {
-                float offX = SRApi.ContentArea.x - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(2f);
-                float offY = SRApi.ContentArea.y - SRApi.PageScroll.y;
-                return new Vector2(layout.x + offX, layout.y + offY);
-            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/坐标换算", __ex); return layout; }
-        }
-
-        // 表格滚轮：Shift 横向、否则纵向；到头返回 false 让给下一层。页面钩子与区域注册共用。
-        private static bool ScrollTableBy(float wheel) {
-            try {
-                bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-                if (__shift && _maxScrollX > 0f) {
-                    float beforeX = _scrollCols.x;
-                    _scrollCols.x = Mathf.Clamp(_scrollCols.x - wheel * SRApi.Ctl.Sc(60), 0f, _maxScrollX);
-                    return Mathf.Abs(_scrollCols.x - beforeX) > 0.01f;
-                }
-                float maxY = _maxScrollY;
-                if (maxY <= 0f && _rowsHCache > 0f)
-                    maxY = SRApi.Ctl.TableMaxScrollY(VisiblePresets().Count, SRApi.Ctl.TableRowH(), _rowsHCache);
-                if (maxY <= 0f) return false;
-                float before = _scrollRows.y;
-                _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(56), 0f, maxY);
-                _maxScrollY = maxY;
-                return Mathf.Abs(_scrollRows.y - before) > 0.01f;
-            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/表格滚动", __ex); return false; }
-        }
-
-        // 表格矩形（屏幕坐标）：_tableBox 是布局坐标，且 Layout 趟可能还是退化矩形。
-        // private：拆分构建下本文件单独成 DLL，internal 跨程序集不可见；当前也只在本文件使用。
-        private static Rect TableScreenBox() {
-            try {
-                Rect b = _tableBox;
-                if (b.width <= 2f || b.height <= 2f) return b;
-                Vector2 p0 = LayoutToScreen(new Vector2(b.x, b.y));
-                return new Rect(p0.x, p0.y, b.width, b.height);
-            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/表格命中框", __ex); return _tableBox; }
-        }
 
         // 筛选行的标签统一宽度：两行控件的左边缘才能对齐成两列网格。
         // 搜索/筛选区的标签列：比保存区的表单标签窄 1/3（那里是输入框对齐，这里是短标签）
@@ -646,29 +559,6 @@ namespace SR_UCH.Tweaks {
                 RenderSaveImportHeader();
                 CancelPendingOnBlank(pendingBefore);
             } catch (Exception __ex) { SRApi.Guard.Log("渲染布局预设页", __ex); }
-        }
-
-        // ================= 页面二：预设列表（筛选 + 工具行 + 列表） =================
-        // 结构照联机列表：页面自身不滚（NoPageScrollBars），列表占满剩余高度，只有列表自己滚。
-        private static void RenderListPage() {
-            try {
-                _renderFrame = Time.frameCount;
-                SRApi.NoPageScrollBars = true;    // 填充模式
-                EnsureLoaded();
-                EnsureCols();
-                string pendingBefore = _pendingKey;
-
-                RenderFilterHeader();
-                RenderListToolbar();
-                ApplyFilterChange();
-
-                _actionHitThisFrame = false;
-                SRApi.Ctl.SetTableHighlight(_search ?? "");   // 搜索命中在表格里高亮
-                // 表格几何在 RenderPresetTable 内部一次算出（唯一真值 = 页面内容底界）。
-                RenderPresetTable(VisiblePresets());
-                DrawInlineRename();
-                CancelPendingOnBlank(pendingBefore);
-            } catch (Exception __ex) { SRApi.Guard.Log("渲染预设列表页", __ex); }
         }
 
         // 头部一：保存 / 导入 / 导出（固定 3 行）
@@ -1060,171 +950,6 @@ namespace SR_UCH.Tweaks {
                     _renameKey = null; _renameText = null;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/内联重命名", __ex); }
-        }
-
-        // 标准表格：核心 TableDraw 负责表头/行/拖列宽/换列位/钉住操作列；本页只提供列定义、单元格文本与操作按钮。
-        // 预设列表（填充模式）：几何只算一次。
-        // 以前是"探针 → 表格矩形 → 屏幕实测夹一次 → 再按 box.y 修正一次"，四次测量互相覆盖，
-        // 任一数算错就表现为 maxY 与实际可视高度脱节（列表滚不到底 / 表体伸到底栏下面）。
-        // 现在的唯一真值：页面内容底界 SRApi.PageContentBottom（布局坐标系，与表格矩形同坐标系）。
-        //   表格高 = 底界 − 表格顶
-        //   行区   = 表格高 − 表头
-        //   maxY   = 条目总高 − 行区           ← 条目总高远大于界面高时 maxY 自然很大，能滚到底
-        private static void RenderPresetTable(List<PresetInfo> visible) {
-            // 控件创建全部在 try 之外：Layout / Repaint 两趟必须创建同样多的控件。
-            Rect probe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
-            float rowH = SRApi.Ctl.TableRowH();
-            float headerH = SRApi.Ctl.TableHeaderH();
-            float minH = headerH + rowH * 2f;
-            // 底界只用"右栏高度 − 底栏"这一条纯尺寸算（和 probe.y 同坐标系，且不依赖任何页面状态）：
-            //   ContentArea.y 就是 BeginArea 的原点，所以 localY = screenY − ContentArea.y。
-            // 之前用 SRApi.PageContentBottom，一旦那个值算偏（多算/少算都会）就会出现
-            // "表格比可视区高 → maxY 变成 0 → 列表滚不动"。
-            float __bottomLocal = SRApi.ContentArea.height - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);
-            if (__bottomLocal <= minH) __bottomLocal = Mathf.Max(minH, SRApi.PageContentBottom);
-            float tableH = Mathf.Max(minH, __bottomLocal - probe.y);
-            Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true),
-                GUILayout.Height(tableH));
-            float rowsH = SRApi.Ctl.TableRowsH(tableH, headerH);
-            try {
-                _visibleCache = visible;   // 悬浮预览按行号取预设时用（与 RowCells 同一份列表）
-                EnsureCols();
-                // 操作列宽始终跟随当前语言的按钮文字：语言热切换后也能立刻避免英文标签被截断。
-                // 操作列：默认按按钮文字实测，但最多占表格宽度的 30%（窗口变窄时不会把数据列挤没）
-                _colW[ColAction] = Mathf.Min(DefaultActionColW(), Mathf.Max(SRApi.Ctl.Sc(96f), box.width * 0.30f));
-                if (_args == null) _args = new SRApi.TableArgs();
-                float pinW = SRApi.Ctl.Sc(_colW[ColAction]);
-                // 有纵向溢出时，在数据区与钉住列之间预留滚动条宽度（与联机列表一致）。
-                // 滚动条已全局隐藏（SR.Table.HideTableScrollbars），这里也不再为它留宽度：
-                // 数据区直接吃满到钉住列，右侧不再空一条。
-                float __sbW = 0f;
-
-                float __pinMax = Mathf.Max(SRApi.Ctl.Sc(40f), box.width - SRApi.Ctl.Sc(80f));
-                if (pinW > __pinMax) pinW = __pinMax;
-                float stripW = Mathf.Max(0f, box.width - pinW - __sbW);
-                // 列策略（对齐 ImGui 的 WidthStretch）：名称列做"拉伸列"——先把其他可见固定列
-                // 的宽度扣掉，剩下的全给它（下限 80 设计单位）。这样窗口宽时不留空、窗口窄时
-                // 其他列溢出并自动出现横向滚动；用户拖名称列宽会被下一帧重新拉伸（与 ImGui 一致：
-                // 拉伸列不单独可调）。
-                // 列宽完全按持久化配置（用户要求：表头宽度固定，不再做"拉伸列"每帧重算）。
-                if (_drawW == null || _drawW.Length != _colW.Length) _drawW = new float[_colW.Length];
-                System.Array.Copy(_colW, _drawW, _colW.Length);
-                float totalW = 0f;
-                for (int i = 0; i < _order.Length; i++) {
-                    int ci = _order[i];
-                    if (ci == ColAction) continue;
-                    if (_hiddenCols.Contains(ci)) continue;   // 隐藏列不占宽度（否则能横向滚进空白）
-                    totalW += SRApi.Ctl.Sc(_drawW[ci]);
-                }
-                _maxScrollX = Mathf.Max(0f, totalW - stripW);
-                _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
-                _rowsHCache = rowsH;   // 缓存真实行区高：滚轮钩子在首帧/刚切页时用它兜底
-                _maxScrollY = SRApi.Ctl.TableMaxScrollY(visible.Count, rowH, rowsH);
-                // 滚轮：本页只有列表一个滚动目标，所以"指针在右栏里"就滚列表（与联机列表同一手感），
-                // 不再依赖命中框坐标换算。先滚、再把 scrollY 交给绘制，同一帧就能看到位移。
-                float __wheel = TakePageWheel(box);
-                if (Mathf.Abs(__wheel) > 0.01f) {
-                    float __before = _scrollRows.y;
-                    _scrollRows.y = Mathf.Clamp(_scrollRows.y - __wheel * SRApi.Ctl.Sc(56f), 0f, _maxScrollY);
-                    if (Mathf.Abs(_scrollRows.y - __before) < 0.01f && _maxScrollY > 0f) _scrollRows.y = __before;
-                }
-                _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _maxScrollY);
-                Event e = Event.current;
-                Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
-                _args.box = box;
-                _args.rowsClip = new Rect(box.x, box.y + headerH, stripW, rowsH);
-                _args.headerH = headerH;
-                _args.rowH = rowH;
-                _args.rowsH = rowsH;
-                _args.stripW = stripW;
-                _args.colW = _drawW;
-                _args.vis = _vis;
-                _args.rowCount = visible.Count;
-                _args.pinCol = ColAction;
-                _args.alignLeftCol = ColName;
-                _args.scrollX = _scrollCols.x;
-                _args.scrollY = _scrollRows.y;
-                _args.mp = mp;
-                _args.pinW = pinW;
-                _args.pinX = box.x + stripW;
-                _args.pinTitle = SRApi.T("操作", "Actions");
-                _args.drawHeader = true;
-                _args.headerLeft = false;
-                _args.title = delegate(int ci) { return ColumnTitle(ci); };
-                _args.tip = ColumnTip;
-                _args.rowCells = delegate(int r) { return RowCells(visible, r); };
-                _args.rowSelected = null;
-                _args.rowAlpha = null;
-                _args.resizable = true;
-                _args.reorderable = true;
-                _args.order = _order;
-                _args.applyOrder = delegate(int[] o) {
-                    _order = o;
-                    SaveCols();
-                    try { SRApi.LogInfo("[布局预设] 列序更新: " + JoinInts(_order)); } catch (Exception) { }
-                };
-                _args.saveOrder = delegate { SaveCols(); };
-                _args.saveWidths = delegate {
-                    SaveCols();
-                    try { SRApi.LogInfo("[布局预设] 列宽更新: " + JoinFloats(_colW)); } catch (Exception) { }
-                };
-                _args.hidden = _hiddenCols;
-                _args.hideable = true;
-                _args.resetAll = delegate { ResetTable(); };
-                _args.defaultColW = DefColW;   // 交给核心：Shift+右键时列宽一并还原到默认值
-                _args.click = delegate(int ci) {
-                    if (ci != ColLevel) return;
-                    _levelShowCode = !_levelShowCode;
-                    try { SRApi.LogInfo("[布局预设] 关卡列显示: " + (_levelShowCode ? "代码" : "名称")); } catch (Exception) { }
-                };
-                _args.sortCol = -1;
-                _args.headerCells = _headerCells;
-                _args.headerCols = _headerCols;
-                _args.rowRects = _rowRects;
-                _args.rowRows = _rowRows;
-                _args.pinRects = _pinRects;
-                _args.pinRows = _pinRows;
-                _args.pinDraw = delegate(int row, Rect r, int visibleIdx) { DrawActionButtons(visible, row, r); };
-                _args.emptyHint = delegate {
-                    return _presets.Count == 0
-                        ? SRApi.T("还没有预设：在「保存与导入」区保存当前布局，或从剪贴板 / 文件导入。", "No presets yet: use the Save & Import section to save the current layout, or import from clipboard / file.")
-                        : SRApi.T("没有匹配当前搜索的预设。", "No presets match the current search.");
-                };
-                _hiddenBeforeTable = _hiddenCols.Count;
-                _tableBox = box;      // 供页面级滚轮钩子命中判定
-                SRApi.TableDraw(_args);
-                // 拖列宽的结果在 _drawW 里（核心直接改传进去的数组）：除拉伸列外同步回持久化宽度
-                for (int i = 0; i < _colW.Length && i < _drawW.Length; i++) {
-                    if (i == ColName) continue;
-                    if (Mathf.Abs(_colW[i] - _drawW[i]) > 0.01f) _colW[i] = _drawW[i];
-                }
-                HandlePresetCells();   // 数据列：悬浮预览 / 左键切三态 / 右键开界面；名称列：右键重命名
-                // 不画底边拖拽条：预设列表不需要手动调高（整块区域就是列表）。
-                // 竖向滚动条：几何、绘制、输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
-                _sbHandled = false;   // 页面滚动模式：不画内部滚动条
-                if (_sbGrabY < 0f) _sbGrabY = 0f;   // 保留状态字段（滚动条只在联机页用）
-                if (_hiddenCols.Count > _hiddenBeforeTable) {
-                    // 核心在右键表头时把列加进 hidden 集合；这里落盘持久化（Shift+右键清空由 resetAll 回调处理）。
-                    SaveCols();
-                    SRApi.LogInfo("[布局预设] " + SRApi.T("已隐藏列（Shift+右键表头可恢复全部列）", "Column hidden (Shift+right-click the header to restore all columns)"));
-                }
-
-                if (e != null) {
-                    // 拖拽兜底复位（拖列宽 / 换列位由核心处理，这里只接住状态与落盘回调）。
-                    SRApi.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _args.moveCol, ref _args.moveDx,
-                        ref _args.dragCol, ref _dragH, SaveCols, null, null);
-                    if (!_sbHandled)
-                        SRApi.TableWheelInput(e, box, mp, _maxScrollX, _maxScrollY, ref _scrollCols, ref _scrollRows);
-                    // 已删除 Input.GetAxis("Mouse ScrollWheel") 兜底：
-                    // 页面级钩子 OnPresetWheel 在 BeginScrollView 之前已处理滚轮并 e.Use()，
-                    // 把事件改成 Used 后 TableWheelInput 会自动跳过；但 GetAxis 是"每帧轮询"，
-                    // 既不检查事件类型也不检查 WheelTakenThisFrame，会在同一帧再滚一次（40 + 0.1*400）。
-                    // 结果就是一次滚轮滚两行、手感发飘。现在滚轮只有页面钩子一个入口。
-                    if (e.type == EventType.MouseUp) SRApi.BlockWindowDrag = false;
-                }
-            } catch (Exception __ex) {
-                SRApi.Guard.Log("布局预设/表格绘制", __ex);
-            }
         }
 
         // Shift+右键表头：核心还原列宽并清空隐藏列后回调这里，再补一次"列序 + 列宽 + 隐藏"的整表还原并落盘。

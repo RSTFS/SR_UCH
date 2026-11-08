@@ -66,6 +66,7 @@ Features\Experiments.cs
 Features\Experiments.Bounds.cs
 Features\Experiments.Misc.cs
 Features\Experiments.Scene.cs
+Features\BuildingPresets.List.cs
 Features\BuildingPresets.cs
 Features\BuildingPresets.Mods.cs
 Features\BuildingPresets.Load.cs
