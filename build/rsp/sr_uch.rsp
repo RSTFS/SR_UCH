@@ -61,7 +61,6 @@ Features\Online.LobbyList.cs
 Features\Online.Join.cs
 Features\Online.Watchdog.cs
 Features\FreePlay.Grid.cs
-Features\FreePlay.Self.Collision.cs
 Features\FreePlay.Self.cs
 Features\FreePlay.cs
 Features\Experiments.cs

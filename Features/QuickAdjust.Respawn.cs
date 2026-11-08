@@ -1,6 +1,4 @@
 // 快速调整 · 重生延迟（自由模式/挑战）。
-// 参考 RespawnControl：改死亡计时阈值，由游戏自己按这个时间重生。
-// 从 QuickAdjust.cs 拆出来只为控制单文件规模，行为不变。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
