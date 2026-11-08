@@ -143,6 +143,21 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
    `SRApi.Ctl.TableRowsH / TableMaxScrollY`，已有单测覆盖），不得在 `tableH` 被修正前先算一次。
 4. **模式门控只失效、不灰显**：功能始终显示，非允许模式下不执行（自由模式页、仅挑战的重试类功能）。
 5. **不自作主张加诊断日志**：需要日志先经用户同意。
+6. **模式限制必须能被 EX「超级模式」无视**（用户硬性要求，之后新增功能一律照此执行）：
+   功能层**只准**用 `SRApi.GateModeAllows(mask)` 做模式判定，它内部先看 `IgnoreModeLimit`
+   （EX 的「超级模式」通过 `SRApi.RegisterModeOverride` 登记，见 `ExModule.Core`），命中豁免就直接放行。
+   禁止在功能层直接读 `GameSettings.GameMode == GameState.GameMode.XXX` 做门控——那样超级模式对它无效。
+   纯显示用途（如 HUD 用"重试/回合"字样）可以读模式，但不得据此决定功能是否生效。
+7. **所有文本标签底部额外 1px 缓冲**（用户硬性要求）：样式侧由 `SR.Styles.AddBottomBuffer` 在
+   `EnsureStyles()` 末尾**遍历 `_styleList` 全部样式**统一加（不要再手工挑样式，新加的会漏）；
+   按文字算高的地方（`SRApi.Ctl.LabelAuto`）高度也 +`Sc(1)`。
+8. **同一帧内 Layout / Repaint 必须做同样的决定**：凡是会进入/退出布局组的状态
+   （`NoPageScrollBars` → `BeginScrollView`），一帧只锁存一次（`SR.Window.ScrollViewLatchedForThisFrame`）。
+   页面是在渲染过程中才声明它的，逐趟重读会让两趟的滚动区进出不配对，
+   直接抛 `Getting control N's position in a group with only N controls`。
+9. **"按在控件上"的手势标记必须在 MouseDown 趟末尾记录**（`SR.Window` 的 `_downOnControl`）：
+   控件是在页面绘制时才置 `BlockWindowDrag` 的，而拖窗口判定在页面之前；
+   滑块/输入框/表格都要在按下时置 `BlockWindowDrag`，否则拖它们会把整块面板一起拖走。
 
 ### 4.3d 列表滚动上限（maxY / maxX）的完整算法### 4.3d 列表滚动上限（maxY / maxX）的完整算法
 
@@ -170,7 +185,9 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
 3) contentH= N × rowH
 4) maxY    = max(0, contentH − rowsH)                 // 只有内容高于行区时才需要滚
 5) y       = clamp(y + Δ, 0, maxY)                    // Δ = −滚轮值 × rowH
-6) 可见行区间 = [ floor(y / rowH) ,  floor((y + rowsH) / rowH) ]
+6) 可见行区间 = [ floor(y / rowH) ,  ceil((y + rowsH) / rowH) ]   // 末尾半行也要画（再按 rowCount 夹取）
+7) 预设列表 / 联机列表**都必须**用这一套：唯一真值 bodyBottom，禁止再写"屏幕底 / 页面视口"
+   等第二套算法去夹取；也禁止 maxY 里额外 +rowH（会滚过表尾，只剩空表体）。
 ```
 
 横向同理：`maxX = max(0, totalW − stripW)`。

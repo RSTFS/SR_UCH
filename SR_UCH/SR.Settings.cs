@@ -1130,7 +1130,16 @@ public partial class SR {
                 _sliderNative.normal.background = null;
                 _sliderNativeThumb.normal.background = null;
             }
+            // 滑块的按下/拖动必须阻止窗口拖拽：HorizontalSlider 只认 hotControl，不会置
+            // BlockWindowDrag，于是拖滑块的同时整块面板跟着鼠标跑（用户反馈）。
+            try {
+                Event __se = Event.current;
+                if (__se != null && (__se.type == EventType.MouseDown || __se.type == EventType.MouseDrag)
+                    && __se.button == 0 && rect.Contains(__se.mousePosition)) BlockWindowDrag = true;
+            } catch (Exception __bd) { Guard.Log("滑块/禁止拖窗口", __bd); }
             float raw = GUI.HorizontalSlider(rect, value, min, max, _sliderNative, _sliderNativeThumb);
+            try { if (GUIUtility.hotControl != 0 && rect.Contains(Event.current.mousePosition)) BlockWindowDrag = true; }
+            catch (Exception __hc) { Guard.Log("滑块/热控件", __hc); }
 
             //按调用方给的 step 量化；step<=0 时才按整数取整（大跨度下取整会表现为拖不动）。
             float nv = raw;

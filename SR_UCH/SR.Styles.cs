@@ -210,6 +210,9 @@ public partial class SR {
         EnsureStylesSliderChrome();
         EnsureStylesCursors();
         // 所有文本样式统一加 1px 底部缓冲（只影响文字绘制区域，不改变控件高度）
+        // 规则（写进 DESIGN）：任何承载文字的样式，padding.bottom 至少 1px；
+        // 以前是手工挑几条样式加，新加的样式会漏，表现为"有的标签还是贴着下边"。
+        for (int __si = 0; __si < _styleList.Count; __si++) AddBottomBuffer(_styleList[__si]);
         AddBottomBuffer(_label); AddBottomBuffer(_labelWrap); AddBottomBuffer(_selItem);
         AddBottomBuffer(SR.Ctl.LabelClip); AddBottomBuffer(SR.Ctl.LabelClipCenter); AddBottomBuffer(SR.Ctl.SecHeaderCenter);
         AddBottomBuffer(_secHeader); AddBottomBuffer(_btn); AddBottomBuffer(_frame);

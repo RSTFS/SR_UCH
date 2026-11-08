@@ -63,13 +63,13 @@ public partial class Experiments : ITweak
         private static ConfigEntry<float> _followSpeed;
     
         private static void SelfReg2() {
-            SRApi.LocKey("Experiments", "Free Camera", "自由相机", null);
-            SRApi.LocDesc("Experiments", "Free Camera", "自由相机\n开启后可用滚轮缩放视野\n菜单与暂停界面不生效", "Free camera\nwheel zoom for the field of view\nnot applied in menus or the pause screen");
-            SRApi.LocKey("Experiments", "Free Camera FOV", "视野大小", null);
-            SRApi.LocDesc("Experiments", "Free Camera FOV", "自由相机视野\n越小越近，越大越远\n范围 1-64；自由相机开启时滚轮也会改", "Free camera FOV\nsmaller is closer, larger is farther\n1-64; the wheel also changes it while on");
+            SRApi.LocKey("自由模式", "Free Camera", "自由相机", null);
+            SRApi.LocDesc("自由模式", "Free Camera", "自由相机\n开启后可用滚轮缩放视野\n菜单与暂停界面不生效", "Free camera\nwheel zoom for the field of view\nnot applied in menus or the pause screen");
+            SRApi.LocKey("自由模式", "Free Camera FOV", "视野大小", null);
+            SRApi.LocDesc("自由模式", "Free Camera FOV", "自由相机视野\n越小越近，越大越远\n范围 1-64；自由相机开启时滚轮也会改", "Free camera FOV\nsmaller is closer, larger is farther\n1-64; the wheel also changes it while on");
             // 必须登记 LocKey/LocDesc，否则界面回退显示英文键名。
-            SRApi.LocKey("Experiments", "Free Camera Speed", "相机移动速度", null);
-            SRApi.LocDesc("Experiments", "Free Camera Speed", "相机跟随速度\n相机跟随角色的快慢\n范围 0.5-5，步长 0.5", "Camera follow speed\nhow fast the camera follows the character\n0.5-5 in steps of 0.5");
+            SRApi.LocKey("自由模式", "Free Camera Speed", "相机移动速度", null);
+            SRApi.LocDesc("自由模式", "Free Camera Speed", "相机跟随速度\n相机跟随角色的快慢\n范围 0.5-5，步长 0.5", "Camera follow speed\nhow fast the camera follows the character\n0.5-5 in steps of 0.5");
             SRApi.LocKey("Experiments", "Free Camera Key", "视野快捷键", null);
             SRApi.LocDesc("Experiments", "Free Camera Key", "自由相机按键\n按下开关自由相机\n可改绑，支持组合键", "Free camera key\ntoggles the free camera\nrebindable, combos supported");
             SRApi.RowSliders.Add(FovSlider);                       // FOV 用滑块渲染

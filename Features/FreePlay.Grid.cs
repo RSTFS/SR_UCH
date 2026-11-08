@@ -1,138 +1,95 @@
-// 自由模式 · 其它 → 地图网格：在世界空间画一张一直可见的网格（早期 EX 有、后来被删掉的功能）。
-// 游戏本体没有网格类，所以这里自己画：相机后处理阶段用 GL.LINES 画线，按距离淡出。
+// 自由模式 · 其它 → 地图网格：让游戏自带的建造网格（Graphpaper）在行动阶段也保持显示。
+// 旧版（SR_UCH-SR_UCH.zip / Experiments.cs）就是这么做的，稳定可用：
+//   1) prefix 掉 Graphpaper.disableGrid（游戏进 PLAY 阶段时调用它把网格淡出）；
+//   2) 开关变化时对场景里所有 Graphpaper 直接 enableGrid / disableGrid，做到随开随关。
+// 之前那版自己用 GL.LINES 画了一张世界网格，实测无效（不跟随关卡网格、且 OnPostRender 时常不触发），
+// 已整块删除，改为复用游戏自己的网格对象。
 
 using System;
+using System.Collections.Generic;
 using BepInEx.Configuration;
+using HarmonyLib;
 using SR_UCH.Tweaks;
 using UnityEngine;
 
 namespace SR_UCH {
-    [SrFeature("sr.freeplay.grid", "FreePlayGrid", "1.0")]
+    [SrFeature("sr.freeplay.grid", "FreePlayGrid", "2.0")]
     public class FreePlayGrid : ITweak {
         private const string Sec = "自由模式";
         private static ConfigEntry<bool> _alwaysOn;
-        private static ConfigEntry<float> _maxAlpha;
-        private static ConfigEntry<float> _fadeTime;
-        private static ConfigEntry<Color> _color;
-        private static SRGridRenderer _renderer;
+        private static bool _lastOn;
+
+        // 功能是否正在生效（patch 与 Tick 共用的唯一判据）。
+        internal static bool Active {
+            get {
+                try { return SRApi.GateMaster && _alwaysOn != null && _alwaysOn.Value; }
+                catch { return false; }
+            }
+        }
 
         public void Initialize(IFeatureHost plugin) {
             try {
                 SRApi.LocKey(Sec, "Grid Always On", "常显网格", "Always show grid");
                 SRApi.LocDesc(Sec, "Grid Always On",
-                    "常显网格\n自由模式下一直显示地面网格（便于对齐摆放）\n仅自由模式生效",
-                    "Always show grid\nalways draws a ground grid in freeplay\nfreeplay only");
-                SRApi.LocKey(Sec, "Grid Max Alpha", "网格亮度", "Grid max alpha");
-                SRApi.LocDesc(Sec, "Grid Max Alpha", "网格亮度\n最近处的格线不透明度\n调低更不挡视线", "Grid max alpha\nopacity of the nearest grid lines\nlower keeps the view clear");
-                SRApi.LocKey(Sec, "Grid Fade Time", "网格淡出距离", "Grid fade distance");
-                SRApi.LocDesc(Sec, "Grid Fade Time", "网格淡出距离\n离相机越远越淡，到该距离归零\n单位：米", "Grid fade distance\nlines fade out with distance from the camera\nunit: metres");
-                SRApi.LocKey(Sec, "Grid Refresh Color", "网格颜色", "Grid colour");
-                SRApi.LocDesc(Sec, "Grid Refresh Color", "网格颜色\n格线颜色（含透明度）\n建议用低透明度避免挡视线", "Grid colour\nline colour including alpha\nkeep the alpha low so it does not hide the level");
+                    "常显网格\n行动状态下也显示建造网格（游戏默认只在建造阶段显示）\n随开随关：开启立即淡入，关闭立即淡出",
+                    "Always show grid\nkeeps the build grid visible during the play phase (vanilla shows it while building only)\ntakes effect immediately when toggled");
 
-                _alwaysOn = plugin.Config.Bind(Sec, "Grid Always On", false, "自由模式下一直显示地面网格。");
-                _maxAlpha = plugin.Config.Bind(Sec, "Grid Max Alpha", 0.35f, "最近处的格线不透明度（0-1）。");
-                _fadeTime = plugin.Config.Bind(Sec, "Grid Fade Time", 30f, "格线淡出距离（米）：离相机越远越淡。");
-                _color = plugin.Config.Bind(Sec, "Grid Refresh Color", new Color(1f, 1f, 1f, 0.5f), "格线颜色。");
+                _alwaysOn = plugin.Config.Bind(Sec, "Grid Always On", false, "常显网格：行动状态下也显示建造网格。");
+                _lastOn = _alwaysOn.Value;
+                // 本功能的补丁单独注册（CreateAndPatchAll 不递归发现独立类型）；
+                // 目标失效只丢本功能，不影响后面的 Tick 注册。
+                try { Harmony.CreateAndPatchAll(typeof(GridKeepOnPatch), (string)null); }
+                catch (Exception __p) { SRApi.LogWarn("地图网格/补丁跳过（Graphpaper.disableGrid 不存在）: " + __p.Message); }
                 SRApi.RegisterTick("自由模式-地图网格", Tick);
             } catch (Exception __ex) { SRApi.Guard.Log("地图网格/初始化", __ex); }
         }
 
-        // 每帧：只在"自由模式 + 总开关 + 本开关"都成立时挂渲染器，否则卸掉（零开销）
+        // 随开随关 + 换场景后补回：游戏自己的阶段事件会在换关时把网格收掉，这里只做"应开则开"。
         private static void Tick() {
             try {
-                bool want = SRApi.GateMaster && _alwaysOn != null && _alwaysOn.Value
-                    && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay);
-                if (want) {
-                    if (_renderer == null) _renderer = SRGridRenderer.Attach();
-                    if (_renderer != null) {
-                        _renderer.enabled = true;
-                        _renderer.Alpha = Mathf.Clamp01(_maxAlpha != null ? _maxAlpha.Value : 0.35f);
-                        _renderer.Fade = Mathf.Max(2f, _fadeTime != null ? _fadeTime.Value : 30f);
-                        _renderer.LineColor = _color != null ? _color.Value : new Color(1f, 1f, 1f, 0.5f);
-                    }
-                } else if (_renderer != null) {
-                    _renderer.enabled = false;
-                }
+                if (_alwaysOn == null) return;
+                bool on = Active;
+                bool changed = on != _lastOn;
+                _lastOn = on;
+                if (on) ApplyToAll(true);
+                else if (changed) ApplyToAll(false);   // 只在"刚关掉"时收一次，之后交回游戏自己控制
             } catch (Exception __ex) { SRApi.Guard.Log("地图网格/每帧", __ex); }
         }
 
-        // 自由模式页「其它」子页：只渲染这几行设置。
+        private static void ApplyToAll(bool enable) {
+            try {
+                Graphpaper[] all = UnityEngine.Object.FindObjectsOfType<Graphpaper>();
+                if (all == null) return;
+                for (int i = 0; i < all.Length; i++) {
+                    Graphpaper gp = all[i];
+                    if (gp == null) continue;
+                    try {
+                        if (enable) gp.enableGrid();
+                        else gp.disableGrid();
+                    } catch (Exception __one) { SRApi.Guard.Log("地图网格/单个网格", __one); }
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("地图网格/应用", __ex); }
+        }
+
+        // 自由模式页「其它」子页：只渲染这一行。
         internal static void RenderOtherPage() {
             try {
                 SRApi.Ctl.SectionTitle(SRApi.T("- 地图网格 -", "- Map grid -"));
                 SRApi.Ctl.LabeledRow(SRApi.T("常显网格", "Always show grid"),
-                    SRApi.T("自由模式下一直显示地面网格\n仅自由模式生效", "always draw a ground grid in freeplay\nfreeplay only"), _alwaysOn);
+                    SRApi.T("行动状态下也显示建造网格\n随开随关：开启立即淡入，关闭立即淡出",
+                        "keeps the build grid visible during the play phase\ntakes effect immediately when toggled"),
+                    _alwaysOn);
             } catch (Exception __ex) { SRApi.Guard.Log("地图网格/渲染", __ex); }
         }
     }
 
-    // 挂在主相机上：OnPostRender 里用 GL 画世界空间格线（内置渲染管线，UCH 就是内置管线）。
-    public class SRGridRenderer : MonoBehaviour {
-        public float Alpha = 0.35f;
-        public float Fade = 30f;
-        public Color LineColor = Color.white;
-        private Material _mat;
-        private static SRGridRenderer _inst;
-
-        internal static SRGridRenderer Attach() {
-            try {
-                if (_inst != null) return _inst;
-                Camera cam = Camera.main;
-                if (cam == null) return null;
-                SRGridRenderer r = cam.gameObject.GetComponent<SRGridRenderer>();
-                if (r == null) r = cam.gameObject.AddComponent<SRGridRenderer>();
-                _inst = r;
-                r.enabled = false;
-                return r;
-            } catch (Exception __ex) { SRApi.Guard.Log("地图网格/挂载", __ex); return null; }
-        }
-
-        private void OnPostRender() {
-            try {
-                if (_mat == null) {
-                    Shader sh = Shader.Find("Hidden/Internal-Colored");
-                    if (sh == null) return;
-                    _mat = new Material(sh);
-                    _mat.hideFlags = HideFlags.HideAndDontSave;
-                    _mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                    _mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                    _mat.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-                    _mat.SetInt("_ZWrite", 0);
-                }
-                Camera cam = Camera.main;
-                if (cam == null) return;
-                Vector3 center = cam.transform.position;
-                float radius = Mathf.Max(8f, Fade);
-                float step = 1f;
-                _mat.SetPass(0);
-                GL.PushMatrix();
-                GL.Begin(GL.LINES);
-                int n = Mathf.CeilToInt(radius / step);
-                for (int i = -n; i <= n; i++) {
-                    float off = i * step;
-                    for (int seg = -n; seg < n; seg++) {
-                        float a0 = seg * step, a1 = (seg + 1) * step;
-                        // 两条正交方向的线段，按距相机的水平距离淡出
-                        AddLine(center, off, a0, off, a1, radius);
-                        AddLine(center, a0, off, a1, off, radius);
-                    }
-                }
-                GL.End();
-                GL.PopMatrix();
-            } catch (Exception __ex) { SRApi.Guard.Log("地图网格/绘制", __ex); }
-        }
-
-        private void AddLine(Vector3 c, float x0, float z0, float x1, float z1, float radius) {
-            Vector3 p0 = new Vector3(c.x + x0, 0.02f, c.z + z0);
-            Vector3 p1 = new Vector3(c.x + x1, 0.02f, c.z + z1);
-            float d = Vector3.Distance(new Vector3(c.x, 0f, c.z), new Vector3(p0.x, 0f, p0.z));
-            float a = Mathf.Clamp01(1f - d / radius) * Alpha;
-            if (a <= 0.004f) return;
-            Color col = LineColor;
-            col.a = Alpha * a;
-            GL.Color(col);
-            GL.Vertex3(p0.x, p0.y, p0.z);
-            GL.Vertex3(p1.x, p1.y, p1.z);
+    // 游戏进入行动阶段时会调用 Graphpaper.disableGrid() 把网格淡出；开启常显网格后跳过它。
+    [HarmonyPatch(typeof(Graphpaper), "disableGrid")]
+    internal static class GridKeepOnPatch {
+        [HarmonyPrefix]
+        private static bool Prefix() {
+            try { return !FreePlayGrid.Active; }
+            catch { return true; }
         }
     }
 }

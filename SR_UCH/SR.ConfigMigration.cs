@@ -717,10 +717,11 @@ namespace SR_UCH.Tweaks {
             text = MoveKeyBetweenSections(text, "Experiments", "自由模式", "Free Camera FOV");
             text = MoveKeyBetweenSections(text, "Experiments", "自由模式", "Free Camera Speed");
             // 地图网格移入 SR 的"自由模式"段（早期在 [EX]/[Freeplay]）：搬值保证老配置继续生效。
+            // 2.0 起改回"复用游戏自带的 Graphpaper"，只保留「常显网格」一个开关——
+            // 亮度/淡出距离/颜色三个键随自制网格一起删除，老配置里的残留值在这里清掉。
             text = MoveKeyBetweenSections(text, "EX", "自由模式", "Grid Always On");
-            text = MoveKeyBetweenSections(text, "EX", "自由模式", "Grid Max Alpha");
-            text = MoveKeyBetweenSections(text, "EX", "自由模式", "Grid Fade Time");
-            text = MoveKeyBetweenSections(text, "EX", "自由模式", "Grid Refresh Color");
+            text = RemoveKeys(text, "自由模式", new[] { "Grid Max Alpha", "Grid Fade Time", "Grid Refresh Color" });
+            text = RemoveKeys(text, "EX", new[] { "Grid Max Alpha", "Grid Fade Time", "Grid Refresh Color" });
             // 「死亡无计分板」功能已删除：清掉它的遗留键。
             text = RemoveKeys(text, "Quick Adjust", new[] { "No Death Scoreboard" });
             text = RemoveKeys(text, "Freeplay", new[] { "Grid Always On", "Grid Max Alpha", "Grid Fade Time", "Grid Refresh Color" });
@@ -735,9 +736,7 @@ namespace SR_UCH.Tweaks {
                     text = MoveComboEntry(text, "EX", "Level", "Close Party Box Key");
                 // 地图网格的界面与代码都在 EX：段名从 [Freeplay] 改为 [EX]。
                 text = MoveKeyBetweenSections(text, "Freeplay", "EX", "Grid Always On");
-                text = MoveKeyBetweenSections(text, "Freeplay", "EX", "Grid Max Alpha");
-                text = MoveKeyBetweenSections(text, "Freeplay", "EX", "Grid Fade Time");
-                text = MoveKeyBetweenSections(text, "Freeplay", "EX", "Grid Refresh Color");
+                text = RemoveKeys(text, "Freeplay", new[] { "Grid Max Alpha", "Grid Fade Time", "Grid Refresh Color" });
                 // [Reflection] 段只剩一个内部迁移标记，并入隐藏的 [Internal]。
                 text = MoveKeyBetweenSections(text, "Reflection", "Internal", "P Suicide Migrated");
                 // 已删功能：可动方块力度、放置形态（[CC] 段），以及 Online 段里删掉的两个筛选。

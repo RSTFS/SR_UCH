@@ -134,7 +134,6 @@ namespace SR_UCH.Tweaks {
         private static Vector2 _scrollCols;   // 诊断：每帧只记一次滚轮事件
         private static Rect _tableBox;     // 表格在屏幕上的矩形（页面级滚轮钩子按它判断是否滚表格）
         private static float _rowsHCache;   // 表格真实行区高度（滚轮钩子兜底用）
-        private static float _tableTopY, _tableHCache;   // 诊断：表格顶（屏幕）与高度
         private static float _maxScrollX;
         private static float _maxScrollY;
         private static bool _sbDragging;
@@ -479,7 +478,6 @@ namespace SR_UCH.Tweaks {
         // 同一页按 SectionTitle 分保存 / 导入导出 / 搜索排序筛选 / 预设列表四个区；页面滚动保留，表格另有一套自己的滚轮（页面级钩子 + 表格内处理）。
         // 预设列表在固定高度区域内用自己的滚轮滚动。
         // 页面内容在布局空间里的起点 y（零高度探针），用于计算表格上方已用高度（同联机列表）。
-        private static float _pageTopY;
 
         // 页面级滚轮：鼠标在表格矩形内就把滚轮换算成行滚动（与核心 TableWheelInput 同一套系数）。
         private static int _renderFrame = -1000;   // 本页最近一次被渲染的帧（滚轮钩子只在自己页面上工作）
@@ -521,7 +519,7 @@ namespace SR_UCH.Tweaks {
                 }
                 float maxY = _maxScrollY;
                 if (maxY <= 0f && _rowsHCache > 0f)
-                    maxY = Mathf.Max(0f, VisiblePresets().Count * SRApi.Ctl.TableRowH() - _rowsHCache + SRApi.Ctl.TableRowH());
+                    maxY = SRApi.Ctl.TableMaxScrollY(VisiblePresets().Count, SRApi.Ctl.TableRowH(), _rowsHCache);
                 if (maxY <= 0f) return false;
                 float before = _scrollRows.y;
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(56), 0f, maxY);
@@ -567,15 +565,6 @@ namespace SR_UCH.Tweaks {
                     if (Time.unscaledTime - _statusShownAt > 8f) status = null;
                 }
                 if (!string.IsNullOrEmpty(status)) count += "   ·   " + status;
-                // 诊断（一直显示，不写日志也能看）：行数/行区/滚动上限/当前偏移/滚轮命中的层。
-                // 若"滚不动"，这几个数字能直接指出是 maxY=0（内容没超出）、还是 layer=none（没收到滚轮）。
-                try {
-                    count += "   ·   行" + shown + " 行区" + _rowsHCache.ToString("0") + " maxY" + _maxScrollY.ToString("0")
-                           + " y" + _scrollRows.y.ToString("0") + " 层:" + (SRApi.WheelLayer ?? "?")
-                           + " 顶" + _tableTopY.ToString("0") + " 高" + _tableHCache.ToString("0")
-                           + " 内容" + (shown * SRApi.Ctl.TableRowH()).ToString("0") + " 行高" + SRApi.Ctl.TableRowH().ToString("0")
-                           + " 底界" + SRApi.PageContentBottom.ToString("0");
-                } catch { /* 静默：诊断行失败不影响列表 */ }
                 // 工具行前面已有"跳过树屋 + 返回树屋"约 290 设计单位；不给状态栏设上限，
                 // 导出目录那种长路径会把 FlexibleSpace 挤没、整行撑出窗口。
                 float maxW = Mathf.Max(SRApi.Ctl.Sc(120f), SRApi.ContentArea.width - SRApi.Ctl.Sc(380f));
@@ -613,9 +602,6 @@ namespace SR_UCH.Tweaks {
                 string pendingBefore = _pendingKey;
 
                 // Layout 趟记录内容原点（表格高度/命中框都相对它计算）
-                Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
-                if (Event.current != null && Event.current.type == EventType.Layout) _pageTopY = topProbe.y;
-
                 RenderSaveImportHeader();
                 CancelPendingOnBlank(pendingBefore);
             } catch (Exception __ex) { SRApi.Guard.Log("渲染布局预设页", __ex); }
@@ -631,18 +617,14 @@ namespace SR_UCH.Tweaks {
                 EnsureCols();
                 string pendingBefore = _pendingKey;
 
-                Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
-                if (Event.current != null && Event.current.type == EventType.Layout) _pageTopY = topProbe.y;
-
                 RenderFilterHeader();
                 RenderListToolbar();
                 ApplyFilterChange();
 
-                Rect last = GUILayoutUtility.GetRect(1f, 0f);
-                float tableH = ComputeFillTableHeight(last);
                 _actionHitThisFrame = false;
                 SRApi.Ctl.SetTableHighlight(_search ?? "");   // 搜索命中在表格里高亮
-                RenderPresetTable(tableH, VisiblePresets());
+                // 表格几何在 RenderPresetTable 内部一次算出（唯一真值 = 页面内容底界）。
+                RenderPresetTable(VisiblePresets());
                 DrawInlineRename();
                 CancelPendingOnBlank(pendingBefore);
             } catch (Exception __ex) { SRApi.Guard.Log("渲染预设列表页", __ex); }
@@ -747,32 +729,6 @@ namespace SR_UCH.Tweaks {
                 RenderListStatus(visible.Count, _presets.Count);
                 GUILayout.FlexibleSpace();
             } finally { GUILayout.EndHorizontal(); }
-        }
-
-        // 填满剩余高度：以**屏幕可视底**为准（不再依赖"页面视口高度"的估算）。
-        // 底栏是固定条，列表底边必须正好落在它上沿：多一点就被遮住最后一行，少一点就留空。
-        private static float ComputeFillTableHeight(Rect last) {
-            float minH = SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH();
-            float tableH;
-            try {
-                // 主算法：**纯布局单位**，右栏总高减去页面内容起点到表格顶的距离。
-                // 同一坐标系，不会像屏幕坐标换算那样算溢出（"表格底边超出可见区"的根因）。
-                // 两种算法各算一次，取**较小值**：任一算法正确都能兜住，绝不会比实际可视区高。
-                float __byLayout = SRApi.PageContentBottom - last.yMax;                       // 页面内容底界（布局）
-                float __byScreen = (SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f))
-                                   - (SRApi.ContentArea.y + last.yMax);                        // 屏幕底 − 表格顶
-                float __avail = Mathf.Min(__byLayout, __byScreen);
-                if (__avail < minH || __avail > SRApi.Ctl.Sc(4000f)) __avail = Mathf.Max(minH, __byLayout);   // 异常时回退
-                tableH = Mathf.Max(minH, __avail);
-            } catch (Exception __sh) {
-                SRApi.Guard.Log("布局预设/可视高度", __sh);
-                float used = Mathf.Max(0f, last.yMax - _pageTopY);
-                tableH = Mathf.Max(minH, SRApi.PageViewportHeight - used);
-            }
-            // 注意：不再套用「Table Height」里存的手动高度。
-            // 那个值一旦被拖过一次就会永久小于可用高度，列表底部便与底栏之间留出一条缝。
-            // 填充模式的原则是"列表始终占满到底栏上沿"。
-            return tableH;
         }
 
         // 筛选/排序变化：回顶并清掉二次确认（必须在本帧控件画完之后读，否则差一帧）
@@ -1057,68 +1013,25 @@ namespace SR_UCH.Tweaks {
         }
 
         // 标准表格：核心 TableDraw 负责表头/行/拖列宽/换列位/钉住操作列；本页只提供列定义、单元格文本与操作按钮。
-        private static void RenderPresetTable(float tableH, List<PresetInfo> visible) {
-            // 控件创建一律放在 try 之外：IMGUI 要求 Layout/Repaint 两趟创建同样多的控件，
-            // 一旦某趟在 try 里抛异常，后面的控件就少建 → "control N's position in a group with only N controls"。
-            Rect __probe = GUILayoutUtility.GetRect(1f, 0f);
-            float __rowH0 = SRApi.Ctl.TableRowH();
-            float __headerH0 = SRApi.Ctl.TableHeaderH();
+        // 预设列表（填充模式）：几何只算一次。
+        // 以前是"探针 → 表格矩形 → 屏幕实测夹一次 → 再按 box.y 修正一次"，四次测量互相覆盖，
+        // 任一数算错就表现为 maxY 与实际可视高度脱节（列表滚不到底 / 表体伸到底栏下面）。
+        // 现在的唯一真值：页面内容底界 SRApi.PageContentBottom（布局坐标系，与表格矩形同坐标系）。
+        //   表格高 = 底界 − 表格顶
+        //   行区   = 表格高 − 表头
+        //   maxY   = 条目总高 − 行区           ← 条目总高远大于界面高时 maxY 自然很大，能滚到底
+        private static void RenderPresetTable(List<PresetInfo> visible) {
+            // 控件创建全部在 try 之外：Layout / Repaint 两趟必须创建同样多的控件。
+            Rect probe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
+            float rowH = SRApi.Ctl.TableRowH();
+            float headerH = SRApi.Ctl.TableHeaderH();
+            float minH = headerH + rowH * 2f;
+            float tableH = Mathf.Max(minH, SRApi.PageContentBottom - probe.y);
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true),
-                GUILayout.Height(Mathf.Max(SRApi.Ctl.TableRowH(), tableH)));
+                GUILayout.Height(tableH));
+            float rowsH = SRApi.Ctl.TableRowsH(tableH, headerH);
             try {
                 _visibleCache = visible;   // 悬浮预览按行号取预设时用（与 RowCells 同一份列表）
-                float rowH = __rowH0;
-                float headerH = __headerH0;
-                // Render() 传入的 tableH 是「分区标题 + 表格」可用的总高度；分区标题本身也占高，
-                // 这里扣掉它的实测高度，否则表格底部会超出可视区、最后一行被底栏裁掉且滚不到。
-                // 不再二次扣减：调用方给的 tableH 已经是"可用总高度"，而分区标题在 GetLastRect 里
-                // 也已经被算进 last.yMax（TableFitHeight 的 used）。再扣一次 titleH + 拖拽条，
-                // 表格就会比可用区域矮一截 —— 列表中下方那片空白的直接来源。
-                // 不再抬到 120：按调用方给的内容高度画，行少时不留空白表体。
-                float __gripH = 0f;   // 已删除底边拖拽条
-                // 行区 = 表格高 − 表头 − 拖拽条：把拖拽条算进来会让 maxY 恒为 0（列表因此永远滚不动）。
-                float rowsH = Mathf.Max(0f, tableH - headerH - __gripH);
-                // 行区不得超过内容高度：内容少时表格就短，不会在行结束处留下"空表体"。
-                // 行区按可用高度（填充模式）
-                // 绘制这一刻按屏幕实测再夹一次：行区不得超出"表格顶到 底栏上沿"的可视区。
-                // 之前表格高度是提前算的，算大会让 rowsH 大于实际可见高度 → maxY 算成 0、下面几行被窗口裁掉，
-                // 表现就是"明明还有项目却划不动"。
-                try {
-                    float __topScreen = SRApi.ContentArea.y + (GUILayoutUtility.GetLastRect().y);
-                    float __bottomScreen = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);
-                    float __visibleRows = __bottomScreen - (__topScreen + headerH);
-                    if (__visibleRows > SRApi.Ctl.TableRowH()) rowsH = Mathf.Min(rowsH, __visibleRows);
-                } catch (Exception __vr) { SRApi.Guard.Log("布局预设/行区实测", __vr); }
-                // 紧贴表格之前再探一次：探针与表格矩形只差 1px，用它的 yMax 定高不会有"探针比表格高 72px"的误差。
-                // 探针必须**无条件**创建：放在 try 里一旦抛异常，本趟就少一个控件，
-                // Layout 与 Repaint 的控制数量不一致会直接抛
-                // "Getting control N's position in a group with only N controls"。
-                float __probeH = 0f;
-                try {
-                    __probeH = SRApi.PageContentBottom - __probe.yMax;
-                    if (__probeH > headerH + rowH * 2f) tableH = Mathf.Max(headerH + rowH * 2f, __probeH);
-                } catch (Exception __ph) { SRApi.Guard.Log("布局预设/表格前探针", __ph); }
-
-                // 用**实际** box.y 再修正一次：探针 y 与表格真实 y 之间还夹着布局，之前差 72px，
-                // 结果表格整体下移并伸出底栏（截图里 顶73+高950 越过了底界951）。
-                try {
-                    float __minH = headerH + rowH * 2f;
-                    // 两种底界取较小值：PageContentBottom 可能把页脚预留也算进去了（偏大 400 量级），
-                    // 屏幕底（底栏上沿）永远是对的，所以用它兜底。
-                    float __fixLayout = SRApi.PageContentBottom - box.y;
-                    float __fixScreen = (SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f))
-                                        - (SRApi.ContentArea.y + box.y);
-                    float __fix = Mathf.Min(__fixLayout, __fixScreen);
-                    if (__fix > __minH && __fix < tableH) {
-                        tableH = __fix;
-                        box.height = __fix;
-                        rowsH = Mathf.Max(0f, tableH - headerH - __gripH);
-                    }
-                } catch (Exception __fx) { SRApi.Guard.Log("布局预设/表格高度修正", __fx); }
-                // 关键：tableH 在前面被探针/修正改过，行区与矩形必须**按最终 tableH 重算一次**。
-                // 以前 rowsH 用的是较早的 tableH，导致 maxY 与实际可视高度脱节（列表滚不到底/多滚）。
-                box.height = tableH;
-                rowsH = SRApi.Ctl.TableRowsH(tableH, headerH + __gripH);
                 EnsureCols();
                 // 操作列宽始终跟随当前语言的按钮文字：语言热切换后也能立刻避免英文标签被截断。
                 // 操作列：默认按按钮文字实测，但最多占表格宽度的 30%（窗口变窄时不会把数据列挤没）
@@ -1149,7 +1062,6 @@ namespace SR_UCH.Tweaks {
                 }
                 _maxScrollX = Mathf.Max(0f, totalW - stripW);
                 _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
-                _tableTopY = SRApi.ContentArea.y + box.y; _tableHCache = tableH;
                 _rowsHCache = rowsH;   // 缓存真实行区高：滚轮钩子在首帧/刚切页时用它兜底
                 _maxScrollY = SRApi.Ctl.TableMaxScrollY(visible.Count, rowH, rowsH);
                 _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _maxScrollY);

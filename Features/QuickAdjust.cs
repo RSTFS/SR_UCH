@@ -20,12 +20,11 @@ namespace SR_UCH.Tweaks {
         // QuickAdjust 的自动重试用来判断"还要等多久"。
         internal static float DelaySeconds { get { try { return _delay != null ? Mathf.Clamp(_delay.Value, 0f, 3f) : 0f; } catch { return 0f; } } }
 
+        // 模式门控一律走契约统一入口：它已含 EX「超级模式（无视模式限制）」豁免。
+        // 直接读 GameSettings.GameMode 的功能在超级模式下会失效（用户要求：所有模式限制都要能被超级模式无视）。
         private static bool ModeOk() {
-            try {
-                GameSettings gs = GameSettings.GetInstance();
-                if (gs == null) return false;
-                return gs.GameMode == GameState.GameMode.CHALLENGE || gs.GameMode == GameState.GameMode.FREEPLAY;
-            } catch (Exception __ex) { SRApi.Guard.Log("重生/模式判定", __ex); return false; }
+            try { return SRApi.GateModeAllows(SRApi.ModeMask.Challenge | SRApi.ModeMask.Freeplay); }
+            catch (Exception __ex) { SRApi.Guard.Log("重生/模式判定", __ex); return false; }
         }
 
         private static void SelfReg() {
@@ -396,11 +395,9 @@ public class QuickAdjust : ITweak {
             try { SRApi.RegisterTick("评分百分比-保持", TickKeepHandicap); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             try { Harmony.CreateAndPatchAll(typeof(QuickAdjust), (string)null); }
             catch (Exception e) { SRApi.LogError("快速调整 补丁注册失败: " + e.Message); }
-            // GamePlayer 的两个补丁独立注册：目标成员在新版游戏里可能改名/消失，不能连累上面的补丁
-            try { Harmony.CreateAndPatchAll(typeof(QuickAdjustStartClientPatch)); }
-            catch (Exception __p1) { SRApi.LogWarn("快速调整/OnStartClient 补丁跳过（该成员不存在）: " + __p1.Message); }
-            try { Harmony.CreateAndPatchAll(typeof(QuickAdjustStartServerPatch)); }
-            catch (Exception __p2) { SRApi.LogWarn("快速调整/OnStartServer 补丁跳过（该成员不存在）: " + __p2.Message); }
+            // 不再注册 GamePlayer.OnStartClient / OnStartServer 补丁：这两个成员在当前游戏版本里
+            // 根本不存在（每次启动都刷两条"补丁跳过"警告）。评分百分比改为 TickKeepHandicap
+            // 每帧按"本地值 != 目标值"重下发，不依赖任何生命周期钩子。
     }
 
         public static bool QuickSwitchOn => _quickSwitchEnabled != null && _quickSwitchEnabled.Value;
@@ -679,27 +676,15 @@ public class QuickAdjust : ITweak {
             } catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.Send", __ex); }
         }
 
-        // 持久化（优化版）：新 GamePlayer 生成时记一个"待补发"时间点，Tick 到点只补一次。
-        // 不常驻轮询，也不反复改数值；切关卡/重开一局都会重新触发一次。
-        private static float _keepApplyAt = -1f;
-
-        // 这两个补丁单独成类：CreateAndPatchAll 是"一个方法找不到就整类失败"，
-        // 之前 GamePlayer.OnStartClient 在游戏更新后消失，导致快速调整的**全部**补丁一起注册失败
-        // （重生延迟 / 快速切换全失效）。拆开后单个目标失效只丢这一条。
-        internal static void QueueKeep(GamePlayer gp) { QueueKeepIfLocal(gp); }
-
-        private static void QueueKeepIfLocal(GamePlayer gp) {
-            try { if (_keepHandicap > 0 && gp != null && gp.isLocalPlayer) _keepApplyAt = Time.unscaledTime + 0.8f; }
-            catch { /* 静默：非关键路径，失败可直接忽略 */ }
-        }
+        // 评分百分比的"保持"不再依赖 GamePlayer 生成钩子（那些成员在本版本游戏里不存在）：
+        // TickKeepHandicap 每帧比对本地值与配置值，不一致就重下发（≤1 次/秒）。
 
         private static float _keepLastAt = -999f;
 
         private static void TickKeepHandicap() {
             try {
                 if (_keepHandicap <= 0) return;
-                if (Time.unscaledTime < _keepApplyAt && Time.unscaledTime - _keepLastAt < 1f) return;
-                _keepApplyAt = -1f;
+                if (Time.unscaledTime - _keepLastAt < 1f) return;
                 _keepLastAt = Time.unscaledTime;
                 foreach (Player p in PlayerManager.GetInstance()) {
                     if (p == null) continue;
@@ -882,19 +867,6 @@ public class QuickAdjust : ITweak {
         }
 }
 
-
-// GamePlayer 生成时的"保持设置"补发：单独成类，目标缺失时只丢这一条补丁。
-internal static class QuickAdjustStartClientPatch {
-    [HarmonyPatch(typeof(GamePlayer), "OnStartClient")]
-    [HarmonyPostfix]
-    private static void Postfix(GamePlayer __instance) { QuickAdjust.QueueKeep(__instance); }
-}
-
-internal static class QuickAdjustStartServerPatch {
-    [HarmonyPatch(typeof(GamePlayer), "OnStartServer")]
-    [HarmonyPostfix]
-    private static void Postfix(GamePlayer __instance) { QuickAdjust.QueueKeep(__instance); }
-}
 
 }
 

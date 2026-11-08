@@ -484,10 +484,6 @@ namespace SR_UCH.Tweaks {
             // 页面滚动保持可用：光标不在列表上时由页面滚动接管（列表钩子只在表格矩形内生效）。
             // 列宽拖动 / 表格高度拖动的收尾都由核心处理，这里无需再收尾。
             EnsureWidths();
-            // 页面内容在布局空间的起点 y（零高度探针），用于计算表格上方已用高度。
-            Rect topProbe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
-            if (Event.current != null && Event.current.type == EventType.Layout) _pageTopY = topProbe.y;
-
             // 按钮顺序：刷新列表 / 退出联机 / 房间码。
             GUILayout.BeginHorizontal();
             if (SRApi.Ctl.HotkeyButton("online.lobbies", SRApi.T("刷新列表", "Refresh"),
@@ -554,34 +550,17 @@ namespace SR_UCH.Tweaks {
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
 
-            // 表格自绘：表头固定，只有房间行滚动；滚动条自绘以跟随界面缩放并在拖到列表外时不断。
+            // 表格自绘：表头固定，只有房间行滚动。
             GUILayout.Space(SRApi.Ctl.Sc(3));
-            Rect last = GUILayoutUtility.GetLastRect();
             // 宽度用纯尺寸计算：布局矩形与屏幕矩形（ContentArea）不同坐标系，混算会导致表格框超宽、操作列被推出屏幕。
             float availW = Mathf.Max(SRApi.Ctl.Sc(220), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(12));
-            // 高度：核心统一公式（页面视口 − 页面已用高度，再按 Table Height 夹取）。
-            // 与预设列表共用核心高度：min(可用, 表头 + 行数*行高 + 拖拽条)。
-            float availH = SRApi.Ctl.ListTableHeight(last.yMax, _pageTopY, _tableH, SRApi.Ctl.Sc(140),
-                _shownLobbies != null ? _shownLobbies.Count : 0, SRApi.Ctl.TableRowH(), SRApi.Ctl.TableHeaderH(),
-                SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f, true);   // 底部贴页面底：始终填满
-            // 让出拖拽条位置：表格底 → 间隙 → 4px 拖拽条 → 底栏上沿（两个列表同一处理）。
-            float __gripTotal = SRApi.Ctl.TableGripH() + SRApi.Ctl.TableGripGap() * 2f;
-            // 直接以"页面视口 − 表格上方已用高度 − 拖拽条"定高：比 ListTableHeight 的夹取更贴底，
-            // 最后一行不会再被底栏吃掉（预设列表用同一公式）。
-            float __used = Mathf.Max(0f, last.yMax - _pageTopY);
-            float __fill = SRApi.PageViewportHeight - __used - __gripTotal;
-            // 以屏幕可视底为准：列表底边正好贴在底栏上沿（多一分被遮、少一分留空）。
+            // 高度只算一次（与预设列表同一套规则，唯一真值 = 页面内容底界）：
+            //   表格高 = 底界 − 表格顶；行区 = 表格高 − 表头；maxY = 条目总高 − 行区。
+            // 以前这里有三种算法互相夹取（ListTableHeight / 页面视口 / 屏幕底），
+            // 任一数算错就让 maxY 与实际可视高度脱节 —— 列表滚不到底。
+            Rect probe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
             float __minH = SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH();
-            float boxH;
-            try {
-                float __screenTop = SRApi.ContentArea.y + last.yMax;
-                float __bottom = SRApi.ContentArea.yMax - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);
-                boxH = Mathf.Max(__minH, __bottom - __screenTop);   // 不再扣拖拽条：列表底边直接与底栏相接
-            } catch (Exception __bh) {
-                SRApi.Guard.Log("联机/可视高度", __bh);
-                boxH = Mathf.Max(__minH, Mathf.Min(availH, __fill > 0f ? __fill : availH));
-            }
-
+            float boxH = Mathf.Max(__minH, SRApi.PageContentBottom - probe.y);
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
 

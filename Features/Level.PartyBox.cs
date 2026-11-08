@@ -534,17 +534,19 @@ public class AutoPartyItem : ITweak {
 
     private static System.Reflection.FieldInfo _fPieces;
     private static float _armedAt = -1f;      // 本次开箱开始计时的时刻
-    private static int _lastBoxId;            // 已经处理过的派对盒实例
-    private static int _pickedBoxId;          // 本次开箱已经挑过（防重复下发）
+    // "本次开箱"用**光标进入挑选态的次数**做序号，而不是派对盒实例 ID：
+    // 派对盒对象在整个大厅里是同一个实例、一轮一轮反复复用，用实例 ID 记账会让
+    // 第一轮挑过之后"已挑"标记永远为真 —— 表现就是"第一次可以拿，之后都不行"。
+    private static int _openSeq;
+    private static int _pickedSeq = -1;
+    private static bool _cursorWasPicking;
     private static float _nextAt = -999f;
     // 悬停挑选流程：先把本地光标挪到目标道具上（让游戏自己算出 hoveredPick），
     // 下一拍再调用游戏自己的 tryPickPiece 协程 —— 房主端只认游戏这条链路。
     private static PartyPickCursor _hpCur;
     private static PickableBlock _hpTarget;
-    private static int _hpStage;          // 0=空闲 1=已移动光标等悬停 2=已触发挑选
+    private static int _hpStage;          // 0=空闲 1=写悬停 2=启动协程 3=等待验收
     private static float _hpAt = -1f;
-    private static float _hpClearAt = -1f;
-    private static float _hpVerifyAt = -1f;
     private static int _hpAttempts;
 
     private static void SelfReg() {
@@ -571,26 +573,29 @@ public class AutoPartyItem : ITweak {
 
     private static void Tick() {
         try {
-            TickHoverPick();   // 悬停挑选流程每帧推进（它自己有节流），不能被下面的 0.15s 轮询挡住
+            TickHoverPick();   // 挑选流程每帧推进（它自己有节流），不能被下面的 0.15s 轮询挡住
+            // 开箱序号：光标从"未挑选"变成"正在挑选"就是新的一次开箱。
+            // 不能用派对盒实例 ID 记账（大厅里是同一个实例反复复用）。
+            PartyPickCursor seen = LocalCursor();
+            if (seen != null && !_cursorWasPicking) { _openSeq++; _armedAt = -1f; _hpAttempts = 0; }
+            _cursorWasPicking = seen != null;
+
             if (_enabled == null || !_enabled.Value) { _armedAt = -1f; return; }
             if (!SRApi.GateMaster) return;
             if (Time.unscaledTime < _nextAt) return;
             // 派对盒正在刷新/关闭：本帧不动作，避免对着已被销毁的旧盒子取道具（冲突修复）
-            if (Time.unscaledTime < LevelPartyBox.BoxBusyUntil) { _armedAt = -1f; _lastBoxId = 0; return; }
+            if (Time.unscaledTime < LevelPartyBox.BoxBusyUntil) { _armedAt = -1f; return; }
             _nextAt = Time.unscaledTime + 0.15f;   // 轮询节流：不抢游戏自己的逻辑，也不每帧全场景找
 
             PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
-            if (pb == null) { _armedAt = -1f; _lastBoxId = 0; return; }
+            if (pb == null) { _armedAt = -1f; return; }
             bool active = false;
             try { active = pb.IsStillActive; } catch (Exception __ac) { SRApi.Guard.Log("自动道具/盒状态", __ac); }
-            if (!active) { _armedAt = -1f; _lastBoxId = 0; return; }
+            if (!active) { _armedAt = -1f; return; }
 
-            int boxId = pb.GetInstanceID();
-            if (boxId != _lastBoxId) { _lastBoxId = boxId; _armedAt = -1f; _pickedBoxId = 0; _hpAttempts = 0; }
-            if (_pickedBoxId == boxId) return;      // 本次开箱已经自动挑过
-
-            PartyPickCursor cur = LocalCursor();
+            PartyPickCursor cur = seen;
             if (cur == null) { _armedAt = -1f; return; }
+            if (_pickedSeq == _openSeq) return;      // 本次开箱已经自动挑过
             if (_armedAt < 0f) { _armedAt = Time.unscaledTime; return; }
             float delay = _delay != null ? Mathf.Clamp(_delay.Value, 0f, 3f) : 0.5f;
             if (Time.unscaledTime - _armedAt < delay) return;
@@ -599,11 +604,9 @@ public class AutoPartyItem : ITweak {
             if (pieces == null || pieces.Count == 0) return;
             PickableBlock target = Choose(pb, pieces);
             if (target == null) return;
-            if (DoPick(cur, target)) {
-                _pickedBoxId = boxId;
-                // 只在这里标记"本次已挑"，具体生效路径由 TickHoverPick 记一条日志，
-                // 避免两条日志一真一假、误以为跑了两遍。
-            }
+            // 只在这里标记"本次已挑"，具体成没成由 TickHoverPick 的验收阶段判定
+            // （避免两条日志一真一假、误以为跑了两遍）。
+            if (DoPick(cur, target)) _pickedSeq = _openSeq;
         } catch (Exception __ex) { SRApi.Guard.Log("自动道具/轮询", __ex); }
     }
 
@@ -673,49 +676,34 @@ public class AutoPartyItem : ITweak {
         } catch (Exception __ex) { SRApi.Guard.Log("自动道具/启动悬停挑选", __ex); return false; }
     }
 
-    // 每帧推进悬停挑选流程
+    // 每帧推进挑选流程，三个阶段：
+    //   1) 写悬停 + 清残留：把目标写进光标的 hoveredPick（游戏协程只读这个字段），
+    //      同时把光标上可能残留的 pickedPiece 清掉。游戏协程开头是
+    //      `if (pickedPiece == null && hoveredPick != null)` —— 上一轮挑中后 pickedPiece
+    //      还留着时，这一轮的协程会**静默什么都不做**，表现就是"日志说挑了，道具没到手，
+    //      而且只有第一次成功"。
+    //   2) 启动游戏自己的 tryPickPiece 协程（房主端只认这条链路）。
+    //   3) 验收：Picking 变 false 或已记录 pickedPiece = 成功；否则清掉伪造的悬停、
+    //      允许本箱再来一次（最多 2 次）。
     private static void TickHoverPick() {
         try {
             if (_hpStage == 0 || _hpCur == null || _hpTarget == null) return;
             if (Time.unscaledTime < _hpAt) return;
             if (_hpStage == 1) {
-                // 优先：直接把光标的 hoveredPick 字段设成目标（协程只读这个字段，不需要真的碰撞）。
-                // 这样**不移动光标、不等帧**，用户看不到任何位移。
                 System.Reflection.FieldInfo hp = null;
                 try { hp = SRApi.Ref.Field(typeof(PartyPickCursor), "hoveredPick", "派对盒自动道具（直接指定悬停对象）"); }
                 catch (Exception __hf) { SRApi.Guard.Log("自动道具/取悬停字段", __hf); }
+                // 清掉上一轮留下的 pickedPiece：不清的话协程开头就跳过整段逻辑。
+                try { _hpCur.NetworkpickedPiece = null; } catch (Exception __cp) { SRApi.Guard.Log("自动道具/清挑选记录", __cp); }
                 if (hp != null) {
                     try { hp.SetValue(_hpCur, _hpTarget); } catch (Exception __hs) { SRApi.Guard.Log("自动道具/写悬停字段", __hs); }
-                    _hpStage = 2;
-                    _hpAt = Time.unscaledTime;          // 立刻进入下一步
-                    return;
+                } else {
+                    // 字段名对不上时退回"挪光标 + 等游戏自己算悬停"
+                    Vector3 p = _hpTarget.transform.position;
+                    _hpCur.transform.position = new Vector3(p.x, p.y + 0.2f, p.z);
                 }
-                // 兜底：字段名对不上时，才退回"挪光标 + 等游戏自己算悬停"
-                Vector3 p = _hpTarget.transform.position;
-                _hpCur.transform.position = new Vector3(p.x, p.y + 0.2f, p.z);
                 _hpStage = 2;
-                _hpAt = Time.unscaledTime + 0.10f;
-                return;
-            }
-            if (_hpStage == 3) {
-                if (Time.unscaledTime < _hpClearAt) return;
-                try {
-                    System.Reflection.FieldInfo hp2 = SRApi.Ref.Field(typeof(PartyPickCursor), "hoveredPick", "派对盒自动道具（清理伪造悬停）");
-                    if (hp2 != null && _hpCur != null) hp2.SetValue(_hpCur, null);
-                } catch (Exception __hc) { SRApi.Guard.Log("自动道具/清理悬停字段", __hc); }
-                // 确认：光标已不再处于挑选态（Picking=false）视为成功；否则允许重试一次。
-                // 以前"发出即记账"，失败后本箱不再尝试 —— 这就是"时灵时不灵"。
-                bool ok = false;
-                try {
-                    PartyPickCursor c0 = _hpCur;
-                    if (c0 != null) ok = !c0.Picking;   // 协程成功会把 Picking 置 false
-                } catch (Exception __ok) { SRApi.Guard.Log("自动道具/确认挑选结果", __ok); }
-                if (!ok && _hpAttempts < 2) {
-                    _hpAttempts++;
-                    _pickedBoxId = 0;          // 允许本箱再挑一次
-                    _armedAt = Time.unscaledTime;   // 重新计时延迟
-                }
-                _hpStage = 0; _hpCur = null; _hpTarget = null;
+                _hpAt = Time.unscaledTime + 0.06f;
                 return;
             }
             if (_hpStage == 2) {
@@ -726,18 +714,35 @@ public class AutoPartyItem : ITweak {
                     try {
                         System.Collections.IEnumerator co = mi.Invoke(_hpCur, null) as System.Collections.IEnumerator;
                         if (co != null) _hpCur.StartCoroutine(co);
-                        SRApi.LogInfo("[自动道具] 已按游戏协程挑选：" + (_hpTarget != null ? _hpTarget.name : "?"));
                     } catch (Exception __iv) { SRApi.Guard.Log("自动道具/启动协程", __iv); }
                 } else {
                     SRApi.LogWarn("[自动道具] 找不到 tryPickPiece，改用消息下发");
                     FallbackSendPick(_hpCur, _hpTarget);
                 }
-                // 协程启动后把 hoveredPick 清回去，避免我们伪造的悬停状态留在光标上
-                // （它会影响 IHoveredCursors/后续手动挑选）。等一小拍让协程读到值再清。
-                _hpClearAt = Time.unscaledTime + 0.05f;
-                _hpVerifyAt = Time.unscaledTime + 0.35f;   // 之后确认是否真的挑中
                 _hpStage = 3;
+                _hpAt = Time.unscaledTime + 0.45f;   // 验收窗口
                 return;
+            }
+            if (_hpStage == 3) {
+                bool ok = false;
+                try {
+                    PartyPickCursor c0 = _hpCur;
+                    if (c0 != null) ok = !c0.Picking || c0.Pick != null;   // 协程会把 Picking 置 false 并记下 pickedPiece
+                } catch (Exception __ok) { SRApi.Guard.Log("自动道具/确认挑选结果", __ok); }
+                if (ok) {
+                    _hpAttempts = 0;
+                    SRApi.LogInfo("[自动道具] 已按游戏协程挑选：" + (_hpTarget != null ? _hpTarget.name : "?"));
+                } else if (_hpAttempts < 2) {
+                    _hpAttempts++;
+                    _pickedSeq = -1;                   // 允许本箱再挑一次
+                    _armedAt = Time.unscaledTime;      // 重新计时延迟
+                }
+                // 无论成败都清掉伪造的悬停，避免影响后续手动挑选（Disable 时游戏也会清）。
+                try {
+                    System.Reflection.FieldInfo hp2 = SRApi.Ref.Field(typeof(PartyPickCursor), "hoveredPick", "派对盒自动道具（清理伪造悬停）");
+                    if (hp2 != null && _hpCur != null) hp2.SetValue(_hpCur, null);
+                } catch (Exception __hc) { SRApi.Guard.Log("自动道具/清理悬停字段", __hc); }
+                _hpStage = 0; _hpCur = null; _hpTarget = null;
             }
         } catch (Exception __ex) { SRApi.Guard.Log("自动道具/悬停挑选推进", __ex); }
     }

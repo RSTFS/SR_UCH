@@ -177,6 +177,21 @@ public partial class SR {
         // 上一帧页面声明的"不要页面滚动条"。页面每帧在渲染时重新声明，渲染结束后由核心收走并清零，
         // 因此切到不声明它的页面（或用 Ctrl+滚轮切页）时不会继承上一页的"关滚动"状态。
         private static bool _noScrollDeclared;
+        // "本帧要不要页面滚动区"的锁存值（见 ScrollViewLatchedForThisFrame）。
+        private static int _noScrollLatchFrame = -1;
+        private static bool _noScrollLatch;
+        // 同一帧里 OnGUI 会被调用多趟（Layout → 输入事件 → Repaint）。页面是在**渲染过程中**才声明
+        // NoPageScrollBars 的：如果每一趟都重新读 _noScrollDeclared，Layout 会用上一帧的值进滚动区、
+        // Repaint 用这一趟刚写的新值不进 → BeginScrollView 的进入/退出在趟与趟之间不配对，直接抛
+        // "Getting control N's position in a group with only N controls when doing repaint"。
+        // 所以"本帧要不要滚动区"只在当帧第一趟锁存，后面所有趟都用同一个值。
+        private static bool ScrollViewLatchedForThisFrame() {
+            if (_noScrollLatchFrame != Time.frameCount) {
+                _noScrollLatchFrame = Time.frameCount;
+                _noScrollLatch = _noScrollDeclared;
+            }
+            return _noScrollLatch;
+        }
         private static string _lastPageSig;   // 上一次的"栏目|页签"，变化时收起下拉框
 
         // 界面缩放：窗口随缩放比例同比放大 / 缩小一次，并把位置夹回屏幕内。
@@ -562,7 +577,7 @@ public partial class SR {
             SRApi.Diag("mode=" + _mode + " section=" + _selectedInternalSection);
             SRApi.Diag("areaH=" + __areaH.ToString("0.0") + " usedTop=" + __usedTop.ToString("0.0") + " barH=" + __barH.ToString("0.0"));
             SRApi.Diag("viewport=" + SRApi.PageViewportHeight.ToString("0.0") + " footerTop=" + (__areaH - __barH).ToString("0.0") + " scrollY=" + _scroll.y.ToString("0.0"));
-            bool __noScroll = _noScrollDeclared;
+            bool __noScroll = ScrollViewLatchedForThisFrame();
 
             // 设置页签常驻顶部（画在滚动区之外，不受滚动影响）：「恢复默认」跟在同一行最右侧。
             if (_mode == Mode.Settings) {
@@ -760,6 +775,13 @@ public partial class SR {
 
             DrawResizeGripAndCursor(winRect, mouse, gripRect);
             DrawTooltip(mouse);
+            // 手势级"按在控件上"标记，必须在本趟**末尾**补记：控件是在页面绘制时才置
+            // BlockWindowDrag 的，而拖窗口的判定在函数开头（早于页面）。
+            // 以前只在开头记，滑块/表格这类"按下后才置标记"的控件永远记不到 →
+            // 拖滑块的同时整块面板跟着跑。
+            try {
+                if (e.type == EventType.MouseDown && e.button == 0 && over) _downOnControl = BlockWindowDrag;
+            } catch (Exception __dg) { Guard.Log("窗口拖拽/按下标记", __dg); }
             } finally {
                 GUI.matrix = prevMatrix; GUI.color = prevColor; GUI.skin.font = SR.Ctl.OrigSkinFont() ?? _prevFont;
                 // 还原全局选择色：GUI.skin 是共享皮肤（Configuration Manager 也在用），只在 SR 绘制期间改色。

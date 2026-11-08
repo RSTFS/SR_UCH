@@ -1119,7 +1119,9 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
                 GUIContent c = new GUIContent(text ?? "");
                 // 左右各留 2px（随 UI 缩放）：与按钮/输入框的 FramePadding 同一节奏，文字不会被裁边。
                 float w = Mathf.Max(minWidth, st.CalcSize(c).x + Sc(4f));
-                float h = Mathf.Max(st.CalcSize(c).y, st.CalcHeight(c, w));
+                // 底部额外 1px 缓冲（统一规则）：CJK / 拉丁字母的下沿常被 CalcHeight 少算一点，
+                // 只给样式加 padding 在"显式指定高度"的地方仍会被裁，所以按文字算高时也补 1px。
+                float h = Mathf.Max(st.CalcSize(c).y, st.CalcHeight(c, w)) + Sc(1f);
                 GUILayout.Label(c, st, GUILayout.Width(w), GUILayout.Height(h));
             } catch {
                 try { GUILayout.Label(text ?? ""); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -1170,9 +1172,14 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             _fillIds.Add(id ?? ""); _fillHandlers.Add(h);
         }
 
-        private static Func<string, Rect, float> _wheelPoll;
+        // 存 object 而非委托：注入点在 SR.Core 的 ManagerUI.Initialize（晚于 MainPlugin 启动期的
+        // SRApi.MissingSinks() 自检），用委托字段会被误报为"未注入"（与颜色面板同一处理）。
+        private static object _wheelPoll;
         public static void SetWheelPollSink(Func<string, Rect, float> f) { _wheelPoll = f; }
-        public static float WheelPoll(string key, Rect rect) { Func<string, Rect, float> f = _wheelPoll; return f != null ? f(key, rect) : 0f; }
+        public static float WheelPoll(string key, Rect rect) {
+            Func<string, Rect, float> f = _wheelPoll as Func<string, Rect, float>;
+            return f != null ? f(key, rect) : 0f;
+        }
 
         public static void WheelFallback(string key, Rect layoutRect, Func<float, bool> apply) {
             Action<string, Rect, Func<float, bool>> f = _wheelFb;
@@ -1203,15 +1210,19 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static System.IDisposable Tint(Color color, bool useIt) { return new GuiScope(true, useIt, color); }
 
         public static void SectionTitle(string title, string tip = null) {
-            try {
-                GUIContent c = new GUIContent(title, tip);
-                GUIStyle st = SecHeader;
-                Vector2 sz = st.CalcSize(c);
-                // 缓冲做进标题自身高度（以前用 GUILayout.Space 追加，紧邻的条目会把这点间距吃掉，
-                // 观感上看不到 —— 用户反馈 10）。这里高度 = 文字高 + 3px，缓冲一定占位。
-                GUILayout.Space(Sc(2));
-                GUILayout.Label(c, st, GUILayout.Width(sz.x), GUILayout.Height(sz.y + Sc(2)));   // 分区标题：上下各 2px
-            } catch { try { GUILayout.Label(title, SecHeader); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
+            // 控件创建不能放在 try 里：Layout 建了 2 个、Repaint 走 catch 建 1 个，
+            // 就会抛 "Getting control N's position in a group with only N controls"。
+            // 只在 try 里算尺寸，控件无条件建（失败退回一个固定尺寸）。
+            GUIContent c = new GUIContent(title ?? "", tip);
+            GUIStyle st = SecHeader;
+            Vector2 sz;
+            try { sz = st.CalcSize(c); } catch { sz = new Vector2(Sc(120f), Sc(20f)); }
+            if (sz.x <= 0f) sz.x = Sc(120f);
+            if (sz.y <= 0f) sz.y = Sc(20f);
+            // 缓冲做进标题自身高度（以前用 GUILayout.Space 追加，紧邻的条目会把这点间距吃掉，
+            // 观感上看不到 —— 用户反馈 10）。这里高度 = 文字高 + 2px，缓冲一定占位。
+            GUILayout.Space(Sc(2));
+            GUILayout.Label(c, st, GUILayout.Width(sz.x), GUILayout.Height(sz.y + Sc(2)));
         }
             public static GUIStyle Btn { get { return Style("Btn"); } }
             public static GUIStyle BtnClip { get { return Style("BtnClip"); } }
@@ -1486,7 +1497,7 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             return n;
         }
 
-        // 故意不注入的通道白名单：当前为空（所有 delegate 字段都会被 MainPlugin 注入，自检里是 114/114）。
+        // 故意不注入的通道白名单：当前为空（所有 delegate 字段都会被 MainPlugin 注入，自检里是满额）。
         // 将来若新增"合法恒为 null"的通道，把 "Owner.Field" 形式的全名加进来即可（历史注释提到的
         // Ref.TypeFn 早已不存在，注释已同步删除）。
         private static readonly HashSet<string> _optionalSinks = new HashSet<string>(StringComparer.Ordinal);
