@@ -40,6 +40,11 @@ namespace SR_UCH.Tests {
             Eq("maxY 内容装得下=0", 0f, (float)SRApi.Ctl.TableMaxScrollY(17, 34f, 600f));
             Eq("maxY 内容超出", 578f - 400f, (float)SRApi.Ctl.TableMaxScrollY(17, 34f, 400f));
             Eq("maxY 空列表=0", 0f, (float)SRApi.Ctl.TableMaxScrollY(0, 34f, 400f));
+            // 自绘列表：框伸到屏幕外时必须收敛到可见底（这是"滚不动"的根因）
+            var boxOut = new UnityEngine.Rect(0f, 100f, 400f, 900f);   // 顶 210、底 1110
+            Eq("行区收敛到可见底", 610f, (float)SRApi.Ctl.ScrollRowsH(boxOut, 20f, 730f, 30f));
+            var boxIn = new UnityEngine.Rect(0f, 100f, 400f, 300f);    // 框本身就在屏幕内
+            Eq("框内不收敛", 280f, (float)SRApi.Ctl.ScrollRowsH(boxIn, 20f, 730f, 30f));
         }
 
         // ColorHex：功能层所有颜色文本解析都走它，最容易在重构里被改坏。

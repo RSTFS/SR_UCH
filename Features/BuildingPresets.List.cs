@@ -89,11 +89,9 @@ namespace SR_UCH.Tweaks {
             // 核心以为"一屏画得完"（把行画到屏幕外），maxY 同时被压成 0 → 彻底滚不动。
             float screenBottom = SRApi.ContentArea.height - SRApi.FooterHeight;
             float rowsTop = box.y + headerH;
-            float rowsHRaw = Mathf.Max(rowH, box.height - headerH);
-            float rowsH = Mathf.Max(rowH, Mathf.Min(rowsHRaw,
-                             Mathf.Max(rowsTop + rowH, screenBottom) - rowsTop));
+            float rowsH = SRApi.Ctl.ScrollRowsH(box, headerH, screenBottom, rowH);
             float contentH = Mathf.Max(0, visible.Count) * rowH;
-            _listMaxY = Mathf.Max(0f, contentH - rowsH);
+            _listMaxY = SRApi.Ctl.ScrollMaxY(visible.Count, rowH, rowsH);
             _maxScrollY = _listMaxY;
             _rowsHCache = rowsH;
             box.height = headerH + rowsH;   // 裁剪框也收敛（否则 clip 底边在屏幕外）

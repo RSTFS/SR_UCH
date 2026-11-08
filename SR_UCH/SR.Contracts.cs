@@ -926,6 +926,22 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             return Mathf.Max(0f, content - Mathf.Max(0f, rowsH));
         }
 
+        // 自绘列表的**唯一**滚动几何：把"表格框"收敛成"屏幕真实可见的行区"。
+        // 根因背景：核心所有相位（行矩形/绘制/滚动上限）都用 rowsH 当视口高，
+        // 而 rowsH 若直接取 box.height - headerH，box 一旦伸到屏幕外就会虚高 →
+        // 行被画到屏幕外、maxY 被压成 0、滚轮彻底失效。
+        // visibleBottom 用「右栏高度 − 底栏高度」（与 box/probe 同一坐标系）。
+        public static float ScrollRowsH(Rect box, float headerH, float visibleBottom, float rowH) {
+            float rowsTop = box.y + headerH;
+            float raw = Mathf.Max(rowH, box.height - headerH);
+            float avail = Mathf.Max(rowsTop + rowH, visibleBottom) - rowsTop;
+            return Mathf.Max(rowH, Mathf.Min(raw, avail));
+        }
+        // 收敛后行区对应的滚动上限（与 TableMaxScrollY 同一公式，只是把收敛逻辑收在一处）。
+        public static float ScrollMaxY(int rows, float rowH, float rowsH) {
+            return TableMaxScrollY(rows, rowH, rowsH);
+        }
+
         public static float TableRowH() { return Sc(26f); }
             // UI 主题令牌（功能层统一入口）。
             public static float ThemeRadius { get { return Sc(6f); } }
