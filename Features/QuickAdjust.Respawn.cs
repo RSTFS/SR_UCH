@@ -47,7 +47,22 @@ namespace SR_UCH.Tweaks {
 //   随后 FreePlayControl.Update 立刻复活 —— 所以把这三个值设成目标秒数就是原生延迟
 // 关闭时把首次读到的原值写回去
 internal static class RespawnDelayTimingPatch {
-    private static readonly Dictionary<Character, float[]> _orig = new Dictionary<Character, float[]>();
+    // 原值快照按「角色 + 当前模式」存：不同模式的原版死亡计时不同（自由/挑战/派对/创造各不相同），
+    // 只按角色存会让"先在挑战开过、再回自由关掉"还原成挑战的值。
+    private static readonly Dictionary<long, float[]> _orig = new Dictionary<long, float[]>();
+
+    // 当前模式位（GateModeAllows 对所有"模式位掩码"回答 true 表示该位命中；超级模式会让多位同时为真，不影响一致性）。
+    private static int ModeKey() {
+        int m = 0;
+        if (SRApi.GateModeAllows(SRApi.ModeMask.Freeplay)) m |= 1;
+        if (SRApi.GateModeAllows(SRApi.ModeMask.Challenge)) m |= 2;
+        if (SRApi.GateModeAllows(SRApi.ModeMask.Party)) m |= 4;
+        if (SRApi.GateModeAllows(SRApi.ModeMask.Creative)) m |= 8;
+        return m;
+    }
+    private static long KeyOf(Character c, int modeKey) {
+        return ((long)c.GetInstanceID() << 8) | (long)(modeKey & 0xFF);
+    }
 
     [HarmonyPatch(typeof(Character), "Update")]
     [HarmonyPrefix]
@@ -71,10 +86,12 @@ internal static class RespawnDelayTimingPatch {
             bool want = !__instance.Success
                 && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay | SRApi.ModeMask.Challenge);
             if (!want) { Restore(__instance); return; }
+            long key = KeyOf(__instance, ModeKey());
             float[] o;
-            if (!_orig.TryGetValue(__instance, out o)) {
+            if (!_orig.TryGetValue(key, out o)) {
                 o = new float[] { __instance.maxDeathDelay, __instance.minDeathDelay, __instance.minSkipDeathTime };
-                _orig[__instance] = o;
+                if (_orig.Count > 64) _orig.Clear();   // 换场景/换角色后按 size 兜底清理
+                _orig[key] = o;
             }
             __instance.maxDeathDelay = d;
             __instance.minDeathDelay = d;
@@ -83,9 +100,11 @@ internal static class RespawnDelayTimingPatch {
     }
 
     private static void Restore(Character c) {
+        if (c == null) return;
+        long key = KeyOf(c, ModeKey());
         float[] o;
-        if (c == null || !_orig.TryGetValue(c, out o)) return;
-        _orig.Remove(c);
+        if (!_orig.TryGetValue(key, out o)) return;
+        _orig.Remove(key);
         if (o == null || o.Length < 3) return;
         try { c.maxDeathDelay = o[0]; c.minDeathDelay = o[1]; c.minSkipDeathTime = o[2]; }
         catch { /* 静默：角色销毁中，无需还原 */ }
