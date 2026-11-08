@@ -50,6 +50,7 @@ Features\QuickAdjust.cs
 Features\BuildingTools.cs
 Features\DestroyBlocks.cs
 Features\Level.cs
+Features\Level.AutoPartyItem.cs
 Features\Level.PartyBomb.cs
 Features\Level.PartyBox.cs
 Features\Level.Tool.cs

@@ -25,6 +25,7 @@
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 /r:"bin\Release\SR_UCH.dll"
 Features\Level.cs
+Features\Level.AutoPartyItem.cs
 Features\Level.PartyBomb.cs
 Features\Level.PartyBox.cs
 Features\Level.Tool.cs
