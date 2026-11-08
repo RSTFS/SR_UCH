@@ -36,27 +36,6 @@ namespace SR_UCH.Tweaks {
             CancelPendingOnBlank(pendingBefore);
         }
 
-        // 滚轮：**唯一来源 = ScrollWheel 事件**，唯一方向约定 = 「向下滚 = notches 为正」。
-        // 教训（见 列表滚动问题深度分析.md）：
-        //   · Input.mouseScrollDelta.y 的正负号与 IMGUI Event.delta.y 相反，混用会让方向反掉；
-        //   · Layout 趟读 Input 会抢在真正的 ScrollWheel 趟之前，再用帧锁把正确路径挡掉，
-        //     结果每格滚轮只被方向反的那条路消费 → 永远滚不动。
-        // 现在只在 ScrollWheel 趟取量、无条件 e.Use()、再判帧锁。
-        private static float TakeListWheel() {
-            try {
-                Event e = Event.current;
-                if (e == null || e.type != EventType.ScrollWheel) return 0f;
-                float raw = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
-                if (Mathf.Abs(raw) < 0.0001f) return 0f;
-                try { e.Use(); } catch { /* 静默：已被别处消费 */ }
-                if (_listWheelFrame == Time.frameCount) return 0f;
-                _listWheelFrame = Time.frameCount;
-                // delta.y > 0 = 向下滚 = 内容上移 = scrollY 增加
-                float notches = Mathf.Abs(raw) < 0.5f ? 1f : Mathf.Round(Mathf.Abs(raw));
-                return Mathf.Sign(raw) * Mathf.Max(1f, notches);
-            } catch (Exception __ex) { SRApi.Guard.Log("预设列表/取滚轮", __ex); return 0f; }
-        }
-
         // 唯一应用入口：notches > 0 = 向下滚。
         private static void ApplyListWheel(float notches) {
             // 没有滚轮时**不做任何夹取**：Layout / Repaint 两趟算出的 box.height 可能不同，
@@ -83,8 +62,10 @@ namespace SR_UCH.Tweaks {
                 if (_listWheelFrame == Time.frameCount) return true;      // 绘制期已经滚过
                 _listWheelFrame = Time.frameCount;
                 float notches = Mathf.Abs(wheel) < 0.5f ? 1f : Mathf.Round(Mathf.Abs(wheel));
+                float before = _scrollRows.y;
                 ApplyListWheel(PageWheelSign * Mathf.Sign(wheel) * Mathf.Max(1f, notches));
-                return true;
+                // 只有真的滚动了才吃掉事件；没滚动就交回窗口，别把滚轮吞掉。
+                return Mathf.Abs(_scrollRows.y - before) > 0.01f;
             } catch (Exception __ex) { SRApi.Guard.Log("预设列表/页面滚轮", __ex); return false; }
         }
 
@@ -103,15 +84,20 @@ namespace SR_UCH.Tweaks {
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true),
                 GUILayout.Height(tableH));
 
-            // 行区 / 内容高 / 滚动上限：三者同源（都用 box 自己的高度），不会再对不上。
-            float rowsH = Mathf.Max(rowH, box.height - headerH);
+            // 行区必须收敛到**屏幕真实可见底**（核心所有相位都用 rowsH 当视口高）：
+            // 以前直接拿 box.height - headerH，box 一旦伸到屏幕外，rowsH 就虚高 →
+            // 核心以为"一屏画得完"（把行画到屏幕外），maxY 同时被压成 0 → 彻底滚不动。
+            float screenBottom = SRApi.ContentArea.height - SRApi.FooterHeight;
+            float rowsTop = box.y + headerH;
+            float rowsHRaw = Mathf.Max(rowH, box.height - headerH);
+            float rowsH = Mathf.Max(rowH, Mathf.Min(rowsHRaw,
+                             Mathf.Max(rowsTop + rowH, screenBottom) - rowsTop));
             float contentH = Mathf.Max(0, visible.Count) * rowH;
             _listMaxY = Mathf.Max(0f, contentH - rowsH);
             _maxScrollY = _listMaxY;
             _rowsHCache = rowsH;
-
+            box.height = headerH + rowsH;   // 裁剪框也收敛（否则 clip 底边在屏幕外）
             _listPageFrame = Time.frameCount;
-            ApplyListWheel(TakeListWheel());
 
             try {
                 _visibleCache = visible;
@@ -193,6 +179,14 @@ namespace SR_UCH.Tweaks {
                         : SRApi.T("没有匹配当前搜索的预设。", "No presets match the current search.");
                 };
                 _hiddenBeforeTable = _hiddenCols.Count;
+                // 滚轮交给核心（TableWheelInput 与 TableDraw 语义完全一致：ScrollWheel 事件、
+                // box 命中、maxY>0 才滚、到边界不消费）。**在绘制前**调用，先改 scrollY 再绘制。
+                if (e != null) {
+                    try {
+                        SRApi.TableWheelInput(e, box, mp, _maxScrollX, _listMaxY, ref _scrollCols, ref _scrollRows);
+                    } catch (Exception __wh) { SRApi.Guard.Log("预设列表/核心滚轮", __wh); }
+                }
+                _args.scrollY = _scrollRows.y;
                 SRApi.TableDraw(_args);
                 // 核心把拖列宽的结果写进 _drawW：同步回持久化宽度（漏了这段 = 表头宽度永远改不动）。
                 for (int i = 0; i < _colW.Length && i < _drawW.Length; i++) {
