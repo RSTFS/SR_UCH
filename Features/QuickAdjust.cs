@@ -20,6 +20,9 @@ namespace SR_UCH.Tweaks {
         // 顶层补丁类（RespawnDelayTimingPatch）读它。
         internal static float RespawnDelaySeconds { get { return DelaySeconds; } }
 
+        // 首次同步标记：把游戏原版的重生延迟填进配置（只做一次，之后以用户的值为主）。
+        internal static bool _respawnDelaySynced;
+
         // QuickAdjust 的自动重试用来判断"还要等多久"。
         internal static float DelaySeconds { get { try { return _delay != null ? Mathf.Clamp(_delay.Value, 0f, 3f) : 0f; } catch { return 0f; } } }
 
@@ -32,7 +35,7 @@ namespace SR_UCH.Tweaks {
 
         private static void SelfReg() {
             SRApi.LocKey(Sec, "Respawn Delay", "重生延迟", null);
-            SRApi.LocDesc(Sec, "Respawn Delay", "重生延迟\n死亡后等多少秒再自动重生\n挑战/自由模式；0 = 立即", "Respawn delay\nseconds to wait after death before respawning automatically\nchallenge and freeplay; 0 = instant");
+            SRApi.LocDesc(Sec, "Respawn Delay", "重生延迟\n死亡后等多少秒再自动重生\n默认值就是游戏原版数值；0 = 立即重生", "Respawn delay\nseconds to wait after death before respawning automatically\ndefaults to the game's own value; 0 = respawn instantly");
             SRApi.LocKey(Sec, "Spawn Invincible", "出生无敌", null);
             SRApi.LocDesc(Sec, "Spawn Invincible", "出生无敌\n每次出生后无敌多少秒\n挑战/自由模式；0 = 不加无敌", "Spawn invincibility\nseconds of invincibility after each spawn\nchallenge and freeplay; 0 = none");
             SRApi.LocKey(Sec, "Cannon Auto Respawn", "炮弹卡死重生", null);
@@ -42,7 +45,10 @@ namespace SR_UCH.Tweaks {
         internal static void Initialize(IFeatureHost plugin) {
             try {
                 SelfReg();
-                _delay = plugin.Config.Bind(Sec, "Respawn Delay", 0.5f, new ConfigDescription("重生延迟（0-3 秒）", new AcceptableValueRange<float>(0f, 3f)));
+                // 默认 -1 = "还没同步"：第一次进入游戏时会把**游戏原版数值**填进来（见 RespawnDelayTimingPatch）。
+                // 用户明确要求：这个功能的默认值就是原版数值，而不是"0 = 原版"。
+                _delay = plugin.Config.Bind(Sec, "Respawn Delay", -1f,
+                    new ConfigDescription("重生延迟（0-10 秒）。默认值会自动取游戏原版数值；0 = 立即重生", new AcceptableValueRange<float>(-1f, 10f)));
                 _invincible = plugin.Config.Bind(Sec, "Spawn Invincible", 1f, new ConfigDescription("出生无敌（0-10 秒）", new AcceptableValueRange<float>(0f, 10f)));
                 _cannonRespawn = plugin.Config.Bind(Sec, "Cannon Auto Respawn", false, "炮弹卡死：死亡且卡在炮弹里超过 1.5 秒自动重生。");
                 SRApi.RegisterTick("重生-轮询", Tick);
@@ -72,8 +78,8 @@ namespace SR_UCH.Tweaks {
                     SRApi.T("重生延迟、出生无敌、炮弹卡死自动重生（挑战/自由通用）。",
                             "Respawn delay, spawn invincibility and cannon-stuck respawn (challenge and freeplay)."));
                 if (_delay != null) QuickAdjust.PageSlider(SRApi.T("重生延迟", "Respawn delay"),
-                    SRApi.T("死亡后等多少秒再自动重生\n游戏原生长按阈值是 0.5 秒\n挑战/自由模式", "seconds to wait after death\nvanilla hold threshold is 0.5s\nchallenge and freeplay"),
-                    _delay, 0f, 3f, "0.0");
+                    SRApi.T("死亡后等多少秒再自动重生\n默认值就是游戏原版数值，可自行调大调小\n0 = 立即重生", "seconds to wait after death before respawning\ndefaults to the game's own value; adjust freely\n0 = respawn instantly"),
+                    _delay, 0f, 10f, "0.0");
                 if (_invincible != null) QuickAdjust.PageSlider(SRApi.T("出生无敌", "Spawn invincibility"),
                     SRApi.T("每次出生后的无敌秒数\n游戏原生重生后是 1 秒\n挑战/自由模式", "seconds of invincibility after each spawn\nvanilla gives 1s after respawn\nchallenge and freeplay"),
                     _invincible, 0f, 10f, "0.0");
@@ -128,6 +134,11 @@ namespace SR_UCH.Tweaks {
                 }
 
             } catch (Exception __ex) { SRApi.Guard.Log("重生/轮询", __ex); }
+        }
+
+        internal static void SetDelayFromVanilla(float v) {
+            if (_delay == null) return;
+            _delay.Value = Mathf.Clamp(Mathf.Round(v * 10f) / 10f, 0f, 10f);
         }
 
         // 自由模式的重生延迟：见文件末尾 RespawnDelayTimingPatch。
@@ -911,7 +922,19 @@ internal static class RespawnDelayTimingPatch {
             if (__instance == null || !__instance.hasAuthority) return;
             if (!SRApi.GateMaster) { Restore(__instance); return; }
             float d = RespawnTools.RespawnDelaySeconds;
-            bool want = d > 0.01f && !__instance.Success
+            // 还没同步：把这个人物的原版 maxDeathDelay 当作"原版数值"写进配置（只做一次）。
+            if (d < 0f) {
+                if (!RespawnTools._respawnDelaySynced) {
+                    RespawnTools._respawnDelaySynced = true;
+                    float vanilla = __instance.maxDeathDelay;
+                    if (vanilla >= 0f && vanilla <= 10f) {
+                        try { RespawnTools.SetDelayFromVanilla(vanilla); } catch { /* 静默：写配置失败不影响功能 */ }
+                    }
+                }
+                Restore(__instance);
+                return;
+            }
+            bool want = !__instance.Success
                 && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay | SRApi.ModeMask.Challenge);
             if (!want) { Restore(__instance); return; }
             float[] o;
