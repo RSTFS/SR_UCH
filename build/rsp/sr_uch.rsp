@@ -32,6 +32,7 @@ SR_UCH\SR.ColorPicker.cs
 SR_UCH\SR.Table.cs
 SR_UCH\SR.Window.cs
 SR_UCH\SR.Gate.cs
+SR_UCH\SR.Settings.Controls.cs
 SR_UCH\SR.Settings.cs
 SR_UCH\SR.KeyBinds.cs
 SR_UCH\SR.Styles.cs

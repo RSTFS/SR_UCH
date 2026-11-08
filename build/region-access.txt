@@ -57,3 +57,16 @@ _winHeight
 _winWidth
 _winX
 _winY
+_comboSeq
+_comboSeqFrame
+_curIsInternal
+_editSelfFrame
+_enumOptionsVersion
+_hoverFrame
+_hoverTaken
+_sliderNative
+_sliderNativeThumb
+_wheelClaimCur
+_wheelClaimFrame
+_wheelClaimPrev
+_wheelDelta
