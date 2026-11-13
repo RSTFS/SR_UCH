@@ -34,7 +34,7 @@ namespace SR_UCH.Tweaks {
         // 6 档：0 泛滥 / 1 普通 / 2 精良 / 3 稀有 / 4 史诗 / 5 传说；-1 = 禁用（不出现）
         private static readonly string[] TierZh = { "泛滥", "普通", "精良", "稀有", "史诗", "传说" };
         private static readonly string[] TierEn = { "Flood", "Common", "Fine", "Rare", "Epic", "Legendary" };
-        private static readonly Color[] TierColor = {
+        private static readonly Color[] TierColorDefault = {
             new Color(0.60f, 0.64f, 0.70f),   // 泛滥 · 灰
             new Color(0.91f, 0.94f, 0.98f),   // 普通 · 白
             new Color(0.42f, 0.88f, 0.54f),   // 精良 · 绿
@@ -42,11 +42,14 @@ namespace SR_UCH.Tweaks {
             new Color(0.71f, 0.48f, 1.00f),   // 史诗 · 紫
             new Color(1.00f, 0.83f, 0.36f),   // 传说 · 金
         };
+        // 实际生效的颜色（配置优先，缺省回退默认表）。
+        private static readonly Color[] TierColor = new Color[6];
         private static readonly float[] TierAlpha = { 0.22f, 0.36f, 0.52f, 0.68f, 0.84f, 1.00f };
         private static readonly int[] TierMaxWeight = { int.MaxValue, 2000, 1000, 700, 500, 200 };
 
         private static IFeatureHost _mp;
-        private static ConfigEntry<bool> _enabled, _breathe, _invert, _legend;
+        private static ConfigEntry<bool> _enabled, _breathe;
+        private static ConfigEntry<string>[] _tierColors;   // 六档自定义颜色（十六进制）
         private static ConfigEntry<int> _strength, _size;
         private static Sprite _glowSprite;          // 柔光（六档共用一张）
         private static Material _addMat;            // 加色混合材质：让"光"叠到画面上而不是盖一层灰
@@ -117,10 +120,15 @@ namespace SR_UCH.Tweaks {
             _mp = plugin;
             _enabled = _mp.Config.Bind(Sec, "Enabled", true, "按当前概率给派对盒里的道具加一圈品质光晕；纯本地视觉，联机各端各画各的。");
             _strength = _mp.Config.Bind(Sec, "Strength", 100, new ConfigDescription("光晕不透明度百分比（20-150）。", new AcceptableValueRange<int>(20, 150)));
+            _tierColors = new ConfigEntry<string>[6];
+            for (int i = 0; i < 6; i++) {
+                _tierColors[i] = _mp.Config.Bind(Sec, "Tier Color " + i, "#" + ColorUtility.ToHtmlStringRGB(TierColorDefault[i]),
+                    "第 " + (i + 1) + " 档（" + TierZh[i] + "）的光晕颜色，十六进制 #RRGGBB。");
+                TierColor[i] = ParseColor(_tierColors[i].Value, TierColorDefault[i]);
+                SRApi.LocKey(Sec, "Tier Color " + i, TierZh[i] + "颜色", TierEn[i] + " color");
+            }
             _size = _mp.Config.Bind(Sec, "Size", 180, new ConfigDescription("光晕相对道具包围盒的尺寸百分比（100-300）。", new AcceptableValueRange<int>(100, 300)));
             _breathe = _mp.Config.Bind(Sec, "Breathe", false, "轻微呼吸脉动。用缩放时间驱动：梦境定格时它会跟着静止。");
-            _invert = _mp.Config.Bind(Sec, "Invert", false, "反向着色：概率越高越亮（默认概率越低品质越高）。");
-            _legend = _mp.Config.Bind(Sec, "Legend", true, "在本页显示品质图例与当前派对盒里的件数统计。");
 
             SRApi.LocSec(Sec, "品质光芒", "Rarity Glow");
 
@@ -185,8 +193,8 @@ namespace SR_UCH.Tweaks {
                 }
             } catch (Exception ex) { SRApi.Guard.Log("品质光芒/读概率", ex); }
             if (w <= 0) return -1;                       // 0 = 该道具不会出现在派对盒
-            for (int t = 5; t >= 0; t--) if (w <= TierMaxWeight[t]) return _invert.Value ? 5 - t : t;
-            return _invert.Value ? 5 : 0;
+            for (int t = 5; t >= 0; t--) if (w <= TierMaxWeight[t]) return t;
+            return 0;
         }
 
         // ============ 光晕的创建 / 更新 / 移除 ============
@@ -256,6 +264,16 @@ namespace SR_UCH.Tweaks {
             if (_breathe.Value) a *= 0.86f + 0.14f * Mathf.Sin(Time.time * 2.2f + pb.GetInstanceID() * 0.37f);
             Color c = TierColor[tier];
             sr.color = new Color(c.r, c.g, c.b, Mathf.Clamp01(a));
+            if (_addMat != null) {
+                try { _addMat.SetColor("_TintColor", new Color(c.r, c.g, c.b, Mathf.Clamp01(a))); }
+                catch (Exception __tc) { SRApi.Guard.Log("品质光芒/tint", __tc); }
+            }
+        }
+
+        private static Color ParseColor(string hex, Color fallback) {
+            Color c;
+            if (!string.IsNullOrEmpty(hex) && ColorUtility.TryParseHtmlString(hex.Trim(), out c)) return c;
+            return fallback;
         }
 
         private static SpriteRenderer FirstArt(PickableBlock pb) {
@@ -373,42 +391,7 @@ namespace SR_UCH.Tweaks {
             CfgRow(_strength);
             CfgRow(_size);
             CfgRow(_breathe);
-            CfgRow(_invert);
-            CfgRow(_legend);
 
-            if (!_legend.Value) return;
-            Line("品质由「当前概率」决定：概率越低越稀有，光晕越亮。权重取自派对盒自己的抽取口径（BlockGroup.GetItemFilterWeight），不是道具的基础稀有度。",
-                 "Tier comes from the *current* probability: lower chance = rarer = brighter. Weights use the party box's own draw rule (BlockGroup.GetItemFilterWeight), not the prefab's base rarity.");
-            Line("" + (_invert.Value ? "反向着色已开启：概率越高越亮。" : "反向着色已关闭：概率越低越亮。"),
-                 "" + (_invert.Value ? "Inverted: higher chance is brighter." : "Normal: lower chance is brighter."));
-
-            GUILayout.Space(SRApi.Ctl.Sc(6f));
-            bool shapeOn = AShape(), hc = AContrast();
-            for (int t = 5; t >= 0; t--) {
-                Color c = TierColor[t];
-                // 文字等级标签：等级名 + [n/6] 序号，完全不依赖颜色也能分档。
-                string zh = TierZh[t] + "  [" + (t + 1) + "/6]  x" + _tierCount[t];
-                string en = TierEn[t] + "  [" + (t + 1) + "/6]  x" + _tierCount[t];
-                GUILayout.Label(SRApi.Ctl.Content(SRApi.T(zh, en)), SRApi.Ctl.Label);
-                // 色块画在上一行文字的右侧：不建布局组（会被 UI 约定守卫拦），也不改 GUI.color
-                // GetLastRect 只在 Repaint 趟有真实矩形；Layout 趟拿到的是退化值（表格踩过同款坑）。
-                if (Event.current != null && Event.current.type == EventType.Repaint) {
-                    Rect last = GUILayoutUtility.GetLastRect();
-                    float u = SRApi.Ctl.Sc(1f);
-                    float w = 22f * u, h = 12f * u;
-                    float bx = last.xMax + 6f * u, by = last.y + (last.height - h) * 0.5f;
-                    if (hc) SRApi.DrawFill(new Rect(bx - 2f * u, by - 2f * u, w + 4f * u, h + 4f * u),
-                                          new Color(0.02f, 0.02f, 0.02f, 1f));
-                    SRApi.DrawFill(new Rect(bx, by, w, h), new Color(c.r, c.g, c.b, 0.95f));
-                    if (shapeOn) DrawShapeMark(new Rect(bx + 28f * u, by, 30f * u, h), t, c);
-                }
-            }
-            Line("派对盒内共 " + _totalSeen + " 件；权重为 0（本局不会出现）的 " + _tierCount[6] + " 件不发光。",
-                 _totalSeen + " items in the party box; " + _tierCount[6] + " with weight 0 (never picked) stay dark.");
-            Line("「可读性」页可以打开六档形状图案（虚点/单环/双环/斜纹/棋盘/放射）与高对比；关掉时六档仍用同一圈柔光，靠上面的文字等级名区分。",
-                 "The Readability page adds six shape patterns and high contrast; with shapes off, all tiers share one soft glow and the text tier names carry the distinction.");
-            Line("说明：光晕是道具自己的子对象，道具消失时自动带走；不修改原材质、不同步网络、不影响抽取结果。",
-                 "The glow is a child of each pickable: it disappears with the item. No material edits, no network sync, no effect on draw odds.");
         }
     }
 }
