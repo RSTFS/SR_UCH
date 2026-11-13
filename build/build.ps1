@@ -102,10 +102,7 @@ $rspFeatures = @(
     'feat_CharacterAuto.rsp',
     'feat_Experiments.rsp',
     'feat_FreePlay.rsp',
-    'feat_A11y.rsp',
-    'feat_Brief.rsp',
     'feat_Chaos.rsp',
-    'feat_HostConsole.rsp',
     'feat_NotifyHub.rsp',
     'feat_PartyGlow.rsp'
 )

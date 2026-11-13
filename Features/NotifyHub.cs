@@ -53,7 +53,7 @@ namespace SR_UCH.Tweaks {
             public bool Reopenable;
         }
 
-        private static ConfigEntry<bool> _enabled, _native, _quiet, _onScreen, _writeRec;
+        private static ConfigEntry<bool> _enabled, _native, _quiet, _onScreen;
         private static ConfigEntry<int> _maxVisible, _toastSeconds, _corner;
 
         private static readonly List<Notice> _history = new List<Notice>();
@@ -162,9 +162,8 @@ namespace SR_UCH.Tweaks {
             _quiet = plugin.Config.Bind(Sec, "Quiet In Match", true, "对局中静默低/中优先级提示（仍进历史）；高优先级照常弹。");
             _maxVisible = plugin.Config.Bind(Sec, "Max Visible", 3,
                 new ConfigDescription("浮层最多同时显示几条（1-6）。", new AcceptableValueRange<int>(1, 6)));
-            _toastSeconds = plugin.Config.Bind(Sec, "Toast Seconds", 4,
+            _toastSeconds = plugin.Config.Bind(Sec, "Toast Seconds", 2,
                 new ConfigDescription("每条通知停留秒数（2-15），可读性页可以再加秒。", new AcceptableValueRange<int>(2, 15)));
-            _writeRec = plugin.Config.Bind(Sec, "Write To Recorder", true, "把中/高优先级通知写进关卡记录器的时间线（软依赖）。");
             _corner = plugin.Config.Bind(Sec, "Corner", 0,
                 new ConfigDescription("浮层停靠角：0 右下 / 1 右上 / 2 左下 / 3 左上。", new AcceptableValueRange<int>(0, 3)));
 
@@ -280,10 +279,6 @@ namespace SR_UCH.Tweaks {
                 }
 
                 // 写进关卡记录器时间线：低优先级的纯确认不写，避免刷屏。
-                if (_writeRec.Value && level >= 1 && _aRecNote != null) {
-                    try { _aRecNote(SRApi.T("屏幕提示：", "Toast: ") + text); }
-                    catch (Exception ex) { SRApi.Guard.Log("通知中心/写记录", ex); }
-                }
                 return !native;
             } catch (Exception ex) {
                 SRApi.Guard.Log("通知中心/收口", ex);
@@ -432,11 +427,8 @@ namespace SR_UCH.Tweaks {
             CfgRow(_quiet);
             CfgRow(_maxVisible);
             CfgRow(_toastSeconds);
-            CfgRow(_writeRec);
             CfgRow(_corner);
 
-            Line("所有屏幕提示都经过一个核心钩子统一收口，包括核心自己的提示、Notify、NotifyT 与 NotifyTag；日志仍由核心照常写入。",
-                 "Every toast goes through one core hook: core notices, Notify, NotifyT and NotifyTag. Logging stays with the core.");
             Line("「退回游戏原生提示」打开后，本功能只记历史不改屏幕；这是零风险回退开关。",
                  "'Use Native Toast' restores the game's own toasts while history is still kept; it is a zero-risk rollback switch.");
             Line("对局中静默只影响低/中优先级；提案、失败、拒绝这类要动手的提示永远会弹。静默的条目仍在历史里可查。",

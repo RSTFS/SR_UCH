@@ -94,7 +94,4 @@ Features\CharacterAuto.cs
 SR_UCH\SR.Wheel.cs
 Features\Chaos.cs
 Features\PartyGlow.cs
-Features\Brief.cs
-Features\HostConsole.cs
 Features\NotifyHub.cs
-Features\A11y.cs
