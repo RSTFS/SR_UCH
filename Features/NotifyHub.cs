@@ -130,9 +130,9 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Card Opacity",
                 "卡片不透明度\n浮层卡片背景的不透明度百分比（20-100），默认 86。",
                 "Card opacity\nOverlay card background opacity in percent. Range 20-100, default 86.");
-            SRApi.LocKey(Sec, "Corner", "浮层停靠角", "Overlay corner");
+            SRApi.LocKey(Sec, "Corner", "停靠位置", "Overlay position");
             SRApi.LocDesc(Sec, "Corner",
-                "浮层停靠角\n浮层停靠角：0 右下 / 1 右上 / 2 左下 / 3 左上。",
+                "浮层停靠角\n浮层停靠位置：0 右下 / 1 右上 / 2 左下 / 3 左上。",
                 "Overlay corner\n0 bottom-right / 1 top-right / 2 bottom-left / 3 top-left.");
             SRApi.LocKey(Sec, "Open Key", "打开历史快捷键", "Open history key");
             SRApi.LocDesc(Sec, "Open Key",
@@ -156,11 +156,11 @@ namespace SR_UCH.Tweaks {
                 if (e == null || e.Definition.Section != Sec) return false;
                 switch (e.Definition.Key) {
                     case "Max Visible": min = 1.0f; max = 6.0f; return true;
-                    case "Toast Seconds": min = 2.0f; max = 15.0f; return true;
+                    case "Toast Seconds": min = 1.0f; max = 5.0f; return true;
                     case "History Limit": min = 100.0f; max = 2000.0f; return true;
                     case "Corner": min = 0.0f; max = 3.0f; return true;
                     case "Card Opacity": min = 20.0f; max = 100.0f; return true;
-                    case "Card Width": min = 120.0f; max = 340.0f; return true;
+                    case "Card Width": min = 100.0f; max = 300.0f; return true;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("数值滑块范围", __ex); }
             return false;
@@ -170,17 +170,17 @@ namespace SR_UCH.Tweaks {
             _enabled = plugin.Config.Bind(Sec, "Enabled", true, "统一接管所有屏幕提示：分级、合并、静默。");
             _native = plugin.Config.Bind(Sec, "Use Native Toast", false, "退回游戏原生提示（本功能只记历史，不改屏幕显示）。");
             _onScreen = plugin.Config.Bind(Sec, "Show On Screen", true, "在局内显示一条可折叠的通知浮层；关掉后只保留历史页。");
-            _quiet = plugin.Config.Bind(Sec, "Quiet In Match", true, "对局中静默低/中优先级提示（仍进历史）；高优先级照常弹。");
+            _quiet = plugin.Config.Bind(Sec, "Quiet In Match", false, "对局中静默低/中优先级提示（仍进历史）；高优先级照常弹。");
             _maxVisible = plugin.Config.Bind(Sec, "Max Visible", 3,
                 new ConfigDescription("浮层最多同时显示几条（1-6）。", new AcceptableValueRange<int>(1, 6)));
             _toastSeconds = plugin.Config.Bind(Sec, "Toast Seconds", 2,
-                new ConfigDescription("每条通知停留秒数（2-15），可读性页可以再加秒。", new AcceptableValueRange<int>(2, 15)));
-            _cardW = plugin.Config.Bind(Sec, "Card Width", 170,
-                new ConfigDescription("浮层卡片像素宽度（120-340）。", new AcceptableValueRange<int>(120, 340)));
+                new ConfigDescription("每条通知停留秒数（1-5）。", new AcceptableValueRange<int>(1, 5)));
+            _cardW = plugin.Config.Bind(Sec, "Card Width", 200,
+                new ConfigDescription("浮层卡片像素宽度（100-300）。", new AcceptableValueRange<int>(100, 300)));
             _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 86,
                 new ConfigDescription("浮层卡片背景不透明度百分比（20-100）。", new AcceptableValueRange<int>(20, 100)));
             _corner = plugin.Config.Bind(Sec, "Corner", 0,
-                new ConfigDescription("浮层停靠角：0 右下 / 1 右上 / 2 左下 / 3 左上。", new AcceptableValueRange<int>(0, 3)));
+                new ConfigDescription("浮层停靠位置：0 右下 / 1 右上 / 2 左下 / 3 左上。", new AcceptableValueRange<int>(0, 3)));
 
             SRApi.LocSec(Sec, "通知", "Notifications");
 
@@ -372,7 +372,7 @@ namespace SR_UCH.Tweaks {
             _small.fontSize = Mathf.RoundToInt(12f * s);
             _label.normal.textColor = hc ? Color.white : new Color(0.94f, 0.96f, 0.99f, 1f);
 
-            float w = Mathf.Clamp(_cardW.Value * s, 120f, 340f);   // 默认 170 ≈ 原 300 的一半，可在设置里调
+            float w = Mathf.Clamp(_cardW.Value * s, 100f, 300f);   // 默认 170 ≈ 原 300 的一半，可在设置里调
             float pad = 8f * s;
             float now = Time.unscaledTime;
 
@@ -464,10 +464,10 @@ namespace SR_UCH.Tweaks {
             {
                 int[] vals = new int[] { 0, 1, 2, 3 };
                 string[] labels = new string[] {
-                    SRApi.T("停靠角：右下", "Corner: bottom-right"),
-                    SRApi.T("停靠角：右上", "Corner: top-right"),
-                    SRApi.T("停靠角：左下", "Corner: bottom-left"),
-                    SRApi.T("停靠角：左上", "Corner: top-left")
+                    SRApi.T("停靠位置：右下", "Position: bottom-right"),
+                    SRApi.T("停靠位置：右上", "Position: top-right"),
+                    SRApi.T("停靠位置：左下", "Position: bottom-left"),
+                    SRApi.T("停靠位置：左上", "Position: top-left")
                 };
                 int cur = Mathf.Clamp(_corner.Value, 0, 3);
                 bool open = _cornerOpen;
