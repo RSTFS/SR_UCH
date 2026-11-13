@@ -287,6 +287,26 @@ public partial class SR {
             try { PatchAudit(); } catch (Exception __ex) { Guard.Log("补丁目标自检", __ex); }
             try { RefAudit(); } catch (Exception __ex) { Guard.Log("反射成员自检", __ex); }
             // 孤儿键审计不在这里跑：此时组合键 / Hotkeys 条目尚未惰性 Bind，会大批误报（见 EnsureScanned）。
+
+            // 开局档案套用后会重跑一次完整自检。走 Slots 而不是新增 SRApi 成员：
+            // 契约层 API 表面与自检基线 api 计数都不用动，功能层仍只认 BCL 委托。
+            Slots.Provide("sr.audit.rescan", (Func<int>)(() => RescanAudit()));
+        }
+
+        /// <summary>真正重跑一次自检，返回当前失效项数（-1 = 重扫本身出错）。</summary>
+        /// <remarks>自检页的 Rescan 只调 ScanPatches() 重扫补丁归因表；PatchAudit / RefAudit
+        /// 都有幂等锁且 _auditIssues 不清空，所以这里显式解锁并重建问题表。</remarks>
+        public static int RescanAudit() {
+            try {
+                _auditIssues.Clear();
+                _patchAudited = false;
+                _refAudited = false;
+                PatchAuditBad = 0;
+                try { PatchAudit(); } catch (Exception __p) { Guard.Log("自检/重扫补丁", __p); }
+                try { RefAudit(); } catch (Exception __r) { Guard.Log("自检/重扫反射", __r); }
+                try { ScanPatches(); } catch (Exception __s) { Guard.Log("自检/重扫归因", __s); }
+                return _auditIssues.Count;
+            } catch (Exception __ex) { Guard.Log("自检/重扫", __ex); return -1; }
         }
 
         // 从配置文件里真正清掉孤儿键（原子替换并留 .bak，会写盘）；返回清掉的条数（0 = 无可清或拿不到表）。

@@ -42,8 +42,37 @@ public partial class SR {
         private static string _tipDownScene;
         private static float _tipRetryAt;   // 降级后的下次重试时刻（60 秒一次）
 
+        // 通知治理钩子（可选）：功能层通过 Slots 提供 "sr.notify.hook"（Func<string,string,bool>）。
+        // 返回 true = 已由治理中心负责屏幕显示，核心不再调 ShowUserMessage；false / 无提供者 = 照旧。
+        // 关键：先用 Slots.Names 判存在再 Require。未安装治理中心时既不产生「槽位缺失」记录，
+        // 也不改变任何原有行为（只是每 2 秒遍历一次已登记槽位名，开销可忽略）。
+        // 所有提示（SRApi.Notify / NotifyT / NotifyTag / 核心直接调 SR.Notify）都汇到 NotifyImpl，
+        // 因此一个钩子即可统一收口，无需改动任何调用点。
+        private const string NotifyHookSlot = "sr.notify.hook";
+        private static Func<string, string, bool> _notifyHook;
+        private static float _notifyHookNext;
+
+        private static Func<string, string, bool> NotifyHook() {
+            if (_notifyHook != null) return _notifyHook;
+            if (Time.unscaledTime < _notifyHookNext) return null;
+            _notifyHookNext = Time.unscaledTime + 2f;
+            foreach (string n in Slots.Names) {
+                if (n != NotifyHookSlot) continue;
+                _notifyHook = Slots.Require<Func<string, string, bool>>(NotifyHookSlot);
+                break;
+            }
+            return _notifyHook;
+        }
+
         private static void NotifyImpl(string text, string tag) {
-            try { ShowUserMessage(text); } catch (Exception __ex) { Guard.Log("提示(UserMessage)", __ex); }
+            bool handled = false;
+            try {
+                Func<string, string, bool> hook = NotifyHook();
+                if (hook != null) handled = hook(text, tag ?? "");
+            } catch (Exception __ex) { Guard.Log("提示(治理钩子)", __ex); }
+            if (!handled) {
+                try { ShowUserMessage(text); } catch (Exception __ex) { Guard.Log("提示(UserMessage)", __ex); }
+            }
             try { SR.LogInfo("[" + (string.IsNullOrEmpty(tag) ? "SR" : tag) + "] " + text); } catch (Exception __ex) { Guard.Log("NotifyImpl", __ex); }
         }
 
