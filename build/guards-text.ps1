@@ -111,7 +111,10 @@ function Check-RspCoverage {
 function Check-Encoding {
     $bad = @()
     $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
-    foreach ($f in Get-ChildItem -LiteralPath $Root -Recurse -File -Include *.cs, *.ps1, *.rsp, *.md, *.txt, *.json) {
+    # 注意：-LiteralPath 与 -Include 同用时不生效（PowerShell 5.1 的坑），会把 .dll/.png 等二进制
+    # 也当文本扫进来误报“非 UTF-8”。改成按扩展名显式过滤。
+    $textExt = @('.cs','.ps1','.rsp','.md','.txt','.json')
+    foreach ($f in Get-ChildItem -LiteralPath $Root -Recurse -File | Where-Object { $textExt -contains $_.Extension.ToLower() }) {
         $full = ($f.FullName -replace '\\', '/')
         if ($full -match '/bin/|/obj/|/\.cache/|/\.git/') { continue }
         try {
