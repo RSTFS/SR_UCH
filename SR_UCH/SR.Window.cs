@@ -384,7 +384,12 @@ public partial class SR {
             }
             if (!_resizing) {
                 float sbDivX = winRect.x + SidebarWidth();
-                bool overSbDiv = Mathf.Abs(mouse.x - sbDivX) < Sc(5);
+                // 命中区必须限制在"顶栏之下、底栏之上"：否则鼠标在窗口外（标题栏/底栏/窗口下方）
+                // 也会判成命中间隔线，光标变成拖拽样式并开始改宽度（用户反馈）。
+                float sbTopY = winRect.y + Sc(26f);   // 顶栏固定 26（与设置页签行同高）
+                float sbBotY = winRect.yMax - SR.FooterHeight;
+                bool inSbBand = mouse.y >= sbTopY && mouse.y <= sbBotY;
+                bool overSbDiv = inSbBand && Mathf.Abs(mouse.x - sbDivX) < Sc(5);
                 if (overSbDiv) CursorResize = true; // 悬停在可拖拽的栏目分隔线上
                 if (e.type == EventType.MouseDown && e.button == 0 && overSbDiv) {
                     _sidebarResizing = true;
