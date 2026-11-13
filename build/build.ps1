@@ -365,6 +365,8 @@ if ($Check) {
     if (-not (Invoke-ContractBoundaryCheck)) { $allOk = $false }
     if (-not (Invoke-FeatureImplLeakCheck)) { $allOk = $false }
     if (-not (Invoke-SinkCoverageCheck)) { $allOk = $false }
+    $schemaGuard = Join-Path $PSScriptRoot 'guards-schema.ps1'
+    if (Test-Path -LiteralPath $schemaGuard) { & $schemaGuard; if ($LASTEXITCODE -ne 0) { $allOk = $false } }
     if (-not $allOk) { Write-Host '== 有守卫未通过 ❌ =='; exit 1 }
     Write-Host '== 全部守卫通过 ✅ =='
     exit 0

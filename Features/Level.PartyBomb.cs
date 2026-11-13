@@ -168,6 +168,8 @@ namespace SR_UCH.Tweaks {
         public void Initialize(IFeatureHost plugin) {
             try {
                 SRApi.LocKey("Level", "Drop Held Piece", "放弃道具", "Drop held piece");
+                SRApi.LocKey("Level", "Party Bomb", "派对盒子炸弹", "Party bomb");
+                SRApi.LocKey("Level", "Party Bomb Type", "炸弹类型", "Party bomb type");
                 SRApi.LocDesc("Level", "Drop Held Piece", "放弃道具按键\n派对阶段丢弃手上的道具（游戏原生通道）\n请勿删除边界墙和出生方块，删了无法复原", "Drop held piece\ndiscards the held piece during the pick phase via the game channel\nnever delete boundary walls or spawn blocks - it cannot be undone");
                 _key = plugin.Config.Bind("Level", "Drop Held Piece", KeyCode.None,
                     "按这个键就把手上拿着的那块丢掉（走游戏原生通道, 全员可见）, 填 None 就是不绑键.");
