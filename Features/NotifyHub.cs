@@ -387,27 +387,39 @@ namespace SR_UCH.Tweaks {
                 for (int i = 0; i < _visible.Count; i++) {
                     Notice n = _visible[i];
                     float h = heights[i];
-                    Rect box = new Rect(x, y, w, h);
-                    Fill(box, new Color(0.06f, 0.08f, 0.11f, hc ? 0.97f : 0.86f));
+                    // 动画：出现时 0.18 秒淡入 + 从停靠侧滑入 8px；消失前 0.22 秒淡出。
+                    float age = Mathf.Max(0f, now - n.At);
+                    float left = Mathf.Max(0f, n.Until - now);
+                    float anim = Mathf.Clamp01(age / 0.18f);
+                    if (left < 0.22f) anim *= Mathf.Clamp01(left / 0.22f);
+                    anim = anim * anim * (3f - 2f * anim);                 // smoothstep，起落都不生硬
+                    float slide = (1f - Mathf.Clamp01(age / 0.18f)) * 8f * s;
+                    float ax = x + ((corner == 2 || corner == 3) ? -slide : slide);
+                    float aa = Mathf.Clamp01(anim);
+                    Color prevGui = GUI.color;
+                    GUI.color = new Color(1f, 1f, 1f, aa);
+                    Rect box = new Rect(ax, y, w, h);
+                    Fill(box, new Color(0.06f, 0.08f, 0.11f, (hc ? 0.97f : 0.86f) * aa));
                     // 左侧优先级色条：颜色之外还有「长短」这一重编码（高=最长）。
                     Color bar = n.Level == 2 ? new Color(1f, 0.55f, 0.22f, 1f)
                               : n.Level == 1 ? new Color(0.36f, 0.72f, 1f, 1f)
                               : new Color(0.55f, 0.60f, 0.66f, 1f);
-                    Fill(new Rect(x, y, (n.Level == 2 ? 6f : 3f) * s, h), bar);
+                    Fill(new Rect(ax, y, (n.Level == 2 ? 6f : 3f) * s, h), new Color(bar.r, bar.g, bar.b, aa));
 
                     string head = n.Level == 2 ? SRApi.T("重要", "IMPORTANT")
                                 : n.Level == 1 ? SRApi.T("提示", "INFO") : SRApi.T("已办", "DONE");
-                    GUI.Label(new Rect(x + pad, y + pad * 0.5f, w - pad * 2f, 16f * s),
+                    GUI.Label(new Rect(ax + pad, y + pad * 0.5f, w - pad * 2f, 16f * s),
                               head + (n.Count > 1 ? "  x" + n.Count : ""), _small);
                     // 文本区底部 +1px 缓冲：游戏字体最后一笔常被 CalcSize 少算 1px，
                     // 不加缓冲时"y/g/p"这类下伸笔画的最后一行会被裁掉。
-                    GUI.Label(new Rect(x + pad, y + pad * 0.5f + 16f * s,
+                    GUI.Label(new Rect(ax + pad, y + pad * 0.5f + 16f * s,
                                        w - pad * 2f - 6f * s, h - pad - 16f * s + 1f),
                               n.Text, _label);
                     // 底部剩余时间条：长度随剩余比例缩短，一眼看出还来得及点。
                     float life = n.Until > n.At ? Mathf.Clamp01((n.Until - now) / (n.Until - n.At)) : 0f;
-                    Fill(new Rect(x + (n.Level == 2 ? 6f : 3f) * s, y + h - 3f * s, (w - (n.Level == 2 ? 6f : 3f) * s) * life, 3f * s),
-                         new Color(bar.r, bar.g, bar.b, 0.85f));
+                    Fill(new Rect(ax + (n.Level == 2 ? 6f : 3f) * s, y + h - 3f * s, (w - (n.Level == 2 ? 6f : 3f) * s) * life, 3f * s),
+                         new Color(bar.r, bar.g, bar.b, 0.85f * aa));
+                    GUI.color = prevGui;
                     y += h + 4f * s;
                 }
             } finally {
