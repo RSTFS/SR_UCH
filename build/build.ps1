@@ -100,7 +100,8 @@ $rspFeatures = @(
     'feat_BuildingPresets.rsp',
     'feat_HUD.rsp',
     'feat_CharacterAuto.rsp',
-    'feat_Experiments.rsp', 'feat_FreePlay.rsp'
+    'feat_Experiments.rsp', 'feat_FreePlay.rsp',
+    'feat_A11y.rsp', 'feat_Brief.rsp', 'feat_Chaos.rsp', 'feat_DeathReport.rsp', 'feat_HostConsole.rsp', 'feat_LevelRecorder.rsp', 'feat_MatchCast.rsp', 'feat_MatchProfile.rsp', 'feat_NotifyHub.rsp', 'feat_PartyGlow.rsp', 'feat_TimeControl.rsp'
 )
 $outDir = Join-Path $Root 'bin\Release'
 
