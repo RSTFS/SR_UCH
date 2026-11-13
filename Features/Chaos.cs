@@ -162,8 +162,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "ProposeKey",
                 "提案快捷键\n房客按此键向房主提案一张牌；离线本机即房主，请直接用重抽键。",
                 "Propose key\nGuest: press to propose a card to the host. Offline, use the reroll key instead.");
-            // 牌池 10 张牌在 Sec 段，自绘但同样需要登记显示名。
-            SRApi.LocSec(Sec, "牌池", "Card pool");
             SRApi.LocKey(Sec, "Low gravity", "低重力", "Low gravity");
             SRApi.LocDesc(Sec, "Low gravity",
                 "低重力\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
@@ -256,7 +254,8 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec("Chaos", "混乱牌组", "Chaos Deck");
             RegUi();
             SRApi.Nav("Chaos", 96);   // 联机(90)/时间控制(91) 之后、实验(100) 之前
-            SRApi.RegisterPage("Chaos", "Deck", "混乱牌组", "Deck", 118, RenderPage);
+            SRApi.RegisterPage("Chaos", "Deck", "牌组", "Deck", 118, RenderPage);
+            SRApi.RegisterPage("Chaos", "Pool", "牌池", "Card pool", 130, RenderPoolPage);
 
             // 静态幂等：ITweak 没有 Shutdown 契约，重复 Initialize 不能叠加监听器。
             if (_listener == null) {
@@ -763,8 +762,7 @@ namespace SR_UCH.Tweaks {
                                        RestoreLastProposal);
             }
 
-            Line("牌池（勾选才可能被抽到）：", "Card pool (checked cards can be drawn):");
-            for (int i = 0; i < Cards.Length; i++) CfgRow(_pool[i]);
+            Line("牌池在「牌池」页勾选（勾上才可能被抽到）。", "Pick the drawable cards on the Card pool page.");
 
             Line("说明：仅房主需要安装；房客未安装时由游戏原生规则生效，房客能看到规则变化但看不到本页。",
                  "Only the host needs the mod. Guests without it still get the vanilla rule change, but cannot see this page.");
@@ -776,6 +774,14 @@ namespace SR_UCH.Tweaks {
                  "Before every draw the previous rules are re-broadcast at their original values, so guest rules never accumulate round over round.");
             SRApi.Ctl.HotkeyButton("chaos.reroll", SRApi.T("立刻重抽一张", "Draw again now"),
                                    SRApi.T("仅房主 / 离线有效", "Host or offline only"), DrawAndBroadcast);
+        }
+
+        // 牌池单独一页：只放 10 张牌的勾选行，避免和牌组状态混在一屏。
+        private void RenderPoolPage() {
+            Line("勾上的牌才可能被抽到；至少留一张。", "Checked cards can be drawn; keep at least one enabled.");
+            for (int i = 0; i < Cards.Length; i++) CfgRow(_pool[i]);
+            Line("射速牌刻意不收录：它会改写时间缩放，与「梦境」定格冲突。",
+                 "Rate-of-fire is excluded: it rewrites time scale and conflicts with Dream.");
         }
     }
 }
