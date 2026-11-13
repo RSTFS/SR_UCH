@@ -534,7 +534,7 @@ public partial class SR {
             // 页面滚动就表现为"一开始能用、切几次页后失效"。
             try {
                 string __sig = (_mode == Mode.Settings ? "settings" : (_selectedInternalSection ?? ""))
-                    + "|" + (_mode == Mode.Settings ? SR.SettingsTab.ToString() : (SR.SelectedPageId(_selectedInternalSection) ?? ""));
+                    + "|" + (_mode == Mode.Settings ? "" : (SR.SelectedPageId(_selectedInternalSection) ?? ""));
                 if (__sig != _lastPageSig) {
                     _lastPageSig = __sig;
                     SR.CloseOpenCombos();
@@ -579,11 +579,6 @@ public partial class SR {
             SRApi.Diag("viewport=" + SRApi.PageViewportHeight.ToString("0.0") + " footerTop=" + (__areaH - __barH).ToString("0.0") + " scrollY=" + _scroll.y.ToString("0.0"));
             bool __noScroll = ScrollViewLatchedForThisFrame();
 
-            // 设置页签常驻顶部（画在滚动区之外，不受滚动影响）：「恢复默认」跟在同一行最右侧。
-            if (_mode == Mode.Settings) {
-                try { SR.RenderSettingsTabBar(); }
-                catch (Exception __tb) { Guard.Log("设置页签", __tb); }
-            }
             // 填充页（预设 / 联机）不建立滚动区：它们把列表高度算到"底栏上沿"，
             // 再套一层滚动区只会把列表裁到视口内、而列表自己仍以为可见 → maxY 与实际不符（滑不到底）。
             bool __useScrollView = !__noScroll;
@@ -662,7 +657,6 @@ public partial class SR {
                     if (SR.Wheel.CtrlHeld) {
                         // Ctrl+滚轮 = 切页签（设置页在通用/自检之间切）
                         if (_mode == Mode.Internal) CyclePage(_selectedInternalSection, SR.Wheel.Value > 0f ? -1 : 1);
-                        else if (_mode == Mode.Settings) SR.SettingsTab = SR.Wheel.Value > 0f ? 0 : 1;
                         SR.Wheel.TakeRemaining(false);
                     } else {
                         // 兜底顺序：控件 → 页面级钩子（列表页自己滚） → 页面滚动

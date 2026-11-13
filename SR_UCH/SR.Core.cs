@@ -436,6 +436,7 @@ public partial class SR : ITweak {
             } catch (Exception __ex) { Guard.Log("关机回调批处理", __ex); }
         }
 
+        private static bool _selfCheckFooterDone;
         public static void RegisterTick(string name, Action hook) {
             if (hook == null) return;
             AddOrReplaceHook(_tickHooks, name, hook);
@@ -1114,6 +1115,16 @@ public partial class SR : ITweak {
             SR.LocSec("Home", "首页", null);
             SR.Nav("Home", 10); // 首页自己的侧栏栏目（顺序 10）
             SR.RegisterPage("Home", RenderHomePage); // 首页也走自绘页注册表（SR.Window 不做 if-else 分派）
+            // 底栏入口按"先注册先显示"排列：通知在功能 Initialize 里注册（先），
+            // 自检在这里排第一帧再注册，确保顺序是 设置 | 通知 | 自检。
+            SR.RegisterTick("底栏-自检入口", delegate {
+                if (_selfCheckFooterDone) return;
+                _selfCheckFooterDone = true;
+                try {
+                    SR.RegisterPage("Self-check", "Audit", "自检", "Self-check", 10, SR.RenderAuditBlock);
+                    SRApi.RegisterFooterButton("Self-check", "自检", "Self-check", null);
+                } catch (Exception __fe) { Guard.Log("底栏-自检入口", __fe); }
+            });
             SR.LocKey(Keys.Settings, Keys.UiScale, "界面缩放", null);
             // 统一登记：功能页里没有自带 LocDesc 的可见条目（3 行：是什么 / 怎么用 / 注意；默认值由核心追加）。
             SR.LocDesc("Chat", "Log Limit", "聊天记录条数\n最多保留多少条聊天消息\n超出后丢弃最旧的；仅本模组记录页", "Chat log limit\nhow many chat messages to keep\noldest dropped first; this mod's log page only");

@@ -142,46 +142,13 @@ public partial class SR {
         }
 
         // 常驻页签栏（画在滚动区之外）：[通用] [自检] ……… [恢复默认]
-        internal static void RenderSettingsTabBar() {
-            try {
-                GUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));
-                if (GUILayout.Button(T("通用", "General"), SettingsTab == 0 ? _selItem : _btn, GUILayout.Height(Sc(26)))) SettingsTab = 0;
-                if (GUILayout.Button(T("自检", "Self-check"), SettingsTab == 1 ? _selItem : _btn, GUILayout.Height(Sc(26)))) SettingsTab = 1;
-                GUILayout.FlexibleSpace();
-                // 恢复默认只在通用页出现（自检页没有可复位的配置）。
-                if (SettingsTab == 0) {
-                    // 悬浮说明：告诉它会重置哪些东西、会不会影响 HUD 位置等。
-                    GUIContent __def = new GUIContent(T("恢复默认", "Reset defaults"),
-                        T("恢复默认\n把设置段（按键 / 界面 / 插件）全部写回默认值\n只影响通用页，不动自检与各功能页的开关",
-                          "Reset defaults\nwrites every Settings-section entry (keys / UI / plugins) back to its default\nonly affects the General tab, feature pages are untouched"));
-                    if (GUILayout.Button(__def, _btn, GUILayout.Height(Sc(26)))) ResetAllDefaults();
-                }
-                GUILayout.EndHorizontal();
-                GUILayout.Space(Sc(4));
-            } catch (Exception __ex) { Guard.Log("设置页签栏", __ex); }
-        }
-
-        private static SRApi.TableArgs _hookArgs;   // 帧钩子表格（SR 列表）
-        private static List<string[]> _hookRows = new List<string[]>();   // 每帧刷新的行数据
-        internal static int SettingsTab;   // 0 = 通用，1 = 自检
-
-        // 设置页入口：顶部两个页签，下面按页签渲染。页面切换只改这个字段，不重建任何配置。
         internal static void RenderSettingsPage(float colWidth) {
             try {
-                // Ctrl+滚轮切页（与其它页签式界面一致；只在设置页生效）。
-                try {
-                    Event __e = Event.current;
-                    if (__e != null && __e.type == EventType.ScrollWheel && (__e.control || __e.command)) {
-                        SettingsTab = __e.delta.y > 0f ? 1 : 0;
-                        __e.Use();
-                    }
-                } catch (Exception __sw) { Guard.Log("设置页/Ctrl 滚轮切页", __sw); }
                 // 页面滚动恢复：NoPageScrollBars 现在是"每帧声明、用后清零"（见 SR.Window），
                 // 否则设置页也会被当成"页面不滚动"——这是自检页滚不动的直接原因。
                 SRApi.NoPageScrollBars = false;
                 GUILayout.Space(Sc(4));
-                if (SettingsTab == 1) RenderAuditBlock();
-                else RenderSettingsEntries(colWidth);
+                RenderSettingsEntries(colWidth);
             } catch (Exception __ex) { Guard.Log("设置页", __ex); }
         }
 
@@ -258,7 +225,10 @@ public partial class SR {
             return sb.ToString();
         }
 
-        private static void RenderAuditBlock() {
+        private static SRApi.TableArgs _hookArgs;   // 帧钩子表格（SR 列表）
+        private static List<string[]> _hookRows = new List<string[]>();   // 每帧刷新的行数据
+
+        internal static void RenderAuditBlock() {
             try {
                 // ===== 卡片式布局：每张卡 = 状态点 + 标题 + 一行结论 + [详情] =====
                 System.Collections.Generic.IList<SR.AuditIssue> issues = SR.AuditIssues;
@@ -441,8 +411,12 @@ public partial class SR {
                 // 行高 = 标题与结论两者较高者 + 2px；点、标题、结论都用 MiddleLeft 样式并同高，
                 // 这样三者在行内垂直居中对齐，标题也不会被行裁掉。
                 float __titleH = Mathf.Max(Sc(20), _cdTitle.CalcHeight(new GUIContent(title), Sc(120)));
-                float __sumH = Mathf.Max(Sc(20), _cdSum.CalcHeight(new GUIContent(summary), Mathf.Max(Sc(120), Sc(SRApi.ContentArea.width * 0.55f))));
+                float __textW0 = Mathf.Max(Sc(120), SRApi.ContentArea.width - Sc(18) - Sc(120) - Sc(30));
+                float __sumH = Mathf.Max(Sc(20), _cdSum.CalcHeight(new GUIContent(summary), __textW0));
                 float __rowH = Mathf.Max(__titleH, __sumH) + Sc(2);
+                // 结论标签拿到的是"标题列 + 圆点之后的剩余宽度"；CalcHeight 必须用同一个宽度，
+                // 否则多行失败明细会被按更宽的宽度算成 1-2 行，实际却折成 3-4 行 → 文本被裁（用户反馈）。
+                float __textW = Mathf.Max(Sc(120), SRApi.ContentArea.width - Sc(18) - Sc(120) - Sc(30));
                 GUILayout.BeginHorizontal(GUILayout.Height(__rowH));
                 Color prev = GUI.color;
                 try {
@@ -450,7 +424,7 @@ public partial class SR {
                     GUILayout.Label(ok ? "●" : "▲", _cdDot, GUILayout.Width(Sc(18)), GUILayout.Height(__rowH));
                 } finally { GUI.color = prev; }
                 GUILayout.Label(title, _cdTitle, GUILayout.Width(Sc(120)), GUILayout.Height(__rowH));
-                GUILayout.Label(summary, _cdSum, GUILayout.Height(__rowH));
+                GUILayout.Label(summary, _cdSum, GUILayout.MinHeight(__rowH));
                 GUILayout.EndHorizontal();
                 // 整行可点：点这一行的任意位置即可展开/收起（详情按钮已删除）。
                 if (canExpand) {

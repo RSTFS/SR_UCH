@@ -174,10 +174,11 @@ namespace SR_UCH.Tweaks {
             _copyKey = plugin.Config.Bind(Sec, "Copy Key", KeyCode.None, "一键复制当前筛选结果的快捷键。");
             _clearKey = plugin.Config.Bind(Sec, "Clear Key", KeyCode.None, "清空历史的快捷键。");
 
-            SRApi.LocSec(Sec, "通知中心", "Notification Hub");
+            SRApi.LocSec(Sec, "通知", "Notifications");
 
             RegUi();
-            SRApi.Nav(Sec, 118);
+            // 底栏入口（设置右侧），不再占用侧栏栏目（用户要求）。
+            SRApi.RegisterFooterButton(Sec, "通知", "Notify", null);
             SRApi.RegisterPage(Sec, "History", "通知历史", "History", 10, RenderHistoryPage);
             SRApi.RegisterPage(Sec, "HubOptions", "通知设置", "Settings", 20, RenderOptionsPage);
             SRApi.RegisterKey("通知中心-打开", _openKey, "press");
