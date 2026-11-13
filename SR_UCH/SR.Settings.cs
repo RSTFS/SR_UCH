@@ -458,7 +458,9 @@ public partial class SR {
 
         //同时更新即时值与配置项（布局立即生效并持久化）。
         private static void SetSidebarWidth(int px) {
-            px = Mathf.Clamp(px, 0, 320);
+            // 上限跟窗口走：自定义宽度再大也不能把内容区挤没（用户反馈"超出界面还能拖"）。
+            float cap = Mathf.Clamp(SRApi.ContentArea.width * 0.55f, 100f, 320f);
+            px = Mathf.Clamp(px, 0, Mathf.RoundToInt(cap));
             _sidebarW = px;
             if (_sidebarWEntry != null) _sidebarWEntry.Value = px;
         }
@@ -766,8 +768,9 @@ public partial class SR {
             if (w <= 0f && _sidebarWEntry != null) w = _sidebarWEntry.Value;
             if (w <= 0f) w = _sidebarW;
             //先判 w 再算自动宽度：CalcAutoSidebarWidth 需逐项 CalcSize，而本方法每帧被调用十几次。
-            if (w > 0f) return Mathf.Clamp(w, 100f, 320f);
-            return CalcAutoSidebarWidth();
+            float cap = Mathf.Clamp(SRApi.ContentArea.width * 0.55f, 100f, 320f);
+            if (w > 0f) return Mathf.Clamp(w, 100f, cap);
+            return Mathf.Min(CalcAutoSidebarWidth(), cap);
         }
 
         private static int _autoSbKey;

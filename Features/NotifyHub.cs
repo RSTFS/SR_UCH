@@ -54,7 +54,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static ConfigEntry<bool> _enabled, _native, _quiet, _onScreen;
-        private static ConfigEntry<int> _maxVisible, _toastSeconds, _corner;
+        private static ConfigEntry<int> _maxVisible, _toastSeconds, _corner, _cardW;
 
         private static readonly List<Notice> _history = new List<Notice>();
         private static readonly List<Notice> _visible = new List<Notice>();
@@ -121,6 +121,10 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Write To Recorder",
                 "写入关卡记录\n把中/高优先级通知写进关卡记录器的时间线（软依赖）。",
                 "Write to recorder\nWrite medium/high priority toasts into the level recorder timeline (soft dependency).");
+            SRApi.LocKey(Sec, "Card Width", "卡片宽度", "Card width");
+            SRApi.LocDesc(Sec, "Card Width",
+                "卡片宽度\n浮层卡片像素宽度（120-340），默认 170。",
+                "Card width\nOverlay card width in pixels. Range 120-340, default 170.");
             SRApi.LocKey(Sec, "Corner", "浮层停靠角", "Overlay corner");
             SRApi.LocDesc(Sec, "Corner",
                 "浮层停靠角\n浮层停靠角：0 右下 / 1 右上 / 2 左下 / 3 左上。",
@@ -150,6 +154,7 @@ namespace SR_UCH.Tweaks {
                     case "Toast Seconds": min = 2.0f; max = 15.0f; return true;
                     case "History Limit": min = 100.0f; max = 2000.0f; return true;
                     case "Corner": min = 0.0f; max = 3.0f; return true;
+                    case "Card Width": min = 120.0f; max = 340.0f; return true;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("数值滑块范围", __ex); }
             return false;
@@ -164,6 +169,8 @@ namespace SR_UCH.Tweaks {
                 new ConfigDescription("浮层最多同时显示几条（1-6）。", new AcceptableValueRange<int>(1, 6)));
             _toastSeconds = plugin.Config.Bind(Sec, "Toast Seconds", 2,
                 new ConfigDescription("每条通知停留秒数（2-15），可读性页可以再加秒。", new AcceptableValueRange<int>(2, 15)));
+            _cardW = plugin.Config.Bind(Sec, "Card Width", 170,
+                new ConfigDescription("浮层卡片像素宽度（120-340）。", new AcceptableValueRange<int>(120, 340)));
             _corner = plugin.Config.Bind(Sec, "Corner", 0,
                 new ConfigDescription("浮层停靠角：0 右下 / 1 右上 / 2 左下 / 3 左上。", new AcceptableValueRange<int>(0, 3)));
 
@@ -357,7 +364,7 @@ namespace SR_UCH.Tweaks {
             _small.fontSize = Mathf.RoundToInt(12f * s);
             _label.normal.textColor = hc ? Color.white : new Color(0.94f, 0.96f, 0.99f, 1f);
 
-            float w = Mathf.Clamp(300f * s, 220f, 460f);
+            float w = Mathf.Clamp(_cardW.Value * s, 120f, 340f);   // 默认 170 ≈ 原 300 的一半，可在设置里调
             float pad = 8f * s;
             float now = Time.unscaledTime;
 
@@ -427,6 +434,7 @@ namespace SR_UCH.Tweaks {
             CfgRow(_quiet);
             CfgRow(_maxVisible);
             CfgRow(_toastSeconds);
+            CfgRow(_cardW);
             CfgRow(_corner);
 
             Line("「退回游戏原生提示」打开后，本功能只记历史不改屏幕；这是零风险回退开关。",
