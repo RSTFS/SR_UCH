@@ -61,6 +61,7 @@ namespace SR_UCH.Tweaks {
         private static float _aNext;
         private static readonly int[] _tierCount = new int[7];   // 索引 6 = 禁用件数
         private static int _totalSeen;
+        private static int _wMin = int.MaxValue, _wMax = 0;   // 本盒出现过的权重范围（相对分档用）
 
         // ============ 生命周期 ============
 
@@ -166,6 +167,7 @@ namespace SR_UCH.Tweaks {
             try {
                 for (int i = 0; i < _tierCount.Length; i++) _tierCount[i] = 0;
                 _totalSeen = 0;
+                _wMin = int.MaxValue; _wMax = 0;
 
                 PickableBlock[] all = SRApi.FrameObjects<PickableBlock>();
                 if (all == null) return;
@@ -173,6 +175,13 @@ namespace SR_UCH.Tweaks {
                     PickableBlock pb = all[i];
                     if (pb == null || !pb.InPartybox) continue;      // 只处理派对盒里的，场上已放置的不碰
                     _totalSeen++;
+                    try {
+                        Placeable __pl = pb.placeablePrefab;
+                        if (__pl != null) {
+                            int __w = BlockGroup.GetItemFilterWeight(__pl, (int)__pl.BaseRarity);
+                            if (__w > 0) { if (__w < _wMin) _wMin = __w; if (__w > _wMax) _wMax = __w; }
+                        }
+                    } catch (Exception __ww) { SRApi.Guard.Log("品质光芒/权重范围", __ww); }
                     int tier = TierOf(pb);
                     if (tier < 0) { _tierCount[6]++; HideGlow(pb); continue; }
                     _tierCount[tier]++;
@@ -193,6 +202,15 @@ namespace SR_UCH.Tweaks {
                 }
             } catch (Exception ex) { SRApi.Guard.Log("品质光芒/读概率", ex); }
             if (w <= 0) return -1;                       // 0 = 该道具不会出现在派对盒
+            // 相对分档（修复"整盒只有一个颜色"）：权重是"每多少件出一件"的绝对值，
+            // 同一盒里常常全部落在同一个绝对阈值里 → 六档只出一档。
+            // 改为按本盒出现过的权重做对数插值：最轻（概率最高）→ 泛滥，最重（最稀有）→ 传说。
+            // 权重记录在扫描阶段（见 RenderTick：_wMin/_wMax）。
+            if (_wMax > _wMin && _wMin > 0) {
+                float lo = Mathf.Log(_wMin), hi = Mathf.Log(_wMax);
+                float pos = hi > lo ? (Mathf.Log(w) - lo) / (hi - lo) : 1f;
+                return Mathf.Clamp(Mathf.RoundToInt(pos * 5f), 0, 5);
+            }
             for (int t = 5; t >= 0; t--) if (w <= TierMaxWeight[t]) return t;
             return 0;
         }
