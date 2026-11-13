@@ -17,6 +17,9 @@ namespace SR_UCH.Tweaks {
             "Reflection",
             "Freeplay",
             "Config Tools",
+            // 2026-11 删除的功能段：段头隐藏，遗留键由下面的 RemoveKeys 清理。
+            "Match Brief", "Accessibility", "Host Console",
+            "Level Recorder", "Match Profile", "Match Cast", "Time Control", "Death Report",
         };
 
         // section 头：[旧] -> [新]
@@ -683,6 +686,15 @@ namespace SR_UCH.Tweaks {
             // 快速自杀功能已删除：清理其遗留键。
             text = RemoveKeys(text, "Quick Adjust", new[] { "Enabled", "Keybind", "Score Discount", "More Discount Values" });
             text = RemoveKeys(text, "Internal", new[] { "P Suicide Migrated" });
+            // 2026-11 删除的八个功能：清掉它们的入口键（其余键随段头一起隐藏）。
+            text = RemoveKeys(text, "Match Brief", new[] { "Enabled", "Show Time", "Show Deaths", "Force Obituary" });
+            text = RemoveKeys(text, "Accessibility", new[] { "Enabled", "Shape Labels", "Font Scale", "High Contrast" });
+            text = RemoveKeys(text, "Host Console", new[] { "Enabled", "Show Roster" });
+            text = RemoveKeys(text, "Level Recorder", new[] { "Enabled" });
+            text = RemoveKeys(text, "Match Profile", new[] { "Enabled" });
+            text = RemoveKeys(text, "Match Cast", new[] { "Enabled" });
+            text = RemoveKeys(text, "Time Control", new[] { "Enabled", "Freeze" });
+            text = RemoveKeys(text, "Death Report", new[] { "Enabled" });
             // 对局记录功能已删除（2026-10）：清理其配置段遗留键。
             text = RemoveKeys(text, "Match Replay", new[] { "Enabled", "Max Sessions", "Record Scores", "Record Blocks" });
             // 配置导出/导入工具已删除：该段只 Bind 过 Enabled 与 Max Backups（备份目录是固定路径，不是配置键）。
