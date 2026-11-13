@@ -32,14 +32,12 @@ namespace SR_UCH.Tweaks {
         private const string SIgnore  = "sr.brief.ignore";    // Action 忽略
         private const string SRarest  = "sr.brief.rarest";    // Func<string> 本盒最稀有道具，null=无
         private const string SRoster  = "sr.brief.roster";    // Func<string> 房内 mod 清单，null=无
-        private const string SDeaths  = "sr.brief.deaths";    // Func<string> 本局已阵亡次数，null=无
-        private const string SObit    = "sr.brief.obituary";  // Func<string> 局末鉴定书（多行），null=无
 
-        private static ConfigEntry<bool> _enabled, _folded, _showRoster, _showRarest, _showTime, _showDeaths, _forceObit;
+        private static ConfigEntry<bool> _enabled, _folded, _showRoster, _showRarest, _showTime;
         private static ConfigEntry<int> _corner, _alpha, _scale, _x, _y;
         private static ConfigEntry<KeyCode> _foldKey;
 
-        private static Func<string> _fDream, _fChaos, _fPending, _fRarest, _fRoster, _fDeaths, _fObit;
+        private static Func<string> _fDream, _fChaos, _fPending, _fRarest, _fRoster;
         private static Action _aAccept, _aIgnore;
         private static int _bindTries;
         private static float _nextBind;
@@ -59,7 +57,7 @@ namespace SR_UCH.Tweaks {
         private static Vector2 _dragOff;
 
         private static Texture2D _white;
-        private static GUIStyle _label, _title, _pending, _obit, _btn, _btnHot;
+        private static GUIStyle _label, _title, _pending, _btn, _btnHot;
         private static BriefUI _ui;
 
         // ============ 生命周期 ============
@@ -155,8 +153,6 @@ namespace SR_UCH.Tweaks {
             _showTime = plugin.Config.Bind(Sec, "Show Time", true, "显示梦境 / 冻结角色状态。");
             _showRarest = plugin.Config.Bind(Sec, "Show Rarest", true, "显示派对盒里最稀有的道具品质。");
             _showRoster = plugin.Config.Bind(Sec, "Show Roster", false, "显示房内 mod 清单（默认关，联机时较占地方）。");
-            _showDeaths = plugin.Config.Bind(Sec, "Show Deaths", true, "显示本局已阵亡次数（死亡鉴定书提供）。");
-            _forceObit = plugin.Config.Bind(Sec, "Force Obituary", true, "一局结束的鉴定书卡片自动展开浮层（一局一次，错过就没了）。");
             _x = plugin.Config.Bind(Sec, "X", -1, "自定义 X；-1 = 跟随停靠角。");
             _y = plugin.Config.Bind(Sec, "Y", -1, "自定义 Y；-1 = 跟随停靠角。");
 
@@ -226,11 +222,8 @@ namespace SR_UCH.Tweaks {
             if (_aIgnore  == null) _aIgnore  = Slots.Require<Action>(SIgnore);
             if (_fRarest  == null) _fRarest  = Slots.Require<Func<string>>(SRarest);
             if (_fRoster  == null) _fRoster  = Slots.Require<Func<string>>(SRoster);
-            if (_fDeaths  == null) _fDeaths  = Slots.Require<Func<string>>(SDeaths);
-            if (_fObit    == null) _fObit    = Slots.Require<Func<string>>(SObit);
             bool all = _fDream != null && _fChaos != null && _fPending != null &&
-                       _aAccept != null && _aIgnore != null && _fRarest != null && _fRoster != null &&
-                       _fDeaths != null && _fObit != null;
+                       _aAccept != null && _aIgnore != null && _fRarest != null && _fRoster != null;
             // 全齐就提前停：不再重复 Require，也不污染缺失槽位计数。
             if (all) _bindTries = 6;
         }
@@ -281,11 +274,6 @@ namespace SR_UCH.Tweaks {
             _pending = new GUIStyle(_label);
             _pending.normal.textColor = new Color(1f, 0.90f, 0.55f, 1f);
             _pending.wordWrap = true;
-            _obit = new GUIStyle(_label);
-            _obit.normal.textColor = new Color(0.98f, 0.86f, 0.66f, 1f);
-            _obit.wordWrap = true;
-            _obit.clipping = TextClipping.Overflow;
-            _obit.padding = new RectOffset(0, 0, 0, 0);
             _btn = new GUIStyle(GUI.skin.button);
             _btn.fontSize = 12; _btn.padding = new RectOffset(4, 4, 2, 2);
             _btnHot = new GUIStyle(_btn);
@@ -307,11 +295,9 @@ namespace SR_UCH.Tweaks {
             string chaos = Safe(_fChaos);
             string rarest = _showRarest.Value ? Safe(_fRarest) : null;
             string roster = _showRoster.Value ? Safe(_fRoster) : null;
-            string deaths = _showDeaths.Value ? Safe(_fDeaths) : null;
-            string obit = Safe(_fObit);
             string pending = Safe(_fPending);
             if (dream == null && chaos == null && rarest == null && roster == null &&
-                deaths == null && obit == null && pending == null) return;
+                pending == null) return;
 
             EnsureStyles();
             float s = S();
@@ -319,12 +305,10 @@ namespace SR_UCH.Tweaks {
             _label.normal.textColor = hc ? Color.white : new Color(0.93f, 0.95f, 0.98f, 1f);
             _title.normal.textColor = hc ? new Color(1f, 1f, 0.72f, 1f) : new Color(0.66f, 0.83f, 1f, 1f);
             _pending.normal.textColor = hc ? new Color(1f, 0.95f, 0.62f, 1f) : new Color(1f, 0.90f, 0.55f, 1f);
-            _obit.normal.textColor = hc ? new Color(1f, 0.93f, 0.78f, 1f) : new Color(0.98f, 0.86f, 0.66f, 1f);
             // 样式是缓存实例，字号按缩放每趟同步一次（属性赋值，不新建对象）。
             _label.fontSize = Mathf.RoundToInt(13f * s);
             _title.fontSize = Mathf.RoundToInt(13f * s);
             _pending.fontSize = Mathf.RoundToInt(13f * s);
-            _obit.fontSize = Mathf.RoundToInt(13f * s);
             _btn.fontSize = Mathf.RoundToInt(12f * s);
             _btnHot.fontSize = Mathf.RoundToInt(12f * s);
             float pad = 10f * s, rowH = 22f * s, headH = 26f * s;
@@ -335,16 +319,13 @@ namespace SR_UCH.Tweaks {
             if (chaos != null) rows++;
             if (rarest != null) rows++;
             if (roster != null) rows++;
-            if (deaths != null) rows++;
             // 待审提案、局末鉴定书都强制展开：这两样都是「错过就没了」的一次性信息。
             // 鉴定书的强制展开可由配置关掉（有人只想安安静静打完一局）。
-            bool forced = pending != null || (obit != null && _forceObit.Value);
+            bool forced = pending != null;
             bool folded = _folded.Value && !forced;
             float pendH = (!folded && pending != null) ? (rowH * 2f + 28f * s + 6f * s) : 0f;
             // CalcHeight 不依赖 GUILayout/GetLastRect，绝对 Rect 绘制下所有趟都可用。
             float obitH = 0f;
-            if (!folded && obit != null)
-                obitH = Mathf.Max(rowH, _obit.CalcHeight(new GUIContent(obit), textW)) + 12f * s + 6f * s;
             float h = headH + pad + (folded ? 0f : rows * rowH) + pendH + obitH + pad;
 
             float x, y;
@@ -386,7 +367,6 @@ namespace SR_UCH.Tweaks {
                 if (chaos != null)  { GUI.Label(new Rect(x + pad, cy, w - pad * 2f, rowH), SRApi.T("牌面：", "Card: ") + chaos, _label); cy += rowH; }
                 if (rarest != null) { GUI.Label(new Rect(x + pad, cy, w - pad * 2f, rowH), SRApi.T("稀有：", "Rare: ") + rarest, _label); cy += rowH; }
                 if (roster != null) { GUI.Label(new Rect(x + pad, cy, w - pad * 2f, rowH), SRApi.T("房间：", "Room: ") + roster, _label); cy += rowH; }
-                if (deaths != null) { GUI.Label(new Rect(x + pad, cy, w - pad * 2f, rowH), SRApi.T("阵亡：", "Deaths: ") + deaths, _label); cy += rowH; }
 
                 // 待审提案在最上：要动手的卡片优先于只读卡片。
                 if (pending != null) {
@@ -408,15 +388,6 @@ namespace SR_UCH.Tweaks {
                 }
 
                 // 死亡鉴定书：一局一次，暖棕卡片，只读。
-                if (obit != null) {
-                    float oy = cy + 4f * s;
-                    float ch = Mathf.Max(rowH, _obit.CalcHeight(new GUIContent(obit), textW));
-                    Rect or = new Rect(x + pad, oy, w - pad * 2f, ch + 8f * s);
-                    Fill(or, hc ? new Color(0.22f, 0.12f, 0.04f, 0.95f) : new Color(0.30f, 0.19f, 0.10f, 0.72f));
-                    Fill(new Rect(or.x, or.y, 3f * s, or.height), new Color(0.95f, 0.72f, 0.36f, 0.95f));
-                    GUI.Label(new Rect(or.x + 8f * s, or.y + 4f * s, or.width - 14f * s, ch),
-                              obit, _obit);
-                }
             } finally {
                 GUI.depth = prevDepth;
                 GUI.color = prevColor;
@@ -462,11 +433,9 @@ namespace SR_UCH.Tweaks {
             CfgRow(_showTime);
             CfgRow(_showRarest);
             CfgRow(_showRoster);
-            CfgRow(_showDeaths);
-            CfgRow(_forceObit);
 
-            Line("浮层只在有内容时出现；有待审提案或局末鉴定书时即使折叠也会强制展开。",
-                 "The strip only appears when there is something to show. A pending proposal or an end-of-match obituary force-expands it.");
+            Line("浮层只在有内容时出现；有待审提案时即使折叠也会强制展开。",
+                 "The strip only appears when there is something to show. A pending proposal force-expands it.");
             Line("拖动标题栏可自定义位置；右上角按钮或快捷键折叠。位置写在配置里，重开游戏仍在。",
                  "Drag the title bar to reposition; use the corner button or hotkey to fold. Position persists in the config.");
             Line("状态一律走契约层槽位读取，本页不直接引用其他功能：删除某个功能只会让对应那一行消失。",

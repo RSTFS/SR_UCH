@@ -32,8 +32,6 @@ namespace SR_UCH.Tweaks {
             if (p == null) return;
             try {
                 if (!ActionAllowed()) return;
-                // 关卡记录器联动：记一条「发起载入」。放在最前面，二次确认/跨关卡分支也能留下痕迹。
-                NotePresetLoad(p.Name);
                 // GateHost 会放行开了"无视房主限制"的房客，但 WriteSyncVar / ReloadScene 在客户端不执行，会假成功。
                 if (!SRApi.GateHost || !NetworkServer.active) {
                     SRApi.NotifyT("仅房主可加载预设：", "Host only: ", p.Name);

@@ -16,8 +16,7 @@ using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
-    [SrFeature("sr.buildingpresets", "BuildingPresets", "1.0", Provides = new string[] {
-        "presets.reloadBusy", "sr.rec.snapshot", "sr.rec.savePreset", "sr.rec.listPresets", "sr.rec.loadPreset" })]
+    [SrFeature("sr.buildingpresets", "BuildingPresets", "1.0", Provides = new string[] { "presets.reloadBusy" })]
     public partial class BuildingPresets : ITweak {
         // 配置段名：导航栏目名 / LocSec / Config.Bind 三处必须完全一致。
         private const string Section = "Building Presets";
@@ -254,8 +253,6 @@ namespace SR_UCH.Tweaks {
                 // 互斥槽位：关卡重载（Level 功能）动手前会 Require 这个槽位；双方都忙时互相拦下，避免两套重载并发。
                 try { Slots.Provide("presets.reloadBusy", (Func<bool>)(() => _reloadBusy)); }
                 catch (Exception __sx) { SRApi.Guard.Log("布局预设/登记重载互斥槽位", __sx); }
-                // 关卡记录器联动：只登记 BCL 委托，删掉记录器 DLL 对本功能零影响。
-                ProvideRecordSlots();
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设 初始化", __ex);
             }

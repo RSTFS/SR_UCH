@@ -96,12 +96,6 @@ Features\TimeControl.cs
 Features\Chaos.cs
 Features\PartyGlow.cs
 Features\Brief.cs
-Features\DeathReport.cs
-Features\LevelRecorder.cs
-Features\LevelRecorder.View.cs
-Features\MatchProfile.cs
 Features\HostConsole.cs
-Features\BuildingPresets.Record.cs
 Features\NotifyHub.cs
 Features\A11y.cs
-Features\MatchCast.cs

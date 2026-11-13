@@ -35,9 +35,7 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<string> _prefix;
         private static ConfigEntry<KeyCode> _reportKey;
 
-        private static Func<string> _fDream, _fChaos, _fRarest, _fDeaths, _fRoster, _fRec, _fProfile;
-        private static Action<string> _aApplyProfile;
-        private static Action _aCopyRec;
+        private static Func<string> _fDream, _fChaos, _fRarest, _fRoster;
         private static int _bindTries;
         private static float _nextBind, _lastCmdAt;
         private static string _lastCmd = "", _status = "";
@@ -133,12 +131,7 @@ namespace SR_UCH.Tweaks {
             if (_fDream == null) _fDream = Slots.Require<Func<string>>("sr.brief.dream");
             if (_fChaos == null) _fChaos = Slots.Require<Func<string>>("sr.brief.chaos");
             if (_fRarest == null) _fRarest = Slots.Require<Func<string>>("sr.brief.rarest");
-            if (_fDeaths == null) _fDeaths = Slots.Require<Func<string>>("sr.brief.deaths");
             if (_fRoster == null) _fRoster = Slots.Require<Func<string>>("sr.brief.roster");
-            if (_fRec == null) _fRec = Slots.Require<Func<string>>("sr.rec.summary");
-            if (_fProfile == null) _fProfile = Slots.Require<Func<string>>("sr.profile.summary");
-            if (_aApplyProfile == null) _aApplyProfile = Slots.Require<Action<string>>("sr.profile.apply");
-            if (_aCopyRec == null) _aCopyRec = Slots.Require<Action>("sr.rec.copy");
         }
 
         private static string Safe(Func<string> f) {
@@ -212,9 +205,6 @@ namespace SR_UCH.Tweaks {
             AppendRow(sb, SRApi.T("时间控制", "Time control"), Safe(_fDream));
             AppendRow(sb, SRApi.T("混乱牌组", "Chaos deck"), Safe(_fChaos));
             AppendRow(sb, SRApi.T("品质光芒", "Piece glow"), Safe(_fRarest));
-            AppendRow(sb, SRApi.T("阵亡", "Deaths"), Safe(_fDeaths));
-            AppendRow(sb, SRApi.T("关卡记录", "Level recorder"), Safe(_fRec));
-            AppendRow(sb, SRApi.T("开局档案", "Match profile"), Safe(_fProfile));
             if (_showRoster.Value) AppendRow(sb, SRApi.T("房内清单", "Mod roster"), Safe(_fRoster));
             return sb.ToString();
         }
@@ -264,8 +254,8 @@ namespace SR_UCH.Tweaks {
             string reply;
             switch (cmd) {
                 case "help":
-                    reply = SRApi.T("/sr help | ping | rules | cards | report | copy | profile <名字>",
-                                    "/sr help | ping | rules | cards | report | copy | profile <name>");
+                    reply = SRApi.T("/sr help | ping | rules | cards | report",
+                                    "/sr help | ping | rules | cards | report");
                     break;
                 case "ping":
                     reply = RoomLine();
@@ -279,23 +269,6 @@ namespace SR_UCH.Tweaks {
                 case "report":
                     CopyReport();
                     reply = SRApi.T("报告已复制到房主剪贴板并写入日志", "Report copied on the host and written to the log");
-                    break;
-                case "copy":
-                    if (_aCopyRec != null) { _aCopyRec(); reply = SRApi.T("关卡记录已复制到房主剪贴板", "Level record copied on the host"); }
-                    else reply = SRApi.T("关卡记录功能未安装", "Level Recorder not installed");
-                    break;
-                case "profile":
-                    // 唯一会写状态的指令：只允许房主本人（本机玩家号）触发。
-                    if (from != LocalNumber()) {
-                        reply = SRApi.T("只有房主能套用档案", "Only the host can apply a profile");
-                        break;
-                    }
-                    if (arg.Length == 0 || _aApplyProfile == null) {
-                        reply = SRApi.T("用法：/sr profile <名字>（或档案功能未安装）", "Usage: /sr profile <name> (or Match Profile missing)");
-                        break;
-                    }
-                    try { _aApplyProfile(arg); reply = SRApi.T("已套用档案：", "Applied profile: ") + arg; }
-                    catch (Exception ex) { SRApi.Guard.Log("房主运维台/套用档案", ex); reply = SRApi.T("套用失败", "Apply failed"); }
                     break;
                 default:
                     reply = SRApi.T("未知指令，发 /sr help 看列表", "Unknown command; send /sr help");
@@ -344,9 +317,6 @@ namespace SR_UCH.Tweaks {
             Line(SRApi.T("时间控制：", "Time control: ") + (Safe(_fDream) ?? "-"), "Time control: " + (Safe(_fDream) ?? "-"));
             Line(SRApi.T("混乱牌组：", "Chaos deck: ") + (Safe(_fChaos) ?? "-"), "Chaos deck: " + (Safe(_fChaos) ?? "-"));
             Line(SRApi.T("品质光芒：", "Piece glow: ") + (Safe(_fRarest) ?? "-"), "Piece glow: " + (Safe(_fRarest) ?? "-"));
-            Line(SRApi.T("阵亡：", "Deaths: ") + (Safe(_fDeaths) ?? "-"), "Deaths: " + (Safe(_fDeaths) ?? "-"));
-            Line(SRApi.T("关卡记录：", "Level recorder: ") + (Safe(_fRec) ?? "-"), "Level recorder: " + (Safe(_fRec) ?? "-"));
-            Line(SRApi.T("开局档案：", "Match profile: ") + (Safe(_fProfile) ?? "-"), "Match profile: " + (Safe(_fProfile) ?? "-"));
             if (_showRoster.Value)
                 Line(SRApi.T("房内清单：", "Mod roster: ") + (Safe(_fRoster) ?? "-"), "Mod roster: " + (Safe(_fRoster) ?? "-"));
 
@@ -358,8 +328,8 @@ namespace SR_UCH.Tweaks {
             if (!string.IsNullOrEmpty(_lastCmd)) Line(SRApi.T("最近指令：", "Last command: ") + _lastCmd, "Last command: " + _lastCmd);
 
             SRApi.Ctl.SectionTitle(SRApi.T("- 聊天指令 -", "- Chat commands -"));
-            Line("/sr help | ping | rules | cards | report | copy | profile <名字>",
-                 "/sr help | ping | rules | cards | report | copy | profile <name>");
+            Line("/sr help | ping | rules | cards | report",
+                 "/sr help | ping | rules | cards | report");
             Line("房客用原生聊天窗发指令即可，房主端执行并回复到聊天窗；只有 profile 会写状态，且仅房主本人可用。1.5 秒限流。",
                  "Guests can send these from the vanilla chat window; the host executes and replies in chat. Only 'profile' writes state, host-only. 1.5s cooldown.");
             Line("若游戏设置里关了文字聊天，回复会被游戏拒掉；房主端仍会收到一条本地提示。自检结论请看「设置 / 自检」页。",
