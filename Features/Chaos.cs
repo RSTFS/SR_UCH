@@ -162,46 +162,46 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "ProposeKey",
                 "提案快捷键\n房客按此键向房主提案一张牌；离线本机即房主，请直接用重抽键。",
                 "Propose key\nGuest: press to propose a card to the host. Offline, use the reroll key instead.");
-            // 牌池 10 张牌在 Sec + ".Pool" 段，自绘但同样需要登记显示名。
-            SRApi.LocSec(Sec + ".Pool", "牌池", "Card pool");
-            SRApi.LocKey(Sec + ".Pool", "Low gravity", "低重力", "Low gravity");
-            SRApi.LocDesc(Sec + ".Pool", "Low gravity",
+            // 牌池 10 张牌在 Sec 段，自绘但同样需要登记显示名。
+            SRApi.LocSec(Sec, "牌池", "Card pool");
+            SRApi.LocKey(Sec, "Low gravity", "低重力", "Low gravity");
+            SRApi.LocDesc(Sec, "Low gravity",
                 "低重力\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
                 "Low gravity\nInclude the low gravity card in the draw pool.");
-            SRApi.LocKey(Sec + ".Pool", "High gravity", "高重力", "High gravity");
-            SRApi.LocDesc(Sec + ".Pool", "High gravity",
+            SRApi.LocKey(Sec, "High gravity", "高重力", "High gravity");
+            SRApi.LocDesc(Sec, "High gravity",
                 "高重力\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
                 "High gravity\nInclude the high gravity card in the draw pool.");
-            SRApi.LocKey(Sec + ".Pool", "Weak jump", "弱跳跃", "Weak jump");
-            SRApi.LocDesc(Sec + ".Pool", "Weak jump",
+            SRApi.LocKey(Sec, "Weak jump", "弱跳跃", "Weak jump");
+            SRApi.LocDesc(Sec, "Weak jump",
                 "弱跳跃\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
                 "Weak jump\nInclude the weak jump card in the draw pool.");
-            SRApi.LocKey(Sec + ".Pool", "Slow sprint", "慢冲刺", "Slow sprint");
-            SRApi.LocDesc(Sec + ".Pool", "Slow sprint",
+            SRApi.LocKey(Sec, "Slow sprint", "慢冲刺", "Slow sprint");
+            SRApi.LocDesc(Sec, "Slow sprint",
                 "慢冲刺\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
                 "Slow sprint\nInclude the slow sprint card in the draw pool.");
-            SRApi.LocKey(Sec + ".Pool", "Slow platforms", "慢平台", "Slow platforms");
-            SRApi.LocDesc(Sec + ".Pool", "Slow platforms",
+            SRApi.LocKey(Sec, "Slow platforms", "慢平台", "Slow platforms");
+            SRApi.LocDesc(Sec, "Slow platforms",
                 "慢平台\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
                 "Slow platforms\nInclude the slow platforms card in the draw pool.");
-            SRApi.LocKey(Sec + ".Pool", "No wall jumps", "禁墙跳", "No wall jumps");
-            SRApi.LocDesc(Sec + ".Pool", "No wall jumps",
+            SRApi.LocKey(Sec, "No wall jumps", "禁墙跳", "No wall jumps");
+            SRApi.LocDesc(Sec, "No wall jumps",
                 "禁墙跳\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
                 "No wall jumps\nInclude the no-wall-jumps card in the draw pool.");
-            SRApi.LocKey(Sec + ".Pool", "Mirror controls", "镜像操作", "Mirror controls");
-            SRApi.LocDesc(Sec + ".Pool", "Mirror controls",
+            SRApi.LocKey(Sec, "Mirror controls", "镜像操作", "Mirror controls");
+            SRApi.LocDesc(Sec, "Mirror controls",
                 "镜像操作\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
                 "Mirror controls\nInclude the mirror controls card in the draw pool.");
-            SRApi.LocKey(Sec + ".Pool", "Dance invincible", "跳舞无敌", "Dance invincible");
-            SRApi.LocDesc(Sec + ".Pool", "Dance invincible",
+            SRApi.LocKey(Sec, "Dance invincible", "跳舞无敌", "Dance invincible");
+            SRApi.LocDesc(Sec, "Dance invincible",
                 "跳舞无敌\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
                 "Dance invincible\nInclude the dance invincibility card in the draw pool.");
-            SRApi.LocKey(Sec + ".Pool", "Player colliding", "玩家互撞", "Player colliding");
-            SRApi.LocDesc(Sec + ".Pool", "Player colliding",
+            SRApi.LocKey(Sec, "Player colliding", "玩家互撞", "Player colliding");
+            SRApi.LocDesc(Sec, "Player colliding",
                 "玩家互撞\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
                 "Player colliding\nInclude the player collisions card in the draw pool.");
-            SRApi.LocKey(Sec + ".Pool", "Frictionless", "无摩擦", "Frictionless");
-            SRApi.LocDesc(Sec + ".Pool", "Frictionless",
+            SRApi.LocKey(Sec, "Frictionless", "无摩擦", "Frictionless");
+            SRApi.LocDesc(Sec, "Frictionless",
                 "无摩擦\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
                 "Frictionless\nInclude the frictionless card in the draw pool.");
             if (!_uiReg) { _uiReg = true; SRApi.RowSliders.Add(UiSlider); }
@@ -233,7 +233,7 @@ namespace SR_UCH.Tweaks {
             _pool = new ConfigEntry<bool>[Cards.Length];
             for (int i = 0; i < Cards.Length; i++) {
                 var c = Cards[i];
-                _pool[i] = _mp.Config.Bind(Sec + ".Pool", c.En, true, "是否进入随机池：" + c.Zh);
+                _pool[i] = _mp.Config.Bind(Sec, c.En, true, "是否进入随机池：" + c.Zh);
             }
 
             _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) RestoreAll(); };

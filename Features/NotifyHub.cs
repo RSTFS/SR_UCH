@@ -54,8 +54,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static ConfigEntry<bool> _enabled, _native, _quiet, _onScreen, _writeRec;
-        private static ConfigEntry<int> _maxVisible, _toastSeconds, _historyLimit, _corner;
-        private static ConfigEntry<KeyCode> _openKey, _copyKey, _clearKey;
+        private static ConfigEntry<int> _maxVisible, _toastSeconds, _corner;
 
         private static readonly List<Notice> _history = new List<Notice>();
         private static readonly List<Notice> _visible = new List<Notice>();
@@ -92,7 +91,7 @@ namespace SR_UCH.Tweaks {
         private static void RegUi() {
             SRApi.LocKey(Sec, "Enabled", "启用通知中心", "Enable notification hub");
             SRApi.LocDesc(Sec, "Enabled",
-                "启用通知中心\n统一接管所有屏幕提示：分级、合并、静默、历史回看。",
+                "启用通知中心\n统一接管所有屏幕提示：分级、合并、静默。",
                 "Enable notification hub\nTake over all screen toasts: priority, merging, quiet mode and history.");
             SRApi.LocKey(Sec, "Use Native Toast", "使用原生提示", "Use native toast");
             SRApi.LocDesc(Sec, "Use Native Toast",
@@ -157,7 +156,7 @@ namespace SR_UCH.Tweaks {
         }
 
         public void Initialize(IFeatureHost plugin) {
-            _enabled = plugin.Config.Bind(Sec, "Enabled", true, "统一接管所有屏幕提示：分级、合并、静默、历史回看。");
+            _enabled = plugin.Config.Bind(Sec, "Enabled", true, "统一接管所有屏幕提示：分级、合并、静默。");
             _native = plugin.Config.Bind(Sec, "Use Native Toast", false, "退回游戏原生提示（本功能只记历史，不改屏幕显示）。");
             _onScreen = plugin.Config.Bind(Sec, "Show On Screen", true, "在局内显示一条可折叠的通知浮层；关掉后只保留历史页。");
             _quiet = plugin.Config.Bind(Sec, "Quiet In Match", true, "对局中静默低/中优先级提示（仍进历史）；高优先级照常弹。");
@@ -165,25 +164,16 @@ namespace SR_UCH.Tweaks {
                 new ConfigDescription("浮层最多同时显示几条（1-6）。", new AcceptableValueRange<int>(1, 6)));
             _toastSeconds = plugin.Config.Bind(Sec, "Toast Seconds", 4,
                 new ConfigDescription("每条通知停留秒数（2-15），可读性页可以再加秒。", new AcceptableValueRange<int>(2, 15)));
-            _historyLimit = plugin.Config.Bind(Sec, "History Limit", 400,
-                new ConfigDescription("历史保留条数上限（100-2000），超出丢最旧。", new AcceptableValueRange<int>(100, 2000)));
             _writeRec = plugin.Config.Bind(Sec, "Write To Recorder", true, "把中/高优先级通知写进关卡记录器的时间线（软依赖）。");
             _corner = plugin.Config.Bind(Sec, "Corner", 0,
                 new ConfigDescription("浮层停靠角：0 右下 / 1 右上 / 2 左下 / 3 左上。", new AcceptableValueRange<int>(0, 3)));
-            _openKey = plugin.Config.Bind(Sec, "Open Key", KeyCode.None, "打开设置面板回看历史的快捷键。");
-            _copyKey = plugin.Config.Bind(Sec, "Copy Key", KeyCode.None, "一键复制当前筛选结果的快捷键。");
-            _clearKey = plugin.Config.Bind(Sec, "Clear Key", KeyCode.None, "清空历史的快捷键。");
 
             SRApi.LocSec(Sec, "通知", "Notifications");
 
             RegUi();
             // 底栏入口（设置右侧），不再占用侧栏栏目（用户要求）。
             SRApi.RegisterFooterButton(Sec, "通知", "Notify", null);
-            SRApi.RegisterPage(Sec, "History", "通知历史", "History", 10, RenderHistoryPage);
             SRApi.RegisterPage(Sec, "HubOptions", "通知设置", "Settings", 20, RenderOptionsPage);
-            SRApi.RegisterKey("通知中心-打开", _openKey, "press");
-            SRApi.RegisterKey("通知中心-复制", _copyKey, "press");
-            SRApi.RegisterKey("通知中心-清空", _clearKey, "press");
             SRApi.RegisterTick("通知中心-绑定与过期", Tick);
 
             // 核心 NotifyImpl 会惰性查这个名字；Provide 之后所有来源的提示都会进 OnNotify。
@@ -220,9 +210,6 @@ namespace SR_UCH.Tweaks {
                 float now = Time.unscaledTime;
                 for (int i = _visible.Count - 1; i >= 0; i--) if (_visible[i].Until <= now) _visible.RemoveAt(i);
 
-                if (_openKey.Value != KeyCode.None && Input.GetKeyDown(_openKey.Value)) SRApi.OpenMenu();
-                if (_copyKey.Value != KeyCode.None && Input.GetKeyDown(_copyKey.Value)) CopyFiltered();
-                if (_clearKey.Value != KeyCode.None && Input.GetKeyDown(_clearKey.Value)) ClearHistory();
             } catch (Exception ex) { SRApi.Guard.Log("通知中心/Tick", ex); }
         }
 
@@ -280,8 +267,8 @@ namespace SR_UCH.Tweaks {
                 n.At = now; n.Until = now + stay; n.Reopenable = reopenable;
 
                 _history.Add(n);
-                int lim = Mathf.Clamp(_historyLimit.Value, 100, 2000);
-                while (_history.Count > lim) _history.RemoveAt(0);
+                // 只保留最近的内部缓冲（用于合并去重），不再对外提供历史页。
+                while (_history.Count > 64) _history.RemoveAt(0);
 
                 bool quiet = _quiet.Value && level < 2 && InMatch();
                 if (!native && !quiet && _onScreen.Value) {
@@ -426,119 +413,14 @@ namespace SR_UCH.Tweaks {
 
         // ============ 历史页 ============
 
-        private static List<Notice> Filtered() {
-            List<Notice> r = new List<Notice>();
-            for (int i = _history.Count - 1; i >= 0; i--) {   // 新的在前
-                Notice n = _history[i];
-                if (_levelFilter == 1 && n.Level < 1) continue;
-                if (_levelFilter == 2 && n.Level < 2) continue;
-                if (_onlyReopen && !n.Reopenable) continue;
-                if (!string.IsNullOrEmpty(_filter) && !Contains(n.Text, _filter) && !Contains(n.Tag, _filter)) continue;
-                r.Add(n);
-            }
-            return r;
-        }
-
-        private static string LevelName(int lv) {
-            return lv == 2 ? SRApi.T("重要", "High") : lv == 1 ? SRApi.T("一般", "Normal") : SRApi.T("确认", "Low");
-        }
-
         private static void Line(string zh, string en) {
             GUILayout.Label(SRApi.T(zh, en), SRApi.Ctl.LabelWrap);
-        }
-
-        private void RenderHistoryPage() {
-            List<Notice> list = Filtered();
-            int pages = Mathf.Max(1, Mathf.CeilToInt((float)list.Count / PageSize));
-            if (_page >= pages) _page = pages - 1;
-            if (_page < 0) _page = 0;
-
-            Line("共 " + _history.Count + " 条历史，当前筛选 " + list.Count + " 条；第 " + (_page + 1) + " / " + pages + " 页。",
-                 _history.Count + " notices, " + list.Count + " shown; page " + (_page + 1) + " / " + pages + ".");
-
-            // 筛选状态是纯查看态，不写进 cfg：用按钮循环切换，避免为了两个临时开关造配置键。
-            _filter = SRApi.ClearableTextField(_filter, 40, SRApi.Ctl.SearchBox);
-            string lvLabel = _levelFilter == 0 ? SRApi.T("级别：全部", "Level: all")
-                           : _levelFilter == 1 ? SRApi.T("级别：中 / 高", "Level: normal+")
-                           : SRApi.T("级别：仅重要", "Level: high only");
-            if (SRApi.Ctl.Button(lvLabel, SRApi.T("在 全部 / 中高 / 仅重要 之间切换", "Cycle all / normal+ / high only")))
-                _levelFilter = (_levelFilter + 1) % 3;
-            if (SRApi.Ctl.Button(_onlyReopen ? SRApi.T("仅可补点：开", "Reopenable only: on")
-                                             : SRApi.T("仅可补点：关", "Reopenable only: off"),
-                                 SRApi.T("只显示提案类、可从历史重新打开的条目", "Show only proposal notices that can be reopened")))
-                _onlyReopen = !_onlyReopen;
-
-            if (SRApi.Ctl.Button(SRApi.T("上一页", "Prev"), SRApi.T("往前翻一页", "Previous page")) && _page > 0) _page--;
-            if (SRApi.Ctl.Button(SRApi.T("下一页", "Next"), SRApi.T("往后翻一页", "Next page")) && _page + 1 < pages) _page++;
-            if (SRApi.Ctl.Button(SRApi.T("跳到最新", "Newest"), SRApi.T("回到第一页", "Back to the newest page"))) { _page = 0; _detail = -1; }
-            if (SRApi.Ctl.Button(SRApi.T("复制当前筛选", "Copy shown"), SRApi.T("把当前筛选结果复制到剪贴板", "Copy the filtered notices"))) CopyFiltered();
-            if (SRApi.Ctl.Button(SRApi.T("导出到文件", "Export"), SRApi.T("写入 BepInEx/config/SR_UCH/", "Write to BepInEx/config/SR_UCH/"))) ExportToFile();
-            if (SRApi.Ctl.Button(SRApi.T("清空历史", "Clear"), SRApi.T("清空全部历史（不可撤销）", "Clear all history"))) ClearHistory();
-
-            GUILayout.Space(SRApi.Ctl.Sc(6f));
-            int from = _page * PageSize;
-            int to = Mathf.Min(list.Count, from + PageSize);
-            for (int i = from; i < to; i++) {
-                Notice n = list[i];
-                string label = "T+" + n.At.ToString("F1") + "  [" + LevelName(n.Level) + "]  " + OneLine(n.Text)
-                             + (n.Count > 1 ? "  x" + n.Count : "");
-                if (SRApi.Ctl.Button(label, SRApi.T("点击展开详情", "Click to expand details"))) {
-                    _detail = (_detail == i) ? -1 : i;
-                }
-                if (_detail != i) continue;
-                Line("完整内容：" + n.Text, "Full text: " + n.Text);
-                Line("来源：" + (string.IsNullOrEmpty(n.Tag) ? "SR" : n.Tag) + "；等级：" + LevelName(n.Level)
-                     + "；合并次数：" + n.Count + "；时刻 T+" + n.At.ToString("F1"),
-                     "Source: " + (string.IsNullOrEmpty(n.Tag) ? "SR" : n.Tag) + "; level: " + LevelName(n.Level)
-                     + "; merged: " + n.Count + "; at T+" + n.At.ToString("F1"));
-                if (n.Reopenable && _aReopen != null) {
-                    if (SRApi.Ctl.Button(SRApi.T("重新打开这条提案", "Reopen this proposal"),
-                                         SRApi.T("把最近一条过期提案恢复到待审状态（混乱牌组提供）", "Restore the last expired proposal"))) {
-                        try { _aReopen(); } catch (Exception ex) { SRApi.Guard.Log("通知中心/重新打开", ex); }
-                    }
-                }
-            }
-            if (list.Count == 0) Line("没有符合条件的记录。", "No notices match this filter.");
         }
 
         private static string OneLine(string s) {
             if (string.IsNullOrEmpty(s)) return "";
             string t = s.Replace("\n", " ").Replace("\r", " ");
             return t.Length > 90 ? t.Substring(0, 90) + "..." : t;
-        }
-
-        private static void CopyFiltered() {
-            try {
-                GUIUtility.systemCopyBuffer = BuildText(Filtered());
-            } catch (Exception ex) { SRApi.Guard.Log("通知中心/复制", ex); }
-        }
-
-        private static string BuildText(List<Notice> list) {
-            StringBuilder sb = new StringBuilder();
-            sb.Append(SRApi.T("SR_UCH 通知历史", "SR_UCH notice history")).Append('\n');
-            for (int i = 0; i < list.Count; i++) {
-                Notice n = list[i];
-                sb.Append("T+").Append(n.At.ToString("F1"))
-                  .Append(" [").Append(LevelName(n.Level)).Append("] ")
-                  .Append(n.Count > 1 ? "(x" + n.Count + ") " : "")
-                  .Append(string.IsNullOrEmpty(n.Tag) ? "" : "{" + n.Tag + "} ")
-                  .Append(OneLine(n.Text)).Append('\n');
-            }
-            return sb.ToString();
-        }
-
-        private static void ExportToFile() {
-            try {
-                string dir = Path.Combine(Paths.ConfigPath, "SR_UCH");
-                Directory.CreateDirectory(dir);
-                string path = Path.Combine(dir, "notices.txt");
-                File.WriteAllText(path, BuildText(Filtered()), new UTF8Encoding(false));
-                SRApi.LogInfo("通知中心/导出 -> " + path);
-            } catch (Exception ex) { SRApi.Guard.Log("通知中心/导出", ex); }
-        }
-
-        private static void ClearHistory() {
-            _history.Clear(); _visible.Clear(); _detail = -1; _page = 0;
         }
 
         // ============ 设置页 ============
@@ -550,12 +432,8 @@ namespace SR_UCH.Tweaks {
             CfgRow(_quiet);
             CfgRow(_maxVisible);
             CfgRow(_toastSeconds);
-            CfgRow(_historyLimit);
             CfgRow(_writeRec);
             CfgRow(_corner);
-            CfgRow(_openKey);
-            CfgRow(_copyKey);
-            CfgRow(_clearKey);
 
             Line("所有屏幕提示都经过一个核心钩子统一收口，包括核心自己的提示、Notify、NotifyT 与 NotifyTag；日志仍由核心照常写入。",
                  "Every toast goes through one core hook: core notices, Notify, NotifyT and NotifyTag. Logging stays with the core.");
