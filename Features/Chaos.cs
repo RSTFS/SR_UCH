@@ -90,9 +90,9 @@ namespace SR_UCH.Tweaks {
         }
 
         private static IFeatureHost _mp;
-        private static ConfigEntry<bool> _enabled, _announce, _allowProposals;
+        private static ConfigEntry<bool> _enabled, _announce;
         private static ConfigEntry<int> _everyRounds, _maxActive;
-        private static ConfigEntry<KeyCode> _drawKey, _proposeKey;
+        private static ConfigEntry<KeyCode> _drawKey;
         private static ConfigEntry<bool>[] _pool;
 
         private static ChaosListener _listener;
@@ -225,8 +225,6 @@ namespace SR_UCH.Tweaks {
             _maxActive = _mp.Config.Bind(Sec, "MaxActive", 1, new ConfigDescription("最多同时生效几张牌。", new AcceptableValueRange<int>(1, 4)));
             _announce = _mp.Config.Bind(Sec, "Announce", true, "抽牌时在屏幕上提示本回合牌面。");
             _drawKey = _mp.Config.Bind(Sec, "RerollKey", KeyCode.None, "房主按此键立刻重抽一张。");
-            _allowProposals = _mp.Config.Bind(Sec, "AllowProposals", true, "房主：是否接收房客的提案（房客按提案键发来，房主在本页采纳或忽略）。");
-            _proposeKey = _mp.Config.Bind(Sec, "ProposeKey", KeyCode.None, "房客按此键向房主提案一张牌；离线本机即房主，请直接用重抽键。");
 
             _pool = new ConfigEntry<bool>[Cards.Length];
             for (int i = 0; i < Cards.Length; i++) {
@@ -237,7 +235,6 @@ namespace SR_UCH.Tweaks {
             _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) RestoreAll(); };
 
             SRApi.RegisterKey("混乱牌组-重抽", _drawKey, "press");
-            SRApi.RegisterKey("混乱牌组-提案", _proposeKey, "press");
 
             // 通知治理中心的历史页用这个槽位把过期提案恢复到待审状态。
             Slots.Provide("sr.notify.reopenProposal", (Action)(() => RestoreLastProposal()));
@@ -278,7 +275,6 @@ namespace SR_UCH.Tweaks {
             if (!_ready) return;
             if (_drawKey.Value != KeyCode.None && Input.GetKeyDown(_drawKey.Value) && IsAuthority) DrawAndBroadcast();
             // 房客/非权威端按提案键；房主自己直接用重抽键，不发提案。
-            if (_proposeKey.Value != KeyCode.None && Input.GetKeyDown(_proposeKey.Value) && !IsAuthority)
                 SendProposal(RandomCardId());
             BindA11y();
             if (_pendingActive && Time.unscaledTime - _pendingAt > ProposalSeconds()) {
@@ -557,7 +553,7 @@ namespace SR_UCH.Tweaks {
                 if (op == OpHello && m.Value >= 0 && m.Value != LocalNetworkNumber())
                     _roster[m.Value] = new RosterEntry("2.2", Time.unscaledTime);
                 else if (op == OpRestore || op == OpClear) { _applied = false; _active.Clear(); }
-                else if (op == OpPropose && _enabled.Value && _allowProposals.Value && IsAuthority) {
+                else if (op == OpPropose && false) {   // 房客提案已删除：收到也忽略（保留消息解析以兼容旧客户端）
                     int from = m.Value >> 8;
                     int cardId = m.Value & 0xFF;
                     if (cardId >= 0 && cardId < Cards.Length) {
@@ -733,8 +729,6 @@ namespace SR_UCH.Tweaks {
             CfgRow(_maxActive);
             CfgRow(_announce);
             CfgRow(_drawKey);
-            CfgRow(_allowProposals);
-            CfgRow(_proposeKey);
 
             Line("当前牌面：" + (Desc() ?? "（未生效）"), "Active: " + (Desc() ?? "(none)"));
             Line(RosterText() ?? "房内 mod 清单：仅本机（离线）", RosterText() ?? "Room roster: this machine only (offline)");
