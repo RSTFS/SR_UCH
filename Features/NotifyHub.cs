@@ -54,7 +54,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static ConfigEntry<bool> _enabled, _native, _quiet, _onScreen;
-        private static ConfigEntry<int> _maxVisible, _toastSeconds, _corner, _cardW, _cardAlpha;
+        private static ConfigEntry<int> _maxVisible, _toastSeconds, _corner, _cardW, _cardAlpha, _cardScale;
         private static bool _cornerOpen;   // 停靠角下拉的展开态（每帧从核心 EditOpen 语义走）
 
         private static readonly List<Notice> _history = new List<Notice>();
@@ -126,6 +126,10 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Card Width",
                 "卡片宽度\n浮层卡片像素宽度（120-340），默认 170。",
                 "Card width\nOverlay card width in pixels. Range 120-340, default 170.");
+            SRApi.LocKey(Sec, "Card Scale", "浮层缩放", "Overlay scale");
+            SRApi.LocDesc(Sec, "Card Scale",
+                "浮层缩放\n整个浮层按百分比缩放（80-160），默认 100。",
+                "Overlay scale\nScale the whole overlay in percent. Range 80-160, default 100.");
             SRApi.LocKey(Sec, "Card Opacity", "卡片不透明度", "Card opacity");
             SRApi.LocDesc(Sec, "Card Opacity",
                 "卡片不透明度\n浮层卡片背景的不透明度百分比（20-100），默认 86。",
@@ -160,6 +164,7 @@ namespace SR_UCH.Tweaks {
                     case "History Limit": min = 100.0f; max = 2000.0f; return true;
                     case "Corner": min = 0.0f; max = 3.0f; return true;
                     case "Card Opacity": min = 20.0f; max = 100.0f; return true;
+                    case "Card Scale": min = 80.0f; max = 160.0f; return true;
                     case "Card Width": min = 100.0f; max = 300.0f; return true;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("数值滑块范围", __ex); }
@@ -177,6 +182,8 @@ namespace SR_UCH.Tweaks {
                 new ConfigDescription("每条通知停留秒数（1-5）。", new AcceptableValueRange<int>(1, 5)));
             _cardW = plugin.Config.Bind(Sec, "Card Width", 200,
                 new ConfigDescription("浮层卡片像素宽度（100-300）。", new AcceptableValueRange<int>(100, 300)));
+            _cardScale = plugin.Config.Bind(Sec, "Card Scale", 100,
+                new ConfigDescription("整个浮层的缩放百分比（80-160）。", new AcceptableValueRange<int>(80, 160)));
             _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 86,
                 new ConfigDescription("浮层卡片背景不透明度百分比（20-100）。", new AcceptableValueRange<int>(20, 100)));
             _corner = plugin.Config.Bind(Sec, "Corner", 0,
@@ -366,7 +373,7 @@ namespace SR_UCH.Tweaks {
         private static void DrawToast() {
             if (_enabled == null || !_enabled.Value || !_onScreen.Value || _visible.Count == 0 || Event.current == null) return;
             EnsureStyles();
-            float s = AFont();
+            float s = AFont() * Mathf.Clamp(_cardScale.Value / 100f, 0.8f, 1.6f);
             bool hc = AContrast();
             _label.fontSize = Mathf.RoundToInt(12f * s);
             _small.fontSize = Mathf.RoundToInt(12f * s);
@@ -460,6 +467,7 @@ namespace SR_UCH.Tweaks {
             CfgRow(_toastSeconds);
             CfgRow(_cardW);
             CfgRow(_cardAlpha);
+            CfgRow(_cardScale);
             // 停靠角改用下拉：0 右下 / 1 右上 / 2 左下 / 3 左上。
             {
                 int[] vals = new int[] { 0, 1, 2, 3 };
