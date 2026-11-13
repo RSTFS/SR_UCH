@@ -67,11 +67,6 @@ namespace SR_UCH.Tweaks {
         private static int _bindTries;
         private static float _nextBind;
 
-        // 历史页的查看状态（不写进配置，关面板后回到第一页）
-        private static int _page, _detail = -1, _levelFilter;
-        private static string _filter = "";
-        private static bool _onlyReopen;
-
         private static Texture2D _white;
         private static GUIStyle _label, _small, _btn;
         private static HubUI _ui;
