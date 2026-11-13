@@ -261,6 +261,9 @@ public partial class Experiments : ITweak
                     RestoreFov(cam);
                     return;
                 }
+                // 模式限制：自由相机只在自由模式生效（其它模式的相机由玩法控制）。
+                // 注意：相机"移动速度"是配置项本身，不随模式拦截，符合"速度不限制"的要求。
+                if (!FreeplayMode()) { RestoreFov(cam); return; }
                 // 仅游戏进行中，菜单里也还原
                 bool inGame = false;
                 try { inGame = (UnityEngine.Cursor.lockState != CursorLockMode.None) || !UnityEngine.Cursor.visible; } catch { inGame = true; }
