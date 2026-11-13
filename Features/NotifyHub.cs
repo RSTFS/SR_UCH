@@ -399,7 +399,10 @@ namespace SR_UCH.Tweaks {
                                 : n.Level == 1 ? SRApi.T("提示", "INFO") : SRApi.T("已办", "DONE");
                     GUI.Label(new Rect(x + pad, y + pad * 0.5f, w - pad * 2f, 16f * s),
                               head + (n.Count > 1 ? "  x" + n.Count : ""), _small);
-                    GUI.Label(new Rect(x + pad, y + pad * 0.5f + 16f * s, w - pad * 2f - 6f * s, h - pad - 16f * s),
+                    // 文本区底部 +1px 缓冲：游戏字体最后一笔常被 CalcSize 少算 1px，
+                    // 不加缓冲时"y/g/p"这类下伸笔画的最后一行会被裁掉。
+                    GUI.Label(new Rect(x + pad, y + pad * 0.5f + 16f * s,
+                                       w - pad * 2f - 6f * s, h - pad - 16f * s + 1f),
                               n.Text, _label);
                     // 底部剩余时间条：长度随剩余比例缩短，一眼看出还来得及点。
                     float life = n.Until > n.At ? Mathf.Clamp01((n.Until - now) / (n.Until - n.At)) : 0f;
