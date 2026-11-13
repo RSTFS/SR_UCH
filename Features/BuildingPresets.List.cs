@@ -70,6 +70,9 @@ namespace SR_UCH.Tweaks {
         }
 
         // ================= 列表本体 =================
+        private static int _rowsHFrame = -1;      // 行区高度锁定的帧号
+        private static float _rowsHFrameValue;    // 该帧锁定的行区高度
+
         private static void RenderListTable(List<PresetInfo> visible) {
             float rowH = SRApi.Ctl.TableRowH();
             float headerH = SRApi.Ctl.TableHeaderH();
@@ -89,7 +92,13 @@ namespace SR_UCH.Tweaks {
             // 核心以为"一屏画得完"（把行画到屏幕外），maxY 同时被压成 0 → 彻底滚不动。
             float screenBottom = SRApi.ContentArea.height - SRApi.FooterHeight;
             float rowsTop = box.y + headerH;
-            float rowsH = SRApi.Ctl.ScrollRowsH(box, headerH, screenBottom, rowH);
+            // 每帧只算一次行区高度：Layout 与 Repaint 两趟的 box/probe 可能差几像素，
+            // 各算一遍会让 _listMaxY 在同一帧里跳变 → 滚到下面时列表"突变"。
+            if (_rowsHFrame != Time.frameCount) {
+                _rowsHFrame = Time.frameCount;
+                _rowsHFrameValue = SRApi.Ctl.ScrollRowsH(box, headerH, screenBottom, rowH);
+            }
+            float rowsH = _rowsHFrameValue;
             float contentH = Mathf.Max(0, visible.Count) * rowH;
             _listMaxY = SRApi.Ctl.ScrollMaxY(visible.Count, rowH, rowsH);
             _maxScrollY = _listMaxY;
