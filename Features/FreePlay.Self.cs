@@ -1,5 +1,5 @@
 // 自由模式 · 自身状态（完全由 SR 自己实现，不依赖 EX）。
-// 六个开关：无敌 / 完美无敌 / 飞天 / 蹲移 / 无视对象 / 无视碰撞。全部只对本地自己生效。
+// 开关：无敌 / 完美无敌 / 飞天 / 无视碰撞。全部只对本地自己生效。
 // 以前这套在 EX 里（ExModule.Core/Other），用户要求 SR 的自身状态必须独立 → 整块搬到这里，
 // EX 里对应的 UI、配置、补丁、槽位全部删除。
 using System;
@@ -31,7 +31,7 @@ namespace SR_UCH {
         private static int _deathBypass;          // 深渊自调用放行深度（用计数，避免嵌套把标志提前清掉）
         private const string CauseFalling = "Falling";
 
-        // ================= 飞天 / 蹲移 =================
+        // ================= 飞天 =================
         private static System.Reflection.FieldInfo _crouchField;
         private static readonly Dictionary<int, Rigidbody2D> _rbCache = new Dictionary<int, Rigidbody2D>();
 
@@ -41,18 +41,15 @@ namespace SR_UCH {
                 _invincible = plugin.Config.Bind(Sec, "Invincible", false, "无敌：免疫所有非强制死亡（陷阱/子弹/掉坑/拳击等）。");
                 _godMode = plugin.Config.Bind(Sec, "God Mode", false, "完美无敌：在无敌之上再拦强制死亡（深坑、掉出判死线）。");
                 _fly = plugin.Config.Bind(Sec, "Fly", false, "飞天：方向键自由飞行（上/下升降，左/右平移，按住 Shift 加速）。");
-                _crouch = plugin.Config.Bind(Sec, "Crouch Move", false, "蹲移：蹲下状态下也能左右移动。");
                 _ignoreCollision = plugin.Config.Bind(Sec, "Ignore Collision", false, "无视碰撞：自己穿过所有实体碰撞（道具 + 场景/地面/墙体）。");
                 _invincibleKey = plugin.Config.Bind(Sec, "Invincible Key", KeyCode.None, "无敌的快捷键（EX 页右键按钮可绑）。");
                 _godModeKey = plugin.Config.Bind(Sec, "God Mode Key", KeyCode.None, "完美无敌的快捷键。");
                 _flyKey = plugin.Config.Bind(Sec, "Fly Key", KeyCode.None, "飞天的快捷键。");
-                _crouchKey = plugin.Config.Bind(Sec, "Crouch Move Key", KeyCode.None, "蹲移的快捷键。");
                 _ignoreCollisionKey = plugin.Config.Bind(Sec, "Ignore Collision Key", KeyCode.None, "无视碰撞的快捷键。");
 
                 SRApi.RegisterKey("自身状态-无敌", _invincibleKey, "toggle");
                 SRApi.RegisterKey("自身状态-完美无敌", _godModeKey, "toggle");
                 SRApi.RegisterKey("自身状态-飞天", _flyKey, "toggle");
-                SRApi.RegisterKey("自身状态-蹲移", _crouchKey, "toggle");
                 SRApi.RegisterKey("自身状态-无视碰撞", _ignoreCollisionKey, "toggle");
 
                 SRApi.RegisterTick("自身状态-快捷键", TickKeys);
@@ -80,8 +77,6 @@ namespace SR_UCH {
             SRApi.LocDesc(Sec, "God Mode", "完美无敌\n在无敌之上再拦强制死亡（深坑、判死线）\n完全没有死亡反馈，不适合正常玩", "God mode\ninvincible plus forced deaths (pits, death line)\nno death feedback at all; not for normal play");
             SRApi.LocKey(Sec, "Fly", "飞天", "Fly");
             SRApi.LocDesc(Sec, "Fly", "飞天\n方向键自由飞行，Shift 加速\n不按键则悬停在空中", "Fly\nfly freely with the arrow keys; hold Shift to speed up\nstays hovering when no key is held");
-            SRApi.LocKey(Sec, "Crouch Move", "蹲移", "Duck move");
-            SRApi.LocDesc(Sec, "Crouch Move", "蹲移\n蹲下状态也能左右移动（A/D 或方向键）", "Duck move\nmove left/right while ducking (A/D or arrow keys)");
             SRApi.LocKey(Sec, "Ignore Collision", "无视碰撞", "Ignore collision");
             SRApi.LocDesc(Sec, "Ignore Collision", "无视碰撞\n自己穿过所有实体碰撞\n可能掉出地图", "Ignore collision\npass through every solid collider\nmay fall out of the map");
         }
@@ -94,7 +89,6 @@ namespace SR_UCH {
                 if (SRApi.ComboKeyDown(_invincibleKey)) Toggle(_invincible, "无敌", "Invincible");
                 if (SRApi.ComboKeyDown(_godModeKey)) Toggle(_godMode, "完美无敌", "God mode");
                 if (SRApi.ComboKeyDown(_flyKey)) Toggle(_fly, "飞天", "Fly");
-                if (SRApi.ComboKeyDown(_crouchKey)) Toggle(_crouch, "蹲移", "Duck move");
                 if (SRApi.ComboKeyDown(_ignoreCollisionKey)) Toggle(_ignoreCollision, "无视碰撞", "Ignore collision");
             } catch (Exception __ex) { SRApi.Guard.Log("自身状态/快捷键", __ex); }
         }
@@ -156,14 +150,13 @@ namespace SR_UCH {
             }
         }
 
-        // 飞天 + 蹲移 + 无敌续期合并成一个 FixedUpdate 后缀，减少每物理帧的 Harmony 调用。
+        // 飞天 + 无敌续期合并成一个 FixedUpdate 后缀，减少每物理帧的 Harmony 调用。
         [HarmonyPatch(typeof(Character), "FixedUpdate")]
         internal static class FixedPatch {
             [HarmonyPostfix]
             private static void Postfix(Character __instance) {
                 try {
                     ApplyFly(__instance);
-                    KeepCrouch(__instance);
                     KeepInvincible(__instance);
                 } catch (Exception __ex) { SRApi.Guard.Log("自身状态/物理帧", __ex); }
             }
@@ -195,22 +188,6 @@ namespace SR_UCH {
                 if (Input.GetKey(KeyCode.LeftArrow)) vx = -7f * mul;
                 else if (Input.GetKey(KeyCode.RightArrow)) vx = 7f * mul;
                 rb.velocity = new Vector2(vx, vy);
-            } catch { /* 静默：物理帧高频路径，失败下帧重试，不写日志 */ }
-        }
-
-        private static void KeepCrouch(Character c) {
-            try {
-                if (!On(_crouch) || On(_fly)) return;   // 飞天已完全接管速度
-                if (c == null || !c.hasAuthority) return;
-                if (_crouchField == null) _crouchField = SRApi.Ref.Field(typeof(Character), "crouchingDown", "自身状态：蹲移");
-                if (_crouchField == null) return;
-                if (!(bool)_crouchField.GetValue(c)) return;
-                Rigidbody2D rb = Rb(c);
-                if (rb == null) return;
-                float h = 0f;
-                if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) h = -1f;
-                else if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) h = 1f;
-                rb.velocity = new Vector2(h * c.RunSpeed * 0.9f, rb.velocity.y);
             } catch { /* 静默：物理帧高频路径，失败下帧重试，不写日志 */ }
         }
 
