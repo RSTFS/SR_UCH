@@ -323,6 +323,10 @@ namespace SR_UCH.Tweaks {
         // 须显式 GUILayout.Width 锁定；仍经 Sc() 随 UI 缩放，但不随窗口宽度变化。
         public static float SliderTrackWidth() { try { return Sc(150); } catch { return 150f; } }
 
+        // 一帧只允许一个下拉消费滚轮：Layout / Repaint 两趟都会轮询，同一格滚轮
+        // 会被两趟各应用一次 → 表现"滚一格跳两格"。
+        private static int _comboWheelFrame = -1;
+
         private static int NextComboSeq() {
             if (_comboSeqFrame != Time.frameCount) { _comboSeqFrame = Time.frameCount; _comboSeq = 0; }
             return _comboSeq++;
@@ -372,7 +376,9 @@ namespace SR_UCH.Tweaks {
                 } else {
                     __w = WheelPoll(__latchKey, boxRect);
                 }
-                if (Mathf.Abs(__w) > 0.01f) {
+                bool __canApply = Mathf.Abs(__w) > 0.01f && _comboWheelFrame != Time.frameCount;
+                if (__canApply) _comboWheelFrame = Time.frameCount;
+                if (__canApply) {
                     int __cur = 0;
                     for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur = i; break; } }
                     // 一格 = 一项（不做幅度钳制：以前 Clamp(…,1,3) 会让大 delta 也最多走 3 项，
