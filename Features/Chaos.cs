@@ -756,8 +756,6 @@ namespace SR_UCH.Tweaks {
 
             Line("说明：仅房主需要安装；房客未安装时由游戏原生规则生效，房客能看到规则变化但看不到本页。",
                  "Only the host needs the mod. Guests without it still get the vanilla rule change, but cannot see this page.");
-            Line("射速牌刻意不收录：它会改写时间缩放，与「梦境」定格冲突。",
-                 "Rate-of-fire is excluded: it rewrites time scale and conflicts with Dream.");
             Line("混乱牌组用规则消息的高位魔数认领自己的消息，其它功能与手动改规则都不会被误解析。",
                  "Chaos Deck claims its rule messages with a high-bit magic, so other features and manual rule edits are never misread.");
             Line("每次抽牌前会先把上一回合的规则按原值重发，房客的规则不会逐回合累积。",
@@ -770,8 +768,6 @@ namespace SR_UCH.Tweaks {
         private void RenderPoolPage() {
             Line("勾上的牌才可能被抽到；至少留一张。", "Checked cards can be drawn; keep at least one enabled.");
             for (int i = 0; i < Cards.Length; i++) CfgRow(_pool[i]);
-            Line("射速牌刻意不收录：它会改写时间缩放，与「梦境」定格冲突。",
-                 "Rate-of-fire is excluded: it rewrites time scale and conflicts with Dream.");
         }
     }
 }

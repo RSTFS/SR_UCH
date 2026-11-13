@@ -476,12 +476,6 @@ namespace SR_UCH.Tweaks {
                 if (sel >= 0 && sel < vals.Length) _corner.Value = vals[sel];
             }
 
-            Line("「退回游戏原生提示」打开后，本功能只记历史不改屏幕；这是零风险回退开关。",
-                 "'Use Native Toast' restores the game's own toasts while history is still kept; it is a zero-risk rollback switch.");
-            Line("对局中静默只影响低/中优先级；提案、失败、拒绝这类要动手的提示永远会弹。静默的条目仍在历史里可查。",
-                 "Quiet in match only affects low/normal priority; proposals, failures and refusals always show. Silenced items stay in history.");
-            Line("提案过期后仍可在历史里点「重新打开」恢复待审；该按钮由混乱牌组提供，没装那个功能时不会出现。",
-                 "Expired proposals can be reopened from history; the button comes from Chaos Deck and disappears if that feature is missing.");
         }
 
         // 常驻组件：面板关闭时 DrawGUI 会早退，覆盖层走不到，所以必须自己挂 OnGUI。
