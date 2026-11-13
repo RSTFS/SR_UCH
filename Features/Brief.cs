@@ -25,7 +25,6 @@ namespace SR_UCH.Tweaks {
         private const string Sec = "局内简报";
 
         // 槽位名：形状全部是 BCL 委托，跨 DLL 不需要共享类型。
-        private const string SDream   = "sr.brief.dream";     // Func<string> 时间状态（已本地化），null=无
         private const string SChaos   = "sr.brief.chaos";     // Func<string> 当前牌面，null=无
         private const string SPending = "sr.brief.pending";   // Func<string> 待审提案（含倒计时），null=无
         private const string SAccept  = "sr.brief.accept";    // Action 采纳
@@ -33,11 +32,11 @@ namespace SR_UCH.Tweaks {
         private const string SRarest  = "sr.brief.rarest";    // Func<string> 本盒最稀有道具，null=无
         private const string SRoster  = "sr.brief.roster";    // Func<string> 房内 mod 清单，null=无
 
-        private static ConfigEntry<bool> _enabled, _folded, _showRoster, _showRarest, _showTime;
+        private static ConfigEntry<bool> _enabled, _folded, _showRoster, _showRarest;
         private static ConfigEntry<int> _corner, _alpha, _scale, _x, _y;
         private static ConfigEntry<KeyCode> _foldKey;
 
-        private static Func<string> _fDream, _fChaos, _fPending, _fRarest, _fRoster;
+        private static Func<string> _fChaos, _fPending, _fRarest, _fRoster;
         private static Action _aAccept, _aIgnore;
         private static int _bindTries;
         private static float _nextBind;
@@ -98,11 +97,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Scale",
                 "整体缩放\n整体缩放百分比（70-160）。",
                 "Overall scale\nWhole board scale in percent. Range 70-160.");
-            SRApi.LocKey(Sec, "Show Time", "显示时间控制状态", "Show time state");
-            SRApi.LocDesc(Sec, "Show Time",
-                "显示时间控制状态\n显示梦境 / 冻结角色状态。",
-                "Show time state\nShow Dream / Freeze self status.");
-            SRApi.LocKey(Sec, "Show Rarest", "显示最稀有道具", "Show rarest item");
+           SRApi.LocKey(Sec, "Show Rarest", "显示最稀有道具", "Show rarest item");
             SRApi.LocDesc(Sec, "Show Rarest",
                 "显示最稀有道具\n显示派对盒里最稀有的道具品质。",
                 "Show rarest item\nShow the rarest item tier in the current party box.");
@@ -150,7 +145,6 @@ namespace SR_UCH.Tweaks {
             _corner = plugin.Config.Bind(Sec, "Corner", 0, new ConfigDescription("停靠角：0 右上 / 1 左上 / 2 右下 / 3 左下。拖动标题栏可自定义位置。", new AcceptableValueRange<int>(0, 3)));
             _alpha = plugin.Config.Bind(Sec, "Alpha", 82, new ConfigDescription("背景不透明度百分比（20-100）。", new AcceptableValueRange<int>(20, 100)));
             _scale = plugin.Config.Bind(Sec, "Scale", 100, new ConfigDescription("整体缩放百分比（70-160）。", new AcceptableValueRange<int>(70, 160)));
-            _showTime = plugin.Config.Bind(Sec, "Show Time", true, "显示梦境 / 冻结角色状态。");
             _showRarest = plugin.Config.Bind(Sec, "Show Rarest", true, "显示派对盒里最稀有的道具品质。");
             _showRoster = plugin.Config.Bind(Sec, "Show Roster", false, "显示房内 mod 清单（默认关，联机时较占地方）。");
             _x = plugin.Config.Bind(Sec, "X", -1, "自定义 X；-1 = 跟随停靠角。");
@@ -215,14 +209,13 @@ namespace SR_UCH.Tweaks {
             // 以前要求 9 个全齐才置一个「已绑定」标志，那个标志既不控制显示、
             // 又会让注释撒谎；本轮移除，改由 _bindTries 统一控制重试上限。
             // Provide 会清除该名字的 miss 记录（Slots.cs:91），装齐时零残留。
-            if (_fDream   == null) _fDream   = Slots.Require<Func<string>>(SDream);
             if (_fChaos   == null) _fChaos   = Slots.Require<Func<string>>(SChaos);
             if (_fPending == null) _fPending = Slots.Require<Func<string>>(SPending);
             if (_aAccept  == null) _aAccept  = Slots.Require<Action>(SAccept);
             if (_aIgnore  == null) _aIgnore  = Slots.Require<Action>(SIgnore);
             if (_fRarest  == null) _fRarest  = Slots.Require<Func<string>>(SRarest);
             if (_fRoster  == null) _fRoster  = Slots.Require<Func<string>>(SRoster);
-            bool all = _fDream != null && _fChaos != null && _fPending != null &&
+            bool all = _fChaos != null && _fPending != null &&
                        _aAccept != null && _aIgnore != null && _fRarest != null && _fRoster != null;
             // 全齐就提前停：不再重复 Require，也不污染缺失槽位计数。
             if (all) _bindTries = 6;
@@ -291,12 +284,11 @@ namespace SR_UCH.Tweaks {
             if (_enabled == null || !_enabled.Value || Event.current == null) return;
 
             // 内容全部来自槽位；一条都没有就整块不画（不常驻空框）。
-            string dream = _showTime.Value ? Safe(_fDream) : null;
             string chaos = Safe(_fChaos);
             string rarest = _showRarest.Value ? Safe(_fRarest) : null;
             string roster = _showRoster.Value ? Safe(_fRoster) : null;
             string pending = Safe(_fPending);
-            if (dream == null && chaos == null && rarest == null && roster == null &&
+            if (chaos == null && rarest == null && roster == null &&
                 pending == null) return;
 
             EnsureStyles();
@@ -315,7 +307,6 @@ namespace SR_UCH.Tweaks {
             float w = 264f * s;
             float textW = w - pad * 2f - 12f * s;
             int rows = 0;
-            if (dream != null) rows++;
             if (chaos != null) rows++;
             if (rarest != null) rows++;
             if (roster != null) rows++;
@@ -363,7 +354,6 @@ namespace SR_UCH.Tweaks {
 
                 float cy = y + headH + pad * 0.5f;
                 // 标签用纯中英文本：特殊符号（◷ ✦ ◆ ◈ ▶ ▼）在游戏内置字体里常常缺字成方框。
-                if (dream != null)  { GUI.Label(new Rect(x + pad, cy, w - pad * 2f, rowH), SRApi.T("时间：", "Time: ") + dream, _label); cy += rowH; }
                 if (chaos != null)  { GUI.Label(new Rect(x + pad, cy, w - pad * 2f, rowH), SRApi.T("牌面：", "Card: ") + chaos, _label); cy += rowH; }
                 if (rarest != null) { GUI.Label(new Rect(x + pad, cy, w - pad * 2f, rowH), SRApi.T("稀有：", "Rare: ") + rarest, _label); cy += rowH; }
                 if (roster != null) { GUI.Label(new Rect(x + pad, cy, w - pad * 2f, rowH), SRApi.T("房间：", "Room: ") + roster, _label); cy += rowH; }
@@ -430,7 +420,6 @@ namespace SR_UCH.Tweaks {
             CfgRow(_corner);
             CfgRow(_alpha);
             CfgRow(_scale);
-            CfgRow(_showTime);
             CfgRow(_showRarest);
             CfgRow(_showRoster);
 

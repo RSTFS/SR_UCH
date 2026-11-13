@@ -35,7 +35,7 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<string> _prefix;
         private static ConfigEntry<KeyCode> _reportKey;
 
-        private static Func<string> _fDream, _fChaos, _fRarest, _fRoster;
+        private static Func<string> _fChaos, _fRarest, _fRoster;
         private static int _bindTries;
         private static float _nextBind, _lastCmdAt;
         private static string _lastCmd = "", _status = "";
@@ -128,7 +128,6 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void TryBind() {
-            if (_fDream == null) _fDream = Slots.Require<Func<string>>("sr.brief.dream");
             if (_fChaos == null) _fChaos = Slots.Require<Func<string>>("sr.brief.chaos");
             if (_fRarest == null) _fRarest = Slots.Require<Func<string>>("sr.brief.rarest");
             if (_fRoster == null) _fRoster = Slots.Require<Func<string>>("sr.brief.roster");
@@ -202,7 +201,6 @@ namespace SR_UCH.Tweaks {
             sb.Append(RoomLine()).Append('\n');
             sb.Append(GameLine()).Append('\n');
             sb.Append(new string('-', 40)).Append('\n');
-            AppendRow(sb, SRApi.T("时间控制", "Time control"), Safe(_fDream));
             AppendRow(sb, SRApi.T("混乱牌组", "Chaos deck"), Safe(_fChaos));
             AppendRow(sb, SRApi.T("品质光芒", "Piece glow"), Safe(_fRarest));
             if (_showRoster.Value) AppendRow(sb, SRApi.T("房内清单", "Mod roster"), Safe(_fRoster));
@@ -314,7 +312,6 @@ namespace SR_UCH.Tweaks {
             Line(GameLine(), GameLine());
 
             SRApi.Ctl.SectionTitle(SRApi.T("- 功能状态（只读汇总） -", "- Feature status (read-only) -"));
-            Line(SRApi.T("时间控制：", "Time control: ") + (Safe(_fDream) ?? "-"), "Time control: " + (Safe(_fDream) ?? "-"));
             Line(SRApi.T("混乱牌组：", "Chaos deck: ") + (Safe(_fChaos) ?? "-"), "Chaos deck: " + (Safe(_fChaos) ?? "-"));
             Line(SRApi.T("品质光芒：", "Piece glow: ") + (Safe(_fRarest) ?? "-"), "Piece glow: " + (Safe(_fRarest) ?? "-"));
             if (_showRoster.Value)

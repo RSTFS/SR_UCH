@@ -48,7 +48,8 @@ namespace SR_UCH.Tweaks {
         private static IFeatureHost _mp;
         private static ConfigEntry<bool> _enabled, _breathe, _invert, _legend;
         private static ConfigEntry<int> _strength, _size;
-        private static Sprite _glowSprite;          // 柔光（形状关闭时六档共用）
+        private static Sprite _glowSprite;          // 柔光（六档共用一张）
+        private static Material _addMat;            // 加色混合材质：让"光"叠到画面上而不是盖一层灰
         private static Sprite[] _glowShapes;        // 6 档形状贴图（可读性页开启时）
         private static float _nextScan;
         // 可读性适配（软依赖）：只查槽位名，缺 DLL 时零 miss、零副作用。
@@ -223,6 +224,13 @@ namespace SR_UCH.Tweaks {
             }
             sr.enabled = true;
             sr.sprite = EnsureSprite(tier);
+            if (_addMat == null) {
+                try {
+                    Shader sh = Shader.Find("Particles/Additive");
+                    if (sh != null) { _addMat = new Material(sh); _addMat.hideFlags = HideFlags.HideAndDontSave; }
+                } catch (Exception __am) { SRApi.Guard.Log("品质光芒/加色材质", __am); }
+            }
+            if (_addMat != null) sr.sharedMaterial = _addMat;
 
             // 包围盒：合并所有 ArtSprites 的世界包围；空则退化成固定尺寸
             Vector3 worldCenter = pb.transform.position;
@@ -238,7 +246,9 @@ namespace SR_UCH.Tweaks {
                 if (has) { worldCenter = b.center; worldSize = Mathf.Max(b.size.x, b.size.y); }
             }
             float scaleX = Mathf.Max(0.01f, holder.lossyScale.x);
-            float localSize = worldSize * (_size.Value / 100f) / scaleX;
+            // 光晕比包围盒大一圈（×2.6）：光要"散"出去，而不是贴着道具画一圈边。
+            float tierSpread = 2.2f + 0.18f * Mathf.Clamp(tier, 0, 5);
+            float localSize = worldSize * tierSpread * (_size.Value / 100f) / scaleX;
             g.localPosition = holder.InverseTransformPoint(worldCenter);
             g.localScale = new Vector3(localSize, localSize, 1f);
 
@@ -274,19 +284,11 @@ namespace SR_UCH.Tweaks {
         }
 
         /// <summary>按档取贴图：可读性页开启「形状图案」时用六档不同纹理，否则退回同一圈柔光。</summary>
-        private static Sprite EnsureSprite(int tier) {
-            if (!AShape()) return EnsureSoft();
-            if (_glowShapes == null) _glowShapes = new Sprite[6];
-            int t = Mathf.Clamp(tier, 0, 5);
-            if (_glowShapes[t] == null) _glowShapes[t] = MakeShape(t);
-            return _glowShapes[t];
-        }
-
-        /// <summary>程序生成的形状光晕：环带上按档画不同图案，色觉辨识困难时靠形状分档。</summary>
-        private static Sprite MakeShape(int tier) {
-            const int N = 64;
+        private static Sprite EnsureSoft() {
+            if (_glowSprite != null) return _glowSprite;
+            const int N = 128;
             Texture2D tex = new Texture2D(N, N, TextureFormat.RGBA32, false);
-            tex.name = "SR_UCH_RarityShape" + tier;
+            tex.name = "SR_UCH_RarityGlowTex";
             tex.hideFlags = HideFlags.HideAndDontSave;
             tex.wrapMode = TextureWrapMode.Clamp;
             tex.filterMode = FilterMode.Bilinear;
@@ -296,61 +298,23 @@ namespace SR_UCH.Tweaks {
                 for (int x = 0; x < N; x++) {
                     float dx = (x - c) / c, dy = (y - c) / c;
                     float d = Mathf.Sqrt(dx * dx + dy * dy);
-                    float soft = Mathf.Clamp01(1f - d);
-                    soft = soft * soft * (3f - 2f * soft);
-                    float ring = 0f;
-                    if (d > 0.58f && d < 0.96f) {
-                        switch (tier) {
-                            case 0: ring = ((x / 6 + y / 6) % 3 == 0) ? 0.90f : 0f; break;             // 虚点环
-                            case 1: ring = 0.85f; break;                                                  // 单实环
-                            case 2: ring = (d < 0.68f || d > 0.84f) ? 0.95f : 0f; break;                // 双环
-                            case 3: ring = (((x + y) / 5) % 2 == 0) ? 0.90f : 0f; break;                // 斜纹
-                            case 4: ring = (((x / 8) + (y / 8)) % 2 == 0) ? 0.95f : 0f; break;          // 棋盘
-                            default: {
-                                float ang = Mathf.Atan2(dy, dx);
-                                int spoke = Mathf.FloorToInt((ang + Mathf.PI) / (2f * Mathf.PI) * 12f);
-                                ring = (spoke % 2 == 0) ? 1f : 0.05f; break;                             // 放射星芒
-                            }
-                        }
-                    }
-                    float a = Mathf.Max(soft * 0.45f, ring);
-                    px[y * N + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(a) * 255f));
-                }
-            }
-            tex.SetPixels32(px);
-            tex.Apply(false, true);
-            Sprite sp = Sprite.Create(tex, new Rect(0f, 0f, N, N), new Vector2(0.5f, 0.5f), N);
-            sp.name = "SR_UCH_RarityShapeSprite" + tier;
-            sp.hideFlags = HideFlags.HideAndDontSave;
-            return sp;
-        }
-
-        /// <summary>程序生成的径向渐变：中心不透明、边缘全透明。整局只建一次。</summary>
-        private static Sprite EnsureSoft() {
-            if (_glowSprite != null) return _glowSprite;
-            const int N = 64;
-            Texture2D tex = new Texture2D(N, N, TextureFormat.RGBA32, false);
-            tex.name = "SR_UCH_RarityGlowTex";
-            tex.hideFlags = HideFlags.HideAndDontSave;         // 别被 UnloadUnusedAssets 收走
-            tex.wrapMode = TextureWrapMode.Clamp;
-            tex.filterMode = FilterMode.Bilinear;
-            Color32[] px = new Color32[N * N];
-            float c = (N - 1) * 0.5f;
-            for (int y = 0; y < N; y++) {
-                for (int x = 0; x < N; x++) {
-                    float dx = (x - c) / c, dy = (y - c) / c;
-                    float d = Mathf.Sqrt(dx * dx + dy * dy);
                     float t = Mathf.Clamp01(1f - d);
-                    t = t * t * (3f - 2f * t);                  // smoothstep，边缘柔和
+                    t = Mathf.Pow(t, 2.6f);
                     px[y * N + x] = new Color32(255, 255, 255, (byte)(t * 255f));
                 }
             }
             tex.SetPixels32(px);
             tex.Apply(false, true);
-            _glowSprite = Sprite.Create(tex, new Rect(0f, 0f, N, N), new Vector2(0.5f, 0.5f), N);
+            _glowSprite = Sprite.Create(tex, new Rect(0f, 0f, N, N), new Vector2(0.5f, 0.5f), N / 2f);
             _glowSprite.name = "SR_UCH_RarityGlowSprite";
             _glowSprite.hideFlags = HideFlags.HideAndDontSave;
             return _glowSprite;
+        }
+
+        private static Sprite EnsureSprite(int tier) {
+            // 六档共用同一张"中心亮、向外平滑衰减"的径向柔光；档位差异靠颜色、尺寸与亮度体现。
+            // （以前的环带形状在实机里看起来就是"画圈"，用户明确要求改成道具自身发光。）
+            return EnsureSoft();
         }
 
         /// <summary>图例里的形状小标记：只用 DrawFill 的小矩形拼，不依赖字体符号。</summary>
