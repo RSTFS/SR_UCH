@@ -82,6 +82,9 @@ namespace SR_UCH.Tweaks {
             new CardDef("玩家互撞", "Player colliding", TabletRule.ModifierPlayerPlayerCollisions, FBoolPlayerCol, true, 0, 0),
             new CardDef("无摩擦",   "Frictionless",     TabletRule.ModifierFrictionless,       FBoolFriction,  true,  0, 0),
             new CardDef("慢射速",   "Slow fire rate",   TabletRule.ModifierRateOfFire,         FRate,          false, 1, 3),
+            new CardDef("高跳跃",   "High jump",        TabletRule.ModifierJumpSpeed,          FJump,          false, 2, 3),
+            new CardDef("快冲刺",   "Fast sprint",      TabletRule.ModifierSprintSpeed,        FSprint,        false, 2, 4),
+            new CardDef("快平台",   "Fast platforms",   TabletRule.ModifierPlatformSpeed,      FPlatform,      false, 2, 4),
         };
 
         private struct ActiveCard { public int Id, Param; public ActiveCard(int id, int param) { Id = id; Param = param; } }
