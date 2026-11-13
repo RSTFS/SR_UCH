@@ -55,6 +55,7 @@ namespace SR_UCH.Tweaks {
 
         private static ConfigEntry<bool> _enabled, _native, _quiet, _onScreen;
         private static ConfigEntry<int> _maxVisible, _toastSeconds, _corner, _cardW;
+        private static bool _cornerOpen;   // 停靠角下拉的展开态（每帧从核心 EditOpen 语义走）
 
         private static readonly List<Notice> _history = new List<Notice>();
         private static readonly List<Notice> _visible = new List<Notice>();
@@ -450,7 +451,21 @@ namespace SR_UCH.Tweaks {
             CfgRow(_maxVisible);
             CfgRow(_toastSeconds);
             CfgRow(_cardW);
-            CfgRow(_corner);
+            // 停靠角改用下拉：0 右下 / 1 右上 / 2 左下 / 3 左上。
+            {
+                int[] vals = new int[] { 0, 1, 2, 3 };
+                string[] labels = new string[] {
+                    SRApi.T("停靠角：右下", "Corner: bottom-right"),
+                    SRApi.T("停靠角：右上", "Corner: top-right"),
+                    SRApi.T("停靠角：左下", "Corner: bottom-left"),
+                    SRApi.T("停靠角：左上", "Corner: top-left")
+                };
+                int cur = Mathf.Clamp(_corner.Value, 0, 3);
+                bool open = _cornerOpen;
+                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, SRApi.Ctl.Sc(180f));
+                _cornerOpen = open;
+                if (sel >= 0 && sel < vals.Length) _corner.Value = vals[sel];
+            }
 
             Line("「退回游戏原生提示」打开后，本功能只记历史不改屏幕；这是零风险回退开关。",
                  "'Use Native Toast' restores the game's own toasts while history is still kept; it is a zero-risk rollback switch.");
