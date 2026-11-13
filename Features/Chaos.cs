@@ -38,7 +38,6 @@ using UnityEngine.Networking;
 
 namespace SR_UCH.Tweaks {
     [SrFeature("sr.chaos", "Chaos", "2.2", Provides = new string[] {
-        "sr.brief.chaos", "sr.brief.pending", "sr.brief.accept", "sr.brief.ignore", "sr.brief.roster",
         "sr.notify.reopenProposal", "sr.cast.pool" })]
     public class Chaos : ITweak {
         private const string Sec = "混乱牌组";
@@ -108,7 +107,7 @@ namespace SR_UCH.Tweaks {
         private static bool _helloSent;
         private static float _nextHelloAt;
         // 房客提案：单槽待审，默认 20 秒过期（unscaledTime，梦境定格时也照走）。
-        // 可读性页可加秒；过期后留一份快照，通知历史里能「重新打开」。
+        // 过期后留一份快照，通知页里能「重新打开」。
         private static bool _pendingActive;
         private static int _pendingCard, _pendingFrom;
         private static float _pendingAt;
@@ -239,13 +238,6 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterKey("混乱牌组-重抽", _drawKey, "press");
             SRApi.RegisterKey("混乱牌组-提案", _proposeKey, "press");
 
-            // 局内简报的状态 / 动作出口：跨 DLL 只认 BCL 委托，不暴露本 DLL 的任何类型。
-            // 采纳 / 忽略用捕获 this 的闭包，避免为了改成 static 去动 RebuildLocal 等实例方法。
-            Slots.Provide("sr.brief.chaos",   (Func<string>)(() => Desc()));
-            Slots.Provide("sr.brief.pending", (Func<string>)(() => BriefPending()));
-            Slots.Provide("sr.brief.accept",  (Action)(() => AcceptProposal()));
-            Slots.Provide("sr.brief.ignore",  (Action)(() => ClearProposal()));
-            Slots.Provide("sr.brief.roster",  (Func<string>)(() => RosterText()));
             // 通知治理中心的历史页用这个槽位把过期提案恢复到待审状态。
             Slots.Provide("sr.notify.reopenProposal", (Action)(() => RestoreLastProposal()));
             // 对局播报：开局公告读本局启用的牌池（不是固定牌序，牌是逐回合随机抽的）。
@@ -292,7 +284,7 @@ namespace SR_UCH.Tweaks {
                 _lastExpiredCard = _pendingCard;
                 _lastExpiredFrom = _pendingFrom;
                 if (_announce.Value && _pendingCard >= 0 && _pendingCard < Cards.Length)
-                    SRApi.NotifyT("提案已过期：{0} 号玩家建议的「{1}」未处理（可在通知历史里重新打开）",
+                    SRApi.NotifyT("提案已过期：{0} 号玩家建议的「{1}」未处理（可在通知页里重新打开）",
                                   "Proposal expired: player {0}'s {1} was not handled (reopen it from notice history)",
                                   _pendingFrom, SRApi.T(Cards[_pendingCard].Zh, Cards[_pendingCard].En));
                 ClearProposal();
@@ -754,8 +746,6 @@ namespace SR_UCH.Tweaks {
             }
             Line("房客提案走同一条规则消息通道（None + 魔数），只有房主处理；未装 mod 的房客不受影响。",
                  "Guest proposals ride the same rule message (None + magic); only the host acts on them. Guests without the mod are unaffected.");
-            Line("提案等待时间 = 20 秒 + 「可读性」页的加秒；过期后仍可在「通知中心 / 通知历史」里点「重新打开」恢复。",
-                 "Proposal window = 20s plus the extra seconds set on the Readability page. Expired ones can be reopened from Notification Hub / History.");
             if (_lastExpiredCard >= 0 && _lastExpiredCard < Cards.Length && IsAuthority) {
                 SRApi.Ctl.HotkeyButton("chaos.reopen", SRApi.T("恢复上一条过期提案", "Reopen last expired proposal"),
                                        SRApi.T("把最近一条过期提案放回待审并重新计时", "Put the last expired proposal back into pending with a fresh timer"),
