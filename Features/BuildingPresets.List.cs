@@ -77,10 +77,10 @@ namespace SR_UCH.Tweaks {
 
             // 控件创建全部在 try 之外：Layout / Repaint 两趟必须创建同样多的控件。
             Rect probe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
-            // 底界：右栏纯尺寸 − 底栏。probe.y 与它是同一坐标系（都在 BeginArea 里）。
-            // 底界 = 右栏高度 − 底栏高度（**不再额外留缝**：用户要求列表底边直接连到底栏上沿）。
-            float bottomLocal = SRApi.ContentArea.height - SRApi.FooterHeight;
-            float tableH = Mathf.Max(minH, bottomLocal - probe.y);
+            // 底界改走核心的自适应高度助手（联机列表用的是同一个）：
+            // 它把"标题栏 26 + 内边距 2 + 底栏"统一扣掉，预设列表底边因此与联机列表一致、直接贴住底栏，
+            // 不再各自用 ContentArea.height - FooterHeight 算一套（两套口径会差 2-28px，表现为底部留白）。
+            float tableH = SRApi.TableAutoHeight(probe.y, minH);
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true),
                 GUILayout.Height(tableH));
 
