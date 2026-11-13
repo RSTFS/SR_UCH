@@ -426,6 +426,15 @@ namespace SR_UCH.Tweaks {
                               : n.Level == 1 ? new Color(0.36f, 0.72f, 1f, 1f)
                               : new Color(0.55f, 0.60f, 0.66f, 1f);
                     Fill(new Rect(ax, y, (n.Level == 2 ? 6f : 3f) * s, h), new Color(bar.r, bar.g, bar.b, aa));
+                    // 高优先级加一圈同色描边：颜色之外再给一层"更醒目"的编码（不新增素材）。
+                    if (n.Level == 2) {
+                        Color oc = new Color(bar.r, bar.g, bar.b, 0.55f * aa);
+                        float t = Mathf.Max(1f, 1f * s);
+                        Fill(new Rect(box.x, box.y, box.width, t), oc);
+                        Fill(new Rect(box.x, box.yMax - t, box.width, t), oc);
+                        Fill(new Rect(box.x, box.y, t, box.height), oc);
+                        Fill(new Rect(box.xMax - t, box.y, t, box.height), oc);
+                    }
 
                     string head = n.Level == 2 ? SRApi.T("重要", "IMPORTANT")
                                 : n.Level == 1 ? SRApi.T("提示", "INFO") : SRApi.T("已办", "DONE");
