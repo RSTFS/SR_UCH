@@ -11,7 +11,7 @@
 //   所以标记不会干扰原生规则，玩家在规则书里手动改的规则（Value2 = 0）也不会被误当成抽牌。
 //
 // 三条刻意收窄：
-//   1) RateOfFire 不进池：游戏 ModifierRateOfFire 分支会调 OnModifiersDynamicChange()
+//   1) 射速牌（RateOfFire）已加回牌池；它会在游戏侧调 OnModifiersDynamicChange()，属于预期行为。
 //      （111551），该函数会写 Time.timeScale = GameSpeed，与「时间控制」抢同一全局状态。
 //   2) GameSpeed / CharacterSize / CameraFlip / Doomsday 不进池：前者归时间控制所有，
 //      后三者碰相机或要重建绘制对象。
@@ -65,7 +65,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        private const int FGravity = 0, FJump = 1, FSprint = 2, FPlatform = 3;
+        private const int FGravity = 0, FJump = 1, FSprint = 2, FPlatform = 3, FRate = 4;
         private static int _drawSeq;   // 抽牌序号：保证每次重抽的随机种子都不同（否则 TickCount 同毫秒会抽出同一张）
         private const int FBoolWallJumps = 8, FBoolDance = 9, FBoolMirror = 10, FBoolPlayerCol = 12, FBoolFriction = 13;
 
@@ -81,11 +81,12 @@ namespace SR_UCH.Tweaks {
             new CardDef("跳舞无敌", "Dance invincible", TabletRule.ModifierDanceInvincibility, FBoolDance,     true,  0, 0),
             new CardDef("玩家互撞", "Player colliding", TabletRule.ModifierPlayerPlayerCollisions, FBoolPlayerCol, true, 0, 0),
             new CardDef("无摩擦",   "Frictionless",     TabletRule.ModifierFrictionless,       FBoolFriction,  true,  0, 0),
+            new CardDef("慢射速",   "Slow fire rate",   TabletRule.ModifierRateOfFire,         FRate,          false, 1, 3),
         };
 
         private struct ActiveCard { public int Id, Param; public ActiveCard(int id, int param) { Id = id; Param = param; } }
         private struct Snapshot {
-            public int Gravity, Jump, Sprint, Platform;
+            public int Gravity, Jump, Sprint, Platform, Rate;
             public bool WallJumps, Dance, Mirror, PlayerCol, Friction;
         }
 
@@ -403,6 +404,7 @@ namespace SR_UCH.Tweaks {
         private static int ArrayLengthFor(int field, Modifiers m) {
             switch (field) {
                 case FGravity:  return m.GravityValues != null ? m.GravityValues.Length : 0;
+                case FRate:     return m.RateOfFireValues != null ? m.RateOfFireValues.Length : 0;
                 case FJump:     return m.JumpSpeedValues != null ? m.JumpSpeedValues.Length : 0;
                 case FSprint:   return m.SprintModifiers != null ? m.SprintModifiers.Length : 0;
                 case FPlatform: return m.PlatformMoveSpeedValues != null ? m.PlatformMoveSpeedValues.Length : 0;
@@ -464,6 +466,7 @@ namespace SR_UCH.Tweaks {
         private static int SnapshotValue(int field) {
             switch (field) {
                 case FGravity:  return _snap.Gravity;
+                case FRate:     return _snap.Rate;
                 case FJump:     return _snap.Jump;
                 case FSprint:   return _snap.Sprint;
                 case FPlatform: return _snap.Platform;
@@ -481,6 +484,7 @@ namespace SR_UCH.Tweaks {
             _snap.Jump = m.JumpSpeedMode;
             _snap.Sprint = m.SprintSpeedMode;
             _snap.Platform = m.PlatformSpeedMode;
+            _snap.Rate = m.RateOfFireMode;
             _snap.WallJumps = m.wallJumpsDisabled;
             _snap.Dance = m.danceInvincibility;
             _snap.Mirror = m.mirrorControls;
@@ -493,6 +497,7 @@ namespace SR_UCH.Tweaks {
             m.JumpSpeedMode = _snap.Jump;
             m.SprintSpeedMode = _snap.Sprint;
             m.PlatformSpeedMode = _snap.Platform;
+            m.RateOfFireMode = _snap.Rate;
             m.wallJumpsDisabled = _snap.WallJumps;
             m.danceInvincibility = _snap.Dance;
             m.mirrorControls = _snap.Mirror;
@@ -503,6 +508,7 @@ namespace SR_UCH.Tweaks {
         private static void ApplyLocal(Modifiers m, CardDef c, int param) {
             switch (c.Field) {
                 case FGravity:  m.GravityMode = param; break;
+                case FRate:     m.RateOfFireMode = param; break;
                 case FJump:     m.JumpSpeedMode = param; break;
                 case FSprint:   m.SprintSpeedMode = param; break;
                 case FPlatform: m.PlatformSpeedMode = param; break;
