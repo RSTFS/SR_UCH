@@ -35,7 +35,7 @@ namespace SR_UCH.Tweaks {
             });
             SRApi.RegisterPage("build", RenderPage); // 本功能页自绘（含建造上限分区）
             SRApi.LocSec("build", "建造", "Build");
-            SRApi.Nav("build", 50); // 侧栏栏目顺序 50
+            SRApi.Nav("build", 60); // 侧栏栏目顺序 50
             SRApi.LocKey("build", "Collision Override", "无视碰撞", null);
             SRApi.LocDesc("build", "Collision Override", "无视碰撞放置\n方块可与任何东西重叠、悬空、穿插\n只影响放置判定，不改物理与玩法", "Ignore-collision placement\npieces may overlap, float or intersect anything\nplacement rules only; physics unchanged");
             SRApi.LocKey("build", "Collision Toggle Key", "无视碰撞开关", null);

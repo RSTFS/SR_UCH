@@ -245,7 +245,7 @@ namespace SR_UCH.Tweaks {
             // 上一版漏了栏目登记：侧栏会显示英文 id 且排序靠后。补上中英名与顺序。
             SRApi.LocSec("Chaos", "混乱牌组", "Chaos Deck");
             RegUi();
-            SRApi.Nav("Chaos", 96);   // 联机(90)/时间控制(91) 之后、实验(100) 之前
+            SRApi.Nav("Chaos", 130);   // 联机(90)/时间控制(91) 之后、实验(100) 之前
             SRApi.RegisterPage("Chaos", "Deck", "牌组", "Deck", 118, RenderPage);
             SRApi.RegisterPage("Chaos", "Pool", "牌池", "Card pool", 130, RenderPoolPage);
 

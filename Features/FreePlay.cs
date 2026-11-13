@@ -15,7 +15,7 @@ namespace SR_UCH {
                 SRApi.LocKey(Sec, "FreePlay Page", "自由模式", "Freeplay");
                 // 侧栏栏目必须显式 Nav 注册：_navOrder 只由 SR.Nav 填充，
                 // 只调 RegisterPage 的栏目不会出现在左栏（这就是"加了但侧栏没有"的原因）。
-                SRApi.Nav(Sec, 85);
+                SRApi.Nav(Sec, 100);
                 // 单页三分区（用户要求：不要页签）
                 SRApi.RegisterPage(Sec, RenderAll);
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式页/初始化", __ex); }

@@ -131,7 +131,7 @@ namespace SR_UCH.Tweaks {
         // ---------------- 注册 ----------------
         private static void SelfReg() {
             SRApi.LocSec(Sec, "角色", null);
-            SRApi.Nav(Sec, 35);
+            SRApi.Nav(Sec, 40);
             SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderPick);
             SRApi.RegisterPage(Sec, "outfit", "自动时装", "Auto outfit", 20, RenderOutfit);
 

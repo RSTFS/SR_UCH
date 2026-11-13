@@ -270,7 +270,7 @@ namespace SR_UCH.Tweaks {
         private static void SelfReg() {
             SRApi.RowFilters.Add(TrackPlayerRowVisible); // 通用条目行扩展点
             SRApi.LocSec("Destroy Blocks", "方块破坏", null);
-            SRApi.Nav("Destroy Blocks", 60); // 侧栏栏目顺序
+            SRApi.Nav("Destroy Blocks", 80); // 侧栏栏目顺序
             SRApi.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);
             SRApi.LocDesc("Destroy Blocks", "Toggle Key", "删除模式按键\n按住高亮候选方块（房客同样可用）\n可改绑，支持组合键", "Delete-mode key\nhold to highlight candidates (guests can use it too)\nrebindable, combos supported");
             SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);

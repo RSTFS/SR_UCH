@@ -215,7 +215,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocEnum("Stack", "堆叠");
             SRApi.LocEnum("Inline", "平铺");
             SRApi.LocSec(Sec, "HUD", "HUD");
-            SRApi.Nav(Sec, 25); // 移动轨迹(20) 之后
+            SRApi.Nav(Sec, 20); // 移动轨迹(20) 之后
             SRApi.RegisterPage(Sec, "hud", "HUD", "HUD", 10, RenderPage1);
             SRApi.RegisterPage(Sec, "content", "显示内容", "Content", 20, RenderPage2);
 

@@ -27,7 +27,7 @@ public partial class Level : ITweak {
         // 快照加载后据此区分关卡自带方块与玩家放置方块。
         SRApi.Ref.Override("QuickSaver.initialLevelPlaceables", "快照加载后的初始方块集合（关卡自带件）");
         SRApi.LocSec("Level", "关卡", null);
-        SRApi.Nav("Level", 40); //侧栏栏目顺序 40
+        SRApi.Nav("Level", 50); //侧栏栏目顺序 40
         // 一个栏目两页：派对盒 → 关卡工具（挑战页已移到快速调整）。
         SRApi.RegisterPage("Level", "partybox", "派对盒", "Party Box", 10, RenderPartyBox);
         // 「挑战」页已移到「快速调整」栏目。

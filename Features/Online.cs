@@ -114,7 +114,7 @@ namespace SR_UCH.Tweaks {
 
         public void Initialize(IFeatureHost plugin) {
             SRApi.LocSec(SecOnline, "联机", "Online");
-            SRApi.Nav(SecOnline, 90);   // 侧栏顺序 90：会话(80) 之后、实验(100) 之前
+            SRApi.Nav(SecOnline, 110);   // 侧栏顺序 90：会话(80) 之后、实验(100) 之前
             SRApi.RegisterPage(SecOnline, RenderOnlinePage);
             SRApi.RegisterPageWheel(OnLobbyWheel);   // 页面关滚动，房间列表自己吃滚轮
             // 填充页兜底：帧尾若滚轮没被消费，直接滚房间列表

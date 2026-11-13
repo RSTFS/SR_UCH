@@ -133,7 +133,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec(Sec, "品质光芒", "Rarity Glow");
 
             RegUi();
-            SRApi.Nav(Sec, 105);                 // 实验(100) 之后
+            SRApi.Nav(Sec, 120);                 // 实验(100) 之后
             SRApi.RegisterPage(Sec, "Glow", "品质光芒", "Rarity Glow", 10, RenderPage);
             SRApi.RegisterTick("品质光芒-扫描", Tick);
             Slots.Provide("sr.brief.rarest", (Func<string>)(() => BriefRarest()));

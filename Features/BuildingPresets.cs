@@ -261,7 +261,7 @@ namespace SR_UCH.Tweaks {
         // 栏目注册：单页（保存 / 导入导出 / 搜索排序筛选 + 预设列表同页，分区用 SectionTitle）。
         private static void SelfReg() {
             SRApi.LocSec(Section, "布局预设", "Layout Presets");
-            SRApi.Nav(Section, 45); // 关卡(40) 之后、构建工具(50) 之前
+            SRApi.Nav(Section, 70); // 关卡(40) 之后、构建工具(50) 之前
             // 多页必须用 6 参重载：单页重载会覆盖 PageRenderers 并清掉 _pageLists，
             // 两次单页注册的结果是"只剩最后一页、没有页签"——这就是之前"啥也没有"的原因。
             SRApi.RegisterPage(Section, "save", "预设保存", "Save", 10, Render);
