@@ -15,8 +15,8 @@ namespace SR_UCH {
         private const string Sec = "自由模式";
         private const string SlotIsPlayerPlaced = "DestroyBlocks.IsPlayerPlaced";
 
-        private static ConfigEntry<bool> _invincible, _godMode, _fly, _crouch, _ignoreCollision;
-        private static ConfigEntry<KeyCode> _invincibleKey, _godModeKey, _flyKey, _crouchKey, _ignoreCollisionKey;
+        private static ConfigEntry<bool> _invincible, _godMode, _fly, _ignoreCollision;
+        private static ConfigEntry<KeyCode> _invincibleKey, _godModeKey, _flyKey, _ignoreCollisionKey;
 
         // 统一门控：EX 的"总开关"语义在 SR 侧就是 GateMaster（设置页 All Enabled）。
         // 自由模式的功能只在自由模式生效（超级模式经由 GateModeAllows 的豁免自动放行）；
@@ -32,7 +32,6 @@ namespace SR_UCH {
         private const string CauseFalling = "Falling";
 
         // ================= 飞天 =================
-        private static System.Reflection.FieldInfo _crouchField;
         private static readonly Dictionary<int, Rigidbody2D> _rbCache = new Dictionary<int, Rigidbody2D>();
 
         public void Initialize(IFeatureHost plugin) {
@@ -346,27 +345,32 @@ namespace SR_UCH {
         // ================= 页面（自由模式页的「自身状态」分区） =================
         internal static void RenderRows() {
             try {
-                float w = SRApi.Ctl.Sc(150f);
-                float gap = SRApi.Ctl.Sc(8f);
-                GUILayout.BeginHorizontal();
-                try {
-                    if (SRApi.Ctl.SelfToggleButton(SRApi.T("无敌：", "Invincible: "), SRApi.T("自己免疫非强制死亡", "Immune to non-forced deaths"), On(_invincible), _invincibleKey, w, true)) Toggle(_invincible, "无敌", "Invincible");
-                    GUILayout.Space(gap);
-                    if (SRApi.Ctl.SelfToggleButton(SRApi.T("飞天：", "Fly: "), SRApi.T("方向键自由飞行", "Fly with the arrow keys"), On(_fly), _flyKey, w, true)) Toggle(_fly, "飞天", "Fly");
-                    GUILayout.Space(gap);
-                    if (SRApi.Ctl.SelfToggleButton(SRApi.T("蹲移：", "Duck: "), SRApi.T("保持蹲下自由移动", "Stay ducked and move freely"), _crouch != null && _crouch.Value, _crouchKey, w, true)) Toggle(_crouch, "蹲移", "Duck move");
-                    GUILayout.FlexibleSpace();
-                } finally { GUILayout.EndHorizontal(); }
+                // 两行两列、列宽固定：同一行的两个按钮起始 x 相同，第二行的"无视碰撞"不会再错位。
+                float w = SRApi.Ctl.Sc(200f);
+                float gap = SRApi.Ctl.Sc(12f);
+                RenderPair(SRApi.T("无敌：", "Invincible: "), SRApi.T("自己免疫非强制死亡", "Immune to non-forced deaths"),
+                           On(_invincible), _invincibleKey, delegate { Toggle(_invincible, "无敌", "Invincible"); },
+                           SRApi.T("飞天：", "Fly: "), SRApi.T("方向键自由飞行", "Fly with the arrow keys"),
+                           On(_fly), _flyKey, delegate { Toggle(_fly, "飞天", "Fly"); }, w, gap);
                 GUILayout.Space(SRApi.Ctl.Sc(4f));
-                GUILayout.BeginHorizontal();
-                try {
-                    if (SRApi.Ctl.SelfToggleButton(SRApi.T("完美无敌：", "God mode: "), SRApi.T("连强制死亡、深坑、掉出判死线都拦", "Also blocks forced deaths (pits, death line)"), On(_godMode), _godModeKey, w, true)) Toggle(_godMode, "完美无敌", "God mode");
-                    GUILayout.Space(gap);
-                    GUILayout.Space(gap);
-                    if (SRApi.Ctl.SelfToggleButton(SRApi.T("无视碰撞：", "Ignore collision: "), SRApi.T("自己穿过所有实体碰撞", "Pass through every solid collider"), On(_ignoreCollision), _ignoreCollisionKey, w, true)) Toggle(_ignoreCollision, "无视碰撞", "Ignore collision");
-                    GUILayout.FlexibleSpace();
-                } finally { GUILayout.EndHorizontal(); }
+                RenderPair(SRApi.T("完美无敌：", "God mode: "), SRApi.T("连强制死亡、深坑、掉出判死线都拦", "Also blocks forced deaths (pits, death line)"),
+                           On(_godMode), _godModeKey, delegate { Toggle(_godMode, "完美无敌", "God mode"); },
+                           SRApi.T("无视碰撞：", "Ignore collision: "), SRApi.T("自己穿过所有实体碰撞", "Pass through every solid collider"),
+                           On(_ignoreCollision), _ignoreCollisionKey, delegate { Toggle(_ignoreCollision, "无视碰撞", "Ignore collision"); }, w, gap);
             } catch (Exception __ex) { SRApi.Guard.Log("自身状态/渲染", __ex); }
+        }
+
+        // 一行两个按钮：固定列宽 + 固定间隔 + 末尾占位，保证两行列起点完全一致。
+        private static void RenderPair(string z1, string t1, bool on1, ConfigEntry<KeyCode> k1, Action a1,
+                                       string z2, string t2, bool on2, ConfigEntry<KeyCode> k2, Action a2,
+                                       float w, float gap) {
+            GUILayout.BeginHorizontal();
+            try {
+                if (SRApi.Ctl.SelfToggleButton(z1, t1, on1, k1, w, true)) a1();
+                GUILayout.Space(gap);
+                if (SRApi.Ctl.SelfToggleButton(z2, t2, on2, k2, w, true)) a2();
+                GUILayout.FlexibleSpace();
+            } finally { GUILayout.EndHorizontal(); }
         }
     }
 }
