@@ -66,6 +66,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private const int FGravity = 0, FJump = 1, FSprint = 2, FPlatform = 3;
+        private static int _drawSeq;   // 抽牌序号：保证每次重抽的随机种子都不同（否则 TickCount 同毫秒会抽出同一张）
         private const int FBoolWallJumps = 8, FBoolDance = 9, FBoolMirror = 10, FBoolPlayerCol = 12, FBoolFriction = 13;
 
         // 10 张牌：4 个数值规则（含同规则不同档的高重力）+ 5 个布尔。
@@ -374,7 +375,8 @@ namespace SR_UCH.Tweaks {
             BroadcastRestoreRules();
             if (NetClientActive()) SendSignal(OpClear);
 
-            var rng = new System.Random(Environment.TickCount ^ (_roundSeen * 7919));
+            _drawSeq++;
+            var rng = new System.Random(Environment.TickCount ^ (_roundSeen * 7919) ^ (_drawSeq * 104729));
             int want = Mathf.Clamp(_maxActive.Value, 1, 4);
             _active.Clear();
             for (int i = 0; i < want; i++) {
@@ -618,7 +620,8 @@ namespace SR_UCH.Tweaks {
             if (id < 0 || id >= Cards.Length || _pool[id] == null || !_pool[id].Value) return;
             BroadcastRestoreRules();
             if (NetClientActive()) SendSignal(OpClear);
-            var rng = new System.Random(Environment.TickCount ^ (_roundSeen * 7919));
+            _drawSeq++;
+            var rng = new System.Random(Environment.TickCount ^ (_roundSeen * 7919) ^ (_drawSeq * 104729));
             int param = ParamFor(id, rng);
             _active.Clear();
             _active.Add(new ActiveCard(id, param));
