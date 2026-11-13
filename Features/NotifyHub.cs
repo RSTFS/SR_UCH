@@ -296,7 +296,12 @@ namespace SR_UCH.Tweaks {
                     _visible.Add(n);
                     int max = Mathf.Clamp(_maxVisible.Value, 1, 6);
                     // 高优先级排最前：要动手的卡片永远在最上面。
-                    _visible.Sort(delegate (Notice a, Notice b) { return b.Level.CompareTo(a.Level); });
+                    // 同级时新的排前面：以前只按 Level 排序（不稳定），超上限时 RemoveAt(末尾)
+                    // 可能把刚到的消息丢掉 → 表现为"通知不灵敏、偶尔漏消息"。
+                    _visible.Sort(delegate (Notice a, Notice b) {
+                        int c = b.Level.CompareTo(a.Level);
+                        return c != 0 ? c : b.At.CompareTo(a.At);
+                    });
                     while (_visible.Count > max) _visible.RemoveAt(_visible.Count - 1);
                 }
 
