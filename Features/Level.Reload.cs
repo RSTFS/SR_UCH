@@ -1,4 +1,4 @@
-// Level 的 partial 分片（只做代码组织，无逻辑改动）
+// Level 分片：重载关卡（房主写快照 → ReloadScene → 全员重建）+ 重载期保分。
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -13,9 +13,9 @@ using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
     public partial class Level {
-        private static bool _reloadBusy; // 重载关卡进行中，防重复触发
+        private static bool _reloadBusy; // 重载进行中
 
-        private static float _reloadBusyAt = -1f; // 加锁时刻，用于识别协程被销毁导致的锁残留
+        private static float _reloadBusyAt = -1f; // 加锁时刻（识别锁残留）
 
         private static void SetReloadBusy(bool busy)
         {
@@ -23,17 +23,16 @@ namespace SR_UCH.Tweaks {
             _reloadBusyAt = busy ? Time.unscaledTime : -1f;
         }
 
-        // 锁残留自愈：协程被销毁时无人复位，超过 45 秒仍锁着即视为残留。
+        // 锁残留自愈：协程被销毁时无人复位，超时仍锁着即视为残留。
         private static bool ReloadLockStuck()
         {
-            // 45s：与契约层 SrTimeouts.ReloadLockStaleSeconds 同源（预设页的重载锁用同一个值）
         return _reloadBusy && _reloadBusyAt >= 0f && Time.unscaledTime - _reloadBusyAt > SrTimeouts.ReloadLockStaleSeconds;
         }
 
-        // 两个入口共用的防重入判定：重载中提示并拦下，锁残留则放锁放行本次操作。
+        // 防重入判定：重载中提示并拦下；锁残留则放锁放行本次操作。
         private static bool ReloadBlocked()
         {
-            // 先查对方：自己准备动手时，布局预设正在加载就必须拦下（对方忙时自己也要等）。
+            // 先查对方：布局预设正在加载时必须拦下。
             try {
                 Func<bool> other = Slots.Require<Func<bool>>("presets.reloadBusy");
                 if (other != null && other()) {
@@ -51,32 +50,29 @@ namespace SR_UCH.Tweaks {
             return true;
         }
 
-        private static float _lastSnapshotAt = -999f; // 上次广播快照的时刻（冷却用）
+        private static float _lastSnapshotAt = -999f; // 上次广播快照时刻
 
-        private static float _reloadLoadedAt = -1f; // 重载场景加载完成（FadeOut）时刻，用于确定何时可清 levelPortalXml
+        private static float _reloadLoadedAt = -1f; // FadeOut 时刻（决定何时清 levelPortalXml）
 
-        private static float _reloadStartedAt = -1f; // 发起 ReloadScene 的时刻（超时兜底）
+        private static float _reloadStartedAt = -1f; // 发起 ReloadScene 时刻（超时兜底）
 
         public static bool ReloadKeepsScore => _reloadMode == null || _reloadMode.Value == ReloadMode.KeepScore;
 
-        // 仅派对 / 创意 / 自由建造关卡内生效（统一走 SRApi.GateModeAllows）。
+        // 仅派对 / 创意 / 自由建造关卡内生效（忽略模式限制的豁免已内置）。
         private static bool IsPartyCreativeOrFreeplay()
         {
-            // 统一模式门控，IgnoreModeLimit 豁免已内置
             return SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay);
         }
 
-        // 真正重载当前关卡场景：重载前把房主快照写入 QuickSaver.levelPortalXml（static），重载后由房主 OnSetupStartLevel 读取并原生广播，全员重建方块。
-        // 仅房主可调用（ReloadScene 是服务器操作），仅派对 / 创意 / 自由建造关卡内生效。
+        // 重载当前关卡：先把房主快照写入 QuickSaver.levelPortalXml，重载后由 OnSetupStartLevel 读取广播。
         public static void ReloadLevel()
         {
             ReloadLevelImpl(SRApi.T("重载关卡", "Reload Level"));
         }
 
-        // 重载关卡实现：模式限制 + 快照写入 levelPortalXml。
         private static void ReloadLevelImpl(string feature)
         {
-            // 启动成功后 _reloadBusy 由协程末尾复位；此处提前放锁会让连点并发重载。
+            // 锁由协程末尾复位；提前放锁会让连点并发重载。
             bool coroutineStarted = false;
             try
             {
@@ -90,13 +86,12 @@ namespace SR_UCH.Tweaks {
                     SRApi.Notify(feature + SRApi.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
                     return;
                 }
-                // 房主判定走统一门控 GateHost（= IsHost || OverrideHost）
                 if (!SRApi.GateHost)
                 {
                     SRApi.NotifyT("仅房主可执行：", "Host only: ", feature);
                     return;
                 }
-                // 必须服务器权威：GateHost 会放行开了无视房主限制的房客，但 NetworkServer.SendToAll 与 ReloadScene / CompressAndSendSnapshotBytes 在客户端都不执行，会假成功。
+                // 必须服务器权威：开了无视房主限制的房客会过 GateHost，但网络调用在客户端不执行会假成功。
                 if (!NetworkServer.active)
                 {
                     SRApi.NotifyT("仅房主可执行：", "Host only: ", feature);
@@ -126,19 +121,18 @@ namespace SR_UCH.Tweaks {
                     SRApi.Notify(SRApi.T("游戏状态尚未就绪", "Game state not ready"));
                     return;
                 }
-                if (ReloadBlocked()) return; // 含锁残留自愈
-                // 快照刚广播过（3 秒内）先别重载，等方块重建落定
+                if (ReloadBlocked()) return; // 锁残留自愈
+                // 快照刚广播（3 秒内）先别重载，等方块重建落定。
                 if (Time.unscaledTime - _lastSnapshotAt < 3f) {
                     SRApi.Notify(SRApi.T("快照刚广播，请稍后重载", "Snapshot just broadcast; retry later"));
                     return;
                 }
                 SetReloadBusy(true);
-                // 协程只在末尾复位 _reloadBusy；本方法所有提前 return 都在 StartCoroutine 之前，必须逐条手动复位，否则与广播快照共用的这把锁会永久锁死。
-                // 生成房主当前快照并写入 QuickSaver.levelPortalXml（static），重载后由 OnSetupStartLevel 读取并原生广播全员。
+                // 协程只在末尾复位锁；本方法所有提前 return 都在 StartCoroutine 之前，须逐条手动复位。
                 System.Xml.XmlDocument doc = qs.GetCurrentXmlSnapshot(false);
                 if (doc == null || string.IsNullOrEmpty(doc.OuterXml))
                 {
-                    SetReloadBusy(false); // 失败路径复位
+                    SetReloadBusy(false); // 失败路径复位锁
                     SRApi.Notify(SRApi.T("当前场景没有可同步的方块", "No blocks to sync in the current scene"));
                     return;
                 }
@@ -148,13 +142,12 @@ namespace SR_UCH.Tweaks {
                 }
                 catch
                 {
-                    SetReloadBusy(false); // 失败路径复位
+                    SetReloadBusy(false); // 失败路径复位锁
                     SRApi.Notify(SRApi.T("快照写入失败", "Failed to write the snapshot"));
                     return;
                 }
-                // KeepScore 的补分标志在协程里、真正调用 ReloadScene 之前才置位：
-                // 提前置位时，后面的“游戏加载中/启动协程失败”等提前返回会让标志残留，下一次正常结算会错误补分。
-                // GameSettings 取不到必须中止重载并解锁：客户端收不到 PrepareToReloadScene 会与房主脱同步。
+                // 补分标志须在真正 ReloadScene 前置位；提前置位会被提前返回留下残留，致下次结算错补分。
+                // GameSettings 取不到必须中止并解锁：客户端收不到 PrepareToReloadScene 会与房主脱同步。
                 GameSettings gsForMode = GameSettings.GetInstance();
                 if (gsForMode == null)
                 {
@@ -178,13 +171,12 @@ namespace SR_UCH.Tweaks {
                     LoadingInterstitialSplash.Instance.showLevelInfoNextLoad = true;
                     LoadingInterstitialSplash.Instance.FadeIn();
                 }
-                // 成败提示在协程内真正执行完才发出；模式随参数传入，协程内不再取 GameSettings（未判空会 NRE）。
+                // 成败提示在协程内发出；模式随参数传入，协程内不再取 GameSettings（未判空会 NRE）。
                 lm.StartCoroutine(ReloadSceneRoutine(feature, gsForMode.GameMode));
-                coroutineStarted = true; // 复位交给协程末尾
+                coroutineStarted = true; // 锁复位交给协程末尾
             }
             catch (Exception ex)
             {
-                // 仅协程未启动（StartCoroutine 之前的异常）时手动复位，否则锁残留
                 if (!coroutineStarted) SetReloadBusy(false);
                 SRApi.LogWarn((object)(feature + "失败: " + ex.Message));
             }
@@ -193,16 +185,15 @@ namespace SR_UCH.Tweaks {
         private static IEnumerator ReloadSceneRoutine(string feature, GameState.GameMode toMode)
         {
             yield return new WaitForEndOfFrame();
-            yield return new WaitForEndOfFrame(); // 等加载画面 FadeIn 生效
+            yield return new WaitForEndOfFrame(); // 等 FadeIn 生效
             bool ok = false;
             try
             {
                 LobbyManager lm = LobbyManager.instance;
                 if ((UnityEngine.Object)(object)lm != (UnityEngine.Object)null)
                 {
-                    // 与游戏原生重载一致：先重置方块 ID 序列，否则重载后新 ID 会与快照里的 parentID/mainID 错位。
+                    // 与原生重载一致：先重置方块 ID 序列，否则新 ID 与快照中的 parentID/mainID 错位。
                     try { Placeable.SetInitialSequenceID(0); } catch (Exception __ex) { SRApi.Guard.Log("重载前重置方块 ID 序列", __ex); }
-                    // 真正重载前才置补分标志：此后的失败只会让本次重载失败，不会把标志留给下一局。
                     if (ReloadKeepsScore) MarkPreserveScores();
                     lm.ReloadScene(toMode);
                     ok = true;
@@ -212,9 +203,7 @@ namespace SR_UCH.Tweaks {
             {
                 SRApi.LogWarn((object)("重载场景失败: " + ex.Message));
             }
-            // D-P1-7：收尾（清 levelPortalXml + 放 busy 锁）必须走 finally。
-            // 以前 Notify / ClearPortalXml 任何一个抛异常，SetReloadBusy(false) 就永远执行不到，
-            // 这把与"广播快照"共用的锁会一直锁着，直到 45 秒自愈或用户重开面板。
+            // 收尾（清 levelPortalXml + 放锁）必须走 finally，否则异常会让锁一直挂着。
             try
             {
                 if (ok)
@@ -227,8 +216,8 @@ namespace SR_UCH.Tweaks {
                     SRApi.Notify(feature + SRApi.T("：重载失败", ": reload failed"));
                 }
                 _reloadStartedAt = Time.unscaledTime;
-                _reloadLoadedAt = -1f; // 等待 LoadingInterstitialSplash.FadeOut 置位
-                // 新场景加载完成后再等 2 秒才清 levelPortalXml 并复位 busy；FadeOut 不触发时用 25 秒硬上限兜底。
+                _reloadLoadedAt = -1f; // 等 FadeOut 置位
+                // 加载完成后等 2 秒再清 levelPortalXml 并放锁；FadeOut 不触发时按 SrTimeouts 兜底。
                 if (ok)
                 {
                     while (_reloadBusy)
@@ -246,13 +235,12 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 重载场景加载完成（FadeOut，由 SR 重载钩子.OnLoadEnd 调用）：记录时刻供 ReloadSceneRoutine 决定何时清 levelPortalXml。
+        // 加载完成回调（FadeOut 时由重载钩子调用）：记录时刻供协程决定何时清 levelPortalXml。
         public static void OnReloadSceneLoaded()
         {
             _reloadLoadedAt = Time.unscaledTime;
         }
 
-        // 清掉写入的 QuickSaver.levelPortalXml（static）
         private static void ClearPortalXml()
         {
             try
@@ -262,7 +250,7 @@ namespace SR_UCH.Tweaks {
             catch (Exception __ex) { SRApi.Guard.Log("Level.Field", __ex); }
         }
 
-        // 广播方块快照：房主重发当前关卡快照，全员按房主视角重建方块。
+        // 重载宽限期：ReloadScene 后 20 秒内跳过断连检查。
     private static float _reloadGraceUntil = 0f;
     [HarmonyPatch(typeof(LobbyManager), "ReloadScene")]
     [HarmonyPrefix]
@@ -279,31 +267,26 @@ namespace SR_UCH.Tweaks {
         } catch (Exception __ex) { SRApi.Guard.Log("重载期跳过断连检查", __ex); return true; }
     }
 
-    // 重载后保留分数：重载前备份各玩家的分块列表，重载后房主按原类型逐个重放 PointAwarded，全员下回合 tally 恢复。
-    // 不恢复 playerTotal（ScoreKeeper.Setup() 会清空 playerTotal 与分块）。
+    // 保分：重载前备份各玩家分块，重载后房主按类型逐个重放 PointAwarded；playerTotal 不恢复。
     private static bool _preserveScoresOnReload = false;
-    // 备份：networkNumber -> 分块列表（含类型）
-    // 值是分块类型的**快照**（不是 PointBlock 引用）：PointBlock 在 tally 后可能被复用/回收，
-    // 持引用补分时会读到被改写的 type（audit P0-11）。
+    // 存类型快照而非 PointBlock 引用：tally 后对象会被复用，引用会读到改写后的 type。
     private static Dictionary<int, List<PointBlock.pointBlockType>> _scoreBackupBlocks = null;
-    // 补分重放后置位：下次结算的 ClearNewPointBlocks 跳过清除，保证重放分块正常显示与 tally。
+    // 补分重放后置位：让 ClearNewPointBlocks 跳过清除，保证重放分块正常显示与 tally。
     private static bool _refillPending = false;
-    // 补分标志的置位时刻（-1 = 未置位）：给 ClearNewPointBlocks 前缀做墙钟自愈用（audit P0-7）。
+    // 补分标志置位时刻（-1 = 未置位），供 ClearNewPointBlocks 前缀做自愈。
     private static float _refillAt = -1f;
-    // 外部加分（MsgPointAwarded.AlwaysAward=true）的分块标记：被清除时缓存，重载备份时补回。
+    // 外部加分（AlwaysAward）的分块键：被清除时缓存，重载备份时补回。
     private static HashSet<int> _externAwardedKeys = new HashSet<int>();
-    // 结算时被 Clear 的外部加分分块，重载备份时合并进 _scoreBackupBlocks
-    // 存「玩家号 + 分块类型」的值快照，而不是 PointBlock 引用：游戏 tally 后这些对象会被复用，
+    // 结算时被清除的外部加分分块（值快照），重载备份时合并进 _scoreBackupBlocks。
     private static List<KeyValuePair<int, PointBlock.pointBlockType>> _clearedExternBlocks
-        = new List<KeyValuePair<int, PointBlock.pointBlockType>>();   // 值快照：对象会被游戏复用
-    // 备份：networkNumber -> handicap，重载后由房主显式写回 SyncVar
+        = new List<KeyValuePair<int, PointBlock.pointBlockType>>();   // 值快照
+    // networkNumber -> handicap，重载后由房主显式写回 SyncVar
     private static Dictionary<int, int> _handicapBackup = null;
 
-    // 保分标志的有效期：标志正常由 ScoreKeeper.Setup 消费，重载失败时会一直挂着，之后普通开局会被误当重载保分。
-    // 超时（PreserveStaleAfter）即视为失效，否则会把陈旧备份分块再补一遍导致分数翻倍。
+    // 保分标志有效期：标志正常由 ScoreKeeper.Setup 消费；超时视为失效，否则陈旧备份再补一遍会翻倍。
     private static float _preserveMarkedAt = -1f;
     private const float PreserveStaleAfter = 90f;
 
-    // 重载前置保分标志（模式一：允许补分）
+    // 重载前置保分标志（允许补分）。
     }
 }

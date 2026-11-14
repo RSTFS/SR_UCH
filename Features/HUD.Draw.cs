@@ -1,5 +1,4 @@
 // 回合 HUD · 运行时绘制（DrawHud）。
-// 从 HUD.cs 拆出来（该文件同时装着定义表、样式、绘制与设置页）。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -17,7 +16,6 @@ namespace SR_UCH.Tweaks {
             float textA = Opacity() * hudA;
             float bgA = BgOpacity() * hudA;
 
-            // 1) 拼行。
             int n = 0;
             _segCount = 0;
             {
@@ -30,7 +28,7 @@ namespace SR_UCH.Tweaks {
                 Color cExtra2 = Col(_colExtra2, Color.white);
 
                 if (DisplayModeValue() == DisplayMode.Inline) {
-                    // 平铺：每个显示项作为独立小段（各自背景/颜色），后面按可用宽度自动换行。
+                    // 平铺：每个显示项作为独立小段（各自背景/颜色），按可用宽度自动换行。
                     if (ShowOn(_showPhase)) AddSeg(cPhase, PhaseName(_phase));
                     if (ShowOn(_showCountdown)) AddSeg(CountdownColor(cCountdown), _timerText);
                     if (ShowOn(_showRound) && !string.IsNullOrEmpty(_roundText)) AddSeg(cRound, _roundText);
@@ -39,7 +37,6 @@ namespace SR_UCH.Tweaks {
                     if (!string.IsNullOrEmpty(_extra1Text)) AddSeg(cExtra1, _extra1Text);
                     if (!string.IsNullOrEmpty(_extra2Text)) AddSeg(cExtra2, _extra2Text);
                 } else {
-                    // 堆叠：每项一行。
                     if (ShowOn(_showPhase)) {
                         string s = PhaseName(_phase);
                         float f = SlotFadeChange(0, s);
@@ -78,7 +75,6 @@ namespace SR_UCH.Tweaks {
             if (n > _hudPlain.Length) n = _hudPlain.Length;
             if (n == 0 && _segCount == 0) return;   // 无任何内容（含平铺小段）时完全隐藏
 
-            // 2) 尺寸：紧凑（padding 2、行高=文本高、行间 0）；平铺模式先把小段排成网格。
             float pad = SRApi.Ctl.Sc(2f);
             float segPad = SRApi.Ctl.Sc(3f);
             float segGap = SRApi.Ctl.Sc(3f);
@@ -127,7 +123,7 @@ namespace SR_UCH.Tweaks {
                     try { th = SRApi.Ctl.TextHeight(_hudPlain[i], textW); } catch { th = 0f; }
                     if (th <= 0f) th = (st != null ? st.fontSize : 14);
                 }
-                // 行高平滑：文本变化导致的高度差用 MoveTowards 过渡，避免整块 HUD 突然重排跳变。
+                // 行高平滑：文本变化导致的高度差用 MoveTowards 过渡，避免整块 HUD 跳变。
                 if (_hudKinds[i] == LineRoundNotice) {
                     _hudHeights[i] = th;   // 回合提示只有 1.5s，高度直接到位
                 } else if (_heightFrame != Time.frameCount) {
@@ -162,12 +158,10 @@ namespace SR_UCH.Tweaks {
             if (ev == null || ev.type != EventType.Repaint) return;
             GUI.depth = 1;
 
-            // 4) 半透明底。
             GUI.color = new Color(0f, 0f, 0f, bgA);
             GUI.DrawTexture(panel, _white);
             GUI.color = Color.white;
 
-            // 5) 平铺小段网格：每段独立背景 + 内边距 + 颜色，按行依次淡入。
             float ty = panel.y + pad;
             if (_segCount > 0 && _segRowCount > 0) {
                 for (int r = 0; r < _segRowCount; r++) {

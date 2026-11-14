@@ -1,4 +1,4 @@
-// Online 的 partial 分片（只做代码组织，无逻辑改动）
+// Online 分片：联机列表的列渲染、筛选、排序与心跳/区域判定。
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -20,25 +20,20 @@ namespace SR_UCH.Tweaks {
             return fallback;
         }
 
-        // 界面语言为英文系时不使用游戏术语，改用自己的英文；判据必须走 SRApi.Ctl.LangEn（兼容外部语言包）。
         private static bool En { get { return SRApi.Ctl.LangEn; } }
 
-        // 语言包优先：SRApi.T 命中外部语言包即为译文，未收录时按英文系 / 中文回落。
         private static string G(string i2Key, string zh, string en) {
             string own = SRApi.T(zh, en);
-            if (En) return own;                 //英文系：我们自己的英文（或语言包译文）
-            return Tr(i2Key, own);              //中文系：优先游戏自己的术语，取不到再用我们自己的中文
+            if (En) return own;                 // 英文系：我们自己的英文（或语言包译文）
+            return Tr(i2Key, own);              // 中文系：优先游戏自己的术语，取不到再用我们自己的中文
         }
 
-        // 区域：取游戏自己的本地化短名，压成语言无关的代码（AP/EU/US/原始名），显示时才翻译。
-        // 两级缓存：按区域对象的类型缓存成员信息；按房间 id 缓存解析结果（重新搜索时清空）。
         private sealed class RegionMember { public PropertyInfo Loc; public FieldInfo Short, Name, Id; }
         private static readonly Dictionary<Type, RegionMember> _regionMembers = new Dictionary<Type, RegionMember>();
-        // 键是房间 id：每次搜索都可能出现新房间，必须设上限，否则长会话里只增不减（评审 G4）。
         private static readonly Dictionary<string, string> _regionCodeCache = new Dictionary<string, string>();
         private const int RegionCodeCacheMax = 512;
 
-        // 重新搜索时清掉按房间 id 的解析结果（区域对象可能已换一批）。
+        // 区域缓存两级：类型级成员信息 + 房间 id 级解析结果；重新搜索时清掉后者（区域对象可能换一批）。
         internal static void ClearRegionCodeCache() {
             try { _regionCodeCache.Clear(); } catch (Exception __ex) { SRApi.Guard.Log("联机/清区域缓存", __ex); }
         }
@@ -47,9 +42,7 @@ namespace SR_UCH.Tweaks {
             RegionMember m;
             if (_regionMembers.TryGetValue(t, out m)) return m;
             m = new RegionMember();
-            // 属性没有 SRApi.Ref 的按名取法，保留 raw 反射；字段走 SRApi.Ref.Field（失效会进自检告警）。
             try { m.Loc = t.GetProperty("LocalizedShortName"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-            // 反射登记（动态类型：按发现时的类型名登记），游戏改字段名后自检能报出来。
             try {
                 string tn = t != null ? t.Name : "Region";
                 SRApi.Ref.Override(tn + ".shortName", "联机列表：区域短名");
@@ -78,16 +71,14 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string RegionCodeUncached(Matchmaker.LobbyListInfo li) {
-            // UnityServerRegion 可能为 null（房主没写 unityRelayRegion 时游戏自己也会空引用）：
-            // 返回独立代码 NoneCode，避免区域筛选在 AP/EU/US 档位上静默滤掉这些房间。
+            // UnityServerRegion 可能为 null（房主没写 unityRelayRegion）：返回独立代码，避免被区域筛选静默滤掉。
             if (li != null && li.UnityServerRegion == null) return NoneCode;
             try { return RegionCodeOf(li != null ? li.UnityServerRegion : null); } catch { return NoneCode; }
         }
 
-        // "拿不到区域对象"的专用代码，取值不可能与任何真实区域相等。
+        // “拿不到区域对象”的专用代码，取值不可能与任何真实区域相等。
         private const string NoneCode = "（无区域）";
 
-        // 把区域对象压成语言无关的代码（AP/EU/US/原始名/""）；RegionVals 也复用这一套映射。
         private static string RegionCodeOf(object r) {
             string loc = "", raw = "";
             try {
@@ -100,7 +91,6 @@ namespace SR_UCH.Tweaks {
                 }
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             string s = ((loc ?? "") + " " + (raw ?? "")).ToLowerInvariant();
-            // 按词 / 后缀判断：region_shortname_ap、ap-southeast、asia 均归亚太。
             if (s.Contains("europe") || s.Contains("_eu") || s.Contains("-eu") || s.Contains(" eu")) return "EU";
             if (s.Contains("asia") || s.Contains("_ap") || s.Contains("-ap") || s.Contains("_as") || s.Contains(" ap")) return "AP";
             if (s.Contains("america") || s.Contains("_us") || s.Contains("-us") || s.Contains("_na") || s.Contains(" us")) return "US";
@@ -110,7 +100,6 @@ namespace SR_UCH.Tweaks {
         }
 
         // 区域归一化：把代码、“亚太/欧盟/美国”、region_shortname_xx、英文名统一归到 AP/EU/US。
-        // 筛选与显示都走这一套，避免“存的是代码、比较的是本地化名”导致筛选失效。
         private static string NormRegion(string s) {
             if (string.IsNullOrEmpty(s)) return "";
             string x = s.ToLowerInvariant();
@@ -130,7 +119,6 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string RegionShort(Matchmaker.LobbyListInfo li) {
-            // 优先用游戏区域对象的本地化短名（LocalizedShortName），拿不到再按代码翻译。
             try {
                 object r = li != null ? li.UnityServerRegion : null;
                 if (r != null) {
@@ -144,10 +132,10 @@ namespace SR_UCH.Tweaks {
             return DispRegion(RegionCode(li));
         }
 
-        // 房间满 4 人不可加入（游戏自己的列表也是 Players"/4"）。
+        // 房间满 4 人不可加入。
         private static bool IsFull(Matchmaker.LobbyListInfo li) { return li.Players >= 4; }
 
-        // 这一行是不是"我们已经在的房间"：加入时记下的房号与行一致，且当前确实在会话里。
+        // 这一行是不是“我们已经在的房间”：加入时记下的房号与行一致，且当前确实在会话里。
         private static bool IsSelfLobby(Matchmaker.LobbyListInfo li) {
             try {
                 if (li == null) return false;
@@ -162,22 +150,18 @@ namespace SR_UCH.Tweaks {
         private static bool IsJoinable(Matchmaker.LobbyListInfo li) {
             try {
                 if (li.error || !li.InfoReceived) return false;
-                // 自己已经在的房间：不允许再点（重复进入会出现两套光标共用一套控制器）。
                 if (IsSelfLobby(li)) return false;
                 if (li.matchProgress != 0) return false; // 进度 != 0 = 已开局，进去会卡加载
                 if (li.isAFK) return false;
-                if (li.Players <= 0) return false;   // 0 人房不可加入（以前只判满员，空房被算成可加入）
+                if (li.Players <= 0) return false;   // 0 人房不可加入
                 if (IsFull(li)) return false;
-                // 心跳只作为「标识」列的显示信息，不参与能否加入的判定（用户要求）
                 return true;
             } catch { return false; }
         }
 
-        // 按钮 / 提示文字：说明不能加入的原因。
+        // 提示文字按优先级判定：已加入 > 房间已空 > 已失联 > 可加入 > 信息不全 > 对局中 > 房主 AFK > 人满。
         private static string JoinText(Matchmaker.LobbyListInfo li) {
-            // 已经在这个房间里：显示"已加入"而不是"加入"，避免误以为还能再进一次。
             if (IsSelfLobby(li)) return SRApi.T("已进入", "joined");
-            // "房间已空"必须在 IsJoinable 之前判定：IsJoinable 只看 Players >= 4，0 人会被算作可加入。
             if (li.Players == 0) return SRApi.T("房间已空", "empty");
             if (IsStale(li) && !IsJoinable(li)) return SRApi.T("已失联", "No heartbeat");
             if (IsJoinable(li)) return SRApi.T("加入", "Join");
@@ -188,18 +172,11 @@ namespace SR_UCH.Tweaks {
             return SRApi.T("不可加入", "closed");
         }
 
-        // 房主是否已失联（僵尸房间）：房主每 10 秒上报一次心跳，断 10 秒即视为房间已死。
-        // 仅用于显示标记，不参与 IsJoinable 与筛选。
-        // 心跳是否停更：**不跨时钟比较**。
-        // 游戏里 lastHearbeatTime 来自 Steam 房主数据 data_lastHostHeartbeat/1000（绝对时间），
-        // 而 GetServerTime() 在 Steam 后端是 SteamUtils.GetServerRealTime()（绝对）、
-        // 在 GameSparks 后端却是 serverTimeDifference + Time.realtimeSinceStartup（相对量）。
-        // 两者相减在有偏差时会"整页房间同时失联"（用户看到的 5 秒全失联就是这个）。
-        // 改为本地观察：记住每个房间第一次看到这个心跳值的时刻，值变了就刷新；
-        // 同一个值持续超过 StaleSeconds 才算失联 —— 与任何服务器时钟无关。
+        // 房主失联（僵尸房间）：断心跳超过 30 秒即视为房间已死，仅用于显示。
         private const float StaleSeconds = 30f;   // 心跳停更 30 秒才标记失联（10 秒太容易误判）
         private static readonly Dictionary<string, float> _hbSeenAt = new Dictionary<string, float>();
         private static readonly Dictionary<string, uint> _hbValue = new Dictionary<string, uint>();
+        // 心跳按本地观察判定：值变了刷新，持续超过 StaleSeconds 才算失联，不与服务器时钟相减。
 
         private static bool IsStale(Matchmaker.LobbyListInfo li) {
             try {
@@ -220,7 +197,7 @@ namespace SR_UCH.Tweaks {
             } catch { return false; }
         }
 
-        // 对局进度：游戏自己的写法（0 -> 大厅中 / 房主AFK；否则 100 - matchProgress %）。
+        // 对局进度按游戏自己的写法：0 = 大厅中 / 房主 AFK，否则 100 - matchProgress %。
         private static string ProgressText(Matchmaker.LobbyListInfo li) {
             try {
                 string txt;
@@ -230,13 +207,11 @@ namespace SR_UCH.Tweaks {
                 } else {
                     txt = (100 - li.matchProgress) + "%";
                 }
-                if (IsStale(li)) txt = " " + txt;   // 心跳已断：仍显示"大厅中"但点不进去
+                if (IsStale(li)) txt = " " + txt;   // 心跳已断：仍显示“大厅中”但点不进去
                 return txt;
             } catch { return "?"; }
         }
 
-        // 游戏质量：按 LobbyHealthNum 对比 Good/OkMatchScore；技能匹配质量系数默认不显示，
-        // Shift+单击该列表头打开后，在标记（✓）后用「 · 0.87」形式追加 CalculatedSkillMatchQuality（0~1）。
         private static string QualityText(Matchmaker.LobbyListInfo li) {
             try {
                 GameSettings gs = GameSettings.GetInstance();
@@ -252,7 +227,6 @@ namespace SR_UCH.Tweaks {
             } catch { return "?"; }
         }
 
-        // 游戏模式：默认规则集用游戏本地化的模式名（中文时）；自定义规则集用规则集名。
         private static string ModeText(Matchmaker.LobbyListInfo li) {
             try {
                 GameSettings gs = GameSettings.GetInstance();
@@ -276,7 +250,6 @@ namespace SR_UCH.Tweaks {
             return DispName("Filter Tag", li.lobbyTag.ToString());
         }
 
-        // 限制：制胜积分（pointLimit/50）与长度限制（轮数 / 时间 / 无限制）。
         private static string LimitText(Matchmaker.LobbyListInfo li) {
             try {
                 bool noLimitMode = li.gameMode == GameState.GameMode.FREEPLAY || li.gameMode == GameState.GameMode.CHALLENGE;
@@ -295,13 +268,13 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string Val(ConfigEntry<string> e) { return e != null ? (e.Value ?? "") : ""; }
+        // 限制列：制胜积分（pointLimit/50）与长度限制（轮数 / 时间 / 无限制）。
 
         private static bool PassFilter(Matchmaker.LobbyListInfo li) {
             try {
                 string v;
                 v = Val(_fRegion);
                 if (v.Length > 0) {
-                    // 存的是代码、显示的是本地化名：两边都归一化后再比，避免筛选选了却没效果。
                     string want = NormRegion(v);
                     string have = NormRegion(RegionCode(li));
                     if (want != have) return false;
@@ -315,9 +288,9 @@ namespace SR_UCH.Tweaks {
                 v = Val(_fTag);
                 if (v.Length > 0 && li.lobbyTag.ToString() != v) return false;
                 v = Val(_fState);
-                if (v == "join") { if (!IsJoinable(li)) return false; }        //可加入：游戏自己的"能不能进"判据
-                else if (v == "full") { if (!IsFull(li)) return false; }        //人满
-                else if (v == "playing") { if (li.matchProgress == 0) return false; } //对局中：进度 != 0
+                if (v == "join") { if (!IsJoinable(li)) return false; }        // 可加入：游戏自己的“能不能进”判据
+                else if (v == "full") { if (!IsFull(li)) return false; }        // 人满
+                else if (v == "playing") { if (li.matchProgress == 0) return false; } // 对局中：进度 != 0
                 return true;
             } catch { return true; }
         }
@@ -332,7 +305,7 @@ namespace SR_UCH.Tweaks {
             return n;
         }
 
-        // 排序：表头选定的排序列优先；否则可加入的排最前，其内部按房间健康分降序，其余按进度。
+        // 排序：表头选定的排序列优先；否则可加入的排最前，其内部按健康分降序，其余按进度。
         // 最后用 sLobbyID 兜底（List.Sort 不稳定，键相同会每帧互换导致表格闪）。
         // 筛选谓词：区域/模式/标签/状态 + 隐藏列表（供核心 TableSource 使用）。
         private static bool PassLobbyFilter(Matchmaker.LobbyListInfo li) {
@@ -342,12 +315,11 @@ namespace SR_UCH.Tweaks {
             } catch { return false; }
         }
 
-        // 排序比较器：表头排序列优先；否则可加入的排最前，其内部按房间健康分降序，其余按进度；sLobbyID 兜底。
+        // 排序比较器：表头排序列优先；否则可加入的排最前，其内部按健康分降序，其余按进度；sLobbyID 兜底。
         private static int CompareLobbies(Matchmaker.LobbyListInfo a, Matchmaker.LobbyListInfo b) {
             if (ReferenceEquals(a, b)) return 0;
             if (a == null) return 1;
             if (b == null) return -1;
-            // 自己已在的房间永远排最前（不论选哪个排序列）：玩家最常回看的就是自己这一间。
             bool sa = IsSelfLobby(a), sb = IsSelfLobby(b);
             if (sa != sb) return sa ? -1 : 1;
             if (_sortCol >= 0) {
@@ -367,7 +339,7 @@ namespace SR_UCH.Tweaks {
         }
 
         // 按某一列比较两个房间：数值列用真实数值（文本比较下 "10" < "2"），其余列用显示文本。
-        // 列索引与 Online.cs 的 ColCount/Titles 对齐（v5：删除技能系数列后进度列前移一位）。
+        // 列索引与 Online.cs 的 ColCount/Titles 对齐。
         private static int CompareCol(int ci, Matchmaker.LobbyListInfo a, Matchmaker.LobbyListInfo b) {
             switch (ci) {
                 case 1: return a.Players.CompareTo(b.Players);
@@ -391,6 +363,6 @@ namespace SR_UCH.Tweaks {
             _lobbyMsg = string.Format(SRApi.T("共 {0} 个房间，筛选后 {1} 个", "{0} lobbies, {1} after filters"), _lobbies.Count, CountShown());
         }
 
-        // 页面：联机
+        // 页面：联机。
     }
 }

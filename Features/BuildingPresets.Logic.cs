@@ -1,9 +1,8 @@
-// 布局预设的筛选纯逻辑：无 Unity / BepInEx 依赖，单元测试直接覆盖。
 using System;
 
 namespace SR_UCH.Tweaks {
     internal static class PresetFilterLogic {
-        // typeFilter: "" 全部 / "preset" 仅自存预设 / "local" 仅本地存档；level/mode 为空 = 不限；search 只匹配名称。
+        // typeFilter: "" 全部 / "preset" 仅自存 / "local" 仅本地存档；level/mode 空 = 不限；search 只匹配名称。
         public static bool Pass(string name, string level, string mode, bool isLocal,
                                 string typeFilter, string levelFilter, string modeFilter, string search) {
             string t = typeFilter ?? "";

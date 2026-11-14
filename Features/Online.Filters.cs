@@ -1,5 +1,4 @@
 // 联机 · 筛选与显示名（区域/模式/标签/状态四个下拉 + 候选值缓存）。
-// 从 Online.cs 拆出来只为控制单文件规模，行为不变。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -7,7 +6,6 @@ using UnityEngine;
 
 namespace SR_UCH.Tweaks {
     public partial class Online {
-        // 表格底边拖动条；Shift+右键还原列宽 / 高度 / 列隐藏（房间行不再支持右键隐藏）。
         private static string DispName(string key, string v) {
             if (string.IsNullOrEmpty(v)) return SRApi.T("全部", "All");
             if (key == "Filter Region") return DispRegion(v);
@@ -19,8 +17,7 @@ namespace SR_UCH.Tweaks {
             return v; // 区域等：值本身就是显示名
         }
 
-        // 版本戳 = 语言 id + 语言版本 hash + AVAILABLE_REGIONS 规模。
-        // 区域代码依赖本地化短名，且该静态 List 可能在本页首次渲染之后才被填好，故规模变化也要重建。
+        // 版本戳 = 语言 id + 语言版本 hash + AVAILABLE_REGIONS 规模（该 List 可能晚于首帧填好）。
         private static int RegionLangStamp() {
             unchecked {
                 int h = 17;
@@ -48,7 +45,7 @@ namespace SR_UCH.Tweaks {
                         if (!vs.Contains(code)) vs.Add(code);   //按 AVAILABLE_REGIONS 的原始次序去重
                     }
                 }
-                // 补上"无区域数据"这一档（放最后）：否则 UnityServerRegion 为 null 的房间在下拉里没有对应选项。
+                // 补上「无区域数据」这一档（放最后）：否则区域为 null 的房间在下拉里没有选项。
                 if (!vs.Contains(NoneCode)) vs.Add(NoneCode);
                 built = vs.Count > 0 ? vs.ToArray() : new[] { "AP", "EU", "US", NoneCode };
             } catch { built = new[] { "AP", "EU", "US" }; }
@@ -58,7 +55,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string[] FilterOptions(string key, string[] values) {
-            // 语言戳必须带语言 id + 版本号：只用 "en"/"zh" 时从语言包 A 切到 B 戳不变，选项会停在旧译文。
+            // 语言戳必须带语言 id + 版本号：只用 "en"/"zh" 时切到另一语言包戳不变，选项会停在旧译文。
             string stamp = SRApi.CurrentLanguageId + SRApi.LangVer + "|" + (values == null ? "-" : values.Length.ToString());
             string[] cached;
             string old;
@@ -101,7 +98,7 @@ namespace SR_UCH.Tweaks {
 
         private static void DropFilter(string labelZh, string labelEn, string tipZh, string tipEn, string key, string[] values, float cellW) {
             try {
-                // 本帧只查一次 entry，当前值与写回都复用它（见 FindStr / SetStr）。
+                // 本帧只查一次 entry，当前值与写回都复用它（不重复 FindEntry）。
                 ConfigEntryBase e = SRApi.Ctl.FindEntry(SecOnline, key);
                 float labelW = FilterLabelWidth();
                 float comboW = SRApi.Ctl.Sc(FilterComboW);
@@ -128,24 +125,21 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("房间筛选下拉", __ex); }
         }
 
-        // 按 key 查值的入口，内部转给按 entry 的重载。
         private static string FindStr(string key) {
             try { return FindStr(SRApi.Ctl.FindEntry(SecOnline, key)); }
             catch { return ""; }
         }
 
-        // 直接从已查到的 entry 上读当前值，不再重复 FindEntry。
         private static string FindStr(ConfigEntryBase e) {
             try { return e != null ? (e.BoxedValue as string ?? "") : ""; }
             catch { return ""; }
         }
 
-        // 接收已查好的 entry，不再自己 FindEntry。
         private static void SetStr(ConfigEntryBase e, string value) {
             try {
                 if (e != null) {
                     SRApi.Ctl.SetValue(e, value);
-                    // 筛选条件变化需立即标脏，否则"筛选后 N 个"要等 1 秒兜底才更新。
+                    // 筛选条件变化需立即标脏，否则房间数要等 1 秒兜底才更新。
                     _lobbiesDirty = true;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("设置房间筛选", __ex); }

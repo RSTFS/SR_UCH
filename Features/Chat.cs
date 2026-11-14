@@ -1,5 +1,4 @@
-// 会话栏目：注册栏目与两个页面、生命周期、Harmony 补丁。
-// 页面拆分：对话窗口 -> Chat.Window.cs；对话内容 -> Chat.Log.cs。
+// 会话栏目：栏目与页面注册、生命周期、Harmony 补丁。
 
 using System;
 using BepInEx;
@@ -10,10 +9,10 @@ public partial class Chat : ITweak {
 
         public void Initialize(IFeatureHost plugin) {
             SRApi.LocSec("Chat", "会话", null);
-            SRApi.Nav("Chat", 90); //侧栏栏目顺序 80
+            SRApi.Nav("Chat", 90); // 栏位顺序值（越小越靠前）
             InitWindow(plugin);
             InitLog(plugin);
-            // CreateAndPatchAll 按程序集扫描：一次调用即覆盖本类两个 partial 文件的全部补丁，不可分两处重复注册。
+            // CreateAndPatchAll 按类型扫描，一次调用覆盖两个 partial 文件，不可重复注册。
             try { HarmonyLib.Harmony.CreateAndPatchAll(typeof(Chat), (string)null); }
             catch (Exception e) { SRApi.LogError("会话(聊天窗口/聊天记录) 补丁注册失败: " + e.Message); }
         }

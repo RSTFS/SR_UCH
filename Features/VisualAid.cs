@@ -1,20 +1,9 @@
 // 视觉辅助：淡化 / 隐藏「其他玩家」，方便录屏、截图或看清自己的操作。
-//
-// 依据（逐项静态核对游戏程序集，均为 public 成员）：
-//   Character.sprite / JetPackSR        : SpriteRenderer，public 字段
-//   Character.HasJetpack                : public 属性
-//   Character.nameTag.maxOpacity        : NameTag 的 public 字段（名牌不透明度上限）
-//   Character.associatedLobbyPlayer / associatedGamePlayer : public 字段，均带 isLocalPlayer
-//   CharacterOpacityController.character / currentOpacity  : public 字段
-//   Util_SpriteRenderer.SetAlpha(SpriteRenderer, float)    : public static 工具方法
-//   PlayerManager.instance.playerList / Player.PlayerCharacter : public 成员
-//
-// 设计要点：
-//   1) 纯本地视觉：只改渲染 alpha / currentOpacity，不碰网络、不碰游戏状态，各端各画各的。
-//   2) 与 CamHog 二选一：检测到 CamHog 已加载时本功能自动让位（两个 mod 同时写 alpha 会互相打架），
-//      页面上给出提示而不是静默失效。
-//   3) 只处理「其他玩家」：本地玩家、未入座角色、菜单/树屋阶段一律不动。
-//   4) 不缓存 Character 引用（角色会被销毁重建），每帧直接从补丁参数取，零生命周期管理。
+// 注意事项：
+// 1) 纯本地视觉：只改渲染 alpha / currentOpacity，不碰网络与游戏状态。
+// 2) 与 CamHog 二选一：检测到 CamHog 即让位并在页面提示，避免两边同时写 alpha。
+// 3) 只处理其他玩家：本地玩家、未入座角色、菜单/树屋一律不动。
+// 4) 不缓存 Character 引用（会被销毁重建），每帧从补丁参数取。
 
 using System;
 using BepInEx.Configuration;
@@ -32,24 +21,24 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<int> _distance;
         private static ConfigEntry<KeyCode> _toggleKey;
 
-        // 缓存常用值：每帧补丁里不走配置对象，改配置时同步刷新。
+        // 缓存常用值：每帧补丁里不读配置对象，改配置时刷新。
         private static bool _on;
         private static bool _useDist;
         private static int _dist;
         private static float _alpha;
-        private static bool _conflict;   // CamHog 已加载 → 本功能让位
-        private static bool _shutdown;   // 核心卸载/重载
-        private static bool _fixingOpacity;   // 防止"改成整十"再次触发事件造成递归
+        private static bool _conflict;   // CamHog 已加载，让位
+        private static bool _shutdown;   // 已卸载/重载
+        private static bool _fixingOpacity;   // 防止改值递归
         private static bool _uiReg;
-        private static readonly System.Collections.Generic.HashSet<int> _faded = new System.Collections.Generic.HashSet<int>();   // 被我们改过透明度的角色
+        private static readonly System.Collections.Generic.HashSet<int> _faded = new System.Collections.Generic.HashSet<int>();   // 已被改过透明度的角色
 
         private static float Alpha { get { return _alpha; } }
 
-        // ============ 注册与配置 ============
+        // 分区：注册与配置
 
         private static void SelfReg() {
             SRApi.LocSec(Sec, "视觉辅助", "Visual Aid");
-            SRApi.Nav(Sec, 140);   // 内置栏目 10-130 之后
+            SRApi.Nav(Sec, 140);   // 侧栏顺序
             SRApi.RegisterPage(Sec, "Main", "画面", "View", 10, RenderPage);
 
             SRApi.LocKey(Sec, "Enabled", "启用视觉辅助", "Enable visual aid");
@@ -73,19 +62,18 @@ namespace SR_UCH.Tweaks {
                 "视觉辅助开关\n对局内临时切换视觉辅助\n可改绑，支持组合键",
                 "Visual aid key\ntoggles the visual aid in-game\nrebindable, combos supported");
 
-            // 开关右侧同一行显示快捷键（与开关逻辑相连：按 F6 就是切换同一个 Enable 开关）。
+            // 开关右侧同行显示快捷键（按 F6 即切换同一个 Enable 开关）。
             SRApi.RowCompanions.Add(Companion);
             SRApi.RowFilters.Add(RowVisible);
             if (!_uiReg) { _uiReg = true; SRApi.RowSliders.Add(UiSlider); }
         }
 
-        // 开关键与开关同行：核心在 Enable 行右侧再画一个「Toggle Key」快捷键控件。
+        // 开关键与开关同行：核心在 Enable 行右侧再画一个快捷键控件。
         private static string Companion(ConfigEntryBase e) {
             if (e == null || e.Definition.Section != Sec) return null;
             return e.Definition.Key == "Enabled" ? "Toggle Key" : null;
         }
 
-        // Toggle Key 不再单独成行（它已经在 Enable 行右侧）。
         private static bool RowVisible(ConfigEntryBase e) {
             if (e == null || e.Definition.Section != Sec) return true;
             return e.Definition.Key != "Toggle Key";
@@ -126,7 +114,6 @@ namespace SR_UCH.Tweaks {
                         SRApi.Ctl.MarkConfigDirty(_enabled.ConfigFile);
                     } catch (Exception __vk) { SRApi.Guard.Log("视觉辅助/开关键", __vk); }
                 });
-                // 快捷键与 Enable 开关逻辑相连：按一下就切换同一个配置开关（与页面复选框等价）。
 
                 _conflict = DetectCamHog();
                 if (_conflict) SRApi.LogWarn("视觉辅助：检测到 CamHog，已让位（避免两边同时改透明度）。");
@@ -138,7 +125,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void Shutdown() { _shutdown = true; RestoreAll(); }
-        // 不透明度步进 10：滑条/手输都收敛到整十（0,10,...,100），避免出现 37% 这种值。
+        // 不透明度步进 10：滑条/手输都收敛到整十，避免出现 37% 这种值。
         private static void FixOpacityStep() {
             if (_fixingOpacity || _opacityPercent == null) return;
             try {
@@ -150,18 +137,17 @@ namespace SR_UCH.Tweaks {
 
         private static void Refresh() {
             try {
-                _shutdown = false;   // 热重载后静态字段会保留：复位关机标记，否则功能永久失效
+                _shutdown = false;   // 热重载后静态字段保留，须复位否则永久失效
                 if (!_conflict && Time.frameCount % 300 == 0) _conflict = DetectCamHog();   // CamHog 可能后加载
                 _on = _enabled != null && _enabled.Value;
-                if (!_on) RestoreAll();   // 关开关：把已经淡化的角色还原，别让游戏一直沿用我们的 currentOpacity
+                if (!_on) RestoreAll();   // 关开关时还原已淡化角色，别让游戏沿用我们的值
                 _useDist = _useDistance == null || _useDistance.Value;
                 _dist = _distance != null ? _distance.Value : 5;
                 _alpha = Mathf.Clamp01((_opacityPercent != null ? _opacityPercent.Value : 30) / 100f);
             } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/刷新配置", __ex); }
         }
 
-        // CamHog（同一思路的现成 mod）在加载时会每帧写 alpha，两边同时写会互相覆盖。
-        // 检测到它就让位，并在页面上说明，而不是让效果时有时无。
+        // CamHog 每帧也写 alpha，两边会互相覆盖；检测到即让位并在页面说明，避免效果时有时无。
         private static bool DetectCamHog() {
             try {
                 foreach (System.Reflection.Assembly asm in AppDomain.CurrentDomain.GetAssemblies()) {
@@ -172,7 +158,7 @@ namespace SR_UCH.Tweaks {
             return false;
         }
 
-        // ============ 每帧应用 ============
+        // 分区：每帧应用
 
         private static bool IsLocal(Character c) {
             if (c.AssociatedLobbyPlayer != null) return c.AssociatedLobbyPlayer.IsLocalPlayer;
@@ -182,15 +168,15 @@ namespace SR_UCH.Tweaks {
 
         private static bool ShouldFade(Character c) {
             if (!_on || _conflict || _shutdown) return false;
-            if (c == null || !c.picked) return false;      // 未入座 / 已离场的角色
-            if (IsLocal(c)) return false;                  // 自己永远不动
-            if (!_useDist || _dist <= 0) return true;      // 不按距离 → 全部淡化
+            if (c == null || !c.picked) return false;      // 未入座/已离场
+            if (IsLocal(c)) return false;                  // 自己不动
+            if (!_useDist || _dist <= 0) return true;      // 不看距离 -> 全部淡化
             float nearest = DistanceToNearestLocal(c);
             return nearest >= 0f && nearest <= _dist;
         }
 
-        // 最近本地玩家到该角色的距离；找不到本地玩家（单机树屋等）返回 -1。
-        // Character.AllCharacters 是游戏自己的 public 静态列表（含所有角色，不用反射 PlayerManager）。
+        // 最近本地玩家到该角色的距离；找不到本地玩家返回 -1。
+        // Character.AllCharacters 是游戏的 public 静态列表，无需反射 PlayerManager。
         private static float DistanceToNearestLocal(Character c) {
             try {
                 System.Collections.Generic.List<Character> all = Character.AllCharacters;
@@ -217,7 +203,6 @@ namespace SR_UCH.Tweaks {
             if (c.nameTag != null) c.nameTag.maxOpacity = a;
         }
 
-        // 还原一个角色的透明度（只还原我们改过的：调用方先判 _faded）。
         private static void RestoreOne(Character c) {
             if (c == null) return;
             if (!_faded.Remove(c.GetInstanceID())) return;
@@ -230,7 +215,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/还原", __ex); }
         }
 
-        // 关闭/关机/冲突：遍历所有角色把改过的透明度清掉（角色可能已销毁，安全跳过）。
+        // 关闭/关机/冲突：把所有改过的透明度清掉（角色可能已销毁，安全跳过）。
         private static void RestoreAll() {
             try {
                 if (_faded.Count == 0) return;
@@ -246,8 +231,7 @@ namespace SR_UCH.Tweaks {
             try { Apply(__instance); } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/角色", __ex); }
         }
 
-        // 游戏的角色透明度控制器每帧会用自己的 currentOpacity 刷新 sprite；
-        // 在这里再写一次，保证我们的透明度不会被它盖掉。
+        // 游戏的透明度控制器每帧用自己的 currentOpacity 刷新 sprite，这里再写一次防被盖掉。
         [HarmonyPatch(typeof(CharacterOpacityController), "Update")]
         [HarmonyPostfix]
         private static void AfterOpacityUpdate(CharacterOpacityController __instance) {
@@ -258,7 +242,6 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/透明度", __ex); }
         }
 
-        // ============ 页面 ============
 
         private static void CfgRow(ConfigEntryBase e) {
             SRApi.Ctl.DrawEntryRow(e, SRApi.Ctl.Sc(180f));

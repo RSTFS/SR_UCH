@@ -1,4 +1,4 @@
-// HUD 状态更新分片（HUD.cs = 配置/注册/设置页；本文件 = 每帧状态与回合/关卡读数；绘制仍在 HUD.cs 的 DrawHud）
+// HUD 状态分片：每帧状态与回合/关卡读数；配置与绘制见 HUD.cs。
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -10,9 +10,7 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
 public partial class HUD {
 
-        // 游戏全局事件入口：相位切换 / 记分板 / 方块事件都走这里。
-        // 之前这里没有特性（特性悬空在 HUD.cs 里落到了 ResetGameState 上），
-        // 导致真正的处理器从未被调用、而状态被每个事件清空。
+        // 全局事件入口：相位切换与记分板事件都从这里分发。
         [HarmonyPatch(typeof(GameControl), "handleEvent")]
         [HarmonyPostfix]
         private static void OnGameControlEvent(GameControl __instance, global::GameEvent.GameEvent e) {
@@ -24,7 +22,7 @@ public partial class HUD {
                 if (end != null) { OnPhaseEnded(end.Phase); return; }
                 ScoreboardEvent sb = e as ScoreboardEvent;
                 if (sb != null) {
-                    // 记分板出现/结算完成 = 本回合确实推进过，可作为“真实回合”增量的证据。
+                    // 记分板出现或结算完成 = 本回合确实推进过，作为回合增量证据。
                     try { if (sb.Showing || sb.AfterTally) _roundTallySeen = true; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("HUD 阶段事件", __ex); }
@@ -42,7 +40,6 @@ public partial class HUD {
         }
         private static void Tick() {
             try {
-                // 显示键已迁移到核心 RegisterKey（HUD.Initialize），这里不再每帧轮询。
                 if (!IsEnabled()) {
                     _hasGame = false;
                     _inLobby = false;
@@ -63,7 +60,7 @@ public partial class HUD {
                 LobbyManager lm = LobbyManager.instance;
                 GameControl gc = (lm != null) ? lm.CurrentGameController : null;
                 if (gc == null) {
-                    // 树屋/大厅：HUD 完全不显示（用户要求删除大厅显示）。
+                    // 树屋/大厅不显示 HUD。
                     if (_gc != null || _hasGame) ResetGameState();
                     _inLobby = false;
                     
@@ -105,7 +102,7 @@ public partial class HUD {
             } catch (Exception __ex) { SRApi.Guard.Log("HUD 状态更新", __ex); }
         }
         private static void UpdateVisible() {
-            // 开关由「显示 HUD」复选框（及其快捷键）决定，打开即显示；面板打开时始终可预览。
+            // 由「显示 HUD」开关决定是否显示。
             bool keyVis = true;
             StepAlpha(IsEnabled() && (_hasGame || _inLobby) && keyVis);
         }
@@ -116,7 +113,7 @@ public partial class HUD {
             _wasVisible = target;
             if (fade) {
                 _hudAppear = Mathf.MoveTowards(_hudAppear, want, 4f * Time.unscaledDeltaTime);
-                _hudAlpha = EaseOut(_hudAppear);   // alpha 也用 ease-out
+                _hudAlpha = EaseOut(_hudAppear);   // alpha 同样 ease-out
             } else {
                 _hudAppear = want;
                 _hudAlpha = want;
@@ -140,7 +137,7 @@ public partial class HUD {
             try { return GameSettings.GetInstance(); } catch { return null; }
         }
         private static void UpdateTimer(GameControl gc, GameSettings gs) {
-            // 挑战模式：计时以游戏自己的 runTime 为准，按空格开始前（runStarted=false）不计数。
+            // 挑战模式以游戏 runTime 为准；开始前（runStarted=false）不计数。
             if (IsChallengeMode() && gc is ChallengeControl) { UpdateChallengeTimer(gc); return; }
 
             float elapsed = Mathf.Max(0f, Time.unscaledTime - _phaseStart);
@@ -154,19 +151,16 @@ public partial class HUD {
                 break;
             }
             case GameControl.GamePhase.PLACE: {
-                // 派对模式：建造阶段以游戏自己的 placementTimer 为准（每个派对盒/每次进入建造都会重置）。
+                // 派对模式建造阶段以 placementTimer 为准（每个派对盒会重置）。
                 if (IsPartyMode(gs)) {
                     if (vs != null) {
                         float pt = ReadFloat(ref _fPlacementTimer, vs, "placementTimer", "HUD（建造剩余时间）");
                         if (pt >= 0f) { countdown = true; remaining = pt; break; }
                     }
-                    // 只有游戏真的在跑建造计时（placementTimer 可读）时才显示倒计时。
-                    // 以前这里还用 PlaceTime − 经过时间兜底，但自由模式/无计时的场景里 PlaceTime 仍是 30，
-                    // 于是明明没有倒计时也会一直显示 30 秒（用户报的就是这个）。
+                    // 仅在 placementTimer 可读（真的在计时）时显示倒计时。
                     break;
                 }
-                // 建造倒计时：优先游戏自己的 placementTimer（暂停时不减），再用 PlaceTime − 经过时间兜底；
-                // 两个来源都在动时取较小值（谁先到算谁）。
+                // 建造倒计时：优先 placementTimer（暂停不减），再用 PlaceTime 兜底，取较小者。
                 float placeLeft = -1f;
                 if (vs != null) {
                     float t = ReadFloat(ref _fPlacementTimer, vs, "placementTimer", "HUD（建造剩余时间）");
@@ -175,8 +169,7 @@ public partial class HUD {
                         if (_vsPlaceSeen) placeLeft = t;
                     }
                 }
-                // 兜底只用"游戏已经开始过建造计时"（_vsPlaceSeen）的场景：
-                // 没有这个前提时 PlaceTime 只是配置值，不代表正在倒计时。
+                // 兜底仅用于已开始过建造计时（_vsPlaceSeen）的场景：否则 PlaceTime 只是配置值。
                 if (gs != null && gs.UsePlaceTimer && _vsPlaceSeen) {
                     float total = gs.PlaceTime;
                     if (total > 0.05f) {
@@ -184,7 +177,7 @@ public partial class HUD {
                         placeLeft = placeLeft > 0f ? Mathf.Min(placeLeft, byElapsed) : byElapsed;
                     }
                 }
-                // 整场限时在建造阶段也在走：总时间可能先于建造时间耗尽，取较小者才不会误导。
+                // 整场限时在建造阶段也在走，取较小者才不会误导。
                 float totalLeft2 = -1f;
                 if (gs != null && gs.GameLimitType == GameLimitType.TIME && vs != null) {
                     float used = ReadFloat(ref _fLevelTimer, vs, "levelTimer", "HUD（对局已用时间）");
@@ -196,15 +189,12 @@ public partial class HUD {
             }
             case GameControl.GamePhase.PLAY: {
                 if (vs != null) {
-                    // 1) 每回合时间限制（规则书里的 RunTimerLimit）：游戏自己的 RunTimer 是最权威的来源，
-                    //    它已经处理了回合起点与暂停；以前只看 GameLimitType==TIME，于是"回合限制+每回合限时"的对局
-                    //    在 HUD 上仍然正计时。
+                    // 每回合限时（RunTimerLimit）以游戏 runTimer 为准，它已处理回合起点与暂停。
                     float runLeft = -1f;
                     try { if (vs.runTimer != null) runLeft = vs.runTimer.TimeLeft; }
                     catch (Exception __rt) { SRApi.Guard.Log("HUD/读每回合剩余时间", __rt); }
                     if (runLeft > 0.01f) { countdown = true; remaining = runLeft; }
-                    // 2) 整场时间限制（GameLimitType.TIME）：levelTimer 在所有阶段累计（游戏源码 VersusControl.Update），
-                    //    与每回合限时同时存在时取较小值——谁先耗尽就算谁。
+                    // 整场限时（GameLimitType.TIME）：levelTimer 全阶段累计，与每回合限时取较小者。
                     if (gs != null && gs.GameLimitType == GameLimitType.TIME) {
                         float used = ReadFloat(ref _fLevelTimer, vs, "levelTimer", "HUD（对局已用时间）");
                         if (used >= 0f) {
@@ -257,12 +247,10 @@ public partial class HUD {
         private static void UpdateRound(GameControl gc, GameSettings gs) {
             try {
                 int candidate = gc.RoundNumber;
-                // 挑战模式：每死一次 = 一次重试，没有「回合上限」概念，也不发结算记分板事件。
-                // 直接采用游戏自身的 roundNumber（避免被“结算证据”门槛卡住），只显示「重试：N」。
+                // 挑战模式：每死一次即一次重试，无回合上限，也不发结算记分板事件。
                 if (IsChallengeMode()) {
                     if (candidate <= 0) { _roundText = null; return; }
-                    // 只接受"前进"或"回到 1"：直接采纳任何值会让 roundNumber 抖动时
-                    // 每帧都把 _trueRound 改来改去，回合提示跟着反复重播（audit 21-P0-4）。
+                    // 只接受「前进」或「回到 1」；否则 roundNumber 抖动会让回合提示反复重播。
                     if (candidate > _trueRound || candidate <= 1) {
                         _trueRound = candidate;
                         _roundPending = 0;
@@ -272,8 +260,7 @@ public partial class HUD {
                     return;
                 }
                                 if (candidate < _trueRound) {
-                    // 回合数回退：只在"确实换了对局"时才接受（否则保留较大的推算值，
-                    // 否则它会来回抖，回合提示跟着反复重播 —— 这就是闪烁的来源）。
+                    // 回合数回退：仅在确实换了对局（回到 1）时接受，否则保留较大值以免提示闪烁。
                     if (candidate <= 1) {
                         _trueRound = candidate;
                         _roundPending = 0;
@@ -281,7 +268,6 @@ public partial class HUD {
                     }
                 }
                 if (_trueRound <= 0 && candidate > 0) {
-                    // 首回合直接接受
                     _trueRound = candidate;
                     _roundPending = 0;
                 } else if (candidate > _trueRound) {
@@ -290,11 +276,11 @@ public partial class HUD {
                         _roundPending = 0;
                         _roundTallySeen = false;
                     } else if (candidate > _roundPending) {
-                        _roundPending = candidate;   // 未确认（可能是重载/刷新派对盒的额外 +1）
+                        _roundPending = candidate;   // 未确认（可能是刷新派对盒的额外 +1）
                     }
                 }
                 if (_roundTallySeen && _roundPending > _trueRound) {
-                    // 结算已发生：接受此前挂起的真实回合
+                    // 结算已发生：接受此前挂起的回合。
                     _trueRound = _roundPending;
                     _roundPending = 0;
                     _roundTallySeen = false;

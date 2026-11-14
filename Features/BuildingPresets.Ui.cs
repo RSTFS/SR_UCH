@@ -1,5 +1,4 @@
 // 布局预设 · 页面头部 UI：保存/导入/导出、搜索/排序/筛选、工具行。
-// 从 BuildingPresets.cs 拆出来只为控制单文件规模，行为不变。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -7,7 +6,6 @@ using UnityEngine;
 
 namespace SR_UCH.Tweaks {
     public partial class BuildingPresets {
-        // 头部一：保存 / 导入 / 导出（固定 3 行）
         private static void RenderSaveImportHeader() {
             SRApi.Ctl.SectionTitle(SRApi.T("- 保存 / 导入 / 导出 -", "- Save / Import / Export -"));
             GUILayout.BeginHorizontal();

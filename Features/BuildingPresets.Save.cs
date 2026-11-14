@@ -1,5 +1,4 @@
-// 布局预设 · 保存 / 导出 / 落盘（保存当前布局、导出预设、写文件与索引、排序、安全文件名）。
-// 从 BuildingPresets.Io.cs 拆出来只为控制单文件规模，行为不变。
+// 布局预设 · 保存与导出：保存当前布局、导出预设、写索引、排序、安全文件名。
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -14,7 +13,7 @@ namespace SR_UCH.Tweaks {
         private static void ExportPreset(PresetInfo p) {
             try {
                 if (p == null) return;
-                if (p.IsLocal) return; // 本地关卡是游戏存档，不提供导出
+                if (p.IsLocal) return; // 本地关卡是游戏存档，不导出
                 if (!ActionAllowed()) return;
                 string xml = ReadAllText(p.FilePath);
                 if (string.IsNullOrEmpty(xml)) {
@@ -30,13 +29,12 @@ namespace SR_UCH.Tweaks {
                 }
                 _status = SRApi.T("已导出到剪贴板：", "Exported to clipboard: ") + p.Name;
                 SRApi.LogInfo("[布局预设] " + _status);
-                SRApi.Notify(_status);   // 导出是显式操作，给屏幕提示
+                SRApi.Notify(_status);   // 显式操作，给屏幕提示
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/导出", __ex);
             }
         }
 
-        // 全部导出到目录：预设目录/exports/<时间>/<模式>/<文件>，并附带一份 index.json。
         private static void ExportAllToDirectory() {
             try {
                 if (!ActionAllowed()) return;
@@ -89,7 +87,7 @@ namespace SR_UCH.Tweaks {
                 XmlDocument doc;
                 string mode;
                 if (!TryGetCurrentSnapshot(out doc, out mode)) return;
-                // <destroyed> 节点在重载后的新场景里没有意义，且会让整批解析中断（与广播快照的处理一致），保存前剥掉。
+                // <destroyed> 在新场景里无意义且会让解析中断，保存前剥掉。
                 StripDestroyed(doc);
                 int blocks = CountBlocks(doc);
                 if (blocks <= 0) {
@@ -100,7 +98,7 @@ namespace SR_UCH.Tweaks {
                 string levelName = CurrentLevelDisplayName(level);
                 string levelCode = CurrentLevelCode(level);
                 string name = (_newName ?? "").Trim();
-                // 名称留空：默认用「关卡名 + 时间」，避免每次手工起名。
+                // 名称留空则默认「关卡名 + 时间」。
                 if (name.Length == 0) {
                     string baseName = string.IsNullOrEmpty(level) ? SRApi.T("布局", "Layout") : level;
                     name = baseName + " " + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture);
@@ -112,11 +110,9 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 保存 / 导入共用的落盘逻辑：同名覆盖需二次确认，数量上限只拦新预设。
-        // level 来自 XML 根节点 levelSceneName（读不到传空串），写进预设元数据用于列表/加载前校验。
+        // 保存与导入共用：同名覆盖需二次确认；level 取自根节点 levelSceneName，用于加载前校验。
         private static void SaveXml(string xml, string name, string mode, int blocks, string level, string levelName, string levelCode) {
             try {
-                // 保存侧与读取/导入同一上限：避免产生"能存不能取"的文件（读不出来只能手动删）。
                 if (string.IsNullOrEmpty(xml)) return;
                 if (xml.Length > MaxImportChars || blocks > MaxImportBlocks) {
                     SRApi.Notify(SRApi.T("布局太大，无法保存为预设（超出读取上限）", "The layout is too large to save as a preset (exceeds the load limit)"));
@@ -145,7 +141,7 @@ namespace SR_UCH.Tweaks {
                         return;
                     }
                 }
-                // 把显示名写进 XML 根属性：索引丢失/重建时名字不会退回旧文件名。
+                // 显示名写入 XML 根属性：索引重建时名字不会退回旧文件名。
                 try {
                     XmlDocument __md = ParseXmlSafe(xml);
                     if (__md.DocumentElement != null && !string.IsNullOrEmpty(name))
@@ -180,12 +176,10 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 原子写文本文件：同目录写 .tmp，成功后替换目标；失败时保留原文件（绝不留下半截文件）。
-        // 统一走核心存储（契约 SRApi.Storage.WriteAtomicPath）：临时文件 + 替换 + UTF-8 无 BOM，
-        // 不再在功能层重复实现一遍（历史出过截断/BOM 事故）。
+        // 原子写文本：先写 .tmp 再替换，失败保留原文件；统一走核心存储。
         private static void WriteFileAtomic(string path, string text) {
             if (string.IsNullOrEmpty(path)) return;
-            // 覆盖前留一份 .bak：index/预设写坏时至少还有上一版可恢复（写失败不阻断主流程）。
+            // 覆盖前留 .bak，写坏时可恢复；备份失败不阻断主流程。
             try { SRApi.Storage.BackupPath(path); } catch (Exception __bk) { SRApi.Guard.Log("布局预设/备份", __bk); }
             if (!SRApi.Storage.WriteAtomicPath(path, text)) SRApi.LogWarn("[布局预设] 原子写失败: " + path);
         }
@@ -199,7 +193,7 @@ namespace SR_UCH.Tweaks {
                 bool first = true;
                 for (int i = 0; i < _presets.Count; i++) {
                     PresetInfo p = _presets[i];
-                    if (p == null || p.IsLocal) continue; // 本地关卡是游戏存档，不写进预设索引
+                    if (p == null || p.IsLocal) continue; // 本地关卡是游戏存档，不入索引
                     if (!first) sb.Append(",\n");
                     first = false;
                     sb.Append("    {\"schema\":").Append(IndexSchema).Append(",\"file\":\"").Append(JsonEsc(p.File))
@@ -219,8 +213,7 @@ namespace SR_UCH.Tweaks {
                 }
                 if (!first) sb.Append('\n');
                 sb.Append("  ]\n}\n");
-                // 原子写：先写 .tmp 再替换。直接 WriteAllText 是"截断+写入"，中途崩溃/磁盘满会留下半截 JSON，
-                // 下次启动就只剩流式扫描的元数据（modsVals / applyRules 等自定义数据全丢）。
+                // 必须原子写：中途崩溃会留半截 JSON，下次启动只剩流式扫描的元数据。
                 WriteFileAtomic(Path.Combine(root, IndexFileName), sb.ToString());
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/写索引", __ex);
@@ -233,7 +226,6 @@ namespace SR_UCH.Tweaks {
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
-        // 文件名安全化：去掉 Windows 不允许的字符，截断长度并处理空名。
         private static string SafeFileName(string name) {
             try {
                 string src = (name ?? "").Trim();
@@ -241,7 +233,7 @@ namespace SR_UCH.Tweaks {
                 StringBuilder sb = new StringBuilder(src.Length);
                 for (int i = 0; i < src.Length; i++) sb.Append(Array.IndexOf(bad, src[i]) < 0 ? src[i] : '_');
                 string s = sb.ToString().Trim().TrimEnd('.');
-            // 显式拒绝路径分隔符与 ..：某些平台 / 是合法文件名字符，会原样保留（audit 11-P0-1）。
+            // 显式拒绝路径分隔符与 ..：某些平台 / 是合法文件名字符。
             s = s.Replace("..", "_").Replace('/', '_').Replace('\\', '_');
                 if (s.Length > 60) s = s.Substring(0, 60).Trim();
                 if (s.Length == 0) s = "preset_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
@@ -259,8 +251,7 @@ namespace SR_UCH.Tweaks {
                 for (int i = 0; i < mode.Length; i++) sb.Append(Array.IndexOf(bad, mode[i]) < 0 ? mode[i] : '_');
                 string s = sb.ToString().Trim();
                 if (s.Length == 0) return "UNKNOWN";
-                // 归一化：具体的 GameMode 名统一大写（PARTY/CREATIVE/...），其它（imported / unknown 等）
-                // 一律折成 UNKNOWN，避免 "IMPORTED" 与 "imported" 各自建一个目录（audit A-10）。
+                // 归一化：GameMode 名统一大写，其它一律折成 UNKNOWN，避免大小写各建目录。
                 string upper = s.ToUpperInvariant();
                 if (upper == "PARTY" || upper == "CREATIVE" || upper == "CHALLENGE" || upper == "FREEPLAY") return upper;
                 return "UNKNOWN";

@@ -1,4 +1,4 @@
-// 门控：每帧场景上下文快照（SR.Gate）+ 统一房主判定 + 内置模式豁免 + 启动自检；Env 提供场景/身份/模式查询。
+// 门控：每帧上下文快照 + 统一房主判定 + 内置模式豁免 + 补丁自检；Env 提供场景/身份/模式查询。
 using System;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -6,17 +6,15 @@ using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 
-// 分区：Gate（门控：每帧上下文快照 + 统一房主判定 + 内置模式豁免 + 启动自检）
+// 分区：Gate（门控 / 房主判定 / 模式豁免 / 补丁自检）
 
 namespace SR_UCH.Tweaks {
 public partial class SR {
 
-// 分区：Env（环境与身份查询：场景 / 房主·房客 / 模式）
-// 只读查询、不含豁免；“能不能用”由 SR.GateMaster / SR.GateHost / SR.GateModeAllows 判定（含豁免）。
+// 分区：Env（场景 / 身份 / 模式查询；只读、不含豁免）
         public static class Env {
 
 
-            // 场景名按帧缓存，避免同一帧重复查询引擎侧。
             private static string _sceneName = "";
             private static int _sceneNameFrame = -1;
 
@@ -30,7 +28,7 @@ public partial class SR {
                 }
             }
 
-            // 场景/网络/模式按帧同步一次后读字段：这些查询在每帧与每物理步路径上被大量调用，同帧内取值不变。
+            // 每帧同步一次后读字段：每帧与每物理步高频调用，同帧内取值不变。
             private static int _envFrame = -1;
             private static bool _inTreehouse, _inMatch, _isHost, _hasServer, _online;
             private static GameState.GameMode _mode;
@@ -43,18 +41,17 @@ public partial class SR {
                     LobbyManager lm = LobbyManager.instance;
                     _hasServer = NetworkServer.active;
                     _online = lm != null && lm.client != null && lm.client.isConnected;
-                    // 有服务器时看 lm.IsHost；无服务器 = 离线/本地对局 = 本机权威。
+                    // 有服务器看 lm.IsHost；无服务器（离线/本地对局）即本机权威。
                     _isHost = _hasServer
                         ? (lm == null || lm.IsHost)
                         : (lm == null || lm.client == null || !lm.client.isConnected);
-                    // 树屋/大厅：大厅控制器存在（最可靠），场景名兜底。
                     bool hasLsc = lm != null && lm.CurrentLevelSelectController != null;
                     string sc = SceneName;
                     _inTreehouse = hasLsc || (!string.IsNullOrEmpty(sc)
                         && (sc == "TreeHouseLobby" || sc == "Treehouse" || sc == "Lobby" || sc.StartsWith("Lobby_")));
                     _inMatch = !_inTreehouse && lm != null && lm.CurrentGameController != null;
                 } catch {
-                    // 取不到一律按“非房主 / 不在树屋 / 不在对局”处理（不放大权限）。
+                    // 取不到一律按非房主 / 非树屋 / 非对局处理，不放大权限。
                     _hasServer = false; _online = false; _isHost = false;
                     _inTreehouse = false; _inMatch = false;
                 }
@@ -64,24 +61,21 @@ public partial class SR {
 
             public static bool InTreehouse { get { EnvSync(); return _inTreehouse; } }
 
-            //对局中：不在树屋、且当前有对局控制器（回合进行中）。
+            // 对局中：不在树屋且有对局控制器。
             public static bool InMatch { get { EnvSync(); return _inMatch; } }
 
 
-            // 本机即权威（房主）；无服务器在跑（离线/单机/本地派对）时本机即权威。
+            // 本机即权威（含离线/单机）。
             public static bool IsHost { get { EnvSync(); return _isHost; } }
 
-            // 联机房客：有服务器且本机非房主；离线/单机/本地派对为 false。
+            // 联机房客：有服务器且非房主；离线/单机为 false。
             public static bool IsGuest { get { EnvSync(); return _hasServer && !_isHost; } }
 
-            // 是否存在可广播的服务器（NetworkServer.active）；写 SyncVar / 广播前必须判它。
             public static bool HasServer { get { EnvSync(); return _hasServer; } }
 
-            //客户端已连接（联机中）。
             public static bool Online { get { EnvSync(); return _online; } }
 
 
-            // 一次取出模式与“是否取到”（ModeKnown）。
             public static bool TryGetMode(out GameState.GameMode mode) {
                 EnvSync();
                 mode = _mode;
@@ -90,12 +84,11 @@ public partial class SR {
 
             public static GameState.GameMode Mode { get { EnvSync(); return _mode; } }
 
-            // 模式是否真的取到；取不到时 GateModeAllows 一律不放行。
             public static bool ModeKnown { get { EnvSync(); return _modeKnown; } }
 
         }
 
-        // 门控上下文快照：GateService 每帧刷新一次，所有限制读同一份 -> 同帧一致。
+        // 门控快照：每帧刷新一次，所有限制读同一份，同帧一致。
         public readonly struct GateContext
         {
             public readonly bool IsHost;        // 统一房主判定
@@ -117,10 +110,10 @@ public partial class SR {
             }
         }
 
-// 分区：GateRequirements（内置限制：总开关 / 模式 / 房主）
-// Master 永不豁免；Mode 可被 IgnoreModeLimit 豁免（凡有模式限制的功能都要接入）；Host 可被 HostOverride 豁免。
+// 分区：GateRequirements（总开关 / 模式 / 房主限制）
+// Master 永不豁免；Mode 可被 IgnoreModeLimit、Host 可被 HostOverride 豁免。
 
-        // 模式位掩码：避免每帧用 params 数组（每次调用都会分配）。
+        // 模式位掩码：避免每帧 params 数组分配。
         [Flags]
         public enum ModeMask {
             None = 0,
@@ -140,17 +133,15 @@ public partial class SR {
             }
         }
 
-        // 零分配便捷查询（每帧路径直接用）
 
-        // 总开关读实时值（AllEnabled）而非每帧快照：它是一键停用全部功能的安全阀，必须立刻生效。
+        // 总开关读实时值而非快照：一键停用的安全阀必须立刻生效。
         public static bool GateMaster { get { return AllEnabled; } }
 
         public static bool GateHost { get { return _gateCtx.IsHost || _gateCtx.OverrideHost; } }
 
-        // 判本机能否执行纯本地操作（不需要广播能力）；不含 EX 的无视房主豁免，离线时 Env.IsHost 为 true。
         public static bool CanControlLocally { get { return Env.IsHost; } }
 
-        // 功能级模式门控：查 [SrFeature].Modes（找不到功能记录/未声明 = 不限）。
+        // 功能级模式门控：查 [SrFeature].Modes（无记录或未声明 = 不限）。
         internal static bool FeatureAllowed(Type impl) {
             try {
                 if (impl == null) return true;
@@ -169,36 +160,31 @@ public partial class SR {
         public static bool GateModeAllows(ModeMask allowed) {
             GateContext ctx = _gateCtx;
             if (ctx.OverrideModes) return true;
-            // 模式未知（取不到 GameSettings）时一律不放行（保守）。
             if (!ctx.ModeKnown) return false;
             return (MaskOf(ctx.Mode) & allowed) != 0;
         }
 
-// 分区：Gate（门控服务：每帧上下文快照 + 统一房主判定）
-// IsHost = 本机即权威（含离线/单机）；HasServer = 存在可广播服务器（NetworkServer.active），两者不可合并。
+// 分区：Gate（门控服务：每帧快照 + 统一房主判定）
+// IsHost = 本机即权威（含离线/单机）；HasServer = 有可广播服务器；两者不可合并。
 
 
-        // 本机即权威的房主权限（含离线/单机）；转发 SR.Env.IsHost。
         public static bool IsHost { get { return Env.IsHost; } }
 
-        // 是否存在可广播的服务器（NetworkServer.active）。
         public static bool HasServer { get { return Env.HasServer; } }
 
-        // 联机房客（有服务器且本机不是房主）。查询层：SR.Env.IsGuest。
         public static bool IsGuest { get { return Env.IsGuest; } }
-        // 能力矩阵（房主/房客权限的统一门面）：[Command] 只对自己、[ClientRpc] 仅服务器广播、client.Send 任何客户端可发。
-        // 功能只声明需要哪一等，判定与提示文案统一由 CanDo 给出。
+        // 能力矩阵，由 CanDo 统一判定并给提示：[Command] 只对自己、[ClientRpc] 仅服务器广播、client.Send 任意客户端可发。
         public enum Cap {
             Self,           // 只影响本机自己：任何人都能做，不需要权限
             HostOnly,       // 必须本机是权威（房主/服务器）才能广播
             AnyViaMessage,  // 靠 client.Send 广播：任何人都能做，但必须连着服务器
         }
 
-        // 判权 + 失败时返回给玩家看的原因；true = 可执行。
+        // 判权；失败时经 why 返回给玩家看的原因。
         public static bool CanDo(Cap cap, out string why) {
             why = null;
             try {
-                // 总开关是不可豁免的先决条件，且必须在所有能力判定之前。
+                // 总开关不可豁免，须在所有能力判定之前。
                 if (!GateMaster) {
                     why = T("总开关已关闭（设置页 → All Enabled）", "Master switch is off (Settings -> All Enabled)");
                     return false;
@@ -207,14 +193,12 @@ public partial class SR {
                     case Cap.Self:
                         return true;                       //只影响自己，不需要任何权限
                     case Cap.HostOnly:
-                        // "仅房主"按"本机是否权威"判断，而不是"本机是否在跑服务器"：
-                        // 离线单机 / 本地派对里 HasServer 为 false，但本机就是权威（audit 03-P0-02）。
+                        // 仅房主按“本机是否权威”而非“是否在跑服务器”：离线单机/本地派对同样成立。
                         if (Env.IsHost) return true;
                         why = T("仅房主可执行此操作",
                                 "Host only");
                         return false;
                     case Cap.AnyViaMessage:
-                        // 任何人都能发，但必须连着服务器，否则消息出不去。
                         if (Env.HasServer || Env.Online) return true;
                         why = T("此操作需要联机对局",
                                 "This action requires an online session");
@@ -225,14 +209,11 @@ public partial class SR {
             return false;
         }
 
-        // 目标玩家版：targetIsSelf = 操作对象即本机自己。
-        // 操作自己无需权限；操作别人只有服务器能广播。
         public static bool CanDo(Cap cap, bool targetIsSelf, out string why) {
             if (targetIsSelf && cap == Cap.AnyViaMessage) return CanDo(Cap.Self, out why);
             return CanDo(cap, out why);
         }
 
-        // CanDo(Cap.HostOnly) 的包装；失败时自动 Notify 原因。
         public static bool CanDoHost() {
             string why;
             bool ok = CanDo(Cap.HostOnly, out why);
@@ -243,13 +224,12 @@ public partial class SR {
 
         private static GateContext _gateCtx;
 
-        // 当前帧的门控快照（未刷新时是默认值，等价于全关，保守）。
+        // 当前帧快照；未刷新时为默认值，等价全关（保守）。
         public static GateContext Gate { get { return _gateCtx; } }
 
-        // 每帧刷新一次（由 SR.Tick 调用）。任何限制都应读这份快照，而不是各自重新求值。
+        // 每帧由 SR.Tick 调用；所有限制读这份快照，不各自重算。
         public static void RefreshGate() {
             try {
-                //场景/身份/模式一律走查询层 Env：门控只负责"叠加豁免"，不再自己重新问一遍游戏。
                 bool isHost = Env.IsHost;
                 bool inMatch = Env.InMatch;
                 bool overrideModes = IgnoreModeLimit;
@@ -260,13 +240,13 @@ public partial class SR {
                 _gateCtx = new GateContext(isHost, inMatch,
                     overrideModes, overrideHost, mode, modeKnown);
             } catch (Exception __ex) {
-                // 不做“保守全关”：运行时 getter 抛异常导致突然全关会打断正在进行的操作；仅记录日志（Guard 去重）。
+                // 不保守全关：突然全关会打断正在进行的操作；仅记日志（Guard 去重）。
                 Guard.Log("刷新门控上下文", __ex);
             }
         }
 
 
-// 补丁自检：经 Harmony 登记表列出本程序集实际打上的补丁目标，并标出挂在每帧方法上的补丁。
+// 补丁自检：列出本程序集实际打上的 Harmony 补丁目标，并标出每帧方法上的补丁。
 
         public static class GateAudit {
             private static readonly HashSet<string> PerFrameMethods = new HashSet<string> {
@@ -297,7 +277,6 @@ public partial class SR {
                         }
                     }
 
-                    // 只留一行汇总：逐个列出每帧补丁属于排查噪音（详情可看设置页自检块）。
                     SR.AuditGateTotal = total;
                     SR.AuditPerFrame = perFrame.Count;
                     SR.LogInfo("[SR.Gate] 补丁目标方法 " + total + " 个（其中每帧方法 " + perFrame.Count + " 个）");

@@ -1,5 +1,4 @@
 // 角色：进入树屋时自动选一次角色（指定 / 随机空闲 / 智能），以及自动时装（随机整套）。
-// 精简版：不再有延迟、重试间隔、已选不覆盖、外观记录、AutoDress 相关内容。
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -22,7 +21,6 @@ namespace SR_UCH.Tweaks {
 
         private static readonly string[] ModeVals = { "smart", "target", "random" };   // 顺序：智能 / 指定 / 随机
 
-        // 每进一次房间只自动选一次：场景切换时复位。
         private static bool _triedThisRoom;
         private static Character.Animals _lastWant = Character.Animals.NONE;   // 上次成功选中的动物
         private static float _sceneChangedAt = -999f;   // 最近一次换场景的时刻（宽限期用）
@@ -39,7 +37,7 @@ namespace SR_UCH.Tweaks {
             return SRApi.T("指定角色", "Specific animal");
         }
 
-        // 可用动物：优先读存档的解锁表（与实际解锁一致）；读不到时退回枚举全集。
+        // 可用动物：优先读存档的解锁表，读不到时退回枚举全集。
         private static readonly List<string> Animals = new List<string>();
         private static readonly List<string> AnimalLabels = new List<string>();
         private static string _animalLang;   // 上次构建列表时的游戏语言
@@ -47,7 +45,6 @@ namespace SR_UCH.Tweaks {
             try { return global::I2.Loc.LocalizationManager.CurrentLanguageCode ?? ""; } catch { return ""; }
         }
         private static void EnsureAnimalList() {
-            // 语言变了就重建：否则切语言后动物列表仍是旧语言的文字
             string lang = CurrentLang();
             if (Animals.Count > 0 && lang == _animalLang) return;
             _animalLang = lang;
@@ -60,13 +57,12 @@ namespace SR_UCH.Tweaks {
                 try { if (unlocked != null && (int)a < unlocked.Length) ok = unlocked[(int)a]; }
                 catch (Exception __u) { SRApi.Guard.Log("角色/解锁过滤", __u); ok = true; }
                 Animals.Add(a.ToString());
-                // 全量列出（解锁表可能缺项/DLC 不同步，以前过滤会把角色漏掉）；未解锁的加后缀
+                // 全量列出（解锁表可能缺项/DLC 不同步）；未解锁的加后缀。
                 AnimalLabels.Add(AnimalZh(a.ToString()) + (ok ? "" : SRApi.T("（未解锁）", " (locked)")));
             }
             if (Animals.Count == 0) { Animals.Add("CHICKEN"); AnimalLabels.Add(AnimalZh("CHICKEN")); }
         }
 
-        // 存档里的解锁表（CharactersUnlocked，StatBoolArray，按枚举下标）。
         private static bool[] UnlockedAnimals() {
             try {
                 SaveFileData data = StatTracker.Instance.GetSaveFileDataForMainUser();
@@ -76,10 +72,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("角色/读取解锁表", __ex); return null; }
         }
 
-        // 角色名直接用游戏自己的本地化表（ScriptLocalization.CharacterNames）；
-        // 取不到时退回枚举名，保证列表永远可用。
-        // 角色名一律查游戏的本地化表（CharacterNames/<PascalCase>），不写死映射：
-        // 写死会漏掉新角色/DLC（枚举有值但没有对应 case 时只能显示英文枚举名，看起来像"列表不全"）。
+        // 角色名查游戏自己的本地化表（scriptLocalization.CharacterNames），取不到退回枚举名。
         private static readonly Dictionary<string, string> _animalNameCache = new Dictionary<string, string>(StringComparer.Ordinal);
         private static string AnimalZh(string en) {
             try {
@@ -105,7 +98,6 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("角色/角色名", __ex); return en; }
         }
 
-        // CHICKEN -> Chicken，REDPANDA -> RedPanda，REALBUNNY -> RealBunny
         private static string Pascal(string en) {
             try {
                 StringBuilder sb = new StringBuilder(en.Length);
@@ -128,7 +120,6 @@ namespace SR_UCH.Tweaks {
             return Character.Animals.NONE;
         }
 
-        // ---------------- 注册 ----------------
         private static void SelfReg() {
             SRApi.LocSec(Sec, "角色", null);
             SRApi.Nav(Sec, 40);
@@ -154,7 +145,6 @@ namespace SR_UCH.Tweaks {
                 _mode = plugin.Config.Bind(Sec, "Mode", "target", "选择方式：target 指定 / random 随机空闲 / smart 智能。");
                 _animal = plugin.Config.Bind(Sec, "Animal", "CHICKEN", "指定方式下要挑的动物（枚举名）。");
                 _outfitOn = plugin.Config.Bind(Sec, "Outfit Enabled", false, "自动时装：角色选定后随机穿一套外观。");
-                // 原地换装走 HotkeyButton：隐藏的 [Hotkeys] 条目由核心统一轮询（每帧，不降频）
                 _outfitData = plugin.Config.Bind(Sec, "Outfit Data", "",
                     "内部状态：每个角色第一次随机到的那套外观（键=动物枚举名，值=四类下标）。勿手动修改。");
                 SRApi.RegisterTick("角色-自动选择", Tick);
@@ -162,38 +152,34 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("角色/初始化", __ex); }
         }
 
-        // ---------------- 页面 ----------------
         private static void RenderPick() {
             try {
                 SRApi.Ctl.SectionTitle(SRApi.T("- 自动选择 -", "- Auto pick -"));
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) { return e.Definition.Key == "Enabled"; });
                 EnsureAnimalList();
-                // 统一控件：核心的 RowCombo 用配置条目当稳定 ID 管理展开态，选中即写值并收起。
-                // 注意传原始枚举值（以前传本地化显示名，与 ModeVals 永不相等 → 永远显示第一项）。
+                // 核心 RowCombo 用配置条目当稳定 ID 管理展开态，选中即写值并收起；须传原始枚举值（传本地化名会永远显示第一项）。
                 if (_mode != null)
                     SRApi.Ctl.RowCombo(SRApi.T("选择方式", "Pick mode"),
                         SRApi.T("选择方式\n指定 = 每次挑同一只\n随机 = 已解锁空闲里随机；智能 = 优先你用得最多的",
                                 "Pick mode\nSpecific = always the same animal\nRandom = any unlocked free one; Smart = your most used"),
                         _mode, ModeVals, new string[] { ModeLabel("smart"), ModeLabel("target"), ModeLabel("random") }, 160f, 96f);
-                // 结构固定：非「指定」时置灰，不变更控件数量（否则 IMGUI 会报 LayoutGroup 不匹配）。
+                // 结构固定：非「指定」时置灰，不变更控件数量（否则 IMGUI 报 LayoutGroup 不匹配）。
                 bool target = (_mode == null || string.IsNullOrEmpty(_mode.Value) || _mode.Value == "target");
                 bool oldEnabled = GUI.enabled;
                 try {
                     GUI.enabled = oldEnabled && target;
                 EnsureAnimalList();
-                // 全部角色直接一次列出来（不用下拉、不滚动），按宽度自动换行；本房间没有的照样列出，
-                // 只是在「自动挑选」时会被跳过（不会选中一个拿不到的角色）。
+                // 全部角色一次列出（不用下拉、不滚动），按宽度换行；本房间没有的照样列出，挑选时跳过。
                 if (_animal != null) RowAnimalGrid(SRApi.T("指定动物", "Target animal"), _animal);
                 } finally { GUI.enabled = oldEnabled; }
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动选择页", __ex); }
         }
 
-        // ================= 指定动物：自绘下拉（全量列出 + 滚轮滚动 + 不可用标记） =================
 
 
 
 
-        // 全量角色按钮网格：一次显示全部，按可用宽度换行；列宽=最长名字，列对齐。
+        // 全量角色按钮网格：一次显示全部，按可用宽度换行；列宽=最长名字。
         private static void RowAnimalGrid(string label, ConfigEntry<string> entry) {
             try {
                 EnsureAnimalList();
@@ -210,7 +196,6 @@ namespace SR_UCH.Tweaks {
                         float w = SRApi.Ctl.Btn.CalcSize(new GUIContent(AnimalLabels[i])).x + SRApi.Ctl.Sc(18);
                         if (w > bw) bw = w;
                     }
-                    // 固定 5 列（15 只 = 5×3），不随窗口宽度自动换行
                     const int cols = 5;
                     string cur = entry != null ? entry.Value : "";
                     for (int i = 0; i < Animals.Count; i++) {
@@ -245,7 +230,6 @@ namespace SR_UCH.Tweaks {
                             SRApi.T("关闭当前角色的全部外观并标记为「不要自动穿」\n想恢复随机请点「随机整套」", "turns off every outfit on the current animal and marks it as do-not-auto-dress\nuse Randomize all to roll again"), 110f, 26f))
                         ClearCurrentOutfit();
                     GUILayout.Space(SRApi.Ctl.Sc(8));
-                    // 按钮式：左键立即打开，右键绑定/解绑快捷键（核心 HotkeyButton 统一行为）
                     if (SRApi.Ctl.HotkeyButton("character.dress", SRApi.T("原地换装", "Dress here"),
                             SRApi.T("在角色当前位置打开游戏原生的换装界面\n需要先选好角色；关闭用 Accept / Esc\n右键本按钮可绑定快捷键", "opens the game's own dresser at your character\npick an animal first; close with Accept or Esc\nright-click this button to bind a hotkey"),
                             OpenNativeDress, SRApi.Ctl.Sc(110), SRApi.Ctl.Sc(26)))
@@ -260,7 +244,6 @@ namespace SR_UCH.Tweaks {
         // 指定动物：直接排成按钮网格，全部可见（下拉框装不下时会被裁掉）。
 
 
-        // ---------------- 逻辑 ----------------
         private static void Tick() {
             try {
                 bool pick = _enabled != null && _enabled.Value;
@@ -293,13 +276,10 @@ namespace SR_UCH.Tweaks {
             return null;
         }
 
-        // 一次房间只尝试一次：已经有角色就结束；没有就等到能挑的时机再挑一次。
         private static void TryPickOnce(LobbyPlayer lp, LobbyManager lm) {
             try {
                 if (lp.CharacterInstance != null) { _triedThisRoom = true; return; }   // 已经有角色：不动
-                // 扫一遍树屋起点上的角色：
-                //  ① 已经属于本地玩家的 → 我们已经选过了，整局不再动（这是"回树屋又选一次"的硬判据）
-                //  ② 被标记为已选却没有任何归属 → 上一轮挑选残留的卡死状态，复位让它重新可选
+                // 扫一遍树屋起点上的角色：已属于本地玩家的不再动；被标记已选却无归属的复位成可选。
                 try {
                     LevelSelectController __lsc0 = lm.CurrentLevelSelectController;
                     List<LobbyStartPoint> __pts0 = __lsc0 != null ? __lsc0.StartingPoints : null;
@@ -321,12 +301,9 @@ namespace SR_UCH.Tweaks {
                         }
                     }
                 } catch (Exception __sc0) { SRApi.Guard.Log("角色/扫描已选角色", __sc0); }
-                // 从对局/关卡回到树屋后的宽限期：游戏自己会恢复你上次的角色，
-                // 但这段时间 CharacterInstance 可能瞬时为空，贸然挑选会"重新选一次"。
                 if (Time.unscaledTime - _sceneChangedAt < 2f) return;
                 LevelSelectController lsc = lm.CurrentLevelSelectController;
                 if (lsc == null) return;                                               // 还不在树屋里，下一帧再看
-                // B：优先选回上次那只（记忆），它不可用才按模式重新挑
                 Character.Animals want = _lastWant != Character.Animals.NONE && FindFreeCharacter(lsc, _lastWant) != null
                     ? _lastWant : ChooseAnimal(lsc);
                 if (want == Character.Animals.NONE) { _triedThisRoom = true; return; }
@@ -361,7 +338,6 @@ namespace SR_UCH.Tweaks {
                 if (free.Count == 0) return Character.Animals.NONE;
                 return free[UnityEngine.Random.Range(0, free.Count)];
             }
-            // 指定角色：本房间没有这只就不选（避免"点了没反应"却把光标抢过去）
             Character.Animals target = ParseAnimal(_animal != null ? _animal.Value : "");
             if (target != Character.Animals.NONE) {
                 try {
@@ -413,9 +389,7 @@ namespace SR_UCH.Tweaks {
             return null;
         }
 
-        // ---------------- 自动时装（随机整套） ----------------
-        // 刚打开的换装界面：克隆体的 Awake/Start 还没跑，立即 Show 会是空白（行与图片都没初始化）。
-        // 等一小段时间后补一次 Show()，与游戏原生衣柜的时序一致。
+        // 刚打开的换装界面尚未 Awake/Start，立即 Show 会是空白，故稍后补一次 Show()。
         private static void RefreshDresserOnce() {
             try {
                 if (_dressShowAt < 0f || Time.unscaledTime < _dressShowAt) return;
@@ -426,14 +400,11 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("角色/换装补显外层", __ex); }
         }
 
-        // 换装界面关闭后自救：游戏原生 Close 有一条路径是 Release(unFreeze:false)（Esc/Start/记分板），
-        // 它不会把 InMenu 置回 false、也不会 Unfreeze —— 于是角色关掉界面后动不了。
-        // 这里检测"界面已不可见但角色还卡在 InMenu"，把它还原。
+        // 换装界面关闭后自救：Close 有路径不置 InMenu 也不 Unfreeze，角色会动不了，这里还原。
         private static void UnstickDresser() {
             try {
                 if (_dressCtrl == null || _dressChar == null) return;
-                // 关掉的可靠信号是 backgroundSprite.enabled（游戏 Show() 置 true、Hide() 置 false）；
-                // 用 activeInHierarchy 判定不成立：对象一直激活，只是把背景/行隐藏了。
+                // 可靠信号是 backgroundSprite.enabled（Show 置 true、Hide 置 false），activeInHierarchy 不成立。
                 bool uiAlive = false;
                 try {
                     uiAlive = _dressCtrl != null && _dressCtrl.gameObject != null
@@ -469,9 +440,8 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("角色/自动时装", __ex); }
         }
 
-        // 原地换装：完全走游戏原生链路 —— 调场景里 OutfitChangeProp.Use()（它会置 InMenu、Freeze、
-        // 记录 usedInputKey、实例化并 Show OutfitController，之后 Accept/Back 走原生 Release），
-        // 唯一的额外处理是：Use 结束后把界面和角色位置都还原到角色原来的位置（原生会把人拉到衣柜前）。
+        // 原地换装：走游戏原生链路（OutfitChangeProp.Use() 置 InMenu/Freeze 并 Show OutfitController），
+        // 唯一额外处理是把界面与角色位置还原到原处（原生会把人拉到衣柜前）。
         private static void OpenNativeDress() {
             try {
                 LobbyManager lm = LobbyManager.instance;
@@ -519,7 +489,6 @@ namespace SR_UCH.Tweaks {
                     try { ch.OnOutfitsUpdated(all); } catch (Exception __uo) { SRApi.Guard.Log("角色/清空时装刷新", __uo); }
                     lp.CallCmdSetOutfitsFromArray(ch.GetOutfitsAsArray());
                 }
-                // 标记为 none：清空后不要自动重穿（否则下一帧又会随机一套，看起来"清空没生效"）
                 SetOutfitRecord(ch.CharacterSprite.ToString(), "none");
                 _dressedFor = ch;
                 SRApi.Notify(SRApi.T("已清空该角色的时装", "Cleared this animal's outfit"));
@@ -531,11 +500,11 @@ namespace SR_UCH.Tweaks {
             try {
                 if (ch == null) return false;
                 Outfit[] all = ch.GetComponentsInChildren<Outfit>(true);
-                // 角色刚生成时外观组件可能还没挂好：返回失败，让调用方下一帧重试（快速换角色时的"概率无效"就是这个）
+                // 角色刚生成时外观组件可能还没挂好：返回失败，让调用方下一帧重试。
                 if (all == null || all.Length == 0) return false;
                 string animal = ch.CharacterSprite.ToString();
                 string rec = reroll ? null : GetOutfitRecord(animal);
-                // "none" = 用户点过「清空时装」：不要自动再穿，等他手动随机
+                // "none" = 用户点过「清空时装」：不要自动再穿。
                 if (rec == "none") return true;
                 if (string.IsNullOrEmpty(rec)) {
                     rec = MakeRandomRecord(all);
@@ -580,7 +549,7 @@ namespace SR_UCH.Tweaks {
 
         private static readonly Outfit.OutfitType[] Types = { Outfit.OutfitType.Accessory, Outfit.OutfitType.Body, Outfit.OutfitType.Head, Outfit.OutfitType.Skin };
 
-        // 生成一套随机记录：每类取"候选列表下标"，没有候选写 -1。
+        // 生成一套随机记录：每类取“候选列表下标”，没有候选写 -1。
         private static string MakeRandomRecord(Outfit[] all) {
             int[] pick = new int[Types.Length];
             for (int t = 0; t < Types.Length; t++) {
@@ -621,7 +590,7 @@ namespace SR_UCH.Tweaks {
             return cand;
         }
 
-        // 按钮：只重抽"当前角色"的那一套，并覆盖它的记录（其它角色不受影响）。
+        // 按钮：只重抽“当前角色”那一套并覆盖它的记录（其它角色不受影响）。
         private static void RandomizeCurrent() {
             try {
                 LobbyManager lm = LobbyManager.instance;

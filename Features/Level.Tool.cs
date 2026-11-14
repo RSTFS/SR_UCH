@@ -1,5 +1,5 @@
-// 关卡工具页（侧栏「关卡」第 2 页）：重载关卡 / 重载模式 / 重载保分补分 / 清场槽位 / 快照后处理补丁。
-// 命名空间内 Level 会遮蔽游戏自带的 global::Level。
+// 关卡工具页（侧栏「关卡」第 2 页）：重载关卡 / 重载模式 / 保分补分 / 快照后处理补丁。
+// 本命名空间内 Level 会遮蔽游戏自带的 global::Level，跨类型引用须写 global::。
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -34,7 +34,7 @@ public partial class Level {
         GUILayout.Space(SRApi.Ctl.Sc(4));
     }
 
-        // 重载关卡模式：保留方块与分数 / 仅保留方块（分数重置）。
+        // 重载模式：保留方块与分数 / 仅保留方块（分数重置）。
         public enum ReloadMode {
             KeepScore,
             KeepBlocksOnly
@@ -49,17 +49,16 @@ public partial class Level {
     [HarmonyPrefix]
     static void OnPrepareReloadMessage(GameEvent.GameEvent e) {
         try {
-            // 收到 PrepareToReloadScene 只重置补分保护，不置补分标志，否则外部工具发起的重载会再补一份导致分数翻倍。
+            // 只重置补分保护、不置补分标志：否则外部工具发起的重载会再补一份导致翻倍。
             if (e is GameEvent.NetworkMessageReceivedEvent nm && nm.Message.msgType == NetMsgTypes.PrepareToReloadScene) {
                 _refillPending = false;
                 _refillAt = -1f;
-                // 折扣备份与补分模式无关；恢复仅房主执行，房客端备份无副作用。
                 BackupHandicaps();
             }
         } catch (Exception __ex) { SRApi.Guard.Log("处理 PrepareToReloadScene", __ex); }
     }
 
-    // 备份所有在线玩家的 handicap（从 LobbyPlayer 读服务器权威值）。
+    // 备份全员 handicap（从 LobbyPlayer 读服务器权威值）。
     private static void BackupHandicaps() {
         try {
             _handicapBackup = new Dictionary<int, int>();
@@ -79,7 +78,7 @@ public partial class Level {
         } catch (Exception __ex) { SRApi.Guard.Log("备份 handicap", __ex); }
     }
 
-    // 重载完成后房主写回备份的 handicap（LobbyPlayer + GamePlayer 的 SyncVar，服务器赋值自动广播全员）。
+    // 重载后房主写回 handicap（SyncVar，服务器赋值自动广播）。
     private static void RestoreHandicapsIfAny() {
         if (_handicapBackup == null || _handicapBackup.Count == 0) return;
         Dictionary<int, int> backup = _handicapBackup;
@@ -102,24 +101,21 @@ public partial class Level {
         } catch (Exception __ex) { SRApi.Guard.Log("恢复 handicap", __ex); }
     }
 
-    // ClearNewPointBlocks 会删掉非 AlwaysAward 分块：补分重放后（_refillPending）跳过清除；正常结算只缓存外部加分分块，原生未 tally 的不缓存以免多计分。
+    // 补分重放后跳过清除；正常结算只缓存外部加分分块，原生未 tally 的不缓存以免多计分。
     [HarmonyPatch(typeof(ScoreKeeper), "ClearNewPointBlocks")]
     [HarmonyPrefix]
     static bool ClearNewPointBlocksPrefix(ScoreKeeper __instance) {
         try {
-            // 自愈：补分标志本该在"补分重放后的下一次结算"被消费掉；若那次 tally 抛异常/被跳过，
-            // 标志会永远为真 -> 之后每次都跳过清除 -> 分块无限累积 -> 下次重载备份合并成双倍分。
-            // 这里给它一个墙钟上限，超时按普通结算处理并记一条日志。
+            // 自愈：补分标志未被消费会一直跳过清除，导致分块累积、下次重载备份翻倍；超时按普通结算处理。
             if (_refillPending && _refillAt >= 0f && Time.unscaledTime - _refillAt > PreserveStaleAfter) {
                 SRApi.LogWarn("[保分] 补分标志超过 " + (int)PreserveStaleAfter + " 秒未被消费，强制按普通结算处理");
                 _refillPending = false;
                 _refillAt = -1f;
             }
             if (_refillPending) {
-                // 跳过清除分支同样要缓存（去重后合并），否则同一批 AlwaysAward 分块会在下次重载备份时被补回两次。
+                // 跳过清除时同样要缓存（去重合并），否则同一批分块会被补回两次。
                 try {
                     if (__instance != null && __instance.newPointBlocks != null) {
-                        // 按 Key 线性去重（条数受 FillTotalCap 限制）
                         for (int i = 0; i < __instance.newPointBlocks.Count; i++) {
                             PointBlock pb = __instance.newPointBlocks[i];
                             if (pb == null) continue;
@@ -129,12 +125,10 @@ public partial class Level {
                                 KeyValuePair<int, PointBlock.pointBlockType> it = _clearedExternBlocks[j];
                                 if (Key(it.Key, it.Value) == k) { dup = true; break; }
                             }
-                            // 立刻快照（玩家号 + 类型），之后不再持有这个对象
                             if (!dup) _clearedExternBlocks.Add(new KeyValuePair<int, PointBlock.pointBlockType>(pb.playerNumber, pb.type));
                         }
                     }
                 } catch (Exception __cex) { SRApi.Guard.Log("缓存补分分块", __cex); }
-                // 补分重放后的第一次结算跳过清除，保留全部分块
                 return false;
             }
             if (__instance == null || __instance.newPointBlocks == null) return true;
@@ -142,9 +136,7 @@ public partial class Level {
                 PointBlock pb = __instance.newPointBlocks[i];
                 if (pb == null) continue;
                 if (!pb.AlwaysAward && _externAwardedKeys.Contains(Key(pb))) {
-                    // 外部加分的非 AlwaysAward 分块：缓存，重载备份时补回。
-                    // 按 (玩家, 类型) 去重，而不是按对象引用：引用相同的重复对象会被合并成一块，
-                    // 补回时丢分块（audit 15-P0-3）。
+                    // 外部加分的非 AlwaysAward 分块：缓存待补回，按 (玩家, 类型) 去重，不可用对象引用。
                     int __k = Key(pb);
                     bool __dup = false;
                     for (int __j = 0; __j < _clearedExternBlocks.Count; __j++) {
@@ -161,13 +153,11 @@ public partial class Level {
         return true;
     }
 
-    // 分块标记键：(playerNumber << 8) | (int)type
-    // 去重键：以前是 (playerNumber << 8) | type —— 类型编号 >= 256 或玩家号 >= 256 就会撞键，
-    // 撞键会让缓存的分块整批错位（重载备份补回错分块 = 分数错乱）。改成 *1024 + type 后两名互不重叠。
+    // 去重键 = playerNumber*1024 + type，两段互不重叠。
     private static int Key(PointBlock pb) { return (pb.playerNumber * 1024) + (int)pb.type; }
     private static int Key(int playerNumber, PointBlock.pointBlockType type) { return (playerNumber * 1024) + (int)type; }
 
-    // 标记外部加分分块：外部模块加分与补分重放都发 AlwaysAward=true，原生名次分等为 false。
+    // 标记外部加分分块：AlwaysAward=true 的加分来自外部模块或补分重放。
     [HarmonyPatch(typeof(ScoreKeeper), "handleEvent")]
     [HarmonyPrefix]
     static void OnPointAwardedMessage(ScoreKeeper __instance, global::GameEvent.GameEvent e) {
@@ -175,7 +165,7 @@ public partial class Level {
             if (e == null || e.GetType() != typeof(GameEvent.NetworkMessageReceivedEvent)) return;
             GameEvent.NetworkMessageReceivedEvent nm = e as GameEvent.NetworkMessageReceivedEvent;
             if (nm == null || nm.Message == null || nm.Message.msgType != NetMsgTypes.PointAwarded) return;
-            // reader 已被 GameState.distributeMessage 消费，再 ReadMessage 会越界，必须用事件里已反序列化的字段。
+            // reader 已被 GameState.distributeMessage 消费，ReadMessage 会越界，只能用已反序列化字段。
             MsgPointAwarded msg = nm.ReadMessage as MsgPointAwarded;
             if (msg != null && msg.AlwaysAward) {
                 _externAwardedKeys.Add(Key(msg.PlayerNumber, msg.PointType));
@@ -183,7 +173,7 @@ public partial class Level {
         } catch (Exception __ex) { SRApi.Guard.Log("标记外部加分分块", __ex); }
     }
 
-    // 分块 tally 后清除 _refillPending 与外部加分标记，恢复正常清除。
+    // tally 后清标志与外部加分标记，恢复正常清除。
     [HarmonyPatch(typeof(ScoreKeeper), "TallyPointBlockAllPlayers")]
     [HarmonyPostfix]
     static void TallyPostfix() {
@@ -209,13 +199,13 @@ public partial class Level {
                 SRApi.LogWarn("[保分] 备份 historyPointBlocks 失败: " + ex.Message);
             }
             try {
-                List<PointBlock> npb = __instance.newPointBlocks; // public 字段，直接读
+                List<PointBlock> npb = __instance.newPointBlocks; // public 字段
                 if (npb != null) blocks.AddRange(npb);
             } catch (Exception ex) {
                 SRApi.LogWarn("[保分] 备份 newPointBlocks 失败: " + ex.Message);
             }
             if (_clearedExternBlocks != null && _clearedExternBlocks.Count > 0) {
-                // 结算时被 Clear 的外部加分分块：用值快照重建 PointBlock 再合并进备份
+                // 用值快照重建被清除的外部加分分块后合并进备份。
                 for (int __bi = 0; __bi < _clearedExternBlocks.Count; __bi++) {
                     KeyValuePair<int, PointBlock.pointBlockType> it = _clearedExternBlocks[__bi];
                     blocks.Add(new PointBlock(it.Value, it.Key));
@@ -235,7 +225,7 @@ public partial class Level {
                     list = new List<PointBlock.pointBlockType>();
                     _scoreBackupBlocks[pb.playerNumber] = list;
                 }
-                list.Add(pb.type);   // 只存类型快照，不持对象引用
+                list.Add(pb.type);   // 只存类型快照
             }
             SRApi.LogInfo("[保分] 重载备份分块 " + blocks.Count + " 条，涉及 " + _scoreBackupBlocks.Count + " 名玩家");
         } catch (Exception ex) {
@@ -247,7 +237,7 @@ public partial class Level {
     [HarmonyPostfix]
     static void ScoreSetupPostfix(ScoreKeeper __instance) {
         try {
-                // 重载保分模式：下次结算跳过 ClearNewPointBlocks；超时未消费的保分标志按普通开局处理，避免补回陈旧分块。
+                // 下次结算跳过清除；超时未消费的保分标志按普通开局处理，避免补回陈旧分块。
                 bool fresh = _preserveScoresOnReload && _preserveMarkedAt >= 0f
                     && (Time.unscaledTime - _preserveMarkedAt) <= PreserveStaleAfter;
                 if (_preserveScoresOnReload && !fresh) {
@@ -256,24 +246,24 @@ public partial class Level {
                 }
                 _refillPending = fresh;
                 _refillAt = fresh ? Time.unscaledTime : -1f;
-                // 只清标志，不恢复分块（分块图标由 FillScoresIfPending 的补分广播恢复）
+                // 只清标志，分块由 FillScoresIfPending 的补分广播恢复。
                 _preserveScoresOnReload = false;
                 _preserveMarkedAt = -1f;
         } catch (Exception __ex) { SRApi.Guard.Log("保分标志复位", __ex); }
     }
 
-    // 重载后广播补分：房主按备份的原类型逐个发 PointAwarded（AlwaysAward=true），下回合 tally 进 playerTotal。
+    // 重载后广播补分：房主按备份类型逐个发 PointAwarded（AlwaysAward=true），下回合 tally 进 playerTotal。
     // 防网络风暴：上限 FillTotalCap 条，每帧 FillPerFrame 条。
     private const int FillPerFrame = 30;
     private const int FillTotalCap = 300;
     private static void FillScoresIfPending() {
         if (_scoreBackupBlocks == null || _scoreBackupBlocks.Count == 0) return;
-        // 只以服务器权威把关（SRApi.HasServer），不用 UI 总开关，否则关掉总开关会让分数补不回来。
+        // 只以服务器权威把关，不看 UI 总开关：否则关掉总开关分数补不回来。
         if (!SRApi.HasServer) return;
         Dictionary<int, List<PointBlock.pointBlockType>> backup = _scoreBackupBlocks;
         _scoreBackupBlocks = null;
         try {
-            // 必须走 NetworkServer.SendToAll（服务器 -> 全员）；lm.client.Send 是 client->server 方向，房客的 ScoreKeeper 收不到。
+            // 必须走 NetworkServer.SendToAll（服务器→全员）；client.Send 方向相反，房客收不到。
             LobbyManager lm = LobbyManager.instance;
             if (lm == null || lm.client == null || !lm.client.isConnected) return;
             List<KeyValuePair<int, PointBlock.pointBlockType>> queue = new List<KeyValuePair<int, PointBlock.pointBlockType>>();
@@ -290,15 +280,14 @@ public partial class Level {
                     if (queue.Count >= FillTotalCap) { capped = true; break; } // 全局上限
                     queue.Add(new KeyValuePair<int, PointBlock.pointBlockType>(kv.Key, list[i]));
                 }
-                if (capped) break; // 已达上限，外层同步停止
+                if (capped) break; // 已达上限
             }
             if (capped) {
                 SRApi.LogWarn("[补分] 备份分块 " + total + " 条超过上限 " + FillTotalCap
                     + "，仅补回前 " + queue.Count + " 条（" + (total - queue.Count) + " 条被丢弃，重载后分数会偏少）");
             }
             if (queue.Count == 0) return;
-            // 宿主必须"不随场景销毁"：重载会切场景，挂在 LobbyManager 上的协程会被直接掐断，
-            // 备份已置 null 而 _refillPending 仍为真 → 下回合跳过清分块 → 分块累积 → 分数翻倍（评审 P0-C）。
+            // 宿主必须不随场景销毁：重载切场景会掐断协程，备份已置空而标志仍真会致分数翻倍。
             FillHost host = FillHost.Ensure();
             if (host != null) host.StartCoroutine(FillScoresCoroutine(queue));
             else lm.StartCoroutine(FillScoresCoroutine(queue));
@@ -315,24 +304,21 @@ public partial class Level {
             int batch = Mathf.Min(FillPerFrame, queue.Count - sent);
             for (int i = 0; i < batch; i++) {
                 try {
-                    // 服务器权威广播：房客的 ScoreKeeper 收到后自行进入 newPointBlocks，非权威端等广播即可。
                     if (!NetworkServer.active) { SRApi.LogWarn("[补分] 已非服务器权威，中止补分"); yield break; }
                     NetworkServer.SendToAll(NetMsgTypes.PointAwarded, new MsgPointAwarded {
                         PlayerNumber = queue[sent].Key, PointType = queue[sent].Value, AlwaysAward = true
                     });
                 } catch (Exception ex) {
-                    // 中途失败必须中止：继续发会让计分板一半新一半旧（audit P0-10）。
-                    // 记清"已发多少 / 共多少"，方便按日志核对分数差。
+                    // 中途失败必须中止：继续发会让计分板一半新一半旧；日志记已发/共多少便于核对。
                     SRApi.LogWarn("[补分] 发送失败，已中止：已发 " + sent + "/" + queue.Count + " 条，" + ex.Message);
                     yield break;
                 }
                 sent++;
             }
-            yield return null; // 每帧发一批
+            yield return null; // 每帧一批
         }
         } finally {
-            // 未能发完（场景被切走 / 异常）：把剩下的写回备份，下回合续补，
-            // 绝不留"已消费但没补"的状态（那正是分数翻倍的成因）。
+            // 未发完（场景被切走 / 异常）须把剩余写回备份，绝不留下“已消费但没补”的状态。
             if (sent < queue.Count) {
                 try {
                     Dictionary<int, List<PointBlock.pointBlockType>> rest = new Dictionary<int, List<PointBlock.pointBlockType>>();
@@ -348,7 +334,7 @@ public partial class Level {
         }
     }
 
-    // 持久宿主：DontDestroyOnLoad 的空对象，专门承载不能被场景切换掐断的协程。
+    // 持久宿主：DontDestroyOnLoad 的空对象，承载不被场景切换掐断的协程。
     private sealed class FillHost : UnityEngine.MonoBehaviour {
         private static FillHost _inst;
         internal static FillHost Ensure() {

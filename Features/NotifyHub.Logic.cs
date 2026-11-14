@@ -1,4 +1,4 @@
-// 通知中心的纯逻辑：分级关键词匹配 / 合并键归一化。无 Unity / BepInEx 依赖，单元测试直接覆盖。
+// 通知中心纯逻辑：关键词分级与合并键归一化；无 Unity 依赖，单测直接覆盖。
 using System;
 using System.Text;
 
@@ -9,7 +9,7 @@ namespace SR_UCH.Tweaks {
                 && s.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        // 返回 0 普通 / 1 注意 / 2 重要：高优先级词优先，其次低优先级词，都没有算"一般反馈"。
+        // 命中高优先级词返回 2，命中低优先级词返回 0，都不命中返回 1。
         public static int Classify(string text, string tag, string[] high, string[] low) {
             string all = (text ?? "") + " " + (tag ?? "");
             if (high != null) for (int i = 0; i < high.Length; i++) if (Contains(all, high[i])) return 2;
@@ -17,7 +17,6 @@ namespace SR_UCH.Tweaks {
             return 1;
         }
 
-        // 合并键归一化：去数字（倒计时会变）、压缩空白、转小写、截前 48 字。
         public static string Norm(string s) {
             StringBuilder sb = new StringBuilder(48);
             s = s ?? "";

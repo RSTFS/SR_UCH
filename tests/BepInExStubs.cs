@@ -1,5 +1,4 @@
-// BepInEx 最小桩：只为了让 tests/ 能在"没装游戏、没有 BepInEx.dll"的机器（含 CI）上编译并跑单测。
-// 不是 BepInEx 的替代品：只提供 SR_UCH/Contracts/*.cs 实际用到的成员，签名与 BepInEx 5 一致。
+// BepInEx 最小桩：仅供 tests 在无 BepInEx.dll 的环境编译，签名与 BepInEx 5 一致。
 using System;
 using System.Collections.Generic;
 

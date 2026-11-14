@@ -1,4 +1,4 @@
-// Online 的 partial 分片（只做代码组织，无逻辑改动）
+// Online 的 partial 分片（表格绘制 / 命中 / 列交互）。
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -12,10 +12,8 @@ using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
     public partial class Online {
-        // 落盘统一交给 SRApi.Ctl.MarkConfigDirty（节流写盘，失败有 Warning）。
-        // 拖动期间高度只写 _dragHTmp，到这里才同步进配置；核心的拖拽看门狗也会调本方法。
+        // 落盘统一交给 SRApi.Ctl.MarkConfigDirty；拖动期间高度只写 _dragHTmp，到这里才同步进配置。
         private static void SaveTableH() {
-            // 高度由核心拖拽条直接写入配置，这里只需触发落盘。
             if (_tableH != null) SRApi.Ctl.MarkConfigDirty(_tableH.ConfigFile);
         }
 
@@ -26,28 +24,24 @@ namespace SR_UCH.Tweaks {
         private const int QualityCol = 2;              // 游戏质量列：Shift+单击表头切换技能匹配质量系数
         private const float CodeLabelW = 58f;          // 房间码标签宽度
 
-        // 单击表头：Shift+左键触发列专属切换（排序不再通过点表头切换，避免误触）。
-        // 质量列实际由页面自己的 MouseDown 入口切换（见 HandleQualityHeaderMouseDown）；
-        // 这里保留核心 click 回调的备用路径：核心在 MouseUp 才派发，且 IMGUI 到那时可能已丢失 Shift，
-        // 故用 ShiftHeldNow() 同时看 Event.current.shift 与 Input.GetKey。
+        // 单击表头：Shift+左键触发列专属切换；质量列实际由页面 MouseDown 入口切换，这里只是备用路径。
+        // 核心在 MouseUp 派发且那时可能已丢 Shift，故用 ShiftHeldNow() 同时看事件与 Input。
         private static void HeaderClick(int ci) {
             try {
                 if (!ShiftHeldNow()) {
-                    // 点击表头不再切换升/降序（按需求移除）。
                     return;
                 }
                 if (ci == QualityCol) ToggleQualityCoeff("core click 回调");
             } catch (Exception __ex) { SRApi.Guard.Log("表头点击", __ex); }
         }
 
-        // Shift 状态：MouseUp/Used 事件上的修饰键不可靠，补 Input.GetKey 兜底。
         private static bool ShiftHeldNow() {
             try { if (Event.current != null && Event.current.shift) return true; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             try { return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return false;
         }
 
-        // 切换「游戏质量」列的技能匹配质量系数显示；页面 MouseDown 与核心 click 两条入口共用。
+        // 切换「游戏质量」列的质量系数显示；两个入口共用。
         private static void ToggleQualityCoeff(string from) {
             if (_showQualityCoeff == null) return;
             bool v = !_showQualityCoeff.Value;
@@ -60,10 +54,8 @@ namespace SR_UCH.Tweaks {
                   v ? "Quality: showing the skill-match coefficient (0-1)" : "Quality: marks only");
         }
 
-        // 页面自己的 Shift+左键质量列表头入口：本帧表头几何刚由 TableDraw 算好，直接复算命中，
-        // 完全不依赖核心 MouseUp 的 click 派发（根因见文件头对 TableColMove 的说明）。
-        // 表头命中（独立复算，避免依赖 core headerCells 的时序）：返回命中的数据列索引，未命中 -1。
-        // 列序/隐藏/横向滚动与核心 DeriveVisibleCols 同一套规则；钉住的操作列不参与。
+        // 页面自己的 Shift+左键质量列表头入口：本帧表头几何刚由 TableDraw 算好，直接复算命中。
+        // 返回命中的数据列索引，未命中 -1；列序 / 隐藏 / 横向滚动与 DeriveVisibleCols 同规则，钉住列不参与。
         private static List<Matchmaker.LobbyListInfo> _shownLobbies = new List<Matchmaker.LobbyListInfo>();
         private static readonly List<Rect> _headerCellsPage = new List<Rect>();   //可滚动列的表头单元格（页面坐标）
         private static readonly List<int> _headerCols = new List<int>();          //上表每个单元格 -> 列索引
@@ -85,7 +77,6 @@ namespace SR_UCH.Tweaks {
         private static float _dragWatchdog;             // 拖拽兜底：太久没有鼠标事件就复位（不用 Input.GetMouseButton）
         private static int _clickFrame = -1;            //表头单击一帧只处理一次
         private static readonly SRApi.TableArgs _tableArgs = new SRApi.TableArgs();
-        // 复用同一个委托：从 _tableArgs.mp 读鼠标位置，避免闭包分配。
         private static readonly System.Action<int, Rect, int> _pinDrawCached = delegate(int row, Rect r, int visible) {
             DrawJoinButton(row, r, _tableArgs != null ? _tableArgs.mp : Vector2.zero);
         }; //统一入口参数（复用，避免每帧分配）
@@ -93,7 +84,7 @@ namespace SR_UCH.Tweaks {
         private static readonly SRApi.TableSource<Matchmaker.LobbyListInfo> _lobbySource =
             new SRApi.TableSource<Matchmaker.LobbyListInfo>();
 
-        // 当前会显示的房间（筛选 + 未隐藏 + 排序）：统一走核心数据管线，最多每 0.5 秒或脏标记时重算一次。
+        // 当前会显示的房间（筛选 + 未隐藏 + 排序）：走核心数据管线，最多每 0.5 秒或脏标记时重算。
         private static void CollectShown() {
             try {
                 if (_lobbiesDirty) { _lobbySource.Invalidate(); }
@@ -105,23 +96,19 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("联机/筛选排序", __ex); }
         }
 
-        // 可视行的单元格文本数组：按房间跨帧复用同一份数组，仅在首次出现时分配。
-        // 房间对象每次刷新都会重建，故设上限兜底：超过 CellStoreMax 时整体清空。
-        // 键用 sLobbyID 而不是 LobbyListInfo 对象引用：房间列表每次刷新都会重建对象，
-        // 引用作键会让缓存持续失效（命中率掉到 0），并周期性触发整表清空（audit B-10）。
+        // 可视行单元格文本：按房间跨帧复用数组，超过 CellStoreMax 整体清空。
+        // 键用 sLobbyID 而非对象引用：房间对象每次刷新都会重建，引用作键会让命中率掉到 0。
         private static readonly System.Collections.Generic.Dictionary<string, string[]> _cellStore =
             new System.Collections.Generic.Dictionary<string, string[]>();
         private const int CellStoreMax = 256;
-        // 按帧缓存每个房间的单元格文本：IMGUI 一帧有 Layout+Repaint+多个输入事件，避免重复计算。
         private static readonly System.Collections.Generic.Dictionary<Matchmaker.LobbyListInfo, string[]> _cellRowsCache =
             new System.Collections.Generic.Dictionary<Matchmaker.LobbyListInfo, string[]>();
         private static int _cellRowsFrame = -1;
-        // 房间稳定键：优先平台房间 id，其次 UnityMatchID，最后退回房主名（保证非空时总能命中缓存）。
+        // 房间稳定键：优先平台房间 id，其次 UnityMatchID，最后房主名。
         private static string CellKey(Matchmaker.LobbyListInfo li) {
             try {
                 if (li == null) return null;
                 if (!string.IsNullOrEmpty(li.sLobbyID)) return li.sLobbyID;
-                // UnityMatchID 是 ulong：0 = 该列表不是 Steam 大厅数据，非 0 才当键用。
                 if (li.UnityMatchID != 0UL) return li.UnityMatchID.ToString(CultureInfo.InvariantCulture);
                 return li.LobbyOwner ?? "";
             } catch { return null; }
@@ -156,10 +143,9 @@ namespace SR_UCH.Tweaks {
         private static readonly List<int> _visScratch = new List<int>(ColCount);   // 交给核心按 order+hidden 填充
         private static int _hiddenColsBeforeTable;                                // 本帧核心处理右键隐藏前的列数
 
-        // 页面级滚轮（页面关掉滚动后，表格必须自己吃滚轮；只有这个钩子能在滚动区建立之前拿到事件）。
+        // 页面级滚轮：页面关掉滚动后表格自己吃滚轮，只有这个钩子能在滚动区建立前拿到事件。
     internal static bool OnLobbyWheel(Vector2 mouse, float wheel) {
         try {
-            // 光标在列表里滚列表，在界面上交给页面滚动。
             Rect __box = _tableScreenBox;
             if (__box.width <= 2f || __box.height <= 2f) return false;
             if (!__box.Contains(mouse)) return false;
@@ -167,7 +153,7 @@ namespace SR_UCH.Tweaks {
         } catch (Exception __ex) { SRApi.Guard.Log("联机列表/页面滚轮", __ex); return false; }
     }
 
-    // 表格滚轮：Shift 横向、否则纵向；到头返回 false 让给下一层。页面钩子与区域注册共用。
+    // 表格滚轮：Shift 横向、否则纵向；到头返回 false 让给下一层。
     internal static bool ScrollTableByWheelPublic(float wheel) { return ScrollTableByWheel(wheel); }
 
     private static bool ScrollTableByWheel(float wheel) {
@@ -190,24 +176,21 @@ namespace SR_UCH.Tweaks {
     }
 
     private static void TableDraw(Rect box) {
-            // _cw 未就绪（EnsureWidths 曾失败/被跳过）时直接跳过本帧绘制，避免 NullReference（audit B-9）。
+            // _cw 未就绪时先重试初始化，避免 NullReference。
             if (_cw == null || _cw.Length <= JoinCol) { try { EnsureWidths(); } catch (Exception __ew) { SRApi.Guard.Log("联机表格/列宽初始化", __ew); } }
             if (_cw == null || _cw.Length <= JoinCol) return;
             Event e = Event.current;
             Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
             CollectShown();
             float rowH = SRApi.Ctl.TableRowH(), headerH = SRApi.Ctl.TableHeaderH();
-            // 记录本帧表格的屏幕矩形（box 是布局坐标，加区域偏移即屏幕坐标）
             try {
                 float __offX = SRApi.ContentArea.x - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(2f);
-                // 页面可能已滚动：内容坐标比屏幕坐标多一个 -_scroll.y，命中框要同步减掉。
+                // 页面可能已滚动：命中框要同步减掉 _scroll.y。
                 float __offY = SRApi.ContentArea.y - SRApi.PageScroll.y;
                 if (box.width > 2f && box.height > 2f) {
                     _tableScreenBox = new Rect(box.x + __offX, box.y + __offY, box.width, box.height);
-                    // 表格区自注册：区域优先于页面钩子，滚轮一定能落到列表上
-                    // 滚轮：绘制期直接用表格矩形取用
+                    // 表格区自注册：区域优先于页面钩子。
                 {
-                    // 唯一入口：绘制期就地轮询（与下拉框同一套）
                     float __w = SRApi.Ctl.WheelPoll("online.table", box);
                     if (Mathf.Abs(__w) > 0.01f) ScrollTableByWheel(__w);
                 }
@@ -215,16 +198,13 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __tbox) { SRApi.Guard.Log("联机表格/命中框", __tbox); }
             float rowsH = Mathf.Max(SRApi.Ctl.Sc(20), box.height - headerH);
             float contentH = _shownLobbies.Count * rowH;
-            // 滚动条已全局隐藏，不再为它预留宽度（数据区吃满到钉住列）。
             float sbW = 0f;
             float viewW = Mathf.Max(SRApi.Ctl.Sc(60), box.width - sbW);
-            // 操作列钉在表格右边缘，不参与横向滚动，加入按钮始终可见可点。
+            // 操作列钉在表格右边缘，不参与横向滚动。
             float joinW = SRApi.Ctl.Sc(_cw[JoinCol]);
             float stripW = Mathf.Max(SRApi.Ctl.Sc(40), viewW - joinW);     //可横向滚动的列区
-            // 列宽固定：完全按持久化配置，不做每帧拉伸（用户要求表头宽度固定）。
 
-            // 可见列由核心 TableDraw 按 order + hidden 自行推导（本页不再维护可见列副本），
-            // 这里只按同一规则提前算横向滚动上限。
+            // 可见列由核心推导，本页只提前算横向滚动上限。
             float totalW = 0f;
             for (int i = 0; i < ColCount; i++) {
                 int ci = _order != null && i < _order.Length ? _order[i] : i;
@@ -235,7 +215,7 @@ namespace SR_UCH.Tweaks {
             _joinXPage = box.x + viewW - joinW;
             _rowsClipPage = new Rect(box.x, box.y + headerH, stripW, rowsH);
             _tableMaxX = Mathf.Max(0f, totalW - stripW);
-            // maxY = 内容高 − 行区（不再 +rowH：多给一整行会滚过表尾，最后只剩空表体）。
+            // maxY = 内容高 − 行区（不能 +rowH，多给一行会滚过表尾）。
             _tableMaxY = SRApi.Ctl.TableMaxScrollY(_shownLobbies.Count, rowH, rowsH);
             _rowsHCache = rowsH;
             _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _tableMaxX);
@@ -246,8 +226,7 @@ namespace SR_UCH.Tweaks {
         }
 
 
-        // 表格回调委托只创建一次（评审 4.3）：DrawTableRows 每帧都会跑，内联 delegate 会逐帧产生垃圾。
-        // 这些委托只捕获静态成员，因此可以安全地复用同一实例。
+        // 回调委托只创建一次（每帧都会跑，内联 delegate 会逐帧产生垃圾）。
         private static readonly Func<int, string> _titleFn = delegate(int ci) { return SRApi.T(Titles[ci], TitlesEn[ci]); };
         private static readonly Action<int[]> _applyOrderFn = delegate(int[] o) { _order = o; SaveCols(); };
         private static readonly Action _resetAllFn = delegate { ResetTable(); };
@@ -261,74 +240,62 @@ namespace SR_UCH.Tweaks {
         private static readonly Action<int> _clickFn = delegate (int ci) { HeaderClickOnce(ci); };
 
         private static void DrawTableRows(Rect box, float headerH, float rowH, float stripW, float rowsH, float viewW, Vector2 mp) {
-            // _rowRows 必须与 _rowRectsPage 一起清空：两者是"行矩形 -> _shownLobbies 下标"的一一对应。
-            // 表头 / 行命中 / 行绘制统一交给核心入口。
+            // _rowRows 必须与 _rowRectsPage 一起清空：两者是行矩形与 _shownLobbies 下标的一一对应。
             _tableArgs.box = box; _tableArgs.rowsClip = _rowsClipPage;
             _tableArgs.headerH = headerH; _tableArgs.rowH = rowH; _tableArgs.rowsH = rowsH; _tableArgs.stripW = stripW;
             _tableArgs.colW = _cw; _tableArgs.vis = _visScratch; _tableArgs.rowCount = _shownLobbies.Count;
             _tableArgs.pinCol = JoinCol; _tableArgs.alignLeftCol = HostCol;
             _tableArgs.scrollX = _scrollCols.x; _tableArgs.scrollY = _scrollRows.y; _tableArgs.mp = mp;
             _tableArgs.pinW = _joinW; _tableArgs.pinX = _joinXPage; _tableArgs.drawHeader = true;   // 表头交给核心绘制
-            // 核心画表头需要列标题回调，缺失会导致表头空白。
+            // 缺标题回调会导致表头空白。
             _tableArgs.title = _titleFn;
-            // 表头悬停说明交给核心的 tip 回调（核心负责 inBox/单元格命中并设置 GUI.tooltip）。
             _tableArgs.tip = _tipFn;
             _tableArgs.pinTitle = SRApi.T(Titles[JoinCol], TitlesEn[JoinCol]);
-        // 隐藏列交由核心 TableDraw 处理（右键隐藏 / Shift+右键还原全部）。
         _tableArgs.hidden = _hiddenCols; _tableArgs.hideable = true;
-        // 列宽拖动 / 列头换位全部交给核心，本页只提供列定义与回调；拖拽状态由核心持有，本页不镜像。
         _tableArgs.resizable = true;
         _tableArgs.reorderable = true;
-        // 把本页的列序源与换位回调注入核心。
         _tableArgs.order = _order;
         _tableArgs.applyOrder = _applyOrderFn;
-            // Shift+右键 = 还原全部：接到本表自己的还原例程 ResetTable。
+            // Shift+右键 = 还原全部：接到本表的 ResetTable。
             _tableArgs.resetAll = _resetAllFn;
         _tableArgs.click = _clickFn;
-            // 表头 Shift+左键（核心在 MouseDown 派发，修饰键可靠）：质量列切换系数显示。
             _tableArgs.headerShiftClick = _headerShiftFn;
-            // 行右键（核心派发，钉住操作列不算行命中）：隐藏该房间。
+            // 行右键（钉住操作列不算行命中）：隐藏该房间。
             _tableArgs.rowCells = _rowCellsFn;
             _tableArgs.rowAlpha = _rowAlphaFn;
             _tableArgs.headerCells = _headerCellsPage; _tableArgs.headerCols = _headerCols;
             _tableArgs.rowRects = _rowRectsPage; _tableArgs.rowRows = _rowRows;
             _tableArgs.pinRects = _joinRectsPage; _tableArgs.pinRows = _joinRows;
-            // 钉住列按钮：位置/裁剪由核心算好，本页只负责画按钮内容。
-            // 静态委托（不捕获 mp）：mp 已经存在 _tableArgs.mp 里，避免每帧新建闭包/委托。
+            // 钉住列按钮：位置 / 裁剪由核心算好，本页只画内容（复用静态委托避免闭包）。
             _tableArgs.pinDraw = _pinDrawCached;
             _tableArgs.emptyHint = _emptyHintFn;
             _hiddenColsBeforeTable = _hiddenCols.Count;
             SRApi.TableDraw(_tableArgs);
-            // 收回核心算出的钉住列表头矩形，供下方命中判定显示"操作"列 tooltip。
             _joinHeaderPage = _tableArgs.pinHeader;
-            // 空提示由核心的 emptyHint 在行区裁剪内绘制。
             if (_joinW > 0f) SRApi.DrawLine(new Rect(_joinXPage - 1f, box.y + headerH, 1f, rowsH), SRApi.TableLineStrong);   // 钉住列分隔线
             // 竖向滚动条：几何/绘制/输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
             _sbHandled = SRApi.Ctl.TableScrollbarFor(_tableArgs, Event.current, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);
         }
 
-        // 钉住列的加入按钮：核心 pinDraw 已给出裁剪后的矩形，这里只画按钮与悬停/按下态。
+        // 钉住列的加入按钮：核心已给出裁剪后的矩形，这里只画按钮与悬停 / 按下态。
         private static void DrawJoinButton(int row, Rect r, Vector2 mp) {
             try {
                 if (row < 0 || row >= _shownLobbies.Count) return;
                 Matchmaker.LobbyListInfo li = _shownLobbies[row];
                 bool can = IsJoinable(li);
                 bool hov = can && r.Contains(mp);
-                // 与旧版一样把按钮限制在行区裁剪框内（最后一行只露出一半时不越界画到页脚）。
                 float y0 = r.y + SRApi.Ctl.Sc(1);
                 float y1 = Mathf.Min(r.y + r.height, _rowsClipPage.yMax - SRApi.Ctl.Sc(1));
                 float bh = Mathf.Max(0f, y1 - y0);
                 if (bh <= 0f) return;
                 Color pc = GUI.color;
                 if (!can) GUI.color = new Color(1f, 1f, 1f, 0.5f);
-                // 窄格子按钮：用内边距小的样式，避免文字被裁掉。
                 SRApi.Ctl.BtnClip.Draw(new Rect(r.x, y0, r.width, bh),
                     new GUIContent(JoinText(li)), hov, hov && _joinDownRow == row, false, false);
                 GUI.color = pc;
             } catch (Exception __ex) { SRApi.Guard.Log("联机表格加入按钮", __ex); }
         }
-        // 表头说明：由核心 TableDraw 在命中表头单元格时回调（核心负责 inBox / 单元格命中 / GUI.tooltip）。
-        // 分隔线悬停与滚动条拖动时不显示，保持与旧版一致的观感。
+        // 表头说明：核心在命中时回调；分隔线悬停与滚动条拖动时不显示。
         private static string TipText(int ci) {
             try {
                 if (ci < 0 || ci >= TitleTips.Length) return null;
@@ -344,7 +311,6 @@ namespace SR_UCH.Tweaks {
             } catch { return null; }
         }
 
-        // 表头分隔线（可拖列宽）当前是否被悬停：用于抑制 core tip 回调（旧版同样在分隔线上不弹说明）。
         private static bool HoveringSeparatorNow(Vector2 mp) {
             try {
                 for (int k = 0; k < _headerCellsPage.Count; k++) {
@@ -359,16 +325,13 @@ namespace SR_UCH.Tweaks {
         private static void TableInput(Rect box, Event e) {
             if (e == null) return;
             Vector2 mp = e.mousePosition;
-            // 拖拽兜底复位：不能用 Input.GetMouseButton(0) 判断（与 IMGUI 事件流不同步），改为超时无鼠标事件才复位。
+            // 拖拽兜底复位：不用 Input.GetMouseButton（与 IMGUI 事件流不同步），改为超时无事件才复位。
             try {
                 SRApi.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _tableArgs.moveCol, ref _tableArgs.moveDx, ref _tableArgs.dragCol, ref _dragH,
                     SaveWidths, SaveTableH, delegate { _joinDownRow = -1; });
             } catch (Exception __ex) { SRApi.Guard.Log("联机表格输入处理", __ex); } // 兜底：表头拖拽 / 列宽 / 加入点击都在这里
-            //竖向滚动条拖拽 / 点轨道 -> 核心实现
             if (_sbHandled) return;   // 核心滚动条已处理本帧事件
-            //滚轮（纵向 / Ctrl 横向 / 无纵向余量转横向）-> 核心实现
             SRApi.TableWheelInput(e, box, mp, _tableMaxX, _tableMaxY, ref _scrollCols, ref _scrollRows);
-            // 光标：调整光标（分隔线悬停 / 拖列宽）由核心 TableDraw 统一置位，本页只补拖拽期间与移动光标。
             if (_tableArgs.dragCol >= 0) SRApi.CursorResize = true;
             bool inBox = box.Contains(mp);   // 横向滚出的列会落到框外，故把判定收回框内
             bool hoverCell = false;
@@ -378,20 +341,17 @@ namespace SR_UCH.Tweaks {
                 }
             }
             SRApi.CursorMove = hoverCell || _tableArgs.moveCol >= 0;
-            // 表头说明已交给核心 tip 回调；核心没有钉住列的 tip，这里只补"操作"列表头。
             if (inBox && !_sbDragging && _joinHeaderPage.width > 0f && _joinHeaderPage.Contains(mp)) {
                 GUI.tooltip = SRApi.T(TitleTips[JoinCol], TitleTipsEn[JoinCol]);
             }
-            // Shift+右键 = 还原全部：核心通常已经处理过（事件变 Used），这里再兜一层，
-            // 保证核心因任何原因没吃到事件时页面自己也能还原（ResetTable 幂等）。
+            // Shift+右键 = 还原全部：核心通常已处理，这里再兜一层（ResetTable 幂等）。
             if (e.button == 1 && e.shift && inBox
                 && (e.type == EventType.MouseDown || e.type == EventType.Used)) {
                 ResetTable();
                 e.Use();
                 return;
             }
-            // 右键：表头 = 隐藏该列（核心已处理，本页只负责落盘与提示）；Shift+右键 = 还原全部（核心清列并回调
-            // resetAll）；房间行 = 隐藏该房间（本功能自己的状态，无核心 API）。
+            // 右键：表头 = 隐藏该列（核心已处理，本页只落盘与提示）；房间行 = 隐藏该房间。
             if (e.type == EventType.MouseDown && e.button == 1 && inBox) {
                 if (e.shift) return;   // 核心 TableDraw 已清空隐藏列并回调 resetAll
                 int hitCol = -1;
@@ -401,11 +361,10 @@ namespace SR_UCH.Tweaks {
                     break;
                 }
                 if (hitCol >= 0) {
-                    // 隐藏动作由核心 TableDraw 完成；确实新增了隐藏列才落盘与提示。
+                    // 确实新增了隐藏列才落盘与提示。
                     if (_hiddenCols.Contains(hitCol) && _hiddenCols.Count > _hiddenColsBeforeTable) {
                         SaveCols();
                         string nm = SRApi.T(Titles[hitCol], TitlesEn[hitCol]);
-                        // SRApi.T(zh, en) 两个实参都会求值：两参相同时先拼一次再传。
                         string hiddenColMsg = SRApi.T("已隐藏列：", "Hidden column: ") + nm;
                         Notes(hiddenColMsg, hiddenColMsg);
                     }
@@ -418,7 +377,7 @@ namespace SR_UCH.Tweaks {
                 int si = _joinRows[i];
                 Matchmaker.LobbyListInfo li = si >= 0 && si < _shownLobbies.Count ? _shownLobbies[si] : null;
                 if (li == null || !IsJoinable(li)) break;
-                // 只在按下到松开之间阻止窗口拖动：无条件设 true 会让鼠标悬停即锁住窗口拖动。
+                // 只在按下到松开之间阻止窗口拖动，否则悬停即锁住窗口拖动。
                 if (e.type == EventType.MouseDown && e.button == 0) { _joinDownRow = si; _joinDownId = li.sLobbyID; SRApi.BlockWindowDrag = true; e.Use(); }
                 else if (e.type == EventType.MouseUp && e.button == 0 && !string.IsNullOrEmpty(_joinDownId) && _joinDownId == li.sLobbyID) {
                     try { SRApi.LogInfo("[联机] 列表项 sLobbyID=" + li.sLobbyID + " UnityMatchID=" + li.UnityMatchID + " (UnityMatchID=0 表示该列表不是 Steam 大厅数据)"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -429,11 +388,10 @@ namespace SR_UCH.Tweaks {
             if (e.type == EventType.MouseUp) { _joinDownRow = -1; _joinDownId = null; }
         }
 
-        // Shift+右键还原列宽 / 表格高度 / 列顺序，并取消列隐藏。
+        // Shift+右键还原列宽 / 高度 / 列序，并取消列隐藏。
         private static void ResetTable() {
             try {
                 _cw = (float[])DefWidths.Clone();
-                // 还原后列宽已就位，同步置上初始化标记。
                 _widthsLoaded = true;
                 _order = new int[ColCount];
                 for (int i = 0; i < ColCount; i++) _order[i] = i;
@@ -445,10 +403,9 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("还原联机表格列设置", __ex); }
         }
 
-        // 模式选项顺序：全部(空) -> 派对 -> 创意 -> 挑战 -> 自由 -> 其它（"全部"由下拉框首项提供）。
         private static readonly string[] ModeVals = { "PARTY", "CREATIVE", "CHALLENGE", "FREEPLAY", "OTHER" };
         private static readonly string[] TagVals = { "Fun", "Competitive", "Beginner", "CustomLevels" };
 
-        // 下拉显示名（内部值 -> 界面名）：选项列表与当前选中项共用，避免两处不一致。
+        // 下拉显示名（内部值 -> 界面名），选项列表与当前选中项共用。
     }
 }

@@ -13,15 +13,13 @@ using UnityEngine.SceneManagement;
 namespace SR_UCH.Tweaks {
 public partial class SR {
 
-// 分区：Localization（T() 入口 / Register 注册表 / 查表回退 / 键名·关卡名·枚举名）
-// 分区名、条目名、悬浮说明由各功能文件经 SR.LocSec / SR.LocKey / SR.LocDesc 注册，本文件只保留字典与查表逻辑。
+// 分区：Localization（T() 入口 / 注册表 / 查表回退 / 键名·关卡名·枚举名）
 
         private static readonly Dictionary<string, string> _sectionZh = new Dictionary<string, string>();
 
         private static readonly Dictionary<string, string> _keyZh = new Dictionary<string, string>();
 
-        // 界面文案自注册入口（供各功能文件调用）：
-        // SR.LocSec(分区, 中文名[, 英文名])；SR.LocKey(分区, 键, 中文名, 英文名)；SR.LocDesc(分区, 键, 中文说明, 英文说明)。
+        // 界面文案自注册入口：LocSec / LocKey / LocDesc。
         public static void LocSec(string sec, string zh, string en = null) {
             if (sec == null) return;
             if (zh != null) _sectionZh[sec] = zh;
@@ -48,13 +46,12 @@ public partial class SR {
             if (changed) _nameCacheVer = -1; //说明缓存整体失效
         }
 
-        //登记枚举成员的中文显示名（如 SR.LocEnum("Hold", "按住显示")）；英文模式仍显示枚举原名。
+        // 登记枚举成员中文名；英文模式仍显示原名。
         public static void LocEnum(string name, string zh) {
             if (string.IsNullOrEmpty(name) || zh == null) return;
             _enumZh[name] = zh;
         }
 
-        // 查表回退：中文模式 中文 -> 英文 -> 原名；英文模式 英文 -> 中文 -> 原名；都没有则不显示。
         private static string ZhSection(string sec) {
             string zh, en;
             _sectionZh.TryGetValue(sec, out zh);
@@ -64,21 +61,17 @@ public partial class SR {
             return UseEn ? (en ?? sec) : (zh ?? en ?? sec);
         }
 
-        //英文分区显示名（英文模式使用）。
         private static readonly Dictionary<string, string> _sectionEn = new Dictionary<string, string>();
 
-        //显示名 / 说明文本缓存：语言、条目表版本或 LocKey / LocDesc 注册变化时整体失效。
-        //这四个缓存服务于每帧被多次调用的 ZhKey / ZhDesc / 默认值后缀 / 悬浮整串。
+        // 显示名 / 说明缓存：语言、条目版本或注册变化时整体失效。
         private static readonly Dictionary<ConfigEntryBase, string> _keyNameCache = new Dictionary<ConfigEntryBase, string>();
         private static readonly Dictionary<ConfigEntryBase, string> _descTextCache = new Dictionary<ConfigEntryBase, string>();
-        //条目默认值后缀与名称列悬浮整串的缓存（按 entry，语言不变时结果恒定）。
         private static readonly Dictionary<ConfigEntryBase, string> _defSuffix = new Dictionary<ConfigEntryBase, string>();
         private static readonly Dictionary<ConfigEntryBase, string> _rowTipCache = new Dictionary<ConfigEntryBase, string>();
         private static int _nameCacheLangVer = -1;   //缓存对应的语言版本
         private static int _nameCacheVer = -1;
 
-        // LocDynamic：条目显示名随游戏语言/内容变化时节流重注册（同一语言下同名不重复写）。
-        // 每帧可能被调用（如牌池名），不拼签名串：直接比语言版本 + 中英文引用/相等。
+        // LocDynamic：显示名随游戏语言变化时节流重注册；每帧可能被调用，只比语言版本与引用。
         private struct DynName { public string Zh, En; public int Lang; }
         private static readonly Dictionary<ConfigEntryBase, DynName> _dynNames = new Dictionary<ConfigEntryBase, DynName>();
         internal static void LocDynamic(ConfigEntryBase e, string zh, string en) {
@@ -121,13 +114,11 @@ public partial class SR {
             return v;
         }
 
-        //英文键显示名（英文模式使用）。
         private static readonly Dictionary<string, string> _keyEn = new Dictionary<string, string>();
 
-        //中文悬浮说明（null = 无说明）。
+        // 中文悬浮说明（null = 无说明）。
         private static readonly Dictionary<string, string> _descZh = new Dictionary<string, string>();
 
-        //英文悬浮说明，与 _descZh 一一对应。
         private static readonly Dictionary<string, string> _descEn = new Dictionary<string, string>();
 
         private static string ZhDesc(ConfigEntryBase e) {
@@ -140,14 +131,12 @@ public partial class SR {
             _descEn.TryGetValue(key, out enDesc);
             string ov = Pack(zh, enDesc);   //外部语言包覆盖（zh/enDesc 可能为 null）
             if (ov != null) { _descTextCache[e] = ov; return ov; }
-            //"" 表示显式无说明；null 同样缓存（值允许为 null）
             string v = en ? (enDesc ?? zh ?? null) : (zh ?? enDesc ?? null);
             _descTextCache[e] = v;
             return v;
         }
 
-        //条目默认值后缀（"默认：X" / "Default: X"），按 entry 缓存；经 T() 生成以便语言包翻译。
-        //无默认值（含 KeyCode.None / 空字符串）时返回 ""，调用方不追加该行。
+        // 默认值后缀（"默认：X"），按 entry 缓存并经 T() 生成以便翻译；无默认值返回 ""。
         internal static string DefaultSuffix(ConfigEntryBase entry) {
             NameCacheSync();
             string cached;
@@ -159,8 +148,7 @@ public partial class SR {
         }
 
 
-        //名称列悬浮说明 = 说明本身（固定 3 行）+ 核心追加的第 4 行（默认值 / 按键）。
-        //说明文案不再自带默认值；无默认值时只显示 3 行。
+        // 名称列悬浮说明 = 说明本身（3 行）+ 核心追加的第 4 行。
         internal static string RowTip(ConfigEntryBase entry, string desc) {
             NameCacheSync();
             string cached;
@@ -170,22 +158,15 @@ public partial class SR {
             return tip;
         }
 
-        // ================= 悬浮条目：按语义组装（不按"第几行"硬编码） =================
-        // 一个条目的悬浮框由若干"语义段"组成，段是否存在取决于这个参数本身：
-        //   1) 是什么      —— 参数名的自然语言解释（LocDesc 第 1 行）
-        //   2) 做什么      —— 打开/调大之后会发生什么（LocDesc 第 2 行）
-        //   3) 注意        —— 可选，LocDesc 第 3 行起（有几行写几行，没有就整段省略、也不着色）
-        //   4) 默认        —— 由参数类型决定：开关=开/关；数值=值（+范围/步进）；枚举=选项名；
-        //                     文本=内容或"空"；键位=键名/未绑定
-        //   5) 按键        —— 只有该条目真的绑定了快捷键（KeyCode / KeyboardShortcut）才出现
-        // 所以不是"固定第 3 行染成注意色"，而是"有注意内容的行才染色"，行号随参数变化。
+        // ================= 悬浮条目：按语义组装（行号随参数变化） =================
+        // 段落：是什么 / 做什么 / 注意（LocDesc 第 3 行起）/ 默认（由类型决定）/ 按键（仅绑定时）。
         internal static string ComposeTip(ConfigEntryBase entry, string desc, ConfigEntry<KeyCode> hk) {
             StringBuilder sb = new StringBuilder(180);
             string body = NormalizeTip(desc);
             try {
                 if (!string.IsNullOrEmpty(body)) {
                     string[] bl = body.Split('\n');
-                    // 第 1、2 行是"是什么/做什么"，第 3 行起全部是"注意"：逐行加不可见标记（绘制时染醒目色）
+                    // 第 3 行起全是"注意"：逐行加不可见标记，绘制时染醒目色。
                     for (int i = 2; i < bl.Length; i++) {
                         if (!bl[i].StartsWith("\u0002")) bl[i] = "\u0002" + bl[i];
                     }
@@ -193,19 +174,16 @@ public partial class SR {
                 }
             } catch (Exception __nt) { Guard.Log("悬浮条目/注意标记", __nt); }
             if (body.Length > 0) sb.Append(body);
-            // 默认段：按类型生成，含范围/选项等参数自身的信息
             if (entry != null) {
                 string dft = DefaultSuffix(entry);
                 if (!string.IsNullOrEmpty(dft)) { if (sb.Length > 0) sb.Append('\n'); sb.Append(dft); }
             }
-            // 按键段：只有键位类条目才出现
             ConfigEntry<KeyCode> keyEntry = hk;
             if (keyEntry == null && entry is ConfigEntry<KeyCode>) keyEntry = (ConfigEntry<KeyCode>)entry;
             if (keyEntry != null) { if (sb.Length > 0) sb.Append('\n'); sb.Append(KeyTipLine(keyEntry)); }
             return sb.ToString();
         }
 
-        // 去掉首尾空行、折叠连续空行（修「第一行空行却换行显示」：说明里带前导 \n 时不再留白）。
         internal static string NormalizeTip(string s) {
             if (string.IsNullOrEmpty(s)) return "";
             string[] lines = s.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
@@ -220,7 +198,7 @@ public partial class SR {
             return string.Join("\n", keep.ToArray());
         }
 
-        // 按键行（第 5 行）：未绑定时给出"右键设置/删除"的指引，绑定了就显示实际按键。
+        // 按键行：未绑定时给"右键设置 / 删除"指引。
         internal static string KeyTipLine(ConfigEntry<KeyCode> hk) {
             if (hk == null) return "";
             KeyCode v = KeyCode.None;
@@ -229,17 +207,14 @@ public partial class SR {
             return T("按键：" + ComboKeyDisplay(hk, v), "Key: " + ComboKeyDisplay(hk, v));
         }
 
-        //键位显示名：按语言返回中文名或 KeyCode 原名。
         public static string KeyDisplayName(KeyCode k) {
             string en = k.ToString();
             string zh = KeyZh(k);
             string ov = Pack(zh, en);   //外部语言包覆盖
             if (ov != null) return ov;
-            //键位一律显示原始 KeyCode 名（本身就是英文）
             return en;   // 一律显示原始 KeyCode 名（Delete / Backspace / LeftAlt），不做中文翻译
         }
 
-        //键位中文名，无专门译名时返回 null。
         private static string KeyZh(KeyCode k) {
             switch (k) {
                 case KeyCode.None: return "未设置";
@@ -266,7 +241,6 @@ public partial class SR {
                 case KeyCode.Mouse5: return "鼠标侧键2";
                 case KeyCode.Mouse6: return "鼠标键7";
                 default:
-                    //F1-F12 / 数字键无中文译名，返回 null
                     return null;
             }
         }
@@ -275,11 +249,10 @@ public partial class SR {
             string zh = MapZh(scene);
             string ov = Pack(zh, scene);   //外部语言包覆盖
             if (ov != null) return ov;
-            //英文模式：显示场景原名（本身就是英文）
             return UseEn ? scene : (zh ?? scene);
         }
 
-        //场景名（如 "Farm"）转中文关卡名：查 _enumZh（大写匹配），其次树屋 / 大厅。
+        // 场景名转中文关卡名：查 _enumZh（大写匹配），其次树屋 / 大厅。
         private static string MapZh(string scene) {
             if (string.IsNullOrEmpty(scene)) return null;
             string zh;
@@ -289,9 +262,7 @@ public partial class SR {
             return null;
         }
 
-        //页脚状态：当前游戏模式 · 当前关卡（模式/关卡名都跟随游戏本地化语言）。
-        // 每帧都算一次太重：I2 查表 + Enum 全表遍历 + 字符串拼接（audit E-9）。
-        // 这里按 (场景, 模式, 快照名, 语言版本) 做记忆化——底栏每帧调它也只是一次字符串比较。
+        // 页脚状态：当前模式 · 当前关卡；每帧全量算太重，故按 (场景, 模式, 快照名, 语言) 记忆化。
         private static string _modeLabelKey;
         private static string _modeLabelVal;
         private static string ModeLabel() {
@@ -302,11 +273,9 @@ public partial class SR {
                 string snap = "";
                 try {
                     LevelSelectController.PlayedSnapshotInfo info = GameState.GetInstance().currentSnapshotInfo;
-                    // PlayedSnapshotInfo 是 struct：没有 null 可判，直接看字段。
                     if (!string.IsNullOrEmpty(info.snapshotName)) snap = info.snapshotName;
                 } catch (Exception __si) { Guard.Log("ModeLabel 快照名(缓存键)", __si); }
-                // 模式读不到（刚启动 / 切场景瞬间 GetInstance() 会抛）时不要把假值写进缓存键，
-                // 否则缓存每帧不命中、页脚模式文本反复闪烁且每次都全量重算（audit 08-P0-04）。
+                // 模式读不到时不要把假值写进缓存键，否则缓存每帧不命中、文本反复闪烁。
                 GameState.GameMode gmKey = GameState.GameMode.CREATIVE;
                 bool __gmOk = false;
                 try { gmKey = GameSettings.GetInstance().GameMode; __gmOk = true; }
@@ -357,13 +326,11 @@ public partial class SR {
             return mode + "·" + level;
         }
 
-        //界面语言开关（设置页配置，运行时立即生效）；外部模块页渲染时 _forceZh=true 强制中文。
         private static bool _langEn = true; //默认英文
         private static bool _forceZh = false;
         private static ConfigEntry<string> _langEntry;
 
-        // 语言标识：内置中文 / English，外部语言包使用自己的 Id（public 供独立程序集判断当前语言）。
-        // 所有文案出口先查语言包词条表，未收录的词条按 FallbackId 回退内置语言。
+        // 语言标识：内置中文 / English，语言包用自己的 Id；文案先查语言包，未收录按 FallbackId 回退。
         public const string LangZh = "中文";
         
         public const string LangEn = "English";
@@ -373,7 +340,6 @@ public partial class SR {
         private static string _langId = LangEn;
         private static int _langVer = 0;         //语言版本号：变化时显示名缓存整体失效
 
-        //下拉框的值 / 显示名两列：内置两门在前，语言包按注册顺序跟在后面
         public static void LanguageOptions(out string[] ids, out string[] names) {
             List<string> lIds = new List<string>();
             List<string> lNames = new List<string>();
@@ -389,8 +355,7 @@ public partial class SR {
             names = lNames.ToArray();
         }
 
-        //注册外部语言包（MainPlugin 扫描 plugins 目录时调用，插件亦可自行调用）。
-        //id 重复则覆盖；与内置语言重名则忽略。
+        // 注册外部语言包；id 重复则覆盖，与内置重名则忽略。
         public static void RegisterLanguage(ILanguagePack pack) {
             if (pack == null) return;
             string id;
@@ -407,8 +372,7 @@ public partial class SR {
             if (MainPlugin.ModLogger != null) SR.LogInfo("[SR] 已注册语言包: " + nm + " (" + id + ")");
         }
 
-        //按 cfg 中的语言 id 重新解析当前语言（启动 / 切语言 / 注册语言包都走这里）。
-        //语言包被删除后 cfg 仍留其 id，此时回退内置英文。
+        // 按 cfg 的语言 id 重新解析当前语言；语言包被删后回退内置英文。
         public static void ApplyLanguage() {
             string id = null;
             try { if (_langEntry != null) id = _langEntry.Value; } catch (Exception __ex) { Guard.Log("ApplyLanguage", __ex); }
@@ -432,19 +396,17 @@ public partial class SR {
             _langVer++;
         }
 
-        //当前语言 id（内置 "中文" / "English"，或语言包 Id），供功能做按语言的缓存失效。
+        // 当前语言 id，供功能做按语言的缓存失效。
         public static string CurrentLanguageId { get { return _langId; } }
 
-        //语言版本号：切语言或注册语言包时 +1。按语言缓存测量结果（列宽 / 文本高度）处须比较本值。
+        // 语言版本号：切语言或注册语言包时 +1；按语言缓存处须比较本值。
         public static int LangVer { get { return _langVer; } }
 
-        //当前是否按英文输出：内置英文或语言包声明回退英文；外部模块页强制中文时为 false。
         private static bool UseEn {
             get { return (_langEn || _fallbackEn) && !_forceZh; }
         }
 
-        //外部语言包覆盖：按中文原文查，其次按英文原名查；外部模块页（_forceZh）不查。
-        //词条表引用按语言版本号缓存，避免语言包把 Map 写成计算属性时反复重建整张表。
+        // 外部语言包覆盖：先按中文原文查，再按英文原名查；词条表引用按语言版本号缓存。
         private static IDictionary<string, string> _packMap;
         private static int _packMapVer = -1;
 
@@ -456,7 +418,7 @@ public partial class SR {
             }
             IDictionary<string, string> map = _packMap;
             if (map == null) return null;
-            //T() 每帧被调用上百次，语言包取词异常不得冒到 UI，取不到即整体回退内置语言。
+            // T() 每帧被调用上百次，语言包取词异常不得冒到 UI，取不到即整体回退内置语言。
             try {
                 string ov;
                 if (zh != null && map.TryGetValue(zh, out ov) && ov != null) return ov;
@@ -497,12 +459,10 @@ public partial class SR {
             { "LevelsPlayed", "关卡数" }, { "Rounds", "回合数" }, { "TimePlayed", "总时间" },
         };
 
-        //枚举显示名：转发 EnumNameZh。
         private static string EnumDisplayName(string n) {
             return EnumNameZh(n);
         }
 
-        //枚举中文名（跨 DLL 使用）：中文模式查 _enumZh，英文模式返回原名。
         public static string EnumNameZh(string n) {
             string zh;
             _enumZh.TryGetValue(n, out zh);
@@ -513,15 +473,12 @@ public partial class SR {
         }
 
         // ---------- 外置 JSON 语言包（config/SR_UCH/lang/*.json） ----------
-        // 第三方语言包不再必须编译 DLL：把 {"id","displayName","fallback","map"} 写进 JSON 即可。
-        // 加载点在 SR.Initialize 早期（语言条目 Bind + ApplyLanguage 之后、各功能 Initialize 之前），
-        // 失败只写日志并跳过对应文件，绝不抛出（语言包缺失不能影响核心启动）。
+        // JSON 写 {id, displayName, fallback, map} 即可，无需编译 DLL；失败只写日志并跳过该文件。
 
         private const long MaxLangPackFileBytes = 2L * 1024L * 1024L; // 单文件 2MB 上限
         private const int MaxLangPackEntries = 20000;                // map 最多 2 万条
 
-        // JSON 语言包实现：Map 直接返回解析出的字典；ApplyLanguage / LanguageOptions 走现有逻辑，
-        // 因此设置页语言下拉会自动多出这一项，无需改 UI。
+        // JSON 语言包实现：Map 返回解析出的字典，语言下拉自动多出一项。
         private sealed class JsonLanguagePack : ILanguagePack {
             private readonly string _id;
             private readonly string _displayName;
@@ -541,7 +498,7 @@ public partial class SR {
             public IDictionary<string, string> Map { get { return _map; } }
         }
 
-        // 扫描并注册 config/SR_UCH/lang/*.json。目录不存在 = 正常情况（未安装任何 JSON 语言包）。
+        // 扫描并注册 config/SR_UCH/lang/*.json；目录不存在属正常情况。
         internal static void LoadJsonLanguagePacks() {
             try {
                 string dir;
@@ -552,12 +509,11 @@ public partial class SR {
                 string[] files;
                 try { files = Directory.GetFiles(dir, "*.json"); }
                 catch (Exception __ex) { Guard.Log("语言包/枚举文件", __ex); return; }
-                // 按文件名排序后加载：同 id 时后加载覆盖（与 RegisterLanguage 的覆盖语义一致），顺序可预期。
                 try { Array.Sort(files, StringComparer.OrdinalIgnoreCase); }
                 catch (Exception __ex) { Guard.Log("语言包/排序文件", __ex); }
                 int loaded = 0;
                 int skipped = 0;
-                // 已加载的 id -> 来源文件名：同名 id 后加载覆盖，并记一条日志方便排查。
+                // 已加载的 id -> 来源文件名，同名覆盖时记一条日志。
                 Dictionary<string, string> seenIds = new Dictionary<string, string>(StringComparer.Ordinal);
                 for (int i = 0; i < files.Length; i++) {
                     if (LoadOneJsonLanguagePack(files[i], seenIds)) loaded++;
@@ -574,7 +530,7 @@ public partial class SR {
             }
         }
 
-        // 加载单个 JSON 语言包；返回 false 表示已记录日志并跳过（每个文件最多一条告警）。
+        // 加载单个 JSON 语言包；返回 false 表示已记日志并跳过。
         private static bool LoadOneJsonLanguagePack(string path, Dictionary<string, string> seenIds) {
             string fileName = "<unknown>";
             try {
@@ -602,7 +558,7 @@ public partial class SR {
                     SR.LogWarn("[SR] JSON 语言包无效，已跳过: " + fileName + "（" + err + "）");
                     return false;
                 }
-                // 与内置语言 id 冲突：RegisterLanguage 也会忽略，这里提前跳过并给出更明确的一条日志。
+                // 与内置语言 id 冲突：提前跳过。
                 if (id == LangZh || id == LangEn) {
                     SR.LogWarn("[SR] JSON 语言包 id 与内置语言冲突，已跳过: " + fileName + "（id=" + id + "）");
                     return false;
@@ -625,8 +581,7 @@ public partial class SR {
             }
         }
 
-        // 最小 JSON 解析器：只取顶层对象里的 id / displayName / fallback（字符串）与 map（对象 string->string）。
-        // 其余字段、map 中的非字符串值、以及数组/数字/布尔/null 一律只做语法跳过，不构造对象。
+        // 最小 JSON 解析器：只取顶层字段与 map，其余只做语法跳过。
         private sealed class JsonLanguagePackParser {
             private string _s;
             private int _i;
@@ -703,7 +658,7 @@ public partial class SR {
                 return false;
             }
 
-            // JSON 字符串：支持 \" \\ \/ \b \f \n \r \t \uXXXX 转义；\u 逐码元追加（代理对由两个转义自然拼成）。
+            // JSON 字符串：支持标准转义与 \uXXXX（代理对由两个转义拼成）。
             private bool TryReadString(out string value) {
                 value = null;
                 SkipWs();
@@ -737,7 +692,7 @@ public partial class SR {
                 return false;
             }
 
-            // map：必须是对象；键必须是字符串，值只收字符串，其他类型按规格跳过（不整文件作废）。
+            // map 必须是对象，键值均字符串；其他类型跳过而不整文件作废。
             private bool TryReadStringMap(out Dictionary<string, string> map, out string err) {
                 map = new Dictionary<string, string>(StringComparer.Ordinal);
                 err = null;
@@ -767,7 +722,6 @@ public partial class SR {
                 }
             }
 
-            // 语法级跳过任意 JSON 值（字符串 / 对象 / 数组 / 数字 / true / false / null）。
             private bool SkipValue() {
                 SkipWs();
                 if (_i >= _s.Length) return false;
@@ -803,7 +757,6 @@ public partial class SR {
                         return TryConsume(']');
                     }
                 }
-                // 数字 / true / false / null：吃到分隔符为止；不做数值校验（跳过即可）。
                 int start = _i;
                 while (_i < _s.Length) {
                     char d = _s[_i];

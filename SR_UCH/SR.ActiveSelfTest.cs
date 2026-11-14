@@ -1,6 +1,4 @@
 // 主动自检 / 最近异常 / 支持包导出（自检页卡片）。
-// 与"启动自检"互补：启动自检是启动瞬间的被动快照，这里是用户点按钮时的主动验证，
-// 能回答"开关还在、但功能没反应"这类问题；结果可直接导出成支持包发给作者。
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -117,7 +115,6 @@ public partial class SR {
                     try {
                         if (line.StartsWith("✗")) GUI.color = new Color(1f, 0.72f, 0.35f);
                         else if (line.StartsWith("✓")) GUI.color = new Color(0.62f, 0.92f, 0.62f);
-                        // 用 AuditLabel：按可用宽度实测高度，长行会换行且不会被裁（之前用固定行高被裁）。
                         AuditLabel(line);
                     } finally { GUI.color = prev; }
                 }
@@ -147,7 +144,7 @@ public partial class SR {
     }
 
     // 支持包：单个 txt（诊断报告 + 主动自检 + 最近异常 + 插件清单 + 配置键名 + 日志尾部）。
-    // 不含配置值（可能有玩家名字/预设 XML），只列 section/key，避免把用户数据带走。
+    // 不含配置值（可能有玩家名字/预设 XML），只列 section/key。
     internal static bool ExportSupportBundle() {
         try {
             string root = null;

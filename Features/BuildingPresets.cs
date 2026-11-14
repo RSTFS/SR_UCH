@@ -1,7 +1,6 @@
 // 布局预设库（sr.buildingpresets）：把当前方块布局存成命名预设，支持列表管理 / 加载 / 导入导出。
-// 存储：BepInEx/config/SR_UCH/presets/<模式>/<安全文件名>.xml + 同目录 index.json（展示元数据缓存）。
-// 约束：功能层只允许走 SRApi / Slots 契约与游戏程序集，绝不引用 SR.* 实现层（拆分构建下本文件单独编成
-//       SR_UCH_BuildingPresets.dll，只引用核心 SR_UCH.dll）。因此这里不能直接写 SR_UCH.Tweaks.Level 的类型。
+// 存储：BepInEx/config/SR_UCH/presets/<模式>/<安全文件名>.xml + 同目录 index.json（元数据缓存）。
+// 约束：本文件单独编成 SR_UCH_BuildingPresets.dll，只允许走 SRApi / Slots 契约，不得引用 SR.* 实现层。
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -27,7 +26,7 @@ namespace SR_UCH.Tweaks {
         // 排序方式：0=时间（新→旧），1=名称（A→Z）。
         private const int SortModeMin = 0;
         private const int SortModeMax = 1;
-        // 表格列索引（与 TableArgs.colW 顺序一致）：名称 / 关卡 / 模式 / 数据 / 时间 / 操作（操作列钉在右侧）。
+        // 列索引（与 TableArgs.colW 顺序一致）：名称 / 关卡 / 模式 / 数据 / 时间 / 操作（操作列钉右）。
         private const int ColName = 0;
         private const int ColLevel = 1;
         private const int ColMode = 2;
@@ -35,11 +34,7 @@ namespace SR_UCH.Tweaks {
         private const int ColTime = 4;
         private const int ColAction = 5;
         private const int ColCount = 6;
-        // 列宽（设计单位）默认值与允许范围；顺序与 Col* 一致。
-        // 操作列的实际默认宽由 DefaultActionColW() 按当前语言按钮文字实时计算（DefColW[ColAction] 仅作兜底）。
-        // 名称 / 关卡 / 模式 / 数据 / 时间 / 操作。数据与时间宽度翻倍、关卡 ×1.5（用户要求）。
-        // 默认列宽改为"核心 TableColumn 模板 + 文字实测"推导（与联机/EX 列表同一套）：
-        // 中英文/不同字号都能自适应；换算回设计单位（核心渲染时再 Sc）。
+        // 列宽由核心 TableColumn 模板 + 文字实测推导（换算回设计单位，渲染时再 Sc）；操作列宽由 DefaultActionColW() 实测。
         private static readonly SRApi.TableColumn[] _presetCols = new SRApi.TableColumn[] {
             new SRApi.TableColumn { TitleZh = "名称", TitleEn = "Name", TipZh = "预设名称", TipEn = "preset name", MinW = 120f, PadW = 22f, AlignLeft = true },
             new SRApi.TableColumn { TitleZh = "关卡", TitleEn = "Level", TipZh = "关卡", TipEn = "level", MinW = 64f, PadW = 22f },
@@ -69,21 +64,17 @@ namespace SR_UCH.Tweaks {
         private const string ColWidthsKey = "Preset Widths";
         private const string ColOrderKey = "Preset Order";
         private const string ColHiddenKey = "Preset Hidden";
-        // 操作列按钮种类：0=加载 1=导出 2=删除
         private const int ActLoad = 0;
         private const int ActExport = 1;
         private const int ActDelete = 2;
-        // 从剪贴板导入的上限：方块数 / XML 字符数。
+        // 剪贴板导入上限：方块数 / XML 字符数。
         private const int MaxImportBlocks = 3000;
         private const int MaxImportChars = 2000000;
-        // 游戏本地关卡快照：7z 压缩文件的大小 / 解压后 XML 大小上限
+        // 游戏本地关卡快照：7z 文件大小 / 解压后 XML 大小上限
         private const int MaxSnapshotBytes = 4 * 1024 * 1024;
         private const int MaxLocalXmlBytes = 8 * 1024 * 1024;
-        // 二次确认窗口（秒）
         private const float ConfirmWindow = 5f;
-        // 重载锁自愈阈值（秒）
         private const float ReloadLockStale = SrTimeouts.ReloadLockStaleSeconds;   // 单一真值：契约层 SrTimeouts
-        // 等游戏消费 levelPortalXml 的硬上限（秒）
         private const float PresetConsumeTimeout = SrTimeouts.PresetConsumeTimeoutSeconds;   // 单一真值：契约层 SrTimeouts
         private static ConfigEntry<int> _maxPresets;
         private static ConfigEntry<bool> _skipTreehouse;   // 跳过树屋流程（联机直接替换关卡，风险自负）
@@ -94,47 +85,40 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<string> _colOrderEntry;
         private static ConfigEntry<string> _colHiddenEntry;
         private static ConfigEntry<int> _tableHEntry;
-        // 运行期快照：配置变化回调里即时更新，供每帧渲染读取
         private static int _sortMode;
         private static int _sortColOverride = -1;   // 表头点击排序的临时覆盖（-1 = 用 Sort Mode 下拉）
         private static bool _sortAsc = true;
-        // 存储根目录缓存
         private static string _rootDir;
 
         private static bool _loaded;
         private static readonly List<PresetInfo> _presets = new List<PresetInfo>();
 
-        // UI 状态：保存名称输入框、状态文案、二次确认、重命名编辑、搜索词、路径导入输入框。
+        // UI 状态：名称输入框、状态文案、二次确认、重命名、搜索词、路径输入框。
         private static string _newName = "";
         private static string _status = "";
         private static string _pendingKey;
         private static float _pendingAt = -1f;
         private static string _renameKey;
         private static string _renameText;
-        // 条件控件的"本帧是否显示"锁存（Layout / Repaint 必须一致，见 DrawInlineRename）。
+        // 条件控件的"本帧是否显示"锁存（Layout / Repaint 必须一致）。
         private static bool _renameFocusPending;   // 打开重命名弹窗后是否还要抢一次输入焦点
         private static string _search = "";
         private static string _importPath = "";
-        // 关卡筛选（运行期状态，不落配置）："" = 全部；否则为预设 XML 里的 levelSceneName。
         private static string _levelFilter = "";
         private static bool _levelFilterOpen;
-        // 模式筛选（运行期状态，不落配置）："" = 全部；否则为预设目录名（GameState.GameMode 的 ToString）。
         private static string _modeFilter = "";
         private static bool _modeFilterOpen;
-        // 类型筛选（运行期状态，不落配置）："" = 全部，preset = 预设，local = 游戏本地保存关卡。
-        // 默认「预设」：打开页面先只显示预设库，需要时再切到全部/本地。
+        // 类型筛选（运行期状态）："" = 全部，preset = 预设，local = 本地关卡。
         private static string _typeFilter = "";   // 默认「全部」（presets + 本地存档），否则只剩自己保存的几条
         private static bool _typeFilterOpen;
-        // 加载模式（运行期状态，不落配置）："" = 默认（跟随预设自身保存的模式，保持原有行为）；
-        // 否则为 GameState.GameMode 的 ToString，加载/重载时强制使用该模式。
+        // 加载模式（运行期状态）："" = 跟随预设自身模式，否则强制使用该模式。
         private static string _loadMode = "";
         private static bool _loadModeOpen;
 
-        // 标准表格（核心 TableDraw）状态：列宽 / 列序 / 隐藏列 / 可见列 / 命中矩形缓存 / 滚动 / 拖拽。
+        // 标准表格状态：列宽 / 列序 / 隐藏列 / 可见列 / 命中矩形 / 滚动 / 拖拽。
         private static readonly float[] _colW = new float[ColCount];
         private static float[] _drawW;   // 绘制用列宽副本（拉伸列只改它）
-        // 初值必须与 ColCount 同长（曾经写成 5 项：DeriveVisibleCols 会因长度不符直接 return，表格一列不画）。
-        // EnsureCols 里还会用 NormalizeOrder 归一再兜一层，但声明处就该是对的。
+        // 初值长度必须与 ColCount 一致：长度不符时 DeriveVisibleCols 会直接 return，表格一列不画。
         private static int[] _order = new int[] { 0, 1, 2, 3, 4, 5 };
         private static readonly HashSet<int> _hiddenCols = new HashSet<int>();
         private static SRApi.TableState _tableCols;   // 列宽/列序/隐藏列（核心统一持久化）
@@ -154,7 +138,6 @@ namespace SR_UCH.Tweaks {
             new SRApi.TableAction { OnClick = DoActExport },
             new SRApi.TableAction { OnClick = DoActDelete }
         };
-        // 本地关卡（游戏存档）只提供「加载」，不提供重命名/导出/删除，避免误动游戏存档。
         private static readonly SRApi.TableAction[] _actLocalActions = new SRApi.TableAction[] {
             new SRApi.TableAction { OnClick = DoActLoad }
         };
@@ -170,45 +153,37 @@ namespace SR_UCH.Tweaks {
         private static bool _dragH;
         private static float _dragWatchdog;
 
-        // ============ 列表数据管线缓存（完美列表）============
-        // 可见行：用"数据 + 筛选 + 排序"签名驱动，签名不变时跨帧复用；
-        // 以前按 frameCount 每帧 Invalidate，什么都不变也要做一次 O(n log n) 排序。
+        // ---------- 列表数据管线缓存 ----------
+        // 可见行由"数据 + 筛选 + 排序"签名驱动，签名不变时跨帧复用。
         private static int _visSig = int.MinValue;
         private static int _sigFrame = -1, _sigCache;
-        // 筛选下拉：按 _presets 的 Level/Mode 签名缓存，避免每帧建 List + HashSet + 排序 + ToArray。
+        // 筛选下拉按 _presets 的 Level/Mode 签名缓存，避免每帧建 List + HashSet + 排序。
         private static int _levelOptSig = int.MinValue, _modeOptSig = int.MinValue;
         private static List<string> _levelOpts = new List<string>(), _modeOpts = new List<string>();
         private static string[] _levelOptVals = new string[0], _levelOptLabels = new string[0];
         private static string[] _modeOptVals = new string[0], _modeOptLabels = new string[0];
-        // 单元格文本：key 用预设的稳定标识字符串（不用 PresetInfo 引用，避免扫描重建后旧对象被字典强引用累积）。
-        // 值带显示签名，上限 256，超了整体清空（预设上限 100）。
+        // 单元格文本缓存：key 用预设的稳定标识串（不用 PresetInfo 引用，避免旧对象累积）；
+        // 值带显示签名，上限 256，超出整体清空（预设上限 100）。
         private sealed class CellCacheEntry {
             public int Sig;
             public readonly string[] Cells = new string[ColCount];
         }
         private static readonly Dictionary<string, CellCacheEntry> _presetCellCache = new Dictionary<string, CellCacheEntry>(64);
-        // 筛选签名上一帧值：变化后复位滚动与二次确认，避免"滚到一半改搜索"或误触旧行的确认态。
         private static int _filterSigLast = int.MinValue;
-        // v2：标签宽度缓存（按语言签名）。FormLabelWidth 每帧被 7 处调用，原实现每次新建
-        // 2 个 GUIContent 并做 2 次 CalcSize —— 一帧 14 次分配 + 字形测量。
+        // 标签宽度缓存（按语言签名）；FormLabelWidth 每帧被调用 7 次。
         private static int _formLabelSig = int.MinValue;
         private static float _formLabelW = 90f;
-        // v2：状态栏反馈的显示起点。_status 由 10 处赋值且永不清除，上屏后会一直挂着
-        // "已删除预设：X"；这里只控制【显示】，不改任何写入方。
         private static string _statusShown;
         private static float _statusShownAt = -1000f;
-        // v2：两个筛选下拉每帧各遍历一次 _presets 算签名，合并为每帧一次遍历。
         private static int _optSigFrame = -1, _optSigLevel, _optSigMode;
-        // 关卡列显示模式：false = 关卡名称（本地化），true = 关卡代码（快照码/场景名）；运行期状态，不落配置。
         private static bool _levelShowCode;
 
-        // 加载预设时的重载锁
         private static string _reloadBusyReason;   // 锁的来源
         private static float _otherBusySince = -1f;   // 对方重载锁开始等待的时刻（-1 = 没在等）
         private static bool _reloadBusy;
         private static float _reloadBusyAt = -1f;
 
-        // 一条预设的展示元数据。磁盘上的 XML 文件是权威数据；index.json 只是名称/关卡/方块数/时间/有效性缓存。
+        // 一条预设的展示元数据；磁盘 XML 是权威数据，index.json 只是缓存。
         private sealed class PresetInfo {
             public string Name;
             public string Mode;      // 模式目录名（GameState.GameMode 的 ToString）
@@ -220,12 +195,12 @@ namespace SR_UCH.Tweaks {
             public int Blocks = -1;  // -1 = 索引里没有，需要从 XML 现算
             public DateTime TimeUtc = DateTime.MinValue;
             public bool Ok;          // XML 可解析且方块数 > 0（存 index.json；缺字段按 false，扫描时自愈）
-        // 修改器策略："" = 预设自带（默认）；"current" = 用游戏当前值；"off" = 全部还原默认。
+        // 修改器策略："" = 预设自带；"current" = 游戏当前值；"off" = 全部还原默认。
             public string ModsMode = "";
-            // 加载该预设时是否一并应用 游戏规则 / 积分设置 / 模块概率（保存时写入 sidecar）。
+            // 加载时是否一并应用 游戏规则 / 积分设置 / 模块概率（存于 sidecar）。
             public bool ApplyRules, ApplyPoints, ApplyBlocks;
         public Dictionary<string, string> ModsVals;   // 旧索引（custom）遗留值；新数据不再写入
-            // 来源：false = 本功能 presets 目录里的预设；true = 游戏本地保存的自定义关卡（.snapshot，只读）。
+            // 来源：false = 本功能预设目录；true = 游戏本地保存的关卡（.snapshot，只读）。
             public bool IsLocal;
             public string LocalRelative = ""; // 本地条目在 snapshots 目录里的相对文件名（key 用 "local:"+相对路径）
 
@@ -238,7 +213,6 @@ namespace SR_UCH.Tweaks {
                 _maxPresets = plugin.Config.Bind(Section, "Max Presets", 100,
                     new ConfigDescription("预设数量上限（1-100，默认 100）：列表最多保留多少条，达到上限后必须先删除旧预设才能保存新布局。",
                         new AcceptableValueRange<int>(1, 100)));
-                // 旧版本默认值是 50，且历史范围到 500：启动时迁移/夹取到新范围（50 视作旧默认值改成 100）。
                 try {
                     if (_maxPresets.Value == 50) _maxPresets.Value = 100;
                     else if (_maxPresets.Value < 1) _maxPresets.Value = 1;
@@ -249,7 +223,7 @@ namespace SR_UCH.Tweaks {
                         new AcceptableValueRange<int>(SortModeMin, SortModeMax)));
                 _sortMode = _sortModeEntry.Value;
                 _sortModeEntry.SettingChanged += delegate { _sortMode = _sortModeEntry.Value; };
-                // 类型/关卡/模式筛选落盘（搜索框不存：临时输入，存了下次打开列表会"莫名其妙少一截"）。
+                // 类型/关卡/模式筛选落盘；搜索框不存（临时输入）。
                 _filterTypeEntry = plugin.Config.Bind(Section, "Filter Type", "",
                     "列表页类型筛选：空=全部 / preset=仅预设 / local=仅本地存档");
                 _filterLevelEntry = plugin.Config.Bind(Section, "Filter Level", "",
@@ -264,23 +238,21 @@ namespace SR_UCH.Tweaks {
                 _filterModeEntry.SettingChanged += delegate { _modeFilter = _filterModeEntry.Value ?? ""; };
                 _skipTreehouse = plugin.Config.Bind(Section, "Skip Treehouse", false,
                     "跳过树屋流程：勾选后联机替换关卡不再先回树屋，而是直接替换场景（房客的 SelectedLevel 可能不同步，风险自负）。");
-                // 旧配置可能残留已弃用的 2/3：夹回 0（时间）。
+                // 旧配置残留的越界值夹回 0（时间）。
                 try { if (_sortModeEntry.Value < SortModeMin || _sortModeEntry.Value > SortModeMax) _sortModeEntry.Value = SortModeMin; }
                 catch (Exception __cx) { SRApi.Guard.Log("布局预设/裁剪排序值", __cx); }
-                // 列表列宽 / 列序（内部状态，由列表表头拖动维护；不在页面上渲染编辑框）。
+                // 列表列宽 / 列序（由表头拖动维护，不在页面上渲染编辑框）。
                 _colWidthsEntry = plugin.Config.Bind(Section, ColWidthsKey, "",
                     "内部状态：预设列表列宽（逗号分隔的设计单位，由表头拖动自动写入）。");
                 _colOrderEntry = plugin.Config.Bind(Section, ColOrderKey, "",
                     "内部状态：预设列表列顺序（逗号分隔的列索引，由表头拖动自动写入）。");
                 _colHiddenEntry = plugin.Config.Bind(Section, ColHiddenKey, "",
                     "内部状态：预设列表隐藏列（逗号分隔的列索引，右键表头隐藏后自动写入）。");
-            // 注意：不要用 AcceptableValueRange(120,1000)——它会把默认值 0 夹成 120，等于强制固定高度。
+            // 不能加 AcceptableValueRange：会把默认值 0 夹成 120。
             _tableHEntry = plugin.Config.Bind(Section, "Table Height", 0,
                 new ConfigDescription(SRApi.T("预设列表高度（0 = 自动；拖动表格底边可直接修改并保存）", "Preset list height (0 = auto; drag the table bottom edge to change and save)")));
-            // 旧版本的默认值被夹成 120，一次性复位为 0（自动）。
             if (_tableHEntry.Value == 120) _tableHEntry.Value = 0;
-            // 一次性迁移：以前"拖拽会写 Table Height 但从不读取"，旧值没有任何可见效果；
-            // 现在它真正生效，若不迁移，老用户升级后列表会突然变矮。用独立标记键保证只做一次。
+            // 一次性迁移：Table Height 现已生效，旧值不迁移会让列表突然变矮；用独立标记键只做一次。
             try {
                 ConfigEntry<bool> __migH = plugin.Config.Bind(Section, "Table Height Migrated", false,
                     "内部状态：是否已把旧版无效的表格高度复位（勿手动修改）。");
@@ -289,7 +261,7 @@ namespace SR_UCH.Tweaks {
                     if (_tableHEntry.Value > 0) { _tableHEntry.Value = 0; SRApi.LogInfo("[布局预设] 旧的表格高度值已复位为自动（此前该值从未生效）"); }
                 }
             } catch (Exception __mh) { SRApi.Guard.Log("布局预设/表格高度迁移", __mh); }
-                // 互斥槽位：关卡重载（Level 功能）动手前会 Require 这个槽位；双方都忙时互相拦下，避免两套重载并发。
+                // 互斥槽位：关卡重载动手前会 Require 它，双方都忙时互相拦下。
                 try { Slots.Provide(SRApi.SlotKeys.PresetsReloadBusy, (Func<bool>)(() => _reloadBusy)); }
                 catch (Exception __sx) { SRApi.Guard.Log("布局预设/登记重载互斥槽位", __sx); }
             } catch (Exception __ex) {
@@ -297,30 +269,26 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 栏目注册：单页（保存 / 导入导出 / 搜索排序筛选 + 预设列表同页，分区用 SectionTitle）。
+        // 栏目注册：单页（保存 / 导入导出 / 搜索排序筛选 + 列表同页，用 SectionTitle 分区）。
         private static void SelfReg() {
             SRApi.LocSec(Section, "布局预设", "Layout Presets");
             SRApi.Nav(Section, 70); // 关卡(40) 之后、构建工具(50) 之前
-            // 多页必须用 6 参重载：单页重载会覆盖 PageRenderers 并清掉 _pageLists，
-            // 两次单页注册的结果是"只剩最后一页、没有页签"——这就是之前"啥也没有"的原因。
+            // 多页必须用 6 参重载：单页重载会覆盖 PageRenderers 并清掉 _pageLists。
             SRApi.RegisterPage(Section, "save", "预设保存", "Save", 10, Render);
             SRApi.RegisterPage(Section, "list", "预设列表", "List", 20, RenderListPage);
             SRApi.RegisterPageWheel(OnListPageWheel);   // 帧尾兜底：绘制期没取到滚轮时由窗口派发
-            // 与「联机」列表一致：填充页没有页面滚动区，滚轮由列表自己接（窗口按栏目派发）。
+            // 填充页没有页面滚动区，滚轮由列表自己接。
             SRApi.Ctl.RegisterFillScroll(Section, delegate (float __w) {
                 try { ApplyListWheel(PageWheelSign * Mathf.Sign(__w) * Mathf.Max(1f, Mathf.Abs(__w))); }
                 catch (Exception __fw) { SRApi.Guard.Log("布局预设/填充页滚轮", __fw); }
             });
-            // 页面关掉了滚动，列表要自己吃滚轮：只有页面级钩子能在滚动区建立之前拿到事件。
-            // 填充页兜底：帧尾若滚轮没被任何控件/钩子消费，直接滚本列表（不依赖命中框）
-            // 重载锁自愈：TickReloadLock 写好了却从未注册，等于"超时兜底"根本不存在，
-            // 失败路径漏放锁只能等用户再点一次加载（audit 10-P0-2）。
-            // 重载锁自愈 + levelPortalXml 兜底清理：两个 tick 都必须注册，否则兜底逻辑等于不存在。
+            // 页面关掉滚动，列表要自己吃滚轮：只有页面级钩子能在滚动区建立前拿到事件。
+            // 重载锁自愈与 levelPortalXml 兜底清理两个 tick 都必须注册。
             try { SRApi.RegisterTick("布局预设-锁自愈", TickReloadLock); }
             catch (Exception __tl) { SRApi.Guard.Log("布局预设/注册锁自愈", __tl); }
             try { SRApi.RegisterTick("布局预设-XML兜底", TickXmlGuard); }
             catch (Exception __tx) { SRApi.Guard.Log("布局预设/注册XML兜底", __tx); }
-            // 淘汰旧键：Show Timestamps（功能已删）与 Enabled（总开关已删除，UI 不可达）。
+            // 淘汰旧键：Show Timestamps（功能已删）与 Enabled（总开关已删）。
             try { SRApi.Migration.Remove(Section, "Show Timestamps"); }
             catch (Exception __mx) { SRApi.Guard.Log("布局预设/注册淘汰键", __mx); }
             try { SRApi.Migration.Remove(Section, "Enabled"); }
@@ -345,10 +313,7 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Section, "Sort Mode",
                 "列表排序方式\n0＝按时间（新到旧），1＝按名称\n由列表页的排序下拉维护",
                 "List sort mode\n0 = newest first, 1 = by name\nmaintained by the list page dropdown");
-            // 换场景后下次打开面板重新扫盘（手动放入/删除的 XML、其它存档的改动都能看到）。
-            // 页面级滚轮钩子：在窗口建立滚动区【之前】拿到滚轮，鼠标在预设表格上就滚表格。
-            // （页面内部拿到的事件已被滚动区处理过，所以必须在这一层接。）
-            // 手轮/滚动条统一走核心 TableScrollbarFor（见表格绘制之后）。
+            // 换场景后下次打开面板重新扫盘，能看到手动增删的 XML。
             try { SRApi.RegisterSceneHook(delegate { _loaded = false; }); }
             catch (Exception __sh) { SRApi.Guard.Log("布局预设/注册场景钩子", __sh); }
             try { SRApi.HotkeyAction("presets.treehouse", "返回树屋", delegate { ReturnToTreehouse(); }); }
@@ -369,15 +334,13 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Section, ColHiddenKey,
                 "预设列表隐藏列\n右键表头隐藏后自动写入\nShift+右键表头可恢复全部",
                 "Preset hidden columns\nwritten after hiding with a header right-click\nShift+right-click the header restores all");
-            // v2：Initialize 新增的 "Table Height Migrated" 与另外三个内部键同段，却没有本地化，
-            // 设置页会显示成原生英文 key。补齐，且同样标注"勿手动修改"。
+            // 内部键同段却没有本地化会显示成英文 key，补齐并标注"勿手动修改"。
             SRApi.LocKey(Section, "Table Height Migrated", "列表高度迁移标记（内部）", "List height migration flag (internal)");
             SRApi.LocDesc(Section, "Table Height Migrated",
                 "内部状态：是否已完成旧版无效的表格高度复位\n由模组自动维护，勿手动修改\n改动后需要重开设置页才会重新判断",
                 "Internal: whether the legacy ineffective table height has been reset\nmaintained by the mod automatically; do not edit\na change is re-evaluated the next time the settings page opens");
         }
 
-        // ---------- 配置读取 ----------
 
 
         private static int MaxPresets {
@@ -392,7 +355,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 所有动作共用的门控：模组总开关 + 本功能总开关；返回 false 时已给出用户提示。
+        // 动作共用门控：模组总开关 + 本功能总开关；返回 false 时已提示。
         private static bool ActionAllowed() {
             if (!SRApi.GateMaster) {
                 SRApi.Notify(SRApi.MsgMasterOff);
@@ -405,7 +368,7 @@ namespace SR_UCH.Tweaks {
             return SRApi.Ctl.Sc(v);
         }
 
-        // 排序：按配置的排序方式（0=时间新→旧，1=名称 A→Z），同序时按名称稳定排序。
+        // 按配置排序（0=时间新→旧，1=名称 A→Z），同序时按名称稳定排序。
         private static int ComparePreset(PresetInfo a, PresetInfo b) {
             try {
                 if (a == null && b == null) return 0;
@@ -428,37 +391,30 @@ namespace SR_UCH.Tweaks {
             } catch { return 0; }
         }
 
-        // 当前搜索过滤（只搜名称）+ 关卡/模式下拉筛选 + 排序后的可见列表。
         private static readonly SRApi.TableSource<PresetInfo> _visSource = new SRApi.TableSource<PresetInfo>();
 
         private static List<PresetInfo> _visibleCache;   // 当前表格的可见行（供数据列悬浮预览取预设）
 
-        // ---------- 页面渲染（单页：保存与导入 + 搜索/排序 + 预设列表） ----------
+        // ---------- 页面渲染 ----------
 
-        // 同一页按 SectionTitle 分保存 / 导入导出 / 搜索排序筛选 / 预设列表四个区；页面滚动保留，表格另有一套自己的滚轮（页面级钩子 + 表格内处理）。
-        // 预设列表在固定高度区域内用自己的滚轮滚动。
-        // 页面内容在布局空间里的起点 y（零高度探针），用于计算表格上方已用高度（同联机列表）。
+        // 同一页用 SectionTitle 分区；表格用自己的滚轮（页面级钩子 + 表内处理），在固定高度区域内滚动。
 
-        // 本页最近一次被渲染的帧（新实现用）
         private static int _renderFrame = -1000;   // 本页最近一次被渲染的帧（滚轮钩子只在自己页面上工作）
 
-        // 筛选行的标签统一宽度：两行控件的左边缘才能对齐成两列网格。
-        // 搜索/筛选区的标签列：比保存区的表单标签窄 1/3（那里是输入框对齐，这里是短标签）
+        // 筛选行标签统一宽度：两行控件左缘对齐；比保存区表单标签窄 1/3。
         private static float FilterLabelWidth() { return Mathf.Max(SRApi.Ctl.Sc(40f), FormLabelWidth() * (2f / 3f)); }
 
         private static void RowLabel(string text) {
             GUILayout.Label(text, SRApi.Ctl.Label, GUILayout.Width(FilterLabelWidth()), GUILayout.Height(SRApi.Ctl.Sc(24f)));
         }
 
-        // 列表状态栏：条数 / 筛选结果 + 最近一次操作反馈。
-        // _status 此前被 10 处赋值却从未读取，用户操作后只能看到会淡出的 Notify；这里让它真正上屏。
+        // 列表状态栏：条数 / 筛选结果 + 最近一次操作反馈（_status 原本只写不读）。
         private static void RenderListStatus(int shown, int total) {
             try {
                 string count = (shown == total)
                     ? SRApi.T("共 ", "Total ") + total + SRApi.T(" 条", " items")
                     : SRApi.T("显示 ", "Showing ") + shown + SRApi.T(" / ", " / ") + total + SRApi.T(" 条", " items");
-                // v2：_status 永不清除，上屏后会一直挂着上次的"已删除预设：X"。
-                // 只控制显示：值变化时重新计时，8 秒后不再拼接（不动任何写入方）。
+                // _status 永不清除，这里只控制显示：值变化时重新计时，8 秒后不再拼接。
                 string status = _status;
                 if (!string.IsNullOrEmpty(status)) {
                     if (!string.Equals(status, _statusShown, StringComparison.Ordinal)) {
@@ -468,17 +424,16 @@ namespace SR_UCH.Tweaks {
                     if (Time.unscaledTime - _statusShownAt > 8f) status = null;
                 }
                 if (!string.IsNullOrEmpty(status)) count += "   ·   " + status;
-                // 工具行前面已有"跳过树屋 + 返回树屋"约 290 设计单位；不给状态栏设上限，
-                // 导出目录那种长路径会把 FlexibleSpace 挤没、整行撑出窗口。
+                // 工具行前面已有约 290 设计单位：状态栏须设上限，否则长路径会撑出窗口。
                 float maxW = Mathf.Max(SRApi.Ctl.Sc(120f), SRApi.ContentArea.width - SRApi.Ctl.Sc(380f));
                 GUILayout.Label(SRApi.Ctl.Content(count, string.IsNullOrEmpty(status) ? null : status), SRApi.Ctl.Label,
                     GUILayout.Height(SRApi.Ctl.Sc(26f)), GUILayout.MaxWidth(maxW));
             } catch (Exception __ls) { SRApi.Guard.Log("布局预设/列表状态栏", __ls); }
         }
 
-        // 保存区的两个标签（预设名称 / XML 路径）按实测宽度取最大值，两行输入框左边缘保持对齐。
+        // 保存区两个标签按实测宽度取最大值，使两行输入框左缘对齐。
         private static float FormLabelWidth() {
-            // v2：只依赖语言 + 字号缩放，签名不变直接复用（每帧 7 处调用，原实现 14 次分配）。
+            // 只依赖语言 + 字号缩放，签名不变直接复用。
             int sig = (SRApi.Ctl.LangEn ? 1 : 0) * 31 + Mathf.RoundToInt(SRApi.Ctl.Sc(100f));
             if (sig == _formLabelSig) return _formLabelW;
             try {
@@ -490,12 +445,8 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/标签宽度", __ex); return SRApi.Ctl.Sc(90f); }
         }
 
-        // ================= 布局预设页（重写：与联机页同一套"填充模式"结构） =================
-        // 结构固定为三段：
-        //   1) 固定头部（保存/导入/导出 + 搜索/排序/筛选 + 工具行）—— 永远可见，不随列表滚动
-        //   2) 列表区：高度 = 页面视口 − 头部已用高度，占满剩余区域，只有列表本身滚动
-        //   3) 底边拖拽条
-        // 页面本身声明 NoPageScrollBars：整页不滚，滚轮只可能落在列表里（由页面级滚轮钩子消费）。
+        // ================= 布局预设页（填充模式） =================
+        // 三段结构：常驻头部、列表区（视口减头部高）、底边拖拽条；页面声明 NoPageScrollBars，滚轮只落在列表里。
         private static void Render() {
             try {
                 _renderFrame = Time.frameCount;
@@ -504,15 +455,13 @@ namespace SR_UCH.Tweaks {
                 EnsureCols();
                 string pendingBefore = _pendingKey;
 
-                // Layout 趟记录内容原点（表格高度/命中框都相对它计算）
                 RenderSaveImportHeader();
                 CancelPendingOnBlank(pendingBefore);
             } catch (Exception __ex) { SRApi.Guard.Log("渲染布局预设页", __ex); }
         }
 
-        // 三个头部（保存/导入导出、搜索筛选、工具行）见 BuildingPresets.Ui.cs。
 
-        // 筛选/排序变化：回顶并清掉二次确认（必须在本帧控件画完之后读，否则差一帧）
+        // 筛选/排序变化：回顶并清二次确认（须在本帧控件画完后读，否则差一帧）
         private static void ApplyFilterChange() {
             int sig = FilterSignature();
             if (sig == _filterSigLast) return;
@@ -545,9 +494,7 @@ namespace SR_UCH.Tweaks {
 
 
 
-        // 重命名弹窗：右键行 → 弹出带输入框 + 确定/取消 的小面板。
-        // 不用"行内输入框"：条件控件/焦点/滚动夹层里太容易失效（用户实测右键无反应）；
-        // 弹窗用绝对矩形绘制，点确定/取消即可，不依赖输入焦点。
+        // 重命名弹窗：右键行弹出输入框 + 确定/取消；用绝对矩形绘制，不依赖行内输入框与焦点。
         private static void DrawInlineRename() {
             try {
                 if (string.IsNullOrEmpty(_renameKey)) return;
@@ -600,7 +547,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/重命名弹窗", __ex); }
         }
 
-        // Shift+右键表头：核心还原列宽并清空隐藏列后回调这里，再补一次"列序 + 列宽 + 隐藏"的整表还原并落盘。
+        // Shift+右键表头：核心还原列宽与隐藏列后回调这里，再补一次整表还原并落盘。
         private static void ResetTable() {
             try {
                 if (_tableCols != null) _tableCols.ResetAll();   // 列序 / 隐藏 / 列宽一起回默认（核心统一实现）
@@ -642,7 +589,7 @@ namespace SR_UCH.Tweaks {
             } catch { return null; }
         }
 
-        // 单元格显示签名：语言 / 关卡显示模式 / 名称 / 关卡 / 模式 / 时间 / 数据策略任一变化都重算。
+        // 单元格显示签名：语言 / 关卡显示模式 / 各字段任一变化都重算。
         private static int CellSignature(PresetInfo p) {
             unchecked {
                 int h = 11;
@@ -666,8 +613,7 @@ namespace SR_UCH.Tweaks {
                 for (int i = 0; i < ColCount; i++) _cells[i] = "";
                 return _cells;
             }
-            // 单元格文本缓存：核心 TableDraw 只读该数组（SR.Table.cs:232 取用后直接传给 DrawTableCells），
-            // 复用安全。以前每可见行每趟 OnGUI 都做 5 次字符串生成 + 本地化，20 行就是上百次/帧。
+            // 单元格文本缓存：核心 TableDraw 只读该数组，避免每帧上百次字符串生成。
             int sig = CellSignature(p);
             string key = p.Key;
             CellCacheEntry ent;
@@ -695,8 +641,7 @@ namespace SR_UCH.Tweaks {
             catch { return null; }
         }
 
-        // 钉住操作列：每行 4 个按钮（加载 / 数据 / 导出 / 删除），删除在二次确认窗口内显示「确认」；重命名走右键名称列。
-        // 按钮布局、命中、悬浮全部由核心统一控件处理；本页只填按钮描述，点击由 DoAct* 分发。
+        // 钉住操作列：每行按钮（加载 / 数据 / 导出 / 删除），删除在确认窗口内显示「确认」；布局与命中由核心处理。
         private static void DrawActionButtons(List<PresetInfo> visible, int row, Rect r) {
             try {
                 PresetInfo p = PresetAt(visible, row);
@@ -721,7 +666,6 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 操作按钮点击分发（由核心在左键 MouseUp 命中后回调）：加载 / 重命名 / 导出 / 删除（两次确认）。
         private static void DoActLoad() {
             PresetInfo p = _actPreset;
             if (p != null) LoadPreset(p);
@@ -737,9 +681,8 @@ namespace SR_UCH.Tweaks {
             if (p != null && !p.IsLocal && ConfirmOrArm("del:" + p.Key)) DeletePreset(p);
         }
 
-        // ---------- 列宽 / 列序持久化 ----------
 
-        // 首次进入列表页时读配置：列宽按范围裁剪、列序必须是 0..ColCount-1 的合法排列且操作列固定在最后。
+        // 首次进入列表页读配置：列宽按范围裁剪、列序须是合法排列且操作列固定在最后。
         private static void EnsureCols() {
             if (_colsLoaded) return;
             _colsLoaded = true;
@@ -754,17 +697,13 @@ namespace SR_UCH.Tweaks {
                 _order = NormalizeOrder(_tableCols.Order);
                 _hiddenCols.Clear();
                 foreach (int h in _tableCols.Hidden) if (h >= 0 && h < ColCount && h != ColAction) _hiddenCols.Add(h);
-                // 操作列宽度强制用默认值（按当前语言按钮文字实测）。
                 _colW[ColAction] = DefaultActionColW();
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/读取列设置", __ex);
             }
         }
 
-        // 操作列默认宽 = 4 个按钮的自适应文字宽 + 按钮间距 + 钉住列左右边距（设计单位）。
-        // 每行按钮由核心按 BtnClip.CalcSize(label).x + 11px 计算，这里用同一公式取最宽标签（含二次确认的「确认」），
-        // 保证中文 / 英文、普通态 / 确认态都不会被截断；DefColW[ColAction] 仅作样式不可用时的兜底。
-        // 操作列默认宽：交给核心按当前语言的按钮文字实测（数据按钮删掉后不再固定 200，右侧不留空）。
+        // 操作列默认宽 = 最宽按钮文字宽 + 按钮间距 + 边距；与核心 BtnClip.CalcSize(label).x + 11px 同公式。
         private static float DefaultActionColW() {
             try {
                 float w = SRApi.TableActionColumnWidth(_actActions);
@@ -773,7 +712,7 @@ namespace SR_UCH.Tweaks {
             return DefColW[ColAction];
         }
 
-        // 列序归一化：只允许前 4 列换位，操作列强制固定在最后；非法/缺列时补回默认相对顺序。
+        // 列序归一化：只允许前 4 列换位，操作列固定在最后；非法 / 缺列时补回默认顺序。
         private static int[] NormalizeOrder(int[] src) {
             int[] def = new int[ColCount];
             for (int i = 0; i < ColCount; i++) def[i] = i;
@@ -800,7 +739,7 @@ namespace SR_UCH.Tweaks {
         private static void SaveCols() {
             try {
                 EnsureCols();
-                // 兜底：长度不符就别写盘（写进去会被 NormalizeOrder 永久降级成默认列序）
+                // 长度不符就别写盘（写进去会被 NormalizeOrder 永久降级成默认列序）
                 if (_order == null || _order.Length != ColCount) _order = NormalizeOrder(_order);
                 if (_tableCols == null) return;
                 for (int i = 0; i < ColCount && i < _tableCols.Widths.Length; i++) _tableCols.Widths[i] = _colW[i];
@@ -827,7 +766,7 @@ namespace SR_UCH.Tweaks {
             } catch { return false; }
         }
 
-        // 第一次调用只登记待确认动作并返回 false；窗口内第二次调用返回 true 并清掉登记。
+        // 首次调用只登记并返回 false；窗口内第二次返回 true 并清掉登记。
         private static bool ConfirmOrArm(string key) {
             if (IsPending(key)) {
                 ClearPending();
@@ -843,7 +782,7 @@ namespace SR_UCH.Tweaks {
             _pendingAt = -1f;
         }
 
-        // 二次确认按钮的倒计时文案：窗口内显示「确认 (2.3s)」。
+        // 二次确认按钮文案：窗口内显示「确认 (2.3s)」。
         private static string PendingLabel(string zhBase, string enBase, string key) {
             try {
                 if (!IsPending(key)) return SRApi.T(zhBase, enBase);

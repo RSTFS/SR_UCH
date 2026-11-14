@@ -1,6 +1,5 @@
-// SR_UCH 最小单元测试（item 5）：只测"纯逻辑"，不碰 Unity / 游戏程序集。
-// 依赖：SR_UCH/Contracts/*.cs（契约层可独立编译：只引用 BCL + BepInEx）里的 ColorHex。
-// 运行：build\run-tests.ps1（csc 编译本文件 + 契约层 → 直接跑，失败返回非 0）
+// SR_UCH 最小单元测试：只测纯逻辑，不碰 Unity / 游戏程序集。
+// 依赖契约层（Contracts/*.cs，可独立编译）；运行 build\run-tests.ps1，失败返回非 0。
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -39,21 +38,19 @@ namespace SR_UCH.Tests {
             return 0;
         }
 
-        // 表格滚动几何：内容装得下 maxY 必须为 0；装不下必须等于高出的部分。
         private static void TestTableScrollMath() {
             Eq("RowsH(200,30)", 170f, (float)SRApi.Ctl.TableRowsH(200f, 30f));
             Eq("RowsH 不为负", 0f, (float)SRApi.Ctl.TableRowsH(10f, 30f));
             Eq("maxY 内容装得下=0", 0f, (float)SRApi.Ctl.TableMaxScrollY(17, 34f, 600f));
             Eq("maxY 内容超出", 578f - 400f, (float)SRApi.Ctl.TableMaxScrollY(17, 34f, 400f));
             Eq("maxY 空列表=0", 0f, (float)SRApi.Ctl.TableMaxScrollY(0, 34f, 400f));
-            // 自绘列表：框伸到屏幕外时必须收敛到可见底（这是"滚不动"的根因）
             var boxOut = new UnityEngine.Rect(0f, 100f, 400f, 900f);   // 顶 210、底 1110
             Eq("行区收敛到可见底", 610f, (float)SRApi.Ctl.ScrollRowsH(boxOut, 20f, 730f, 30f));
             var boxIn = new UnityEngine.Rect(0f, 100f, 400f, 300f);    // 框本身就在屏幕内
             Eq("框内不收敛", 280f, (float)SRApi.Ctl.ScrollRowsH(boxIn, 20f, 730f, 30f));
         }
 
-        // ColorHex：功能层所有颜色文本解析都走它，最容易在重构里被改坏。
+        // ColorHex：功能层颜色文本解析入口。
         private static void TestColorHex() {
             Color c;
 
@@ -61,20 +58,19 @@ namespace SR_UCH.Tests {
             Eq("ParseHex 无 # 前缀", true, SRApi.ColorHex.ParseHex("00FF00", out c) && Math.Abs(c.g - 1f) < 0.01f && Math.Abs(c.r) < 0.01f);
             Eq("ParseHex 小写", true, SRApi.ColorHex.ParseHex("#0a0b0c", out c));
 
-            // 非法输入必须返回 false，且不抛异常（调用方靠返回值判红框）
+            // 非法输入返回 false 且不抛异常（调用方靠返回值判红框）。
             Check("ParseHex(空) 返回 false", !SRApi.ColorHex.ParseHex("", out c));
             Check("ParseHex(null) 返回 false", !SRApi.ColorHex.ParseHex(null, out c));
             Check("ParseHex(#XYZ) 返回 false", !SRApi.ColorHex.ParseHex("#XYZXYZ", out c));
             Check("ParseHex(过短) 返回 false", !SRApi.ColorHex.ParseHex("#FFF", out c));
 
-            // 往返：ToHex -> ParseHex -> 同一个颜色
             Color src = new Color(0.2f, 0.6f, 0.9f, 1f);
             string hex = SRApi.ColorHex.ToHex(src);
             bool rt = SRApi.ColorHex.ParseHex(hex, out c);
             Check("ToHex/ParseHex 往返", rt && Math.Abs(c.r - src.r) < 0.01f && Math.Abs(c.g - src.g) < 0.01f && Math.Abs(c.b - src.b) < 0.01f, hex);
             Check("ToHex 输出 7 字符 #RRGGBB", hex != null && hex.Length == 7 && hex[0] == '#', hex);
 
-            // Color32 取整边界：0 / 255 不能溢出成 256 或负数
+            // Color32 取整边界：0 / 255 不得溢出成 256 或负数。
             Color32 c32 = SRApi.ColorHex.ToColor32(new Color(0f, 1f, 0.5f, 1f));
             Eq("ToColor32 R=0", (byte)0, c32.r);
             Eq("ToColor32 G=255", (byte)255, c32.g);
@@ -82,8 +78,6 @@ namespace SR_UCH.Tests {
             Check("FromColor32(ToColor32) 往返", Math.Abs(back.g - 1f) < 0.01f);
         }
 
-        // Slots（槽位总线）：覆盖 Provide/Require 覆盖语义、类型不符、Retract 只删自己、miss 统计。
-        // 注意：契约里没有 Clear()，测试用唯一槽位名 + 相对计数（Count/MissCount 的 delta）。
         private static void TestSlots() {
             int c0 = Slots.Count;
             object a = new object();
@@ -93,18 +87,18 @@ namespace SR_UCH.Tests {
             Eq("Provide 后 Count+1", c0 + 1, Slots.Count);
             Check("Require 取回同一引用", ReferenceEquals(a, Slots.Require<object>("ut.slot")));
 
-            // 覆盖语义：后 Provide 的赢（真实用途：EX 覆盖内置实现）
+            // 后 Provide 覆盖前一个（EX 覆盖内置实现）。
             Slots.Provide("ut.slot", b);
             Check("Provide 覆盖后 Require 返回新实现", ReferenceEquals(b, Slots.Require<object>("ut.slot")));
 
-            // Retract(expected) 只删自己提供的：expected 不匹配时不能删别人的
+            // Retract(expected) 只删自己提供的：不匹配时不得删别人的。
             Slots.Retract("ut.slot", a);
             Eq("Retract(expected 不匹配) 不删除", c0 + 1, Slots.Count);
             Slots.Retract("ut.slot", b);
             Eq("Retract(expected 匹配) 删除", c0, Slots.Count);
             Eq("Retract 后 Require 返回 null", (object)null, Slots.Require<object>("ut.slot"));
 
-            // 非法输入：null/空槽位名、null 实现都不得改变注册表
+            // 非法输入（null/空槽位名、null 实现）不得改变注册表。
             int c1 = Slots.Count;
             Slots.Provide("", a);
             Slots.Provide(null, a);
@@ -116,7 +110,7 @@ namespace SR_UCH.Tests {
             Eq("非法 Retract 不改变 Count", c1, Slots.Count);
             Eq("空槽位名 Require 返回 null", (object)null, Slots.Require<object>(""));
 
-            // 缺槽位：返回 null 并记入自检统计（MissCount 增加、MissNames 能找到）
+            // 缺槽位返回 null，并记入 MissCount / MissNames。
             int m0 = Slots.MissCount;
             Eq("缺槽位 Require 返回 null", (object)null, Slots.Require<object>("ut.slot.absent"));
             Check("缺槽位记入 MissCount", Slots.MissCount > m0, "before=" + m0 + " after=" + Slots.MissCount);
@@ -124,7 +118,7 @@ namespace SR_UCH.Tests {
             foreach (string n in Slots.MissNames) if (n != null && n.StartsWith("ut.slot.absent")) { named = true; break; }
             Check("缺槽位名出现在 MissNames", named);
 
-            // 类型不符：已登记但不是要的类型 -> null + 记 miss（带「类型不符」后缀）
+            // 类型不符返回 null，miss 名带「类型不符」后缀。
             Slots.Provide("ut.slot.typed", a);
             Eq("类型不符 Require 返回 null", (object)null, Slots.Require<string>("ut.slot.typed"));
             bool typedMiss = false;
@@ -133,7 +127,6 @@ namespace SR_UCH.Tests {
             Slots.Retract("ut.slot.typed", a);
         }
 
-        // 功能清单：FromType 有/无 [SrFeature]、MinContract 过期、Register 去重、Find、ToString 标记。
         [SrFeature("ut.basic", "Basic", "1.5", Rank = 7)]
         private sealed class BasicTweak : ITweak { public void Initialize(IFeatureHost host) { } }
 
@@ -146,7 +139,6 @@ namespace SR_UCH.Tests {
         private sealed class NoManifestTweak : ITweak { public void Initialize(IFeatureHost host) { } }
 
         private static void TestFeatureManifest() {
-            // 属性默认值：Rank 默认 120，MinContract 默认 = 当前契约版本
             SrFeatureAttribute attr = new SrFeatureAttribute("ut.x", "X", "1.0");
             Eq("SrFeature 默认 Rank", 120, attr.Rank);
             Eq("SrFeature 默认 MinContract", SRContract.Version, attr.MinContract);
@@ -174,7 +166,6 @@ namespace SR_UCH.Tests {
             Eq("无清单回退 Version=0", "0", nm.Version);
             Check("ManifestMissing 出现在 ToString", nm.ToString().Contains("未声明清单"));
 
-            // Register / Find / 去重：同一 id 第二次注册改成 id#类型名，不互相覆盖
             int n0 = Features.Count;
             FeatureInfo r1 = new FeatureInfo { Id = "ut.reg", Name = "R1", Version = "1", Impl = typeof(string) };
             Features.Register(r1);
@@ -193,7 +184,7 @@ namespace SR_UCH.Tests {
             Features.Register(new FeatureInfo { Id = "ut.problem", Name = "Problem", Version = "1", Impl = typeof(string), ContractTooNew = true });
             Check("ProblemCount 计数包含过期契约", Features.ProblemCount >= 1);
 
-            // 依赖缺失/槽位冲突的检测逻辑在 Rebuild() 里（需要扫 AppDomain），这里只验证数据结构可用。
+            // 依赖缺失 / 槽位冲突检测在 Rebuild()，这里只验数据结构。
             di.MissingDeps.Add("ut.missing.dep");
             di.ConflictSlots.Add("ut.slot.provided");
             Eq("MissingDeps 记录", 1, di.MissingDeps.Count);
@@ -202,7 +193,6 @@ namespace SR_UCH.Tests {
             Check("Describe 返回非空且含契约版本", !string.IsNullOrEmpty(ds) && ds.Contains("契约 v"));
         }
 
-        // 通道/回退：未注入 sink 时 T() 回退中文、Sink 记账单调、时间常量合理。
         private static void TestSinksAndFallbacks() {
             Eq("T 未注入时回退中文", "中文原文", SRApi.T("中文原文", "English text"));
             Check("SinkCount <= SinkTotal", SRApi.SinkCount() <= SRApi.SinkTotal(), SRApi.SinkCount() + "/" + SRApi.SinkTotal());
@@ -215,17 +205,15 @@ namespace SR_UCH.Tests {
             Check("ThemeRadius >= 0", SRApi.Ctl.ThemeRadius >= 0f);
             Check("ThemeHoverFade 在 0..1", SRApi.Ctl.ThemeHoverFade >= 0f && SRApi.Ctl.ThemeHoverFade <= 1f);
             Eq("TableColumnWidths(null) 返回 null", (object)null, SRApi.Ctl.TableColumnWidths(null));
-            // 线程检查：主线程上断言不得抛异常（跨线程行为需真游戏环境，这里只保证接口安全）
             MainThread.Enable(true);
             MainThread.Assert("ut.mainthread");
             MainThread.Enable(false);
             Check("主线程 Assert 不抛异常", true);
         }
 
-        // 统一存储（绝对路径版）：原子写、UTF-8 无 BOM、读回、覆盖、删除。
+        // 统一存储：原子写、UTF-8 无 BOM、读回、覆盖、删除。
         private static void TestStoragePath() {
-            // 注意：%TEMP% 在测试宿主进程里会被拒绝写（UnauthorizedAccessException，沙箱 ACL），
-            // 所以用测试程序自己的目录（构建产物目录天然可写）做真实文件回归。
+            // %TEMP% 在测试宿主可能被拒写，故用构建产物目录。
             string dir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "sr_store_test");
             try { System.IO.Directory.CreateDirectory(dir); } catch (Exception) { }
             string file = System.IO.Path.Combine(dir, "a_" + Guid.NewGuid().ToString("N") + ".txt");
@@ -244,7 +232,6 @@ namespace SR_UCH.Tests {
             }
         }
 
-        // TableArgs.Create/Validate：合法参数返回空列表；缺表头/行回调要能报出来。
         private static void TestTableArgsCreate() {
             var vis = new System.Collections.Generic.List<int> { 0, 1 };
             var a = SRApi.TableArgs.Create(new Rect(0, 0, 400, 200), new float[] { 100f, 100f }, vis, 2,
@@ -254,7 +241,6 @@ namespace SR_UCH.Tests {
             Check("TableArgs.Validate 能报缺回调", bad.Validate().Length > 0);
         }
 
-        // 功能层纯逻辑（从功能类里抽出的无依赖 helper）：分级 / 归一化 / 筛选 / 牌面分类。
         private static void TestFeatureLogic() {
             string[] high = { "失败", "拒绝" };
             string[] low = { "已保存", "已开启" };
@@ -277,7 +263,7 @@ namespace SR_UCH.Tests {
             Eq("ChaosLogic 未知字段=中性", 2, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 7, 1));
         }
 
-        // 契约版本单调递增：外部模块按它握手，倒退会让 DLL 静默失效。
+        // 契约版本单调递增：外部模块按它握手，倒退会让 DLL 失效。
         private static void TestContractVersion() {
             Check("SRContract.Version >= 2", SRContract.Version >= 2, "v" + SRContract.Version);
         }

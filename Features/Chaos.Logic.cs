@@ -1,8 +1,7 @@
-// 混乱牌组的纯逻辑：无 Unity / BepInEx 依赖，便于在单元测试里直接覆盖（tests 项目会编译本文件）。
+// 混乱牌组纯逻辑：无 Unity / BepInEx 依赖，tests 工程直接编译本文件。
 namespace SR_UCH.Tweaks {
     internal static class ChaosLogic {
-        // 牌面分类：0 = 增益（绿边）/ 1 = 减益（红边）/ 2 = 中性（蓝边）。
-        // 数值字段 id 与 Chaos.CardDef 的 F* 常量一致；改动时两边要同步（测试会锁行为）。
+        // 0 增益（绿边）/ 1 减益（红边）/ 2 中性（蓝边）；field 与 CardDef.F* 同步。
         public static int TintKind(bool isBool, int field, int min) {
             if (isBool) {
                 if (field == 9) return 0;                                  // 跳舞无敌

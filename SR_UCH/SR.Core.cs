@@ -1,5 +1,4 @@
-// 框架本体：状态与初始化、各类 Register 扩展点、Provide/Require 槽位、每帧钩子派发、
-// 对局开始时重置界面、日志包装 Guard。不认识任何具体功能（功能自己通过 SR.Register 挂上来）。
+// 框架本体：状态与初始化、Register 扩展点、每帧钩子派发、页面重置与日志包装 Guard。
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -16,25 +15,18 @@ namespace SR_UCH.Tweaks {
 public partial class SR : ITweak {
 
 // 分区：Core（核心状态 / 初始化 / 插件扫描）
-// 约定：静态字段集中在此；新功能实现 ITweak 即被自动发现，新分区需在 sr_uch.rsp 注册。
-// 分区分界（item 10）：SR 由 17 个 partial 拼成一个静态类，编译器不会拦"跨分区写别人私有字段"。
-//   约定：自己分区的 private static 字段只在本文件用；确实要跨分区读写就改成 internal + 访问器。
-//   机器检查：build\guards-text.ps1 的 Check-RegionFields 会拦下"新增的跨分区私有字段"，
-//   历史遗留 53 个登记在 build\region-access.txt（棘轮：只减不增）。目标是逐步收敛到 0，
-//   必要时再把 Gate / Ctl / Nav 提成独立静态类。
+// 静态字段集中于此；分区之间共享 private 字段编译器不会拦，故只在本文件用。
 
         private static ConfigEntry<KeyCode> _openKey;
         private static ConfigEntry<bool> _tickProf;
-        // 自检页「帧钩子」卡读取：剖析开关关闭时不做任何采样与刷新。
         public static bool TickProfilingEnabled { get { return _tickProf != null && _tickProf.Value; } }   // 帧钩子剖析开关
         private static ConfigEntry<bool> _blockInputEntry;
         private static ConfigEntry<float> _uiScaleEntry;
         private static ConfigEntry<string> _disabledPluginsEntry;
         private static ConfigEntry<bool> _allEnabledEntry;
-        // 对外（外部 DLL）暴露的注册接口版本：外部模块初始化时比对自己的需求版本，不匹配就提示 / 降级。
-        // 用 static readonly 而非 const：const 会在编译外部模块时被内联，握手只能靠运行时读取生效。
+        // 对外暴露的注册接口版本；必须 static readonly：const 会被内联，握手只能运行时读取。
         public static readonly int ApiVersion = 3;
-        // Ui：窗口宽高 / 位置 / 侧栏宽 / 整体缩放的唯一真值（读入与拖动 / 缩放夹取都读它）。
+        // Ui：窗口宽高 / 位置 / 侧栏宽 / 整体缩放的唯一真值。
         internal static class Ui {
             public const int WinWMin = 400, WinWMax = 1600;
             public const int WinHMin = 300, WinHMax = 1000;
@@ -42,7 +34,7 @@ public partial class SR : ITweak {
             public const int SidebarWMin = 0, SidebarWMax = 320;
             public const float ScaleMin = 1f, ScaleMax = 1.8f;
         }
-        // Keys：设置段与其中各键名的唯一真值。
+        // Keys：设置段与各键名的唯一真值。
         internal static class Keys {
             public const string Settings = "Settings";
             public const string OpenKey = "Open Key";
@@ -60,8 +52,7 @@ public partial class SR : ITweak {
             public const string ComboPrefix = "组合键 ";
         }
 
-        // 反射辅助：失效告警 + 结果缓存（连"查过但没有"也缓存）。
-        // 功能在 SelfReg 里用 SR.RefOverride 声明"成员 -> 支撑什么功能"，调用处用 SR.RefField / RefMethod 取。
+        // 反射辅助：失效告警 + 结果缓存（未命中同样缓存）。
         private static readonly Dictionary<string, string> _refFeature = new Dictionary<string, string>();
         private static readonly HashSet<string> _refWarned = new HashSet<string>();
         private static readonly Dictionary<string, FieldInfo> _refFieldCache = new Dictionary<string, FieldInfo>();
@@ -87,12 +78,10 @@ public partial class SR : ITweak {
 
 
 
-        // 把各功能声明的反射成员逐个解析一遍，日志给出可用 N / 失效 M 总览（幂等，只跑一次）。
         private static bool _refAudited;
 
 
-        // 补丁侧自检：反射遍历 SR 自己与引用了 SR_UCH 的功能 DLL，读每条 [HarmonyPatch] 特性
-        // （类级与方法级合并），逐个验证按名绑定的目标方法是否还存在（无需改补丁写法）。
+        // 补丁自检：合并类级/方法级 [HarmonyPatch]，逐个验证按名绑定的目标是否仍存在。
         private static bool _patchAudited;
 
 
@@ -109,16 +98,13 @@ public partial class SR : ITweak {
         }
         private static readonly List<AuditIssue> _auditIssues = new List<AuditIssue>();
         public static IList<AuditIssue> AuditIssues { get { return _auditIssues; } }
-        // 孤儿键数：BepInEx 把"文件里有但没有任何代码 Bind"的键留在 OrphanedEntries，Save 时原样写回。
-        // 启动扫描后显示在设置页（可一键清理）。
+        // 孤儿键数：文件里有但没被 Bind 的键，Save 时会原样写回；启动扫描后显示在设置页。
         public static int OrphanKeyCount;
-        // 供启动自检汇总行使用的审计计数
         public static int AuditOrphan;
         public static int AuditGateTotal;
         public static int AuditPerFrame;
-        // 按需生成、尚未 Bind 的条目数（快捷键/组合键）：仅统计不告警。
         public static int OrphanPendingCount;
-        // 没有登记归属、也没被 NavHide 的配置段数：它们会以兜底页出现在侧栏（含漏登记退役的已删功能段）。
+        // 无归属又未被 NavHide 的配置段数（会以兜底页出现在侧栏）。
         public static int FallbackSectionCount;
         public static int AuditIssueCount { get { return _auditIssues.Count; } }
         public static int AuditPatchTotal, AuditPatchOk, AuditRefTotal, AuditRefOk;
@@ -126,11 +112,10 @@ public partial class SR : ITweak {
 
 
 
-        // BepInEx 的 OrphanedEntries 不是编译期可见的公开成员，只能反射取（先属性后字段），
-        // 拿不到就安静跳过（纯诊断功能，不影响启动，也不计入 AuditIssue 的失效列表）。
+        // OrphanedEntries 非公开，只能反射取；拿不到就跳过，纯诊断不影响启动。
         private static System.Reflection.MemberInfo _orphanMember;
         private static bool _orphanMemberTried;
-        // BepInEx 的 OrphanedEntries（反射取；拿不到返回 null），OrphanAudit 与 CleanOrphanKeys 共用
+        // 反射取 OrphanedEntries，拿不到返回 null；OrphanAudit 与 CleanOrphanKeys 共用。
         private static System.Collections.IDictionary ReadOrphanDict() {
             ConfigFile cfg = _internalConfig;
             if (cfg == null) return null;
@@ -160,16 +145,13 @@ public partial class SR : ITweak {
 
 
 
-        // 自检是否有问题（首页 / 设置页据此决定要不要显眼提示）
         public static bool AuditHasIssues { get { return _auditIssues.Count > 0; } }
-        // 调试模式：开关状态与信息都在核心生成（关掉 EX 也保留设置），EX 只负责画复选框。
 
-        // 调试信息：每行独立 try，任何一项取不到都只影响那一行。
-        
-        // 本 Mod 总开关：关闭时所有内部功能运行时失效，各功能开关值不变；改动自动保存。
+        // 调试信息逐行独立 try，某项取不到只影响那一行。
+        // 总开关：关闭时功能运行时失效，各功能开关值不变；改动自动保存。
         public static bool AllEnabled = false;
         private static bool _appliedDisabled;
-        // 组合键修饰：持久化格式 "Shift+Ctrl+Alt"（见 SR.KeyBinds 的 ParseComboMod / FormatComboMod）。
+        // 组合修饰持久化格式 "Shift+Ctrl+Alt"（见 SR.KeyBinds 的 ParseComboMod）。
         [Flags]
         public enum ComboMod { None = 0, Shift = 1, Ctrl = 2, Alt = 4 }
         private static readonly Dictionary<ConfigEntryBase, ComboMod> _keyMods = new Dictionary<ConfigEntryBase, ComboMod>();
@@ -180,40 +162,35 @@ public partial class SR : ITweak {
         private enum Mode { Internal, Settings, External }
         // internal = SR_UCH 栏目，settings = 独立设置页，external = 其它插件
         private static ConfigFile _internalConfig;
-        // "扫描时没找到自己的 GUID"只告警一次（见 EnsureScanned）
         private static bool _warnedNoSelfGuid;
-        // 配置落盘节流状态（SaveOnConfigSet 已关闭，见 EnsureScanned）
         private static bool _cfgDirty;
         private static float _cfgNextSaveAt;
 
         private static void OnAnySettingChanged(object s, SettingChangedEventArgs e) { _cfgDirty = true; }
 
-        // 把"这个配置该落盘了"交给节流器：SR 自己的配置记 _cfgDirty（FlushConfig 每秒最多写一次），
-        // 其它插件的配置走 _dirtyConfig（Tick 里松手即写）。必须 public：拆分模式下功能是独立程序集。
+        // 登记配置待落盘：SR 自身记 _cfgDirty，其它插件进 _dirtyConfigs。必须 public：拆分模式下功能是独立程序集。
         public static void MarkConfigDirty(ConfigFile cfg) {
             if (cfg == null) return;
             if (ReferenceEquals(cfg, _internalConfig)) { _cfgDirty = true; return; }
-            // 用集合而不是单槽：先改 A 插件、再改 B 插件时单槽会把 A 覆盖掉，
-            // A 的改动永远不会落盘（audit 04-P0-1）。
+            // 用集合而非单槽：先后改动两个插件时单槽会覆盖前者，其改动永不落盘。
             _dirtyConfigs.Add(cfg);
             _dirty = true;
         }
 
-        // 改过的配置最多每秒落盘一次；关面板 / 退出前的显式 Save 仍即时落盘。
+        // 改过的配置最多每秒落盘一次；关面板 / 退出前的显式 Save 仍即时。
         public static void FlushConfig() {
             if (!_cfgDirty || _internalConfig == null) return;
             if (Time.unscaledTime < _cfgNextSaveAt) return;
             _cfgNextSaveAt = Time.unscaledTime + 1f;
-            // 保存成功才清脏标记（失败时保持脏，下一秒重试），否则这批改动会被当成已落盘而丢失。
+            // 保存成功才清脏标记，失败保持脏以便下次重试。
             bool saved = Guard.Try("配置定期落盘", () => { _internalConfig.Save(); return true; }, false);
             if (saved) _cfgDirty = false;
         }
         private static readonly List<string> _internalSections = new List<string>();
-        // 全部栏目（含被隐藏的），给自定义栏目的表头当列用；_internalSections 只含可见的。
+        // 全部栏目（含隐藏）供表头当列用；_internalSections 只含可见的。
         internal static readonly List<string> _allSections = new List<string>();
-        // 手动隐藏的栏目（与 NavHide 的 _navHidden 分开：那是永不显示，这个可随时还原）
+        // 手动隐藏的栏目（可还原；NavHide 是永不显示）
         internal static readonly HashSet<string> _userHiddenSections = new HashSet<string>();
-        // 侧栏栏目自注册表（各功能在自己的 SelfReg 里声明；见 SR.Nav / SR.NavHide）
         private static readonly List<string> _navOrder = new List<string>();                     // 注册先后
         private static readonly Dictionary<string, int> _navRank = new Dictionary<string, int>(); // 顺序值（越小越靠前）
         private static readonly HashSet<string> _navHidden = new HashSet<string>();              // 有 cfg 段但不单独成栏目
@@ -222,41 +199,38 @@ public partial class SR : ITweak {
         private static readonly List<PluginEntry> _externalPlugins = new List<PluginEntry>();
         private static string _pluginKey = "";
         private static Vector2 _scroll;
-        // 文本测量缓存（避免每帧对所有条目 CalcSize / CalcHeight）
+        // 文本测量缓存，避免每帧对所有条目 CalcSize。
         private static int _nameWKey;   // 文本哈希折叠键（见 EntryNameWidth）
         private static float _nameWCached;
         private static readonly Dictionary<string, List<float[]>> _heightCache = new Dictionary<string, List<float[]>>();   // 两级键（文本 -> [宽, 缩放, 高]），免每帧拼 key
         private static Vector2 _leftScroll;
 
         private static ConfigEntryBase _capturing; // 键位捕捉目标
-        // 捕捉起始帧：右键进入捕捉的同一次 MouseDown 不能被"按下即取消捕捉"清掉。
+        // 捕捉起始帧：右键进入捕捉的那次 MouseDown 不能被"按下即取消"清掉。
         private static int _captureStartFrame = -1;
         private static int _rmbConsumedFrame = -1; // 当帧右键绑键：一帧只认一个按钮
         private static object _prevBoxed;
-        // 快捷键录制态：收集所有按键及其顺序（见 SR.Window 的录制分支 / CommitRecording）
+        // 快捷键录制态：按键及其顺序（见 SR.Window 的录制分支 / CommitRecording）。
         private static readonly List<KeyCode> _recSeq = new List<KeyCode>();
         private static readonly List<KeyCode> _recHeld = new List<KeyCode>(); // 录制中仍按住的键（全部松开即完成录制）
-        // 待落盘的外部插件配置集合（SR 自己的配置走 _cfgDirty + FlushConfig）
+        // 待落盘的外部插件配置（SR 自身走 _cfgDirty + FlushConfig）。
         private static readonly HashSet<ConfigFile> _dirtyConfigs = new HashSet<ConfigFile>();
         internal static HashSet<ConfigFile> DirtyConfigs { get { return _dirtyConfigs; } }
         private static readonly Dictionary<ConfigEntryBase, string> _editText = new Dictionary<ConfigEntryBase, string>();
         private static readonly Dictionary<ConfigEntryBase, bool> _editOpen = new Dictionary<ConfigEntryBase, bool>();
-        // 窗口几何
         private static int _winWidth = 720;
         private static int _winHeight = 520;
         private static float _winX = 30f;
         private static float _winY = 30f;
-        // 窗口几何配置条目（Initialize 里建一次；SR.Window 拖动 / 关闭时写它们）
         private static ConfigEntry<int> _winWidthEntry, _winHeightEntry;
         private static ConfigEntry<float> _winXEntry, _winYEntry;
         private static bool _dragActive, _dragMoved, _resizing;
         private static Vector2 _dragOffset, _downPos, _resizeStart, _resizeStartSize;
         private static bool _dirty;
-        // 缩放同时作用于布局尺寸与字号（不使用矩阵缩放）
         private static float _scaled = 1f;
         private static float Sc(float v) { return v * _scaled; }
 
-        // 性能计数器（自检页显示）：每帧调度与面板绘制的平滑耗时，用于定位热点（不参与任何逻辑）。
+        // 性能计数器（自检页显示）：每帧调度与绘制的平滑耗时，不参与逻辑。
         internal static float PerfTickAvgMs, PerfGuiAvgMs, PerfTickMaxMs, PerfGuiMaxMs;
         private static UnityEngine.EventSystems.EventSystem _gatedEventSystem;
         private static bool _stylesReady;
@@ -273,21 +247,17 @@ public partial class SR : ITweak {
         public static bool CursorMove;            // 本帧是否显示移动光标
         private static readonly List<GUIStyle> _styleList = new List<GUIStyle>();
 
-        // 管理器窗口是否真正打开（打开时输入冻结逻辑见 SR.Input）
         public static bool UiOpen { get { return _visible; } }
-        // 管理器打开时冻结游戏输入（是否有功能 UI 打开见 SR.AnyUiBlocked）
         public static bool BlockInput = true;
 
-        // 8) 门控豁免登记：任何模块都可登记"要求放开某项限制"的取值委托；未登记 = 不豁免，
-        // 多个模块同时登记时任一为真即豁免（核心不认识具体模块）。
+        // 门控豁免：模块登记委托，任一为真即豁免；未登记不豁免。
         private static readonly List<Func<bool>> _modeOverrides = new List<Func<bool>>();
         private static readonly List<Func<bool>> _hostOverrides = new List<Func<bool>>();
         private static readonly List<Func<bool>> _pauseProviders = new List<Func<bool>>();
 
         // 豁免来源登记：谁在提权必须可见（设置页显示 + 首次登记写日志）。
         public static readonly List<string> OverrideSources = new List<string>();
-        // 找"真正发起登记的程序集"：跳过核心自身（含契约层 SRApi）的栈帧，
-        // 这样经 SRApi 转发的外部调用才能识别为发起方，而不是误判成 SR_UCH。
+        // 找真正的发起程序集：跳过核心自身（含 SRApi）的栈帧，避免把转发误判成 SR_UCH。
         private static string CallerAssembly() {
             try {
                 string mine = typeof(SR).Assembly.GetName().Name;
@@ -304,7 +274,6 @@ public partial class SR : ITweak {
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return "";
         }
-        // 该程序集是否引用了 SR_UCH（= 用契约层编译出来的模块）。
         private static bool IsContractConsumer(string asmName) {
             try {
                 foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies()) {
@@ -324,9 +293,7 @@ public partial class SR : ITweak {
         private static bool NoteOverrideSource(string kind) {
             try {
                 string who = CallerAssembly();
-                // 信任规则（不按具体模块名开白名单）：核心自身，以及**引用了 SR_UCH 的程序集**
-                // 才允许登记 —— 后者就是用契约层编译出来的模块，是这些 API 的合法调用方；
-                // 其它来源拒绝并写一条可见日志，避免任意插件静默提权。
+                // 只信任核心自身与引用 SR_UCH 的程序集；其它来源拒绝并写日志，避免静默提权。
                 bool ok = string.IsNullOrEmpty(who) || IsContractConsumer(who);
                 string line = kind + " <- " + (string.IsNullOrEmpty(who) ? "核心" : who)
                     + (ok ? "" : "（已拒绝：非契约调用方）");
@@ -338,15 +305,12 @@ public partial class SR : ITweak {
                 return ok;
             } catch { return false; }
         }
-        // 登记"无视模式限制"豁免
         public static void RegisterModeOverride(Func<bool> f) {
             if (f != null && !_modeOverrides.Contains(f) && NoteOverrideSource("模式限制")) _modeOverrides.Add(f);
         }
-        // 登记"无视房主限制"豁免
         public static void RegisterHostOverride(Func<bool> f) {
             if (f != null && !_hostOverrides.Contains(f) && NoteOverrideSource("房主限制")) _hostOverrides.Add(f);
         }
-        // 登记"冻结角色"求值（打开面板 / 地图时冻结自己的角色）
         public static void RegisterPauseProvider(Func<bool> f) {
             if (f != null && !_pauseProviders.Contains(f)) _pauseProviders.Add(f);
         }
@@ -357,20 +321,17 @@ public partial class SR : ITweak {
             }
             return false;
         }
-        // 无视模式限制：所有"仅自由模式"的门控（视野 / 地图 / 重生 / 关卡等）都读它
         public static bool IgnoreModeLimit { get { return AnyTrue(_modeOverrides); } }
-        // 无视房主限制：门控 GateHost 的 OverrideHost 读它
         public static bool HostOverride { get { return AnyTrue(_hostOverrides); } }
-        // 冻结角色：打开面板 / 地图时冻结自己的角色
         public static bool PauseGame { get { return AnyTrue(_pauseProviders); } }
 
 
         private static bool _selfCheckFooterDone;   // 自检底栏入口只注册一次（第一帧注册，顺序 设置 | 通知 | 自检）
         public void Initialize(IFeatureHost plugin) {
-            // 表格自适应高度助手：公式留在实现层，契约层只负责转发（功能页在 Initialize 之后才会渲染）。
+            // 表格自适应高度：公式在实现层，契约层只转发（功能页在 Initialize 后才渲染）。
             try { SRApi.SetTableAutoHeightSink(delegate (float __u, float __m) { return SR.Ctl.TableAutoHeight(__u, __m); }); }
             catch (Exception __ex) { Guard.Log("注入表格高度助手", __ex); }
-            // 统一操作列按钮：绘制/命中/悬浮都在实现层，契约层只转发（功能页在 Initialize 之后才会渲染）。
+            // 统一操作列按钮：绘制/命中/悬浮在实现层，契约层只转发。
             try {
                 SRApi.Ctl.SetSelfToggleButtonSink(delegate (string __l, string __t, bool __o, ConfigEntry<KeyCode> __k, float __w, bool __b) {
                     return SR.Ctl.SelfToggleButton(__l, __t, __o, __k, __w, __b);
@@ -380,8 +341,7 @@ public partial class SR : ITweak {
                 SRApi.Ctl.SetRowSliderSink(delegate (string __l, string __t, ConfigEntryBase __e, float __min, float __max, float __w, string __f) {
                     return SR.Ctl.RowSlider(__l, __t, __e, __min, __max, __w, __f);
                 });
-                // 之前漏了这一个：_rowCombo 从未注入 → 所有 RowCombo 行(模式/关卡/类型下拉)拿不到值。
-                // 契约里的 sink 是 7 参（不含 cur），别写成 8 参。
+                // _rowCombo 未注入时，模式/关卡/类型下拉拿不到值；契约 sink 是 7 参（不含 cur）。
                 try {
                     SRApi.Ctl.SetRowComboSink(delegate (string __l, string __t, ConfigEntryBase __e, string[] __vals, string[] __labels, float __w, float __ls) {
                         return SR.Ctl.RowCombo(__l, __t, __e, __vals, __labels, __w, __ls);
@@ -429,19 +389,15 @@ public partial class SR : ITweak {
             // 竖向滚动条绘制（ImGui 配色）由核心统一提供。
             try { SRApi.SetTableScrollbarSink(delegate (Rect __t, float __ch, float __vh, float __sy, bool __dr, out Rect __th, bool __vis, float __al) { SR.Ctl.TableScrollbar(__t, __ch, __vh, __sy, __dr, out __th, __vis, __al); }); }
             catch (Exception __ex) { Guard.Log("注入表格滚动条", __ex); }
-            // “不写绑定提示”的快捷键按钮：与普通 HotkeyButton 同一套右键绑键逻辑，只少了提示行。
+            // 无绑定提示的快捷键按钮：与 HotkeyButton 同一套右键绑键逻辑，只少提示行。
             try { SRApi.Ctl.SetHotkeyButtonNoHintSink(delegate (string __id, string __l, string __t, Action __a, float __w, float __h) { return SR.Ctl.HotkeyButtonNoHint(__id, __l, __t, __a, __w, __h); }); }
             catch (Exception __ex) { Guard.Log("注入无提示快捷键按钮", __ex); }
             _internalConfig = MainPlugin.Data != null ? MainPlugin.Data : plugin.Config; // 核心条目也走外置文件
-            // 界面文案自注册：本处只派发 SR 分部文件，功能在自己的 Initialize 里注册自己的文案。
+            // 界面文案自注册：派发各分部文件，功能在 Initialize 里注册自己的文案。
             SelfRegCore();
-            // 必须在任何 Config.Bind 之前把旧 cfg 的中文 section / key 改写成英文；
-            // 改写后要重新读盘，否则内存里仍是旧键，新建条目拿默认值且下次写盘又写回中文。
+            // 必须在任何 Config.Bind 之前把旧 cfg 的中文段/键改成英文并重新读盘，否则新条目取默认值且写盘又写回中文。
             try {
-                // 迁移必须覆盖两处文件：
-                //   1) plugin.Config 指向的插件自带 cfg；
-                //   2) MainPlugin.Data（外置 SR_UCH_data.cfg）—— 核心与功能的条目实际都 Bind 在它上面。
-                // 只迁 1) 时，外置文件里的中文旧段名永不改写，老用户升级后设置项表现为"消失"（读默认值）。
+                // 两处文件都要迁：插件自带 cfg 与 MainPlugin.Data（条目实际 Bind 在后者），只迁前者会让外置旧段名永不改写。
                 bool migratedAny = false;
                 string pluginPath = plugin.Config.ConfigFilePath;
                 if (ConfigMigration.Migrate(pluginPath)) migratedAny = true;
@@ -457,38 +413,34 @@ public partial class SR : ITweak {
                     SR.LogInfo("[T1] 已迁移旧版 cfg（插件 cfg + 外置 cfg）并重新读盘");
                 }
             } catch (Exception __ex) { Guard.Log("T1 cfg 迁移/重读", __ex); }
-            // 反射探针只做启动自检（RefAudit 逐条解析登记的成员并报可用 / 失效）。
-            // NavHide 把历史 cfg 里可能残留的 [Reflection] 段从侧栏藏掉。
+            // 反射探针只做启动自检；NavHide 把 cfg 里残留的 [Reflection] 段从侧栏藏掉。
             try { NavHide("Reflection"); } catch (Exception __ex) { Guard.Log("Reflection 段隐藏", __ex); }
             _openKey = plugin.Config.Bind(Keys.Settings, Keys.OpenKey, KeyCode.Insert, "打开和关闭管理器用, 默认 Insert. 组合键的绑法: 点按钮, 按住 Shift 或 Ctrl 或 Alt, 再按主键.");
             RegisterKey("管理器-开关", _openKey, "press");
             RegisterFrameEnd("滑块残留状态清理", SliderFrameEndCleanup);   // 滑块残留状态清理挂在每帧收尾
             _blockInputEntry = plugin.Config.Bind(Keys.Settings, Keys.BlockInput, true, "管理器打开时冻结游戏输入, 免得误操作角色.（默认开启）");
             _uiScaleEntry = plugin.Config.Bind(Keys.Settings, Keys.UiScale, 1.3f, "整个界面放大多少, 1.0 到 1.8, 默认 1.3.");
-            // 界面语言：中文 / English（运行时立即生效；外部模块页面始终中文）
+            // 界面语言，运行时立即生效；外部模块页面始终中文。
             _langEntry = plugin.Config.Bind(Keys.Settings, Keys.Language, "English", "界面用哪种语言. 装了语言包 DLL 的话, 它也会自动出现在这个下拉里. 外部插件的页面始终是中文.");
-            // 帧钩子剖析开关：默认关闭，避免每 10 秒刷一条性能警告；排查卡顿时再打开。
+            // 帧钩子剖析：默认关闭，避免频繁刷性能警告；排查卡顿时再开。
             _tickProf = plugin.Config.Bind(Keys.Settings, "Tick Profiling", false,
                 "把每个帧钩子的耗时写进日志（默认关，排查卡顿时打开）。");
-            // 切语言 / 装语言包都走 ApplyLanguage：解析 id 并让显示名缓存失效
+            // 切语言 / 装语言包都走 ApplyLanguage：解析 id 并让显示名缓存失效。
             _langEntry.SettingChanged += (s, e) => ApplyLanguage();
             ApplyLanguage();
-            // 语言包外置：扫描 config/SR_UCH/lang/*.json 并注册（第三方语言包不再需要编译 DLL）。
-            // 位置要求：必须在语言条目 Bind + ApplyLanguage 之后（RegisterLanguage 内部会按 cfg 里保存的语言 id
-            // 重新解析，否则本次启动选不中 JSON 语言包），并在各功能的 Initialize 与第一次渲染之前。
-            // 加载器自身逐文件兜底，这里再包一层 try，保证任何异常都不影响核心启动。
+            // 语言包外置：扫描 config/SR_UCH/lang/*.json 并注册；须在语言条目 Bind + ApplyLanguage 之后、
+            // 各功能 Initialize 与首次渲染之前。
             try { LoadJsonLanguagePacks(); } catch (Exception __ex) { Guard.Log("加载 JSON 语言包", __ex); }
-            // 地图总开关：默认关闭；开启后 M 键开地图，关闭时已打开的地图立即关闭（地图网格等独立功能不受影响）。
-            // 设置页栏目宽度：0 = 自动按文字宽度；也可拖动窗口侧栏右缘调整，结果写回本项。
+            // 地图总开关：开启后 M 键开地图，关闭时已开的地图立即关闭。
+            // 侧栏栏目宽度：0 = 按文字宽度自动；拖侧栏右缘也可调整并写回。
             SidebarWEntry = plugin.Config.Bind(Keys.Settings, Keys.SidebarWidth, 0, "左边那一栏有多宽, 单位像素, 填 0 让它自己算. 也可以直接在窗口里拖侧栏右边缘.");
             SidebarOrderEntry = plugin.Config.Bind(Keys.Settings, Keys.SidebarOrder, "", "侧栏栏目的先后顺序, 用逗号隔开. 在设置页的栏目顺序那一块用上移下移按钮调, 调完自动写回来.");
-            // 用配置版本号一次性清掉历史遗留的 Sidebar Order 脏值（此后拖动的顺序照常保存）。
+            // 用配置版本号一次性清掉无效的 Sidebar Order 值。
             try {
                 // 内部版本号绑在隐藏段，不出现在设置页
                 NavHide("Internal");
                 ConfigEntry<int> __schema = plugin.Config.Bind("Internal", "Sidebar Order Schema", 0, "内部用: 侧栏顺序的存储版本, 用来一次性清掉历史遗留的脏值.");
-                // 第二个版本号：清掉栏目改名后残留的旧段名（ApplyCustomSidebarOrder 负责改名映射与剔除死条目）。
-                // v3: HUD / presets added and default order adjusted; drop stale custom sidebar order once.
+                // 第二个版本号：清掉栏目改名后残留的旧段名（由 ApplyCustomSidebarOrder 做改名映射与剔除）。
                 if (__schema.Value < 3) {
                     SidebarOrderEntry.Value = "";
                     __schema.Value = 3;
@@ -497,29 +449,25 @@ public partial class SR : ITweak {
             } catch (Exception __ex) { Guard.Log("清理侧栏顺序历史值", __ex); }
             SidebarW = SidebarWEntry.Value;
             SidebarWEntry.SettingChanged += (s, e) => SidebarW = SidebarWEntry.Value;
-            // 加载后清理已迁到 Experiments.cs（section 同时改为 Experiments，界面位置不变）
                     _allEnabledEntry = plugin.Config.Bind(Keys.Settings, Keys.AllEnabled, false, "整个 Mod 的总开关. 关掉以后所有内部功能都不生效, 但每个功能的开关值不会被改掉.\n默认是关的, 改动会自动保存, 下次启动保持上次的状态.");
             AllEnabled = _allEnabledEntry.Value;
-            // 总开关关闭也走 FireDismissUi（与换场景、对局开始、EX 强制回主界面并列）
+            // 总开关关闭也走 FireDismissUi（与换场景、对局开始、EX 强制回主界面同理）。
             _allEnabledEntry.SettingChanged += (s, e) => {
                 AllEnabled = _allEnabledEntry.Value;
                 if (!AllEnabled) {
                     try { FireDismissUi(); } catch (Exception __ex) { Guard.Log("总开关关闭时收起功能 UI", __ex); }
                 }
             };
-            // 外部插件默认启用；手动禁用的 GUID 记入本列表（deny-list），重启后保持禁用。
+            // 外部插件默认启用；手动禁用的 GUID 记入 deny-list，重启后保持禁用。
             _disabledPluginsEntry = plugin.Config.Bind(Keys.Settings, Keys.DisabledPlugins, "", "不想让它跟着管理器一起出现的外部插件, 把 GUID 填进来, 用分号隔开. 没写进来的默认启用.");
-            // 设置页顶部有专门的插件清单，这个原始 GUID 字符串条目不再显示
             SRApi.RowFilters.Add(SettingsHiddenDisabledPlugins);
-            // 窗口宽高 / XY 不暴露为设置条目（右下角拖拽即可，见 SR.Window.ApplyScaleToWindow）
             SRApi.RowFilters.Add(SettingsHiddenWindowGeometry);
             BlockInput = _blockInputEntry.Value;
             _blockInputEntry.SettingChanged += (s, e) => {
                 BlockInput = _blockInputEntry.Value;
                 ApplyEventSystemGate();
             };
-            // 窗口几何条目：在这里建一次并缓存到静态字段（SR.Window 拖动时直接写缓存条目）。
-            // 类型必须与历史写法一致（宽高 int，X/Y float），否则 BepInEx 会按新类型建出另一个条目。
+            // 窗口几何条目建一次并缓存；类型须与既有写法一致（宽高 int，X/Y float），否则 BepInEx 会另建条目。
             _winWidthEntry = plugin.Config.Bind(Keys.Settings, Keys.WinWidth, 720, "");
             _winHeightEntry = plugin.Config.Bind(Keys.Settings, Keys.WinHeight, 520, "");
             _winXEntry = plugin.Config.Bind(Keys.Settings, Keys.WinX, 30f, "");
@@ -532,10 +480,10 @@ public partial class SR : ITweak {
             GameObject go = new GameObject("SR_UCHManager");
             UnityEngine.Object.DontDestroyOnLoad(go);
             go.AddComponent<ManagerUI>();
-            // 换场景：复位全部 UI 状态，否则打开的管理器会冻结角色、停掉 GameControl 并禁用 EventSystem。
+            // 换场景：复位全部 UI 状态，否则管理器会冻结角色、停掉 GameControl 并禁用 EventSystem。
             SceneManager.activeSceneChanged += (a, b) => {
                 _stylesReady = false;
-                // 换场景：先通知各功能（FireSceneChanged），再请它们收起自己的 UI（FireDismissUi）。
+                // 先通知功能（FireSceneChanged），再请它们收起自己的 UI（FireDismissUi）。
                 try { FireSceneChanged(); } catch (Exception __ex) { Guard.Log("换场景通知功能", __ex); }
                 try { FireDismissUi(); } catch (Exception __ex) { Guard.Log("换场景时收起功能 UI", __ex); }
                 if (_visible) {
@@ -549,14 +497,13 @@ public partial class SR : ITweak {
                 }
                 try { ResetWheelState(); } catch (Exception __ex) { Guard.Log("SR.Core", __ex); }   // 清掉滑块 / 滚轮盾的跨帧残留
             };
-            // EnsureScanned / ApplyDisabledPlugins 不在此调用：其它 tweak 可能在本插件之后初始化，扫描在首帧 Update 跑。
+            // 扫描不在此调用：其它 tweak 可能晚于本插件初始化，改在首帧 Update 跑。
             try { Harmony.CreateAndPatchAll(typeof(SR)); } catch (Exception ex) { SR.LogError("SR 补丁注册失败: " + ex.Message); }
-            // 录键屏蔽表情系统的嵌套类不被 CreateAndPatchAll 递归发现，需单独注册；失败不影响其它补丁
+            // 录键屏蔽表情系统的嵌套类不被 CreateAndPatchAll 递归发现，需单独注册。
             try { Harmony.CreateAndPatchAll(typeof(EmoteBlockPatch)); } catch (Exception ex) { SR.LogWarn("录键屏蔽表情系统 补丁注册失败: " + ex.Message); }
         }
 
-        // 侧栏栏目自注册（SR.Nav(段, 顺序值) 越小越靠前；SR.NavHide(段) 有 cfg 段但不单独成栏目）。
-        // 按注册表重建侧栏栏目表：注册顺序值排序 -> 兜底 cfg 段 -> 自定义顺序；晚注册也必须立刻生效。
+        // 侧栏栏目自注册（Nav 顺序值越小越靠前，NavHide 不成栏目）；晚注册也立即生效。
         private static void RebuildSections(bool resetSelection) {
 
             try {
@@ -568,7 +515,6 @@ public partial class SR : ITweak {
                     if (r != 0) return r;
                     return _navOrder.IndexOf(a).CompareTo(_navOrder.IndexOf(b)); // 同顺序值：按注册先后
                 });
-                // 已在底栏注册按钮的栏目不再出现在左栏
                 for (int i = 0; i < SRApi.FooterButtons.Count; i++) {
                     string fb = SRApi.FooterButtons[i] != null ? SRApi.FooterButtons[i].Id : null;
                     if (!string.IsNullOrEmpty(fb)) registered.Remove(fb);
@@ -576,7 +522,7 @@ public partial class SR : ITweak {
                 for (int i = 0; i < registered.Count; i++) {
                     if (!_internalSections.Contains(registered[i])) _internalSections.Add(registered[i]);
                 }
-                // 兜底：既没注册也没 NavHide 的 cfg 段（含老 cfg 残留段）排在注册项之后
+                // 兜底：既没注册也没 NavHide 的 cfg 段排最后
                 if (_internalConfig != null) {
                     foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
                         string sec = e.Definition.Section;
@@ -592,16 +538,15 @@ public partial class SR : ITweak {
                 }
                 ApplyCustomSidebarOrder(); // 侧栏自定义顺序（拖动栏目后排的）
                 if (resetSelection && _internalSections.Count > 0) _selectedInternalSection = _internalSections[0];
-                // 当前选中项被移除 / 改名 -> 回到第一个，避免显示空白页
+                // 选中项被移除 / 改名时回到第一个，避免空白页
                 if (_internalSections.Count > 0 && !_internalSections.Contains(_selectedInternalSection))
                     _selectedInternalSection = _internalSections[0];
             } catch (Exception __ex) { Guard.Log("重建侧栏栏目", __ex); }
         }
 
-        // 供自定义栏目在写完顺序后立刻生效
         public static void RebuildSectionsPublic(bool resetSelection) { RebuildSections(resetSelection); }
 
-        // 隐藏状态并入 Sidebar Order（隐藏的栏目名带 "!" 前缀）：顺序与可见性共用一份真值。
+        // 隐藏状态并入 Sidebar Order（隐藏项带 "!" 前缀），顺序与可见性共用一份真值。
         public static void SetSectionHidden(string sec, bool hidden) {
             try {
                 if (string.IsNullOrEmpty(sec)) return;
@@ -618,7 +563,7 @@ public partial class SR : ITweak {
                 RebuildSections(false);   // 内部已有"选中项被移除 -> 回到第一个"的兜底
             } catch (Exception __ex) { Guard.Log("隐藏侧栏栏目", __ex); }
         }
-        // Shift+右键还原：清空 Sidebar Order（排序 + 隐藏存在同一份串里），恢复按 Nav rank 的默认栏目顺序。
+        // Shift+右键还原：清空 Sidebar Order，恢复按 Nav rank 的默认顺序。
         public static void ResetSidebarOrder() {
             try {
                 if (SidebarOrderEntry != null) SidebarOrderEntry.Value = "";
@@ -628,7 +573,7 @@ public partial class SR : ITweak {
             } catch (Exception __ex) { Guard.Log("还原侧栏顺序", __ex); }
         }
 
-        // 晚注册：首次扫描之后再注册栏目 -> 立刻重建（否则静默不显示）
+        // 晚注册：首次扫描后注册栏目需立刻重建，否则静默不显示。
         private static void OnNavChanged(string sec) {
             if (!_scanned) return;   // 启动期注册：等 EnsureScanned 一次算完
             RebuildSections(false);
@@ -644,14 +589,12 @@ public partial class SR : ITweak {
             OnNavChanged(sec);
         }
 
-        // 正在打字登记（通用：任何有输入框的功能都能登记）；多个来源任一为真即认为"正在打字"。
+        // 正在打字登记：任一来源为真即认为在打字。
         private static readonly List<Func<bool>> _typingProviders = new List<Func<bool>>();
-        // OnGUI 按键捕获：IMGUI 的 KeyDown 事件在个别帧比 Input.GetKeyDown 更可靠（例如界面正在吞输入时）。
-        // 按键记录只保留两帧，ComboKeyDown 命中一次即消费，避免跨帧重复触发。
+        // OnGUI 按键捕获：界面吞输入时比 Input.GetKeyDown 可靠；记录只留两帧，命中即消费。
         private static int _guiKeyAt;
         private static readonly List<KeyCode> _guiKeys = new List<KeyCode>();
 
-        // 本帧是否有 IMGUI 记录的按键事件（CheckHotkeys 无输入短路用）。
         internal static bool GuiKeyThisFrame { get { return _guiKeys.Count > 0 && Time.frameCount - _guiKeyAt <= 1; } }
 
         internal static void RecordGuiKeyEvent(Event e) {
@@ -659,16 +602,13 @@ public partial class SR : ITweak {
                 if (e == null || e.type != EventType.KeyDown) return;
                 KeyCode k = e.keyCode;
                 if (k == KeyCode.None) return;
-                // 关键：Input.GetKeyDown 本轮已经上报过的键不再补记。
-                // 否则 Update 里读到一次、下一帧又从记录里读到一次，同一次按下会触发两遍
-                // （打开面板的键会"开了又立刻关"，表现就是界面打不开）。
+                // Input.GetKeyDown 已上报的键不再补记，否则同一次按下会触发两次（面板开了又关）。
                 if (Input.GetKeyDown(k)) return;
                 if (Time.frameCount - _guiKeyAt > 1) { _guiKeys.Clear(); _guiKeyAt = Time.frameCount; }
                 if (!_guiKeys.Contains(k)) _guiKeys.Add(k);
             } catch (Exception __ex) { Guard.Log("记录 IMGUI 按键", __ex); }
         }
 
-        // 消费一次记录（最多保留两帧），命中即移除，避免同一次按下触发两次。
         internal static bool ConsumeGuiKey(KeyCode k) {
             try {
                 if (_guiKeys.Count == 0) return false;
@@ -712,14 +652,11 @@ public partial class SR : ITweak {
                     instance = info.Instance,
                     path = SafeAssemblyPath(info.Instance)
                 };
-                // 用 MainPlugin 的编译期常量：与 [BepInPlugin] 同源，改名漏改会编译报错。
                 if (kv.Key == MainPlugin.PluginGuid) {
                     foundSelf = true;
                     _internalConfig = pe.config;
-                    // 启动期注册的功能键组合条目在这里才建得出来（此前 Bind 不了隐藏条目）
                     try { FlushPendingCombos(); } catch (Exception __ex) { Guard.Log("补建按键组合条目", __ex); }
-                    // 功能 / 外部模块自注册的配置迁移规则此时已登记完（本方法晚于全部 ITweak 与 EX 初始化），
-                    // 这里补跑一次；规则幂等，无人登记时零开销。
+                    // 本方法晚于全部 ITweak 与 EX 初始化，此处补跑一次迁移规则（幂等，无登记时零开销）。
                     try {
                         if (ConfigMigration.HasPending) {
                             string cfgPath = MainPlugin.Data != null ? MainPlugin.Data.ConfigFilePath : pe.config.ConfigFilePath;
@@ -730,12 +667,11 @@ public partial class SR : ITweak {
                             }
                         }
                     } catch (Exception __ex) { Guard.Log("功能自注册迁移规则", __ex); }
-                    // 关掉 BepInEx 的 SaveOnConfigSet，改由 FlushConfig（最多 1 秒一次）+ 关面板 Save + 各功能显式 Save。
+                    // 关掉 BepInEx 的 SaveOnConfigSet，改由 FlushConfig（最多 1 秒一次）+ 显式 Save 落盘。
                     try {
                         pe.config.SaveOnConfigSet = false;
                         pe.config.SettingChanged += OnAnySettingChanged;
                     } catch (Exception __ex) { Guard.Log("配置落盘节流初始化", __ex); }
-                    // 回填组合键持久化：功能 Initialize 早于本扫描，当时的组合修饰可能未落盘。
                     try {
                         foreach (var kme in new Dictionary<ConfigEntryBase, ComboMod>(_keyMods)) {
                             SetKeyComboMod(kme.Key, kme.Value);
@@ -747,18 +683,17 @@ public partial class SR : ITweak {
             }
             _externalPlugins.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.OrdinalIgnoreCase));
             RebuildSections(true);
-            // 栏目归属审计必须在 RebuildSections 之后（此时 _navRank / _navHidden 才完整）
+            // 栏目归属检查须在 RebuildSections 之后（此时 _navRank / _navHidden 才完整）
             try { SectionFallbackAudit(); } catch (Exception __ex) { Guard.Log("兜底栏目审计", __ex); }
-            // 迁移规则与当前真正被绑定的键比对（必须晚于全部功能的 Bind）
+            // 迁移规则须与真正被绑定的键比对，必须晚于全部功能的 Bind
             try { MigrationRuleAudit(); } catch (Exception __ex) { Guard.Log("迁移规则冲突自检", __ex); }
-            // 孤儿键审计同样必须在全部 Bind 之后（含 FlushPendingCombos 建的组合键条目），否则会大批误报。
+            // 孤儿键检查同样必须在全部 Bind 之后（含补建的组合键条目），否则会大批误报。
             try { OrphanAudit(); } catch (Exception __ex) { Guard.Log("配置孤儿键自检", __ex); }
             if (_externalPlugins.Count > 0) _pluginKey = _externalPlugins[0].guid;
             ApplyDisabledPlugins(); // 重新禁用上次会话禁用的插件
             ApplyCmOrder();         // 让 Configuration Manager 的条目顺序与 SR 界面一致（侧栏顺序 + 栏目内绑定顺序）
 
-            // 没命中自己的 GUID 就告警：靠 _internalConfig == null 判不出来（它从不为 null）。
-            // 此时 FlushPendingCombos / SaveOnConfigSet / 组合键回填都不跑，表现为组合键全丢、配置每次写盘。
+            // 没命中自己的 GUID 就告警：此时组合键补建 / 回填都不跑，表现为组合键全丢、配置每次写盘。
             if (!foundSelf && !_warnedNoSelfGuid) {
                 _warnedNoSelfGuid = true;
                 try {
@@ -768,10 +703,10 @@ public partial class SR : ITweak {
             }
         }
 
-        // 供契约层转发（SRApi.CloseMenu）：功能页要打开游戏自己的界面时先收起本面板。
+        // 供 SRApi.CloseMenu 转发：功能页要开游戏自己的界面时先收起本面板。
         public static void CloseMenuExternal() { CloseMenu(); }
 
-        // 供契约层转发（SRApi.OpenMenu）：从游戏界面返回后自动把管理器重新打开。
+        // 供 SRApi.OpenMenu 转发：从游戏界面返回后把管理器重新打开。
         public static void OpenMenuExternal() {
             try {
                 _visible = true;
@@ -779,8 +714,7 @@ public partial class SR : ITweak {
                 EnsureStyles();
             } catch (Exception __ex) { Guard.Log("OpenMenuExternal", __ex); }
             finally {
-                // EnsureStyles 会写 GUI.skin.settings.selectionColor（共享皮肤）：这里不在绘制期，必须马上还原，
-                // 否则游戏/其它插件界面会沿用我们的选中色。
+                // EnsureStyles 写了共享皮肤的选择色，此处不在绘制期，须马上还原。
                 try { RestoreSkinSelectionColor(); } catch (Exception __rc) { Guard.Log("OpenMenuExternal/还原选中色", __rc); }
             }
         }
@@ -791,10 +725,10 @@ public partial class SR : ITweak {
             ConfigFile[] __dcs = new ConfigFile[_dirtyConfigs.Count];
             _dirtyConfigs.CopyTo(__dcs);
             _dirty = false;
-            // 关闭菜单时保存配置，失败记日志（逐个保存，一个失败不影响其它）
+            // 关闭菜单时逐个保存，单个失败不影响其它。
             for (int __i = 0; __i < __dcs.Length; __i++) {
                 ConfigFile __dc = __dcs[__i];
-                // 成功才移除：写盘失败（占用/只读/磁盘满）时保留脏标记，下一次 Tick 会重试。
+                // 成功才移除：写盘失败时保留脏标记，下一次 Tick 重试。
                 try { __dc.Save(); _dirtyConfigs.Remove(__dc); }
                 catch (Exception __se) { Guard.Log("关闭菜单时保存配置 " + (__dc.ConfigFilePath ?? "?"), __se); }
             }
@@ -802,24 +736,22 @@ public partial class SR : ITweak {
             try { ResetWheelState(); } catch (Exception __ex) { Guard.Log("CloseMenu", __ex); }   // 清掉滑块 / 滚轮盾的跨帧残留
         }
 
-        // 本 Mod 总开关在设置页不重复成行（搜索栏右侧已有专用按钮）
+        // 总开关不在设置页重复成行（搜索栏右侧已有专用按钮）
         private static bool AllEnabledRowHidden(ConfigEntryBase e) {
             return !(e.Definition.Section == "Settings" && e.Definition.Key == "All Enabled");
         }
 
-        // 管理器自己的界面文案与侧栏注册
         private static void SelfRegCore() {
             SRApi.RowFilters.Add(AllEnabledRowHidden); // 设置页不重复显示本 Mod 总开关
             SR.LocSec("Settings", "设置", null);
             SR.NavHide("Settings"); // 设置页是独立顶层页（不占内部侧栏栏目）
-            // 已删除功能的段名不能让老 cfg 残留段出现在侧栏；名单在 ConfigMigration，核心不维护功能名单。
+            // 已删除功能的段名不能让残留段出现在侧栏；名单由 ConfigMigration 维护。
             for (int i = 0; i < ConfigMigration.DeletedSections.Length; i++)
                 SR.NavHide(ConfigMigration.DeletedSections[i]);
             SR.LocSec("Home", "首页", null);
             SR.Nav("Home", 10); // 首页自己的侧栏栏目（顺序 10）
             SR.RegisterPage("Home", RenderHomePage); // 首页也走自绘页注册表（SR.Window 不做 if-else 分派）
-            // 底栏入口按"先注册先显示"排列：通知在功能 Initialize 里注册（先），
-            // 自检在这里排第一帧再注册，确保顺序是 设置 | 通知 | 自检。
+            // 底栏入口先注册先显示：通知在功能 Initialize 注册，自检首帧注册，顺序为 设置 | 通知 | 自检。
             SR.RegisterTick("底栏-自检入口", delegate {
                 if (_selfCheckFooterDone) return;
                 _selfCheckFooterDone = true;
@@ -829,7 +761,7 @@ public partial class SR : ITweak {
                 } catch (Exception __fe) { Guard.Log("底栏-自检入口", __fe); }
             });
             SR.LocKey(Keys.Settings, Keys.UiScale, "界面缩放", null);
-            // 统一登记：功能页里没有自带 LocDesc 的可见条目（3 行：是什么 / 怎么用 / 注意；默认值由核心追加）。
+            // 登记无自带 LocDesc 的可见条目（是什么 / 怎么用 / 注意；默认值由核心追加）。
             SR.LocDesc("Chat", "Log Limit", "聊天记录条数\n最多保留多少条聊天消息\n超出后丢弃最旧的；仅本模组记录页", "Chat log limit\nhow many chat messages to keep\noldest dropped first; this mod's log page only");
             SR.LocDesc("Level", "Party Bomb", "派对盒炸弹\n开派对盒时按概率生成炸弹\n需要房主权限；仅派对盒阶段", "Party box bomb\nchance to spawn a bomb when a party box opens\nhost only; party-box phase only");
             SR.LocDesc("Level", "Party Bomb Type", "派对盒炸弹种类\n决定生成哪一种炸弹\n与游戏内炸弹类型一一对应", "Party box bomb type\nwhich bomb the party box spawns\nmatches the game's bomb types");
@@ -845,7 +777,7 @@ public partial class SR : ITweak {
             SR.LocDesc("Chat Window", "Key Defaults v2", "内部标记：键位默认值已迁移\n仅配置迁移使用\n改动不会产生任何效果", "Internal flag: key defaults migrated\nconfig migration only\nchanging it has no effect");
             SR.LocDesc("Chat Window", "Defaults v3", "内部标记：字号默认值已迁移\n仅配置迁移使用\n改动不会产生任何效果", "Internal flag: font defaults migrated\nconfig migration only\nchanging it has no effect");
             SR.LocDesc(Keys.Settings, Keys.UiScale, "界面缩放\n整个界面按比例放大，1.0 为原始大小\n范围 0.5 到 2；字太小可适当调大", "UI scale\nscales the whole interface; 1.0 is the original size\nrange 0.5-2; increase it if the text is too small");
-            // 核心自己的设置项也走"行扩展点"：设置页因此只有一份滑块绘制代码，语言下拉不按 section/key 硬编码。
+            // 核心设置项也走行扩展点，设置页因此只有一份滑块绘制代码。
             SRApi.RowSliders.Add(SettingsSliderRange);
             SR.RowComboOptions.Add(SettingsComboOptions);
             SR.LocKey(Keys.Settings, Keys.DisabledPlugins, "禁用的外部插件", null);
@@ -868,8 +800,7 @@ public partial class SR : ITweak {
         }
 
 // 分区：Guard（可观测性：统一带日志的 try / catch 包装）
-// 实现只有一份，在契约层 SRApi.Guard（去重窗口 / 计数 / LastWhat）；这里只做转发，
-// 避免两套去重表与两套计数同时存在导致日志与统计不一致。
+// 实现在契约层 SRApi.Guard，这里只转发。
         public static class Guard {
             public static void Try(string what, Action action) { SRApi.Guard.Try(what, action); }
             public static T Try<T>(string what, Func<T> action, T fallback) { return SRApi.Guard.Try(what, action, fallback); }

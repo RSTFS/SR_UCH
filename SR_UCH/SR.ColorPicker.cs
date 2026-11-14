@@ -1,5 +1,5 @@
-// 颜色选择器（统一调色板）：功能层只用 SRApi.Ctl.ColorEdit / ColorSwatch / ColorPanel / PreviewColor / ResetColor。
-// 布局对齐 ImGui ColorPicker3；展开 / 拖动 / 输入状态全部按 ConfigEntryBase 保存在这里，核心只负责转发。
+// 颜色选择器（统一调色板）：功能层只用 SRApi.Ctl.ColorEdit / ColorSwatch / ColorPanel / PreviewColor。
+// 版式对齐 ImGui ColorPicker3；展开 / 拖动 / 输入状态按 ConfigEntryBase 保存在此，核心只转发。
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -11,12 +11,9 @@ public partial class SR {
 
 // 分区：ColorPicker（统一调色板控件）
 
-    // ================= 颜色选择器（统一调色板）=================
-    // 功能层只用 SRApi.Ctl.ColorEdit / ColorSwatch / ColorPanel / PreviewColor / ResetColor。
-    // 版式对齐 ImGui ColorPicker3：预览行 → 饱和度×明度方块（H 固定）+ 竖向色相条 → 24 色常用色网格
-    // → H/S/V 三行 → RGB 三行 → Hex 行 → 复制/粘贴/还原默认。
-    // 直接拖动方块 / 色相条时只改“预览色”（Dirty），鼠标松开或回车才写盘；文本输入回车 / 失焦提交；
-    // 切条目、收起、关窗、切页仍由 Close / Tick 兜底提交。展开、拖动、输入状态全部按 ConfigEntryBase 保存在这里。
+    // ================= 颜色选择器（统一调色板）================
+    // 版式：预览行 -> SV 方块 + 色相条 -> 常用色网格 -> HSV -> RGB -> Hex。
+    // 拖动只改预览色，松开或回车才写盘；切条目 / 收起 / 关窗由 Close / Tick 兜底提交。
     internal static class ColorPicker {
         // 常用色：8 档灰阶 + 16 常见色（12 列 × 2 行，对应 ImGui 的 palette 区）。
         private static readonly string[] Palette = new string[] {
@@ -32,7 +29,6 @@ public partial class SR {
         private static float _svTexHue = -1f;
         private static Color32[] _svPixels;
 
-        // 一个颜色键的可变状态。
         private sealed class State {
             public bool Open;          // 调色板是否展开
             public float H, S = 1f, V = 1f;
@@ -46,7 +42,6 @@ public partial class SR {
             public int Drag;           // 0=无 1=S/V 方块 2=色相条
         }
 
-        // 配置重读 / 条目重建时清空调色板状态（与 _enumOptions / _editText 同批失效）。
         internal static void ClearStates() {
             try { _states.Clear(); } catch (Exception __ex) { Guard.Log("清空调色板状态", __ex); }
         }
@@ -57,23 +52,20 @@ public partial class SR {
         private const string HexField = "SR_ColorHex";
         private static readonly string[] RgbFields = new string[] { "SR_ColorR", "SR_ColorG", "SR_ColorB" };
 
-        // 契约层门面注入：由 Ctl 的静态构造器调用一次。
         internal static void Wire() {
             SRApi.Ctl.WireColorPicker(Edit, Swatch, Panel, Preview, Reset);
         }
 
-        // 每帧兜底落盘：首次使用时挂上（此时 SR 已初始化，RegisterTick 一定可用）。
         private static void EnsureTick() {
             if (_tickHooked) return;
             _tickHooked = true;
             try { RegisterTick("颜色调色板兜底落盘", Tick); }
             catch (Exception __rt) {
-                // 注册失败就等于没有兜底：至少记一条，并且立刻提交一次当前展开项。
                 Guard.Log("颜色调色板兜底 tick 注册失败", __rt);
                 try { if (_open != null) { State __s; if (_states.TryGetValue(_open, out __s)) Commit(_open, __s); } }
                 catch (Exception __im) { Guard.Log("颜色调色板立即提交", __im); }
             }
-            // 收起面板 / 换页时显式收尾：颜色预览与文本输入都在此落盘，不依赖"窗口是否还在绘制"。
+            // 收起面板 / 换页时显式收尾：颜色预览与文本输入在此落盘，不依赖窗口是否仍绘制。
             try {
                 SRApi.RegisterDismissHook(delegate {
                     try {
@@ -89,10 +81,9 @@ public partial class SR {
 
         private static State Get(ConfigEntryBase e) {
             State s;
-            // 容量上限：配置重读后条目对象会重建，旧键会留成僵尸（评审 G4）。
-            // 真正的一致失效由 ClearStates() 负责，这里只做兜底。
+            // 容量上限：配置重读后旧条目会留成僵尸；一致失效由 ClearStates 负责，这里只兜底。
             if (_states.Count > 128) {
-                    // 只清"非当前编辑项"：正在拖动/有未提交文本的 State 一旦被清，用户刚调的颜色就没了。
+                    // 只清非当前编辑项：清掉会丢用户刚调的颜色。
                     var __keep = _open;
                     _states.Clear();
                     if (__keep != null) _states[__keep] = default(State);
@@ -106,7 +97,7 @@ public partial class SR {
 
         // ------------------------- 对外三件套 -------------------------
 
-        // 颜色条目：标签（点名称还原默认色）+ 色块（点开展开/收起）+ 展开后的调色板。
+        // 颜色条目：标签（点名称还原默认色）+ 色块（点开展开 / 收起）+ 展开后的调色板。
         public static bool Edit(GUIContent label, ConfigEntryBase e, float width, float height) {
             if (e == null) return false;
             EnsureTick();
@@ -128,7 +119,6 @@ public partial class SR {
             return changed;
         }
 
-        // 只画一个色块按钮（无标签），返回是否被点击；供自绘行使用。
         public static bool Swatch(Rect r, ConfigEntryBase e) {
             if (e == null) return false;
             EnsureTick();
@@ -145,7 +135,6 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("颜色色块", __ex); return false; }
         }
 
-        // 自绘行在 EndHorizontal 之后调用：该条目展开时画统一调色板，收起时什么都不画。
         public static void Panel(ConfigEntryBase e) {
             if (e == null) return;
             State s;
@@ -153,7 +142,6 @@ public partial class SR {
             try { DrawPanel(e, s); } catch (Exception __ex) { Guard.Log("颜色调色板", __ex); }
         }
 
-        // 未落盘的预览色（null = 没有预览，调用方读配置值）。
         public static Color? Preview(ConfigEntryBase e) {
             try {
                 State s;
@@ -162,7 +150,6 @@ public partial class SR {
             } catch { return null; }
         }
 
-        // 写回该颜色键的默认值（点名称 / 调色板里的「还原默认」共用）。
         public static void Reset(ConfigEntryBase e) {
             if (e == null) return;
             try {
@@ -181,19 +168,17 @@ public partial class SR {
             return Color.HSVToRGB(Mathf.Clamp01(s.H), Mathf.Clamp01(s.S), Mathf.Clamp01(s.V));
         }
 
-        // 预览/写盘统一走 Color32 量化：预览、hex 标签与实际文字颜色完全一致。
         private static Color Quant(Color c) {
             return SRApi.ColorHex.FromColor32(SRApi.ColorHex.ToColor32(c));
         }
 
-        // RGB→HSV；keepHueIfGray 时 V=0 或 S=0 保留原色相（ImGui 行为，拖到底不丢 hue）。
+        // RGB→HSV；keepHueIfGray 时 V=0 或 S=0 保留原色相。
         private static void PickFrom(State s, Color c, bool keepHueIfGray) {
             try {
                 c = Quant(c);
                 float h, sat, v;
                 Color.RGBToHSV(c, out h, out sat, out v);
-                // 注意不能用 Mathf.Repeat(h, 1f)：h 正好为 1 时会被折成 0，表现为色相条拖到最右端后
-            // 颜色直接跳回红色（用户反馈 4）。这里把 1 夹成 0.99999，色相连续。
+                // 不能用 Mathf.Repeat：h 为 1 时会被折成 0，色相条拖到最右端会跳回红色。
             if (!keepHueIfGray || (sat > 0.0001f && v > 0.0001f)) s.H = h >= 1f ? 0.99999f : (h <= 0f ? 0f : h);
                 s.S = Mathf.Clamp01(sat);
                 s.V = Mathf.Clamp01(v);
@@ -220,10 +205,9 @@ public partial class SR {
             Load(s, ReadColor(e));
         }
 
-        // 收起：先把拖动/输入中的预览写回，避免预览色留在界面上。
         private static void Close(ConfigEntryBase e, State s) {
             try {
-                // 顺序与 ImGui 一致：先提交预览，再提交文本（文本是最后一次编辑，必须最后生效）。
+                // 先提交预览再提交文本（文本是最后一次编辑，须最后生效）。
                 Commit(e, s);
                 if (s.TextPending) FlushText(e, s);
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -236,7 +220,6 @@ public partial class SR {
             if (ReferenceEquals(_open, e)) _open = null;
         }
 
-        // 立即落盘（只在色板/方块/色相条/滑块/文本改动后调用；拖动过程中不写配置）。
         private static void Commit(ConfigEntryBase e, State s) {
             try {
                 if (!s.Dirty || e == null) return;
@@ -247,7 +230,7 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("颜色写入", __ex); }
         }
 
-        // 应用一个颜色：commit=true 时同时写配置（色板 / 粘贴）。
+        // 应用颜色；commit=true 时同时写配置。
         private static void Apply(ConfigEntryBase e, State s, Color c, bool keepHueIfGray, bool commit) {
             PickFrom(s, c, keepHueIfGray);
             s.TextPending = false;
@@ -256,14 +239,13 @@ public partial class SR {
             if (commit) Commit(e, s);
         }
 
-        // 兜底落盘：切页 / 关窗后调色板不再绘制，把预览与输入框里的值写回。
+        // 兜底落盘：切页 / 关窗后调色板不再绘制。
         private static void Tick() {
             try {
                 State s;
                 if (_open == null || !_states.TryGetValue(_open, out s)) return;
-                // 拖动中丢失 MouseUp（指针移出窗口后松开、或被别的控件吃掉事件）时，
-                // Dirty 会永久留着、预览色永不落盘（audit 05-P0-5）。
-                // 只要鼠标已经完全松开，就补一次提交 —— 这条必须在"8 帧内跳过"之前。
+                // 拖动中丢失 MouseUp（指针移出窗口或事件被吃掉）会让 Dirty 永久留着、预览永不落盘。
+                // 只要鼠标已完全松开就补一次提交，这条必须在"8 帧内跳过"之前。
                 try {
                     if (s.Dirty && !Input.GetMouseButton(0) && !Input.GetMouseButton(1)) Commit(_open, s);
                 } catch (Exception __dm) { Guard.Log("颜色兜底提交", __dm); }
@@ -299,15 +281,15 @@ public partial class SR {
 
         // ------------------------- 绘制 -------------------------
 
-        // 面板宽度：默认 340 设计单位；窗口变窄时按可用宽度收缩（低于 240 时优先不撑破页面）。
+        // 面板宽度：默认 340 设计单位，窗口变窄时按可用宽度收缩。
         private static float PanelWidth() {
             float avail = AvailWidth();
-            // 两列布局后需要更宽：左 150+24+8，右至少 150，加内边距
+            // 两列布局：左 150+24+8，右至少 150，加内边距
             float pw = Mathf.Min(Sc(460f), avail);
             return Mathf.Max(Sc(120f), pw);
         }
 
-        // 内容区可用宽度：优先 ContentArea，其次窗口宽度扣侧栏；下限 120，避免除零。
+        // 内容区可用宽度：优先 ContentArea，其次窗口宽度扣侧栏；下限 120 避免除零。
         private static float AvailWidth() {
             float w = 0f;
             try { w = ContentArea.width; } catch { w = 0f; }
@@ -316,13 +298,11 @@ public partial class SR {
             return Mathf.Max(Sc(120f), w - Sc(12f));
         }
 
-        // 文本测量：标签列按当前语言的实测宽度计算，不再写死 34 / 14。
         private static float TextW(string text, GUIStyle st) {
             try { return st != null ? st.CalcSize(new GUIContent(text ?? "")).x : Sc(24f); }
             catch { return Sc(24f); }
         }
 
-        // 同一列取最大值 + 8px：用于 H/S/V、RGB、Hex 的标签列。
         private static float LabelCol(params string[] texts) {
             float w = 0f;
             if (texts != null) {
@@ -338,7 +318,7 @@ public partial class SR {
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
-        // 右栏内容总高度（用于让 SV 正方形边长 = 右栏高度）：色板网格 + HSV×3 + RGB + HEX + 间距。
+        // 右栏内容总高（让 SV 正方形边长 = 右栏高度）。
         private static float RightColumnH(float rightW) {
             try {
                 float gap = Sc(3f);
@@ -364,10 +344,7 @@ public partial class SR {
                 DrawHeader(e, s, pw);
                 GUILayout.Space(Sc(6f));
 
-                // 两列：左边 SV 方块 + 色相条；右边 色板 / HSV / RGB / HEX。
-                // 用户要求：SV 方块必须是**正方形**，且高度与右栏内容对齐。
-                // 做法：先按"右栏内容高度"求方块边长（右栏宽度反过来由剩余空间决定，迭代 3 次收敛），
-                // 方块边长 = 右栏高度 = 正方形边长；色相条同高。
+                // 两列布局；SV 方块须为正方形：先按右栏内容高求边长，宽度由剩余空间反推，迭代 3 次收敛。
                 float hueW = Sc(24f), gap = Sc(8f);
                 float side = Sc(150f);
                 float rightW = 0f;
@@ -388,7 +365,6 @@ public partial class SR {
                     try {
                         DrawPaletteGrid(e, s, rightW);
                         GUILayout.Space(Sc(4f));
-                        // H/S/V 与 Hex 共用同一标签列：取当前语言里最宽的文本 + 8px。
                         float labelW = LabelCol(T("色相", "Hue"), T("饱和", "Sat"), T("明度", "Val"), "Hex");
                         DrawHsvRow(e, s, T("色相", "Hue"), 0, 0f, 360f, rightW, labelW);
                         DrawHsvRow(e, s, T("饱和", "Sat"), 1, 0f, 100f, rightW, labelW);
@@ -400,7 +376,6 @@ public partial class SR {
                 } finally { GUILayout.EndHorizontal(); }
             } finally { GUILayout.EndVertical(); }
 
-            // 回车提交（不吞其它按键）；失焦提交；方块/色相条/HSV 滑块松手提交。
             if (enterText) ApplyText(e, s);
             else if (enter && s.Dirty) Commit(e, s);
             HandleFocus(e, s);
@@ -411,7 +386,7 @@ public partial class SR {
             }
         }
 
-        // 预览色块 + #RRGGBB + 收起：ImGui ColorPicker 的顶部预览行。
+        // 预览色块 + #RRGGBB：ImGui ColorPicker 的顶部预览行。
         private static void DrawHeader(ConfigEntryBase e, State s, float pw) {
             float h = Ctl.ControlH();
             float hexW = TextW("#FFFFFF", Ctl.Label) + Sc(8f);
@@ -422,13 +397,12 @@ public partial class SR {
                 PreviewBox(pv, Quant(PickerColor(s)));
                 GUILayout.Label(SRApi.ColorHex.ToHex(PickerColor(s)), Ctl.Label, GUILayout.Width(hexW), GUILayout.Height(h));
                 GUILayout.FlexibleSpace();
-                // 用户要求：不再提供 复制 / 粘贴 / 还原默认 / 收起。
-                // 面板的开合仍由色块点击控制（与列表里的开关行为一致）。
+                // 不提供复制 / 粘贴 / 还原默认；面板开合由色块点击控制。
             } catch (Exception __ex) { Guard.Log("调色板顶栏", __ex); }
             GUILayout.EndHorizontal();
         }
 
-        // 色板主体：左边饱和度×明度**正方形**，右边竖向色相条（同高）。
+        // 色板主体：左 SV 正方形，右竖向色相条（同高）。
         private static void DrawSvBlock(ConfigEntryBase e, State s, float side) {
             float hueW = Sc(24f), gap = Sc(8f);
             Rect sq = default(Rect), hb = default(Rect);
@@ -443,7 +417,6 @@ public partial class SR {
             DrawHueBar(e, s, hb);
         }
 
-        // 饱和度（X）× 明度（Y）二维方块：H 固定；贴图只随 H 变化，拖动时每秒最多重建几十次小图。
         private static void DrawSvSquare(ConfigEntryBase e, State s, Rect r) {
             if (r.width <= 0f || r.height <= 0f) return;
             DrawFill(r, Color.black);
@@ -469,7 +442,7 @@ public partial class SR {
             HoverTip(r, T("拖动选择饱和度与明度；松开写入配置", "drag to pick saturation/value; release to apply"));
         }
 
-        // 竖向色相条：顶部 0°、底部 360°，点击/拖动立即更新预览，松开落盘。
+        // 竖向色相条：顶部 0°、底部 360°，点击 / 拖动立刻更新预览。
         private static void DrawHueBar(ConfigEntryBase e, State s, Rect r) {
             if (r.width <= 0f || r.height <= 0f) return;
             int n = 96;
@@ -487,7 +460,6 @@ public partial class SR {
             HoverTip(r, T("拖动选择色相；松开写入配置", "drag to pick hue; release to apply"));
         }
 
-        // S/V 方块命中：按下、拖动只改预览；松开写盘。
         private static void HandleSvInput(ConfigEntryBase e, State s, Rect r) {
             Event ev = Event.current;
             if (ev == null || r.width <= 0f || r.height <= 0f) return;
@@ -520,7 +492,6 @@ public partial class SR {
             s.V = Mathf.Clamp01(1f - (mp.y - r.y) / Mathf.Max(1f, r.height));
         }
 
-        // 色相条命中：按下、拖动只改预览；松开写盘。
         private static void HandleHueInput(ConfigEntryBase e, State s, Rect r) {
             Event ev = Event.current;
             if (ev == null || r.height <= 0f) return;
@@ -549,13 +520,11 @@ public partial class SR {
         }
 
         private static void SetHueFromRect(State s, Rect r, Vector2 mp) {
-            // 不能对归一化色相用 Mathf.Repeat：拖到底（t=1，或拖出条外被夹到 1）会被折成 0，
-            // 表现为滑块从底部瞬移到顶部。上限留一个极小余量，视觉仍是 360°（= 红），但不会回绕。
+            // 不能对归一化色相用 Mathf.Repeat：拖到底会被折成 0，滑块会瞬移到顶部；上限留极小余量。
             float t = Mathf.Clamp01((mp.y - r.y) / Mathf.Max(1f, r.height));
             s.H = Mathf.Min(t, 0.99999f);
         }
 
-        // 24 色网格，点击即应用；当前色用黑白双描边高亮。
         private static void DrawPaletteGrid(ConfigEntryBase e, State s, float pw) {
             float gap = Sc(3f);
             float cw = Mathf.Clamp((pw - (PaletteCols - 1) * gap) / PaletteCols, Sc(10f), Sc(28f));
@@ -571,7 +540,6 @@ public partial class SR {
             }
         }
 
-        // 单个色板格子：填充 + 外黑描边 + 选中白内框 + 悬停 hex 提示 + 点击判定。
         private static bool DrawCell(Rect r, Color c, bool selected, string tip) {
             DrawFill(r, c);
             Ring(r, new Color(0f, 0f, 0f, selected ? 0.9f : 0.4f));
@@ -581,7 +549,7 @@ public partial class SR {
             return GUI.Button(r, new GUIContent("", tip), GUIStyle.none);
         }
 
-        // H/S/V 一行：自适应标签列 + 滑块（整数步进）+ 读数；拖动只改预览，松手由 DrawPanel 落盘。
+        // H/S/V 一行：标签列 + 整数滑块 + 读数；拖动只改预览。
         private static void DrawHsvRow(ConfigEntryBase e, State s, string label, int which, float min, float max, float pw, float labelW) {
             float rowH = Ctl.ControlH();
             float numW = TextW("360", Ctl.Label) + Sc(8f);
@@ -606,7 +574,7 @@ public partial class SR {
             SyncText(s, false);
         }
 
-        // R/G/B 整数输入（0-255）：三格都合法即时预览，回车/失焦提交；非法格红框。
+        // R/G/B 整数输入（0-255）：三格都合法即时预览，非法格红框。
         private static void DrawRgbRow(ConfigEntryBase e, State s, float pw) {
             float rowH = Ctl.ControlH();
             float labelW = LabelCol("R", "G", "B");
@@ -633,7 +601,6 @@ public partial class SR {
             GUILayout.EndHorizontal();
         }
 
-        // 三格都合法才更新预览（非法格保持上一次的有效值）。
         private static void ApplyRgbPreview(State s) {
             int r, g, b;
             if (!TryParseComp(s.Rgb[0], out r)) return;
@@ -644,7 +611,7 @@ public partial class SR {
             SyncText(s, false);
         }
 
-        // Hex 输入：#RRGGBB；内容非法时实时红框，回车/失焦回退为当前色。
+        // Hex 输入：#RRGGBB；非法时实时红框，回车 / 失焦回退为当前色。
         private static void DrawHexRow(ConfigEntryBase e, State s, float pw, float labelW) {
             float rowH = Ctl.ControlH();
             float hintW = Mathf.Max(Sc(56f), TextW(T("回车应用", "Enter to apply"), Ctl.Label) + Sc(8f));
@@ -653,8 +620,7 @@ public partial class SR {
             try {
                 GUILayout.Label("Hex", Ctl.Label, GUILayout.Width(labelW), GUILayout.Height(rowH));
                 GUI.SetNextControlName(HexField);
-                // 不强制钳制输入：允许先输入（含 # / 简写 / 多余字符），
-                // 只在回车或失焦时解析；解析失败才回退到当前颜色（输入过程中只画红框提示）。
+                // 不强制钳制输入：允许先输入，只在回车或失焦时解析，失败才回退当前色。
                 s.HexEdit = GUILayout.TextField(s.HexEdit ?? "", 16, Ctl.SearchBox, GUILayout.Width(fieldW), GUILayout.Height(rowH));
                 Rect fr = GUILayoutUtility.GetLastRect();
                 Color probe;
@@ -665,8 +631,7 @@ public partial class SR {
             if (!string.Equals(s.HexEdit, SRApi.ColorHex.ToHex(PickerColor(s)))) s.TextPending = true;
         }
 
-        // 当前 H 对应的 S/V 方块贴图：像素 (x,y) = HSV(H, x/(w-1), y/(h-1))。
-        // 只随 H 变化；拖动色相条时逐帧重建 96×96 小图，开销远低于逐格 DrawFill。
+        // 当前 H 对应的 S/V 方块贴图；拖动时逐帧重建小图，开销远低于逐格填充。
         private static Texture2D SvTexture(float h) {
             h = Mathf.Repeat(h, 1f);
             if (_svTex != null && Mathf.Abs(_svTexHue - h) < 0.0005f) return _svTex;
@@ -695,12 +660,11 @@ public partial class SR {
 
         // ------------------------- 输入 / 焦点 -------------------------
 
-        // 回车：hex 优先（合法则应用，非法回退文本），RGB 三格合法则应用；随后落盘。
+        // 回车：hex 优先，RGB 三格合法则应用，随后落盘。
         private static void ApplyText(ConfigEntryBase e, State s) {
             try {
                 Color c;
                 if (IsFocused(HexField)) {
-                    // 合法才应用；不合法就**回退成当前颜色**（这就是"输入不正确才钳制"）。
                     if (SRApi.ColorHex.ParseHex(s.HexEdit, out c)) { PickFrom(s, c, true); s.Dirty = true; }
                     else { s.HexEdit = SRApi.ColorHex.ToHex(PickerColor(s)); }
                     Commit(e, s);
@@ -718,7 +682,6 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("调色板输入", __ex); }
         }
 
-        // 失焦提交：hex/RGB 输入框失去焦点即校验并落盘（与 ImGui 的输入框一致）。
         private static void HandleFocus(ConfigEntryBase e, State s) {
             try {
                 string cur = null;
@@ -748,8 +711,7 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("调色板失焦", __ex); }
         }
 
-        // 不依赖 GUI 焦点地解析文本并写盘（关窗时兜底）：hex 优先，其次 RGB 三格。
-        // 写完把 H/S/V 与预览标记一起对齐，避免下一次 Commit 用旧预览把文本值覆盖回去。
+        // 不依赖 GUI 焦点地解析文本并写盘（关窗兜底）；写完对齐 HSV 与预览标记，避免旧预览覆盖文本值。
         private static void FlushText(ConfigEntryBase e, State s) {
             try {
                 s.TextPending = false;
@@ -771,7 +733,6 @@ public partial class SR {
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
-        // 单个分量（0-255）：空串/非数字/越界都算非法。
         private static bool TryParseComp(string str, out int v) {
             v = 0;
             try {
@@ -811,7 +772,7 @@ public partial class SR {
 
         // ------------------------- 绘制原语 -------------------------
 
-        // 1px 描边（白贴图着色）：色板选中框、色块边界、输入框错误提示共用。
+        // 1px 描边（白贴图着色），多处共用。
         private static void Ring(Rect r, Color c) {
             if (Event.current == null || Event.current.type != EventType.Repaint) return;
             DrawFill(new Rect(r.x, r.y, r.width, 1f), c);
@@ -820,7 +781,6 @@ public partial class SR {
             DrawFill(new Rect(r.xMax - 1f, r.y, 1f, r.height), c);
         }
 
-        // 预览色块：外黑内白双描边，浅色/深色色块上边界都清楚。
         private static void PreviewBox(Rect r, Color c) {
             DrawFill(r, c);
             Ring(r, new Color(0f, 0f, 0f, 0.9f));

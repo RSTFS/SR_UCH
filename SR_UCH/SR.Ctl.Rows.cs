@@ -1,5 +1,4 @@
-// 控件门面 · 统一行控件（标签 + 控件：行下拉 / 行滑块 / 标签列宽）。
-// 从 SR.Ctl.cs 拆出来只为控制单文件规模，行为不变。
+// 控件门面 · 统一行控件：标签 + 控件（行下拉 / 行滑块 / 标签列宽）。
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -13,13 +12,13 @@ public partial class SR {
 
         internal static void EndLabelColumnFrame() { if (Mathf.Abs(_labelColCur - _labelColPrev) > 0.5f) _labelColPrev = _labelColCur; }
 
-        // 标签列统一 token（所有页面/所有行控件共用；间距/上下限只改这里）。
+        // 标签列 token；间距与上下限只改这里。
         private static readonly float LabelMinW = Sc(48f);
         private static readonly float LabelMaxW = Sc(180f);
         private static readonly float LabelPadW = Sc(10f);
         private static readonly float LabelSlackW = Sc(60f);
 
-        // 文本宽度缓存：同一标签每帧会被多行控件重复测量；按「语言版本 + UI 缩放」失效。
+        // 文本宽度缓存：按「语言版本 + UI 缩放」失效。
         private static readonly Dictionary<string, float> _labelWCache = new Dictionary<string, float>();
         private static int _labelWCacheLang = -1;
         private static float _labelWCacheScale = -1f;
@@ -38,13 +37,12 @@ public partial class SR {
                 }
                 float w = __cw + LabelPadW;
                 if (w > _labelColCur) _labelColCur = w;
-                // 对齐仍用上帧列宽，但不允许比当前标签宽出太多（旧实现会把别的页面的长标签宽度一直带过来）。
                 float __prev = Mathf.Min(_labelColPrev, w + LabelSlackW);
                 return Mathf.Max(LabelMinW, Mathf.Min(LabelMaxW, Mathf.Max(__prev, w)));
             } catch { return Sc(80f); }
         }
 
-        // 点标签恢复默认值（复选框/滑块/编辑框/下拉通用）：只处理左键 MouseDown，且指针在标签矩形内。
+        // 点标签恢复默认值：仅左键 MouseDown 且指针在标签矩形内。
         private static void ResetOnLabelClick(Rect labelRect, ConfigEntryBase e) {
             try {
                 Event ev = Event.current;
@@ -59,13 +57,11 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("统一行/恢复默认", __ex); }
         }
 
-        // 统一行控件：标签按文字实测 + 右侧控件；与 RestoreLabel 的排版一致，页面不再各写一份。
         public static void LabeledRow(string label, string tip, ConfigEntryBase e, float labelWidth) {
             try {
                 GUILayout.BeginHorizontal();
                 try {
                     float lw = labelWidth > 0f ? Sc(labelWidth)
-                        // 默认 = 本区最长标签宽度（与方块破坏页同一套对齐规则），再留 6px 间距
                         : LabelColumnWidth(label);
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
                     ResetOnLabelClick(GUILayoutUtility.GetLastRect(), e);
@@ -77,7 +73,7 @@ public partial class SR {
             GUILayout.Space(Sc(2));
         }
 
-        // 统一下拉行：标签按文字实测，entry 作为稳定 ID 交给核心管理展开态，选中即写值并收起。
+        // 统一下拉行：entry 作为展开态 ID，选中即写值并收起。
         public static int RowCombo(string label, string tip, ConfigEntryBase e, string[] vals, string[] labels, float width, float labelWidth) {
             if (e == null || vals == null || labels == null || vals.Length == 0 || labels.Length == 0) return -1;
             int picked = -1;
@@ -85,7 +81,6 @@ public partial class SR {
                 GUILayout.BeginHorizontal();
                 try {
                     float lw = labelWidth > 0f ? Sc(labelWidth)
-                        // 默认 = 本区最长标签宽度（与方块破坏页同一套对齐规则），再留 6px 间距
                         : LabelColumnWidth(label);
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
                     ResetOnLabelClick(GUILayoutUtility.GetLastRect(), e);
@@ -94,8 +89,7 @@ public partial class SR {
                     int idx = 0;
                     for (int i = 0; i < vals.Length; i++) if (vals[i] == cur) { idx = i; break; }
                     idx = Mathf.Clamp(idx, 0, labels.Length - 1);
-                    // 展开态存在核心的 _editOpen（以配置条目为 key）：每帧必须以它为准，
-                    // 否则局部变量恒 false，点击写进 EditOpen 后列表框永远不会被画出来（"下拉打不开"）。
+                    // 展开态须每帧从核心 EditOpen 取，否则局部变量恒 false，下拉永远打不开。
                     bool open = false;
                     if (SRApi.Ctl.EditOpen != null) SRApi.Ctl.EditOpen.TryGetValue(e, out open);
                     int sel = ComboBox(e, labels[idx], vals, labels, ref open, Sc(width));
@@ -112,7 +106,7 @@ public partial class SR {
             return picked;
         }
 
-        // 统一滑块行：0.1 步进 + 数值右对齐；返回本帧是否写入了新值。
+        // 统一滑块行：0.1 步进 + 数值右对齐；返回本帧是否写入。
         public static bool RowSlider(string label, string tip, ConfigEntryBase e, float min, float max, float labelWidth, string fmt) {
             if (e == null || max <= min) return false;
             bool written = false;
@@ -120,15 +114,13 @@ public partial class SR {
                 GUILayout.BeginHorizontal();
                 try {
                     float lw = labelWidth > 0f ? Sc(labelWidth)
-                        // 默认 = 本区最长标签宽度（与方块破坏页同一套对齐规则），再留 6px 间距
                         : LabelColumnWidth(label);
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
                     ResetOnLabelClick(GUILayoutUtility.GetLastRect(), e);
                     GUILayout.Space(Sc(6));
                     float cur = (float)e.BoxedValue;
                     Rect r = GUILayoutUtility.GetRect(Sc(150f), Sc(28f));
-                    // Ctrl+点击滑块 → 变成输入框（ImGui 的 Ctrl+Click to input 做法）：
-                    // 精确数值不用再靠一个"更多数值"开关，平时仍是滑块。
+                    // Ctrl+点击滑块转输入框，便于精确输入。
                     Event __ev = Event.current;
                     if (__ev != null && __ev.type == EventType.MouseDown && __ev.button == 0 && __ev.control && r.Contains(__ev.mousePosition)) {
                         NumEdit = e; NumText = cur.ToString("0.###"); __ev.Use();
@@ -152,7 +144,7 @@ public partial class SR {
                         GUILayout.Space(Sc(2));
                         return written;
                     }
-                    // 按下滑块时禁止拖窗口：我们放开了 hotControl 判定后，滑块按下会被当成"空白拖动"
+                    // 滑块按下时禁止拖窗口，否则会被当成空白拖动。
                     try {
                         Event __md = Event.current;
                         if (__md != null && __md.type == EventType.MouseDown && __md.button == 0 && r.Contains(__md.mousePosition))

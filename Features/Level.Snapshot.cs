@@ -1,4 +1,4 @@
-// Level 的 partial 分片（只做代码组织，无逻辑改动）
+// Level 分片：广播快照、清场与快照加载后的收尾（阶段事件 / 放置计数 / 归属）。
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -15,7 +15,7 @@ using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
     public partial class Level {
-        // 安全 XML 解析：禁 DTD / 外部实体（快照 XML 可能来自其它玩家分享的关卡）。
+        // 安全 XML 解析：禁 DTD / 外部实体（快照 XML 可能来自其它玩家）。
         private static XmlDocument ParseXmlSafe(string xml) {
             XmlDocument doc = new XmlDocument();
             XmlReaderSettings s = new XmlReaderSettings();
@@ -25,11 +25,10 @@ namespace SR_UCH.Tweaks {
             return doc;
         }
 
-        // 生成房主当前快照并经 CompressAndSendSnapshotBytes 广播，全员按房主视角重建；不重载场景，分数保留；仅房主可调用。
-        // 快照来源判定：房主发送时在 XML 根节点写 srSnapshot="1"，客户端按该标记识别（不依赖进程内静态门闩）。
+        // 广播房主快照并全员按房主视角重建；不重载场景，分数保留，仅房主可调。
+        // SR 快照在根节点写 srSnapshot="1"，客户端按该标记识别（房主与房客同一判据）。
 
 
-        // 该快照是否由 SR 发起：只看 XML 标记（房主与房客同一判据）。
         private static bool IsSrSnapshot(System.Xml.XmlDocument doc) {
             try {
                 if (doc != null && doc.DocumentElement != null
@@ -38,7 +37,7 @@ namespace SR_UCH.Tweaks {
             return false;
         }
 
-        // 广播快照的前置检查（总开关 -> 模式 -> 房主 -> 对局 -> 控制器 -> 快照组件 -> 重载锁）；返回 false 时已提示原因。
+        // 前置检查（总开关→模式→房主→服务器→对局→控制器→快照组件→重载锁）；返回 false 时已提示原因。
         private static bool TryGetSnapshotContext(string feature, out GameControl gc, out QuickSaver qs)
         {
             gc = null;
@@ -58,7 +57,7 @@ namespace SR_UCH.Tweaks {
                 SRApi.NotifyT("仅房主可执行：", "Host only: ", feature);
                 return false;
             }
-            // 服务器权威守卫：房客开了无视房主限制也会被放行到这里。
+            // 服务器权威守卫：开了无视房主限制的房客也会被放行到这里。
             if (!NetworkServer.active)
             {
                 SRApi.NotifyT("仅房主可执行：", "Host only: ", feature);
@@ -82,71 +81,62 @@ namespace SR_UCH.Tweaks {
                 SRApi.Notify(SRApi.T("当前对局不支持该操作", "Unsupported in the current match"));
                 return false;
             }
-            if (ReloadBlocked()) return false; // 含锁残留自愈
+            if (ReloadBlocked()) return false; // 锁残留自愈
             gc = g;
             qs = q;
             return true;
         }
 
-        // QuickSaver.initialLevelPlaceables 的反射字段缓存。
         private static System.Reflection.FieldInfo _initialPiecesField;
 
-        // 关卡自带件集合（QuickSaver.initialLevelPlaceables，私有字段 -> 走 SRApi.Ref.Field 反射）。
-        // 这些件不能列入清场目标：QuickClear 删后会 RestoreSaveables 恢复，本路径只删不恢复，会连可动方块一起删掉。
+        // 关卡自带件集合（私有字段，走 SRApi.Ref.Field）：不能列入清场目标，本路径只删不恢复。
         private static System.Collections.Generic.HashSet<Placeable> InitialLevelPieces(QuickSaver qs) {
             System.Collections.Generic.HashSet<Placeable> set = new System.Collections.Generic.HashSet<Placeable>();
             try {
-                // 反射游戏成员必须走 SRApi.Ref.Field（自带缓存与失败告警）；外层字段缓存只省一次字典查找。
+                // 反射必须走 SRApi.Ref.Field（自带缓存与失败告警）；外层缓存只省一次字典查找。
                 if (_initialPiecesField == null) _initialPiecesField = SRApi.Ref.Field(typeof(QuickSaver), "initialLevelPlaceables", "快照加载后的初始方块集合（关卡自带件）");
                 System.Collections.IEnumerable list = (_initialPiecesField != null && qs != null) ? _initialPiecesField.GetValue(qs) as System.Collections.IEnumerable : null;
                 if (list == null) return set;
                 foreach (object o in list) {
                     if (o == null) continue;
-                    // QuickSaver.SaveablePiece 是公开嵌套类型、placeable 是 public 字段，直接强类型访问以便编译期发现改版。
                     QuickSaver.SaveablePiece sp = o as QuickSaver.SaveablePiece;
                     if (sp != null && sp.placeable != null) set.Add(sp.placeable);
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("收集关卡初始件", __ex); }
             return set;
         }
-        // 清除玩家放置的方块（全员可见，房客也能用）：逐块网络销毁，不走 <destroyed> 快照路径。
+        // 清除玩家放置的方块（全员可见）：逐块网络销毁，不走 <destroyed> 快照路径。
         public static void ClearPlacedBlocks(List<Placeable> targets, string feature) {
             try {
                 if (targets == null || targets.Count == 0) { SRApi.Notify(SRApi.T("地图上没有玩家放置的道具", "No player-placed props on the map")); return; }
                 GameControl gc; QuickSaver qs;
                 if (!TryGetSnapshotContext(feature, out gc, out qs)) return;
-                FallbackClearPlacedBlocks(targets); // 直接逐块网络销毁（不用快照）
+                FallbackClearPlacedBlocks(targets); // 逐块网络销毁
             } catch (Exception __ex) { SRApi.Guard.Log("清场.逐块销毁", __ex); }
         }
 
-        // 对外槽位：调用方经 Slots.Require 按名取用，不引用 Level 类型，取不到即降级。
+        // 对外槽位：调用方经 Slots.Require 按名取用，取不到即降级。
         private const string SlotClearPlacedBlocks = "Level.ClearPlacedBlocks"; // Action<List<Placeable>,string>
-        // 槽位名与 DestroyBlocks 逐字一致，双方各写各的常量，互不引用以免编译期依赖。
         private const string SlotAttributeToHost = "DestroyBlocks.AttributeToHost"; // Action<List<Placeable>>
-        // 快照加载后处理（仅 SR 发起的快照）：补发当前阶段事件、补放置计数与着色、把重建出的方块归属房主。
+        // 快照加载后收尾（仅 SR 发起的快照）：补阶段事件、放置计数与着色、方块归属房主。
         [HarmonyPatch(typeof(QuickSaver), "LoadSnapshotFromXmlDocument")]
         [HarmonyPostfix]
         private static void AfterLoadSnapshot(QuickSaver __instance, System.Xml.XmlDocument doc, ref bool __result) {
             try {
-                // 双重判据：仅 SR 自己发起的快照才补发阶段事件（房主看静态门闩，客户端看 XML 根节点 srSnapshot="1"）。
-                // 阶段由服务器经 RpcStartPhase 权威下发（含 EndPhaseEvent 与 nextPhase），无条件补发会让客户端与服务器状态机错位。
+                // 仅 SR 发起的快照才补发阶段事件（房主看门闩，客户端看 srSnapshot 标记）。
                 if (!IsSrSnapshot(doc)) return;
-                if (!__result) return; // 快照加载失败（关卡名/结构不符）时不按阶段处理
+                if (!__result) return; // 加载失败时不按阶段处理
                 GameControl gc = UnityEngine.Object.FindObjectOfType<GameControl>();
                 if (gc == null) return;
-                // GameControl.Phase / GameEvent.StartPhaseEvent / GameEventManager.SendEvent 均为 public，直接调用，无需反射。
                 GameControl.GamePhase phv = gc.Phase;
-                // 相位边沿由服务器经 RpcStartPhase 权威下发；客户端自己再补发 StartPhaseEvent 会让
-                // 客户端状态机多收一次"凭空"的阶段开始（与服务器错位）。所以只在服务器补发。
+                // 相位由服务器权威下发；客户端再补发会让状态机多收一次阶段开始而错位，故只在服务器补发。
                 if (UnityEngine.Networking.NetworkServer.active) {
                     GameEvent.GameEventManager.SendEvent(new GameEvent.StartPhaseEvent(phv));
                     SRApi.LogInfo("[快照] 加载后补发阶段事件: " + phv);
                 } else {
                     SRApi.LogInfo("[快照] 客户端：不补发阶段事件（相位由服务器权威下发）: " + phv);
                 }
-                // 只补发一次当前真实阶段（伪造 PLACE/PLAY 边沿会让客户端与服务器状态机错位）；快照方块无需照抄 WaitForPlacement 的 isKinematic/layer=9：prefab 默认已 Kinematic，而 layer 9(Placed) 与自身及 Fixed 都不碰撞。
-                // 快照路径真正缺的只有放置计数 GameState.IncrementPieceCount 与一次 Tint()。
-                // 关卡自带件集合算一次就够（同一方法内两次反射遍历纯属重复开销 —— audit C-10）。
+                // 只补发当前真实阶段；快照方块无需照抄 isKinematic/layer，真正缺的只有放置计数与一次 Tint()。
                 System.Collections.Generic.HashSet<Placeable> initFix = InitialLevelPieces(__instance);
                 try {
                     int nFix = 0;
@@ -154,10 +144,9 @@ namespace SR_UCH.Tweaks {
                     try { gsFix = GameState.GetInstance(); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                     foreach (Placeable fp in Placeable.AllPlaceables) {
                         if (fp == null || fp.MarkedForDestruction) continue;
-                        if (initFix.Contains(fp)) continue; // 关卡自带件不动
-                        if (!fp.Placed) continue; // 只处理已放置的
+                        if (initFix.Contains(fp)) continue; // 自带件不动
+                        if (!fp.Placed) continue; // 只处理已放置
                         try {
-                            // 补放置计数（快照路径唯一真正缺的一步）
                             if (gsFix != null) gsFix.IncrementPieceCount(fp.Name);
                             fp.Tint();
                             nFix++;
@@ -165,16 +154,16 @@ namespace SR_UCH.Tweaks {
                     }
                     if (nFix > 0) SRApi.LogInfo("[快照] 已为 " + nFix + " 个方块补放置计数并着色");
                 } catch (Exception __fx) { SRApi.Guard.Log("快照方块收尾", __fx); }
-                // 归属登记必须在加载之后：方块是加载时创建的，加载前集合为空。
+                // 归属登记必须在加载之后：方块是加载时创建的，之前集合为空。
                 try {
-                    System.Collections.Generic.HashSet<Placeable> initPcs = initFix;   // 与上方共用同一份（同一次调用内）
+                    System.Collections.Generic.HashSet<Placeable> initPcs = initFix;   // 与上方共用
                     List<Placeable> built = new List<Placeable>();
                     foreach (Placeable bp in Placeable.AllPlaceables) {
-                        // 必须过滤 MarkedForDestruction：上一轮残留的死方块（destroyMarkedPieces 未回收）会被误算进 built。
+                        // 必须过滤 MarkedForDestruction：上一轮残留的死方块会被误算进 built。
                         if (bp == null || bp.MarkedForDestruction || initPcs.Contains(bp)) continue;
                         built.Add(bp);
                     }
-                    // 经槽位取用以避免跨功能编译期依赖；取不到只丢名牌与归属，不影响重建。
+                    // 经槽位取用以避免跨功能依赖；取不到只丢归属，不影响重建。
                     Action<List<Placeable>> attributeToHost = Slots.Require<Action<List<Placeable>>>(SlotAttributeToHost);
                     if (attributeToHost != null) {
                         attributeToHost(built);
@@ -186,7 +175,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("快照后补发阶段事件", __ex); }
         }
 
-        // 兜底清场：快照 <destroyed> 路径不可用时退回逐块 DestroySelf（仍走游戏原生网络销毁信号）。
+        // 兜底清场：快照路径不可用时逐块 DestroySelf（仍走原生网络销毁）。
         public static void FallbackClearPlacedBlocks(List<Placeable> targets) {
             if (targets == null) return;
             int n = 0;
@@ -198,23 +187,21 @@ namespace SR_UCH.Tweaks {
             SRApi.LogInfo("[清场] 快照路径不可用，已退回逐块网络销毁: " + n + " 个");
         }
 
-// 分区 Reload：重载关卡保分补分 / 折扣保留 / 重载宽限。
+// 分区：Reload（重载保分补分 / 折扣保留 / 加载完成收尾）
 
     [HarmonyPatch(typeof(LoadingInterstitialSplash), "FadeOut")]
     [HarmonyPostfix]
     static void OnLoadEnd() {
-        // 补丁内异常会被 Harmony 吞掉并每次记一条日志，统一兜住并经 SRApi.Guard.Log（按调用点去重）记录。
+        // 异常会被 Harmony 吞掉并每次记日志，故统一兜住经 Guard.Log 去重记录。
         try {
-                // 重载后广播补分：按原类型分块补分，下一回合结算显示。
+                // 重载后补分并恢复 handicap（房主写回 SyncVar 广播）。
                 FillScoresIfPending();
-                // 重载后恢复分数折扣（handicap）：不受重载模式影响，房主写回 SyncVar 广播全员。
                 RestoreHandicapsIfAny();
-                // 通知 Experiments 记录场景加载完成时刻，用于决定何时清 levelPortalXml。
+                // 记录加载完成时刻，决定何时清 levelPortalXml。
                 Level.OnReloadSceneLoaded();
         } catch (Exception __ex) { SRApi.Guard.Log("重载完成收尾", __ex); }
     }
 
-    // 场景重载期间暂停“坏客户端踢出”检测。
-    // LobbyManager.Update 会把连续 3 秒无有效 player controller 的连接踢掉，重载中 controller 暂时无效会被误判。
+    // 重载期间暂停“坏客户端踢出”：连续 3 秒无有效 controller 会被误判。
     }
 }

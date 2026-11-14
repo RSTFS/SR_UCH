@@ -1,8 +1,5 @@
-// 第三方插件兼容性自检：列出从 BepInEx\plugins 加载的其它插件，并给出已知冲突/注意事项。
-//
-// 数据来源：AppDomain 里已加载程序集的位置（含 BepInEx\plugins 且不是 SR 自己）。
-// 规则来源：对本机实际安装的插件做过静态分析（Mono.Cecil）后手工登记，
-// 只写"对 SR 用户有意义的结论"，不做自动推断（自动推断误报比不报更糟）。
+// 第三方插件兼容性自检：列出 BepInEx\plugins 下已加载的其它插件，并给出已知冲突/注意事项。
+// 数据来源：AppDomain 已加载程序集的位置；规则为本机插件静态分析后手工登记，不做自动推断。
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -105,7 +102,6 @@ public partial class SR {
         if (_compatPlugins == null) ScanCompatPlugins();
     }
 
-    // 诊断报告里的一行摘要。
     internal static string CompatSummary() {
         try {
             EnsureCompat();

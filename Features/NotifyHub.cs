@@ -1,21 +1,12 @@
 // 通知治理中心：把散在各功能里的屏幕提示统一收口。
 //
-// 为什么必须在核心挂一个钩子（本轮最重要的结构判断）：
-//   SRApi.Notify / NotifyT / NotifyTag 是三条不同的注入通道，而核心自己也直接调 SR.Notify；
-//   功能层又不能引用实现层（守卫会拦），也不该为了加个开关去改 60 多个调用点。
-//   但它们全都汇到 SR.Notify.cs 的 NotifyImpl —— 所以在那里留一个可选的 Slots 钩子，
-//   一个点就能覆盖全部来源，且未安装本功能时行为一字不变。
-//   钩子返回 true = 治理中心已负责屏幕显示，核心不再调 ShowUserMessage；日志仍由核心照写。
+// 钩子挂在核心一处即可：三条 SRApi 通道与核心直调 SR.Notify 都汇到 NotifyImpl。
+// 返回 true = 本中心已负责屏幕显示；日志仍由核心照写。
 //
-// 收口后做的事（全部只在本机，不碰网络 / 相机 / 线程 / 补丁 / msgType / 反射登记）：
-//   · 优先级分级：要动手的（失败 / 拒绝 / 被拦下）> 一般反馈 > 纯确认（关键词兜底；NotifyEx 可显式指定）
-//   · 同类合并：3 秒窗口内同来源同内容合并成一条（卡片只显示正文，不再显示 ×N）
-//   · 排队不丢：同时上屏条数可调，超出排队（上限 16），每条真正上屏后才开始计停留时间
-//   · 通知动作：NotifyEx 可带一个动作按钮（例如「撤销」），点了执行并关闭该条
-//   · 悬浮暂停倒计时 / 左键或 × 关闭
+// 只在本机做的事（不碰网络 / 相机 / 线程 / 补丁 / 反射登记）：优先级分级、3 秒同类合并、
+// 超出上屏数则排队、NotifyEx 动作按钮、悬浮暂停与左键 / × 关闭。
 //
-// 浮层为什么自建 MonoBehaviour.OnGUI：SRApi.RegisterOverlay 的覆盖层只在面板打开/淡出期间绘制
-//   （SR.Window.DrawGUI 在面板关闭时直接 return），局内看不见。与 Brief.cs 同一套范式。
+// 浮层必须自建 MonoBehaviour.OnGUI：SRApi.RegisterOverlay 只在面板打开时绘制，局内看不见。
 
 using System;
 using System.Collections.Generic;
@@ -51,7 +42,6 @@ namespace SR_UCH.Tweaks {
             public float EnterAt;     // 入场动画起点；0 = 尚未开始（续期不重播入场）
             public float DyingAt;     // >0 = 正在退场（淡出 + 侧滑），到时从列表移除
             public Action Action;     // 可选动作按钮（NotifyEx 才带；点击后执行并关闭本条）
-            // 文本高度缓存：CalcHeight 每帧对每张卡都算一次很贵，只有文本/宽度/字号变化才重算。
             public float CachedH, CachedW;
             public int CachedFs;
             public string CachedText;
@@ -66,16 +56,14 @@ namespace SR_UCH.Tweaks {
 
         private static readonly List<Notice> _history = new List<Notice>();
         private static readonly List<Notice> _visible = new List<Notice>();
-        // 排队上限：Max Visible 只决定「一次画几条」，超出的排队等前一条退场后再上屏，
-        // 因此快速连发也不会互相顶掉；只有排到 16 条还放不下才丢最旧的。
+        // 排队上限：Max Visible 只决定一次画几条，排到上限仍放不下才丢最旧的。
         private const int PendingCap = 16;
         private static int _animFrame = -1;   // 一帧内 OnGUI 会跑多趟：动画时间每帧只取一次
         private static float _animDt;
-        // 鼠标悬停在浮层卡片上：暂停过期计时（看长提示时不会被自动吞掉）。
-        // 由 DrawToast 每次绘制时写入，Tick 读取（OnGUI 每帧多趟，取最后一趟的结果即可）。
+        // 悬停在卡片上时暂停过期计时；DrawToast 写入，Tick 读取。
         private static bool _hoverAny;
 
-        // 动画固定内置（用户要求删除「启用动画 / 动画时长」两项配置）。
+        // 动画参数固定内置。
         private static float AnimIn() { return 0.22f; }
         private static float AnimOut() { return 0.20f; }
 
@@ -83,7 +71,7 @@ namespace SR_UCH.Tweaks {
         private static GUIStyle _label, _btn, _sym;
         private static HubUI _ui;
 
-        // 自己 Provide 的委托实例：注销时按值匹配，避免误删之后注册的实现。
+        // 自己 Provide 的委托实例：注销时按值匹配。
         private static readonly System.Collections.Generic.Dictionary<string, object> _provided =
             new System.Collections.Generic.Dictionary<string, object>();
 
@@ -91,15 +79,12 @@ namespace SR_UCH.Tweaks {
 
         private static bool _uiReg;
 
-        // 配置行统一走"标签 + 控件"：RenderControl 只画控件、没有名称列，
-        // 那样 LocKey / LocDesc 登记不会被消费，界面上也没有任何配置项名称。
-        // 列宽与核心 Sc() 同坐标系；契约层未暴露 EntryNameWidth，故用固定 180 设计像素。
+        // 配置行走"标签 + 控件"，否则 LocKey / LocDesc 不会被消费；列宽固定 180 设计像素。
         private static void CfgRow(ConfigEntryBase e) {
             SRApi.Ctl.DrawEntryRow(e);
         }
 
-        // 本页配置行的显示名与悬浮说明：缺 LocKey 时中文界面回退英文键名，
-        // 缺 LocDesc 时英文界面完全没有提示（内部条目不会回退 Bind 的中文描述）。
+        // 显示名与悬浮说明必须登记。
         private static void RegUi() {
             SRApi.LocKey(Sec, "Enabled", "启用通知中心", "Enable notification hub");
             SRApi.LocDesc(Sec, "Enabled",
@@ -140,7 +125,7 @@ namespace SR_UCH.Tweaks {
             if (!_uiReg) { _uiReg = true; SRApi.RowSliders.Add(UiSlider); }
         }
 
-        // 数值条目改由滑块渲染：范围与 Bind 的 AcceptableValueRange 逐项一致。
+        // 数值条目改由滑块渲染，范围与 Bind 一致。
         private static bool UiSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
             min = 0f; max = 0f; fmt = "0";
             try {
@@ -160,7 +145,7 @@ namespace SR_UCH.Tweaks {
 
         public void Initialize(IFeatureHost plugin) {
             _enabled = plugin.Config.Bind(Sec, "Enabled", true, "统一接管所有屏幕提示：分级、合并、静默。");
-            // 旧配置项已删除：打开通知中心 = 用通知中心；关闭 = 交回游戏原生提示。
+            // 旧配置项已删除：启动时从 cfg 清理。
             try { SRApi.Migration.Remove(Sec, "Use Native Toast"); } catch (Exception __mr) { SRApi.Guard.Log("通知中心/清理旧键1", __mr); }
             try { SRApi.Migration.Remove(Sec, "Show On Screen"); } catch (Exception __mr2) { SRApi.Guard.Log("通知中心/清理旧键2", __mr2); }
             _maxVisible = plugin.Config.Bind(Sec, "Max Visible", 3,
@@ -171,7 +156,6 @@ namespace SR_UCH.Tweaks {
                 new ConfigDescription("浮层卡片像素宽度（100-500）。", new AcceptableValueRange<int>(100, 500)));
             _fontSize = plugin.Config.Bind(Sec, "Font Size", 20,
                 new ConfigDescription("正文文字大小（10-32）。", new AcceptableValueRange<int>(10, 32)));
-            // 旧配置项已删除，启动时从 cfg 清理。
             try { SRApi.Migration.Remove(Sec, "Quiet In Match"); } catch (Exception __mq) { SRApi.Guard.Log("通知中心/清理静默键", __mq); }
             try { SRApi.Migration.Remove(Sec, "Animate"); } catch (Exception __ma) { SRApi.Guard.Log("通知中心/清理动画键", __ma); }
             try { SRApi.Migration.Remove(Sec, "Anim Ms"); } catch (Exception __mm) { SRApi.Guard.Log("通知中心/清理动画时长键", __mm); }
@@ -179,7 +163,7 @@ namespace SR_UCH.Tweaks {
                 new ConfigDescription("整个浮层的缩放百分比（100-300）。", new AcceptableValueRange<int>(100, 300)));
             _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 72,
                 new ConfigDescription("浮层卡片背景不透明度百分比（20-100）。", new AcceptableValueRange<int>(20, 100)));
-            // 旧默认值是 64：一次性迁移（只迁移仍是旧默认值的配置，用户手动改过的值不动）。
+            // 旧默认值是 64，一次性迁移。
             try {
                 ConfigEntry<bool> __mig = plugin.Config.Bind(Sec, "Opacity Default 72", false,
                     "内部标记：卡片不透明度默认值从 64 迁移到 72 是否已执行");
@@ -195,16 +179,15 @@ namespace SR_UCH.Tweaks {
             SRApi.LocSec(Sec, "通知", "Notifications");
 
             RegUi();
-            // 底栏入口（设置右侧），不再占用侧栏栏目（用户要求）。
+            // 底栏入口，不占侧栏栏目。
             SRApi.RegisterFooterButton(Sec, "通知", "Notify", null);
-            // 本功能有 cfg 段但没有侧栏栏目：显式声明"不单独成栏目"，否则启动自检会把它
-            // 当成"没登记归属的兜底段"告警（栏目审计同时也会跳过底栏覆盖的段，双保险）。
+            // 有 cfg 段但不单独成栏目：显式 NavHide，否则启动自检会告警。
             SRApi.NavHide(Sec);
             SRApi.RegisterPage(Sec, "HubOptions", "通知设置", "Settings", 20, RenderOptionsPage);
             SRApi.RegisterTick("通知中心-绑定与过期", Tick);
-            // 关掉通知中心时清空待显示队列：否则重新打开会把过期旧消息一次性弹出来。
+            // 关掉时清空待显示队列，否则重新打开会弹旧消息。
             _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) ClearPending(); };
-            // 停留秒数按 0.5 步进：滑条/手输都收敛（防递归用标志位）。
+            // 停留秒数按 0.5 步进（防递归用标志位）。
             _toastSeconds.SettingChanged += (s2, e2) => {
                 if (_toastFixing) return;
                 try {
@@ -214,11 +197,11 @@ namespace SR_UCH.Tweaks {
                 } catch (Exception __ts) { SRApi.Guard.Log("通知中心/停留步进", __ts); }
             };
 
-            // 核心 NotifyImpl 会惰性查这个名字；Provide 之后所有来源的提示都会进 OnNotify。
+            // 核心 NotifyImpl 惰性查这个名字。
             Func<string, string, bool> __hook = (t, g) => OnNotify(t, g); _provided[HookSlot] = __hook; Slots.Provide(HookSlot, __hook);
-            // 新钩子：带级别/动作的通知（NotifyEx）。旧钩子保留给普通 Notify。
+            // 新钩子带级别 / 动作（NotifyEx）；旧钩子给普通 Notify。
             SRApi.NotifyExFn __hook2 = delegate (SRApi.NotifyArgs a) { return OnNotifyEx(a); };
-            _provided[SRApi.SlotKeys.NotifyHub2] = __hook2;   // 关机时也要 Retract（此前漏了这个）
+            _provided[SRApi.SlotKeys.NotifyHub2] = __hook2;   // 关机时需一并 Retract
             Slots.Provide(SRApi.SlotKeys.NotifyHub2, __hook2);
 
             SRApi.OnShutdown("通知中心", Shutdown);
@@ -229,8 +212,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 关机/卸载入口（经 SRApi.OnShutdown 注册）：注销槽位、销毁自建对象与贴图。
-        // 槽位必须传自己的委托，否则契约层 expected==null 时会无条件删除。
+        // 关机入口：注销槽位、销毁自建对象；槽位须传自己的委托。
         public void Shutdown() {
             foreach (System.Collections.Generic.KeyValuePair<string, object> kv in _provided) {
                 try { if (kv.Value != null) Slots.Retract(kv.Key, kv.Value); }
@@ -247,8 +229,7 @@ namespace SR_UCH.Tweaks {
             try {
                 float now = Time.unscaledTime;
                 float outDur = AnimOut();
-                // 鼠标停在浮层上时冻结所有卡片的时间轴（剩余时间条也一起停）：
-                // 把 ShownAt 往前推 = 已显示时长保持不变，松手后继续从暂停处倒计时。
+                // 悬停时把 ShownAt 往前推 = 冻结时间轴。
                 float hoverDt = _hoverAny ? Mathf.Clamp(Time.unscaledDeltaTime, 0f, 0.05f) : 0f;
                 for (int i = _visible.Count - 1; i >= 0; i--) {
                     Notice n = _visible[i];
@@ -256,8 +237,7 @@ namespace SR_UCH.Tweaks {
                         if (now - n.DyingAt >= outDur) _visible.RemoveAt(i);   // 退场播完再真正移除
                         continue;
                     }
-                    // 只有真正上屏过的才开始计时：排队期间不消耗停留时间，
-                    // 否则连发一批消息时，排在后面的还没轮到就"过期"了（表现为漏消息）。
+                    // 只有真正上屏过的才开始计时，否则连发时后面的会提前过期。
                     if (n.ShownAt <= 0f) continue;
                     if (hoverDt > 0f) { n.ShownAt += hoverDt; continue; }
                     if (now - n.ShownAt >= Mathf.Max(0.4f, n.Stay)) n.DyingAt = now;
@@ -269,7 +249,6 @@ namespace SR_UCH.Tweaks {
             try { _visible.Clear(); _history.Clear(); } catch (Exception ex) { SRApi.Guard.Log("通知中心/清空队列", ex); }
         }
 
-        // 队列排序 + 上限：高优先级在前，同级新的在前（Level 相同按到达时间倒序）。
         private static void SortTrim() {
             _visible.Sort(delegate (Notice a, Notice b) {
                 int c = b.Level.CompareTo(a.Level);
@@ -282,7 +261,7 @@ namespace SR_UCH.Tweaks {
 
         private static bool _inNotify;
 
-        /// <summary>返回 true = 已接管屏幕显示；false = 让核心照旧用游戏原生提示。</summary>
+        /// <summary>返回 true = 已接管显示；false = 让核心用游戏原生提示。</summary>
         private static bool OnNotify(string text, string tag) { return HandleNotify(text, tag, -1, null); }
 
         private static bool OnNotifyEx(SRApi.NotifyArgs a) {
@@ -291,10 +270,8 @@ namespace SR_UCH.Tweaks {
         }
 
         private static bool HandleNotify(string text, string tag, int levelOverride, Action action) {
-            // 打开通知中心 = 由本功能接管；关闭 = 返回 false，由核心交回游戏原生提示。
             if (_enabled == null || !_enabled.Value) return false;
-            // 防重入：外部回调若也发提示，这里直接放行给原生通道，
-            // 绝不形成 Notify -> OnNotify -> Notify 的无限递归。
+            // 防重入：避免 Notify -> OnNotify 无限递归。
             if (_inNotify) return false;
             if (string.IsNullOrEmpty(text)) return true;         // 空提示不占队列，但已接管屏幕
             _inNotify = true;
@@ -304,7 +281,7 @@ namespace SR_UCH.Tweaks {
                 string key = (tag ?? "") + "|" + Norm(text);
                 float stay = Mathf.Clamp(_toastSeconds.Value, 0.5f, 5f);
 
-                // 同类合并：3 秒窗口内同 key 只累加计数并续期，不再插入新行。
+                // 同类合并：3 秒窗口内同 key 只累加计数并续期。
                 Notice merged = null;
                 for (int i = _history.Count - 1; i >= 0; i--) {
                     if (_history[i].Key != key) continue;
@@ -317,8 +294,7 @@ namespace SR_UCH.Tweaks {
                     merged.At = now;
                     merged.Stay = stay;
                     merged.Level = Mathf.Max(merged.Level, level);
-                    // 已经不在队列里（上一轮已经显示完并移除了）：重新排队，保证同一条消息
-                    // 在 3 秒窗口内再次出现时不会被"合并掉"而完全看不到。
+                    // 已不在队列：重新排队，避免再次出现时被合并掉。
                     bool queued = false;
                     for (int vi = 0; vi < _visible.Count; vi++) if (_visible[vi].Key == key) { queued = true; break; }
                     if (queued) {
@@ -355,7 +331,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 分级 / 归一的实现放在 NotifyHub.Logic.cs（无 Unity 依赖，单元测试覆盖）。
+        // 分级 / 归实在 NotifyHub.Logic.cs（无 Unity 依赖，有单测）。
         private static int Classify(string text, string tag) { return NotifyLogic.Classify(text, tag, HighWords, LowWords); }
         private static bool Contains(string s, string w) { return NotifyLogic.Contains(s, w); }
         private static string Norm(string s) { return NotifyLogic.Norm(s); }
@@ -395,7 +371,7 @@ namespace SR_UCH.Tweaks {
             if (_enabled == null || !_enabled.Value || _visible.Count == 0 || Event.current == null) return;
             EnsureStyles();
             float s = Mathf.Clamp(_cardScale.Value / 160f, 0.6f, 1.8f);
-            // 参考 imgui-notify 的观感：更大的字号/内边距，卡片最宽不超过屏幕 1/3。
+            // 观感参考 imgui-notify：更大字号与内边距，卡片最宽不超过屏幕 1/3。
             _label.fontSize = Mathf.RoundToInt((_fontSize != null ? _fontSize.Value : 17) * s);
             _label.normal.textColor = new Color(0.94f, 0.96f, 0.99f, 1f);
 
@@ -406,15 +382,14 @@ namespace SR_UCH.Tweaks {
             float dIn = AnimIn();
             float dOut = AnimOut();
 
-            // 一帧里 OnGUI 会跑多趟（Layout/Repaint/事件），动画时间只能取一次。
+            // 一帧里 OnGUI 跑多趟，动画时间只能取一次。
             if (_animFrame != Time.frameCount) {
                 _animFrame = Time.frameCount;
                 _animDt = Mathf.Clamp(Time.unscaledDeltaTime, 0f, 0.05f);
             }
-            // 纵向位置过渡：指数逼近、帧率无关；关掉动画时直接把位置对齐目标。
             float k = (_animDt > 0.001f) ? (1f - Mathf.Exp(-14f * _animDt)) : 1f;
 
-            // 一次最多画 Max Visible 条；超出的排队（退场中的必须继续画完，不能瞬间消失）。
+            // 一次最多画 Max Visible 条，退场中的必须画完。
             int cap = Mathf.Clamp(_maxVisible.Value, 1, 6);
             int n = _visible.Count;
             float[] heights = new float[n];
@@ -437,8 +412,7 @@ namespace SR_UCH.Tweaks {
                 if (it.DyingAt > 0f || drawnCount < cap) { draw[i] = true; drawnCount++; total += heights[i]; }
             }
             if (drawnCount == 0) return;
-            // 被更高优先级挤到画面外的卡片退回排队：不消耗它的停留时间，等下次轮到再完整显示，
-            // 否则"来了更重要的提示"会把正在显示的低优先级提示挤掉、而且它还没看满时间就过期了。
+            // 被挤到画面外的卡片退回排队，不消耗停留时间。
             for (int i = 0; i < n; i++) {
                 if (draw[i]) continue;
                 Notice it = _visible[i];
@@ -461,13 +435,11 @@ namespace SR_UCH.Tweaks {
                     if (!draw[i]) continue;
                     Notice nt = _visible[i];
                     float h = heights[i];
-                    // 位置过渡：新卡插到上面 / 前一条退场，都会让目标 Y 变化；这里平滑过去，
-                    // 而不是让整列卡片瞬移（这就是"过渡"的第二层）。
                     if (!nt.VisSet) { nt.VisY = target; nt.VisSet = true; }
                     else nt.VisY = (k >= 1f) ? target : Mathf.Lerp(nt.VisY, target, k);
                     float y = nt.VisY;
 
-                    // 入场：淡入 + 从停靠侧滑入 10px（三次缓出）；退场：淡出 + 同侧滑出。
+                    // 入场：淡入 + 滑入；退场：淡出 + 滑出。
                     if (nt.EnterAt <= 0f) {
                         nt.EnterAt = now;
                         if (nt.ShownAt <= 0f) nt.ShownAt = now;
@@ -487,8 +459,7 @@ namespace SR_UCH.Tweaks {
                     Color prevGui = GUI.color;
                     GUI.color = new Color(1f, 1f, 1f, aa);
                     Rect box = new Rect(ax, y, w, h);
-                    // 悬停：暂停计时（Tick 读 _hoverAny），并给卡片加一圈浅描边提示"可以停住看"；
-                    // 左键点击：立即开始退场（点击不会穿透到游戏——浮层在 IMGUI 的最上层）。
+                    // 悬停暂停计时并加浅描边；左键点击立即退场。
                     bool hovered = false;
                     Event ev = Event.current;
                     if (ev != null && nt.DyingAt <= 0f) {
@@ -511,13 +482,12 @@ namespace SR_UCH.Tweaks {
                         Fill(new Rect(box.x, box.y, ht, box.height), hc);
                         Fill(new Rect(box.xMax - ht, box.y, ht, box.height), hc);
                     }
-                    // 左侧优先级色条：颜色之外还有「长短」这一重编码（高=最长）。
+                    // 左侧优先级色条（颜色 + 长短双重编码）。
                     Color bar = nt.Level == 2 ? new Color(1f, 0.55f, 0.22f, 1f)
                               : nt.Level == 1 ? new Color(0.36f, 0.72f, 1f, 1f)
                               : new Color(0.55f, 0.60f, 0.66f, 1f);
                     float barW = (nt.Level == 2 ? 6f : 3f) * s;
                     Fill(new Rect(ax, y, barW, h), new Color(bar.r, bar.g, bar.b, aa));
-                    // 高优先级加一圈同色描边：颜色之外再给一层"更醒目"的编码（不新增素材）。
                     if (nt.Level == 2) {
                         Color oc = new Color(bar.r, bar.g, bar.b, 0.55f * aa);
                         float t = Mathf.Max(1f, 1f * s);
@@ -527,11 +497,7 @@ namespace SR_UCH.Tweaks {
                         Fill(new Rect(box.xMax - t, box.y, t, box.height), oc);
                     }
 
-                    // 只显示通知正文（用户要求去掉「提示/已办/重要」这类前缀）。
-                    // 只显示正文（用户要求去掉「xN」计数）。
-                    // 文本区底部 +2px 缓冲：游戏字体最后一笔常被 CalcSize 少算，
-                    // 不加缓冲时"y/g/p"这类下伸笔画的最后一行会被裁掉（用户实测 1px 仍偏紧）。
-                    // 类型符号（勾/叹号/三角）：只用符号 + 颜色两重编码，不只靠颜色区分。
+                    // 只显示正文；底部 +2px 缓冲，否则下伸笔画会被裁。
                     string __symTxt = nt.Level == 2 ? "!!" : nt.Level == 1 ? "!" : "-";
                     _sym.fontSize = Mathf.RoundToInt(_label.fontSize * 0.95f);
                     Color __symPrev = GUI.color;
@@ -541,12 +507,10 @@ namespace SR_UCH.Tweaks {
                         GUI.color = new Color(1f, 1f, 1f, aa);
                         GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(18f) * s, y + pad * 0.6f, w - pad * 2f - SRApi.Ctl.Sc(20f) * s, h - pad * 1.6f), nt.Text, _label);
                     } finally { GUI.color = __symPrev; }
-                    // 悬浮时右上角显示关闭按钮（ImGuiNotify 的 optional dismiss）。
                     if (hovered) {
                         Rect __x = new Rect(ax + w - SRApi.Ctl.Sc(20f) * s, y + SRApi.Ctl.Sc(2f), SRApi.Ctl.Sc(18f) * s, SRApi.Ctl.Sc(18f) * s);
                         if (GUI.Button(__x, "×", _btn)) nt.DyingAt = now;
                     }
-                    // 底部剩余时间条：从满格开始缩短（排队期间还没上屏，不画消耗）。
                     float life = Mathf.Clamp01(1f - Mathf.Max(0f, now - nt.ShownAt) / Mathf.Max(0.4f, nt.Stay));
                     Fill(new Rect(ax + barW, y + h - 3f * s, (w - barW) * life, 3f * s),
                          new Color(bar.r, bar.g, bar.b, 0.85f * aa));
@@ -569,7 +533,6 @@ namespace SR_UCH.Tweaks {
             CfgRow(_cardW);
             CfgRow(_fontSize);
             CfgRow(_cardAlpha);
-            // 停靠位置：核心统一下拉框（用户要求用核心的下拉，不用自绘按钮）。
             {
                 string[] vals = new string[] { "0", "1", "2", "3" };
                 string[] labels = new string[] {
@@ -582,7 +545,7 @@ namespace SR_UCH.Tweaks {
 
         }
 
-        // 常驻组件：面板关闭时 DrawGUI 会早退，覆盖层走不到，所以必须自己挂 OnGUI。
+        // 常驻组件：面板关闭时 DrawGUI 早退，故须自挂 OnGUI。
         private sealed class HubUI : MonoBehaviour {
             private void OnGUI() {
                 try { DrawToast(); }

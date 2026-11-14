@@ -1,4 +1,4 @@
-// 实验 · 关卡边界页：页面渲染 + 边界解除本体 + 解除 UI3 覆盖。
+// 实验 · 关卡边界页：页面渲染与条目行。
 
 using System;
 using System.Collections.Generic;
@@ -11,7 +11,7 @@ namespace SR_UCH.Tweaks {
 [SrFeature("sr.experiments", "Experiments", "1.0")]
 public partial class Experiments : ITweak
     {
-        // 统一控件：标签 + 控件由核心排版（标签宽度按文字实测），页面不再各写一份水平布局。
+        // 统一控件：标签 + 控件交给核心排版，标签宽度按文字实测。
         private static void AdvRow(string key, string zh, string en, string zhTip, string enTip) {
             try {
                 ConfigEntryBase e = SRApi.Ctl.FindEntry("Experiments", key);
@@ -31,7 +31,6 @@ public partial class Experiments : ITweak
         public static void Render() {
             try {
                 SRApi.Ctl.SectionTitle(SRApi.T("- 解除关卡边界 -", "- Unlock level bounds -"));
-                // 子项已全部并入主开关（不再单独成键）；旧键由 SR.ConfigMigration 统一清理。
                 Row("解除关卡边界", "Unlock level bounds",
                     "解除关卡边界：放开关卡四周的空间限制.\n"
                     + "开启后实体墙、放置光标、相机取景、界外黑幕与方块越界放置同时解除; 关闭即逐项还原.",
@@ -40,7 +39,6 @@ public partial class Experiments : ITweak
                     "Level Bounds");
                 GUILayout.Space(SRApi.Ctl.Sc(6));
                 SRApi.Ctl.SectionTitle(SRApi.T("- 进阶（一般不用改）-", "- Advanced (rarely needed) -"));
-                // 提示只写默认值，不写范围（AcceptableValueRange 已删除）。
                 AdvRow("Level Bounds Radius", "越界范围", "Unlock radius",
                     "硬解除半径：光标与相机可到关卡外的距离, 不限范围.\n"
                     + "值越大可走得越远; 相机取景与放置光标的边界都按这个值换掉.",

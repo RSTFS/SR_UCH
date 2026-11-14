@@ -1,6 +1,5 @@
-// 延迟探测回显（核心）：EX 页的「延迟」列由 EX 显示，但**探测回显放到核心**，
-// 这样对方只要装了 SR 基础模组（不必装 EX）就能被房主测到 RTT；两端都装 EX 时行为不变。
-// 协议与 ExModule.Ping.cs 一致：MsgGameRuleSet + Magic=774，NewRule=None 的带外信号。
+// 延迟探测回显：回显逻辑放核心，对方只装基础模组也能被房主测到 RTT。
+// 协议同 ExModule.Ping.cs：MsgGameRuleSet + Magic=774，NewRule=None 的带外信号。
 using System;
 using GameEvent;
 using UnityEngine.Networking;

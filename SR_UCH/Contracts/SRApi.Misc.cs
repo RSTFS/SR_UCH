@@ -1,4 +1,4 @@
-// 契约层：ITweak / IFeatureHost / ILanguagePack / Slots，第三方功能只依赖本文件。
+// 契约层：SlotKeys / Migration / Env / ColorHex / Cache / Ref / NetMagic / Sinks / Guard。
 // 硬约定：本文件不得引用 SR 的其它文件，须能单独编译成程序集；槽位只传 BCL / 引擎 / 游戏类型。
 using System;
 using System.Collections.Generic;
@@ -12,7 +12,7 @@ using BepInEx.Logging;
 namespace SR_UCH {
     public static partial class SRApi {
 
-        // 槽位名常量：Slots.Provide/Require/Retract 以前是裸字符串，拼错只会静默失效；统一从这里取。
+        // 槽位名常量：Slots.Provide/Require/Retract 用裸字符串时拼错只会静默失效。
         public static class SlotKeys {
             public const string NotifyHook = "sr.notify.hook";           // Func<string,string,bool> 通知治理钩子
             public const string NotifyHub2 = "sr.notify.hub2";           // NotifyExFn 带元数据/动作的通知钩子
@@ -28,9 +28,7 @@ namespace SR_UCH {
             private static Action<string, string[]> _remove;
             private static Action<string, string, string> _move;
             public static void SetSinks(Action<string, string[]> remove, Action<string, string, string> move) { _remove = remove; _move = move; }
-            // 从 cfg 清理指定段下的一批死键（幂等）
             public static void Remove(string section, params string[] keys) { Action<string, string[]> f = _remove; if (f != null) f(section, keys); }
-            // 把某个键从一段搬到另一段
             public static void Move(string fromSection, string toSection, string key) { Action<string, string, string> f = _move; if (f != null) f(fromSection, toSection, key); }
         }
         public static class Env {
@@ -58,7 +56,6 @@ namespace SR_UCH {
                     + q.g.ToString("X2", CultureInfo.InvariantCulture)
                     + q.b.ToString("X2", CultureInfo.InvariantCulture);
             }
-            // 唯一的 Color→Color32 归一化入口：预览、色板、实际文字颜色都走这里，避免多套取整逻辑。
             public static Color32 ToColor32(Color c) {
                 int r = Mathf.Clamp(Mathf.RoundToInt(c.r * 255f), 0, 255);
                 int g = Mathf.Clamp(Mathf.RoundToInt(c.g * 255f), 0, 255);
@@ -99,8 +96,7 @@ namespace SR_UCH {
             public static MethodInfo Method(Type owner, string name, Type[] parameters, string feature) { Func<Type, string, Type[], string, MethodInfo> f = MethodArgsFn; return f != null ? f(owner, name, parameters, feature) : null; }
             public static void Override(string member, string feature) { Action<string, string> f = OverrideFn; if (f != null) f(member, feature); }
         }
-        // 网络魔数注册表：各功能把 MsgGameRuleSet 的 magic 号登记进来，自检断言唯一，
-        // 避免以后再加通道时撞号（现在散在核心/混乱牌组的常量里，只能靠注释互相提醒）。
+        // 网络魔数注册表：各功能登记 MsgGameRuleSet 的 magic 号，自检断言唯一以防撞号。
         public static class NetMagic {
             private static readonly Dictionary<string, int> _byName = new Dictionary<string, int>();
             private static readonly Dictionary<int, string> _byValue = new Dictionary<int, string>();
@@ -123,8 +119,7 @@ namespace SR_UCH {
             public static int Registered { get { try { return _byValue.Count; } catch (Exception) { return 0; } } }
         }
 
-        // 注入状态登记：MissingSinks() 只能反射 delegate 字段，覆盖不到"非委托状态"通道
-        // （例如 Storage 的根目录注入）。核心可把这类状态登记成 (名称, 就绪判定)，自检统一检查。
+        // 状态通道登记：MissingSinks() 只反射 delegate，覆盖不到非委托状态（如 Storage 根目录）。
         public static class Sinks {
             private static readonly Dictionary<string, Func<bool>> _states = new Dictionary<string, Func<bool>>();
             private static readonly List<string> _order = new List<string>();
@@ -155,7 +150,7 @@ namespace SR_UCH {
 
         public static class Guard {
             private static readonly Dictionary<string, int> _lastWarn = new Dictionary<string, int>();
-            // 最近异常环形缓冲（16 条）：自检页「最近异常」卡与支持包用；不参与去重/计数逻辑。
+            // 最近异常环形缓冲（16 条）：自检页「最近异常」卡与支持包用。
             private const int RecentCap = 16;
             private static readonly string[] _recent = new string[RecentCap];
             private static int _recentNext, _recentTotal;
@@ -183,7 +178,7 @@ namespace SR_UCH {
                     int now = Environment.TickCount;
                     int last;
                     if (what != null && _lastWarn.TryGetValue(what, out last) && unchecked((uint)(now - last)) < 5000u) return;
-                    // 去重表只增不减：异常风暴时（what 动态拼接）加容量上限，超过即整体清空（去重语义可容忍重置）。
+                    // 去重表只增不减：异常风暴时加容量上限，超过即整体清空。
                     if (what != null && _lastWarn.Count > 512) _lastWarn.Clear();
                     if (what != null) _lastWarn[what] = now;
                     LastWhat = what;

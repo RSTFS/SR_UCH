@@ -1,7 +1,5 @@
-// 单元测试用的 UnityEngine 最小桩（item 5）。
-// 游戏目录里的 UnityEngine.*.dll 是 Unity 自己的 netstandard 变体，脱离 Unity 运行时加载会
-// TypeLoadException；契约层只用到下面这些"纯数据结构"成员，所以测试工程用这份桩编译，
-// 不引用任何游戏/DLL。**本文件不参与插件构建**（只在 build\run-tests.ps1 里被编译）。
+// 单元测试用的 UnityEngine 最小桩：只提供契约层用到的纯数据类型。
+// 不参与插件构建；引用真实 UnityEngine.dll 会 TypeLoadException。
 using System;
 
 namespace UnityEngine {
@@ -114,7 +112,7 @@ namespace UnityEngine {
         public static int frameCount { get { return 0; } }
     }
 
-    // 契约层的"注入前日志兜底"用 UnityEngine.Debug；测试工程要能编译到它。
+    // 契约层的"注入前写日志"用 UnityEngine.Debug，测试工程要能编译到它。
     public static class Debug {
         public static void LogWarning(object m) { }
         public static void LogError(object m) { }

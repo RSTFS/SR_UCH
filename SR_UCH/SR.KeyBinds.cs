@@ -1,4 +1,4 @@
-// 键位：组合键（按按下顺序显示）、录制式快捷键序列、右键绑键、序列匹配与统一轮询触发。
+// 键位：组合键、录制式快捷键序列、右键绑键、序列匹配与统一轮询触发。
 using System;
 using System.Collections.Generic;
 using BepInEx;
@@ -9,15 +9,14 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
 public partial class SR {
 
-// 分区：KeyBinds（自定义键位 / Shift·Ctrl·Alt 组合键 / 捕捉与显示）
+// 分区：KeyBinds（自定义键位 / 组合键 / 捕捉与显示）
 
-        // 组合键持久化：每个键位建一个隐藏配置项（设置\组合键 <Key>）存修饰键，重启后保留。
-        // name / mode 仅保留在签名里（调用点已按此签名写好，参数未使用）。
+        // 组合键持久化：每个键位建一个隐藏配置项存修饰键，重启后保留。
         public static void RegisterKey(string name, ConfigEntry<KeyCode> entry, string mode) {
             RegisterComboEntry(entry);
         }
 
-        //组合键条目名必须带分区名：SR 与外部模块都有 "Respawn Key"，只用 Key 名会互相覆盖。
+        // 组合键条目名必须带分区名，否则 SR 与外部模块的同名键位会互相覆盖。
         private static string ComboEntryName(ConfigEntryBase entry) {
             return entry.Definition.Section + " " + entry.Definition.Key;
         }
@@ -26,10 +25,8 @@ public partial class SR {
         private static readonly List<ConfigEntry<KeyCode>> _pendingCombo = new List<ConfigEntry<KeyCode>>();
         private static readonly Dictionary<ConfigEntryBase, ComboMod> _pendingComboDefault = new Dictionary<ConfigEntryBase, ComboMod>();
 
-        // 建立持久化修饰键配置（惰性：捕捉时首次设置才写入）
-        // 键位字典以 ConfigEntryBase 对象为键，配置重读后旧对象会留成僵尸。
-        // 超过 512 条时按"当前配置里还存在的条目"裁剪，只删真正失效的键 ——
-        // 不能整体清空，那会让已绑定的组合键全部失效（audit 05-P0-2）。
+        // 修饰键表以 ConfigEntryBase 对象为键，配置重读后旧对象会留成僵尸。
+        // 超过 512 条时按现存条目裁剪；不能整体清空，否则已绑定的组合键全部失效。
         private static void PruneComboMapsIfNeeded() {
             try {
                 if (_keyModEntries == null || _keyMods == null) return;
@@ -50,7 +47,7 @@ public partial class SR {
 
         private static void RegisterComboEntry(ConfigEntry<KeyCode> entry) {
             if (entry == null || _keyModEntries.ContainsKey(entry)) return;
-            PruneComboMapsIfNeeded();   // 条目对象重建后旧键会留成僵尸（audit 05-P0-2）
+            PruneComboMapsIfNeeded();   // 条目重建后旧键会留成僵尸
             if (_internalConfig == null) {
                 if (!_pendingCombo.Contains(entry)) _pendingCombo.Add(entry);
                 return;
@@ -66,14 +63,13 @@ public partial class SR {
                                 "组合键修饰（旧命名，已弃用；值会自动迁移到带分区名的新条目）");
                             if (!string.IsNullOrEmpty(legacy.Value)) {
                                 modEntry.Value = legacy.Value;
-                                // 不在这里清空旧条目：清空后一旦新条目被重置/删掉，用户原来的修饰设置
-                                // 就永久丢失（audit 05-P0-4）。旧条目留着当备份，代价只是一个空转的键。
+                                // 不清空旧条目：留着当备份，否则新条目被重置/删掉会丢失用户设置。
                             }
                         }
                     } catch (Exception __ex) { Guard.Log("RegisterComboEntry", __ex); }
                     _keyModEntries[entry] = modEntry;
                     _watchDirty = true;
-                    NoteEntryBound();   //新增了一个条目：让 SectionEntries 的缓存失效
+                    NoteEntryBound();   // 让 SectionEntries 缓存失效
                     string v = modEntry.Value;
                     ComboMod m = ParseComboMod(v);
                     if (m != ComboMod.None) _keyMods[entry] = m;
@@ -93,8 +89,7 @@ public partial class SR {
             foreach (KeyValuePair<ConfigEntryBase, ComboMod> kv in _pendingComboDefault) defs.Add(kv);
             _pendingComboDefault.Clear();
             for (int i = 0; i < defs.Count; i++) {
-                // 以"持久化字符串是否为空"为准：只设主键/清空修饰键的用户在 _keyMods 里没有条目，
-                // 用 _keyMods 判会把延迟默认又写回去，配置看起来"自己变回来"（audit 05-P0-3）。
+                // 以持久化字符串是否为空为准；用 _keyMods 判会把延迟默认又写回去。
                 ConfigEntry<string> __me;
                 bool __has = _keyModEntries.TryGetValue(defs[i].Key, out __me) && __me != null && !string.IsNullOrEmpty(__me.Value);
                 if (!__has) SetKeyComboMod(defs[i].Key, defs[i].Value);
@@ -117,7 +112,6 @@ public partial class SR {
             return m;
         }
 
-        // 读该条目保存的"组合/序列"原始串（录制时按按下顺序写入）
         internal static string RawComboString(ConfigEntryBase entry) {
             try {
                 ConfigEntry<string> me;
@@ -125,7 +119,6 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("RawComboString", __ex); }
             return "";
         }
-        // 按"按下顺序"返回修饰键串（如 "Alt+Shift"）。原始组合串由录制时按按下顺序写入。
         private static string RawModsInOrder(ConfigEntryBase entry) {
             try {
                 string raw = RawComboString(entry);
@@ -142,7 +135,7 @@ public partial class SR {
                     if (s.Length > 0) return s;
                 }
             } catch (Exception __ex) { Guard.Log("RawModsInOrder", __ex); }
-            return FormatComboMod(KeyComboMod(entry));   //兜底：固定顺序
+            return FormatComboMod(KeyComboMod(entry));   // 兜底：固定顺序
         }
         private static string FormatComboMod(ComboMod m) {
             if (m == ComboMod.None) return "";
@@ -153,8 +146,7 @@ public partial class SR {
             return s;
         }
 
-        // 按住中的修饰键按帧缓存（同帧结果必然相同，调用点每帧上百次）。
-        // GetKeyDown 是边沿触发，不能按帧缓存（那条路径走 ComboDown）。
+        // 按住中的修饰键按帧缓存（同帧结果必相同）；GetKeyDown 是边沿触发，走 ComboDown。
         private static ComboMod _heldModsCache;
         private static int _heldModsFrame = -1;
         public static ComboMod HeldComboMods() {
@@ -170,8 +162,7 @@ public partial class SR {
             return m;
         }
 
-        // 录制式快捷键：一串按键 + 顺序（如 Shift -> 9 -> 0）。
-        // 持久化是同一隐藏条目里的一条字符串：开头连续修饰键 + 序列前键，最后一位是主键（存在键位项里）。
+        // 录制式快捷键：一串按键 + 顺序（如 Shift -> 9 -> 0）；隐藏条目存修饰键 + 序列前键。
 
         private static bool IsModifierKey(KeyCode k) {
             return k == KeyCode.LeftShift || k == KeyCode.RightShift ||
@@ -199,7 +190,6 @@ public partial class SR {
             }
         }
 
-        // 名称 -> KeyCode：支持 Enum 名（"Alpha9"/"LeftShift"）与简写（"Shift"/"Ctrl"/"Alt"）
         private static KeyCode ParseKeyName(string p) {
             if (string.IsNullOrEmpty(p)) return KeyCode.None;
             if (p.Equals("Shift", StringComparison.OrdinalIgnoreCase)) return KeyCode.LeftShift;
@@ -228,7 +218,6 @@ public partial class SR {
             return extras;
         }
 
-        // 完整序列 = 开头的修饰键（按固定顺序）+ 序列前键 + 主键
         public static List<KeyCode> SeqOf(ConfigEntry<KeyCode> entry) {
             List<KeyCode> seq = new List<KeyCode>();
             if (entry == null) return seq;
@@ -271,11 +260,10 @@ public partial class SR {
 
         // 序列匹配（仅"有序列前键"时启用；纯修饰键组合走 held 判定）
         private static readonly Dictionary<ConfigEntryBase, int> _seqProg = new Dictionary<ConfigEntryBase, int>();
-        // 序列进度的时间戳：超过 1.2 秒没有新按键就作废，避免半完成进度跨帧永久残留（audit 05-P0-1）
+        // 序列进度时间戳：超过 1.2 秒没有新按键就作废，避免半完成进度残留。
         private static readonly Dictionary<ConfigEntryBase, float> _seqAt = new Dictionary<ConfigEntryBase, float>();
         private static readonly Dictionary<ConfigEntryBase, int> _seqStamp = new Dictionary<ConfigEntryBase, int>();
         private static readonly Dictionary<ConfigEntryBase, bool> _seqResult = new Dictionary<ConfigEntryBase, bool>();
-        // 普通组合键（修饰键 + 主键）的按帧去重，与 SeqMatched 同机制。
         private static readonly Dictionary<ConfigEntryBase, int> _comboStamp = new Dictionary<ConfigEntryBase, int>();
         private static readonly Dictionary<ConfigEntryBase, bool> _comboResult = new Dictionary<ConfigEntryBase, bool>();
         private static readonly List<KeyCode> _frameKeys = new List<KeyCode>();
@@ -300,7 +288,6 @@ public partial class SR {
             return _watchKeys;
         }
 
-        // 本帧按下的键（按 WatchKeys 顺序，一帧只算一次）
         private static List<KeyCode> FrameKeyDowns() {
             if (_frameKeysStamp == Time.frameCount) return _frameKeys;
             _frameKeysStamp = Time.frameCount;
@@ -312,7 +299,6 @@ public partial class SR {
             return _frameKeys;
         }
 
-        // 顺序匹配：按 seq 依次按下才算触发（同一 entry 每帧只算一次，避免一帧多次调用重复推进）
         private static bool SeqMatched(ConfigEntry<KeyCode> entry, List<KeyCode> seq) {
             int stamp;
             if (_seqStamp.TryGetValue(entry, out stamp) && stamp == Time.frameCount) {
@@ -324,7 +310,6 @@ public partial class SR {
             if (down.Count == 0) return false;
             int prog;
             _seqProg.TryGetValue(entry, out prog);
-            // 半完成进度必须有时效：超过 1.2 秒没有任何新按键，就当用户已经放弃这次序列。
             float __lastAt;
             if (prog != 0) {
                 _seqAt.TryGetValue(entry, out __lastAt);
@@ -355,7 +340,6 @@ public partial class SR {
             return fired;
         }
 
-        // 直接写入原始组合串（录制时按按下顺序生成；解析按名字，不依赖顺序）
         internal static void SetRawComboString(ConfigEntryBase entry, string text) {
             if (entry == null) return;
             try {
@@ -393,7 +377,6 @@ public partial class SR {
             }
         }
 
-        // 为键位设置默认组合修饰（仅在该键位从未被设置过时生效）
         public static void SetDefaultCombo(ConfigEntryBase entry, ComboMod mod) {
             if (entry == null || _keyMods.ContainsKey(entry)) return;
             if (_internalConfig == null) {
@@ -426,8 +409,7 @@ public partial class SR {
             return (held & need) == need;
         }
 
-        // 按下检测：单键 / 修饰键组合（修饰键全按住 + 主键按下）/ 多键序列（按顺序，如 9 -> 0）。
-        // Typing 为真（输入框打开）时一律返回 false；所有功能与外部模块的键轮询都走这里。
+        // 按下检测：单键 / 组合键 / 多键序列；Typing 为真时一律返回 false；所有键轮询都走这里。
         public static bool ComboKeyDown(ConfigEntry<KeyCode> entry) {
             if (entry == null) return false;
             if (Typing) return false;  // Typing 由 ChatWindow 注册，核心不编译期引用它
@@ -435,8 +417,7 @@ public partial class SR {
             try { main = entry.Value; } catch (Exception __ex) { Guard.Log("ComboKeyDown", __ex); }
             if (main == KeyCode.None) return false;
             if (SeqExtras(entry).Count > 0) return SeqMatched(entry, SeqOf(entry));
-            // 按帧去重：Input.GetKeyDown 在整个渲染帧内为 true，而 FixedUpdate 一帧可跑多次 ->
-            // FixedUpdate 上的调用点会重复触发；故按 entry + frameCount 缓存结果。
+            // 按帧去重：Input.GetKeyDown 整帧为 true 而 FixedUpdate 一帧可多跑，故按 entry 缓存。
             int stamp;
             if (_comboStamp.TryGetValue(entry, out stamp) && stamp == Time.frameCount) {
                 bool cached; return _comboResult.TryGetValue(entry, out cached) && cached;
@@ -456,13 +437,11 @@ public partial class SR {
             return ComboModDown(entry) && Input.GetKey(entry.Value);
         }
 
-        // 显示文本：单键 "X" / 组合键 "Shift+Ctrl + X" / 序列 "Shift + 9 -> 0"
         public static string ComboKeyDisplay(ConfigEntryBase entry, KeyCode kc) {
             if (kc == KeyCode.None) return KeyDisplayName(kc);
             List<KeyCode> extras = SeqExtras(entry);
             // 修饰键按按下顺序显示（原始组合串保存的就是按下顺序），不用固定顺序
             string mods = RawModsInOrder(entry);
-            // 主键位是修饰键时（录制可能把修饰键存进主键位）把修饰键放到最前面显示。
             bool __kcIsMod = false;
             try {
                 __kcIsMod = (kc == KeyCode.LeftControl || kc == KeyCode.RightControl
@@ -481,8 +460,7 @@ public partial class SR {
             return s + KeyDisplayName(kc);
         }
 
-        // 自动快捷键：右键界面上的开关 / 按钮即可绑定，SR 统一轮询触发。
-        // 功能只登记"按下做什么"；条目建在隐藏段 [Hotkeys]（不占侧栏），由 CheckHotkeys 每帧检测。
+        // 自动快捷键：右键开关/按钮绑定；条目建在隐藏段 [Hotkeys]，由 CheckHotkeys 每帧检测。
         private const string HkSec = "Hotkeys";
 
         private sealed class HkItem {
@@ -506,7 +484,6 @@ public partial class SR {
             return it;
         }
 
-        // 键位冲突：两条自动快捷键绑了同一个（主键 + 修饰键）组合时列出，自检页据此报警。
         public sealed class KeyConflict {
             public string A, B;
             public string Combo;
@@ -532,7 +509,6 @@ public partial class SR {
             return res;
         }
 
-        // 修饰键状态（与 ComboKeyDown 一致的来源：隐藏的组合键条目）。
         private static int ComboModOf(ConfigEntry<KeyCode> e) {
             try {
                 ComboMod m;
@@ -541,7 +517,6 @@ public partial class SR {
             return 0;
         }
 
-        // 冲突展示用："Ctrl+Shift+K" 形式。
         private static string ComboNameOf(ConfigEntry<KeyCode> e) {
             try { return FormatComboMod(KeyComboMod(e)) + KeyDisplayName(e.Value); }
             catch (Exception __ex) { Guard.Log("键位冲突/组合键文本", __ex); return e != null ? e.Value.ToString() : ""; }
@@ -553,7 +528,6 @@ public partial class SR {
             if (it != null) { it.Run = action; }
         }
 
-        // 取该动作的快捷键条目（界面用它做右键绑定与显示）；_internalConfig 就绪后惰性建立
         public static ConfigEntry<KeyCode> Hotkey(string id) {
             HkItem it;
             if (string.IsNullOrEmpty(id) || !_hkById.TryGetValue(id, out it)) return null;
@@ -562,22 +536,20 @@ public partial class SR {
                     it.Key = _internalConfig.Bind(HkSec, it.Id, KeyCode.None,
                         "自动快捷键：" + (it.Label ?? it.Id) + "（在管理界面右键对应开关/按钮绑定，再右键删除）");
                     RegisterComboEntry(it.Key);
-                    NoteEntryBound();   //新增了一个条目：让 SectionEntries 的缓存失效
+                    NoteEntryBound();   // 让 SectionEntries 缓存失效
                     _watchDirty = true;
                 } catch (Exception __ex) { Guard.Log("建立自动快捷键条目", __ex); }
             }
             return it.Key;
         }
 
-        // 显示文本（"" = 未绑定）：界面把它拼在标签后；录制中返回带方括号的紧凑文本（" [...]" / " [1]"），
-        // 未按键时用单字符省略号，避免固定宽度的标签被挤到下一行。
+        // 显示文本（"" = 未绑定）：界面拼在标签后；录制中返回紧凑的 [...] 文本。
         public static string HotkeyText(string id) {
             ConfigEntry<KeyCode> k = Hotkey(id);
             if (k == null) return "";
             return KeySuffix(k);
         }
 
-        // 键位框文本：只显示按键本身（未绑定 / 录制中各自有对应文案），供快捷键框使用。
         public static string KeyText(ConfigEntry<KeyCode> k) {
             if (k == null) return T("未绑定", "Unbound");
             if (_capturing == k) return _recSeq.Count == 0 ? "..." : RecText();
@@ -603,13 +575,11 @@ public partial class SR {
             _hkInitDone = true;
             try { NavHide(HkSec); } catch (Exception __ex) { Guard.Log("隐藏 Hotkeys 段", __ex); }
             for (int i = 0; i < _hkItems.Count; i++) {
-                // 单个条目建不出来不能连累后面的（_hkInitDone 已置位，抛一次就永久少一批）
                 try { Hotkey(_hkItems[i].Id); } catch (Exception __ex) { Guard.Log("建立自动快捷键 " + _hkItems[i].Id, __ex); }
             }
         }
 
         // 每帧轮询（SR.Tick 调用）：绑定的键按下 -> 执行动作
-        // ============ 键位动作核心化（RegisterKey 4 参） ============
         private sealed class KeyAct {
             public string Name, Mode;
             public ConfigEntry<KeyCode> Entry;
@@ -640,9 +610,8 @@ public partial class SR {
             // 每个条目的回调单独隔离：一个功能抛异常不影响其余快捷键。
             try { HkInitAll(); } catch (Exception __ex) { Guard.Log("初始化自动快捷键", __ex); }
             CheckRegisteredKeyActions();   // 功能登记的键位动作（核心统一轮询；hold 类需每帧）
-            if (_capturing != null) return; //正在录制按键：不触发
-            // 本帧没有任何按键事件时不必遍历全部快捷键（ComboKeyDown 是边沿触发）。
-            // 注意：hold 语义的键位动作不在这里，已在上一行统一处理。
+            if (_capturing != null) return; // 正在录制按键：不触发
+            // 本帧无按键事件时不必遍历快捷键；hold 语义的键位动作已在上一行统一处理。
             if (!UnityEngine.Input.anyKeyDown && !SR.GuiKeyThisFrame) return;
             for (int i = 0; i < _hkItems.Count; i++) {
                 HkItem it = _hkItems[i];
@@ -657,9 +626,7 @@ public partial class SR {
             }
         }
 
-        // ============ 按键中心（自检页卡片） ============
-        // 列出所有「自动快捷键」（HotkeyButton 惰性建的 Hotkeys 段条目，右键绑定也写在这）
-        // 与「手动键位」（功能配置里的 KeyCode 条目），支持一键清除与重复组合提示。
+        // 分区：按键中心（自检页卡片；自动快捷键 + 手动键位，支持清除与重复提示）
         private sealed class KeyCenterRow {
             public ConfigEntry<KeyCode> Entry;
             public string Group;    // 分组显示名（本地化）
@@ -673,7 +640,7 @@ public partial class SR {
         private static int _kcBuiltEntryVersion = -1;
         private static bool _kcDirty = true;
         internal static void MarkKeyCenterDirty() { _kcDirty = true; }
-        // 按键中心/主动自检用：只读数量，避免其它分部文件直接碰私有字段（分区守卫要求）。
+        // 只读数量，供其它分部文件与自检页使用（分区守卫要求不直接碰私有字段）。
         internal static int HotkeyCount { get { return _hkItems != null ? _hkItems.Count : 0; } }
 
         private static string KeyCenterAutoLabel(string id) {
@@ -683,7 +650,6 @@ public partial class SR {
             return id;
         }
 
-        // 重新采集：只在条目表变化 / 用户点刷新时执行，避免每帧枚举全部配置条目。
         private static void BuildKeyCenterRows() {
             _kcRows = new List<KeyCenterRow>();
             try {

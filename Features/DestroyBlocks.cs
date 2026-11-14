@@ -1,6 +1,5 @@
 // 方块破坏：列出现场方块、按玩家归属筛选、远程销毁。
 // 槽位（对外 Provide）：DestroyBlocks.PlayerPlacedBlocks / AttributeToHost。
-// 权限模型：默认只有房主能真正删除；房客可以用同样的键高亮、选中、看信息条，按删除键不生效。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -26,10 +25,9 @@ namespace SR_UCH.Tweaks {
         private static Placeable _infoTarget;
         private static bool _infoTagTried;
         private static Placeable _tintedBlock; // 当前高亮方块
-        // 高亮作用域：多部件道具有 ParentPiece / ChildPieces 结构，只 tint 主体时子件不会被标记。
         private static readonly List<Placeable> _tintedGroup = new List<Placeable>();
 
-        // 把主体和它的全部子件一起加/去高亮：ParentPiece/ChildPieces 是多部件道具的结构。
+        // 主体与全部子件一起高亮（多部件道具经 ParentPiece/ChildPieces 关联）。
         private static void TintGroup(Placeable root) {
             CollectTint(root, 0);
         }
@@ -67,13 +65,13 @@ namespace SR_UCH.Tweaks {
             Distance
         }
 
-        // 列表模式：普通只列有玩家放置记录的方块，进阶列出全部方块。
+        // 列表模式：普通=只列玩家放置的方块；进阶=全部方块。
         public enum ListMode {
             Normal,
             Advanced
         }
 
-        // 追踪玩家：不追踪 = 全部；#1-#4 = 只找对应玩家号的方块（仅普通列表模式相关）。
+        // 追踪玩家：不追踪=全部；#1-#4=只列该玩家号的方块。
         public enum TrackMode {
             NoTrack,
             P1,
@@ -82,35 +80,31 @@ namespace SR_UCH.Tweaks {
             P4
         }
 
-        // 列表刷新方式（按住切换键期间）：实时 = 候选表持续保持最新，别人刚放/刚删即时可见；
-        // 暂存 = 只在按下切换键时重建一次，整段按住期间不再扫描，开销最小。
+        // 列表刷新：实时=持续更新，别人刚放/刚删即时可见；暂存=按下时只重建一次。
         public enum RefreshMode {
             Realtime,
             Snapshot
         }
 
-        // 实时列表的兜底重建间隔：放置/销毁事件未覆盖的变化（重载 / 快照重建）靠它兜住。
         private const float RealtimeFallbackInterval = 0.2f; // 事件漏掉的场景变化兜底
         private static bool _listDirty; // 有变化待刷新（由放置/销毁事件置位）
         private static float _lastListRebuildAt = -999f; // 上次全量重建的时刻
         private static int _lastPlaceableCount = -1;    // 上次重建时 AllPlaceables 的数量（零成本变化检测）
 
-        // 追踪玩家仅在列表模式 = 普通时显示。
         public static bool TrackPlayerVisible { get { return _listMode == null || _listMode.Value == ListMode.Normal; } }
         private static PlacementListener _listener;
         private static NetworkPlacementListener _netListener;
 
-        // 以 Placeable 为键（Unity 对象作字典键）：对象被 OnDisable/Destroy 掉却没走 DestroyPieceEvent 时会永久留在表里，
-        // 既拖住 GC，又让 PlayerPlacedBlocks 返回「假存活」的对象（audit P0-17）。这里加周期修剪。
+        // 以 Placeable 为键：对象未走 DestroyPieceEvent 销毁时会永久留表，需周期修剪。
         private static Dictionary<Placeable, PlacementInfo> _placements = new Dictionary<Placeable, PlacementInfo>();
         private static float _placementsPrunedAt = -999f;
         private const float PlacementsPruneInterval = 30f;
-        // 把快照加载出来的方块登记为房主（1 号）放置；由关卡功能经 DestroyBlocks.AttributeToHost 槽位调用。
+        // 把快照方块登记为房主（1 号）放置；由关卡经槽位调用。
         public static void AttributeToHost(List<Placeable> blocks) {
             try {
                 if (blocks == null || blocks.Count == 0) return;
                 string hostName = null;
-                // 必须一并填 color：PlacementInfo.color 默认 (0,0,0,0)，UpdateInfoTag 会无条件赋值，漏填会让名牌文字全透明。
+                // 必须一并填 color：漏填会让名牌文字全透明。
                 Color hostColor = Color.white;
                 try {
                     LobbyManager lm = LobbyManager.instance;
@@ -144,8 +138,7 @@ namespace SR_UCH.Tweaks {
             public Color color;
         }
 
-        // 临时道具（炸弹，放置后自爆）记成“玩家放置”会在普通列表留下永远删不到的幽灵项。
-        // PlayerNumber <= 0 表示非玩家放置（系统 / 关卡自带件）。
+        // 炸弹等自爆道具记成玩家放置会留下幽灵项；PlayerNumber <= 0 为非玩家放置。
         private static readonly string[] _tmpPieces = new string[] { "Bomb Mini", "3x3 Bomb", "Bomb Mega" };
 
         private static bool IsPlayerPlacement(Placeable p, int playerNumber) {
@@ -158,23 +151,17 @@ namespace SR_UCH.Tweaks {
             return true;
         }
 
-        // 普通页（本栏目唯一页面）：直接渲染本栏目的通用设置条目。
         private static void RenderNormalPage() {
             SRApi.RenderSectionEntries("Destroy Blocks");
         }
 
 
-        // 方块破坏的唯一实现，保证各入口行为一致。
-        // DestroySelf 自带网络同步（发 MsgPieceDestroyed），不可再显式广播以免重复。
+        // 方块破坏的唯一实现；DestroySelf 自带网络同步与收尾，不要再显式广播或补 OnDestroy。
         private static void DestroyBlockNative(int index) {
             try {
                 if (index < 0 || index >= Blocks.Count) return;
                 Placeable target = Blocks[index];
                 if (target == null) return;
-                // DestroySelf 自带网络同步，并且它自己就有 useSmoke 参数（游戏侧签名
-                // DestroySelf(bool destroyChildren, bool useSmoke, bool sendNetworkSignal)），
-                // 所以"破坏动画"开关直接传进去即可（audit 19-P0-1）。
-                // 不再手动补 OnDestroy：DestroySelf 已标记销毁并走自己的收尾，重复调用可能二次销毁（audit 19-P0-2）。
                 bool __smoke = _useSmoke == null || _useSmoke.Value;
                 target.DestroySelf(false, __smoke, true);
                 _placements.Remove(target); // 本路径不发 DestroyPieceEvent，必须自己清记录，避免强引用已销毁对象
@@ -182,7 +169,7 @@ namespace SR_UCH.Tweaks {
         }
 
 
-        // 多对象道具：游戏只为“主体”发 PiecePlacedEvent，子元件需沿 Placeable.ParentPiece 向上找归属。
+        // 多部件道具：只有主体发 PiecePlacedEvent，子件需沿 ParentPiece 上溯归属。
         private static PlacementInfo ResolveInfo(Placeable p) {
             if (p == null) return null;
             PlacementInfo info;
@@ -229,7 +216,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // PiecePlacedEvent 只在放置者本地触发，房主端缺房客的方块；PiecePlaced 网络消息所有端都收，故从这里补记录。
+        // PiecePlacedEvent 只在放置者本地触发，故从全端都收的 PiecePlaced 网络消息补记录。
         public class NetworkPlacementListener : GameEvent.IGameEventListener {
             public void handleEvent(GameEvent.GameEvent e) {
                 try {
@@ -259,7 +246,7 @@ namespace SR_UCH.Tweaks {
 
         private static Placeable FindPlaceableByID(int id) {
                 foreach (Placeable p in Placeable.AllPlaceables) {
-                    // 必须过滤 MarkedForDestruction：DestroySelf 后的对象仍留在 AllPlaceables，只判 null + ID 会把死方块当作有效目标。
+                    // 必须过滤 MarkedForDestruction：销毁后的对象仍在 AllPlaceables。
                     if (p != null && !p.MarkedForDestruction && p.ID == id) return p;
                 }
                 return null;
@@ -291,7 +278,6 @@ namespace SR_UCH.Tweaks {
                 "Break effect\nplays the smoke and shatter effect when a piece is removed\nwhen off the piece just disappears");
         }
 
-        // 是否走实时列表（默认实时）
         private static bool RealtimeListOn { get { return _refreshMode == null || _refreshMode.Value == RefreshMode.Realtime; } }
 
         private static bool TrackPlayerRowVisible(ConfigEntryBase e) {
@@ -317,7 +303,6 @@ namespace SR_UCH.Tweaks {
                 "Keybind for deleting the currently selected block");
             SRApi.RegisterKey("方块破坏-切换", _toggleKey, "hold");
             SRApi.RegisterKey("方块破坏-删除", _deleteKey, "press");
-            // 本功能只有一个页面（原高级页已整体删除）。
             SRApi.RegisterPage("Destroy Blocks", "Normal", "普通", "Normal", 10, RenderNormalPage);
             _selectMode = _mp.Config.Bind(
                 "Destroy Blocks",
@@ -329,7 +314,7 @@ namespace SR_UCH.Tweaks {
                 "List Mode",
                 ListMode.Normal,
                 "列表模式：普通 = 只列出玩家确切放置过的方块（关卡初始布局/系统方块不出现）；进阶 = 所有方块单独列出，不在乎有没有玩家号。");
-            // 该行可见性取决于列表模式（见 TrackPlayerRowVisible），而条目缓存只按绑定版本失效，故切换时需主动失效。
+            // 该行可见性取决于列表模式，条目缓存只按绑定版本失效，故切换时须主动失效。
             _listMode.SettingChanged += (s, e) => SRApi.Ctl.NoteEntryBound();
             _trackMode = _mp.Config.Bind(
                 "Destroy Blocks",
@@ -344,7 +329,6 @@ namespace SR_UCH.Tweaks {
             _useSmoke = _mp.Config.Bind("Destroy Blocks", "Use Smoke", false,
                 "破坏动画：删除方块时播放烟雾与破碎效果；关闭后方块直接消失。");
 
-            // 过滤条件变了：实时模式下候选表要重新过滤一次。
             _listMode.SettingChanged += (s, e) => _listDirty = true;
             _trackMode.SettingChanged += (s, e) => _listDirty = true;
 
@@ -360,18 +344,16 @@ namespace SR_UCH.Tweaks {
             _listener = listener;
             _netListener = netListener;
 
-            // 归属登记同样走槽位，避免与关卡功能产生编译期引用（拆分编译会 CS0103）。
-            // 两个槽位必须在这里 Provide：Level.Snapshot 经 Slots.Require 取 AttributeToHost，
-            // 少了这一行快照方块不会登记房主（列表里看不到、清场也带不走）。
-            // 委托实例存进局部变量：注销时按值匹配，避免误删后来注册的实现（与通知中心同一处理）。
+            // 归属登记走槽位，避免编译期引用（拆分编译 CS0103）；Level.Snapshot 经 Require 取 AttributeToHost。
+            // 委托存局部变量：注销按值匹配，避免误删后来注册的实现。
             Func<List<Placeable>> __ppb = PlayerPlacedBlocks;
             Action<List<Placeable>> __ath = AttributeToHost;
             Slots.Provide(SlotPlayerPlacedBlocks, __ppb);
             Slots.Provide(SlotAttributeToHost, __ath);
-            // 关机时把自己提供的槽位摘掉：否则宿主代码仍能 Require 到已失效的实现。
+            // 关机时摘掉自己提供的槽位，否则宿主仍能 Require 到失效实现。
             SRApi.OnShutdown("方块破坏/槽位", delegate {
                 try {
-                    // 事件与场景订阅一并注销：模组重载后不会留下第二份闭包（审查 P2-7）。
+                    // 事件与场景订阅一并注销：模组重载后不留第二份闭包。
                     try {
                         if (_listener != null) {
                             GameEventManager.ChangeListener<GameEvent.PiecePlacedEvent>(_listener, false);
@@ -392,10 +374,9 @@ namespace SR_UCH.Tweaks {
         }
 
 
-        // 槽位名：与调用方的唯一约定是“名字 + 委托签名”，刻意用 private const，调用方另写自己的常量以免编译期依赖。
-        // 名字一经发布不再更改（改需两边同步）。
-        // 房客删除放行槽位：外部模组提供 Func<bool>，true = 房客端也可以真正删除。
-        // 每次调用都 Require 一次（字典查找，代价可忽略）：放行方可能比本功能初始化更晚。
+        // 槽位名：与调用方只靠“名字 + 委托签名”约定，故用 private const。
+        // 房客删除放行槽位：外部模组提供 Func<bool>，true = 房客也可真正删除。
+        // 每次调用都 Require：放行方可能比本功能初始化更晚。
         private const string SlotAllowClientsOn = "Blocks.AllowClientsOn";
         private static bool AllowClientsOn {
             get {
@@ -411,8 +392,7 @@ namespace SR_UCH.Tweaks {
 
         private static void OnSceneChanged(Scene a, Scene b) {
             _placements.Clear();
-            // 候选表与选中态跨场景作废：旧场景的 Placeable 已销毁，留着会被当作有效选中项（AddBombTint 会抛异常）。
-            // Blocks 只在按住切换键时重建，清空不影响正常流程。
+            // 候选表与选中态跨场景作废：旧场景 Placeable 已销毁，留着会被当有效项。
             Blocks.Clear();
             _selected = null;
             _tintedBlock = null;
@@ -429,11 +409,9 @@ namespace SR_UCH.Tweaks {
             if (!SRApi.GateMaster) return;
             if (!Enabled) return;
             if (SRApi.Typing) return; 
-            // 仅派对 / 创意 / 自由建造模式；模式掩码声明在 [SrFeature].Modes 上，
-            // 由核心 FeatureAllowed 统一判定（IgnoreModeLimit 豁免已内置）。
+            // 仅派对 / 创意 / 自由建造模式；模式掩码由 FeatureAllowed 统一判定。
             if (!SRApi.FeatureAllowed(typeof(DestroyBlocks))) return;
-            // 权限：只有房主能真正删除；房客照样可以按住切换键高亮、滚轮换目标、看信息条（只读）。
-            // 房客按删除键时给一次明确提示，避免"按了没反应"的困惑。
+            // 权限：仅房主可删除；房客可高亮、换目标、看信息条，按删除键给提示。
             bool canDestroy = SRApi.CanControlLocally || AllowClientsOn;
             if (SRApi.ComboKeyDown(_toggleKey)) {
                 _altDown = true;
@@ -451,7 +429,6 @@ namespace SR_UCH.Tweaks {
             }
             if (SRApi.ComboKeyHeld(_toggleKey)) 
             {
-                // 实时列表：按住期间保持候选表最新（事件置脏 + 节流重建）；暂存模式或不按住时完全不跑。
                 if (RealtimeListOn) TickRealtimeList();
 
                 if (Blocks.Count <= 0) return;
@@ -476,7 +453,7 @@ namespace SR_UCH.Tweaks {
                             return;
                         }
 
-                        // DestroySelf 自身会发 MsgPieceDestroyed，再显式广播会发两条（接收端报 "already marked"）。
+                        // DestroySelf 自身会发 MsgPieceDestroyed，再广播会重复（接收端报 already marked）。
                         DestroyBlockNative(_index);
                         Blocks.RemoveAt(_index);
                         _index--;
@@ -486,10 +463,7 @@ namespace SR_UCH.Tweaks {
                         if (Blocks.Count <= 0) return;
                     }
                 }
-                // 滚轮量必须取 SRApi.TakeWheelEvent()：Input.GetAxis("Mouse ScrollWheel") 在本环境恒为 0，滚轮切换永不生效。
-                // TakeWheelEvent 由每帧执行的 ManagerUI.OnGUI 从事件 delta 记录，面板关着也有效。
-                // 每帧只吃一次：TakeWheelEvent 在某些趟里会重复给出同一个量，
-                // 一帧内连加两次会让索引来回跳（"只在两个之间切"的观感之一）。
+                // 滚轮量必须取 SRApi.TakeWheelEvent()（Input.GetAxis 恒为 0），且每帧只吃一次，连加会来回跳。
                 if (_wheelFrame != Time.frameCount) {
                     float wheel = SRApi.TakeWheelEvent();
                     if (wheel != 0f) {
@@ -503,7 +477,6 @@ namespace SR_UCH.Tweaks {
                 if (_index < 0) _index = Blocks.Count - 1;
                 _selected = Blocks[_index];
                 if (_selected != _tintedBlock) {
-                    // 整组高亮：主体 + 全部子件（多部件道具以前只有主体被标记）。
                     ClearTintGroup();
                     TintGroup(_selected);
                     _tintedBlock = _selected;
@@ -538,7 +511,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("按距离排序方块", __ex); }
         }
 
-        // 本地角色位置按帧缓存：距离模式每次重建都要排序，FindObjectsOfType<Character> 不宜反复全场景遍历。
+        // 本地角色位置按帧缓存：距离模式重建要排序，不宜反复全场景遍历。
         private static int _localPosFrame = -1;
         private static Vector3 _localPosCache = Vector3.zero;
 
@@ -554,18 +527,17 @@ namespace SR_UCH.Tweaks {
             return _localPosCache;
         }
 
-        // 本方法跑在 GameControl.Update 链路上（按住 Alt 时最坏每秒 10 次），遍历 AllPlaceables 期间别的脚本可能
-        // Object.Destroy(p)，MissingReferenceException 不能外泄，整段须兜住。
+        // 本方法跑在 Update 链路上（按住 Alt 最坏每秒 10 次），扫描期间 Object.Destroy 会抛异常，须兜住。
         private static void RebuildList() {
           try {
             Blocks.Clear();
             bool normalOnly = _listMode == null || _listMode.Value == ListMode.Normal;
             bool trackOn = _trackMode != null && _trackMode.Value != TrackMode.NoTrack;
-            // 不追踪的进阶模式用不到放置者信息；ResolveInfo 最坏沿 ParentPiece 上溯 8 层，是整段扫描的最大开销。
+            // 不追踪模式用不到放置者信息；ResolveInfo 最坏上溯 8 层，是扫描最大开销。
             bool needInfo = normalOnly || trackOn;
             foreach (Placeable p in Placeable.AllPlaceables) {
                 if (p == null) continue;
-                // DestroySelf 只隐藏渲染器、不移出 AllPlaceables，故 activeSelf 检查不够，MarkedForDestruction 才可靠。
+                // DestroySelf 只隐藏渲染器、不移出 AllPlaceables，须用 MarkedForDestruction 判活。
                 if (p.MarkedForDestruction) continue;
                 if (!p.gameObject.activeSelf) continue;
                 string name = p.Name;
@@ -584,29 +556,25 @@ namespace SR_UCH.Tweaks {
           } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.RebuildList", __ex); }
         }
 
-        // 实时列表：按住切换键期间按"计数变化/事件脏标记"重建；不按切换键或暂存模式下不会被调用。
-        // 同 RebuildList：跑在 GameControl.Update 链路上，异常不能外泄。
+        // 实时列表：按住期间按“计数变化/事件脏标记”重建，异常不能外泄。
         private static void TickRealtimeList() {
           try {
             float now = Time.unscaledTime;
-            // 计数变化 = 最廉价的变化信号：别人刚放/刚删时事件可能丢（房主端尤其），计数一定变。
+            // 计数变化是最廉价的信号：事件可能丢（房主端尤其），计数一定变。
             try {
                 int cnt = Placeable.AllPlaceables != null ? Placeable.AllPlaceables.Count : -1;
                 if (cnt != _lastPlaceableCount) { _lastPlaceableCount = cnt; _listDirty = true; }
             } catch (Exception __ct) { SRApi.Guard.Log("DestroyBlocks/计数变化检测", __ct); }
-            // 兜底：放置/销毁事件未覆盖的变化（重载关卡、快照重建）靠固定间隔兜住，不由其它页面的开关决定。
+            // 兜底：事件未覆盖的变化（重载关卡、快照重建）靠固定间隔兜住；不做额外节流。
             bool stale = (now - _lastListRebuildAt) >= RealtimeFallbackInterval;
             if (!_listDirty && !stale) return;
-            // 用户要求"实时=每帧"：去掉重建节流（脏了或兜底到点就立刻重建）。
-            // 成本由调用点决定：只在按住切换键时调用，且期间只看计数变化/事件脏标记。
             _lastListRebuildAt = now;
             _listDirty = false;
             RefreshListKeepSelection();
           } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.TickRealtimeList", __ex); }
         }
 
-        // 重建候选表并按引用找回当前选中项：实时模式下列表反复重建，不保选中项会导致高亮乱跳。
-        // 同 RebuildList：异常会抛进 GameControl.Update 链路，须兜住。
+        // 重建候选表并按引用找回选中项：否则高亮会乱跳；异常须兜住。
         private static void RefreshListKeepSelection() {
           try {
             Placeable prev = (_selected != null ? _selected : _tintedBlock);
@@ -628,7 +596,7 @@ namespace SR_UCH.Tweaks {
                     if (Blocks[i] == prev) { _index = i; _selected = Blocks[i]; return; }
                 }
             }
-            // 选中项已不在列表（多半被别人删了）：就地钳制同一下标，跳到头/尾会让选中项乱飞。
+            // 选中项已不在列表：就地钳制同一下标，跳到头/尾会让选中项乱飞。
             if (_index >= Blocks.Count) _index = Blocks.Count - 1;
             if (_index < 0) _index = 0;
             _selected = Blocks[_index];
@@ -637,7 +605,7 @@ namespace SR_UCH.Tweaks {
 
 
 
-        // 选中方块上方的名牌（参考 RemovePlayerPlacements：克隆角色光标名牌，显示 (玩家号) 名字 + 玩家颜色）。
+        // 选中方块上方的名牌：显示 (玩家号) 名字 + 玩家颜色。
         private static void UpdateInfoTag(Placeable p) {
             if (p == _infoTarget) {
                 if (_infoTag != null) _infoTag.transform.position = p.transform.position + new Vector3(0f, 1.5f, 0f);
@@ -684,8 +652,7 @@ namespace SR_UCH.Tweaks {
             _infoTarget = null;
             _infoTagTried = false;
         }
-        // 周期修剪归属表：清掉已销毁（== null 对 Unity 对象成立）或已标记销毁的键。
-        // 30 秒一次、只在字典非空时遍历，开销可忽略；不在每帧做是为了不干扰按住删除的热路径。
+        // 周期修剪归属表：30 秒一次、仅在非空时遍历，避开按住删除热路径。
         private static void PrunePlacementsIfDue() {
             float now = Time.unscaledTime;
             if (now - _placementsPrunedAt < PlacementsPruneInterval) return;

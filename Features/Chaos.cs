@@ -1,33 +1,15 @@
 // 混乱牌组（树屋选举版）+ 房内 mod 清单。
 //
-// 核心主张：发「真实 TabletRule + 真实 Value」，而不是 None 带外信号。
-//   依据：TabletRulesScreen.handleEvent 的守卫是
-//        `if (msg.NewRule != TabletRule.None && !LobbyManager.instance.IsHost)`  （反编译 111469）
-//   即「非房主端收到真实规则值，由游戏自己的代码写进 Modifiers」。
-//   所以没装 mod 的房客也能被房主带着变 —— 仅房主安装即可带全场。
-//   代价：房主自己不执行那段（被 !IsHost 挡住），房主必须本地双写一次。
-//   Value2 高位放牌组魔数，装了 mod 的房客据此把消息解析成「牌面」用于 UI；
-//   游戏的这 10 个规则分支都只读 Value / Valueb，不读 Value2（111512-111613），
-//   所以标记不会干扰原生规则，玩家在规则书里手动改的规则（Value2 = 0）也不会被误当成抽牌。
+// 发「真实 TabletRule + 真实 Value」而非 None 带外信号：游戏只对「非房主 + 非 None」的规则消息写
+// Modifiers，故仅房主装 mod 即可带全场；房主自己被 !IsHost 挡住，需本地双写。
 //
-// 三条刻意收窄：
-//   1) 射速牌（RateOfFire）已加回牌池；它会在游戏侧调 OnModifiersDynamicChange()，属于预期行为。
-//      （111551），该函数会写 Time.timeScale = GameSpeed，与「时间控制」抢同一全局状态。
-//   2) GameSpeed / CharacterSize / CameraFlip / Doomsday 不进池：前者归时间控制所有，
-//      后三者碰相机或要重建绘制对象。
-//   3) 还原「双写」：既重发每条规则的树屋原值（让没装 mod 的房客还原），
-//      也发一条带外 Restore 消息（让装了 mod 的房客清掉牌面标记），
-//      同时房主自己本地还原被 !IsHost 挡住的那份。
-//
-// 房内 mod 清单（握手）：复用 MsgGameRuleSet，以 TabletRule.None(0) 承载，
-//   Value2 高位放魔数认领自己的消息。None 的三个游戏消费者全部短路：
-//     111469 `NewRule != None` 不成立、106439 switch 无 None case、
-//     TabletRuleUtility.IsRuleModifierChange(None) 返回 false。
-//   Value 放本机 networkNumber（不用 conn —— 在客户端所有消息都来自服务器连接，无法区分发件人）。
-//
-// 不新增 Harmony 补丁、不新增 msgType、不新增反射登记：
-//   自检基线 patches / reflection / api 计数不变，仅 features +1。
-// 不碰相机、不生成实体、不加线程；状态只在主线程回调里读写。
+// 约束：
+// 1) Value2 高位放牌组魔数；游戏只读 Value / Valueb，手动改规则的 Value2 = 0 不会误判。
+// 2) 射速牌会写 Time.timeScale，与时间控制抢同一全局状态。
+// 3) GameSpeed / CharacterSize / CameraFlip / Doomsday 不进池（归时间控制或需重建绘制对象）。
+// 4) 还原必须双写：重发树屋原值（未装 mod 的房客）+ 带外 Restore（清牌面标记）。
+// 5) 房内清单复用 MsgGameRuleSet 以 None 承载，Value 放本机 networkNumber。
+// 不新增 Harmony 补丁 / msgType / 反射登记；状态只在主线程读写。
 
 using System;
 using System.Collections.Generic;
@@ -67,8 +49,7 @@ namespace SR_UCH.Tweaks {
         private static int _drawSeq;   // 抽牌序号：保证每次重抽的随机种子都不同（否则 TickCount 同毫秒会抽出同一张）
         private const int FBoolWallJumps = 8, FBoolDance = 9, FBoolMirror = 10, FBoolPlayerCol = 12, FBoolFriction = 13;
 
-        // 17 张牌：5 个数值规则的多档取值（重力 / 跳跃 / 冲刺 / 平台 / 射速）+ 5 个布尔规则。
-        // 每张牌带一句人话效果（牌面卡片第二行）；牌名/效果都走 SRApi.T，跟随界面语言。
+        // 17 张牌：5 个数值规则的多档取值 + 5 个布尔规则；每张带一句效果说明。
         private static readonly CardDef[] Cards = new CardDef[] {
             new CardDef("低重力",   "Low gravity",      "重力变轻，跳得更高",       "Lighter gravity, floatier jumps",      TabletRule.ModifierGravity,            FGravity,       false, 1, 2),
             new CardDef("高重力",   "High gravity",     "重力加重，下落更快",       "Heavier gravity, faster falls",        TabletRule.ModifierGravity,            FGravity,       false, 2, 2),
@@ -117,15 +98,12 @@ namespace SR_UCH.Tweaks {
 
         private static bool _uiReg;
 
-        // 配置行统一走"标签 + 控件"：RenderControl 只画控件、没有名称列，
-        // 那样 LocKey / LocDesc 登记不会被消费，界面上也没有任何配置项名称。
-        // 列宽与核心 Sc() 同坐标系；契约层未暴露 EntryNameWidth，故用固定 180 设计像素。
+        // 配置行走"标签 + 控件"，否则 LocKey / LocDesc 不会被消费；列宽固定 180 设计像素。
         private static void CfgRow(ConfigEntryBase e) {
             SRApi.Ctl.DrawEntryRow(e);
         }
 
-        // 本页配置行的显示名与悬浮说明：缺 LocKey 时中文界面回退英文键名，
-        // 缺 LocDesc 时英文界面完全没有提示（内部条目不会回退 Bind 的中文描述）。
+        // 显示名与悬浮说明必须登记。
         private static void RegUi() {
             SRApi.LocKey(Sec, "Enabled", "启用混乱牌组", "Enable chaos deck");
             SRApi.LocDesc(Sec, "Enabled",
@@ -190,7 +168,7 @@ namespace SR_UCH.Tweaks {
             if (!_uiReg) { _uiReg = true; SRApi.RowSliders.Add(UiSlider); }
         }
 
-        // 数值条目改由滑块渲染：范围与 Bind 的 AcceptableValueRange 逐项一致。
+        
         private static bool UiSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
             min = 0f; max = 0f; fmt = "0";
             try {
@@ -214,14 +192,12 @@ namespace SR_UCH.Tweaks {
             for (int i = 0; i < Cards.Length; i++) {
                 var c = Cards[i];
                 _pool[i] = plugin.Config.Bind(Sec, c.En, true, "是否进入随机池：" + c.Zh);
-                // 本地化跟着牌表走：以后加牌不用再记得补 LocKey（此前扩到 14 张只登记了 10 张）。
+                
                 SRApi.LocPair(Sec, c.En, c.Zh, c.En,
                               c.Zh + "\n勾选后才可能被抽到。", c.En + "\ncheck to include it in the draw pool.");
             }
 
-            // 混乱牌组「不存盘」（用户要求第一种）：启动时把本功能所有配置强制回到默认值，
-            // 上一局写在 cfg 里的值一律不继承——效果上等于每次启动都是全新会话。
-            // （cfg 文件仍可能被设置页写回，但下次启动会被这里覆盖，用户永远看不到"上次的设置还在"。）
+            // 本功能配置不存盘：启动时强制回到默认值。
             try {
                 _enabled.Value = false;
                 _everyRounds.Value = 1;
@@ -240,19 +216,17 @@ namespace SR_UCH.Tweaks {
                 if (_enabled != null && _enabled.Value) DrawAndBroadcast();
             });
 
-            // 对局播报：开局公告读本局启用的牌池（不是固定牌序，牌是逐回合随机抽的）。
-            // 上一版漏了栏目登记：侧栏会显示英文 id 且排序靠后。补上中英名与顺序。
+            // 播报读本局启用的牌池（牌逐回合随机抽）。
             SRApi.LocSec(Sec, "混乱牌组", "Chaos Deck");
             RegUi();
             SRApi.Nav(Sec, 130);
             // 每帧钩子：重抽键与握手都在 Tick 里。
-            // 此前这里漏了注册，整个每帧调度线是死的（重抽键完全无效）。
             SRApi.RegisterTick("混乱牌组-每帧", Tick);
             SRApi.RegisterPage(Sec, "Deck", "牌组", "Deck", 118, RenderPage);
             SRApi.RegisterPage(Sec, "Pool", "牌池", "Card pool", 130, RenderPoolPage);
             SRApi.OnShutdown("混乱牌组", Shutdown);
 
-            // 静态幂等：重复 Initialize 不能叠加监听器（关机回调按名字覆盖，天然幂等）。
+            
             if (_listener == null) {
                 _listener = new ChaosListener(this);
                 GameEventManager.ChangeListener<GameEvent.StartPhaseEvent>(_listener, true);
@@ -263,7 +237,7 @@ namespace SR_UCH.Tweaks {
             _ready = true;
         }
 
-        // 关机/卸载回调（经 SRApi.OnShutdown 注册）：解监听、撤规则。
+        
         public void Shutdown() {
             if (_listener != null) {
                 GameEventManager.ChangeListener<GameEvent.StartPhaseEvent>(_listener, false);
@@ -301,11 +275,10 @@ namespace SR_UCH.Tweaks {
         private static bool NetClientActive() { try { return NetworkClient.active; } catch { return false; } }
         private static Modifiers SafeMods() { try { return Modifiers.GetInstance(); } catch { return null; } }
         private static bool IsOnline() { var lm = SafeLobby(); return lm != null && lm.IsInOnlineGame; }
-        // 混乱牌组只在对局允许的模式里生效：派对 / 创意（模式豁免由统一门控处理）。
-        // 其它模式一律静默跳过：不抽牌、不接收、不弹提示。
+        // 只在派对 / 创意模式生效，其它模式静默跳过。
         private static bool ModeAllowed() {
             try {
-                // 树屋里还没进入具体模式：允许手动重抽（否则「重抽」按钮看起来无效）。
+                
                 if (SRApi.Env.InTreehouse) return true;
                 return SRApi.FeatureAllowed(typeof(Chaos));
             }
@@ -341,9 +314,7 @@ namespace SR_UCH.Tweaks {
             if (!_ready || !_enabled.Value) return;
             if (e == null || e.Phase != GameControl.GamePhase.PLACE) return;
 
-            // 房客端绝不本地重建：规则由房主广播 + 游戏写入 Modifiers。
-            // 若在这里 RebuildLocal()，会用「已被房主改过的值」Capture 快照，
-            // 再用空的 _active 还原，把房主的牌冲掉 —— 联机规则不同步的老坑。
+            // 房客端绝不本地重建：会用已被房主改过的值做快照、再用空 _active 还原，把房主的牌冲掉。
             if (!IsAuthority) return;
             _roundSeen++;
             if (_roundSeen % Mathf.Max(1, _everyRounds.Value) == 0) DrawAndBroadcast();
@@ -352,7 +323,7 @@ namespace SR_UCH.Tweaks {
 
         private void OnGameEnd() { RestoreAll(); }
 
-        /// <summary>换局：只清本机状态，不广播（房主还没抽牌，游戏自己会重置规则）。</summary>
+        /// <summary>换局：只清本机状态，不广播（游戏自己会重置规则）。</summary>
         private void OnNewMatch() {
             _active.Clear();
             _applied = false;
@@ -364,7 +335,7 @@ namespace SR_UCH.Tweaks {
         // ============ 抽牌与广播 ============
 
         private void DrawAndBroadcast() {
-            // P0（审查报告）：只有权威端（房主/离线）才能抽牌并广播；按钮是零成本触发路径，必须在源头拦截。
+            // 只有权威端才能抽牌并广播。
             if (!IsAuthority) { SRApi.NotifyT("仅房主可抽牌", "Only the host can draw"); return; }
             if (_enabled == null || !_enabled.Value) return;
             if (!ModeAllowed()) return;                                 // 限制模式：静默跳过
@@ -372,9 +343,7 @@ namespace SR_UCH.Tweaks {
             for (int i = 0; i < Cards.Length; i++) if (_pool[i] != null && _pool[i].Value) chosen.Add(i);
             if (chosen.Count == 0) return;
 
-            // 关键：先把上一回合生效过的规则按树屋原值重发。
-            // 房主本地 RebuildLocal 会「整体还原再重建」，但没装 mod 的房客只收到
-            // 新牌那条规则消息 —— 不发还原，房客的规则会逐回合累积，与房主不一致。
+            // 先重发上一回合规则的树屋原值，否则未装 mod 的房客会逐回合累积。
             BroadcastRestoreRules();
 
             _drawSeq++;
@@ -416,8 +385,7 @@ namespace SR_UCH.Tweaks {
             return 0;
         }
 
-        /// <summary>发一条真实规则消息。房客由游戏自己写 Modifiers；房主被 !IsHost 挡住，靠本地双写。</summary>
-        /// <remarks>方法定义在 TabletModalOverlay（:108555），不是 TabletRulesScreen —— 后者只有调用点。</remarks>
+        /// <summary>发一条真实规则消息；房客由游戏写 Modifiers，房主靠本地双写。</summary>
         private static void BroadcastOne(int cardId, int param, bool restore = false) {
             if (!NetClientActive()) return;
             CardDef c = Cards[cardId];
@@ -428,10 +396,10 @@ namespace SR_UCH.Tweaks {
             } catch (Exception ex) { SRApi.Guard.Log("混乱牌组/广播", ex); }
         }
 
-        // ============ 本地落位（幂等重建：先还原再按序重建） ============
+        // ============ 本地落位（幂等：先还原再按序重建） ============
 
         private void RebuildLocal() {
-            // 只有权威端（房主 / 离线本机）能写本地 Modifiers；房客端规则由游戏写入。
+            
             if (!IsAuthority) return;
             var m = SafeMods();
             if (m == null) return;
@@ -441,7 +409,7 @@ namespace SR_UCH.Tweaks {
             _applied = true;
         }
 
-        /// <summary>把当前生效牌对应的规则按树屋原值重发，让没装 mod 的房客回到基线。</summary>
+        /// <summary>把生效牌对应的规则按树屋原值重发。</summary>
         private static void BroadcastRestoreRules() {
             if (!IsAuthority || !NetClientActive() || !_hasSnapshot) return;
             for (int i = 0; i < _active.Count; i++) {
@@ -452,21 +420,20 @@ namespace SR_UCH.Tweaks {
         }
 
         private void RestoreAll() {
-            // 1) 没装 mod 的房客：重发每条曾生效规则的树屋原值，让游戏自己写回。
+            // 未装 mod 的房客：重发每条曾生效规则的树屋原值。
             if (_hasSnapshot && _active.Count > 0 && IsAuthority) {
                 BroadcastRestoreRules();
-                // 2) 装了 mod 的房客：清掉牌面标记，避免下一局显示过期牌。
+                // 装了 mod 的房客：清牌面标记，避免下一局显示过期牌。
                 SendSignal(OpRestore);
             }
-            // 3) 房主自己（被 !IsHost 挡住）本地还原；房客端不碰 Modifiers。
+            // 房主自己本地还原；房客端不碰 Modifiers。
             if (_hasSnapshot && IsAuthority) { var m = SafeMods(); if (m != null) RestoreLocal(m); }
             if (IsAuthority) {
                 _active.Clear();
                 _hasSnapshot = false;
                 _roundSeen = 0;
             } else {
-                // 房客：规则是房主广播的，游戏仍会写进 Modifiers；关本机开关只清"已应用"标记，
-                // 牌面继续跟踪（页面显示"未生效"而不是牌面消失）。
+                // 房客：关本机开关只清"已应用"标记，牌面继续跟踪。
             }
             _applied = false;
         }
@@ -534,9 +501,9 @@ namespace SR_UCH.Tweaks {
             if (!_ready || !IsOnline() || !NetClientActive()) return;
             if (_helloSent && Time.unscaledTime < _nextHelloAt) return;
             _helloSent = true;
-            // UCH 锁房、没有中途加入，8 秒一刷纯属冗余流量；降到 30 秒只为换局/重连兜底。
+            // 无中途加入，30 秒一刷只为换局 / 重连兜底。
             _nextHelloAt = Time.unscaledTime + 30f;
-            // 名单带时间戳：退出房间 / 换局后旧条目 60 秒过期，不会一直显示幽灵端。
+            // 名单带时间戳：旧条目 60 秒过期。
             float now = Time.unscaledTime;
             var dead = new List<int>();
             foreach (var kv in _roster) if (now - kv.Value.At > RosterTtl) dead.Add(kv.Key);
@@ -562,7 +529,7 @@ namespace SR_UCH.Tweaks {
             var m = e.ReadMessage as MsgGameRuleSet;
             if (m == null) return;
 
-            // 自己的带外信号（None + 魔数）。
+            
             if (m.NewRule == TabletRule.None && (m.Value2 >> 8) == Magic) {
                 int op = m.Value2 & 0xFF;
                 if (op == OpHello && m.Value >= 0 && m.Value < 8 && m.Value != LocalNetworkNumber())
@@ -571,11 +538,7 @@ namespace SR_UCH.Tweaks {
                 return;
             }
 
-            // 只认「房主发的、带牌组魔数」的真实规则消息。
-            // 玩家在规则书里手动改规则时 Value2 = 0，其它功能发的带外消息魔数也不同
-            // —— 都不能被当成抽牌（否则会把牌面搞乱）。
-            // 注：本机开关关掉也要继续「只跟踪不生效」——规则是房主广播的，游戏照样写进
-            // Modifiers；如果这里按 _enabled 早退，页面会显示「未生效」而规则其实在生效（审计 P2-7）。
+            // 只认「房主发的、带牌组魔数」的真实规则消息；本机开关关掉也要只跟踪不生效，否则页面与真实状态不符。
             if (!IsOnline() || IsHostSelf()) return;
             if (!ModeAllowed()) return;                                 // 限制模式：不接收牌面
             if ((m.Value2 >> 16) != CardMagic) return;
@@ -584,7 +547,7 @@ namespace SR_UCH.Tweaks {
             if (card < 0 || card >= Cards.Length) return;
             if (op2 == OpCardRestore) { _active.Clear(); _applied = false; return; }
             if (op2 != OpCardDraw) return;
-            // 同规则多张牌（低/高重力）只保留最新的一张，避免牌面同时出现两张。
+            // 同规则多张牌只保留最新一张。
             for (int i = _active.Count - 1; i >= 0; i--)
                 if (Cards[_active[i].Id].Rule == Cards[card].Rule) _active.RemoveAt(i);
             int param = Cards[card].IsBool ? (m.Valueb ? 1 : 0) : m.Value;
@@ -593,10 +556,7 @@ namespace SR_UCH.Tweaks {
         }
 
         // ============ 对外展示 ============
-
-        // 同一 Rule 只有最后写进去的那张真正生效（房主重建与房客端接收都是后写覆盖前写）。
-        // 显示也按「每条规则的最后一张」收口：以前房主抽到两张同规则牌时会画两张，
-        // 房客端只收到/只留一张，两端牌面不一致。
+        // 同一 Rule 只有最后写入的生效，显示按每条规则的最后一张收口，保证两端一致。
         private static int[] _effIdx = new int[4];
         private static int EffectiveIndexes() {
             if (_effIdx == null || _effIdx.Length < Mathf.Min(Cards.Length, 16)) _effIdx = new int[Mathf.Min(Cards.Length, 16)];
@@ -609,13 +569,13 @@ namespace SR_UCH.Tweaks {
                 for (int k = 0; k < n; k++) if (Cards[_active[_effIdx[k]].Id].Rule == rule) { dup = true; break; }
                 if (!dup) _effIdx[n++] = i;
             }
-            // 翻转回抽牌顺序（从后往前收集是为了「后写者优先」）。
+            
             for (int a = 0, b = n - 1; a < b; a++, b--) { int t = _effIdx[a]; _effIdx[a] = _effIdx[b]; _effIdx[b] = t; }
             return n;
         }
 
         public static string Desc() {
-            // 同帧内 UI 与通知各调一次；用核心的按帧缓存只算一遍（帧号变了自动重算）。
+            // 用核心按帧缓存，同帧只算一遍。
             return SRApi.Cache.FrameSig("chaos.desc", delegate { return DescCore(); });
         }
 
@@ -627,7 +587,7 @@ namespace SR_UCH.Tweaks {
             for (int k = 0; k < n; k++) {
                 int i = _effIdx[k];
                 var c = Cards[_active[i].Id];
-                // 播报要发给房客，牌面必须跟随房主界面语言；简报同样受益。
+                // 播报要发给房客，文案须跟随房主界面语言。
                 string name = SRApi.T(c.Zh, c.En);
                 parts.Add(c.IsBool ? name : name + " " + _active[i].Param);
             }

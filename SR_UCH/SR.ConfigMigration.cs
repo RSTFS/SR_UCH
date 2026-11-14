@@ -1,5 +1,5 @@
-// 配置迁移：把老版本 cfg 里的中文 section / key 换成英文，并清掉已删功能留下的配置段。
-// 必须赶在任何 Config.Bind 之前运行；文件被改写后调用方随后 ConfigFile.Reload()。
+// 配置迁移：把旧版 cfg 的中文 section/key 改为英文，并清理已删功能的配置段。
+// 必须在任何 Config.Bind 之前运行；改写后由调用方 ConfigFile.Reload()。
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 
 namespace SR_UCH.Tweaks {
     public static partial class ConfigMigration {
-        // 已删除功能的 cfg 段名名单：SR.Core 启动时统一 NavHide，侧栏不再显示这些段。
+        // 已删除功能的 cfg 段名：启动时统一 NavHide，侧栏不再显示。
         public static readonly string[] DeletedSections = new string[] {
             "Saved Lobby Details",
             "Camera",
@@ -17,12 +17,10 @@ namespace SR_UCH.Tweaks {
             "Reflection",
             "Freeplay",
             "Config Tools",
-            // 2026-11 删除的功能段：段头隐藏，遗留键由下面的 RemoveKeys 清理。
             "Match Brief", "Accessibility", "Host Console",
             "Level Recorder", "Match Profile", "Match Cast", "Time Control", "Death Report",
         };
 
-        // section 头：[旧] -> [新]
         private static readonly Dictionary<string, string> SectionMap = new Dictionary<string, string> {
             { "设置", "Settings" },
             { "首页", "Home" },
@@ -33,11 +31,9 @@ namespace SR_UCH.Tweaks {
             { "实验", "Experiments" },
             { "会话内容", "Chat" },
             { "Treehouse Suicide", "Quick Adjust" },
-            // HUD 原名 Round HUD（功能早已只剩 HUD），老 cfg 段头统一改名并保留全部键值。
             { "Round HUD", "HUD" },
-            // 早期版本用过的中文段名（与各功能 LocSec 的中文名一致）：缺了它们对应段及其键都识别不出来。
-            // 注意：[自由模式] 现在是 SR 自己的活段（自由模式页），不要再把它当旧名改名到 Freeplay，
-            // 否则与"段改名规则撞上活段"自检冲突，且每次启动都会把该段的键搬走。
+            // 早期中文段名（与各功能 LocSec 中文名一致）：缺了它们对应段与键都不识别。
+            // 注意：[自由模式] 是活段，不可当旧名改到 Freeplay，否则每次启动都会搬走其键。
             { "联机", "Online" },
             { "建造", "build" },
             { "Builder Enhancements", "build" }, // 段名改名
@@ -47,7 +43,7 @@ namespace SR_UCH.Tweaks {
             { "移动轨迹", "Player Tracker" },
         };
 
-        // key 名（行首 键名 = 值）：旧中文 key -> 新英文 key
+        // key 名改名表（行首“键名 = 值”）：旧中文 -> 新英文。
         private static readonly Dictionary<string, string> KeyMap = new Dictionary<string, string> {
             { "解除建造上限", "Lift Build Cap" },
             { "上限数值", "Build Cap Value" },
@@ -56,15 +52,13 @@ namespace SR_UCH.Tweaks {
             { "过滤快捷消息", "Filter Quick Msgs" },
             { "显示时间", "Show Time" },
             { "加载后清理", "GC After Load" },
-            // 联机自动快捷键的旧 id（cc.）改为 online.；[Hotkeys] 段的键名即该 id。
+            // 联机快捷键旧 id（cc.）改为 online.，[Hotkeys] 键名即该 id；cc.mainmenu 并入 online.disband。
             { "cc.lobbies", "online.lobbies" },
             { "cc.disband", "online.disband" },
-            // cc.mainmenu 无对应 id（联机页两个按钮已合并），并入同动作的 online.disband。
             { "cc.mainmenu", "online.disband" },
         };
 
-        // 组合键条目内层 "<section> <key>" 改名（key 可含空格，先匹配 section）。
-        // 必须同时查功能自注册的段/键改名表（_xSections / _xKeys），且自注册表优先。
+        // 组合键条目内层“<section> <key>”改名：先匹配段再改键，自注册表 _xSections/_xKeys 优先。
         private static string RenameComboInner(string rest) {
             foreach (KeyValuePair<string, string> kv in _xSections) {
                 if (rest.StartsWith(kv.Key + " ", StringComparison.Ordinal))
@@ -74,7 +68,7 @@ namespace SR_UCH.Tweaks {
                 if (rest.StartsWith(kv.Key + " ", StringComparison.Ordinal))
                     return kv.Value + " " + RenameKeyIn(rest.Substring(kv.Key.Length + 1));
             }
-            // 段名未变、仅 key 改名的情况：按第一个空格切成 "<section> <key>"，对后半段查 KeyMap。
+            // 段名未变、仅 key 改名：按首个空格切段后查 KeyMap。
             int sp = rest.IndexOf(' ');
             if (sp > 0) {
                 string tail = RenameKeyIn(rest.Substring(sp + 1));
@@ -89,7 +83,7 @@ namespace SR_UCH.Tweaks {
             return KeyMap.TryGetValue(key, out to) ? to : key;
         }
 
-        // 把某个 key 行从 from 段搬到 to 段（幂等：已不在 from 段就原样返回）
+        // 把 from 段的 key 行搬到 to 段（幂等：源段无此键则原样返回）。
         private static string MoveKeyBetweenSections(string text, string from, string to, string key) {
             try {
                 _appliedMoves.Add(new[] { from, key }); // 登记规则（供冲突自检，与文件里是否命中无关）
@@ -116,7 +110,6 @@ namespace SR_UCH.Tweaks {
                     outp.Add("[" + to + "]");
                     outp.Add(moved);
                 } else {
-                    // outp 已删掉 keyLine 一行、下标位移，须在 outp 里重新定位目标段表头再插入。
                     int insertAt = -1;
                     for (int i = 0; i < outp.Count; i++) {
                         if (outp[i].Trim() == "[" + to + "]") { insertAt = i + 1; break; }
@@ -133,13 +126,11 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SR.Guard.Log("cfg 行搬移", __ex); return text; }
         }
 
-        // 删掉已删除功能的废弃键（幂等：不在就原样返回）。带 "组合键 <段> <键>" 的绑定行一起删。
+        // 删除废弃键（幂等）：含 [Settings] 里对应的“组合键 <段> <键>”绑定行。
         private static string RemoveKeys(string text, string section, string[] keys) {
             try {
-                // 登记删除规则，供启动后的冲突自检比对。
                 if (keys != null) for (int __k = 0; __k < keys.Length; __k++) _appliedRemovals.Add(new[] { section, keys[__k] });
-                // 删除由"手工死键名单"驱动，名单与活键脱节时会永久抹掉用户设置（audit 09-P0-01）。
-                // 迁移层此时尚未 Bind、读不到"哪些键还活着"，所以至少把每次删除写明，便于事后反查。
+                // 名单手工维护且此处尚未 Bind、读不到活键，故逐条记录删除以便事后反查。
                 if (_removedKeysLog != null && keys != null) {
                     for (int __k = 0; __k < keys.Length; __k++) _removedKeysLog.Add(section + "/" + keys[__k]);
                 }
@@ -159,7 +150,7 @@ namespace SR_UCH.Tweaks {
                         if (eq > 0) {
                             string k = t.Substring(0, eq).TrimEnd();
                             bool drop = false;
-                            // 组合键条目一律 Bind 在 [Settings] 段（键名 = "组合键 <目标段> <目标键>"），与普通键不同段。
+                            // 组合键条目统一 Bind 在 [Settings] 段，键名 = “组合键 <目标段> <目标键>”。
                             if (k.StartsWith("组合键 " + section + " ", StringComparison.Ordinal)) {
                                 for (int j = 0; j < keys.Length; j++) {
                                     if (k == "组合键 " + section + " " + keys[j]) { drop = true; break; }
@@ -178,8 +169,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SR.Guard.Log("cfg 废弃键清理", __ex); return text; }
         }
 
-        // 把 from 段 keyFrom 的值写到 to 段 keyTo（仅当源有值、目标无此键）。
-        // 已删除条目的绑定值抢救：调用方随后用 RemoveKeys 删掉源键。
+        // 把 from 段 keyFrom 的值写到 to 段 keyTo：仅当源有值、目标无此键（已有优先）。
         private static string MergeKeyValue(string text, string from, string keyFrom, string to, string keyTo) {
             try {
                 string[] lines = text.Replace("\r\n", "\n").Split('\n');
@@ -202,7 +192,7 @@ namespace SR_UCH.Tweaks {
                 int e0 = lines[fromLine].IndexOf('=');
                 if (e0 <= 0) return text;
                 string val = lines[fromLine].Substring(e0 + 1).Trim();
-                // "未设置"的值不用搬（None = KeyCode.None；0 = 枚举序号 0）
+                // 空值 / None / 0 视为未设置，不搬。
                 if (val.Length == 0 || val == "None" || val == "0") return text;
                 List<string> outp = new List<string>(lines);
                 string newLine = keyTo + " = " + val;
@@ -217,8 +207,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SR.Guard.Log("cfg 键值合并", __ex); return text; }
         }
 
-        // 把 from 段 keyFrom 的值经 map 变换后写进 to 段 keyTo，并删掉源键（幂等：源键不存在或目标已有同键时原样返回）。
-        // 用于"列键换版本号"这类迁移：光改名不够，旧值里的列索引必须先裁剪，否则会指到别的列。
+        // 值经 map 变换后搬到 to 段并删源键（幂等）；用于须先裁剪旧值索引的迁移。
         private static string MoveMappedKey(string text, string from, string keyFrom, string to, string keyTo,
             Func<string, string> map) {
             try {
@@ -253,7 +242,7 @@ namespace SR_UCH.Tweaks {
                     outp.Add("[" + to + "]");
                     outp.Add(newLine);
                 } else {
-                    // 源行删除后目标段表头可能前移，重新在 outp 里定位再插入。
+                    // 源行删除后段头可能前移，重新在 outp 中定位再插入。
                     int insertAt = -1;
                     for (int i = 0; i < outp.Count; i++) {
                         if (outp[i].Trim() == "[" + to + "]") { insertAt = i + 1; break; }
@@ -270,12 +259,11 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SR.Guard.Log("cfg 键值迁移", __ex); return text; }
         }
 
-        // 联机表格 v5 删除了「技能系数」列（v4 的索引 3），其后各列索引统一 -1。
         private const int OnlineV4ColCount = 12;
         private const int OnlineV5ColCount = 11;
         private const int OnlineV4SkillCol = 3;
 
-        // v4 列宽（12 项）-> v5（11 项）：裁掉已删除的技能系数列。
+        // v4 列宽（12 项）-> v5（11 项）：裁掉技能系数列；形状不符则原样搬。
         private static string MapOnlineV4ColWidths(string v) {
             try {
                 if (string.IsNullOrEmpty(v)) return v;
@@ -287,7 +275,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SR.Guard.Log("cfg 联机列宽迁移", __ex); return v; }
         }
 
-        // v4 隐藏列索引 -> v5：丢掉已删除的 3，大于 3 的索引 -1；再按新列数裁剪越界项与不可隐藏的操作列。
+        // v4 隐藏列索引 -> v5：去掉索引 3、大于 3 的减 1，再裁越界项与不可隐藏的操作列。
         private static string MapOnlineV4HiddenCols(string v) {
             try {
                 if (string.IsNullOrEmpty(v)) return v;
@@ -306,12 +294,11 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SR.Guard.Log("cfg 联机隐藏列迁移", __ex); return v; }
         }
 
-        // 键在段间搬家时，[Settings] 里的 "组合键 <旧段> <键>" 条目名要一起改，否则组合键失效。
+        // 键在段间搬家时同步改 [Settings] 里的组合键条目名，否则组合键失效。
         private static string MoveComboEntry(string text, string fromSec, string toSec, string key) {
             return MoveComboEntryTo(text, fromSec, key, toSec, key);
         }
 
-        // 组合键条目改名通用版：段名与键名都可变。
         private static string MoveComboEntryTo(string text, string fromSec, string fromKey, string toSec, string toKey) {
             try {
                 string oldName = "组合键 " + fromSec + " " + fromKey;
@@ -331,10 +318,8 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SR.Guard.Log("组合键条目搬家", __ex); return text; }
         }
 
-        // 同一段内同名键只保留最后一条（BepInEx 解析为后写覆盖先写，生效值不变）。
-        // 清理"旧命名"的 [Settings] 热键条目：名字是 "组合键 <键>"（剩余部分不以任何已存在的段名开头），
-        // 且值为空。值非空的不动（可能是用户手改的，宁可留着）。
-        // 注意：条目上方通常紧跟它自己的三行注释（## 说明 / # Setting type / # Default value），一起删掉。
+        // 清理旧命名热键：名为“组合键 <键>”、剩余部分不以任何段名开头且值为空的条目。
+        // 值非空的不动（可能是用户手改）；条目上方紧邻的 # 注释一并删除。
         private static string PruneLegacyComboKeys(string text) {
             try {
                 string[] lines = text.Replace("\r\n", "\n").Split('\n');
@@ -364,7 +349,7 @@ namespace SR_UCH.Tweaks {
                             if (name.StartsWith(sec + " ", StringComparison.Ordinal)) { prefixed = true; break; }
                         }
                         if (!prefixed && val.Length == 0) {
-                            // 连同紧贴它的注释一起删（遇到空行/段头就停）。
+                            // 连同紧贴的 # 注释一起删（遇空行/段头停）。
                             while (keep.Count > 0) {
                                 string back = keep[keep.Count - 1].Trim();
                                 if (back.Length == 0 || back[0] != '#') break;
@@ -384,7 +369,7 @@ namespace SR_UCH.Tweaks {
         private static string DedupeSectionKeys(string text) {
             try {
                 string[] lines = text.Replace("\r\n", "\n").Split('\n');
-                // 先记录每个 (段, 键) 最后一次出现的行号
+                // 同名键只保留最后一条（后写覆盖先写，生效值不变）：先记每个 (段, 键) 末次行号。
                 Dictionary<string, int> lastAt = new Dictionary<string, int>();
                 string cur = "";
                 for (int i = 0; i < lines.Length; i++) {
@@ -422,18 +407,15 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SR.Guard.Log("cfg 重复键清理", __ex); return text; }
         }
 
-        // 记录本次实际应用过的“删 / 搬 / 改名”动作，启动后与真正被 Config.Bind 绑定的键比对并报冲突。
-        // 清理与搬移名单是手工维护的；规则撞上仍被绑定的键会让该设置每次启动被删且无报错。
+        // 记录本次实际应用的删/搬/改名，启动后与真正 Bind 的键比对报冲突；名单手工维护，撞上仍绑定的键会无报错丢设置。
         private static readonly List<string[]> _appliedRemovals = new List<string[]>();  // [sec,key]
         private static readonly List<string[]> _appliedMoves = new List<string[]>();     // [fromSec,key]
         private static readonly List<string> _appliedOldSections = new List<string>();
         private static readonly List<string> _appliedOldKeys = new List<string>();
-        // 分隔符：用不可见字符拼“段+键”，避免与段名/键名冲突。
-        // 本文件刻意只依赖 BCL（不引用 BepInEx），以便规则 + 记录 + 判定能在离线测试台直接跑。
-        // 把当前条目表喂进来的那一步在 SR.Core（MigrationRuleAudit），因为它才持有 ConfigFile。
+        // 用不可见字符拼“段+键”，避免与段名/键名冲突。
+        // 本文件只依赖 BCL（不引 BepInEx），规则/记录/判定可在离线测试台直接跑；喂条目表在 SR.Core.MigrationRuleAudit。
         internal const string AuditSep = "\u0001";
         public static int RuleConflictCount;
 
-        // 核心判定（只依赖 BCL）：live = "段\u0001键" 列表
     }
 }

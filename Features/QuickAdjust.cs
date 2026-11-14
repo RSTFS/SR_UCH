@@ -1,4 +1,4 @@
-// 快速调整：分数折扣、记分板 handicap 刷新、快速切换、快速重试、树屋/局内自杀。
+// 快速调整：分数折扣、记分板 handicap 刷新、快速切换、快速重试、树屋/局内自杀与重生延迟。
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -7,8 +7,7 @@ using HarmonyLib;
 using UnityEngine;
 
 namespace SR_UCH.Tweaks {
-// 分数折扣、记分板 handicap 刷新、快速切换、快速重试（含两个 Character 补丁）；ITweak 由 MainPlugin 反射初始化。
-    // 重生相关逻辑并入 QuickAdjust（同一个 DLL / 同一页），所以不再单独注册成功能。
+// 含两个 Character 补丁；ITweak 由 MainPlugin 反射初始化。
     internal static partial class RespawnTools {
         private const string Sec = "Quick Adjust";
         private static ConfigEntry<float> _delay;          // 重生延迟（0-3 秒）
@@ -17,14 +16,11 @@ namespace SR_UCH.Tweaks {
         private static readonly Dictionary<int, float> _deadSince = new Dictionary<int, float>();
         private static float _cannonStuckAt = -1f;
 
-        // 顶层补丁类（RespawnDelayTimingPatch）读它。
         internal static float RespawnDelaySeconds { get { return DelaySeconds; } }
 
-        // QuickAdjust 的自动重试用来判断"还要等多久"。
         internal static float DelaySeconds { get { try { return _delay != null ? Mathf.Clamp(_delay.Value, 0f, 3f) : 0f; } catch { return 0f; } } }
 
-        // 模式门控一律走契约统一入口：它已含统一模式豁免。
-        // 直接读 GameSettings.GameMode 的功能不走统一门控，模式豁免会失效。
+        // 模式门控走契约统一入口（已含统一模式豁免）；直接读 GameSettings.GameMode 会绕过豁免。
         private static bool ModeOk() {
             try { return SRApi.GateModeAllows(SRApi.ModeMask.Challenge | SRApi.ModeMask.Freeplay); }
             catch (Exception __ex) { SRApi.Guard.Log("重生/模式判定", __ex); return false; }
@@ -42,8 +38,7 @@ namespace SR_UCH.Tweaks {
         internal static void Initialize(IFeatureHost plugin) {
             try {
                 SelfReg();
-                // 默认 -1 = "还没同步"：第一次进入游戏时会把**游戏原版数值**填进来（见 RespawnDelayTimingPatch）。
-                // 用户明确要求：这个功能的默认值就是原版数值，而不是"0 = 原版"。
+                // 默认 -1 = 还没同步：首次进入游戏时把游戏原版数值填进来。
                 _delay = plugin.Config.Bind(Sec, "Respawn Delay", 0.5f,
                     new ConfigDescription("重生延迟（0-3 秒）。默认值会自动取游戏原版数值；0 = 立即重生", new AcceptableValueRange<float>(-1f, 3f)));
                 _invincible = plugin.Config.Bind(Sec, "Spawn Invincible", 1f, new ConfigDescription("出生无敌（0-10 秒）", new AcceptableValueRange<float>(0f, 10f)));
@@ -51,7 +46,7 @@ namespace SR_UCH.Tweaks {
                 SRApi.RegisterTick("重生-轮询", Tick);
                 try { Harmony.CreateAndPatchAll(typeof(RespawnTools)); }
                 catch (Exception __h) { SRApi.Guard.Log("重生/补丁注册", __h); }
-                // 重生延迟的计时阈值补丁单独注册（失败只丢那一条，并留一条能定位的警告）。
+                // 重生延迟计时阈值补丁单独注册，失败只丢那一条并留警告。
                 try { Harmony.CreateAndPatchAll(typeof(RespawnDelayTimingPatch)); }
                 catch (Exception __h2) { SRApi.LogWarn("重生延迟/计时阈值补丁跳过: " + __h2.Message); }
             } catch (Exception __ex) { SRApi.Guard.Log("重生/初始化", __ex); }
@@ -59,8 +54,7 @@ namespace SR_UCH.Tweaks {
 
         private static Character LocalCharacter() {
             try {
-                // 优先走游戏自己的静态列表（零查找成本）；FrameObjects<Character> 会做一次全场景
-                // FindObjectsOfType（约 2ms），落在本钩子上就是"重生-轮询"平均 2.7ms 的来源。
+                // 优先走游戏自己的静态列表（零查找成本）；FrameObjects 会做全场景查找。
                 List<Character> all = Character.AllCharacters;
                 if (all != null) {
                     for (int i = 0; i < all.Count; i++) {
@@ -90,7 +84,7 @@ namespace SR_UCH.Tweaks {
                 bool dead = c.Dead || c.Dying || c.LocallyDead;
                 if (!dead) { _cannonStuckAt = -1f; return; }
 
-                // 炮弹卡死：死了还留在炮弹里超过 1.5 秒 -> 重生
+                // 炮弹卡死：死了还留在炮弹里超过 1.5 秒就重生。
                 if (_cannonRespawn != null && _cannonRespawn.Value && c.InCannon) {
                     if (_cannonStuckAt < 0f) _cannonStuckAt = Time.unscaledTime;
                     else if (Time.unscaledTime - _cannonStuckAt > 1.5f) {
@@ -110,14 +104,9 @@ namespace SR_UCH.Tweaks {
             _delay.Value = Mathf.Clamp(Mathf.Round(v * 10f) / 10f, 0f, 3f);
         }
 
-        // 自由模式的重生延迟：见文件末尾 RespawnDelayTimingPatch。
-        // 参考 RespawnControl（D:\CC\RespawnControl-main.zip）：自由模式的重生时刻由
-        // Character.maxDeathDelay / minDeathDelay / minSkipDeathTime 决定，
-        // 直接改这三个值就是原生延迟；不需要拦任何重生调用。
+        // 自由模式的重生时刻由 Character.maxDeathDelay / minDeathDelay / minSkipDeathTime 决定，改这三个值即原生延迟。
 
-        // 重生延迟：游戏每次自动重都会走 Character.AttemptRespawn（反编译 61563）。
-        // 延迟窗口内直接抑制它，窗口过后放行由游戏自己重生；这样"重生延迟"才真的作用于重生本身，
-        // 而不只是自动重试的等待时间。
+        // 重生延迟：游戏每次自动重走 Character.AttemptRespawn，延迟窗口内抑制它，窗口过后放行。
         [HarmonyPatch(typeof(Character), "AttemptRespawn")]
         [HarmonyPrefix]
         private static bool HoldRespawn(Character __instance, ref bool __result) {
@@ -145,7 +134,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("重生/发起重生", __ex); }
         }
 
-        // 出生无敌：Character.Enable 后给本地角色挂无敌计时（挑战/自由模式）
+        // 出生无敌：挂无敌计时（挑战/自由模式）。
         [HarmonyPatch(typeof(Character), "Enable")]
         [HarmonyPostfix]
         private static void AfterEnable(Character __instance) {
@@ -167,12 +156,10 @@ public partial class QuickAdjust : ITweak {
 
         private static ConfigEntry<int> _handicap;
         private static ConfigEntry<bool> _moreHandicap;
-    // 输入框草稿：编辑期间不写配置、不钳制，点"应用"（或回车）时才提交并钳制。
     private static string _draftText;
     private static int _draftFrame = -1;
     private static ConfigEntry<bool> _quickSwitchEnabled;
     private static ConfigEntry<float> _quickSwitchHold;
-    // 我们改过的 SwitchTime 原值：功能关掉时逐个还原成 prefab 序列化值，做到"像没改过"。
     private static readonly Dictionary<PiecePlacementCursor, float> _switchTimeOrig = new Dictionary<PiecePlacementCursor, float>();
     private static void RestoreSwitchTime() {
         if (_switchTimeOrig.Count == 0) return;
@@ -188,12 +175,9 @@ public partial class QuickAdjust : ITweak {
     private static ConfigEntry<bool> _quickRetryEnabled;
     private static ConfigEntry<bool> _quickRetryFast;
     private static ConfigEntry<float> _quickRetryHoldTime;
-    // 计分板刷新用的反射字段缓存。
     private static FieldInfo _gsbField;
     private static FieldInfo _relField;
     private static int _switchTimeFrame = -1; // SwitchTime 整表同步按帧只做一次
-    // 长按 B 阈值文案按帧缓存：Render() 每帧至少被调两次，且计算需遍历 PlayerManager 拼字符串。
-    // SwitchTime 是 prefab 序列化值，运行期不变，同帧内可直接复用。
     private static string _vanSwCache;    // forSwitch = true 的结果
     private static string _vanRetryCache; // forSwitch = false 的结果
     private static int _vanFrame = -1;
@@ -220,20 +204,17 @@ public partial class QuickAdjust : ITweak {
         SRApi.LocDesc("Quick Adjust", "Handicap", "评分百分比\n直接设置自己那行的评分百分比\n范围 10-100 整十；100 即不折扣", "Score percentage\nsets your own row's score percentage\n10-100 in tens; 100 = no discount");
         SRApi.LocKey("Quick Adjust", "More Handicap Values", "更多数值", null);
         SRApi.LocDesc("Quick Adjust", "More Handicap Values", "自由输入百分比\n评分百分比改为输入框而非整十滑块\n范围 10-100 任意整数", "Free percentage input\nreplaces the tens slider with an input box\nany integer 10-100");
-        // 预登记本页自动快捷键。
         SRApi.HotkeyAction("qa.apply_discount", "应用折扣", () => QuickAdjust.ApplyScoreDiscount());
         SRApi.HotkeyAction("qa.restore_discount", "重置为不折扣", () => QuickAdjust.RestoreScoreDiscount());
     }
 
     public static void Render() {
         try {
-        // 每对 BeginHorizontal/EndHorizontal 之间都有会抛异常的控件，任一抛出会使 IMGUI 布局栈失衡，
-        // 故整段包 try/catch。
+        // 每对 BeginHorizontal/EndHorizontal 之间都有会抛异常的控件，任一处抛异常会使 IMGUI 布局栈失衡，故整段包 try/catch。
         SRApi.Ctl.SectionTitle(SRApi.T("- 评分百分比 -", "- Score percentage -"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase disc = SRApi.Ctl.FindEntry("Quick Adjust", "Handicap");
         int discVal = QuickAdjust.HandicapValue;
-        // 悬浮说明：直接给标签挂 tooltip（本页自定义控件不走条目自动提示）。
         GUIContent __dct = SRApi.Ctl.Content(SRApi.T("评分百分比", "Score percentage"),
             SRApi.T("当前评分百分比\n直接设置自己那行的评分百分比（10-100）\n等效折扣 = 100 减该数值，100 即不折扣。",
                 "current score percentage\nsets your own score percentage directly (10-100)\nequivalent discount = 100 minus this value, 100 = no discount"));
@@ -241,7 +222,7 @@ public partial class QuickAdjust : ITweak {
         GUILayout.Label(__dct, SRApi.Ctl.LabelWrap, GUILayout.Width(__dcw), GUILayout.Height(SRApi.Ctl.Sc(52)));
         int slideVal = Mathf.Clamp(discVal, 10, 100);
         if (QuickAdjust.MoreHandicapOn) {
-            // 自由输入：编辑期间只更新草稿，不写配置也不钳制（否则"85"打到"8"就被钳成 10）。
+            // 自由输入：编辑期间只更新草稿、不钳制（否则“85”打到“8”就被钳成 10）。
             string cur = _draftText ?? slideVal.ToString();
             string nvText = SRApi.ClearableTextField(cur, SRApi.Ctl.SearchBox, GUILayout.Width(SRApi.Ctl.Sc(90)), GUILayout.Height(SRApi.Ctl.Sc(26)));
             if (nvText != cur) { _draftText = nvText; _draftFrame = Time.frameCount; }
@@ -270,7 +251,7 @@ public partial class QuickAdjust : ITweak {
         if (SRApi.Ctl.HotkeyButton("qa.restore_discount", SRApi.T("还原折扣", "Restore"), SRApi.T("把评分百分比恢复为 100%（不折扣）.\n等价于滑块拖到 100 再应用.\n只影响自己那一行.", "Restore your score percentage to 100% (no discount).\nSame as setting the slider to 100 and applying.\nAffects only your own row."), QuickAdjust.RestoreScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
             QuickAdjust.RestoreScoreDiscount();
         }
-        // 「更多数值」开关：紧接在「还原折扣」右边同一行（不再占滑块那一行）。
+            // 「更多数值」开关紧接在「还原折扣」右边同一行。
         GUILayout.Space(SRApi.Ctl.Sc(10));
         ConfigEntryBase more = SRApi.Ctl.FindEntry("Quick Adjust", "More Handicap Values");
         if (more != null) {
@@ -314,9 +295,7 @@ public partial class QuickAdjust : ITweak {
         } catch (Exception __ex) { SRApi.Guard.Log("快速调整页 渲染", __ex); }
     }
 
-    // 第 2 页：挑战（自动重试 + 快速重试 + 等待秒数）。原来在「关卡 → 挑战」，现归到快速调整。
-        // 本页标签列宽：把本页所有标签一次性量出来取最大值，所有行共用。
-        // 不用核心的两帧收敛版（换页第一帧会差一截、看起来没对齐），这里确定性更强。
+        // 本页标签列宽：一次量出本页所有标签取最大值，所有行共用，换页第一帧也对齐。
         private static float _pageLabelW;
         private static string _pageLabelLang;
         internal static float PageLabelWidth() {
@@ -341,12 +320,10 @@ public partial class QuickAdjust : ITweak {
             } catch { return SRApi.Ctl.Sc(90f); }
         }
 
-        // 行统一入口：自动带上本页标签列宽
         internal static void PageRow(string label, string tip, ConfigEntryBase e) {
             SRApi.Ctl.LabeledRow(label, tip, e, PageLabelWidth() / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)));
         }
         internal static void PageSlider(string label, string tip, ConfigEntryBase e, float min, float max, string fmt) {
-            // 契约签名：label, tip, entry, min, max, fmt, labelWidth
             SRApi.Ctl.RowSlider(label, tip, e, min, max, fmt, PageLabelWidth() / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)));
         }
 
@@ -374,15 +351,12 @@ public partial class QuickAdjust : ITweak {
                 SRApi.T("长按 B 的等待阈值（Character.SuicideTime）：挑战模式重试游戏默认 0.5 秒。\n范围 0-2，0.1 步进",
                         "Hold-B threshold (Character.SuicideTime): vanilla 0.5s for challenge retry.\nrange 0-2 in 0.1 steps"),
                 qrh, 0f, 2f, "0.0");
-            // 分区二：重生（与挑战合并到同一页，分区在挑战下面）
             RespawnTools.RenderRespawnSection();
         } catch (Exception __ex) { SRApi.Guard.Log("快速调整/挑战页", __ex); }
     }
 
     public void Initialize(IFeatureHost plugin) {
         SelfReg();
-            // 走契约 IFeatureHost.Config：把 host 硬转成 BaseUnityPlugin 会在非 BaseUnityPlugin 宿主下抛
-            // InvalidCastException（被 MainPlugin 兜住，但本功能静默消失）。
             ConfigFile cfg = plugin.Config;
         _handicap = cfg.Bind<int>("Quick Adjust", "Handicap", 100, "当前 handicap：直接设置自己那行的 handicap（范围 10-100，整十；等效折扣 = 100 - 该值）。");
         _moreHandicap = cfg.Bind<bool>("Quick Adjust", "More Handicap Values", false, "自由输入数值：选中后 handicap 滑块变为输入框（10-100 任意整数）。");
@@ -396,9 +370,8 @@ public partial class QuickAdjust : ITweak {
             try { SRApi.RegisterTick("评分百分比-保持", TickKeepHandicap); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             try { Harmony.CreateAndPatchAll(typeof(QuickAdjust), (string)null); }
             catch (Exception e) { SRApi.LogError("快速调整 补丁注册失败: " + e.Message); }
-            // 不再注册 GamePlayer.OnStartClient / OnStartServer 补丁：这两个成员在当前游戏版本里
-            // 根本不存在（每次启动都刷两条"补丁跳过"警告）。评分百分比改为 TickKeepHandicap
-            // 每帧按"本地值 != 目标值"重下发，不依赖任何生命周期钩子。
+            // 不注册 GamePlayer.OnStartClient / OnStartServer 补丁（这些成员在本版本不存在）；
+            // 评分百分比改由 TickKeepHandicap 每帧按“本地值 != 目标值”重下发。
     }
 
         public static bool QuickSwitchOn => _quickSwitchEnabled != null && _quickSwitchEnabled.Value;
@@ -429,23 +402,19 @@ public partial class QuickAdjust : ITweak {
         public static bool MoreHandicapOn => _moreHandicap != null && _moreHandicap.Value;
 
 
-        // 局内改 handicap 不会刷新计分板（游戏只在开局 SetPlayerCharacter 时调 ScoreLine.SetHandicap），
-        // 故 patch set_NetworkHandicap + OnDeserialize，仅在值变化时刷新。
+        // 局内改 handicap 不会刷新计分板，故补丁 set_NetworkHandicap + OnDeserialize，仅在值变化时刷新。
         private static readonly Dictionary<GamePlayer, int> _lastHandicapShown = new Dictionary<GamePlayer, int>();
 
 
 
-        // 重生延迟判定（读「重生」页写的配置条目，失败按"不等待"处理）
         private static readonly Dictionary<int, float> _deadSinceMap = new Dictionary<int, float>();
-        // 快速重试已发标记（闩锁）：按 networkNumber 记，见 ForceSuicidalState。
         private static readonly HashSet<int> _retrySentTo = new HashSet<int>();
 
-        // 评分百分比的"保持"不再依赖 GamePlayer 生成钩子（那些成员在本版本游戏里不存在）：
-        // TickKeepHandicap 每帧比对本地值与配置值，不一致就重下发（≤1 次/秒）。
+        // 评分百分比保持：TickKeepHandicap 每帧比对本地值与配置值，不一致就重下发（≤1 次/秒）。
 
         private static float _keepLastAt = -999f;
 
-        // 已应用的折扣目标（10~100；0 = 未应用）。切换关卡 / 重建 GamePlayer 后由 Tick 自动补回。
+        // 已应用的折扣目标（10~100；0 = 未应用）；切换关卡/重建 GamePlayer 后由 Tick 自动补回。
         private static int _keepHandicap;
 
 }

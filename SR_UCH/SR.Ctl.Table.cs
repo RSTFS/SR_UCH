@@ -1,5 +1,4 @@
 // 控件门面 · 表格几何与操作列按钮（尺寸令牌 / 列宽计算 / 操作列命中）。
-// 从 SR.Ctl.cs 拆出来只为控制单文件规模，行为不变。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -8,7 +7,6 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
 public partial class SR {
     public static partial class Ctl {
-        // 表格尺寸令牌：行高/表头高/拖拽条/滚动条宽/最小高度（全部随 UI 缩放，页面不再写死字面量）。
         // 依据列模板与当前语言表头文字计算默认列宽（只增不减的下限），供列表首次布局使用。
         public static float[] TableColumnWidths(SRApi.TableColumn[] cols) {
             if (cols == null) return null;
@@ -43,11 +41,7 @@ public partial class SR {
             return Mathf.Max(minH, avail - usedAbove - Sc(2f));
         }
 
-        // 统一操作列按钮：在行矩形里依次画 BtnClip 按钮，返回本帧左键 MouseUp 命中并已执行回调的下标。
-        // widths 为 null、长度不足或某项 <=0 时，该按钮宽度 = BtnClip.CalcSize(label).x + 11px（自适应文字）；
-        // 多个按钮总宽超出行宽时按可用宽度统一收缩，绝不横向溢出。Enabled=false 的按钮画灰且不响应。
-        // 操作列需要的宽度（核心化）：按按钮文字实测 + 每个按钮 11px 内边距 + 2px 间距 + 左右 2px。
-        // 表格方把它当作"操作列"的默认宽即可自适应；返回设计单位（未乘 UI 缩放）。
+        // 操作列默认宽 = 按钮文字实测 + 每按钮 11px 内边距 + 2px 间距 + 左右各 2px；返回设计单位。
         public static float TableActionColumnWidth(SRApi.TableAction[] actions) {
             try {
                 if (actions == null || actions.Length == 0) return 0f;
@@ -69,6 +63,7 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("操作列宽计算", __ex); return 0f; }
         }
 
+        // 操作列按钮：返回本帧左键 MouseUp 命中的下标（-1 = 无）；宽度不足时按比例收缩不溢出。
         public static int TableActionButtons(Rect rowRect, SRApi.TableAction[] actions, float[] widths, ref int hoverIndex) {
             hoverIndex = -1;
             if (actions == null || actions.Length == 0) return -1;
@@ -100,11 +95,10 @@ public partial class SR {
                 }
                 if (valid == 0) return -1;
                 float gapTotal = gap * Mathf.Max(0, valid - 1);
-                // 可绘制宽度 = 行宽减去左侧起始内边距（右侧允许画到行边界，不再额外留 padX）。
                 float avail = Mathf.Max(0f, rowRect.width - padX);
                 float need = sum + gapTotal;
                 if (need > avail) {
-                    // 可用宽度不足：按钮和间距一起按比例收缩，保证最后一个按钮不越过行右边界。
+                    // 可用宽度不足：按钮和间距按比例收缩，保证最后一个按钮不越过行右边界。
                     float scale = need > 0f ? avail / need : 0f;
                     for (int i = 0; i < n; i++) if (bw[i] > 0f) bw[i] *= scale;
                     gap *= scale;

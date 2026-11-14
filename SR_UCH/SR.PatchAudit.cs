@@ -1,5 +1,4 @@
-// 补丁目标审计：游戏更新改名/改签名时，Harmony 只在日志报一次，功能会静默失效。
-// 这里扫本程序集里所有 [HarmonyPatch] 特性，逐个校验目标类型/方法是否存在，自检页统一报告。
+// 补丁目标审计：扫本程序集所有 [HarmonyPatch]，校验目标类型/方法是否存在。
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -7,7 +6,7 @@ using HarmonyLib;
 
 namespace SR_UCH.Tweaks {
     public partial class SR {
-        // 返回检查的补丁目标总数；missing 为缺失的 "类型.方法" 列表。
+        // 返回检查的目标总数；missing 为缺失的 "类型.方法" 列表。
         internal static int AuditPatches(out string[] missing) {
             List<string> miss = new List<string>();
             int total = 0;

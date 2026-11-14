@@ -1,23 +1,7 @@
-// 派对盒道具「品质光芒」。
-//
-// 依据（全部逐行核对过游戏反编译源码，均为 public 编译期可见 API，零反射登记）：
-//   Placeable.Rarity                 :11982   NeverPick=0 / Rare=200 / Normal=1000 / Common=2000
-//   TabletBlockList.GetWeightFromStepValue :104578  概率档 0..9 → 权重 0/100/200/500/700/1000/1500/2000/3000/5000
-//   BlockGroup.GetItemFilterWeight  :6954   按派对盒实际抽取口径取权重（自动处理 FilterOverride）
-//   GameSettings.GetBlockFrequency  :129627 退化路径：按 blockSerializeIndex 读频率档
-//   PartyBox.InitializeWeightedBlockList :87385 派对盒抽取用的正是 GetItemFilterWeight
-//   PickableBlock.InPartybox        :49752  [SyncVar]，客户端已同步
-//   PickableBlock.ArtSprites        :49736  / ArtHolderTransform :49759
-//   PartyBox 布置道具               :87357  设为 layer 5、ChangeArtLayer("Background 2")、NetworkServer.Spawn
-//
-// 设计要点（刻意避开这个仓库历史上的三个坑）：
-//   1) 不建全局强引用字典 —— 光晕是「道具自己的子对象」，道具销毁时自动带走，
-//      用 Transform.Find(名字) 判重与更新，完全无状态（Bounds.cs 的 alive/dead 范式都不需要）。
-//   2) 不改原 SpriteRenderer / 材质 —— 只加一层半透明径向渐变，排序放在最底，绝不遮住道具本体。
-//   3) 不碰网络、不碰相机、不新增 Harmony 补丁 / msgType / 反射登记、不加线程。
-//      概率本来就是 GameSettings 同步的，各端各算各画，天然一致。
-//
-// 品质方向：概率越低 = 越稀有 = 品质越高（RPG 直觉）。可用「反向着色」开关翻转。
+// 派对盒道具「品质光芒」：按抽取权重给道具加一层品质色柔光。
+// 权重取自 BlockGroup.GetItemFilterWeight（派对盒实际抽取口径），只读 public API、无反射。
+// 光晕是道具自身的子对象（随道具销毁），只加半透明径向渐变，不遮住本体、不碰网络。
+// 品质方向：概率越低 = 越稀有 = 品质越高；可用「反向着色」开关翻转。
 
 using System;
 using System.Collections.Generic;
@@ -29,7 +13,7 @@ namespace SR_UCH.Tweaks {
     public class PartyGlow : ITweak {
         private const string Sec = "品质光芒";
         private const string GlowName = "SR_UCH_RarityGlow";
-        private const float ScanInterval = 0.05f;   // 道具出现后光晕尽快跟上（原来 0.2s 有明显延迟）
+        private const float ScanInterval = 0.05f;   // 道具出现后光晕尽快跟上
 
         // 6 档：0 泛滥 / 1 普通 / 2 精良 / 3 稀有 / 4 史诗 / 5 传说；-1 = 禁用（不出现）
         private static readonly string[] TierZh = { "泛滥", "普通", "精良", "稀有", "史诗", "传说" };
@@ -57,13 +41,11 @@ namespace SR_UCH.Tweaks {
         private static float _nextScan;
         private static int _wMin = int.MaxValue, _wMax = 0;   // 本盒出现过的权重范围（相对分档用）
         private static int[] _wCache = new int[0];            // 本轮扫描每件道具的权重（两遍扫描共用）
-        // 权重按实例缓存：GetItemFilterWeight 每次扫描都重算全盒是主要开销；实例本局不变，缓存后只算新道具。
+        // 权重按实例缓存：GetItemFilterWeight 每次全盒重算是主要开销；实例本局不变。
         private static readonly System.Collections.Generic.Dictionary<int, int> _wById = new System.Collections.Generic.Dictionary<int, int>();
         // 我们创建过的光晕 Transform 弱登记：只用于清理，不参与分级/查询。
-        // 光晕本身仍是道具的子对象，道具消失时随之销毁；这里只为「帧对象缓存为空时关功能」兜底（审计 O-7）。
         private static readonly List<Transform> _made = new List<Transform>();
 
-        // ============ 生命周期 ============
 
         private static bool _uiReg;
 
@@ -74,8 +56,7 @@ namespace SR_UCH.Tweaks {
             SRApi.Ctl.DrawEntryRow(e, SRApi.Ctl.Sc(180f));
         }
 
-        // 本页配置行的显示名与悬浮说明：缺 LocKey 时中文界面回退英文键名，
-        // 缺 LocDesc 时英文界面完全没有提示（内部条目不会回退 Bind 的中文描述）。
+        // 本页配置行的显示名与悬浮说明：缺 LocKey 时中文界面回退英文键名。
         private static void RegUi() {
             SRApi.LocKey(Sec, "Enabled", "启用品质光芒", "Enable rarity glow");
             SRApi.LocDesc(Sec, "Enabled",
@@ -96,7 +77,7 @@ namespace SR_UCH.Tweaks {
             if (!_uiReg) { _uiReg = true; SRApi.RowSliders.Add(UiSlider); }
         }
 
-        // 数值条目改由滑块渲染：范围与 Bind 的 AcceptableValueRange 逐项一致。
+        // 数值条目改由滑块渲染：范围与 Bind 的 AcceptableValueRange 一致。
         private static bool UiSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
             min = 0f; max = 0f; fmt = "0";
             try {
@@ -118,7 +99,6 @@ namespace SR_UCH.Tweaks {
                 _tierColors[i] = plugin.Config.Bind(Sec, "Tier Color " + i, "#" + ColorUtility.ToHtmlStringRGB(TierColorDefault[i]),
                     "第 " + (i + 1) + " 档（" + TierZh[i] + "）的光晕颜色，十六进制 #RRGGBB。");
                 TierColor[i] = ParseColor(_tierColors[i].Value, TierColorDefault[i]);
-                // 改 cfg 文件 / 其它入口改值也要立即重算颜色表，不必重启。
                 _tierColors[i].SettingChanged += (s2, e2) => { TierColor[ti] = ParseColor(_tierColors[ti].Value, TierColorDefault[ti]); };
                 SRApi.LocKey(Sec, "Tier Color " + i, TierZh[i] + "颜色", TierEn[i] + " color");
             }
@@ -156,9 +136,7 @@ namespace SR_UCH.Tweaks {
                 PickableBlock[] all = SRApi.FrameObjects<PickableBlock>();
                 if (all == null) return;
                 if (_wCache.Length < all.Length) _wCache = new int[all.Length];
-                // 第一遍：先把全盒权重范围统计完，并把每件道具的权重缓存下来（第二遍不再重算）。
-                // 边扫边分级会让"第一件只有它自己"落回绝对阈值、第二件起才走相对分档 —— 同一盒
-                // 用两套相反标准，六档分布会乱。
+                // 第一遍：先统计全盒权重范围并缓存每件权重，第二遍不再重算。
                 for (int i = 0; i < all.Length; i++) {
                     PickableBlock pb0 = all[i];
                     _wCache[i] = -1;
@@ -178,7 +156,7 @@ namespace SR_UCH.Tweaks {
                         }
                     } catch (Exception __ww) { SRApi.Guard.Log("品质光芒/权重范围", __ww); }
                 }
-                // 第二遍：按完整范围分级并上光（权重直接用第一遍的缓存，省掉一半 GetItemFilterWeight）。
+                // 第二遍：按完整范围分级并上光（权重用第一遍缓存）。
                 for (int i = 0; i < all.Length; i++) {
                     PickableBlock pb = all[i];
                     if (pb == null || !pb.InPartybox) continue;      // 只处理派对盒里的，场上已放置的不碰
@@ -190,7 +168,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception ex) { SRApi.Guard.Log("品质光芒/扫描", ex); }
         }
 
-        /// <summary>派对盒实际抽取权重 → 品质档（w 为第一遍扫描缓存的权重，-1 = 没有 prefab 权重）。</summary>
+        /// <summary>派对盒实际抽取权重 → 品质档（w 为缓存的权重，-1 = 没有 prefab 权重）。</summary>
         private static int TierOf(PickableBlock pb, int w) {
             try {
                 if (w < 0 && pb.blockSerializeIndex >= 0) {
@@ -199,10 +177,8 @@ namespace SR_UCH.Tweaks {
                 }
             } catch (Exception ex) { SRApi.Guard.Log("品质光芒/读概率", ex); }
             if (w <= 0) return -1;                       // 0 = 该道具不会出现在派对盒
-            // 相对分档（修复"整盒只有一个颜色"）：权重是"每多少件出一件"的绝对值，
-            // 同一盒里常常全部落在同一个绝对阈值里 → 六档只出一档。
-            // 改为按本盒出现过的权重做对数插值：权重越小（越稀有）→ 档位越高（传说），权重越大 → 泛滥。
-            // 权重记录在扫描阶段（见 Tick：_wMin/_wMax）。
+            // 相对分档：权重是"每多少件出一件"的绝对值，同一盒常全落在同一绝对阈值里。
+            // 改为按本盒出现过的权重做对数插值：权重越小（越稀有）档位越高。
             if (_wMax > _wMin && _wMin > 0) {
                 float lo = Mathf.Log(_wMin), hi = Mathf.Log(_wMax);
                 // 权重 = "每多少件出一件"：越小越稀有 → 高档位。pos 按稀有度取反。
@@ -213,9 +189,8 @@ namespace SR_UCH.Tweaks {
             return 0;
         }
 
-        // ============ 光晕的创建 / 更新 / 移除 ============
 
-        // 光晕对象按道具实例缓存：避免每次扫描都 Transform.Find(名字) + GetComponent（全盒几十件时是主要开销）。
+        // 光晕对象按道具实例缓存：避免每次扫描都 Transform.Find + GetComponent。
         private static readonly Dictionary<int, Transform> _glowById = new Dictionary<int, Transform>();
 
         private static Transform GlowOf(PickableBlock pb) {
@@ -247,7 +222,7 @@ namespace SR_UCH.Tweaks {
             SpriteRenderer sr;
             if (g == null) {
                 GameObject go = new GameObject(GlowName);
-                go.layer = 5;                                  // 与 PartyBox:87360 一致
+                go.layer = 5;                                  // 与 PartyBox 布置一致
                 go.transform.SetParent(holder, false);
                 sr = go.AddComponent<SpriteRenderer>();
                 sr.sprite = EnsureSoft();
@@ -267,7 +242,6 @@ namespace SR_UCH.Tweaks {
             Material __mat = AddMat(tier);
             if (__mat != null) sr.sharedMaterial = __mat;
 
-            // 包围盒：合并所有 ArtSprites 的世界包围；空则退化成固定尺寸
             Vector3 worldCenter = pb.transform.position;
             float worldSize = 1.6f;
             Bounds b = default(Bounds); bool has = false;
@@ -281,8 +255,7 @@ namespace SR_UCH.Tweaks {
                 if (has) { worldCenter = b.center; worldSize = Mathf.Max(b.size.x, b.size.y); }
             }
             float scaleX = Mathf.Max(0.01f, holder.lossyScale.x);
-            // 光晕比包围盒大一圈（×2.6）：光要"散"出去，而不是贴着道具画一圈边。
-            // 贴附：光斑只比道具大一圈（1.6–2.2 倍），能量集中在道具本体上，而不是糊成一片背景光。
+            // 光晕比包围盒大一圈（×2.6）：光要散出去，而不是贴着道具画边。
             float tierSpread = 1.6f + 0.12f * Mathf.Clamp(tier, 0, 5);
             float localSize = worldSize * tierSpread * (_size.Value / 100f) / scaleX;
             g.localPosition = holder.InverseTransformPoint(worldCenter);
@@ -290,14 +263,12 @@ namespace SR_UCH.Tweaks {
 
             float a = TierAlpha[tier] * (_strength.Value / 100f);
             if (_breathe.Value) a *= 0.86f + 0.14f * Mathf.Sin(Time.time * 2.2f + pb.GetInstanceID() * 0.37f);
-            // 只写顶点色：Additive shader 是 i.color × _TintColor × tex，颜色写两遍会被平方（偏暗偏色），
-            // 且同档共享材质的 tint 会被最后扫描的那件覆盖、呼吸相位串扰。材质 tint 保持白色。
+            // 只写顶点色：Additive shader 是 i.color × _TintColor × tex，写两遍颜色会被平方。
             Color c = TierColor[tier];
             sr.color = new Color(c.r, c.g, c.b, Mathf.Clamp01(a));
         }
 
-        // 每档一份材质：六档共用一份时，同一帧里每件道具都会改写它，
-        // 最终所有光晕都变成最后一件的颜色（"只有一个颜色"的另一个来源）。
+            // 每档一份材质：共用一份时同帧各件互相改写，最终全变成最后一件的颜色。
         private static Material AddMat(int tier) {
             int t = Mathf.Clamp(tier, 0, 5);
             if (_addMats == null) _addMats = new Material[6];
@@ -325,7 +296,7 @@ namespace SR_UCH.Tweaks {
             return null;
         }
 
-        /// <summary>六档共用一张"中心亮、向外平滑衰减"的径向柔光；档位差异靠颜色、尺寸与亮度体现。</summary>
+        /// <summary>六档共用一张径向柔光；档位差异靠颜色、尺寸与亮度体现。</summary>
         private static Sprite EnsureSoft() {
             if (_glowSprite != null) return _glowSprite;
             const int N = 128;
@@ -354,7 +325,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void RemoveAll() {
-            // 首选弱登记：帧对象缓存为空（关功能瞬间 / 道具重建前）时也能把光晕清干净（审计 O-7）。
+            // 首选弱登记：帧对象缓存为空（关功能瞬间/道具重建前）时也能清干净。
             try {
                 for (int i = _made.Count - 1; i >= 0; i--) {
                     Transform g = _made[i];
@@ -362,7 +333,7 @@ namespace SR_UCH.Tweaks {
                 }
             } catch (Exception ex) { SRApi.Guard.Log("品质光芒/清理登记表", ex); }
             _made.Clear();
-            // 兜底：帧缓存里还有但我们没登记过的光晕（理论上不会有，防旧版本/手工残留）。
+            // 兜底：帧缓存里还有但未登记的光晕（防旧版本/手工残留）。
             try {
                 PickableBlock[] all = SRApi.FrameObjects<PickableBlock>();
                 if (all == null) return;
@@ -388,7 +359,7 @@ namespace SR_UCH.Tweaks {
             CfgRow(_strength);
             CfgRow(_size);
             CfgRow(_breathe);
-            // 六档颜色走核心取色器（带色块、调色板、HSV/RGB/Hex 编辑）；改完立即重建颜色表。
+            // 六档颜色走核心取色器；改完立即重建颜色表。
             if (_tierColors != null) {
                 if (_tierLabels == null) {
                     _tierLabels = new GUIContent[6];

@@ -1,7 +1,4 @@
-// 自由模式 · 自身状态（完全由 SR 自己实现，不依赖 EX）。
-// 开关：无敌 / 完美无敌 / 飞天 / 无视碰撞。全部只对本地自己生效。
-// 早期这套在外部模块里，用户要求 SR 的自身状态必须独立 → 整块搬到这里，
-// 外部模块里对应的 UI、配置、补丁、槽位全部删除。
+// 自由模式 · 自身状态：无敌 / 完美无敌 / 飞天 / 无视碰撞，只对本地自己生效。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -17,20 +14,18 @@ namespace SR_UCH {
         private static ConfigEntry<bool> _invincible, _godMode, _fly, _ignoreCollision;
         private static ConfigEntry<KeyCode> _invincibleKey, _godModeKey, _flyKey, _ignoreCollisionKey;
 
-        // 统一门控：EX 的"总开关"语义在 SR 侧就是 GateMaster（设置页 All Enabled）。
-        // 自由模式的功能只在自由模式生效（统一门控的豁免会自动放行）；
-        // 开关本身照常可以打开/关闭，只是非自由模式下"开了无效"。
+        // 统一门控：GateMaster（设置页 All Enabled）+ 模式豁免；非自由模式下开关可开但无效。
         private static bool On(ConfigEntry<bool> e) {
             return e != null && e.Value && SRApi.GateMaster && SRApi.FeatureAllowed(typeof(SelfState));
         }
 
-        // ================= 无敌 / 完美无敌 =================
+        // 分区：无敌 / 完美无敌
         private static System.Reflection.FieldInfo _invTimerField;
         private static bool _invWasOn;
         private static int _deathBypass;          // 深渊自调用放行深度（用计数，避免嵌套把标志提前清掉）
         private const string CauseFalling = "Falling";
 
-        // ================= 飞天 =================
+        // 分区：飞天
         private static readonly Dictionary<int, Rigidbody2D> _rbCache = new Dictionary<int, Rigidbody2D>();
 
         public void Initialize(IFeatureHost plugin) {
@@ -52,8 +47,7 @@ namespace SR_UCH {
 
                 SRApi.RegisterTick("自身状态-穿模", TickIgnore);
                 SRApi.RegisterSceneHook(OnSceneChanged);
-                // 三个补丁类各自独立注册：一个目标不存在只丢那一条，
-                // 也不会依赖"CreateAndPatchAll 会不会递归嵌套类型"这种不保险的行为。
+                // 三个补丁类独立注册：一个目标不存在只丢那一条。
                 try { Harmony.CreateAndPatchAll(typeof(KillPatch), (string)null); }
                 catch (Exception __h1) { SRApi.LogWarn("自身状态/死亡拦截补丁跳过: " + __h1.Message); }
                 try { Harmony.CreateAndPatchAll(typeof(SetupDeathPatch), (string)null); }
@@ -78,8 +72,7 @@ namespace SR_UCH {
             SRApi.LocDesc(Sec, "Ignore Collision", "无视碰撞\n自己穿过所有实体碰撞\n可能掉出地图", "Ignore collision\npass through every solid collider\nmay fall out of the map");
         }
 
-        // ================= 快捷键 =================
-        // 键位动作统一交给核心轮询（RegisterKey 4 参）；这里只保留"是否允许"与动作本身。
+        // 分区：快捷键
         private static void SelfKey(ConfigEntry<bool> e, string zh, string en) {
             try {
                 if (!SRApi.GateMaster) return;
@@ -88,7 +81,7 @@ namespace SR_UCH {
             } catch (Exception __ex) { SRApi.Guard.Log("自身状态/快捷键", __ex); }
         }
 
-        // 直接写 ConfigEntry.Value 不会自动落盘（宿主关掉了自动保存），必须显式标记脏文件。
+        // 直接写 ConfigEntry.Value 不会自动落盘，必须显式标记脏文件。
         internal static void MarkDirty(ConfigEntryBase e) {
             try { if (e != null) SRApi.Ctl.MarkConfigDirty(e.ConfigFile); } catch { /* 静默：保存失败不影响功能 */ }
         }
@@ -97,15 +90,14 @@ namespace SR_UCH {
             if (e == null) return;
             e.Value = !e.Value;
             MarkDirty(e);
-            // 模式受限时静默跳过：不改变开关、不弹提示（等价于复选框不勾选）。
             bool inMode = true;
             try { inMode = SRApi.FeatureAllowed(typeof(SelfState)); } catch { inMode = true; }
             if (!inMode) return;
             SRApi.Notify(SRApi.T(zh, en) + (e.Value ? SRApi.T("：开", ": on") : SRApi.T("：关", ": off")));
         }
 
-        // ================= 死亡拦截 =================
-        // 两条死亡路径：本地 KillCharacter 与房主广播的 setupDeath，两处都要拦，否则只挡一半。
+        // 分区：死亡拦截
+        // 本地 KillCharacter 与房主广播的 setupDeath 两条路径都要拦，否则只挡一半。
         [HarmonyPatch(typeof(Character), "KillCharacter")]
         internal static class KillPatch {
             [HarmonyPrefix]
@@ -118,7 +110,7 @@ namespace SR_UCH {
                     bool ignoreMode = On(_ignoreCollision);
                     if (!On(_invincible) && !ignoreMode) return true;
                     if (cause == CauseFalling) {
-                        // 深渊：普通无敌不拦。用计数放行一次 force 死亡，避免无限递归。
+                        // 深渊：普通无敌不拦；用计数放行一次 force 死亡以免递归。
                         _deathBypass++;
                         try { __instance.KillCharacter(cause, deathFreezeOn, causedByPlayerNumber, true); }
                         finally { if (_deathBypass > 0) _deathBypass--; }
@@ -145,7 +137,7 @@ namespace SR_UCH {
             }
         }
 
-        // 飞天 + 无敌续期合并成一个 FixedUpdate 后缀，减少每物理帧的 Harmony 调用。
+        // 飞天与无敌续期合并到一个 FixedUpdate 后缀，减少每物理帧 Harmony 调用。
         [HarmonyPatch(typeof(Character), "FixedUpdate")]
         internal static class FixedPatch {
             [HarmonyPostfix]
@@ -186,7 +178,7 @@ namespace SR_UCH {
             } catch { /* 静默：物理帧高频路径，失败下帧重试，不写日志 */ }
         }
 
-        // 无敌/完美无敌共用游戏自己的重生无敌计时器：开着就一直续期，关掉时只清我们拉高的那一份。
+        // 共用游戏的重生无敌计时器续期；关闭时只清我们拉高的那份。
         private static void KeepInvincible(Character c) {
             try {
                 if (c == null || !c.hasAuthority) return;
@@ -207,7 +199,7 @@ namespace SR_UCH {
         }
 
 
-        // ================= 无视对象 / 无视碰撞 =================
+        // 分区：无视对象 / 无视碰撞
         private class IgnoreTarget {
             public Collider2D col;
             public bool wasEnabled;
@@ -219,7 +211,6 @@ namespace SR_UCH {
         private static float _ignoreRefreshAt;
         private static Character _ignoreChar;
 
-        // ================= 无视对象 / 无视碰撞 =================
         private static void OnSceneChanged() {
             try { RestoreIgnored(); } catch { /* 静默：换场景时旧碰撞体已销毁，无需恢复 */ }
             try { _ignoreChar = null; _rbCache.Clear(); } catch { /* 静默：缓存清理失败无副作用 */ }
@@ -331,17 +322,16 @@ namespace SR_UCH {
                 IgnoreTarget t = new IgnoreTarget();
                 t.col = col;
                 t.wasEnabled = col.enabled;
-                // 其他角色身上的碰撞体只关碰撞对，不禁用：禁用会让对方在本地穿地、抽搐。
+                // 其他角色的碰撞体只关碰撞对不禁用，否则对方在本地会穿地、抽搐。
                 Character other = col.GetComponentInParent<Character>();
                 t.noDisable = other != null && !other.hasAuthority;
                 _ignored.Add(t);
             }
         }
 
-        // ================= 页面（自由模式页的「自身状态」分区） =================
+        // 分区：页面（自由模式页的「自身状态」分区）
         internal static void RenderRows() {
             try {
-                // 两行两列、列宽固定：同一行的两个按钮起始 x 相同，第二行的"无视碰撞"不会再错位。
                 float w = SRApi.Ctl.Sc(200f);
                 float gap = SRApi.Ctl.Sc(12f);
                 RenderPair(SRApi.T("无敌：", "Invincible: "), SRApi.T("自己免疫非强制死亡", "Immune to non-forced deaths"),
@@ -356,7 +346,6 @@ namespace SR_UCH {
             } catch (Exception __ex) { SRApi.Guard.Log("自身状态/渲染", __ex); }
         }
 
-        // 一行两个按钮：固定列宽 + 固定间隔 + 末尾占位，保证两行列起点完全一致。
         private static void RenderPair(string z1, string t1, bool on1, ConfigEntry<KeyCode> k1, Action a1,
                                        string z2, string t2, bool on2, ConfigEntry<KeyCode> k2, Action a2,
                                        float w, float gap) {

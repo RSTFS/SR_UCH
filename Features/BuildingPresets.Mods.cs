@@ -1,9 +1,5 @@
-// 布局预设 · 修改器策略（BuildingPresets 的第二个分部文件）。
-// 关卡快照里的 <mods .../> 就是游戏的关卡修改器：24 个属性（15 个模式索引 + 9 个开关）。
-// 预设默认原样继承这份修改器；本页允许对每条预设单独选择：
-//   继承 = 用预设自带的（默认，行为与以前一致）
-//   关闭 = 全部还原为默认值（等于"没有修改器"）
-//   自定义 = 由用户逐项设定，加载时覆盖预设自带的值
+// 布局预设 · 修改器策略：关卡快照 <mods .../> 的 24 个属性（15 模式索引 + 9 开关）如何应用。
+// 每条预设独立选择：继承（默认原样）/ 关闭（全部默认值）/ 当前（用游戏现值）/ 自定义（逐项覆盖）。
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -16,18 +12,18 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
     public partial class BuildingPresets {
 
-        // 一条修改器属性的描述：Attr 是快照 XML 里 <mods> 的属性名。
+        // 一条修改器属性：Attr 是快照 XML 里 <mods> 的属性名。
         private sealed class ModDef {
             public readonly string Attr;
             public readonly string Zh;
             public readonly string En;
-            public readonly bool IsBool;   // true = 开关（True/False）；false = 模式索引（0 = 默认）
+            public readonly bool IsBool;   // true = 开关，false = 模式索引（0 = 默认）
             public ModDef(string attr, string zh, string en, bool isBool) {
                 Attr = attr; Zh = zh; En = en; IsBool = isBool;
             }
         }
 
-        // 顺序与游戏写入顺序一致；新增属性只追加在末尾（索引不改写）。
+        // 顺序与游戏写入一致；新增属性只追加在末尾（索引不改写）。
         private static readonly ModDef[] Mods = new ModDef[] {
             new ModDef("GravityMode",             "重力",       "Gravity",            false),
             new ModDef("JumpSpeedMode",           "跳跃高度",   "Jump speed",         false),
@@ -55,22 +51,18 @@ namespace SR_UCH.Tweaks {
             new ModDef("Frictionless",            "无摩擦",     "Frictionless",       true)
         };
 
-        // 策略取值："" = 预设（默认）；"current" = 用游戏当前值；"off" = 全部默认。
-        // "custom" 仅为旧索引兼容保留（现在的 UI 不会再产生它）。
-        private const string ModsInherit = "";   // 预设（默认）
+        // 策略取值："" = 预设、current = 游戏当前值、off = 全部默认；custom 仅旧索引兼容。
+        private const string ModsInherit = "";   // 预设
         private const string ModsOff = "off";
         private const string ModsCustom = "custom";
-        // "current" = 按当前（游戏里正在用的）修改器加载：不写 <mods>，交给游戏保留现值。
         private const string ModsCurrent = "current";
 
-        // 编辑器状态（不落配置：打开时从预设/索引读，保存时写回索引）。
-        // 规则 / 积分设置 / 模块概率：加载该预设时是否一并应用（草稿）。
+        // 加载该预设时是否一并应用规则 / 积分设置 / 模块概率（草稿）。
 
         private static string ModDefault(ModDef d) { return d.IsBool ? "False" : "0"; }
 
 
-        // ---------- 索引持久化：modsMode / modsVals 两个纯文本字段 ----------
-        // modsVals 用 "attr=value;attr=value" 编码（属性名与取值都是字母数字，无需转义；仍按 JsonEsc 写字符串）。
+        // 分区：索引持久化（modsMode / modsVals 两个纯文本字段）
 
         private static string ModsValsToText(PresetInfo p) {
             try {
@@ -104,15 +96,14 @@ namespace SR_UCH.Tweaks {
             } catch { /* 静默：索引被手改坏时按"无自定义值"处理，不影响预设加载 */ }
         }
 
-        // ---------- 应用到快照 XML ----------
-        // 只在加载前调用（列表统计/导出不受影响）：把 <mods> 的 24 个属性按策略改写。
-        // 返回（可能被修改过的）XML 字符串；任何解析异常都原样返回输入，绝不会让预设加载失败。
+        // 分区：应用到快照 XML（只在加载前调用，按策略改写 <mods>）
+        // 只在加载前调用（列表统计/导出不受影响）：按策略改写 <mods> 的 24 个属性。
+        // 任何解析异常都原样返回输入，绝不让预设加载失败。
         private static string ApplyModsPolicy(string xml, PresetInfo p) {
             try {
-                if (p == null || p.IsLocal) return xml;         // 游戏本地关卡是只读数据，不做改写
+                if (p == null || p.IsLocal) return xml;         // 本地关卡只读
                 string mode = p.ModsMode ?? ModsInherit;
                 if (mode == ModsCurrent) {
-                    // 当前：把 <mods> 去掉，游戏就用它此刻的修改器，不被预设覆盖。
                     XmlDocument __cd = ParseXmlSafe(xml);
                     if (__cd == null || __cd.DocumentElement == null) return xml;
                     XmlElement __cm = __cd.DocumentElement.SelectSingleNode("mods") as XmlElement;
@@ -144,24 +135,22 @@ namespace SR_UCH.Tweaks {
         }
 
 
-        // 表内显示用短标签：继承显示 "-"（不改动），关闭显示「关」，自定义显示「改」。
+        // 表内显示标签：继承显示“预设”，当前/关闭显示对应文字。
         private static string ModsLabel(PresetInfo p) {
             try {
                 if (p == null || p.IsLocal) return "-";
                 string m = p.ModsMode ?? ModsInherit;
                 if (string.Equals(m, ModsCurrent, StringComparison.Ordinal)) return SRApi.T("当前", "Current");
                 if (string.Equals(m, ModsOff, StringComparison.Ordinal)) return SRApi.T("关闭", "Off");
-                // 历史数据里的 ModsCustom 一律按"预设"显示：真值已迁回 XML 的 <mods>。
                 return SRApi.T("预设", "Preset");
             } catch { return "-"; }
         }
 
-        //   预设 = 用 XML 里的 <mods>；当前 = 不移除/覆盖（用游戏现值）；关闭 = 写成默认值
+        // 左键切换：预设 → 当前 → 关闭 → 预设。
         private static void CycleDataMode(PresetInfo p) {
             try {
                 if (p == null || p.IsLocal) return;
                 string m = p.ModsMode ?? ModsInherit;
-                // 顺序：预设 -> 当前 -> 关闭 -> 预设
                 string next = string.Equals(m, ModsInherit, StringComparison.Ordinal) || string.IsNullOrEmpty(m)
                     ? ModsCurrent
                     : (string.Equals(m, ModsCurrent, StringComparison.Ordinal) ? ModsOff : ModsInherit);
@@ -204,11 +193,9 @@ namespace SR_UCH.Tweaks {
                             if (!string.IsNullOrEmpty(s)) return s;
                         }
                     }
-                    return raw;   // 游戏没有对应文案（如平台速度）：保留数值，避免显示空白
+                    return raw;   // 无对应文案（如平台速度）时保留数值
                 }
-                // 布尔项：走游戏的"开/关"本地化
                 bool bv = string.Equals(raw, "True", StringComparison.OrdinalIgnoreCase) || raw == "1";
-                // 反射登记：修改器布尔项文案靠这个方法，游戏改名后自检要能报出来。
                 SRApi.Ref.Override("Modifiers.GetOnOffValueString", "布局预设：修改器布尔项文案");
                 MethodInfo onOff = SRApi.Ref.Method(typeof(Modifiers), "GetOnOffValueString", "布局预设/修改器预览开关文本");
                 if (onOff != null) {
@@ -223,7 +210,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 从预设 XML 的 <mods> 取"非默认项"，格式「中文名=值」，供数据格悬浮预览（最多 10 项）。
+        // 从 <mods> 取非默认项，格式「中文名=值」，供数据格悬浮预览。
         private static string ModsSummaryFromXml(PresetInfo p, int maxItems) {
             try {
                 if (p == null || p.IsLocal) return "";
@@ -251,7 +238,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 从预设 XML 的 <mods> 读回 24 项（用于"清空"后回显 / 数据列统计）。
+        // 从 <mods> 读回属性条数（用于“清空”后回显 / 数据列统计）。
         private static int ModsCountInXml(PresetInfo p) {
             try {
                 if (p == null || p.IsLocal) return 0;
@@ -264,8 +251,7 @@ namespace SR_UCH.Tweaks {
             } catch { return 0; }
         }
 
-        // 数据列：悬浮预览 / 左键切换 预设-当前-关闭
-        // 名称列：右键重命名
+        // 数据列悬浮预览；名称列右键重命名。
         private static void HandlePresetCells() {
             try {
                 Event e = Event.current;
@@ -285,19 +271,17 @@ namespace SR_UCH.Tweaks {
                 if (col == ColMods) {
                     string tip = DataPreviewTip(p);
                     if (!string.IsNullOrEmpty(tip)) GUI.tooltip = tip;
-                    // 左键三态切换改由核心 cellClick 派发（见 _cellClickFn），这里只负责悬浮提示。
+                    // 左键三态切换由核心 cellClick 派发，这里只管悬浮提示。
                 }
                 if (col == ColName && e.type == EventType.MouseDown && e.button == 1) {
-                    // IsLocal 的含义是"游戏本地关卡存档"（snapshots 目录里的 .xml），
-                    // 那是只读数据、改名会破坏存档映射；**自己的预设**（IsLocal=false）才是可改名的。
-                    // 上一版把条件写反成 p.IsLocal，正好只允许给存档改名 → 右键自己的预设没反应。
+                    // IsLocal = 游戏本地关卡存档（只读，改名会破坏映射），只有自己的预设可改名。
                     if (!p.IsLocal) { ClearPending(); _renameKey = p.Key; _renameText = p.Name; _renameFocusPending = true; e.Use(); }
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/行内单元格", __ex); }
         }
 
 
-        // 鼠标 x 落在可视列的哪一列（与核心 DrawTableCells 同一套排布）。
+        // 鼠标 x 落在哪一可视列（与核心 DrawTableCells 同一套排布）。
         private static int ColumnAtX(float x) {
             try {
                 float left = _args.box.x - _args.scrollX;
@@ -312,7 +296,6 @@ namespace SR_UCH.Tweaks {
             return -1;
         }
 
-        // 可见行 -> 预设（行号是 visible 列表的下标，与 RowCells 用的是同一份）。
         private static PresetInfo _currentVisibleRow(int row) {
             try {
                 List<PresetInfo> vis = _visibleCache;
@@ -321,9 +304,7 @@ namespace SR_UCH.Tweaks {
             } catch { return null; }
         }
 
-        // 数据格悬浮：只保留修改器预览（用户要求）。
-        //   预设态：列出该 XML 里存的非默认修改器，值用游戏本地化文本；
-        //   关闭态：一句说明（加载时写成默认值）。
+        // 数据格悬浮提示：预设态列出非默认修改器，关闭/当前态各一句说明。
         private static string DataPreviewTip(PresetInfo p) {
             try {
                 if (p == null) return null;

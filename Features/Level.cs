@@ -1,18 +1,15 @@
-// 关卡栏目：栏目注册、两页页签、生命周期。
-// 第 1 页 派对盒 -> Level.PartyBox.cs；第 2 页 关卡工具 -> Level.Tool.cs。
-// 本命名空间自定义的 Level 会遮蔽游戏的 global::Level：引用游戏类型一律写 global::Level。
+// 关卡栏目：栏目注册、两页页签、生命周期；页面见 Level.PartyBox.cs / Level.Tool.cs。
+// 本命名空间自定义的 Level 会遮蔽游戏 global::Level：引用游戏类型一律写 global::Level。
 using System;
 using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 namespace SR_UCH.Tweaks {
-// 两页共用一个 partial 类：页面渲染分别在 Level.PartyBox.cs / Level.Tool.cs。
 [SrFeature("sr.level", "Level", "1.0", Provides = new string[] { SRApi.SlotKeys.LevelReloadBusy, "Level.ClearPlacedBlocks" })]
 public partial class Level : ITweak {
 
-    // 栏目注册：本地化文案、侧栏顺序、页签、快捷键。
-    // 重载锁自愈：协程被场景切换掐断时没人复位，超时即视为残留并放锁。
+    // 重载锁自愈：协程被场景切换掐断时无人复位，超时即视为残留并放锁。
     private static void TickReloadLock() {
         try {
             if (!ReloadLockStuck()) return;
@@ -28,28 +25,24 @@ public partial class Level : ITweak {
         SRApi.Ref.Override("QuickSaver.initialLevelPlaceables", "快照加载后的初始方块集合（关卡自带件）");
         SRApi.LocSec("Level", "关卡", null);
         SRApi.Nav("Level", 50); //侧栏栏目顺序 40
-        // 一个栏目两页：派对盒 → 关卡工具（挑战页已移到快速调整）。
         SRApi.RegisterPage("Level", "partybox", "派对盒", "Party Box", 10, RenderPartyBox);
-        // 「挑战」页已移到「快速调整」栏目。
         SRApi.RegisterPage("Level", "tools", "关卡工具", "Level Tools", 20, RenderTools);
         SRApi.LocKey("Level", "Reload Mode", "重载模式", null);
         SRApi.LocDesc("Level", "Reload Mode", "关卡重载模式\n保留方块和分数＝保方块并给全员补分；只保留方块＝分数清零\n补分在下次结算显示，未装本模组的房客同样生效", "Reload mode\nblocks+score = refill scores too; blocks only = scores reset\nrefill shows at the next settlement and also covers vanilla clients");
-        // 预登记本页自动快捷键：不预登记则重启后在首次打开本页前按键无效；渲染时 HotkeyButton 会再登记一次（同 id 幂等）。
+        // 预登记自动快捷键：不预登记则重启后首次打开本页前按键无效；渲染时会幂等再登记。
         SRApi.HotkeyAction("level.reload", "重载关卡", () => Level.ReloadLevel());
     }
 
     public void Initialize(IFeatureHost plugin) {
         SelfReg();
-        // 对外槽位：其它功能经 Slots.Require 取用清场能力，无需引用 Level 类型。
+        // 对外槽位：清场能力、重载忙碌状态（预设据此避免并发重载）。
         Slots.Provide(SlotClearPlacedBlocks, (Action<List<Placeable>, string>)ClearPlacedBlocks);
-        // 对外槽位：关卡重载忙碌状态（布局预设等功能据此避免与本功能的重载并发）。
         Slots.Provide(SRApi.SlotKeys.LevelReloadBusy, (Func<bool>)(() => _reloadBusy));
-        // 锁自愈 tick：与布局预设侧对称。以前只有"用户再点一次重载"才会发现残留锁，
-        // 于是预设加载会被一条早已死掉的 level.reloadBusy 永久拦住。
+        // 锁自愈 tick：预设加载会被残留的 level.reloadBusy 永久拦住，需定时放锁。
         try { SRApi.RegisterTick("关卡重载-锁自愈", TickReloadLock); }
         catch (Exception __tr) { SRApi.Guard.Log("关卡重载/注册锁自愈", __tr); }
         _reloadMode = plugin.Config.Bind<ReloadMode>("Level", "Reload Mode", ReloadMode.KeepScore, "重载关卡模式：\n保留方块和分数（允许补分）= 重载后当前方块保留；房主按重载前的分类型分块（获胜/金币/陷阱等原样）给全员广播补分，下一回合结算时全员得分板显示与重载前一致的分数和类型（含未装 mod 的房客；补分不立即结算，图标随正常结算显示）。\n仅保留方块（跳过补分）= 重载后当前方块保留，分数重置（重新对局，不补分）。");
-            // CreateAndPatchAll 不自动发现带 [HarmonyPatch] 的独立类，必须显式注册；单个补丁目标失效只丢本类功能，不影响其它功能。
+            // CreateAndPatchAll 不自动发现带 [HarmonyPatch] 的独立类，必须显式注册。
         try { Harmony.CreateAndPatchAll(typeof(Level), (string)null); }
         catch (Exception e) { SRApi.LogError("Level 补丁注册失败: " + e.Message); }
     }

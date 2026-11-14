@@ -1,4 +1,4 @@
-// 契约层：ITweak / IFeatureHost / ILanguagePack / Slots，第三方功能只依赖本文件。
+// 契约层：表格绘制参数（TableArgs / TableState / TableSource / TableColumn）。
 // 硬约定：本文件不得引用 SR 的其它文件，须能单独编译成程序集；槽位只传 BCL / 引擎 / 游戏类型。
 using System;
 using System.Collections.Generic;
@@ -33,7 +33,6 @@ namespace SR_UCH {
             public System.Func<int, string[]> rowCells;     //整行文本（行号 -> 各列文本）
             public System.Func<int, float> rowAlpha;       //行透明度（可选；不可用的行压暗）
             public bool drawHeader = true;                 //是否画表头（表头另外画时置 false）
-            // 竖向排列：格子沿 Y 叠放（每项一行），默认 false。
             public bool vertical;
             public float[] defaultColW; // 默认列宽（Shift+右键还原时核心会还原成它）
             public System.Func<int, bool> rowSelected; // 某行是否“选中”（核心据此画整行高亮）
@@ -49,7 +48,6 @@ namespace SR_UCH {
             public System.Action saveWidths;               //列宽拖动松开时落盘（可选；核心自己处理 MouseUp 清状态）
             public System.Action<int> click;               //单击列头（可选）
             public System.Action resetAll;                 //Shift+右键=还原全部（可选）
-            // 钉住列按钮与空列表提示也由本控件负责绘制：三处列表只提供内容。
             public System.Action<int, Rect, int> pinDraw;  //(数据行下标, 钉住列绝对矩形, 可见序号)
             public System.Func<string> emptyHint;          //无行时的居中提示（返回 null/空 = 不画）
             public float moveX0, moveDx;
@@ -65,7 +63,6 @@ namespace SR_UCH {
             public List<Rect> pinRects = new List<Rect>();
             public List<int> pinRows = new List<int>();
             public Rect pinHeader;
-            // 行交互：核心每帧用 rowRects 做命中并回填，调用方只读。
             public int rowHover = -1;                       //鼠标命中的数据行号；-1 = 没有
             public System.Action<int> rowClick;             //左键 MouseUp 命中非钉住列区域时回调行号
             public System.Action<int> rowDoubleClick;
@@ -76,7 +73,7 @@ namespace SR_UCH {
             public bool hoverHighlight = true;              //rowHover >= 0 时核心在行矩形上叠一层很淡的高亮
             }
     public sealed partial class TableArgs { 
-        // 带默认值的构造入口 + 必填校验：表格页少写样板，漏填（表头 title / 行回调等）能被自检/日志抓到。
+        // 带默认值的构造入口 + 必填校验：漏填（表头 title / 行回调等）能被自检/日志抓到。
         public static TableArgs Create(Rect box, float[] colW, List<int> vis, int rowCount,
                                        System.Func<int, string> title, System.Func<int, string[]> rowCells) {
             TableArgs a = new TableArgs();
@@ -91,7 +88,7 @@ namespace SR_UCH {
             a.sortCol = -1; a.sortAsc = true; a.hoverHighlight = true;
             return a;
         }
-        // 返回参数问题列表（空 = 合法）。核心 TableDraw 每帧调用一次并按问题签名去重记日志。
+        // 返回参数问题列表（空 = 合法）。核心 TableDraw 每帧调用并按问题签名去重记日志。
         public string[] Validate() {
             List<string> p = new List<string>();
             try {
@@ -182,7 +179,6 @@ namespace SR_UCH {
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
-        // 还原：列宽回默认、列序回自然序、隐藏清空。
         public void ResetAll() {
             for (int i = 0; i < Widths.Length && i < _defaultW.Length; i++) Widths[i] = _defaultW[i];
             for (int i = 0; i < Order.Length; i++) Order[i] = i;

@@ -1,5 +1,4 @@
 // 回合 HUD · 设置页（RenderPage1 / RenderPage2）。
-// 从 HUD.cs 拆出来（该文件同时装着定义表、样式、绘制与设置页）。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;

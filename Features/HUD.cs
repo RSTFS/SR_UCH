@@ -9,13 +9,12 @@ using HarmonyLib;
 using UnityEngine;
 
 namespace SR_UCH.Tweaks {
-    // 本类自带 [HarmonyPatch]，由 ITweak 反射发现后手动 CreateAndPatchAll。
     [SrFeature("sr.roundhud", "HUD", "1.0")]
     public partial class HUD : ITweak {
         private const string Sec = "HUD";   // 原名 Round HUD，2026-10 改名（迁移见 ConfigMigration）
         private const int WinScoreFallback = 250;
 
-        // 布局：四角按固定边距贴边；Custom 用拖动后的运行期位置（会话内有效）。
+        // 布局：四角按固定边距贴边；Custom 用拖动后的运行期位置。
         public enum HudLayout {
             TopLeft,
             TopRight,
@@ -24,14 +23,13 @@ namespace SR_UCH.Tweaks {
             Custom
         }
 
-        // 显示方案：堆叠（每项一行）/ 平铺（全部内容用分隔符连成一行）。
+        // 显示方案：堆叠（每项一行）/ 平铺（用分隔符连成一行）。
         public enum DisplayMode {
             Stack,
             Inline
         }
 
-        // 页面 2 的内容条目：开关键 + 颜色键 + 名称/说明（说明 3 行，与 LocDesc 共用）。
-        // HUD 内容定义表（ContentDef + _content）见 HUD.Content.cs。
+        // 页面 2 的内容条目：开关键 + 颜色键 + 名称 / 说明；内容定义表见 HUD.Content.cs。
 
         private static ConfigEntry<string> _extra1;
         private static ConfigEntry<string> _extra2;
@@ -43,7 +41,6 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<string> _colExtra1;
         private static ConfigEntry<string> _colExtra2;
 
-        // ---- 阶段/对局状态 ----
         private static GameControl _gc;
         private static GameControl.GamePhase _phase = GameControl.GamePhase.NONE;
         private static float _phaseStart;
@@ -57,27 +54,23 @@ namespace SR_UCH.Tweaks {
         private static string _levelText;
         private static string _winText;
         private static int _lastRound;
-        // 真实回合：GameControl.RoundNumber 会在重载/刷新派对盒时被额外 +1，用“结算记分板”事件
-        // 作为“确实进入下一回合”的证据；未确认的增量先挂起，达到上限时钳制显示。
+        // 真实回合：RoundNumber 在重载 / 刷新派对盒时会被额外 +1，故只在观察到结算记分板后接受增量。
         private static int _trueRound;
         private static int _roundPending;
         private static bool _roundTallySeen;
         private static bool _vsPlaceSeen;
 
-        // ---- 树屋/大厅 ----
         private static bool _inLobby;
 
-        // ---- 回合提示动画 ----
         private static string _roundNoticeText;
         private static float _roundNoticeStart;
         private const float RoundNoticeDuration = 1.5f;
 
-        // ---- 内容行变化淡入 ----
         private const float LineFadeTime = 0.15f;
         private static readonly string[] _lineLast = new string[24];
         private static readonly float[] _lineShownAt = new float[24];
 
-        // ---- 平铺模式：独立小段（各自背景/颜色），一行放不下自动换行 ----
+        // 平铺模式：独立小段（各自背景 / 颜色），一行放不下自动换行
         private static readonly string[] _segText = new string[16];
         private static readonly Color[] _segColor = new Color[16];
         private static readonly float[] _segW = new float[16];
@@ -88,23 +81,19 @@ namespace SR_UCH.Tweaks {
         private static int _segRowCount;
         private static float _segRowsW;
 
-        // ---- 丝滑动画：整体滑入 + 行 stagger ----
         private static float _hudAppear;        // 0..1 出现进度
         private static float _hudShownAt;       // 本轮开始出现的时间（stagger 基准）
         private static bool _wasVisible;
 
-        // ---- 额外信息行 ----
         private static string _extra1Text;
         private static string _extra2Text;
 
-        // ---- 反射缓存（VersusControl 计时字段）----
         private static FieldInfo _fPlacementTimer;
         private static FieldInfo _fLevelTimer;
         private static FieldInfo _fCountdownTimer;
         private static FieldInfo _fChallengeRunTime;
         private static FieldInfo _fChallengeRunStarted;
 
-        // ---- HUD 绘制 ----
         private static GUIStyle _phaseStyle;
         private static GUIStyle _timerStyle;
         private static GUIStyle _smallStyle;
@@ -127,14 +116,12 @@ namespace SR_UCH.Tweaks {
         private static int _heightFrame = -1;   // 行高平滑每帧只推进一次
         private static float _hudW = 260f;
         private static float _hudH = 150f;
-        // Custom 布局位置：运行期内存，会话内保持，不写配置。
         private static float _customX = 16f;
         private static float _customY = 16f;
         private static bool _dragging;
         private static float _dragOffX;
         private static float _dragOffY;
 
-        // ---- 设置页 ----
         private static readonly HashSet<string> _keysConfig = new HashSet<string> { "Enabled", "Fade", "Show Key" };
         private static readonly HashSet<string> _keysAppearance = new HashSet<string> { "Layout", "Font Size", "Opacity", "Background Opacity" };
         private static readonly HashSet<string> _keysBehavior = new HashSet<string> { "Warning Seconds", "Blink", "Round Notice" };
@@ -189,7 +176,7 @@ namespace SR_UCH.Tweaks {
             try { return e != null ? e.Value : null; } catch { return null; }
         }
 
-        // 配置色：核心调色板有未落盘预览时用预览色（拖动/输入即时生效），否则读配置值。
+        // 配置色：核心调色板有未落盘预览时用预览色。
         private static Color Col(ConfigEntry<string> e, Color fallback) {
             Color? preview = SRApi.Ctl.PreviewColor(e);
             if (preview.HasValue) return preview.Value;
@@ -198,13 +185,11 @@ namespace SR_UCH.Tweaks {
 
         // ================= 注册 =================
         private static void SelfReg() {
-            // 本文件反射的游戏私有成员，改名时启动自检会在日志里告警。
             SRApi.Ref.Override("VersusControl.placementTimer", "HUD（建造阶段剩余时间）");
             SRApi.Ref.Override("VersusControl.levelTimer", "HUD（对局已用时间）");
             SRApi.Ref.Override("VersusControl.countdownTimer", "HUD（决胜倒计时）");
             SRApi.Ref.Override("ChallengeControl.runTime", "HUD（挑战计时）");
             SRApi.Ref.Override("ChallengeControl.runStarted", "HUD（挑战是否已开始）");
-            // 枚举下拉框的中文显示名（英文模式仍显示枚举原名）。
             SRApi.LocEnum("TopLeft", "左上");
             SRApi.LocEnum("TopRight", "右上");
             SRApi.LocEnum("BottomLeft", "左下");
@@ -250,11 +235,9 @@ namespace SR_UCH.Tweaks {
                 "回合提示\n回合数变化时以放大闪烁动画显示当前回合（约 1.5 秒）\n关闭则不显示",
                 "round notice\nshows the current round with a scaled blinking animation when the round changes (about 1.5 seconds)\nwhen off it is hidden");
 
-            // 显示方案下拉。
             Loc("Display Mode", "显示方案", "Display mode",
                 "显示方案\n堆叠 = 每个内容单独一行；平铺 = 每个内容独立小段横向排列，放不下自动换行\n回合提示始终单独占行",
                 "display mode\nStack = one line per content item; Inline = each item is a small tile laid out horizontally and wraps when needed\nthe round notice always uses its own line");
-            // 第二页内容：开关 + 颜色（颜色说明统一模板）。
             for (int i = 0; i < _content.Length; i++) {
                 ContentDef d = _content[i];
                 Loc(d.Key, d.LabelZh, d.LabelEn, d.DescZh, d.DescEn);
@@ -284,7 +267,7 @@ namespace SR_UCH.Tweaks {
         private static bool RowBehavior(ConfigEntryBase e) { return InSet(e, _keysBehavior); }
         private static bool RowDisplay(ConfigEntryBase e) { return InSet(e, _keysDisplay); }
 
-        // 行可见性：颜色键用同行的色块渲染，显示方式跟随显示按键行，都不单独成行。
+        // 行可见性：颜色键与显示方式都不单独成行。
         private static bool RowVisible(ConfigEntryBase e) {
             try {
                 if (!IsSec(e)) return true;
@@ -294,7 +277,6 @@ namespace SR_UCH.Tweaks {
             } catch { return true; }
         }
 
-        // 显示按键行的同行附加控件：显示方式下拉框。
         private static string RowExtra(ConfigEntryBase e) {
             try {
                 if (!IsSec(e)) return null;
@@ -311,7 +293,7 @@ namespace SR_UCH.Tweaks {
 
 
 
-        // 一行：标签 + 开关/文本框 + 右侧统一色块；点名称还原默认色，点色块展开核心调色板。
+        // 一行：标签 + 开关 / 文本框 + 右侧色块；点名称还原默认色，点色块展开调色板。
         private static void RenderContentRow(ContentDef d) {
             try {
                 ConfigEntryBase show = SRApi.Ctl.FindEntry(Sec, d.Key);
@@ -320,23 +302,20 @@ namespace SR_UCH.Tweaks {
                 GUIContent label = new GUIContent(SRApi.T(d.LabelZh, d.LabelEn), tip);
                 float h = SRApi.Ctl.Sc(26f);
                 GUILayout.BeginHorizontal();
-                // 名称文本可点击：把该内容颜色还原为配置默认色（写盘与调色板状态同步由核心处理）。
                 if (GUILayout.Button(label, SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(150f)), GUILayout.Height(h))) {
                     SRApi.Ctl.ResetColor(color);
                 }
                 if (show != null) SRApi.Ctl.RenderControl(show);
                 GUILayout.Space(SRApi.Ctl.Sc(6f));
-                // 色块：点击展开/收起统一调色板（预览色、写盘时机都由核心负责）。
                 Rect swatch = GUILayoutUtility.GetRect(SRApi.Ctl.Sc(64f), h);
                 SRApi.Ctl.ColorSwatch(swatch, color);
                 GUILayout.FlexibleSpace();
                 GUILayout.EndHorizontal();
-                // 展开时由核心补画调色板：HUD 不再持有任何调色板状态。
                 SRApi.Ctl.ColorPanel(color);
             } catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 内容行", __ex); }
         }
 
-        // 滑块范围注册：字体大小 / 文字不透明度 / 背景透明度 / 警告秒数。
+        // 滑块范围注册：字体大小 / 文字与背景透明度 / 警告秒数。
         private static bool IsKey(ConfigEntryBase e, string key) {
             try { return e != null && e.Definition.Section == Sec && e.Definition.Key == key; } catch { return false; }
         }
@@ -366,7 +345,6 @@ namespace SR_UCH.Tweaks {
             try {
                 SelfReg();
                 ConfigFile cfg = plugin.Config;
-                // 第一页：配置 / 外观 / 行为。
                 _enabled = cfg.Bind(Sec, "Enabled", false, "显示HUD：总开关（默认关闭）。");
                 _fade = cfg.Bind(Sec, "Fade", false, "淡入淡出：HUD 显示/隐藏时平滑过渡。");
                 _showKey = cfg.Bind(Sec, "Show Key", KeyCode.F5, "显示按键：用于显示 HUD 的按键（默认 F5）。");
@@ -381,7 +359,6 @@ namespace SR_UCH.Tweaks {
                     new ConfigDescription("警告秒数（5-60）。", new AcceptableValueRange<int>(5, 60)));
                 _blink = cfg.Bind(Sec, "Blink", false, "闪烁提醒：最后 5 秒倒计时文字闪烁。");
                 _roundNotice = cfg.Bind(Sec, "Round Notice", false, "回合提示：回合数变化时以放大闪烁动画显示当前回合。");
-                // 第二页：显示方案 + 显示内容 + 颜色。
                 _displayMode = cfg.Bind(Sec, "Display Mode", DisplayMode.Inline, "显示方案：平铺（小段横向排列，自动换行，默认）/ 堆叠（每项一行）。");
                 _showPhase = cfg.Bind(Sec, "Show Phase", false, "显示阶段名（默认关闭）。");
                 _colPhase = cfg.Bind(Sec, "Color Phase", "#FFFFFF", "阶段名文字颜色（#RRGGBB）。");
@@ -398,7 +375,7 @@ namespace SR_UCH.Tweaks {
                 _extra2 = cfg.Bind(Sec, "Extra Line 2", "", "额外信息行 2：按原文显示，留空则不显示。");
                 _colExtra2 = cfg.Bind(Sec, "Color Extra 2", "#FFFFFF", "额外信息行 2 文字颜色（#RRGGBB）。");
 
-                // 行扩展点：隐藏颜色/显示方式行、显示方式跟随显示按键行、四个滑块。
+                // 行扩展点：隐藏颜色 / 显示方式行、四个滑块。
                 try { SRApi.RowFilters.Add(RowVisible); } catch (Exception __ex) { SRApi.Guard.Log("HUD 行过滤", __ex); }
                 try { SRApi.RowExtras.Add(RowExtra); } catch (Exception __ex) { SRApi.Guard.Log("HUD 行附加", __ex); }
                 try {
@@ -408,14 +385,12 @@ namespace SR_UCH.Tweaks {
                     SRApi.RowSliders.Add(WarnSlider);
                 } catch (Exception __ex) { SRApi.Guard.Log("HUD 滑块注册", __ex); }
 
-                // 旧版已删除的键：自动从旧 cfg 清理（幂等；原文件由核心备份）。
                 try {
                     SRApi.Migration.Remove(Sec,
                         "Pos X", "Pos Y", "Edge Margin", "Show Scores", "Show Players", "Show Eliminations", "Beep", "Beep Volume",
                         "Phase Notice", "Color Player Panel");
                 } catch (Exception __ex) { SRApi.Guard.Log("HUD 清理旧键", __ex); }
 
-                // 显示键接入核心键位系统（用于按键显示/冲突提示）。
                 try {
                     SRApi.RegisterKey("HUD-显示键", _showKey, "press", delegate {
                         try {
@@ -430,7 +405,6 @@ namespace SR_UCH.Tweaks {
                 SRApi.RegisterTick("HUD", Tick);
                 SRApi.RegisterSceneHook(ResetStateSafe);
 
-                // 常驻对象：只承载 OnGUI 绘制。
                 GameObject go = new GameObject("SR_UCH_HUD");
                 UnityEngine.Object.DontDestroyOnLoad(go);
                 go.AddComponent<HudComponent>();
@@ -442,42 +416,10 @@ namespace SR_UCH.Tweaks {
         }
 
         // ================= 阶段事件 =================
-        // 补丁特性放在 HUD.State.cs 的 OnGameControlEvent() 上（这里原本是一段悬空特性，
-        // 后面没有任何声明，结果被 C# 归给了 ResetGameState —— 见 HUD模块漏洞分析.md P0）。
 
         // ================= 每帧状态 =================
 
-        // 显示按键 + 淡入淡出：设置窗口打开时强制可见（便于拖动/预览）。
-
-
-        // ease-out（t = 1-(1-x)^3）。
-
-        // 内容行依次淡入：每行延迟 20ms，0.2s 完成。
-
-        // 位移动画与 alpha 分离：位移用 0.25s 的独立 ease-out 进度。
-
-
-
-        // 挑战模式叫「重试」（无上限），其它模式叫「回合」（有上限）。
-
-        // 派对模式：只用于「建造阶段不计时」的判断（读不到设置时按非派对处理，保持原行为）。
-
-
-        // 回合进度格式：「回合：当前/最大」。
-        // 游戏里唯一的回合字段是 GameControl.roundNumber（protected；属性 RoundNumber），
-        // 只在 VersusControl.ToPlaceMode（反编译行 144554）/ ChallengeControl（122107）里 ++；
-        // GameState / ScoreKeeper 都没有回合字段（已全量检索）。该值会被场景重载/刷新派对盒额外 +1，
-        // 因此这里只在“观察到回合结算记分板”后接受增量，未确认的增量挂起；并钳制 ≤ MaxRounds。
-
-        // 当前关卡显示名：自定义快照优先用 snapshotName；只有代码时显示「自定义关卡」；否则用本地化关卡名。
-
-        // 关卡/模式行：「关卡名 · 模式」，不带前缀；自定义关卡显示实际快照名。
-
-        // 获胜：取游戏设置的获胜目标分，读不到时用 250。
-
-
-        // 树屋/大厅：只保留标题「大厅」与当前投票关卡；玩家列表随玩家面板一并删除。
-        // 得票最多的关卡传送门（没有票就返回 null）。
+        // 显示按键 + 淡入淡出：设置窗口打开时强制可见。
 
 
 
@@ -485,7 +427,26 @@ namespace SR_UCH.Tweaks {
 
 
 
-        // 挑战模式计时：读游戏 ChallengeControl 的私有字段 runTime / runStarted（反射缓存，读不到返回 -1/false）。
+
+
+
+        // 回合进度格式「回合：当前/最大」；唯一回合字段是 RoundNumber，须只接受结算后的增量并钳制上限。
+
+        // 关卡名：自定义快照优先 snapshotName，只有代码时显示「自定义关卡」。
+
+        // 关卡 / 模式行：「关卡名 · 模式」，不带前缀。
+
+
+
+        // 树屋 / 大厅：只保留标题「大厅」与当前投票关卡。
+
+
+
+
+
+
+
+        // 挑战模式计时：读 ChallengeControl 私有字段（反射缓存，读不到返回 -1/false）。
 
 
 
@@ -493,8 +454,7 @@ namespace SR_UCH.Tweaks {
 
         private static void ResetGameState() {
             _gc = null;
-            // 不清 _phase：HUD 的相位/回合由 Tick 每帧从 GameControl 重读，
-            // 换场景时清零会让 HUD 收起再展开（闪烁）并抹掉正在显示的回合提示。
+            // 不清 _phase：换场景清零会让 HUD 闪烁并抹掉回合提示。
             _phaseStart = 0f;
             _eventSeen = false;
             _timerText = "00:00";
@@ -529,7 +489,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 纯色绘制用白贴图（必须用 GUI.color 着色，不能用 GUI.backgroundColor 乘在深色按钮贴图上）。
+        // 纯色绘制用白贴图，必须用 GUI.color 着色。
         private static void EnsureWhite() {
             if (_white != null) return;
             _white = new Texture2D(1, 1, TextureFormat.RGBA32, false);
@@ -607,7 +567,7 @@ namespace SR_UCH.Tweaks {
             return Mathf.Clamp01((Time.unscaledTime - _lineShownAt[slot]) / LineFadeTime);
         }
 
-        // 只在"从无到有"时淡入（用于每秒变化的倒计时，避免每秒闪一次）。
+        // 只在从无到有时淡入（避免倒计时闪烁）。
         private static float SlotFadeAppear(int slot, string cur) {
             if (slot < 0 || slot >= _lineLast.Length) return 1f;
             string last = _lineLast[slot];
@@ -625,8 +585,6 @@ namespace SR_UCH.Tweaks {
             return baseCol;
         }
 
-        // 平铺模式的分段连接符（「 · 」）。
-        // 平铺小段：文字 + 颜色（宽度在绘制时按样式实测）。
         private static void AddSeg(Color c, string text) {
             if (string.IsNullOrEmpty(text) || _segCount >= _segText.Length) return;
             _segText[_segCount] = text;
@@ -634,7 +592,7 @@ namespace SR_UCH.Tweaks {
             _segCount++;
         }
 
-        // 回合提示：固定大号字 + 颜色交替闪烁 + 末尾淡出，约 1.5 秒（无缩放/位移）。
+        // 回合提示：大号字 + 交替闪烁 + 末尾淡出，约 1.5 秒。
         private static void AddRoundNoticeLine(ref int n, float textA) {
             if (!RoundNoticeOn() || string.IsNullOrEmpty(_roundNoticeText)) return;
             float t = (Time.unscaledTime - _roundNoticeStart) / RoundNoticeDuration;
@@ -653,7 +611,6 @@ namespace SR_UCH.Tweaks {
 
         private static Color WithA(Color c, float a) { return new Color(c.r, c.g, c.b, Mathf.Clamp01(a)); }
 
-        // 四角严格贴边：TL=(0,0)、TR=(W-w,0)、BL=(0,H-h)、BR=(W-w,H-h)；Custom 用运行期拖动位置。
         private static void LayoutPosition(float w, float h, out float x, out float y) {
             float sw = (float)Screen.width;
             float sh = (float)Screen.height;
@@ -674,14 +631,12 @@ namespace SR_UCH.Tweaks {
             y = Mathf.Clamp(y, 0f, Mathf.Max(0f, sh - h));
         }
 
-        // 复用同一个 GUIContent：每帧最多 40 次测量，避免逐次分配（IMGUI 标准做法）。
         private static readonly GUIContent _measureContent = new GUIContent();
         private static float Measure(string text, GUIStyle style) {
             if (string.IsNullOrEmpty(text) || style == null) return 0f;
             try { _measureContent.text = text; return style.CalcSize(_measureContent).x; } catch { return 0f; }
         }
 
-        // 拖动：仅在"设置窗口打开 + Layout=自定义"时允许；只更新运行期位置，不写配置。
         private static void HandleDrag(Rect panel) {
             Event e = Event.current;
             if (e == null) return;

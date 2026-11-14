@@ -1,5 +1,4 @@
 // 关卡 · 自动道具（AutoPartyItem）：派对盒开启后自动挑一个道具。
-// 从 Level.PartyBox.cs 拆出来：那个文件原来同时装着 4 个功能类。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -14,15 +13,12 @@ public class AutoPartyItem : ITweak {
 
     private static System.Reflection.FieldInfo _fPieces;
     private static float _armedAt = -1f;      // 本次开箱开始计时的时刻
-    // "本次开箱"用**光标进入挑选态的次数**做序号，而不是派对盒实例 ID：
-    // 派对盒对象在整个大厅里是同一个实例、一轮一轮反复复用，用实例 ID 记账会让
-    // 第一轮挑过之后"已挑"标记永远为真 —— 表现就是"第一次可以拿，之后都不行"。
+    // 开箱序号取自光标进入挑选态的次数；派对盒实例全大厅复用，用实例 ID 会永远判为已挑。
     private static int _openSeq;
     private static int _pickedSeq = -1;
     private static bool _cursorWasPicking;
     private static float _nextAt = -999f;
-    // 悬停挑选流程：先把本地光标挪到目标道具上（让游戏自己算出 hoveredPick），
-    // 下一拍再调用游戏自己的 tryPickPiece 协程 —— 房主端只认游戏这条链路。
+    // 悬停挑选：先把本地光标挪到目标道具上让游戏算出 hoveredPick，下一拍再走 tryPickPiece。
     private static PartyPickCursor _hpCur;
     private static PickableBlock _hpTarget;
     private static int _hpStage;          // 0=空闲 1=把光标挪到目标上 2=启动协程 3=等待验收
@@ -56,7 +52,7 @@ public class AutoPartyItem : ITweak {
     private static void Tick() {
         try {
             TickHoverPick();   // 挑选流程每帧推进（它自己有节流），不能被下面的 0.15s 轮询挡住
-            // 先做便宜的总开关判断：关闭时不要每帧 FindObjectsOfType（原来在开关判断之前，功能关着也白扫）。
+            // 先判总开关：关闭时不做每帧全场景查找。
             if (_enabled == null || !_enabled.Value) { _armedAt = -1f; return; }
             if (!SRApi.GateMaster) return;
             // 开箱序号：光标从"未挑选"变成"正在挑选"就是新的一次开箱。
@@ -64,7 +60,7 @@ public class AutoPartyItem : ITweak {
             if (seen != null && !_cursorWasPicking) { _openSeq++; _armedAt = -1f; _hpAttempts = 0; }
             _cursorWasPicking = seen != null;
             if (Time.unscaledTime < _nextAt) return;
-            // 派对盒正在刷新/关闭：本帧不动作，避免对着已被销毁的旧盒子取道具（冲突修复）
+            // 派对盒正在刷新/关闭时本帧不动作，避免对已销毁的旧盒取道具。
             if (Time.unscaledTime < LevelPartyBox.BoxBusyUntil) { _armedAt = -1f; return; }
             _nextAt = Time.unscaledTime + 0.15f;   // 轮询节流：不抢游戏自己的逻辑，也不每帧全场景找
 
@@ -85,13 +81,12 @@ public class AutoPartyItem : ITweak {
             if (pieces == null || pieces.Count == 0) return;
             PickableBlock target = Choose(pb, pieces);
             if (target == null) return;
-            // 只在这里标记"本次已挑"，具体成没成由 TickHoverPick 的验收阶段判定
-            // （避免两条日志一真一假、误以为跑了两遍）。
+            // 仅在此标记本次已挑，成败由 TickHoverPick 验收阶段判定（避免重复日志）。
             if (DoPick(cur, target)) _pickedSeq = _openSeq;
         } catch (Exception __ex) { SRApi.Guard.Log("自动道具/轮询", __ex); }
     }
 
-    // 本地玩家自己的派对盒光标：有权威、已启用、正处于挑选状态。
+    // 本地玩家的派对盒光标：有权威、已启用、正处于挑选状态。
     private static PartyPickCursor LocalCursor() {
         try {
             PartyPickCursor[] cursors = SRApi.FrameObjects<PartyPickCursor>();   // 按帧缓存，避免每帧全场景 FindObjectsOfType
@@ -142,13 +137,9 @@ public class AutoPartyItem : ITweak {
         return false;
     }
 
-    // 与游戏 PartyPickCursor.tryPickPiece 完全一致：记下选中的对象 -> 发 PiecePicked -> 冻结并关闭光标。
-    // 严格照抄游戏 PartyPickCursor.tryPickPiece 的**每一步**（顺序也要一致）：
-    //   Picking=false → 记 NetworkpickedPiece → （有权威才）发 PiecePicked → Freeze → Disable()
-    // 之前在房客端失效，就是因为少了 Picking=false 且用了不同的 Disable 重载：
-    // 房主端的校验只认"光标已结束挑选"的状态，状态不对就当作无效挑选丢掉。
-    // 走游戏自己的挑选链路：光标必须先"悬停"在道具上（游戏靠碰撞体算 hoveredPick，
-    // 并从它取 netIdValue）。直接发 PiecePicked 在房客端会被房主判为无效。
+    // 走游戏 tryPickPiece 链路：Picking=false → 记 NetworkpickedPiece →（有权威才）发
+    // PiecePicked → Freeze → Disable()。顺序不可变，否则房主端判为无效挑选。
+    // 故光标须先悬停在道具上：游戏靠碰撞体算 hoveredPick，并从中取 netIdValue。
     private static bool DoPick(PartyPickCursor cur, PickableBlock target) {
         try {
             if (cur == null || target == null) return false;
@@ -157,18 +148,15 @@ public class AutoPartyItem : ITweak {
         } catch (Exception __ex) { SRApi.Guard.Log("自动道具/启动悬停挑选", __ex); return false; }
     }
 
-    // 每帧推进挑选流程。优先"直接选择"（把目标写进 hoveredPick 后**同一瞬间**启动协程，
-    // 中间不留任何等待，游戏没机会把它清掉）；失败才退回复刻手动挑选（挪光标让物理自己算悬停）。
-    //
-    // 以前"直接写字段"不生效的原因：写完等了一拍再启动协程，中间跑了一个物理帧，
-    // 光标没压在道具上 → OnTriggerExit2D → ClearHoverPick 把字段清成了 null。
+    // 每帧推进：优先直接写 hoveredPick 并同栈启动协程，失败才复刻手动挑选。
+    // 写完必须同栈启动协程：中间跑物理帧会触发 OnTriggerExit2D 清掉 hoveredPick。
     private static void TickHoverPick() {
         try {
             if (_hpStage == 0 || _hpCur == null || _hpTarget == null) return;
             if (Time.unscaledTime < _hpAt) return;
 
             if (_hpStage == 1) {
-                // 直接选择：清残留 → 写悬停 → 立刻启动协程（同一调用栈内）。
+                // 直接选择：清残留 → 写悬停 → 同栈启动协程。
                 bool started = false;
                 try { _hpCur.NetworkpickedPiece = null; } catch (Exception __cp) { SRApi.Guard.Log("自动道具/清挑选记录", __cp); }
                 System.Reflection.FieldInfo hp = null;
@@ -245,7 +233,7 @@ public class AutoPartyItem : ITweak {
         _hpMoved = false;
     }
 
-    // 兜底：与以前相同的直接发消息（仅当反射拿不到协程时）
+    // 兜底：直接发 PiecePicked，仅当反射拿不到协程时。
     private static void FallbackSendPick(PartyPickCursor cur, PickableBlock target) {
         try {
             if (cur == null || target == null) return;

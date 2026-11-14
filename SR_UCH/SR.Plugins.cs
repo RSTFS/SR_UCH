@@ -1,4 +1,4 @@
-// 外部插件管理页。扫描 plugins 目录下的插件和语言包 DLL，负责禁用 / 启用 / 记住状态。
+// 外部插件管理页：扫描插件与语言包 DLL，负责禁用 / 启用 / 记住状态。
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -12,7 +12,7 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
 public partial class SR {
 
-// 分区：Plugins（外部插件管理：扫描 / 禁用 / 启用 / 持久化）
+// 分区：Plugins（扫描 / 禁用 / 启用 / 持久化）
 
         private class PluginEntry {
             public string guid;
@@ -22,7 +22,7 @@ public partial class SR {
             public string path;   // 程序集路径：外部 DLL 来源必须可见
         }
 
-        //外部插件的禁用状态（持久化在配置项 DisabledPlugins 中）。
+        // 禁用状态，持久化在配置项 DisabledPlugins。
         private static readonly Dictionary<string, bool> _extDisabled = new Dictionary<string, bool>();
 
 
@@ -31,12 +31,11 @@ public partial class SR {
             return _extDisabled.TryGetValue(guid, out v) && v;
         }
 
-        //设置页不渲染原始的禁用 GUID 字符串条目（改由顶部按钮清单呈现）。
+        // 设置页不显示禁用 GUID 条目（改由顶部按钮清单呈现）。
         private static bool SettingsHiddenDisabledPlugins(ConfigEntryBase e) {
             return !(e.Definition.Section == Keys.Settings && e.Definition.Key == Keys.DisabledPlugins);
         }
 
-        //窗口宽高 / XY 配置项仅用于持久化，不在设置页显示（窗口可直接拖动缩放与移动）。
         private static bool SettingsHiddenWindowGeometry(ConfigEntryBase e) {
             if (e.Definition.Section != Keys.Settings) return true;
             string k = e.Definition.Key;
@@ -50,7 +49,7 @@ public partial class SR {
             return null;
         }
 
-        //该 GUID 对应插件的程序集，供按程序集认领补丁的兜底解绑；取不到返回 null。
+        // 取插件程序集供兜底解绑；取不到返回 null。
         private static Assembly AssemblyOf(string guid) {
             try {
                 PluginEntry p = EntryByGuid(guid);
@@ -59,8 +58,7 @@ public partial class SR {
             return null;
         }
 
-        //判断补丁是否属于该插件：owner 等于 GUID，或 PatchMethod 所在程序集等于该插件程序集。
-        //不认领 SR_UCH 自身程序集，避免误删本 mod 的补丁。
+        // 补丁归属：owner 等于 GUID，或 PatchMethod 所在程序集等于插件程序集；不认领本 mod。
         private static bool PatchOwnedBy(HarmonyLib.Patch patch, string guid, Assembly target, Assembly mine) {
             try {
                 if (patch == null) return false;
@@ -75,8 +73,7 @@ public partial class SR {
             } catch { return false; }
         }
 
-        //撤销该插件的全部 Harmony 补丁：先按 ID，再扫描补丁表按 owner / 程序集兜底解绑。
-        //解绑共用一份静态 Harmony 实例。
+        // 撤销该插件全部补丁：先按 ID，再按 owner / 程序集兜底解绑。
         private static HarmonyLib.Harmony _unpatcher;
         private static void UnpatchPlugin(string guid) {
             Guard.Try("撤销外部插件补丁(UnpatchID): " + guid, () => HarmonyLib.Harmony.UnpatchID(guid));
@@ -97,7 +94,7 @@ public partial class SR {
         }
 
         private static void DisablePlugin(PluginEntry p) {
-            //所有插件同挂在一个 BepInEx_Manager 物体上，只能关本插件自身组件，不可遍历该物体的全部组件。
+            // 所有插件同挂在一个 BepInEx_Manager 上，只能关本组件，勿遍历其全部组件。
             if (p.instance != null) p.instance.enabled = false;
             UnpatchPlugin(p.guid);
         }
@@ -105,7 +102,7 @@ public partial class SR {
         private static void EnablePlugin(PluginEntry p) {
             if (p.instance != null) {
                 p.instance.enabled = true; //只开本插件自身组件
-                //先解绑再 PatchAll（解绑幂等），否则会重复打上未被清掉的补丁。
+                // 先解绑再 PatchAll，否则会重复打补丁。
                 UnpatchPlugin(p.guid);
                 try {
                     new HarmonyLib.Harmony(p.guid).PatchAll(p.instance.GetType().Assembly);
@@ -113,7 +110,6 @@ public partial class SR {
             }
         }
 
-        //外部插件默认启用：配置项只记录用户手动禁用的 GUID。
         private static void SaveEnabledPlugins() {
             List<string> list = new List<string>();
             foreach (var kv in _extDisabled) {
@@ -123,7 +119,7 @@ public partial class SR {
             MarkConfigDirty(_disabledPluginsEntry.ConfigFile); //交给 SR.FlushConfig 节流落盘
         }
 
-        //插件扫描后执行一次：启用全部外部 mod，仅保持持久化禁用列表中记录的插件为禁用。
+        // 扫描后执行一次：仅禁用持久化列表中的插件。
         private static void ApplyDisabledPlugins() {
             if (_appliedDisabled) return;
             _appliedDisabled = true;
@@ -135,7 +131,6 @@ public partial class SR {
                 }
             }
             bool changed = false;
-            //清理已卸载插件的 GUID
             foreach (string g in new List<string>(disabledSet)) {
                 if (!Chainloader.PluginInfos.ContainsKey(g)) { disabledSet.Remove(g); changed = true; }
             }
@@ -166,8 +161,7 @@ public partial class SR {
             return _externalPlugins.Count > 0 ? _externalPlugins[0] : null;
         }
 
-        //设置页顶部的插件清单：每行 = 启用/禁用按钮 + 插件名（悬停显示 GUID）。
-        // 外部插件程序集路径（来源可见性：设置页悬停显示）。
+        // 插件程序集路径（设置页悬停显示来源）。
         private static string SafeAssemblyPath(BaseUnityPlugin p) {
             try { return p != null && p.GetType().Assembly != null ? p.GetType().Assembly.Location : ""; }
             catch { return ""; }
@@ -177,7 +171,6 @@ public partial class SR {
             try {
                 if (_externalPlugins.Count == 0) return;
                 GUILayout.Label(T("- 外部插件（运行时启用/禁用）-", "- External plugins (enable/disable at runtime) -"), _secHeader);
-                //按可用宽度自动换行
                 WrapLabel(T("禁用会立刻卸载该插件的 Harmony 补丁并停掉它，重启后保持；启用会重新应用补丁。",
                             "Disabling unpatches and stops the plugin immediately and persists after a restart; enabling re-applies its patches."));
                 GUILayout.Space(Sc(2));
@@ -205,13 +198,8 @@ public partial class SR {
         }
 
 
-        // ============================================================
         // 分区：补丁归因（谁改了同一个游戏方法）
-        // 目的：自检只能证明"我们的目标存在"，不能证明"别人也在改同一个方法"。
-        // 这里用 Harmony 自带的全局补丁表，把每个被改方法的补丁按"声明程序集"分组，
-        // 分出"我们 / 其它 mod"，并把其它 mod 还原成 GUID+版本（经 Chainloader 查表）。
-        // 只读查询，不改任何补丁；扫描推迟到启动 3 秒后（等其它插件打完补丁）。
-        // ============================================================
+        // 只读扫描 Harmony 全局补丁表，分出本模组与其它 mod；启动 3 秒后开始。
 
         private sealed class SharedMethodInfo {
             public string Signature;
@@ -245,7 +233,7 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("补丁归因 Tick", __ex); }
         }
 
-        // 把程序集还原成"插件名 版本"；查不到就退回程序集名。结果缓存（同一程序集只算一次）。
+        // 程序集 → 「插件名 版本」；查不到退回程序集名。结果按程序集缓存。
         private static string ModLabel(Assembly asm) {
             if (asm == null) return "?";
             string hit;
@@ -350,7 +338,6 @@ public partial class SR {
             }
         }
 
-        // 供诊断页与报告使用：多行文本。
         internal static string AttributionReport() {
             try {
                 if (!_attrDone) return "";

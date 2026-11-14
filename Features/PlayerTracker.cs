@@ -1,5 +1,5 @@
 // 玩家移动轨迹：在玩家身后画一条轨迹线（移植自 UCHPlayerTrackerMod）。
-// 自行创建常驻 GameObject + TrackerComponent 驱动，不走核心的页面/Register 机制。
+// 自建常驻 GameObject + TrackerComponent 驱动，不走核心的页面/Register 机制。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -7,26 +7,23 @@ using GameEvent;
 using UnityEngine;
 
 namespace SR_UCH.Tweaks {
-    // 玩家移动轨迹线：在每位玩家身后绘制一条轨迹。
     [SrFeature("sr.playertracker", "PlayerTracker", "1.0")]
     public class PlayerTracker : ITweak {
-        private static IFeatureHost _mp;   // 只用来读 Config（契约类型）
+        private static IFeatureHost _mp;   // 只用来读 Config
         private static ConfigEntry<int> _trackingLength;
         private static ConfigEntry<int> _skipFrames;
         private static ConfigEntry<float> _lineWidthStart;
         private static ConfigEntry<float> _lineWidthEnd;
         private static ConfigEntry<float> _teleportThreshold;
-        private static ConfigEntry<float> _alpha;      // 轨迹透明度
-        // 运行期开关：游戏内管理器同时也可改。
+        private static ConfigEntry<float> _alpha;      // 透明度
+        // 运行期开关：游戏内管理器也可改。
         public static bool Enabled = true;
 
-        // 透明度取值辅助（异常/未绑定 -> 1）。
         public static float Alpha() {
             try { return _alpha != null ? Mathf.Clamp(_alpha.Value, 0.05f, 1f) : 1f; }
             catch { return 1f; }
         }
-        // 以下取值一律 Clamp：AcceptableValueRange 只约束 UI，手改的 cfg 仍会返回超范围值；
-        // 负数线宽会让 LineRenderer 异常，负轨迹长度会让队列被立刻丢空。
+        // 以下一律 Clamp：AcceptableValueRange 只约束 UI，手改的 cfg 仍可能超范围（负线宽会让渲染异常）。
         public static int TrackingLength() {
             try { return _trackingLength != null ? Mathf.Clamp(_trackingLength.Value, 10, 3000) : 120; }
             catch { return 120; }
@@ -52,7 +49,7 @@ namespace SR_UCH.Tweaks {
             public Queue<Vector3> queue = new Queue<Vector3>();
             public LineRenderer renderer;
             public GameObject go;
-            // 最近一个记录点：Queue<T> 的 Last() 是 O(n) 遍历，入队时顺手记住。
+            // 最近记录点：Queue<T>.Last() 是 O(n) 遍历，入队时顺手记住。
             public Vector3 lastPos;
             public bool hasLastPos;
         }
@@ -67,11 +64,11 @@ namespace SR_UCH.Tweaks {
         private static readonly Dictionary<int, GamePlayer> _gpByIndex = new Dictionary<int, GamePlayer>();
         private static readonly Dictionary<int, LobbyPlayer> _lpByIndex = new Dictionary<int, LobbyPlayer>();
 
-        private static GameEvent.IGameEventListener _levelResetListener;   // 关机时注销用
+        private static GameEvent.IGameEventListener _levelResetListener;   // 关机时注销
 
         private class LevelResetListener : GameEvent.IGameEventListener {
             public void handleEvent(GameEvent.GameEvent e) {
-                // 事件回调抛异常会冒到 GameEventManager 并影响同链其它监听器，故只记日志。
+                // 事件回调抛异常会冒到 GameEventManager 影响同链监听器，故只记日志。
                 try {
                     ClearLines();
                 } catch (Exception __ex) { SRApi.Guard.Log("移动轨迹：关卡重置清理", __ex); }
@@ -84,7 +81,6 @@ namespace SR_UCH.Tweaks {
             private void FixedUpdate() {
                 if (!_linesReady()) return;
                 bool eff = Enabled && SRApi.GateMaster;
-                // 只在显示状态变化时 SetActive。
                 if (eff != _lastEff) {
                     _lastEff = eff;
                     foreach (LineInfo li in _lines) {
@@ -95,16 +91,15 @@ namespace SR_UCH.Tweaks {
                 if (!eff) return;
                 if (framesLeft > 0) { framesLeft--; return; }
                 framesLeft = SkipFrames();
-                // 每个玩家各自一个 try：出错只跳过该玩家（下帧重试），并经 SRApi.Guard.Log 去重记录。
+                // 每个玩家各自 try：出错只跳过该玩家（下帧重试）并经 Guard.Log 去重记录。
                 foreach (PlayerLine pl in GetPlayers()) {
                   try {
                         Vector3 pos = pl.character.transform.position;
-                        // 异常坐标过滤：与上一记录点距离超过阈值（瞬移/角色消失）则清空重来，避免拖出贯穿全图的长线。
+                        // 异常坐标过滤：与上一记录点距离超阈值（瞬移/角色消失）即清空重来，避免贯穿全图的长线。
                         float threshold = TeleportThreshold();
                         if (pl.line.hasLastPos) {
                             float d = Vector3.Distance(pl.line.lastPos, pos);
                             if (d > threshold) {
-                                // 只置 positionCount = 0，不重新分配数组
                                 pl.line.queue.Clear();
                                 pl.line.hasLastPos = false;
                                 pl.line.renderer.positionCount = 0;
@@ -115,12 +110,11 @@ namespace SR_UCH.Tweaks {
                         pl.line.lastPos = pos;
                         pl.line.hasLastPos = true;
                         while (pl.line.queue.Count > TrackingLength()) pl.line.queue.Dequeue();
-                        // 逐点 SetPosition 写入，避免每帧 queue.ToArray() 分配。
+                        // 逐点 SetPosition，避免每帧分配
                         ApplyPositions(pl.line);
                   } catch (Exception e) {
-                        // PlayerLine 是结构体，不能与 null 比较，只判 character
                         SRApi.Guard.Log("轨迹更新 " + (pl.character != null ? pl.character.name : "?"), e);
-                        try { ClearLine(pl.line); } catch { /* 静默：非关键路径，失败可直接忽略 */ }   // 出错的玩家本帧不画，下帧重试
+                        try { ClearLine(pl.line); } catch { /* 静默：非关键路径，失败可直接忽略 */ }   // 本帧不画，下帧重试
                   }
                 }
             }
@@ -130,8 +124,8 @@ namespace SR_UCH.Tweaks {
 
         private static void SelfReg() {
             SRApi.LocSec("Player Tracker", "移动轨迹", null);
-            SRApi.Nav("Player Tracker", 10); // 侧栏顺序 20
-            // 每个栏目自己声明自己的页面：缺了它只会靠核心兜底分支成页，外部模块无法替换这一页。
+            SRApi.Nav("Player Tracker", 10); // 侧栏顺序
+            // 每个栏目自声明页面：缺了会靠核心兜底分支成页，外部模块无法替换。
             SRApi.RegisterPage("Player Tracker", Render);
             SRApi.LocKey("Player Tracker", "Tracking Length", "轨迹长度", null);
             SRApi.LocDesc("Player Tracker", "Tracking Length", "轨迹长度\n记录多少帧的历史位置\n范围 10-3000，60 帧约 1 秒", "Trail length\nhow many frames of history are kept\nrange 10-3000; 60 frames is about 1 second");
@@ -147,7 +141,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc("Player Tracker", "Enabled", "玩家轨迹\n在画面上绘制其他玩家的移动轨迹\n仅显示，不影响游戏判定", "Player trails\ndraws other players' movement trails\ndisplay only; gameplay unaffected");
         }
 
-        // 本页内容 = 该段的条目列表。
         private static void Render() {
             try {
                 List<ConfigEntryBase> list = SRApi.SectionEntries("Player Tracker");
@@ -156,7 +149,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("渲染移动轨迹页", __ex); }
         }
 
-        // 初始化需整段 try：中途抛异常会留下 DontDestroyOnLoad 的常驻对象，且功能静默消失。
+        // 初始化需整段 try：中途抛异常会留下 DontDestroyOnLoad 常驻对象且功能静默消失。
         public void Initialize(IFeatureHost plugin) {
           try {
             SelfReg();
@@ -203,26 +196,22 @@ namespace SR_UCH.Tweaks {
             // 宽度只在 CreateLine 里读一次，配置变更时需刷新已存在的线。
             _lineWidthStart.SettingChanged += (s, e) => ApplyWidths();
             _lineWidthEnd.SettingChanged += (s, e) => ApplyWidths();
-            // 透明度逐帧写进 renderer，无需订阅配置变更。
 
-            // 常驻对象：承载逐帧更新与所有轨迹线
             GameObject go = new GameObject("SR_UCHPlayerTracker");
             UnityEngine.Object.DontDestroyOnLoad(go);
             go.AddComponent<TrackerComponent>();
 
             _trackerRoot = go;
-            // 行池按需增长，支持超过 8 人。
             EnsureCapacity(8);
 
-            // 保留监听器引用：关机时要注销，否则重载模组/重新 Initialize 会重复订阅（audit 21-P0-2）。
+            // 保留监听器引用：关机时注销，否则重载/重新 Initialize 会重复订阅。
             _levelResetListener = new LevelResetListener();
             GameEventManager.ChangeListener<GameEvent.LevelResetEvent>(_levelResetListener, true);
-            // 关机时销毁常驻对象与材质（功能关闭时也走同一条清理，避免 DontDestroyOnLoad 残留）。
+            // 关机时销毁常驻对象、材质并注销监听，避免 DontDestroyOnLoad 残留。
             SRApi.OnShutdown("移动轨迹", delegate {
                 try {
                     if (_trackerRoot != null) { UnityEngine.Object.Destroy(_trackerRoot); _trackerRoot = null; }
                     if (_lineMat != null) { UnityEngine.Object.Destroy(_lineMat); _lineMat = null; }
-                    // 注销事件监听（audit 21-P0-2）。
                     try {
                         if (_levelResetListener != null) {
                             GameEventManager.ChangeListener<GameEvent.LevelResetEvent>(_levelResetListener, false);
@@ -240,7 +229,7 @@ namespace SR_UCH.Tweaks {
             foreach (LineInfo li in _lines) ClearLine(li);
         }
 
-        // 把队列里的点写进 LineRenderer：逐点 SetPosition，避免每帧分配。
+        // 把队列点写进 LineRenderer：逐点 SetPosition，避免每帧分配。
         private static void ApplyPositions(LineInfo line) {
             int n = line.queue.Count;
             line.renderer.positionCount = n;
@@ -249,7 +238,6 @@ namespace SR_UCH.Tweaks {
             foreach (Vector3 v in line.queue) line.renderer.SetPosition(i++, v);
         }
 
-        // 把当前宽度设置应用到已创建的线（配置变更时调用）。
         private static void ApplyWidths() {
             if (_lines == null) return;
             foreach (LineInfo li in _lines) {
@@ -266,8 +254,7 @@ namespace SR_UCH.Tweaks {
             if (line.renderer != null) line.renderer.positionCount = 0;
         }
 
-        // networkNumber 直接当槽位下标时，索引不连续会撑出大量空 LineRenderer。
-        // 游戏最多 4 名玩家，这里给到 8 的上限即可（audit 21-P0-3）。
+        // networkNumber 当槽位下标时索引不连续会撑出大量空 LineRenderer，故设上限。
         private const int MaxTrackedPlayers = 8;
 
         private static void EnsureCapacity(int count) {
@@ -277,21 +264,21 @@ namespace SR_UCH.Tweaks {
             int old = _lines == null ? 0 : _lines.Length;
             if (old > 0) Array.Copy(_lines, arr, old);
             for (int i = old; i < target; i++) {
-                // 着色器缺失（已告警）时不再重试，槽位保持 null；消费点均已判空。
+                // 着色器缺失时不再重试，槽位为 null（消费点均已判空）
                 if (_shaderMissingWarned) { arr[i] = null; continue; }
                 arr[i] = CreateLine(i);
             }
             _lines = arr;
         }
 
-        // 所有轨迹线共用一个材质，避免逐条创建导致泄漏。
+        // 所有轨迹线共用一个材质，避免逐条创建泄漏。
         private static Material _lineMat;
 
         private static bool _shaderMissingWarned;
 
         private static LineInfo CreateLine(int i) {
-            // 先取材质再建对象：Shader.Find 在裁剪过的构建里可能返回 null，new Material(null) 会抛异常，
-            // 若发生在建对象之后会留下永久残留的 DontDestroyOnLoad 对象。逐级回退，全失败则返回 null 并只告警一次。
+            // 先取材质再建对象：new Material(null) 会抛异常，发生在建对象之后会留下永久残留对象。
+            // 逐级回退，全失败返回 null 并只告警一次；先取材质再建对象防残留。
             if (_lineMat == null) {
                 Shader sh = Shader.Find("Sprites/Default");
                 if (sh == null) sh = Shader.Find("UI/Default");
@@ -321,13 +308,12 @@ namespace SR_UCH.Tweaks {
             LobbyManager lm = LobbyManager.instance;
             if (lm == null) yield break;
             if (lm.CurrentGameController != null) {
-                // 复用字典避免每帧分配；行池按最大玩家索引增长。
                 _gpByIndex.Clear();
                 int need = 0;
                 foreach (GamePlayer gp in lm.CurrentGameController.CurrentPlayerQueue) {
                     if (gp == null) continue;
                     int idx = gp.networkNumber - 1;
-                if (idx < 0 || idx >= MaxTrackedPlayers) continue;   // 见 MaxTrackedPlayers 注释（audit 21-P0-3）
+                if (idx < 0 || idx >= MaxTrackedPlayers) continue;   // 见 MaxTrackedPlayers
                     if (idx < 0) continue;
                     _gpByIndex[idx] = gp;
                     if (idx + 1 > need) need = idx + 1;
@@ -348,7 +334,7 @@ namespace SR_UCH.Tweaks {
                 foreach (LobbyPlayer lp in lm.GetLobbyPlayers()) {
                     if (lp == null) continue;
                     int idx = lp.networkNumber - 1;
-                if (idx < 0 || idx >= MaxTrackedPlayers) continue;   // audit 21-P0-3
+                if (idx < 0 || idx >= MaxTrackedPlayers) continue;   // 同 MaxTrackedPlayers
                     if (idx < 0) continue;
                     _lpByIndex[idx] = lp;
                     if (idx + 1 > need) need = idx + 1;

@@ -1,5 +1,5 @@
-// 入口（BepInEx 插件）：配置外置到 SR_UCH_data.cfg；反射发现并初始化全部 ITweak；扫描外部
-// 功能 / 语言包 DLL；注册 SR_UCH 程序集解析。本文件定义统一契约 ITweak。
+// 入口（BepInEx 插件）：配置外置到 SR_UCH_data.cfg；反射发现并初始化全部 ITweak；
+// 扫描外部功能 / 语言包 DLL；注册程序集解析；定义统一契约 ITweak。
 using System;
 using UnityEngine;
 using BepInEx.Configuration;
@@ -12,41 +12,36 @@ using BepInEx.Logging;
 using SR_UCH.Tweaks;
 
 namespace SR_UCH {
-    // 单一真值：插件声明与 SR.Core.EnsureScanned 必须比对同一个字符串，否则漏改不报错。
-    // 用 const 是要求编译期内联；SR.ApiVersion 用 static readonly 恰恰相反（避免被外部模块内联）。
+    // 单一真值：插件声明与 SR.Core.EnsureScanned 必须比对同一字符串；用 const 要求编译期内联。
     [BepInPlugin(PluginGuid, "SR_UCH", "1.0.0")]
-    // IFeatureHost 由契约文件提供；BaseUnityPlugin.Config / .Logger 已满足它。
+    
     public class MainPlugin : BaseUnityPlugin, IFeatureHost {
         public const string PluginGuid = "com.rs.SR_UCH";
 
         public static ManualLogSource ModLogger;
 
-        // IFeatureHost：Config 由 BaseUnityPlugin.Config 隐式满足；Logger 基类不是 public，显式实现。
+        
         ManualLogSource IFeatureHost.Logger { get { return Logger; } }
 
-        // 已处理过的外部程序集（按 FullName）：同一份 DLL 只初始化一次。
+        // 已处理过的外部程序集：同一份 DLL 只初始化一次。
         private static readonly HashSet<string> _extSeen = new HashSet<string>();
 
-        // 配置外置：所有 Bind 落到这个独立文件，插件自己的 cfg 保持为空，
-        // ConfigurationManager 等配置浏览器就列不出 SR_UCH 的任何条目。
+        // 配置外置：所有 Bind 落到这个文件，插件自己的 cfg 保持为空。
         public static BepInEx.Configuration.ConfigFile Data;
 
-        // 进程退出 / 模组被销毁：执行功能登记的关机回调（R2 的可选出口）。
-        // 不在这里 Unpatch：Harmony 的补丁表随程序集卸载，强行 UnpatchAll 反而可能打断
-        // 正在退出的游戏对象；回调负责的只是"我们自己创建的对象与订阅"。
+        // 进程退出 / 模组销毁：执行功能登记的关机回调。不要在这里 Unpatch：补丁表随程序集卸载，强拆会打断退出流程。
         private void OnDestroy() {
             try { SR.NetShutdown(); } catch (Exception __ns) { SRApi.Guard.Log("联机握手/注销", __ns); }
             try { SR.RunShutdowns(); } catch (Exception __sd) { try { ModLogger.LogWarning("[SR] 关机回调执行失败: " + __sd.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         }
 
         public void Awake() {
-            // ModLogger 必须是本方法第一条语句：下面的步骤与其 catch 内的日志都依赖它。
+            // 必须是本方法第一条语句：后续步骤与其 catch 内的日志都依赖它。
             ModLogger = Logger;
-            // 顶层兜底（评审 P0-E）：任何一步抛异常以前都会让整个模组"静默不启动"，而 BepInEx 仍显示已加载。
-            // 这里失败也必须留下一条 ERROR + 一条可 grep 的标记行，并把已完成的阶段记清楚。
+            // 顶层兜底：任何一步异常都不能让模组"静默不启动"，失败须留可 grep 的标记行。
             string stage = "start";
             try {
-                // 启动阶段计时（自检页/诊断报告/日志各留一份）：慢启动时能直接看出卡在哪个阶段。
+                // 启动阶段计时：慢启动时看出卡在哪个阶段。
                 System.Text.StringBuilder __boot = new System.Text.StringBuilder();
                 System.Diagnostics.Stopwatch __sw = System.Diagnostics.Stopwatch.StartNew();
                 System.Action<string, System.Action> __run = (nm, act) => {
@@ -58,15 +53,13 @@ namespace SR_UCH {
                 __run("PatchOwnConfigFile", PatchOwnConfigFile);
                 __run("SetupStandaloneConfig", SetupStandaloneConfig);
                 __run("MigrateLegacyConfigNames", MigrateLegacyConfigNames);
-                // 程序集解析：外部功能 / 语言包 DLL 只引用 SR_UCH.dll（不引用 BepInEx），全局注册一次。
+                // 程序集解析：外部 DLL 只引用 SR_UCH.dll，全局注册一次。
                 __run("AssemblyResolve", delegate { AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve; });
                 __run("InjectApiSinks", InjectApiSinks);
                 __run("InitializeTweaks", delegate { InitializeTweaks(); });
-                    // 外部功能 DLL / 语言包 DLL：一个 DLL 一个功能（ITweak）或一门语言（ILanguagePack）；
-                // 放在本程序集扫描与 EX 之后（EX 的硬编码路径不受影响）。
+                    // 外部功能 / 语言包 DLL：一个 DLL 一个功能或一门语言。
                 __run("LoadExternal", LoadExternal);
-                // 装配完成后补扫一轮 ITweak（audit P0-1）：EX / 外部 DLL 若漏在 ExLoader 的反射路径之外，
-                // 还能被主扫描发现并初始化；EX 自己做了幂等，两条路都走也只初始化一次。
+                // 装配完成后补扫一轮 ITweak；EX 自身幂等。
                 __run("InitializeTweaks(late)", delegate { InitializeTweaks(true); });
                 __run("RebuildFeatureManifest", RebuildFeatureManifest);   // 含功能清单登记 + 启动自检 + 自检日志
                 __run("NetHandshake", SR.NetInit);   // 联机版本/功能握手（纯提示，不改游戏状态）
@@ -80,9 +73,8 @@ namespace SR_UCH {
             }
         }
 
-        // 配置外置补丁：需显式注册（CreateAndPatchAll 不递归发现独立类型），失败只记日志。
+        // 需显式注册补丁（CreateAndPatchAll 不递归发现独立类型），失败只记日志。
         private void PatchOwnConfigFile() {
-            // PatchOwnConfigFile 需显式注册（CreateAndPatchAll 不递归发现独立类型），失败只记日志。
             try { HarmonyLib.Harmony.CreateAndPatchAll(typeof(PatchOwnConfigFile)); }
             catch (Exception __pf) { try { ModLogger.LogWarning("配置外置补丁(PatchOwnConfigFile)注册失败: " + __pf.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
 
@@ -90,7 +82,7 @@ namespace SR_UCH {
 
         // 独立配置文件（旧 cfg 自动迁移）+ 插件 Config 后备字段指向它。
         private void SetupStandaloneConfig() {
-            // 独立配置文件（旧 cfg 自动迁移）
+
             try {
                 string __dir = BepInEx.Paths.ConfigPath;
                 string __newF = System.IO.Path.Combine(__dir, "SR_UCH_data.cfg");
@@ -101,7 +93,7 @@ namespace SR_UCH {
                     else if (System.IO.File.Exists(__oldB)) { System.IO.File.Copy(__oldB, __newF); ModLogger.LogInfo("[配置] 已迁移 com.gamingbeast.SR_UCH.cfg -> SR_UCH_data.cfg"); }
                 }
                 Data = new BepInEx.Configuration.ConfigFile(__newF, true);
-                // 把插件 Config 的后备字段直接指向本文件：只补 get_Config 不够，BepInEx 自身保存路径也走这里。
+                // 把 Config 后备字段指向本文件：BepInEx 自身保存也走这里。
                 try {
                     System.Reflection.FieldInfo __cf = typeof(BepInEx.BaseUnityPlugin).GetField("<Config>k__BackingField",
                         System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
@@ -112,9 +104,8 @@ namespace SR_UCH {
 
         }
 
-        // 在任何 Bind 之前把旧 GUID 的 cfg 复制成新名字（GUID 改名导致文件名变化）。
+        // 在任何 Bind 之前把旧 GUID 的 cfg 复制成新名字。
         private void MigrateLegacyConfigNames() {
-            // 在任何 Bind 之前把旧 GUID 的 cfg 复制成新名字（GUID 改名导致文件名变化）。
             try {
                 string __cfgDir = BepInEx.Paths.ConfigPath;
                 string __oldCfg = System.IO.Path.Combine(__cfgDir, "com.gamingbeast.SR_UCH.cfg");
@@ -126,9 +117,9 @@ namespace SR_UCH {
             } catch (Exception __mig) { try { ModLogger.LogWarning("配置迁移失败: " + __mig.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         }
 
-        // 契约层 API 门面的全部 sink：漏注入会让对应功能静默失效。
+        // 契约层 API 门面的全部 sink：漏注入会让功能静默失效。
         private void InjectApiSinks() {
-            // 契约层 API 门面的日志出口：接到本插件的日志系统。
+            
             SinkStep("Log", delegate () {
                 SRApi.SetLogSinks(
                     delegate (string __m) { SR.LogInfo(__m); },
@@ -139,7 +130,7 @@ namespace SR_UCH {
                 SRApi.SetCloseMenuSink(delegate { SR.CloseMenuExternal(); });
                 SRApi.SetOpenMenuSink(delegate { SR.OpenMenuExternal(); });
             });
-            // 线程契约检查：只有诊断模式打开时才启用（默认零成本），越线程访问静态集合会记一次警告。
+            // 线程契约检查：仅诊断模式启用，越线程访问静态集合记一次警告。
             SinkStep("MainThread", delegate () {
                 SR_UCH.MainThread.Enable(false);   // 线程契约检查默认关（零成本）
             });
@@ -155,7 +146,7 @@ namespace SR_UCH {
                     delegate (string __m, string __f) { SR.RefOverride(__m, __f); });
             });
             SinkStep("Ctl/Table sinks", delegate () {
-                // 契约层给外部 DLL 预留的控件/表格 sink：内部实现一直都在，只是从没注入过。
+                // 契约层给外部 DLL 预留的控件 / 表格 sink。
                 SRApi.SetTableActionColumnWidthSink(delegate (SRApi.TableAction[] __a) { return SR.Ctl.TableActionColumnWidth(__a); });
                 SRApi.SetTableColMoveSink(delegate (Event __e, Rect __c, int __ci, int __k, List<int> __cols, Vector2 __mp, bool __inBox,
                     List<Rect> __hc, int[] __ord, Action<int[]> __apply, Action __save, Action<int> __click,
@@ -189,7 +180,7 @@ namespace SR_UCH {
                 });
             });
             SinkStep("Section", delegate () {
-                // 可折叠分区：契约层两处门面都接上（顶层 SRApi 与 Ctl 子门面各自持有委托字段）。
+                
                 SRApi.WireSection(SR.SectionBegin, SR.SectionEnd);
                 SRApi.Ctl.WireSection(SR.SectionBegin, SR.SectionEnd);
             });
@@ -271,7 +262,7 @@ namespace SR_UCH {
                     delegate (ConfigFile __c) { SR.Ctl.MarkConfigDirty(__c); },
                     delegate { return SR.Ctl.LangEn; },
                     delegate { return SR.Ctl.EditOpen; });
-                // 统一复选框：EX 与功能层的勾选控件都走核心实现（外观与设置页一致）。
+                
                 SRApi.Ctl.SetCheckboxSink(delegate (Rect __r, bool __v, string __tip) { return SR.Ctl.CheckboxAt(__r, __v, __tip); });
             });
             SinkStep("Ui", delegate () {
@@ -338,11 +329,9 @@ namespace SR_UCH {
                     delegate (Func<bool> __f) { SR.RegisterPauseProvider(__f); },
                     delegate (string __s, Action __d) { SR.RegisterTabPrefix(__s, __d); });
             });
-                // P0-1：API 通道自检 —— 漏注入的 sink 会让对应功能静默失效，这里必须报错。
+                // API 通道自检：漏注入会让功能静默失效，必须报错。
                 string[] __miss = SRApi.MissingSinks();
-                // 有一批通道由 UI 初始化时注入（ManagerUI.Initialize），本自检跑在它之前，
-                // 那时必然是空的 —— 直接报 Error 会误导成"漏注入"。这里把它们剔除，
-                // 只对"启动期就该注入却没注入"的通道报错。
+                // 有一批通道由 UI 初始化时注入，本自检跑在它之前必然为空。
                 List<string> __lateInjected = new List<string> {
                     "SRApi._wheelLayer", "SRApi._wheelTake", "SRApi._overlay", "SRApi._rounded", "SRApi._typing",
                     "Ctl._labeledRow", "Ctl._rowCombo", "Ctl._rowSlider", "Ctl._button", "Ctl._labelCol",
@@ -354,11 +343,10 @@ namespace SR_UCH {
             if (ApiSinkFailures.Count > 0) ModLogger.LogError("[SR.Api] sink 注入失败的分组 (" + ApiSinkFailures.Count + "): " + string.Join(", ", ApiSinkFailures.ToArray()));
         }
 
-        // sink 注入失败的分组名：一组失败不影响其它组，结论同时进 [SR.SelfTest]。
+        // 注入失败的分组名：一组失败不影响其它组。
         internal static readonly List<string> ApiSinkFailures = new List<string>();
 
-        // 逐分组注入：任何一组抛异常只记录并继续（旧实现用一个 try 包住全部 sink，
-        // 中途抛出则后面的 sink 全部静默不注入、只留一行 error，故障无法定位）。
+        // 逐分组注入：一组抛异常只记录并继续。
         private static void SinkStep(string what, Action inject) {
             try { inject(); }
             catch (Exception __sx) {
@@ -369,11 +357,10 @@ namespace SR_UCH {
         }
 
 
-        // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
-        // 已初始化过的 ITweak 类型：第二轮扫描（EX / 外部 DLL 加载之后）只补新出现的，避免重复初始化。
+        // 已初始化过的 ITweak 类型：补扫只处理新出现的。
         private static readonly HashSet<Type> _initedTweaks = new HashSet<Type>();
 
-        // 补扫用：只取名字以 SR_UCH 开头的已加载程序集（核心自身 + EX + 拆分模式的各功能 DLL）。
+        // 补扫用：只取名字以 SR_UCH 开头的程序集。
         private static Assembly[] PickUchAssemblies() {
             try {
                 List<Assembly> keep = new List<Assembly>();
@@ -388,14 +375,11 @@ namespace SR_UCH {
             } catch (Exception __ex) { SR.LogWarn("枚举程序集失败: " + __ex.Message); return new Assembly[0]; }
         }
 
-        // latePass = true 时表示"装配完成后补扫"（audit P0-1）：EX 若没被 ExLoader 拉起，
-        // 仍能在这里被 ITweak 扫描发现并初始化；已初始化过的类型直接跳过。
+        // latePass = true 表示装配完成后补扫。
         private void InitializeTweaks(bool latePass = false) {
-            // 反射发现全部 ITweak 并初始化（Harmony 补丁需类自己注册），个别类型加载失败不致命。
-            // 顺序：SR 必须最先 Initialize（旧 cfg 迁移必须早于任何功能 Config.Bind）；其余按类型全名排序。
+            // 顺序：SR 必须最先 Initialize（旧 cfg 迁移要早于任何功能 Bind）。
             List<Type> __tweaks = new List<Type>();
-            // 补扫只覆盖 SR_UCH* 程序集（外部功能 DLL 由 LoadExternal 自己初始化）：
-            // 扫全部 AppDomain 会把游戏程序集也展开一遍，启动白白多花上百毫秒。
+            // 补扫只覆盖 SR_UCH* 程序集：扫全部 AppDomain 会白花上百毫秒。
             Assembly[] __asms = latePass ? PickUchAssemblies() : new Assembly[] { Assembly.GetExecutingAssembly() };
             for (int __ai = 0; __ai < __asms.Length; __ai++) {
                 foreach (Type __t in GetTypesSafe(__asms[__ai])) {
@@ -411,7 +395,7 @@ namespace SR_UCH {
                 return string.Compare(a.FullName, b.FullName, StringComparison.Ordinal);
             });
             foreach (Type type in __tweaks) {
-                // 实例化也放进 try：单个功能构造失败不能中断后续的外部 DLL 装配。
+                
                 _initedTweaks.Add(type);
                 try {
                     var tweak = (ITweak)Activator.CreateInstance(type);
@@ -423,16 +407,14 @@ namespace SR_UCH {
         }
 
         // 功能清单登记 + 启动自检 + 自检日志。
-        // 装配（LoadExternal）只由 Awake 按固定顺序调一次：这里不再重复调用。
         private void RebuildFeatureManifest() {
-            // 功能清单（SMAPI 的 manifest 等价物）：内置 / 外部 / EX 的 ITweak 全部就位后统一登记，校验依赖与契约版本。
+            // 功能清单：全部 ITweak 就位后统一登记，校验依赖与契约版本。
             try { Features.Rebuild(); if (Features.ProblemCount > 0) ModLogger.LogInfo(Features.Describe()); } catch (Exception __ft) { try { ModLogger.LogWarning("[SR.Feat] 功能清单登记失败: " + __ft.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
-            // 启动自检（补丁目标 / 反射成员）：必须在全部功能与 EX 都挂完之后，结论进日志。
+            // 启动自检必须晚于全部功能与 EX 挂完。
             try { SR.RunStartupAudit(); } catch (Exception __ex) { try { ModLogger.LogWarning("[SR] 启动自检失败: " + __ex.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
-            // 补丁归因：推迟 3 秒扫描，等其它 BepInEx 插件把补丁打完（只读查询，见 SR.Plugins.cs）。
+            // 补丁归因：推迟 3 秒，等其它插件打完补丁。
             try { SR.InitAttribution(); } catch (Exception __at) { try { ModLogger.LogWarning("[SR] 补丁归因初始化失败: " + __at.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
-            // 诊断浮层：独立常驻宿主，面板关闭时也显示（开关在 设置 → 自检）。
-            // P1-1：运行时冒烟测试标记 —— 单行、固定格式、可被脚本 grep（build\smoke.ps1）。
+            // 诊断浮层 + 冒烟测试标记（单行、固定格式、可被脚本 grep）。
             try {
                 try { ModLogger.LogInfo("[SR] 游戏版本=" + UnityEngine.Application.version + " | 契约=v" + SRContract.Version); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 string[] __miss = SRApi.MissingSinks();
@@ -446,23 +428,20 @@ namespace SR_UCH {
             } catch (Exception __st) { try { ModLogger.LogError("[SR.SelfTest] FAIL 自检异常: " + __st.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         }
 
-        // 只认 SR_UCH 这几个程序集名：外部 DLL 编译时引用的就是它。
+        // 只认 SR_UCH 这几个程序集名。
         private static Assembly OnAssemblyResolve(object sender, ResolveEventArgs args) {
             try {
                 AssemblyName want = new AssemblyName(args.Name);
-                // 拆分模式下核心文件名是 SR_Manager.dll / SR_UCH_Manager.dll（程序集标识仍是 "SR_UCH"）。
+                // 拆分模式下核心文件名是 SR_Manager.dll / SR_UCH_Manager.dll。
                 if (want.Name == "SR_UCH" || want.Name == "SR_Manager" || want.Name == "SR_UCH_Manager")
                     return typeof(MainPlugin).Assembly;
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return null;
         }
 
-        // 外部 DLL（功能 / 语言包）：实现 ITweak 或 ILanguagePack，不需要 [BepInPlugin] 与 BepInEx 引用，
-        // 只引用 SR_UCH.dll，把生成的 DLL 丢进 BepInEx\plugins\（或 BepInEx\modules\）。
+        // 外部 DLL 实现 ITweak 或 ILanguagePack，只需引用 SR_UCH.dll。
         private void LoadExternal() {
-            // 供应链透明化（评审 G6）：本方法会对 plugins/ 与 modules/ 下每个 dll 做 LoadFrom 并实例化其中的
-            // ITweak/ILanguagePack。第三方 dll 一旦放进受信任目录就等于会被执行 —— 所以这里把"扫到哪些、
-            // 实际加载了哪些、来自哪个文件、多大、什么时候改的"逐条写进日志，出问题时能对账。
+            // 第三方 dll 进受信任目录即会被执行，故把加载来源与大小写进日志。
             string[] dirs = null;
             try {
                 dirs = new[] { Paths.PluginPath, Path.Combine(Paths.BepInExRootPath, "modules") };
@@ -479,7 +458,7 @@ namespace SR_UCH {
             }
         }
 
-        // 外部模块一行摘要：文件、大小、修改时间、是否本次新加载。永不抛异常（日志失败不影响加载）。
+        // 外部模块一行摘要；永不抛异常。
         private void TryLogExternalModule(string dll, string name, bool loadedNow) {
             try {
                 long size = -1; DateTime when = DateTime.MinValue;
@@ -492,9 +471,9 @@ namespace SR_UCH {
         private void LoadOneExternal(string dll) {
             try {
                 string name = Path.GetFileNameWithoutExtension(dll);
-                // 跳过自己与外部模块；拆分模式下核心自己的文件名同样要跳过，否则会把"自己"再扫一遍。
+                
                 if (name == "SR_UCH" || name == "SR_Manager" || name == "SR_UCH_Manager") return;
-                // 已加载过则复用同一份程序集：LoadFile 会复制副本，typeof(SR) 不再是同一个 Type。
+                // 已加载过则复用同一份程序集：LoadFile 会复制副本，Type 不再相同。
                 Assembly asm = null;
                 foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies()) {
                     try {
@@ -506,19 +485,17 @@ namespace SR_UCH {
                 bool loadedNow = false;
                 if (asm == null) { asm = Assembly.LoadFrom(dll); loadedNow = true; }
                 if (asm == null) return;
-                // 只记"本次真正加载"与"识别出可挂载类型"的，避免把 BepInEx 自带的几十个 dll 刷满日志。
+                
                 TryLogExternalModule(dll, name, loadedNow);
 
-                // 同一份程序集只处理一次：重复会 Initialize 两遍、补丁打两遍。
-                // 语言包允许随独立 BepInEx 插件提供，故不能按"是不是刚加载的"判断。
+                // 同一份程序集只处理一次，否则 Initialize 与补丁都会跑两遍。
                 string key = null;
                 try { key = asm.FullName; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 if (string.IsNullOrEmpty(key)) key = dll;
                 if (!_extSeen.Add(key)) return;
 
                 Type[] types = GetTypesSafe(asm);
-                // 按特性类型名判断，不写 typeof(BepInPluginAttribute)：BepInEx 改名不致编译失败。
-                // [BepInPlugin] 打在插件类上而非 assembly 上：必须遍历类型，否则独立插件会被重复初始化。
+                // 按特性类型名判断，不写 typeof(BepInPluginAttribute)；特性打在类上须遍历类型。
                 bool isBepInPlugin = false;
                 for (int ti = 0; ti < types.Length && !isBepInPlugin; ti++) {
                     Type tCheck = types[ti];
@@ -530,23 +507,22 @@ namespace SR_UCH {
                         }
                     } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 }
-                // 通用模块入口：不带 [BepInPlugin] 的 DLL 若提供 public static Init(插件) 入口，
-                // 就调用一次（这样外部模块无需被核心按名字硬编码加载）。
+                // 通用模块入口：不带 [BepInPlugin] 的 DLL 若有 public static Init(插件) 就调用一次。
                 if (!isBepInPlugin) TryInvokeModuleEntry(types, name);
                 for (int i = 0; i < types.Length; i++) {
                     Type t = types[i];
                     if (t == null || t.IsInterface || t.IsAbstract) continue;
                     try {
-                        // 语言包：任何 DLL 形态都收（含独立 BepInEx 插件顺带提供的）
+                        // 语言包：任何 DLL 形态都收
                         if (typeof(ILanguagePack).IsAssignableFrom(t)) {
                             var pack = (ILanguagePack)Activator.CreateInstance(t);
                             SR.RegisterLanguage(pack);
                             continue;
                         }
-                        // 功能：只收没有 BepInPlugin 入口的 DLL；带入口的插件自行调 SR.RegisterTweak。
+                        // 功能：只收没有 BepInPlugin 入口的 DLL。
                         if (isBepInPlugin) continue;
                         if (!typeof(ITweak).IsAssignableFrom(t)) continue;
-                        // 阶段C（SMAPI 行为）：功能清单要求的最低契约版本高于当前核心时拒绝加载，而不是带病初始化。
+                        // 要求的最低契约版本高于核心时拒绝加载。
                         FeatureInfo __fi = Features.FromType(t);
                         if (__fi != null && __fi.MinContract > SRContract.Version) {
                             ModLogger.LogError("[SR.Feat] 拒绝加载 " + __fi.Id + "：" + __fi.ToString());
@@ -560,13 +536,12 @@ namespace SR_UCH {
                     }
                 }
             } catch (Exception e) {
-                // 单个 DLL 出问题（缺依赖 / 版本不符）不影响其余，也不影响 SR 本身
+                
                 ModLogger.LogWarning("[SR] 跳过外部 DLL " + Path.GetFileName(dll) + ": " + e.Message);
             }
         }
 
-        // 通用外部模块入口：找 public static <bool|void> Init(<本插件类型可赋值>) 并调用一次。
-        // 不针对任何具体模块名，模块是否存在完全由装了什么 DLL 决定。
+        // 通用外部模块入口：找 public static Init(本插件类型) 并调用一次。
         private void TryInvokeModuleEntry(Type[] types, string file) {
             try {
                 for (int i = 0; i < types.Length; i++) {
@@ -592,7 +567,7 @@ namespace SR_UCH {
             } catch (Exception e) { ModLogger.LogError("[SR] 外部模块入口调用失败 " + file + ": " + e.Message); }
         }
 
-        // GetTypes 遇"程序集引用了本机不存在的类型"会整体抛 ReflectionTypeLoadException：只取成功加载的类型。
+        // GetTypes 遇缺失类型会抛异常：只取成功加载的类型。
         private static Type[] GetTypesSafe(Assembly asm) {
             try { return asm.GetTypes(); } catch (ReflectionTypeLoadException ex) {
                 List<Type> ok = new List<Type>();
@@ -605,7 +580,7 @@ namespace SR_UCH {
         }
 
     }
-        // 只针对本插件：plugin.Config 返回自己的 ConfigFile，于是所有 Bind 落到 SR_UCH_data.cfg。
+        // 只针对本插件：Bind 落到 SR_UCH_data.cfg。
         [HarmonyLib.HarmonyPatch(typeof(BepInEx.BaseUnityPlugin), "get_Config")]
         internal static class PatchOwnConfigFile {
             [HarmonyLib.HarmonyPrefix]

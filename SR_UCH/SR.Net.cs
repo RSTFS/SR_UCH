@@ -1,12 +1,8 @@
-// 联机版本/功能握手：双方 SR 的功能表签名不一致时提示（纯提示，不改任何游戏状态）。
-//
-// 做法：复用游戏已有的 GameRuleSet 消息做"带外信号"（与混乱牌组 771/772 魔数错开，用 773），
-// 消息体 NewRule=None 表示不是真实规则变更；游戏/其它功能都按各自魔数忽略。
-//   - 每个客户端每 20 秒向服务器发一次本机签名；
-//   - 房主每 20 秒用 SendToAll 广播一次自己的签名（Valueb=true 标"来自房主"）；
-//   - 收到对方签名且与本地不同 -> 记一次日志 + 弹一条提示（同一签名只提示一次）。
-// 为什么需要：UCH 锁房，双方装的 SR 功能/版本不同时，界面与行为可能不一致（例如只有一方有某个开关），
-// 这个提示能把"为什么我们不一样"直接说清楚。
+// 联机版本/功能握手：双方 SR 的功能表签名不一致时提示（纯提示，不改游戏状态）。
+// 做法：复用 GameRuleSet 消息做带外信号，魔数 773（与混乱牌组的 771/772 错开），
+// 消息体 NewRule=None 表示不是真实规则变更；每 20 秒互发一次本机签名，
+// 房主用 SendToAll 广播（Valueb=true 标「来自房主」），签名不同则记日志 + 弹一次提示。
+// 为什么需要：UCH 锁房，双方功能/版本不同时界面与行为可能不一致。
 using System;
 using GameEvent;   // GameEventManager / IGameEventListener 在 namespace GameEvent 内
 using UnityEngine;
@@ -38,7 +34,7 @@ public partial class SR {
             _compatListener = new CompatListener();
             GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(_compatListener, true);
             SRApi.NetMagic.Register("core.compat", CompatMagic);
-            LatencyInit();   // 延迟探测回显（EX 的「延迟」列用；对方只要装 SR 就能被测量）
+            LatencyInit();   // 延迟探测回显（EX 的「延迟」列用；对方装 SR 即可测量）
             RegisterTick("联机兼容握手", NetTick);
             LogInfo("[SR.Net] 联机版本握手已启用（联机时每 " + (int)CompatInterval + " 秒比对一次功能签名）");
         } catch (Exception __ex) { Guard.Log("联机握手/初始化", __ex); }
@@ -55,7 +51,7 @@ public partial class SR {
     }
 
     // 本地签名：所有功能 id 排序后做 FNV-1a，再混入契约版本。
-    // 功能增删/改名/契约版本变化都会改变签名；同一版本号但功能表不同也能识别出来。
+    // 功能增删/改名/契约版本变化都会改变签名；同版本号但功能表不同也能识别。
     private static int LocalCompatHash() {
         if (_compatHash != 0) return _compatHash;
         try {

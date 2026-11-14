@@ -1,5 +1,4 @@
-// 契约层：ITweak / IFeatureHost / ILanguagePack / Slots，第三方功能只依赖本文件。
-// 硬约定：本文件不得引用 SR 的其它文件，须能单独编译成程序集；槽位只传 BCL / 引擎 / 游戏类型。
+// 契约层分片；硬约定：不得引用 SR 其它文件，须能单独编译成程序集。
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -12,12 +11,12 @@ using BepInEx.Logging;
 namespace SR_UCH {
     public static partial class SRApi {   // 门面主体；其余成员见同目录 SRApi.*.cs（同一个 partial 类）
 
-        // 统一存储（契约 v7）：功能的文件数据走这里——原子写（临时文件 + 替换）、UTF-8 无 BOM、目录自动创建。
+        // 统一存储：原子写（临时文件 + 替换）、UTF-8 无 BOM、目录自动创建。
         public static class Storage {
             private static string _root = "";
             public static void SetRoot(string root) { try { _root = root ?? ""; } catch (Exception) { _root = ""; } }
             public static string RootOf { get { return _root; } }
-            // 核心是否已注入根目录：false 时所有写都会失败，功能应视为"存储不可用"而不是静默成功。
+            // false 时所有写都会失败，功能应视为"存储不可用"，不要当作静默成功。
             public static bool Ready { get { return !string.IsNullOrEmpty(_root); } }
             private static string SafeName(string s) {
                 try {
@@ -68,7 +67,6 @@ namespace SR_UCH {
                     return System.IO.File.ReadAllText(path, System.Text.Encoding.UTF8);
                 } catch { return null; }
             }
-            // 绝对路径版本：功能已有自己的目录布局（如布局预设）时直接复用同一套原子写。
             public static bool WriteAtomicPath(string fullPath, string text) {
                 try {
                     if (string.IsNullOrEmpty(fullPath)) return false;
@@ -95,7 +93,6 @@ namespace SR_UCH {
                 try { string p = PathOf(feature, file); return !string.IsNullOrEmpty(p) && System.IO.File.Exists(p); }
                 catch { return false; }
             }
-            // 原子写前备份：把现有文件复制为 <path>.bak（保存流程用；读坏时可手工/以后自动回滚）。
             public static bool BackupPath(string fullPath) {
                 try {
                     if (string.IsNullOrEmpty(fullPath) || !System.IO.File.Exists(fullPath)) return false;

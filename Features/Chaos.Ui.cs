@@ -1,38 +1,15 @@
-// 混乱牌组（树屋选举版）+ 房内 mod 清单。
-//
-// 核心主张：发「真实 TabletRule + 真实 Value」，而不是 None 带外信号。
-//   依据：TabletRulesScreen.handleEvent 的守卫是
-//        `if (msg.NewRule != TabletRule.None && !LobbyManager.instance.IsHost)`  （反编译 111469）
-//   即「非房主端收到真实规则值，由游戏自己的代码写进 Modifiers」。
-//   所以没装 mod 的房客也能被房主带着变 —— 仅房主安装即可带全场。
-//   代价：房主自己不执行那段（被 !IsHost 挡住），房主必须本地双写一次。
-//   Value2 高位放牌组魔数，装了 mod 的房客据此把消息解析成「牌面」用于 UI；
-//   游戏的这 10 个规则分支都只读 Value / Valueb，不读 Value2（111512-111613），
-//   所以标记不会干扰原生规则，玩家在规则书里手动改的规则（Value2 = 0）也不会被误当成抽牌。
-//
-// 三条刻意收窄：
-//   1) 射速牌（RateOfFire）已加回牌池；它会在游戏侧调 OnModifiersDynamicChange()，属于预期行为。
-//      （111551），该函数会写 Time.timeScale = GameSpeed，与「时间控制」抢同一全局状态。
-//   2) GameSpeed / CharacterSize / CameraFlip / Doomsday 不进池：前者归时间控制所有，
-//      后三者碰相机或要重建绘制对象。
-//   3) 还原「双写」：既重发每条规则的树屋原值（让没装 mod 的房客还原），
-//      也发一条带外 Restore 消息（让装了 mod 的房客清掉牌面标记），
-//      同时房主自己本地还原被 !IsHost 挡住的那份。
-//
-// 房内 mod 清单（握手）：复用 MsgGameRuleSet，以 TabletRule.None(0) 承载，
-//   Value2 高位放魔数认领自己的消息。None 的三个游戏消费者全部短路：
-//     111469 `NewRule != None` 不成立、106439 switch 无 None case、
-//     TabletRuleUtility.IsRuleModifierChange(None) 返回 false。
-//   Value 放本机 networkNumber（不用 conn —— 在客户端所有消息都来自服务器连接，无法区分发件人）。
-//
-// 不新增 Harmony 补丁、不新增 msgType、不新增反射登记：
-//   自检基线 patches / reflection / api 计数不变，仅 features +1。
-// 不碰相机、不生成实体、不加线程；状态只在主线程回调里读写。
+// 混乱牌组（树屋选举版）UI + 房内 mod 清单。
+// 网络方案：发真实的 TabletRule + Value，由游戏自己的代码写进 Modifiers，房主安装即可带全场。
+// 房主被 !IsHost 挡住不执行那段，故房主须本地双写一次；Value2 高位放牌组魔数供 UI 解析。
+// 高位标记不干扰原生规则：游戏的规则分支只读 Value / Valueb。
+// 不进池的规则：GameSpeed（归时间控制）、CharacterSize / CameraFlip / Doomsday（碰相机或要重建绘制）。
+// 房内 mod 清单复用 MsgGameRuleSet 以 TabletRule.None 承载；Value 放本机 networkNumber（conn 无法区分发件人）。
+// 不新增 Harmony 补丁 / msgType / 反射登记；状态只在主线程回调里读写。
 
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
-using GameEvent;   // GameEventManager / IGameEventListener 都在 namespace GameEvent 内（反编译 151389）
+using GameEvent;   // GameEventManager / IGameEventListener 都在 namespace GameEvent 内
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -70,9 +47,9 @@ namespace SR_UCH.Tweaks {
             _cardEffect.normal.textColor = new Color(0.78f, 0.81f, 0.87f, 1f);
         }
 
-        // 牌面边框色：让玩家变强 = 增益（绿），变弱 = 减益（红），两边都占/纯整活 = 中性（蓝）。
+        // 牌面边框色：变强 = 增益（绿），变弱 = 减益（红），两边都占/纯整活 = 中性（蓝）。
         private static Color CardTint(CardDef c) {
-            // 分类规则在 ChaosLogic（无 Unity 依赖，单元测试覆盖）；这里只做颜色映射。
+            // 分类规则在 ChaosLogic（无 Unity 依赖，有单元测试）；这里只做颜色映射。
             int kind = ChaosLogic.TintKind(c.IsBool, c.Field, c.Min);
             return kind == 0 ? CardBuff : kind == 1 ? CardDebuff : CardNeutral;
         }
@@ -97,7 +74,7 @@ namespace SR_UCH.Tweaks {
             DrawCardLegend();
         }
 
-        // 三色小图例：色边含义写在卡上不如画出来直观（详细说明仍在分区提示里）。
+        // 三色小图例：色边含义画出来比写在卡上直观（详细说明仍在分区提示里）。
         private static void DrawCardLegend() {
             float h = SRApi.Ctl.Sc(14f);
             float chip = SRApi.Ctl.Sc(10f);
@@ -122,7 +99,7 @@ namespace SR_UCH.Tweaks {
         private static void DrawCard(Rect r, CardDef c, int param) {
             Color tint = CardTint(c);
             float bw = Mathf.Max(1f, SRApi.Ctl.Sc(2f));
-            // 底色 + 四边色条（不用圆角面板：卡片每帧重画，纯矩形最省）
+            // 底色 + 四边色条（不用圆角面板：卡片每帧重画，纯矩形最省）。
             SRApi.DrawFill(r, new Color(0.10f, 0.115f, 0.15f, 0.94f));
             SRApi.DrawFill(new Rect(r.x, r.y, r.width, bw), tint);
             SRApi.DrawFill(new Rect(r.x, r.yMax - bw, r.width, bw), tint);
@@ -152,7 +129,7 @@ namespace SR_UCH.Tweaks {
             if (!ModeAllowed())
                 Line("仅派对 / 创意模式可用。", "Party / Creative only.");
 
-            // 本机开关关掉时，牌面只作跟踪（房主规则仍然生效），必须明说，不能让页面假称"未生效"。
+            // 本机开关关掉时牌面只作跟踪（房主规则仍生效），必须明说，不能让页面假称“未生效”。
             if (_enabled != null && !_enabled.Value)
                 Line("本机开关已关：这里只显示收到的牌面，房主规则仍会生效。",
                      "Switch is off on this machine: cards are display-only; host rules still apply.");
@@ -166,7 +143,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 牌池单独一页：按「数值规则 / 布尔规则」分组勾选 + 批量操作（全选 / 全不选 / 仅增益 / 仅减益）。
+        // 牌池单独一页：按「数值规则 / 布尔规则」分组勾选 + 批量操作（全选/全不选/仅增益/仅减益）。
 
         private void RenderPoolPage() {
             // 四个批量操作同排一行（紧凑按钮，避免占掉过多列表空间）。
@@ -192,8 +169,8 @@ namespace SR_UCH.Tweaks {
             RenderPoolGroup(false);   // 布尔规则
         }
 
-        // 分组渲染：按数值/布尔规则分成两块（顺序固定，结构不随勾选变化）。
-        // 配置条目显示名缓存：游戏名/语言变化时才重注册 LocKey（每帧重注册会让本地化缓存抖动）。
+        // 分组渲染：按数值/布尔规则分两块（顺序固定，结构不随勾选变化）。
+        // 配置条目显示名缓存：仅游戏名/语言变化时重注册 LocKey（每帧重注册会让本地化缓存抖动）。
         private static string[] _poolLabelCache;
 
         private void RenderPoolGroup(bool numeric) {
@@ -221,7 +198,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception ex) { SRApi.Guard.Log("混乱牌组/批量勾选", ex); }
         }
 
-        // 规则名优先用游戏自己的本地化文本（跟随游戏语言）；取不到再回退本功能的中英文名。
+        // 规则名优先用游戏自己的本地化文本（跟随游戏语言），取不到再回退本功能的中英文名。
         private static readonly Dictionary<TabletRule, string> _ruleNameCache = new Dictionary<TabletRule, string>();
         private static string GameRuleName(TabletRule rule) {
             string cached;

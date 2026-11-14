@@ -1,5 +1,4 @@
-// 实验栏目：注册侧栏栏目和三页、生命周期。
-// 页面拆分：p1 关卡边界 -> Experiments.Bounds.cs；p2 其它 -> Experiments.Misc.cs；p3 场景 -> Experiments.Scene.cs。
+// 实验栏目：注册侧栏栏目与三页（p1 边界 / p2 其它 / p3 场景，各自 partial 文件）。
 
 using System;
 using UnityEngine;
@@ -7,18 +6,16 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
 public partial class Experiments : ITweak
     {
-        // 栏目注册：本地化文案、侧栏顺序、三页页签。
         private static void SelfReg() {
             SRApi.LocSec("Experiments", "实验", null);
-            SRApi.Nav("Experiments", 999); //侧栏栏目顺序 100
-            // 本栏目自绘，共三页。页签顺序由 Order 决定：p3 场景(10) / p1 关卡边界(20) / p2 其它(30)，id 与文件对应关系固定。
+            SRApi.Nav("Experiments", 999); // 栏位顺序值（越小越靠前）
+            // 页签顺序由 Order 决定：p3 场景(10) / p1 边界(20) / p2 其它(30)；id 与文件对应固定。
             SRApi.RegisterPage("Experiments", "p1", "关卡边界", "Bounds", 20, Render);
             SRApi.RegisterPage("Experiments", "p2", "其它", "Misc", 30, RenderPage2);
             SRApi.RegisterPage("Experiments", "p3", "场景", "Scene", 10, RenderPage3);
         }
 
-        // 状态行：只读、可复制。
-        // 高度必须取 SRApi.Ctl.TextHeight(text, w)：中文有字形下沉，固定高度会裁字；该函数内部已含下沉余量并带缓存。
+        // 状态行只读可复制；高度须用 Ctl.TextHeight(text, w)，固定高度会裁掉下沉字形。
         private static void DrawStatus(string text) {
             try {
                 if (string.IsNullOrEmpty(text)) return;
@@ -32,7 +29,6 @@ public partial class Experiments : ITweak
         {
             SelfReg();
             InitCleanup(plugin);
-            // 跨平台联机开关：初始化时探测一次把定位结果写日志（功能本体在 CrossPlay 里）。
             try { CrossPlay.Init(); } catch (Exception __cp) { SRApi.Guard.Log("跨平台联机 初始化", __cp); }
         }
 }

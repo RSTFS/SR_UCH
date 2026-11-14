@@ -1,5 +1,4 @@
-// 绘制原语：圆角面板 / 填充 / 线 / 就地滚轮轮询。
-// 从 SR.Ctl.cs 拆出：自绘页面共用的底层绘制，不涉及控件布局。
+// 绘制原语：圆角面板 / 填充 / 线 / 就地滚轮轮询（自绘页面共用）。
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,8 +6,7 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
 public partial class SR {
 
-    // 绘制期就地滚轮：直接读 Input.mouseScrollDelta，用控件自己的矩形做命中，
-    // 每帧每控件只应用一次。完全不经过 IMGUI 事件，也不依赖跨趟登记。
+    // 绘制期就地滚轮：读 Input.mouseScrollDelta，用控件自己的矩形做命中，每帧每控件只应用一次。
     private static readonly Dictionary<string, int> _wheelPollFrame = new Dictionary<string, int>();
     public static float WheelPoll(string key, Rect rect) {
         try {
@@ -16,8 +14,7 @@ public partial class SR {
             if (e == null || !rect.Contains(e.mousePosition)) return 0f;
             float d = 0f;
             try { d = Input.mouseScrollDelta.y; } catch (Exception __iw) { Guard.Log("滚轮/就地轮询", __iw); }
-            // 若该环境里 Input.mouseScrollDelta 恒为 0（早期源码注释提到过这种情况），
-            // 就地改用本趟的 ScrollWheel 事件量：同样在控件绘制期处理，不经过登记表。
+            // 某些环境里 Input.mouseScrollDelta 恒为 0，改用本趟 ScrollWheel 事件量。
             if (Mathf.Abs(d) < 0.01f && e.type == EventType.ScrollWheel) {
                 float raw = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
                 d = -raw;
@@ -33,10 +30,9 @@ public partial class SR {
         } catch (Exception __ex) { Guard.Log("滚轮/就地轮询外层", __ex); return 0f; }
     }
 
-    // 表格通用绘制原语（三处列表共用）。
-    // 纯白填充用 Unity 内置 whiteTexture（常驻，无需自建/销毁）。
+    // 表格通用绘制原语（三处列表共用）；纯白填充用常驻的 whiteTexture。
     public static Texture2D Px() { return Texture2D.whiteTexture; }
-    // 圆角矩形：中心/边用纯色填充，四角用运行时生成的圆形 alpha 贴图（缓存，不逐帧分配）。
+    // 圆角矩形：中心/边用纯色填充，四角用运行时生成并缓存的圆形 alpha 贴图。
     private static Texture2D _roundTex;
     private static Texture2D RoundTex() {
         if (_roundTex != null) return _roundTex;
@@ -67,11 +63,9 @@ public partial class SR {
             Texture2D tex = RoundTex();
             Color old = GUI.color;
             GUI.color = c;
-            // 中间 + 四条边（纯色）
             DrawFill(new Rect(r.x + rad, r.y, r.width - rad * 2f, r.height), c);
             DrawFill(new Rect(r.x, r.y + rad, rad, r.height - rad * 2f), c);
             DrawFill(new Rect(r.xMax - rad, r.y + rad, rad, r.height - rad * 2f), c);
-            // 四角（圆形的 1/4，按 UV 取向）
             DrawCorner(tex, new Rect(r.x, r.y, rad, rad), new Rect(0f, 0.5f, 0.5f, 0.5f));
             DrawCorner(tex, new Rect(r.xMax - rad, r.y, rad, rad), new Rect(0.5f, 0.5f, 0.5f, 0.5f));
             DrawCorner(tex, new Rect(r.x, r.yMax - rad, rad, rad), new Rect(0f, 0f, 0.5f, 0.5f));
@@ -88,8 +82,7 @@ public partial class SR {
 
     public static void DrawLine(Rect r, Color c) { DrawFill(r, c); }
 
-    // 纯色填充（仅 Repaint 趟画），供表头底与隔行底使用。
-    // alpha <= 0 直接跳过：关闭表头底/隔行底只需把颜色 alpha 设为 0。
+    // 纯色填充（仅 Repaint 趟画）；alpha <= 0 直接跳过，关闭底纹只需把 alpha 设为 0。
     public static void DrawFill(Rect r, Color c) {
         if (c.a <= 0f) return;
         if (Event.current == null || Event.current.type != EventType.Repaint) return;
@@ -100,7 +93,7 @@ public partial class SR {
         } finally { GUI.color = old; }
     }
 
-    //表格配色的只读视图：供功能页自绘"表外但属于表"的元素对齐（如联机页钉住列的分隔线）。
+    // 表格配色的只读视图：供功能页自绘「表外但属于表」的元素对齐。
     public static Color TableLineStrong { get { return CurStyle.LineStrong; } }
     public static void DrawRect(Rect r, float a) {
         if (Event.current == null || Event.current.type != EventType.Repaint) return;

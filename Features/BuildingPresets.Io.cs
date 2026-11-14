@@ -1,5 +1,4 @@
-// 布局预设 · 存储与导入导出（BuildingPresets 分部）：保存 / 导入 / 导出 / 删除 / 重命名、
-// 快照获取、预设目录与索引（index.json）读写、游戏本地自定义关卡扫描。
+// 布局预设 · 存储与导入导出：保存 / 导入 / 导出 / 删除 / 重命名、快照获取、索引读写、本地关卡扫描。
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -17,7 +16,6 @@ namespace SR_UCH.Tweaks {
 
     public partial class BuildingPresets {
 
-        // ---------- 保存 / 导入 / 导出 / 删除 / 重命名 ----------
 
 
 
@@ -38,7 +36,6 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 从磁盘 XML 文件导入：支持绝对路径，也支持相对 BepInEx 根目录 / 配置目录 / 预设目录的路径。
         private static void ImportFromPath() {
             try {
                 if (!ActionAllowed()) return;
@@ -50,7 +47,6 @@ namespace SR_UCH.Tweaks {
                 }
                 string path = ResolveImportPath(input);
                 if (!string.IsNullOrEmpty(path)) {
-                    // 只接受预设支持的两类扩展名：这两类都是 XML/压缩快照，其它文件读进来只会白解析。
                     string ext = Path.GetExtension(path) ?? "";
                     if (!ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)
                         && !ext.Equals(".snapshot", StringComparison.OrdinalIgnoreCase)) {
@@ -84,7 +80,6 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 剪贴板 / 文件路径共用的 XML 导入：校验根节点/方块数/关卡名后落盘（同名覆盖仍走 SaveXml 的二次确认）。
         private static void ImportXmlText(string xml, string defaultBaseName, string sourceLabel) {
             try {
                 if (string.IsNullOrEmpty(xml) || xml.Trim().Length == 0) {
@@ -101,7 +96,6 @@ namespace SR_UCH.Tweaks {
                 try {
                     doc = ParseXmlSafe(xml);
                 } catch (Exception __ex) {
-                    // 解析失败是非常常见的用户错误（粘错东西），只记一次 Guard 日志并提示，不抛到页面。
                     SRApi.Guard.Log("布局预设/解析导入 XML", __ex);
                 }
                 if (doc == null || doc.DocumentElement == null || doc.DocumentElement.Name != "scene") {
@@ -140,8 +134,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 路径解析：绝对路径直接使用；相对路径依次尝试 当前目录 / BepInEx 根目录 / 配置目录 / 预设目录。
-        // 判定 full 是否在 root 之内。前缀比较必须带尾部分隔符，否则 root=/presets 会误放 /presets_evil/x。
+        // 路径解析：绝对路径直接用；相对路径依次尝试 当前目录 / BepInEx 根目录 / 配置目录 / 预设目录（前缀比较须带尾部分隔符）。
         private static bool IsUnderRoot(string full, string root) {
             try {
                 if (string.IsNullOrEmpty(full) || string.IsNullOrEmpty(root)) return false;
@@ -156,7 +149,7 @@ namespace SR_UCH.Tweaks {
         private static string ResolveImportPath(string input) {
             try {
                 if (string.IsNullOrEmpty(input)) return null;
-                // 绝对路径快速通道必须做根校验：否则任意存在的路径都能被导入（任意文件读）。
+                // 绝对路径通道必须做根校验，否则任意存在的路径都能被导入（任意文件读）。
                 try {
                     if (File.Exists(input)) {
                         string full0 = Path.GetFullPath(input);
@@ -165,7 +158,7 @@ namespace SR_UCH.Tweaks {
                         return null;
                     }
                 } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-                // 相对路径快速通道同样必须做根校验：`..\..\x.xml` 能跳出预设根（受限的任意文件读）。
+                // 相对路径通道同样必须做根校验：`..\..\x.xml` 能跳出预设根。
                 string root0 = Path.GetFullPath(PresetsRoot());
                 string p = null;
                 try {
@@ -201,7 +194,7 @@ namespace SR_UCH.Tweaks {
 
 
 
-        // 启动/刷新时清理残留的 .tmp（原子写中途退出留下的），只清 24 小时前的，避免误删正在写的文件。
+        // 启动/刷新时清理残留 .tmp（原子写中途退出留下），只清 24 小时前的。
         private static void SweepStaleTemp() {
             try {
                 string root = PresetsRoot();
@@ -218,8 +211,7 @@ namespace SR_UCH.Tweaks {
                 if (p == null) return;
                 if (p.IsLocal) return; // 游戏本地存档不允许从这里删除
                 if (!ActionAllowed()) return;
-                // 先删文件，再同步内存列表与索引：只删文件的话，列表这一帧还显示它、
-                // 下一次磁盘扫描又会把它从 index.json 复活（评审 P0-A2）。
+                // 先删文件再同步内存列表与索引；只删文件的话下次扫描会从 index.json 复活它。
                 bool existed = false;
                 try { existed = File.Exists(p.FilePath); } catch (Exception __fe) { SRApi.Guard.Log("布局预设/删除前检查", __fe); }
                 if (existed) {
@@ -227,9 +219,9 @@ namespace SR_UCH.Tweaks {
                     catch (Exception __df) {
                         SRApi.Guard.Log("布局预设/删除文件", __df);
                         SRApi.Notify(SRApi.T("删除失败：文件被占用？", "Delete failed: file in use?"));
-                        return;   // 文件没删掉就不要动索引，避免"索引说没了、磁盘还在"
+                        return;   // 文件没删掉就不要动索引
                     }
-                    // 顺手清理同名残留（原子写临时文件 / 覆盖前备份），避免目录越积越多。
+                    // 顺手清理同名残留（原子写临时文件 / 覆盖前备份）。
                     try { if (File.Exists(p.FilePath + ".tmp")) File.Delete(p.FilePath + ".tmp"); } catch (Exception __ct) { SRApi.Guard.Log("布局预设/清理临时文件", __ct); }
                     try { if (File.Exists(p.FilePath + ".bak")) File.Delete(p.FilePath + ".bak"); } catch (Exception __cb) { SRApi.Guard.Log("布局预设/清理备份", __cb); }
                 }
@@ -261,8 +253,7 @@ namespace SR_UCH.Tweaks {
                 if (name.Length > 40) name = name.Substring(0, 40);
                 string oldName = p.Name;
                 p.Name = name;
-                // 回写 XML 的 srName：XML 是权威数据源，只改索引的话，换场景重扫（LoadFromDisk 从 XML 回填）
-                // 会把名字退回旧的 —— 这是"重命名后名字自己变回去"的根因。
+                // 回写 XML 的 srName：XML 是权威数据源，只改索引会让重扫时名字退回旧的。
                 bool written = false;
                 try {
                     string xmlPath = p.FilePath;
@@ -272,8 +263,7 @@ namespace SR_UCH.Tweaks {
                         if (doc != null && doc.DocumentElement != null) {
                             doc.DocumentElement.SetAttribute("srName", name);
                             WriteFileAtomic(xmlPath, doc.OuterXml);
-                            // 回读校验：XML 才是权威源。写不进去（只读/被杀毒占用/磁盘满）时
-                            // 不能只改索引，否则下次扫描会从 XML 回填旧名，两处永久分叉。
+                            // XML 才是权威源；写不进去时不能只改索引，否则下次扫描会回填旧名。
                             try {
                                 XmlDocument verify = ParseXmlSafe(File.ReadAllText(xmlPath));
                                 written = verify != null && verify.DocumentElement != null
@@ -303,9 +293,8 @@ namespace SR_UCH.Tweaks {
 
 
 
-        // ---------- 快照获取 ----------
 
-        // 取本机当前看到的布局快照（保存是本地行为，不做房主门控；房客看到的是同步后的方块）。
+        // 取本机当前看到的布局快照（保存是本地行为，不做房主门控）。
         private static bool TryGetCurrentSnapshot(out XmlDocument doc, out string mode) {
             doc = null;
             mode = "UNKNOWN";
@@ -343,16 +332,14 @@ namespace SR_UCH.Tweaks {
             return true;
         }
 
-        // ---------- 存储 ----------
 
-        // BepInEx.Paths 是 BepInEx 的公开类型，功能层允许引用（契约边界只禁止引用 SR.* 实现层）。
         private static string PresetsRoot() {
             if (!string.IsNullOrEmpty(_rootDir)) return _rootDir;
             try {
                 _rootDir = Path.Combine(Paths.ConfigPath, "SR_UCH", "presets");
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/定位存储目录", __ex);
-                // 极端情况下 BepInEx.Paths 不可用：退回临时目录，至少不让功能整个崩掉。
+                // 极端情况下 BepInEx.Paths 不可用：退回临时目录，至少不让功能崩掉。
                 _rootDir = Path.Combine(Path.GetTempPath(), "SR_UCH_presets");
             }
             return _rootDir;
@@ -364,12 +351,11 @@ namespace SR_UCH.Tweaks {
             LoadFromDisk(false);
         }
 
-        // 扫描磁盘重建列表：index.json 只提供展示元数据，XML 文件才是权威数据。
-        // 索引损坏 / 被手改坏 / 旧版索引缺字段（level / ok）时按 XML 重新读取元数据，扫完回写自愈。
+        // 扫描磁盘重建列表：index.json 只提供展示元数据，XML 才是权威数据；索引损坏时按 XML 重读并回写自愈。
         private static void LoadFromDisk(bool revalidate) {
             _loaded = true;
             _presets.Clear();
-            bool upgraded = false; // 旧索引缺字段 / 出现新文件 / 强制重校验结果变化：扫完回写一次
+            bool upgraded = false; // 旧索引缺字段 / 新文件 / 重校验结果变化：扫完回写一次
             try {
                 string root = PresetsRoot();
                 if (!Directory.Exists(root)) {
@@ -408,7 +394,7 @@ namespace SR_UCH.Tweaks {
                             pi.ApplyPoints = JsonBool(line, "applyPoints");
                             pi.ApplyBlocks = JsonBool(line, "applyBlocks");
                             ParseModsVals(pi, JsonStr(line, "modsVals"));
-                            // 字段缺失判定：老索引（v1-v3）没有 level / levelName / levelCode / ok -> 默认 false/0，扫描时自愈。
+                            // 老索引没有 level / levelName / levelCode / ok，扫描时自愈。
                             bool complete = line.IndexOf("\"level\":", StringComparison.Ordinal) >= 0
                                 && line.IndexOf("\"levelName\":", StringComparison.Ordinal) >= 0
                                 && line.IndexOf("\"levelCode\":", StringComparison.Ordinal) >= 0
@@ -418,7 +404,7 @@ namespace SR_UCH.Tweaks {
                             byKey[mode + "/" + file] = pi;
                         }
                     } catch (Exception __ex) {
-                            // 索引坏了就当它不存在：改名为 .bad 留证，继续用 XML 扫描重建（不再整批放弃）。
+                            // 索引坏了就当它不存在：改名为 .bad 留证，继续用 XML 扫描重建。
                             try {
                                 string bad = index + ".bad-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
                                 File.Move(index, bad);
@@ -432,7 +418,7 @@ namespace SR_UCH.Tweaks {
                 for (int i = 0; i < dirs.Length; i++) {
                     string dir = dirs[i];
                     string mode = Path.GetFileName(dir);
-                    // rulesets 是规则/积分/模块概率的侧车目录，不是预设；exporse 同理。
+                    // rulesets 是规则/积分/模块概率的侧车目录，不是预设。
                     if (string.Equals(mode, "rulesets", StringComparison.OrdinalIgnoreCase)) continue;
                     if (string.Equals(mode, "exports", StringComparison.OrdinalIgnoreCase)) continue;
                     string[] files = Directory.GetFiles(dir, "*.xml");
@@ -455,7 +441,7 @@ namespace SR_UCH.Tweaks {
                         pi.Mode = mode;
                         pi.File = file;
                         pi.FilePath = fp;
-                        // 索引缺元数据（老索引 / 无索引 / 刷新强制重校验）：流式读一次 XML 根节点与方块数。
+                        // 索引缺元数据（老索引 / 无索引 / 强制重校验）：流式读一次 XML 根节点与方块数。
                         if (revalidate || !complete || string.IsNullOrEmpty(pi.Level) || !pi.Ok || pi.Blocks < 0) {
                             bool oldOk = pi.Ok;
                             string oldLevel = pi.Level ?? "";
@@ -468,7 +454,7 @@ namespace SR_UCH.Tweaks {
                             bool xmlOk = TryReadPresetMeta(fp, out lv, out blocks, out metaName, out metaCode, out metaPreset);
                             pi.Level = lv ?? "";
                             if (!string.IsNullOrEmpty(metaPreset) && (string.IsNullOrEmpty(pi.Name) || pi.Name == Path.GetFileNameWithoutExtension(pi.File)))
-                                pi.Name = metaPreset;   // 索引丢失时优先用 XML 里保存的显示名，避免重命名回退成旧文件名
+                                pi.Name = metaPreset;   // 索引丢失时优先用 XML 里保存的显示名
                             if (string.IsNullOrEmpty(pi.LevelName) && !string.IsNullOrEmpty(metaName)) {
                                 pi.LevelName = metaName;
                                 upgraded = true;
@@ -496,16 +482,14 @@ namespace SR_UCH.Tweaks {
                 }
                 LoadLocalSnapshots(); // 游戏本地保存的自定义关卡（只读，不写 index.json）
                 SortPresets();
-                if (upgraded) SaveIndex(); // 自愈结果立刻落盘（旧索引升级 / 新文件补登记）
+                if (upgraded) SaveIndex(); // 自愈结果立刻落盘
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/扫描目录", __ex);
             }
         }
 
-        // ---------- 游戏本地保存的自定义关卡（只读扫描） ----------
 
-        // 游戏快照目录：优先用游戏自己的 QuickSaver.LocalSavesFolder（PC = Application.persistentDataPath + "/snapshots"），
-        // 取不到时退回 persistentDataPath 拼接。只读，不写/不删任何文件。
+        // 游戏快照目录：优先用 QuickSaver.LocalSavesFolder，取不到时退回 persistentDataPath。只读。
         private static string LocalSnapshotsFolder() {
             try {
                 string f = QuickSaver.LocalSavesFolder;
@@ -514,8 +498,7 @@ namespace SR_UCH.Tweaks {
             try { return Path.Combine(Application.persistentDataPath, "snapshots"); } catch { return null; }
         }
 
-        // 本地快照是 SevenZipHelper 压缩的 UTF8 XML（与原版 DoLocalSave 一致）：校验压缩大小/解压大小/字符数/方块数后
-        // 用 ParseXmlSafe 解析，返回解压后的 XML 字符串。只读，绝不写回。
+        // 本地快照是 SevenZipHelper 压缩的 UTF8 XML：校验压缩/解压大小、字符数、方块数后解析。
         private static string ReadLocalSnapshotXml(string path, out XmlDocument doc, out int blocks) {
             doc = null;
             blocks = 0;
@@ -527,7 +510,7 @@ namespace SR_UCH.Tweaks {
                     return null;
                 }
                 byte[] bytes = File.ReadAllBytes(path);
-                // 7z/LZMA 头：前 5 字节是编码属性，随后 8 字节是解压后字节数（小端）。先按声明大小拦截解压炸弹。
+                // 7z/LZMA 头：前 5 字节是编码属性，随后 8 字节是解压后字节数；先按声明大小拦截解压炸弹。
                 if (bytes.Length >= 13) {
                     long declared = 0L;
                     for (int i = 0; i < 8; i++) declared |= (long)bytes[5 + i] << (8 * i);
@@ -554,8 +537,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 本地关卡展示名：文件名去掉 .snapshot 与 .c/.v 后缀（游戏自己的 GetSnapshotNameWithoutSuffix 同一规则），
-        // 空名回退文件名。
+        // 本地关卡展示名：文件名去掉 .snapshot 与 .c/.v 后缀，空名回退文件名。
         private static string LocalLevelName(string fileName) {
             try {
                 string n = fileName ?? "";
@@ -566,7 +548,7 @@ namespace SR_UCH.Tweaks {
             } catch { return fileName ?? ""; }
         }
 
-        // 扫描 snapshots 目录，把本地保存的自定义关卡追加进 _presets（IsLocal=true，key="local:"+文件名）。
+        // 扫描 snapshots 目录，把本地自定义关卡追加进 _presets（IsLocal=true，key="local:"+文件名）。
         private static void LoadLocalSnapshots() {
             try {
                 string folder = LocalSnapshotsFolder();
@@ -586,17 +568,16 @@ namespace SR_UCH.Tweaks {
                         li.File = fn;
                         li.FilePath = fp;
                         li.Name = LocalLevelName(fn);
-                        // 快照里若带 snapshotName/levelName（部分导入/下载的 .snapshot），优先用它作为名称；
-                        // 原版本地保存的 XML 没有该属性，按文件名回退。
+                        // 快照里带 snapshotName/levelName 时优先用它，否则按文件名回退。
                         string snapName = doc.DocumentElement.GetAttribute("snapshotName");
                         if (string.IsNullOrEmpty(snapName)) snapName = doc.DocumentElement.GetAttribute("levelName");
                         if (!string.IsNullOrEmpty(snapName)) li.Name = snapName;
-                        li.Mode = "";   // 本地快照不存 GameMode：留空表示跟随当前/所选的加载模式，避免按后缀误判成派对
+                        li.Mode = "";   // 本地快照不存 GameMode：留空表示跟随加载模式
                         li.Blocks = blocks;
                         li.Ok = blocks > 0;
                         li.TimeUtc = File.GetLastWriteTimeUtc(fp);
                         li.Level = doc.DocumentElement.GetAttribute("levelSceneName") ?? "";
-                        // 自定义关卡（BlankLevel）用文件名作为实际关卡名；内置关卡让 LevelText 走本地化场景名。
+                        // 自定义关卡（BlankLevel）用文件名作为关卡名；内置关卡走本地化场景名。
                         if (string.Equals(li.Level, "BlankLevel", StringComparison.OrdinalIgnoreCase)) li.LevelName = li.Name;
                         string code = doc.DocumentElement.GetAttribute("snapshotCode");
                         if (string.IsNullOrEmpty(code)) code = doc.DocumentElement.GetAttribute("levelCode");
@@ -611,8 +592,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 统一读取入口：预设读 .xml 文本；本地关卡解压 .snapshot（仍走同一套大小/方块上限）。
-        // 加载前按该预设的修改器策略改写 <mods>（继承时原样返回）。
+        // 统一读取入口：预设读 .xml；本地关卡解压 .snapshot（同一套大小/方块上限）；加载前按修改器策略改写 <mods>。
         private static string ReadPresetXml(PresetInfo p) {
             string xml = ReadPresetXmlRaw(p);
             return string.IsNullOrEmpty(xml) ? xml : ApplyModsPolicy(xml, p);
@@ -660,7 +640,7 @@ namespace SR_UCH.Tweaks {
 
 
 
-        // 读取预设 XML：加载路径与导入路径用同一套上限（超大/畸形文件直接拒绝，避免主线程长时间卡顿或 OOM）。
+        // 读取预设 XML：加载与导入共用同一套上限（超大/畸形文件直接拒绝，避免卡顿或 OOM）。
         private static string ReadAllText(string path) {
             try {
                 if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
@@ -674,7 +654,7 @@ namespace SR_UCH.Tweaks {
                 try { xml = File.ReadAllText(path, Encoding.UTF8); }
                 catch (Exception __rx) { SRApi.Guard.Log("布局预设/读取主文件", __rx); }
                 if (string.IsNullOrEmpty(xml)) {
-                    // 主文件读不出来（写坏/被占用/截断）时回退到覆盖前留的 .bak，避免整条预设直接丢失。
+                    // 主文件读不出来（写坏/被占用/截断）时回退到覆盖前的 .bak。
                     try {
                         string bak = path + ".bak";
                         if (File.Exists(bak)) {
@@ -688,14 +668,14 @@ namespace SR_UCH.Tweaks {
                     SRApi.Notify(SRApi.T("预设文件过大，已拒绝加载（上限约 2MB）", "Preset file is too large and was not loaded (limit about 2MB)"));
                     return null;
                 }
-                // 方块数上限：与导入路径的 MaxImportBlocks 保持一致（超限的畸形文件不进入重建流程）。
+                // 方块数上限：与导入路径的 MaxImportBlocks 一致。
                 int blocks = 0;
                 int at = 0;
                 while (true) {
                     at = xml.IndexOf("<block", at, StringComparison.Ordinal);
                     if (at < 0) break;
                     int after = at + 6;
-                    // 只认 <block ... / <block> / <block/>：避免把 <blocked> 之类的节点误计成方块。
+                    // 只认 <block ... / <block> / <block/>，避免把 <blocked> 误计成方块。
                     if (after < xml.Length) {
                         char ch = xml[after];
                         if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == '>' || ch == '/') blocks++;

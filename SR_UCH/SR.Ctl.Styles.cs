@@ -1,5 +1,4 @@
-// 控件样式门面分片：从 SR.Ctl.cs 拆出的纯 getter（评审 P2：SR.Ctl.cs 偏大）。
-// 只做转发，不含逻辑；样式对象本身仍由 SR.Styles.cs 创建。
+// 控件样式门面分片：纯 getter 转发，样式对象由 SR.Styles.cs 创建。
 using System;
 using System.Collections.Generic;
 using UnityEngine;

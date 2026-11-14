@@ -11,16 +11,15 @@ public partial class SR {
 // 分区：Styles（深色主题 GUIStyle / 字体 / 纹理 / 滑块素材）
 
         internal static Font OrigSkinFontValue { get { return _origSkinFont; } }
-        private static Font _origSkinFont;                 //全局皮肤的原始字体（恢复用）
+        private static Font _origSkinFont;                 // 全局皮肤的原始字体（恢复用）
         private static bool _origSelColorSaved;
-        private static Color _origSelColor;               //全局皮肤的原始选择色
+        private static Color _origSelColor;               // 全局皮肤的原始选择色
 
-        // 控件内边距（对齐 Dear ImGui 的 FramePadding 节奏）：按钮、输入框、下拉框、复选框共用同一套水平内边距，
-        // 底部 5px 是 CJK 字形下沉余量（微软雅黑字形的下半截会被裁），不要跟着水平值一起改小。
+        // 控件内边距（对齐 Dear ImGui 的 FramePadding）；底部 5px 是 CJK 字形下沉余量，不要跟着水平值改小。
         internal const int FramePadX = 10;          // 左右内边距
         internal const int FramePadTop = 3;         // 上内边距
         internal const int FramePadBottom = 5;      // 下内边距（CJK 基线偏移余量）
-        // 章节标题 / 分组的间距节奏：标题上方 8px、下方 6px（与 ItemSpacing 同一量级，保持 6/8 节奏）。
+        // 章节标题间距节奏：上方 8px、下方 6px。
         internal const int SectionGapTop = 8;
         internal const int SectionGapBottom = 6;
 
@@ -32,7 +31,7 @@ public partial class SR {
             return t;
         }
 
-        //复制自 GUI.skin 后重置边框 / 边距 / 偏移，避免游戏皮肤自带的大边距挤压并裁剪文字。
+        // 复制自 GUI.skin 后重置边框/边距/偏移，避免游戏皮肤的大边距挤压并裁剪文字。
         private static void CleanStyle(GUIStyle s, RectOffset border) {
             s.border = border;
             s.margin = new RectOffset(0, 0, 0, 0);
@@ -43,7 +42,7 @@ public partial class SR {
         private static GUIStyle StyleBtn(Color bg, Color hover, Color active, Color text) {
             GUIStyle s = new GUIStyle(GUI.skin.button);
             CleanStyle(s, new RectOffset(2, 2, 2, 2));
-            s.stretchWidth = false; //绝不随窗口宽度拉伸（下拉框/按钮宽度固定）
+            s.stretchWidth = false; // 绝不随窗口宽度拉伸
             s.stretchHeight = false;
             s.normal.background = Solid(bg);
             s.normal.textColor = text;
@@ -52,57 +51,50 @@ public partial class SR {
             s.active.background = Solid(active);
             s.active.textColor = text;
             s.alignment = TextAnchor.MiddleLeft;
-            // 水平内边距 10px（按钮文字不贴边），垂直 3/5（底部 5 给 CJK 字形留余量）。
             s.padding = new RectOffset(FramePadX, FramePadX, FramePadTop, FramePadBottom);
             _styleList.Add(s);
             return s;
         }
 
-        //中文字体候选名，依次尝试：CreateDynamicFontFromOSFont 在字体缺失时返回 null 而不抛异常，故须显式判空回退。
-        //微软雅黑的 CJK 字形下沉到度量线下方，所有文本样式须加额外垂直内边距防裁切。
+        // 中文字体候选依次尝试（字体缺失时返回 null 须回退）；雅黑 CJK 字形下沉，所有文本样式须加垂直内边距防裁切。
         private static readonly string[] FontCandidates = {
             "Microsoft YaHei", "微软雅黑", "Noto Sans CJK SC", "Source Han Sans SC",
             "WenQuanYi Micro Hei", "PingFang SC", "Heiti SC"
         };
 
-        //字体创建整轮失败后的退避：记录失败字号，3 秒内不再重试（否则每帧重查 7 个候选字体）。
-        private static int _fontFailSize = -1;   //上次失败的目标字号（-1 = 无记录）
+        // 字体创建整轮失败后的退避：3 秒内不再重试同一字号。
+        private static int _fontFailSize = -1;   // 上次失败的目标字号（-1 = 无记录）
         private static float _fontNextTryAt;
         // 已退役但可能仍被 GUI.skin 引用的字体（下一轮重建时再销毁）
         private static Font _retiredFont;
 
-        //字号随 UI 缩放，保证布局高度与文字实际高度一致。
+        // 字号随 UI 缩放，保证布局高度与文字实际高度一致。
         private static void EnsureFont() {
             int fs = Mathf.RoundToInt(14f * Mathf.Clamp(_uiScaleEntry.Value, Ui.ScaleMin, Ui.ScaleMax));
-            if (_font != null && _font.fontSize == fs) return; //字号未变，直接返回
-            //退避期内不重试该字号
+            if (_font != null && _font.fontSize == fs) return; // 字号未变，直接返回
             if (_fontFailSize == fs && Time.unscaledTime < _fontNextTryAt) return;
-            //先摘下旧字体再重建（重建循环以 _font == null 为条件），失败则回退旧字体。
+            // 先摘下旧字体再重建（重建循环以 _font == null 为条件），失败则回退旧字体。
             Font old = _font;
             _font = null;
             for (int i = 0; i < FontCandidates.Length && _font == null; i++) {
                 try {
                     Font nf = Font.CreateDynamicFontFromOSFont(FontCandidates[i], fs);
-                    if (nf == null) continue; //字体不存在时返回 null
+                    if (nf == null) continue; // 字体不存在时返回 null
                     UnityEngine.Object.DontDestroyOnLoad(nf);
                     _font = nf;
                 } catch (Exception __ex) { Guard.Log("创建中文字体(" + FontCandidates[i] + ")", __ex); }
             }
             if (_font == null) {
-                _font = old;                      //回退旧字体（可能为 null）
-                _fontFailSize = fs;               //记录失败字号
+                _font = old;                      // 回退旧字体（可能为 null）
+                _fontFailSize = fs;               // 记录失败字号
                 _fontNextTryAt = Time.unscaledTime + 3f;
             } else {
-                _fontFailSize = -1;               //清除失败记录
-                //GUI.skin 为全局共享皮肤（ConfigurationManager 等同样使用）。
-                //这里只"记录原值"，不再写皮肤：字体由 SR.Window 在自己的 try 里应用、finally 里还原，
-                //否则创建字体这一步就会把全局皮肤改掉（评审 G7：跨模组污染、且失败路径也会赋值）。
+                _fontFailSize = -1;               // 清除失败记录
+                // 这里只“记录原值”不写皮肤：字体由 SR.Window 应用并在 finally 还原。
                 try {
                     if (_origSkinFont == null) _origSkinFont = GUI.skin.font;
                 } catch (Exception __ex) { Guard.Log("EnsureFont", __ex); }
-                // 旧字体延迟销毁：此刻 GUI.skin.font 可能仍指向 old（窗口在本帧稍后才应用新字体），
-                // 立即 Destroy 会销毁正在使用的字体（audit 07-P0-3）。
-                // 记下来，等下一次重建时确认皮肤已经不用它了再销毁。
+                // 旧字体延迟销毁：此刻 GUI.skin.font 可能仍指向它，立即 Destroy 会销毁正在使用的字体，故下次重建再回收。
                 if (old != null && !ReferenceEquals(old, _font)) {
                     if (_retiredFont != null && !ReferenceEquals(_retiredFont, GUI.skin.font)) {
                         try { UnityEngine.Object.Destroy(_retiredFont); } catch (Exception __rf) { Guard.Log("销毁旧字体", __rf); }
@@ -126,19 +118,18 @@ public partial class SR {
         private static readonly Color _cCapture = new Color(0.5f, 0.3f, 0.12f, 1f);
         private static readonly Color _cText = new Color(0.92f, 0.92f, 0.95f, 1f);
 
-        //保存原始选择色：必须在第一次改写之前调用。
+        // 保存原始选择色：必须在第一次改写之前调用。
         private static void EnsureOrigSelColor() {
             try {
                 if (!_origSelColorSaved) { _origSelColor = GUI.skin.settings.selectionColor; _origSelColorSaved = true; }
             } catch (Exception __ex) { Guard.Log("保存原始选择色", __ex); }
         }
-        //绘制结束后还原全局选择色（GUI.skin 为全局共享皮肤）。
-        // 供 SR.Window 在每次 OnGUI 趟写回（共享皮肤可能被别的插件改回暖色）
+        // 绘制结束后还原全局选择色（GUI.skin 为全局共享皮肤，可能被别的插件改回）。
         internal static void RestoreSkinSelectionColor() {
             try { if (_origSelColorSaved && GUI.skin != null) GUI.skin.settings.selectionColor = _origSelColor; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
-        // 文本标签底部 1px 缓冲：中文/字母的下沿常被样式高度裁掉一点，统一多给 1px 内边距。
+        // 文本标签底部 1px 缓冲：中文/字母下沿常被样式高度裁掉。
         private static void AddBottomBuffer(GUIStyle st) {
             try {
                 if (st == null) return;
@@ -148,7 +139,6 @@ public partial class SR {
         }
 
         private static void EnsureStyles() {
-            //样式仍在但纹理被卸载时重建
             if (_stylesReady && _win != null && _win.normal.background == null) _stylesReady = false;
             if (_stylesReady) { SyncScaledStyles(); return; }
             _stylesReady = true;
@@ -159,14 +149,13 @@ public partial class SR {
                 if (s.focused.background != null) UnityEngine.Object.Destroy(s.focused.background);
             }
             _styleList.Clear();
-            //这些纹理挂在 DontDestroyOnLoad 上，重建前须先销毁旧对象。
             if (_gripTex != null) { UnityEngine.Object.Destroy(_gripTex); _gripTex = null; }
             if (_cursorTex != null) { UnityEngine.Object.Destroy(_cursorTex); _cursorTex = null; }
             if (_cursorResizeTex != null) { UnityEngine.Object.Destroy(_cursorResizeTex); _cursorResizeTex = null; }
             if (_cursorMoveTex != null) { UnityEngine.Object.Destroy(_cursorMoveTex); _cursorMoveTex = null; }
             if (_checkTex != null) { UnityEngine.Object.Destroy(_checkTex); _checkTex = null; }
-        //文本选中高亮改为左栏选中项的蓝色（IMGUI 默认为橙色）
-        EnsureOrigSelColor();   //必须先存原始值再改写
+        // 文本选中高亮改为左栏选中项的蓝色（IMGUI 默认为橙色）。
+        EnsureOrigSelColor();   // 必须先存原始值再改写
         GUI.skin.settings.selectionColor = _cSelItem;
 
             Texture2D winTex = new Texture2D(2, 2);
@@ -192,7 +181,7 @@ public partial class SR {
             _titleMid.fontStyle = FontStyle.Normal;
             _titleMid.fontSize = 0; //跟随缩放后的字体
             _titleMid.normal.textColor = new Color(0.75f, 0.78f, 0.85f, 1f);
-            //左对齐：宽度收窄后居中会两端同时裁切，左对齐仅裁右端，文字开头始终可读。
+            // 左对齐：宽度收窄后居中会两端同时裁切，左对齐只裁右端。
             _titleMid.alignment = TextAnchor.MiddleLeft;
             _styleList.Add(_titleMid);
 
@@ -202,9 +191,6 @@ public partial class SR {
         EnsureStylesPopups();
         EnsureStylesSliderChrome();
         EnsureStylesCursors();
-        // 所有文本样式统一加 1px 底部缓冲（只影响文字绘制区域，不改变控件高度）
-        // 规则（写进 DESIGN）：任何承载文字的样式，padding.bottom 至少 1px；
-        // 以前是手工挑几条样式加，新加的样式会漏，表现为"有的标签还是贴着下边"。
         for (int __si = 0; __si < _styleList.Count; __si++) AddBottomBuffer(_styleList[__si]);
         AddBottomBuffer(_label); AddBottomBuffer(_labelWrap); AddBottomBuffer(_selItem);
         AddBottomBuffer(SR.Ctl.LabelClip); AddBottomBuffer(SR.Ctl.LabelClipCenter); AddBottomBuffer(SR.Ctl.SecHeaderCenter);
@@ -212,8 +198,7 @@ public partial class SR {
         SyncScaledStyles();   //记录当前缩放档并同步随缩放变化的样式
         }
 
-        //部分样式的字号在构建时按缩放写死（见 _labelWrap），缩放变化时不重建，故在此同步。
-        //只改样式字号，不重建纹理。
+        // 部分样式的字号按缩放写死，缩放变化时在此同步（只改字号，不重建纹理）。
         private static float _styleScale = -1f;
         private static void SyncScaledStyles() {
             try {
@@ -236,20 +221,17 @@ public partial class SR {
             _nameLabel.wordWrap = true; //条目名称列：换行而非裁切
             _styleList.Add(_nameLabel);
 
-            //固定宽度单元格用：不折行，超出裁切。
             _labelClip = new GUIStyle(_label);
             _labelClip.wordWrap = false;
             _labelClip.clipping = TextClipping.Clip;
             _styleList.Add(_labelClip);
 
-            //联机列表的表头与单元格一律居中
             _labelClipCenter = new GUIStyle(_labelClip);
             _labelClipCenter.alignment = TextAnchor.MiddleCenter;
             _styleList.Add(_labelClipCenter);
 
             _secHeaderCenter = new GUIStyle(_labelClip);
             _secHeaderCenter.fontStyle = FontStyle.Bold;
-        //表头在格内居中，左右不需要内边距，故把继承的 6px 压到 2px。
         _secHeaderCenter.padding = new RectOffset(2, 2, 3, 5);
             _secHeaderCenter.alignment = TextAnchor.MiddleCenter;
             _secHeaderCenter.normal.textColor = new Color(0.65f, 0.78f, 1f, 1f);
@@ -258,7 +240,6 @@ public partial class SR {
             _secHeader = new GUIStyle(_label);
             _secHeader.fontStyle = FontStyle.Bold;
             _secHeader.normal.textColor = new Color(0.65f, 0.78f, 1f, 1f);
-            // 章节标题上下固定节奏（上 8 / 下 6）：对应 ImGui 的 ItemSpacing，让分区有呼吸感。
             _secHeader.margin = new RectOffset(0, 0, SectionGapTop, SectionGapBottom);
             _styleList.Add(_secHeader);
 
@@ -273,7 +254,6 @@ public partial class SR {
             _chatLabel.padding = new RectOffset(6, 6, 6, 16);
             _styleList.Add(_chatLabel);
 
-            //会话内容页显示聊天记录（可选中复制），沿用聊天标签样式且无输入框底色
             _chatArea = new GUIStyle(_chatLabel);
             _chatArea.wordWrap = true;
             _chatArea.richText = false;
@@ -283,12 +263,10 @@ public partial class SR {
         private static void EnsureStylesSidebarItems() {
             _item = StyleBtn(_cItem, _cItemHover, _cItemHover, _cText);
             _item.alignment = TextAnchor.MiddleLeft;
-            //外边距归零，消除相邻栏目之间的缝隙。
             _item.margin = new RectOffset(0, 0, 0, 0);
-            _item.border = new RectOffset(0, 0, 0, 0); //9-slice 边框同样会留缝
+            _item.border = new RectOffset(0, 0, 0, 0); // 9-slice 边框同样会留缝
             _selItem = StyleBtn(_cSelItem, _cSelItem, _cSelItem, Color.white);
             _selItem.alignment = TextAnchor.MiddleLeft;
-            //几何参数与普通项一致（仅配色不同），否则选中项与普通项之间会出现细缝。
             _selItem.margin = _item.margin;
             _selItem.border = _item.border;
             _selItem.padding = _item.padding;
@@ -300,7 +278,6 @@ public partial class SR {
         private static void EnsureStylesButtons() {
             _btn = StyleBtn(_cBtnBg, _cBtnHover, _cBtnActive, _cText);
             _btn.alignment = TextAnchor.MiddleCenter;
-            //窄格按钮（联机列表操作列）：内边距 2px
             _btnClip = new GUIStyle(_btn);
             _btnClip.padding = new RectOffset(2, 2, 2, 2);
             _btnClip.clipping = TextClipping.Clip;
@@ -315,7 +292,7 @@ public partial class SR {
             _checkOff = StyleBtn(_cFrame, _cFrameHover, _cFrame, new Color(0.35f, 0.35f, 0.4f, 1f));
             _checkOff.alignment = TextAnchor.MiddleCenter;
             _checkOff.padding = new RectOffset(0, 0, 0, 0);
-            //Dear ImGui 风格复选框：1px 方框 + 深色底，勾选时淡蓝填充；未勾选用浅灰边框保证可辨。
+            // Dear ImGui 风格复选框：1px 方框 + 深色底，勾选时淡蓝填充。
             Texture2D chkOffTex = new Texture2D(3, 3);
             Color chkOffBg = new Color(0.16f, 0.17f, 0.2f, 1f);
             Color chkOffBorder = new Color(0.45f, 0.48f, 0.55f, 0.9f);
@@ -342,14 +319,14 @@ public partial class SR {
             _checkOn.normal.background = Solid(new Color(0.2f, 0.32f, 0.52f, 1f)); //勾选态：淡蓝底
             _checkOn.hover.background = Solid(new Color(0.26f, 0.4f, 0.62f, 1f));
 
-            //勾用运行时生成的贴图：字体回退到 Unity 默认字体时 U+2713 会显示为豆腐块。
+            // 勾用运行时生成的贴图：字体回退到 Unity 默认字体时 U+2713 会显示为豆腐块。
             _checkTex = MakeCheckTex(24, 2.6f);
 
         }
         private static void EnsureStylesPopups() {
             _popup = new GUIStyle(GUI.skin.box);
             CleanStyle(_popup, new RectOffset(1, 1, 1, 1));
-            //Dear ImGui popup：深色底 + 1px 边框（9-slice：边=边框色，中心=背景色）
+            // Dear ImGui popup：深色底 + 1px 边框（9-slice：边=边框色，中心=背景色）。
             Texture2D popTex = new Texture2D(3, 3);
             Color popBorder = new Color(0.42f, 0.45f, 0.52f, 0.9f);
             Color popBg = new Color(0.1f, 0.1f, 0.12f, 0.98f);
@@ -366,8 +343,7 @@ public partial class SR {
             _styleList.Add(_popup);
 
             _searchBox = new GUIStyle(GUI.skin.textField);
-            CleanStyle(_searchBox, new RectOffset(0, 0, 0, 0));            //各状态都须有实底，否则会透出游戏皮肤的悬停贴图
-            // 背景保持原有灰（用户要改的是"选中文本的颜色"，不是输入框底色）
+            CleanStyle(_searchBox, new RectOffset(0, 0, 0, 0));            // 各状态都须有实底，否则会透出游戏皮肤的悬停贴图
             _searchBox.normal.background = Solid(_cFrame);
             _searchBox.normal.textColor = _cText;
             _searchBox.hover.background = Solid(_cFrameHover);
@@ -376,11 +352,10 @@ public partial class SR {
             _searchBox.active.textColor = _cText;
             _searchBox.focused.background = Solid(_cFrameHover);
             _searchBox.focused.textColor = _cText;
-            // 输入框与按钮同一套内边距：同排控件里的文字基线一致。
             _searchBox.padding = new RectOffset(FramePadX, FramePadX, FramePadTop, FramePadBottom);
             _styleList.Add(_searchBox);
 
-            //Dear ImGui 风格滑块：轨道 / 已填充 / 把手（normal、hover、active 三态）
+            // Dear ImGui 风格滑块：轨道/已填充/把手（normal、hover、active 三态）。
         }
         private static void EnsureStylesSliderChrome() {
             _sliderTrack = new GUIStyle(GUI.skin.box);
@@ -393,7 +368,7 @@ public partial class SR {
             _styleList.Add(_sliderFill);
             _sliderHandle = StyleBtn(new Color(0.72f, 0.74f, 0.8f, 1f), new Color(0.72f, 0.74f, 0.8f, 1f), new Color(0.72f, 0.74f, 0.8f, 1f), Color.white);
             _sliderHandle.alignment = TextAnchor.MiddleCenter;
-            //把手配色对齐 ImGui 的 Grab / GrabHovered / GrabActive（悬停变亮，按下略暗偏蓝）。
+            // 把手配色对齐 ImGui 的 Grab/GrabHovered/GrabActive（悬停变亮，按下略暗偏蓝）。
             _sliderHandleHover = StyleBtn(new Color(0.85f, 0.87f, 0.92f, 1f), new Color(0.85f, 0.87f, 0.92f, 1f), new Color(0.85f, 0.87f, 0.92f, 1f), Color.white);
             _sliderHandleHover.alignment = TextAnchor.MiddleCenter;
             _sliderHandleActive = StyleBtn(new Color(0.58f, 0.64f, 0.78f, 1f), new Color(0.58f, 0.64f, 0.78f, 1f), new Color(0.58f, 0.64f, 0.78f, 1f), Color.white);
@@ -414,20 +389,19 @@ public partial class SR {
             _tooltip.wordWrap = true;
             _styleList.Add(_tooltip);
 
-        //右下角缩放三角：实心三角，贴图边长等于绘制边长（点采样无锯齿），纯白贴图由 GUI.color 着色。
-        int gs = Mathf.Max(8, Mathf.RoundToInt(Sc(21)));   //贴图边长随 UI 缩放
+        // 右下角缩放三角：实心三角，贴图边长等于绘制边长（点采样无锯齿），纯白贴图由 GUI.color 着色。
+        int gs = Mathf.Max(8, Mathf.RoundToInt(Sc(21)));   // 贴图边长随 UI 缩放
         _gripTex = new Texture2D(gs, gs, TextureFormat.RGBA32, false);
         Color wclear = new Color(1f, 1f, 1f, 0f);
         Color wsolid = new Color(1f, 1f, 1f, 1f);
         for (int gy = 0; gy < gs; gy++) {
             for (int gx = 0; gx < gs; gx++) {
-                //右下角实心三角：贴图坐标 y=0 在下，故填充条件为 gx >= gy。
                 bool on = gx >= gy;
                 _gripTex.SetPixel(gx, gy, on ? wsolid : wclear);
             }
         }
         _gripTex.Apply();
-        _gripTex.filterMode = FilterMode.Point;   //贴图与绘制 1:1，点采样即锐利
+        _gripTex.filterMode = FilterMode.Point;   // 贴图与绘制 1:1，点采样即锐利
         _gripTex.wrapMode = TextureWrapMode.Clamp;
         UnityEngine.Object.DontDestroyOnLoad(_gripTex);
 
@@ -446,7 +420,6 @@ public partial class SR {
             _cursorTex.Apply();
             UnityEngine.Object.DontDestroyOnLoad(_cursorTex);
 
-            //左右调整光标（<->）：悬停栏目分隔线时替代圆点光标
             _cursorResizeTex = new Texture2D(16, 16, TextureFormat.RGBA32, false);
             string[] rs = {
                 "................",
@@ -476,7 +449,6 @@ public partial class SR {
             _cursorResizeTex.Apply();
             UnityEngine.Object.DontDestroyOnLoad(_cursorResizeTex);
 
-            //四向移动光标（+）：悬停可拖动单元格时使用（与联机列表共用）
             _cursorMoveTex = new Texture2D(16, 16, TextureFormat.RGBA32, false);
             string[] ms = {
                 "................",
@@ -507,14 +479,14 @@ public partial class SR {
             UnityEngine.Object.DontDestroyOnLoad(_cursorMoveTex);
         }
 
-        //复选框的"勾"贴图（透明底 + 白色勾）：对两段线段逐像素求距离做软边抗锯齿。
+        // 复选框的“勾”贴图（透明底 + 白色勾）：对两段线段逐像素求距离做软边抗锯齿。
         private static Texture2D _checkTex;
         internal static Texture2D CheckTex { get { return _checkTex; } set { _checkTex = value; } }
         private static Texture2D MakeCheckTex(int size, float thickness) {
             Texture2D t = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            Vector2 p0 = new Vector2(size * 0.18f, size * 0.50f);   //起点（左中）
-            Vector2 p1 = new Vector2(size * 0.40f, size * 0.28f);   //底点（y=0 在下）
-            Vector2 p2 = new Vector2(size * 0.82f, size * 0.72f);   //终点（右上）
+            Vector2 p0 = new Vector2(size * 0.18f, size * 0.50f);   // 起点（左中）
+            Vector2 p1 = new Vector2(size * 0.40f, size * 0.28f);   // 底点（y=0 在下）
+            Vector2 p2 = new Vector2(size * 0.82f, size * 0.72f);   // 终点（右上）
             float half = thickness * 0.5f;
             Color clear = new Color(1f, 1f, 1f, 0f);
             for (int y = 0; y < size; y++) {
@@ -530,7 +502,6 @@ public partial class SR {
             UnityEngine.Object.DontDestroyOnLoad(t);
             return t;
         }
-        //点到线段的最短距离
         private static float SegDist(Vector2 p, Vector2 a, Vector2 b) {
             Vector2 ab = b - a;
             float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-5f, ab.sqrMagnitude));

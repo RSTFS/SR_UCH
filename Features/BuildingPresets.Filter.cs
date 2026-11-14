@@ -1,5 +1,4 @@
-// 布局预设 · 筛选 / 排序 / 可见行集合。
-// 从 BuildingPresets.cs 拆出来只为控制单文件规模，行为不变。
+// 布局预设 · 筛选与排序：可见行集合、签名缓存、各筛选下拉。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -8,8 +7,7 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
     public partial class BuildingPresets {
         private static List<PresetInfo> VisiblePresets() {
-            // 签名驱动：只有数据 / 筛选 / 排序 / 语言 / 显示模式真正变化时才重算。
-            // 同一帧内 OnGUI 的多次调用由 _sigFrame 折叠成一次签名计算。
+            // 签名驱动：仅数据 / 筛选 / 排序 / 语言 / 显示模式变化时重算。
             int sig = VisibleSignature();
             if (sig != _visSig) {
                 _visSig = sig;
@@ -22,8 +20,7 @@ namespace SR_UCH.Tweaks {
             return _visSource.Rows;
         }
 
-        // 覆盖所有会影响可见行内容的输入。漏掉任何一处都只会让列表"不刷新"，所以显式枚举，
-        // 不依赖调用方记得 Invalidate。签名按帧缓存，避免每趟 OnGUI 都遍历一次。
+        // 显式枚举所有影响可见行的输入（漏掉只会让列表不刷新）；签名按帧缓存。
         private static int VisibleSignature() {
             if (_sigFrame == Time.frameCount) return _sigCache;
             unchecked {
@@ -53,7 +50,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 仅筛选条件（不含数据）的签名：变化时复位滚动位置与二次确认态。
+        // 仅筛选条件的签名：变化时复位滚动位置与二次确认态。
         private static int FilterSignature() {
             unchecked {
                 int h = 7;
@@ -66,8 +63,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 筛选下拉选项的签名：只依赖预设集合里的 Level/Mode 与当前语言。
-        // 两个下拉同帧各调一次；这里一次遍历同时算出两份签名并按帧缓存。
+        // 下拉选项签名：只依赖预设集合的 Level/Mode 与语言。
         private static void EnsureOptionSignatures() {
             if (_optSigFrame == Time.frameCount) return;
             unchecked {
@@ -91,8 +87,6 @@ namespace SR_UCH.Tweaks {
             return level ? _optSigLevel : _optSigMode;
         }
 
-        // 过滤条件（原 VisiblePresets 内的判断，原样保留语义）。
-        // 筛选值落盘（节流由核心配置系统/FlushConfig 统一处理）。
         private static void SetFilterValue(ConfigEntry<string> e, string v) {
             try { if (e != null) { e.Value = v ?? ""; SRApi.Ctl.MarkConfigDirty(e.ConfigFile); } }
             catch (Exception __fv) { SRApi.Guard.Log("布局预设/筛选落盘", __fv); }
@@ -100,7 +94,6 @@ namespace SR_UCH.Tweaks {
 
         private static bool PassPresetFilter(PresetInfo p) {
             try {
-                // 纯逻辑在 PresetFilterLogic（无 Unity 依赖，单元测试覆盖）。
                 return PresetFilterLogic.Pass(p.Name, p.Level, p.Mode, p.IsLocal,
                     _typeFilter, _levelFilter, _modeFilter, _search);
             } catch { return false; }
@@ -127,7 +120,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/渲染关卡筛选", __ex); }
         }
 
-        // 关卡筛选选项：第一项为空（全部），其余为当前预设里出现过的关卡场景名，按本地化关卡名排序。
+        // 关卡筛选项：首项「全部」，其余为出现过的关卡场景名，按本地化名排序。
         private static List<string> LevelFilterValues() {
             int sig = FilterOptionsSignature(true);
             if (sig == _levelOptSig && _levelOpts.Count > 0) return _levelOpts;
@@ -170,7 +163,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/渲染模式筛选", __ex); }
         }
 
-        // 模式筛选选项：第一项为空（全部），其余为当前预设里出现过的模式目录名，按本地化模式名排序。
+        // 模式筛选项：首项「全部」，其余为出现过的模式目录名，按本地化名排序。
         private static List<string> ModeFilterValues() {
             int sig = FilterOptionsSignature(false);
             if (sig == _modeOptSig && _modeOpts.Count > 0) return _modeOpts;
@@ -212,8 +205,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/渲染类型筛选", __ex); }
         }
 
-        // 加载模式下拉：默认 + 游戏四模式（派对 / 创意 / 挑战 / 自由）。运行期状态，不落配置。
-        // 值为 "" 或 GameState.GameMode 的 ToString；显示名复用 ModeText（游戏本地化 / 中文回退）。
+        // 加载模式下拉：默认 + 游戏四模式；运行期状态，不落配置。
         private static void RenderLoadModeCombo() {
             try {
                 string[] vals = new string[] { "", "PARTY", "CREATIVE", "CHALLENGE", "FREEPLAY" };
@@ -221,7 +213,6 @@ namespace SR_UCH.Tweaks {
                 for (int i = 0; i < vals.Length; i++) {
                     if (string.Equals(vals[i], _loadMode, StringComparison.OrdinalIgnoreCase)) { cur = i; break; }
                 }
-                // 运行期状态被外部改坏时回退到默认，避免下拉框显示空白。
                 if (cur == 0 && !string.IsNullOrEmpty(_loadMode)) _loadMode = "";
                 string[] labels = new string[vals.Length];
                 labels[0] = SRApi.T("默认", "Default");
@@ -235,7 +226,6 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 排序下拉：只有 时间 / 名称 两项。
         private static void RenderSortCombo() {
             try {
                 ConfigEntryBase e = SRApi.Ctl.FindEntry(Section, "Sort Mode");

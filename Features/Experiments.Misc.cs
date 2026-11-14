@@ -1,4 +1,4 @@
-// 实验 · 其它页：自由相机 + 加载后清理（GC）。
+// 实验 · 其它页：跨平台联机开关 + 页面补丁注册。
 
 using System;
 using System.Reflection;
@@ -11,12 +11,10 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
 public partial class Experiments : ITweak
     {
-        // 其它页：自由相机 / 加载后清理
         public static void RenderPage2() {
             try {
-                // 「自由相机」分区已迁到侧栏「自由模式」页（用户要求），这里不再渲染。
 
-                // 跨平台联机：直接改游戏自己的 CrossPlatformToggle（反射定位，不绑版本）。
+                // 跨平台联机：反射改游戏自己的 CrossPlatformToggle，不绑版本。
                 GUILayout.Space(SRApi.Ctl.Sc(6));
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("跨平台联机", "Cross-play") + " -",
                     SRApi.T("开：匹配池包含其它平台（走 Unity 大厅/中继，延迟通常更高）；关：只和同平台玩家联机. "
@@ -41,7 +39,7 @@ public partial class Experiments : ITweak
 
             } catch (Exception __ex) { SRApi.Guard.Log("其它页 渲染", __ex); }
         }
-        // 本页功能的补丁统一注册点（CreateAndPatchAll 不会自动发现带 [HarmonyPatch] 的类型）。
+        // 本页补丁统一注册点（CreateAndPatchAll 不会自动发现带 [HarmonyPatch] 的类型）。
         internal static void InitCleanup(IFeatureHost plugin) {
             try { Harmony.CreateAndPatchAll(typeof(Experiments), (string)null); }
             catch (Exception e) { SRApi.LogError("实验页 补丁注册失败: " + e.Message); }
@@ -49,17 +47,15 @@ public partial class Experiments : ITweak
 
 }
 
-    // 自由相机（实验）：经游戏自己的 ZoomCamera 生效，不直接写 Camera.fieldOfView（会被每帧覆盖）。
-    // 默认键 F3，滚轮调 FOV（1-64，每格 0.5）；仅开启时消费滚轮，每次启用从相机当前 FOV 起算，关闭时还原。
+    // 自由相机：经游戏自己的 ZoomCamera 生效，直接写 Camera.fieldOfView 会被每帧覆盖。
+    // 默认键 F3；滚轮调 FOV（1-64，每格 0.5），启用时从当前 FOV 起算，关闭时还原。
     [SrFeature("sr.freecam", "FreeCam", "1.0", Modes = (int)(SRApi.ModeMask.Freeplay))]
     public class FreeCam : ITweak {
-        internal const float MinFov = 1f, MaxFov = 64f;   // 视野上限 64（用户要求）
-        // 滚轮灵敏度：perspective 与 orthographic 两分支统一使用。
+        internal const float MinFov = 1f, MaxFov = 64f;   // 视野上限 64
         private const float ZoomSensitivity = 0.5f;
         private static ConfigEntry<bool> _on;
         private static ConfigEntry<float> _fov;
         private static ConfigEntry<KeyCode> _key;
-        // 相机移动速度（改 ZoomCamera.MaxFollowSpeed）。
         private static ConfigEntry<float> _followSpeed;
     
         private static void SelfReg2() {
@@ -81,7 +77,6 @@ public partial class Experiments : ITweak
             min = MinFov; max = MaxFov; fmt = "0";
             try { return (e.Definition.Section == "自由模式" || e.Definition.Section == "Experiments") && e.Definition.Key == "Free Camera FOV"; } catch { return false; }
         }
-        // 相机移动速度用滑块渲染（范围 0-10）。
         private static bool SpeedSlider(ConfigEntryBase e, out float min, out float max, out string fmt) {
             min = 0f; max = 10f; fmt = "0.0";
             try { return (e.Definition.Section == "自由模式" || e.Definition.Section == "Experiments") && e.Definition.Key == "Free Camera Speed"; } catch { return false; }
@@ -104,19 +99,17 @@ public partial class Experiments : ITweak
                 _on = plugin.Config.Bind("自由模式", "Free Camera", false, "自由相机：开启后滚轮缩放视野；关闭后完全恢复游戏默认相机（仅自由模式）。");
                 _fov = plugin.Config.Bind("自由模式", "Free Camera FOV", 10f, new ConfigDescription("视野 1-64", new AcceptableValueRange<float>(MinFov, MaxFov)));
                 _key = plugin.Config.Bind("自由模式", "Free Camera Key", KeyCode.F3, "按键切换自由相机（组合键：点按钮后在按住 Shift/Ctrl/Alt 的同时按主键设置）。");
-                // 只受模组总开关限制，不受「自由相机」开关影响（它改的是游戏相机跟随速度）。
+                // 只受模组总开关限制，不受「自由相机」开关影响（它改的是相机跟随速度）。
                 _followSpeed = plugin.Config.Bind("自由模式", "Free Camera Speed", 1f,
                     new ConfigDescription("相机跟随角色的速度倍数（0-10，每次 0.5，1 = 游戏原值；与自由相机开关无关）",
                         new AcceptableValueRange<float>(0f, 10f)));
                 SRApi.RegisterKey("实验-自由相机", _key, "press", CheckKey);
                 SRApi.RegisterWheelHook(WheelZoom);
-                // 启动时不再"强制重置并写盘"（评审 G8：会覆盖用户手动保存的设置，且每次启动都写 cfg）。
-                // 只修非法值：FOV 超出范围时回落到默认 10；开关状态完全交给用户/会话控制。
+                // 不强制重置写盘（会覆盖用户设置）；只把非法 FOV 回落到 10。
                 try { if (_fov.Value <= 0f || _fov.Value > 64f) _fov.Value = 10f; } catch (Exception __fv) { SRApi.Guard.Log("自由相机/修正FOV", __fv); }
                 SRApi.RegisterCameraView(ApplyToCamera);
                 SRApi.RegisterTick("自由相机-移动速度", ApplyFollowSpeed);
-            // 相机缓存只在换场景时失效：以前缓存为 null 就全场景 FindObjectsOfType，
-            // 那是 tick 剖析里 自由相机-移动速度 峰值 4ms 的来源。
+            // 相机缓存只在换场景时失效：缓存过期就全场景 FindObjectsOfType，开销太大。
             SRApi.RegisterSceneHook(delegate { _followZc = null; });   // 自由相机/换场景清缓存
                 _on.SettingChanged += OnLockChanged;
                 // 不挂 SettingChanged：ApplyFollowSpeed 已作为 30 帧节流的 Tick，下一拍自然生效。
@@ -124,23 +117,19 @@ public partial class Experiments : ITweak
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 初始化", __ex); }
         }
     
-        // 直接改 ZoomCamera.MaxFollowSpeed（FixedUpdate 里相机跟随的每帧最大位移），越大越跟得上。
-        // 记录原值可还原；仅总开关开启时生效。
+        // 直接改 ZoomCamera.MaxFollowSpeed（每帧最大位移），记录原值可还原；仅总开关开启时生效。
         private static float _followOrig = -1f;
         // "原值"与当前相机对象绑定：相机对象更换时标记为待重取。
         private static ZoomCamera _followZc;
-        // 相机速度的独立状态行（写入 FreeCam.Note 会串到其它页）。
         internal static string SpeedNote = "";
-        // 每帧钩子：30 帧节流；文案只在倍数变化时更新。
+        // 每帧钩子（0.5s 节流）；状态文案只在倍数变化时更新。
         private static float _followAt = -9999f;
         private static float _followLastMul = -1f;
         private static void ApplyFollowSpeed() {
             try {
-                if (Time.unscaledTime - _followAt < 0.5f) return;   // 0.5s 一次足够（原先 30 帧，实测仍偏重）
+                if (Time.unscaledTime - _followAt < 0.5f) return;   // 0.5s 一次足够
                 _followAt = Time.unscaledTime;
-                // 每帧回调需自行判 GateMaster：不满足时还原原值并清快照，下次开启重新取。
-                // 只受模组总开关限制，不受「自由相机」开关限制。
-                // 非自由模式：把相机参数还回去，避免退出自由模式后还留着改动。
+                // 每帧回调自行判 GateMaster：不满足时还原原值并清快照；只受模组总开关限制。
                 if (!SRApi.GateMaster || !FreeplayMode()) {
                     if (_followOrig >= 0f) {
                         try { if (_followZc != null) _followZc.MaxFollowSpeed = _followOrig; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -157,7 +146,6 @@ public partial class Experiments : ITweak
                 if (zc == null) return;
                 if (_followZc != zc) { _followZc = zc; _followOrig = -1f; }   // 相机换了就重取原值
                 if (_followOrig < 0f) _followOrig = zc.MaxFollowSpeed;
-                // 量化到 0.5 一档并夹取
                 float mul = _followSpeed != null ? QuantSpeed(Mathf.Clamp(_followSpeed.Value, 0f, 10f)) : 1f;
                 float want = _followOrig * mul;
                 if (Mathf.Abs(zc.MaxFollowSpeed - want) > 0.001f) zc.MaxFollowSpeed = want;
@@ -172,9 +160,7 @@ public partial class Experiments : ITweak
         private static void OnLockChanged(object s, EventArgs e) {
             try {
                 if (_on != null && _on.Value) { float v = CurrentFov(); _fov.Value = Mathf.Clamp(v, MinFov, MaxFov); _savedFov = v; Camera g = GameCamera(); if (g != null) { try { if (g.orthographic) g.orthographicSize = _fov.Value; else g.fieldOfView = _fov.Value; } catch { /* 静默：非关键路径，失败可直接忽略 */ } } }
-                // 通知要带逻辑：受到模式限制的功能，在非自由模式下"开了也不生效"要说明白，
-                // 而不是只报一个"开"（用户会在非自由模式里以为功能坏了）。
-                // 模式受限时静默跳过（用户要求：不要「仅XX模式」提示）。
+                // 通知须说明实际效果：模式受限时“开了也不生效”，但不弹「仅XX模式」提示。
                 if (_on != null && _on.Value && !FreeplayMode()) return;
                 SRApi.Notify((_on != null && _on.Value) ? SRApi.T("自由相机：开", "Free camera: ON")
                                                          : SRApi.T("自由相机：关（已还原）", "Free camera: OFF (restored)"));
@@ -183,7 +169,7 @@ public partial class Experiments : ITweak
         // 自由模式判定：自由相机只在该模式生效（其它模式相机由玩法控制）。
         internal static bool FreeplayMode() {
             try {
-                // 走统一模式门控：开了统一模式豁免后，非自由模式也能用自由相机
+                // 走统一模式门控：开模式豁免后，非自由模式也能用自由相机。
                 return SRApi.FeatureAllowed(typeof(FreeCam));
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机/判断自由模式", __ex); return false; }
         }
@@ -191,12 +177,9 @@ public partial class Experiments : ITweak
         internal static void CheckKey() {
             try {
                 // 总开关必须在此判定，否则关闭模组后快捷键仍能改游戏相机。
-                // （按键边沿由核心 RegisterKey 负责，这里不再轮询 ComboKeyDown。）
                 if (!SRApi.GateMaster) return;
-                // 开关始终可以切换；是否生效由 ApplyToCamera 里的模式门控决定
-                // （非自由模式 = 开了也不动相机，模式豁免可放行）。
+                // 开关始终可切换；是否生效由 ApplyToCamera 的模式门控决定（受限时静默跳过）。
                 if (_on != null) { _on.Value = !_on.Value; try { SRApi.Ctl.MarkConfigDirty(_on.ConfigFile); } catch { /* 静默：保存失败不影响功能 */ } }
-                // 模式受限：触发即跳过，不弹提示。
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 快捷键", __ex); }
         }
     
@@ -218,7 +201,6 @@ public partial class Experiments : ITweak
         public static float CurrentFov() {
             try { Camera cam = GameCamera(); if (cam == null) return _fov != null ? _fov.Value : 10f; return cam.orthographic ? cam.orthographicSize : cam.fieldOfView; } catch { return 10f; }
         }
-        // 滚轮缩放。
         public static bool WheelZoom(float wheel) {
             try {
                 // 总开关关闭时不消费滚轮，避免与其它功能抢同一事件。
@@ -235,23 +217,20 @@ public partial class Experiments : ITweak
         }
         // 每帧幂等：满足条件时相机 FOV 跟随滑条值。
         private static float _savedFov = -1f;   // 开启时的原视野，关闭/菜单场景还原用
-        // 回调会轮到菜单/UI 相机，故三道闸：开关开、只改游戏相机（cam == GameCamera()）、仅游戏进行中；
-        // 任一不满足时还原已改过的 FOV，确保菜单渲染正常。
+        // 三道闸：开关开、只改游戏相机、仅游戏进行中；任一不满足就还原已改的 FOV。
         public static void ApplyToCamera(Camera cam) {
             try {
                 if (cam == null) return;
                 Camera g = GameCamera();
                 if (g == null || cam != g) return;
-                // 未开启（含总开关关闭）：写回保存的原视野后返回。
-                // 核心的 ApplyCameraViews 分发不带门控，本回调需自行判定总开关。
+                // 未开启（含总开关关闭）：写回原视野后返回；核心分发不带门控，须自行判定。
                 if (!SRApi.GateMaster || _on == null || !_on.Value) {
                     RestoreFov(cam);
                     return;
                 }
-                // 模式限制：自由相机只在自由模式生效（其它模式的相机由玩法控制）。
-                // 注意：相机"移动速度"是配置项本身，不随模式拦截，符合"速度不限制"的要求。
+                // 模式限制：自由相机只在自由模式生效（其它模式相机由玩法控制）。
+                // 相机速度是配置项本身，不随模式拦截。
                 if (!FreeplayMode()) { RestoreFov(cam); return; }
-                // 仅游戏进行中，菜单里也还原
                 bool inGame = false;
                 try { inGame = (UnityEngine.Cursor.lockState != CursorLockMode.None) || !UnityEngine.Cursor.visible; } catch { inGame = true; }
                 if (!inGame) { RestoreFov(cam); return; }
@@ -295,9 +274,7 @@ public partial class Experiments : ITweak
                     try { types = asm.GetTypes(); } catch (ReflectionTypeLoadException __tl) { types = __tl.Types; }
                     catch (Exception __t) { SRApi.Guard.Log("跨平台联机/取类型", __t); continue; }
                     if (types == null) continue;
-                    // 优先 GameSettings（真正的运行时设置对象），其次才任意类型；
-                    // 以前按 asm.GetTypes() 顺序取第一个，常常先命中 SaveFileData（没有 GetInstance），
-                    // 于是宿主永远解析不到 → "游戏还没初始化完" 一直出现。
+                    // 优先 GameSettings（真正的运行时设置对象），其次才任意类型。
                     Type prefer = null;
                     for (int ti = 0; ti < types.Length; ti++) {
                         if (types[ti] != null && types[ti].FullName == "GameSettings") { prefer = types[ti]; break; }
@@ -330,7 +307,6 @@ public partial class Experiments : ITweak
             } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/探测成员", __ex); }
         }
 
-        // 单例查找：常见命名 instance / Instance / Current / singleton。
         private static object FindOwner(Type ty) {
             // 先试 GetInstance()（UCH 的 GameSettings 就是用这个而不是 instance 字段）。
             try {
@@ -362,8 +338,7 @@ public partial class Experiments : ITweak
 
         internal static bool Available { get { Probe(); return _member != null; } }
 
-        // 宿主按需解析：GameSettings 是 ScriptableObject 单例，插件初始化时 GetInstance() 往往还是 null，
-        // 之前把它缓存成"静态成员"处理，导致读/写都抛 "Non-static field requires a target"。
+        // 宿主按需解析：GameSettings 单例在初始化时可能仍为 null，不能当静态成员缓存。
         private static object CurrentOwner(out bool isStaticField) {
             isStaticField = true;
             try {
@@ -415,8 +390,7 @@ public partial class Experiments : ITweak
                     if (!pr.CanWrite) { Note = SRApi.T("该设置不可写（只读属性）", "read-only property"); return false; }
                     pr.SetValue(isStatic ? null : target, on, null);
                 }
-                // 只写 GameSettings 只在本次会话生效；存档里的真值是 SaveFileData.CrossPlatformToggle，
-                // 通过 StatTracker 拿到主用户存档后同步写一次，再让游戏自己保存。
+                // 只写 GameSettings 仅本次会话生效；还须同步写存档字段 CrossPlatformToggle，再让游戏保存。
                 bool savedFile = TryWriteSaveFile(on);
                 bool persisted = TryPersist(target) || savedFile;
                 Note = (on ? SRApi.T("已开启跨平台联机", "Cross-play ON") : SRApi.T("已关闭跨平台联机", "Cross-play OFF"))
@@ -426,7 +400,6 @@ public partial class Experiments : ITweak
             } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/写值", __ex); return false; }
         }
 
-        // 同步写存档对象：StatTracker.Instance.GetSaveFileDataForMainUser().CrossPlatformToggle。
         private static bool TryWriteSaveFile(bool on) {
             try {
                 Type st = null;
@@ -465,7 +438,7 @@ public partial class Experiments : ITweak
             } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/写存档", __ex); return false; }
         }
 
-        // 找游戏自己的保存入口：方法名包含 save/write/flush 且无参、返回 void 或 bool。
+        // 找游戏自己的保存入口：方法名在白名单内、无参、返回 void 或 bool。
         private static bool TryPersist(object owner) {
             if (owner == null) return false;
             try {
@@ -477,9 +450,7 @@ public partial class Experiments : ITweak
                         MethodInfo m = ms[i];
                         if (m == null || m.IsAbstract || m.GetParameters().Length != 0) continue;
                         string n = m.Name;
-                        // 只接受"名字完全等于白名单项"且声明在目标类型自身上的方法：
-                        // 以前用"名字包含 save/write/flush"做子串匹配 + 继承链搜索，
-                        // 可能调到 SaveSettingsAndQuit 之类的破坏性方法（audit 20-P0-1）。
+                        // 只接受名字完全等于白名单项、且声明在目标类型自身上的方法，避免调到 SaveSettingsAndQuit 之类。
                         if (!string.Equals(n, keys[k], StringComparison.Ordinal)) continue;
                         if (m.DeclaringType != ty) continue;
                         if (m.ReturnType != typeof(void) && m.ReturnType != typeof(bool)) continue;

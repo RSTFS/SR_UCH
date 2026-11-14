@@ -1,5 +1,4 @@
 // 回合 HUD · 内容定义表。
-// 从 HUD.cs 拆出来（HUD 同时装着定义表、绘制组件与页面）。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;

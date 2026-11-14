@@ -14,7 +14,6 @@ public partial class Experiments : ITweak
         // 场景页：树屋 / 加载与切场景
         public static void RenderPage3() {
             try {
-                // 树屋：立即开始
             GUILayout.Space(SRApi.Ctl.Sc(6));
             SRApi.Ctl.SectionTitle("- " + SRApi.T("树屋", "Treehouse") + " -", SRApi.T("在树屋大厅里直接开始关卡.",
                        "Start the level immediately from the treehouse."));
@@ -26,14 +25,12 @@ public partial class Experiments : ITweak
                     DrawStatus(LobbyTools.Note);
                 }
 
-                // 加载与切场景
                 GUILayout.Space(SRApi.Ctl.Sc(6));
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("加载与切场景", "Loading and scene switch") + " -", SRApi.T("跳过加载动画. 温柔加载在切换场景时先卸载再回收.",
                          "Skip the loading animation. Gentle load unloads and collects before switching."));
                 SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
                     return e.Definition.Key.StartsWith("Splash ") || e.Definition.Key == "Gentle Load";
                 });
-                // 关闭遮罩：同样按返回值执行。
                 Action doCloseMask = delegate {
                     SplashTools.CloseMaskNow();
                     SRApi.Notify(SplashTools.Note ?? SRApi.T("关闭遮罩：已执行一次", "Close the mask: executed once"));
@@ -51,7 +48,7 @@ public partial class Experiments : ITweak
 }
 
 
-    // 加载遮罩 + 温柔加载。SRHost 为协程挂载点（SR 核心不是 MonoBehaviour）。
+    // 加载遮罩与温柔加载；SRHost 为协程挂载点（SR 核心非 MonoBehaviour）。
     internal sealed class SRHost : MonoBehaviour { }
 
     [SrFeature("sr.splashtools", "SplashTools", "1.0")]
@@ -65,9 +62,9 @@ public partial class Experiments : ITweak
         internal static string Note = "";
 
         private static void SelfReg() {
-            // Scene 段条目全部渲染在场景页，必须 NavHide，否则兜底分支会再加一个独立侧栏栏目。
+            // Scene 段条目已渲染在场景页，须 NavHide，否则兜底会重复建栏目。
             SRApi.NavHide("Scene");
-            // 反射登记：SkipBool 是 protected 字段，游戏改名后自检要能报出来。
+            // SkipBool 为 protected，登记后游戏改名时自检能报出来。
             SRApi.Ref.Override("UISplashScreen.SkipBool", "关闭跳过加载动画需清此标志");
             SRApi.LocKey("Scene", "Splash Skip Load", "跳过加载动画", "Skip load animation");
             SRApi.LocDesc("Scene", "Splash Skip Load", "跳过加载动画\n加载画面一出现就跳过\n无副作用，只省等待", "Skip loading animation\nskips the splash as soon as it appears\nno side effects, only saves the wait");
@@ -101,18 +98,15 @@ public partial class Experiments : ITweak
         private static void Tick() {
             try {
                 SplashPatch.Tick();
-                // 门控不得挡住 ApplySkip：总开关关闭时也须走到 ClearSkip 分支清掉游戏标志位。
                 ApplySkip();
             } catch (Exception __ex) { SRApi.Guard.Log("加载遮罩 Tick", __ex); }
         }
 
-        // 游戏 Skip() 只把 SkipBool 置真且无取消路径，一旦开过就永远跳。
-        // 故关闭时反射把 SkipBool 写回 false，恢复正常的按时间推进。
+        // Skip() 只置真 SkipBool 且无取消路径；关闭时反射写回 false 才能恢复按时间推进。
         private static System.Reflection.FieldInfo _fiSkip;
         private static bool _fiSkipTried;
         private static void ApplySkip() {
             try {
-                // 总开关参与判定；为 false 时走 ClearSkip 把游戏标志清回去。
                 bool want = SRApi.GateMaster && _skipLoad != null && _skipLoad.Value;
                 LoadingInterstitialSplash sp = FindSplash();
                 if (sp == null) return;
@@ -126,7 +120,7 @@ public partial class Experiments : ITweak
             } catch (Exception __ex) { SRApi.Guard.Log("跳过加载动画", __ex); }
         }
 
-        // 清掉 SkipBool（protected 字段，无公开的关闭接口）。
+        // 清掉 SkipBool（protected，无公开关闭接口）。
         private static void ClearSkip(UISplashScreen sp) {
             try {
                 if (!_fiSkipTried) {
@@ -148,7 +142,7 @@ public partial class Experiments : ITweak
             try { return UnityEngine.Object.FindObjectOfType<LoadingInterstitialSplash>(); } catch { return null; }
         }
 
-        // 一次性关闭当前加载遮罩：按钮点一次走一次，不改变「跳过加载动画」的设置。
+        // 一次性关闭当前遮罩，不改变「跳过加载动画」设置。
         internal static void CloseMaskNow() {
             try {
                 LoadingInterstitialSplash sp = FindSplash();
@@ -157,19 +151,17 @@ public partial class Experiments : ITweak
                     SRApi.Notify(SRApi.T("当前没有遮罩", "No mask on screen"));
                     return;
                 }
-                // 无条件尝试 Skip：以前只在 FADING_IN/SHOW 两个状态才调，其余状态直接"没反应"。
                 bool closed = false;
                 try { sp.Skip(); closed = true; }
                 catch (Exception __sk) { SRApi.Guard.Log("关闭遮罩/Skip", __sk); }
                 if (!closed) {
                     try { sp.FadeOut(); closed = true; } catch (Exception __fo) { SRApi.Guard.Log("关闭遮罩/FadeOut", __fo); }
                 }
-                // Skip 会把游戏的 SkipBool 置真且没有取消入口：这里立刻清回 false，
-                // 保证"只关这一次"，下一次加载照常走（与「跳过加载动画」开关互不影响）。
+                // Skip 会置真 SkipBool 且无取消接口：此处立刻清回，保证只关这一次。
                 try { ClearSkip(sp); } catch (Exception __cs) { SRApi.Guard.Log("关闭遮罩/清SkipBool", __cs); }
                 if (_closeLoadUi != null && _closeLoadUi.Value) {
                     CloseLoadingUi();
-                    // 开启「同时关闭加载界面」时，连加载动画（splash 根对象）一起关闭：停用后动画/音效都不再推进。
+                    // 连 splash 根对象一起停用，动画音效不再推进。
                     try { if (sp != null && sp.gameObject != null) sp.gameObject.SetActive(false); }
                     catch (Exception __sa) { SRApi.Guard.Log("关闭遮罩/关闭加载动画", __sa); }
                 }
@@ -179,8 +171,7 @@ public partial class Experiments : ITweak
             } catch (Exception __ex) { SRApi.Guard.Log("关闭遮罩", __ex); }
         }
 
-        // 顺带关掉平板加载界面（TabletLoadingScreen）：只在用户显式开启"同时关闭加载界面"时执行。
-        // 注意这不会加快加载——界面只是进度显示，关掉后画面停住可能看起来像卡死。
+        // 顺带隐藏平板加载界面；不会加快加载，可能看起来像卡住。
         private static void CloseLoadingUi() {
             try {
                 TabletLoadingScreen ui = UnityEngine.Object.FindObjectOfType<TabletLoadingScreen>();
@@ -193,7 +184,7 @@ public partial class Experiments : ITweak
         internal static bool GentleOn() { return _gentleLoad != null && _gentleLoad.Value && SRApi.GateMaster; }
     }
 
-    // 温柔加载：前置 SceneManagerWrapper 的两个入口，改走游戏自己的 DoGentleSceneLoad。
+    // 温柔加载：前置 SceneManagerWrapper 两个入口，改走 DoGentleSceneLoad。
     internal static class SplashPatch {
         private static SRHost _host;
         private static float _runningUntil = -1f;
@@ -207,12 +198,10 @@ public partial class Experiments : ITweak
             UnityEngine.Object.DontDestroyOnLoad(go);
         }
 
-        // Prefix 返回 false = 抑制游戏自己的加载，抑制后必须保证接管失败时能回落，否则场景请求被吞掉。
-        // 约定：Start 返回 true = 已接管；false = 未接管，Prefix 放行原版。
+        // Prefix 返回 false = 抑制原版；Start true = 已接管，false = 未接管须放行。
         [HarmonyPatch(typeof(SceneManagerWrapper), "LoadScene")]
         [HarmonyPrefix]
         static bool PreLoadScene(string sceneName) {
-            // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SRApi.Guard.Log（按调用点去重）留痕。
             try {
                         if (!Should(sceneName)) return true;
                         return !Start(sceneName);
@@ -222,7 +211,6 @@ public partial class Experiments : ITweak
         [HarmonyPatch(typeof(SceneManagerWrapper), "LoadSceneAsync")]
         [HarmonyPrefix]
         static bool PreLoadSceneAsync(string sceneName) {
-            // Harmony 会吞掉补丁异常并每次记一条日志，故统一兜住并经 SRApi.Guard.Log（按调用点去重）留痕。
             try {
                         if (!Should(sceneName)) return true;
                         return !Start(sceneName);
@@ -247,13 +235,12 @@ public partial class Experiments : ITweak
                     return false;
                 }
                 if (_runningUntil > 0f && Time.realtimeSinceStartup < _runningUntil) {
-                    // 不能静默返回：Prefix 已决定抑制原版，放弃即请求被吞掉。
                     SRApi.LogWarn("[场景] 温柔加载已在进行中，本次请求回落原版（" + sceneName + "）");
                     return false;
                 }
                 _target = sceneName;
                 _host.StartCoroutine(SceneManagerWrapper.DoGentleSceneLoad(sceneName));
-                // 协程无 isDone：场景已切换到目标即视为完成，5 秒后自动解锁。
+                // 协程无 isDone：场景切到目标即算完成，5 秒后自动解锁。
                 _runningUntil = Time.realtimeSinceStartup + 5f;
                 SRApi.LogInfo("[场景] 温柔加载：" + sceneName);
                 return true;
@@ -272,7 +259,6 @@ public partial class Experiments : ITweak
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
     }
-    // 树屋：立即开始。
     [SrFeature("sr.lobbytools", "LobbyTools", "1.0")]
     public class LobbyTools : ITweak {
         private static ConfigEntry<KeyCode> _launchKey;
@@ -308,11 +294,9 @@ public partial class Experiments : ITweak
         }
 
         private static void DoLaunch(LevelSelectController lsc) {
-            // 判 SRApi.CanControlLocally（离线时为真）；LaunchLevel 是纯本地调用，与广播能力无关。
             if (!SRApi.CanControlLocally) { SRApi.Notify(SRApi.T("仅房主可开始关卡", "Host only")); return; }
             LevelPortal[] portals = lsc.portals;
             if (portals == null || portals.Length == 0) { SRApi.Notify(SRApi.T("未找到可用关卡门", "No level portal available")); return; }
-            // 1) 优先"房主自己投过票的那扇门"：先按本地玩家拿角色，再退化到任意 hasAuthority 角色。
             Character hostChar = null;
             try {
                 LobbyManager lm = LobbyManager.instance;
@@ -341,7 +325,6 @@ public partial class Experiments : ITweak
                     if (p.Votes.ContainsKey(hostChar)) { pick = p; break; }
                 }
             }
-            // 2) 兜底（与提示文案一致）：自动选票数最高的那扇门；全都没票才报"未选择关卡"。
             if (pick == null) {
                 int best = 0;
                 for (int i = 0; i < portals.Length; i++) {

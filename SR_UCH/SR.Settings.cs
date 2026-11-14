@@ -1,4 +1,4 @@
-// 设置页：条目行 / 控件渲染、滑块、下拉框、侧栏自定义顺序，以及 Configuration Manager 的排序与隐藏。
+// 设置页：条目行与控件渲染、滑块、下拉框、侧栏顺序、CM 排序与隐藏。
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -11,13 +11,11 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
 public partial class SR {
 
-// 分区：Settings（设置页 / 通用条目行渲染 / 控件渲染 / 滑块 / 下拉框）
+// 分区：Settings（设置页 / 条目行 / 控件 / 滑块 / 下拉框）
 
-        // 使 Configuration Manager 的条目顺序与 SR 界面一致：经反射替换 ConfigEntryBase.Description 的标签。
-        // 顺序 = 侧栏栏目顺序（_internalSections），栏目内按条目绑定顺序；仅改标签，Value / AcceptableValues 保留。
+        // 让 CM 条目顺序与 SR 一致：反射替换 Description 标签；仅改标签，值保留。
         private static int _cmOrderVer = -1;   //上次应用排序时的条目版本
-        // ConfigEntryBase 的 Description 后备字段名随 BepInEx 版本不同（有人是 <Description>k__BackingField，
-        // 有人是 description），硬编码两个猜测名会静默失效（audit 08-P0-02）。这里按"名字含 escription"探测。
+        // Description 后备字段名随 BepInEx 版本不同，故按"名字含 escription"探测。
         private static readonly FieldInfo _fEntryDesc = ProbeEntryDescField();
         private static FieldInfo ProbeEntryDescField() {
             try {
@@ -26,7 +24,7 @@ public partial class SR {
                     if (fs[i].FieldType != typeof(ConfigDescription)) continue;
                     if (fs[i].Name.IndexOf("escription", StringComparison.Ordinal) >= 0) return fs[i];
                 }
-                // 探测不到就明确报错（带 BepInEx 版本），不要静默跳过排序/隐藏。
+                // 探测不到就带版本号明确报错，不要静默跳过排序 / 隐藏。
                 string ver = "?";
                 try { ver = typeof(ConfigFile).Assembly.GetName().Version.ToString(); } catch { /* 版本号取不到就写 ? */ }
                 SR.LogWarn("[设置] 未找到 ConfigEntryBase 的 Description 后备字段（BepInEx " + ver
@@ -40,11 +38,11 @@ public partial class SR {
             if (_cmOrderVer == _entryVersion) return;   //条目表没变：直接返回
             _cmOrderVer = _entryVersion;
             try {
-                //Configuration Manager 为 OrderByDescending：栏目内倒序编号，先绑定的条目 Order 最大。
+                // CM 为 OrderByDescending：栏目内倒序编号，先绑定的条目 Order 最大。
                 Dictionary<string, int> secRank = new Dictionary<string, int>();
-                //Order 大的在前，故侧栏第一个栏目 rank 取 总数-1-i。
+                // Order 大的在前，故侧栏第一个栏目 rank 取 总数-1-i。
                 for (int i = 0; i < _internalSections.Count; i++) secRank[_internalSections[i]] = _internalSections.Count - 1 - i;
-                //先按栏目分组，取得每栏条目数后才能倒序编号
+                // 先按栏目分组，取得每栏条目数后才能倒序编号
                 Dictionary<string, List<ConfigEntryBase>> bySec = new Dictionary<string, List<ConfigEntryBase>>();
                 foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
                     if (e == null) continue;
@@ -63,7 +61,7 @@ public partial class SR {
                         try {
                             ConfigDescription d = e.Description;
                             if (_fEntryDesc != null) {
-                                //Browsable=false + HideSetting=true：SR 自带界面，CM 中不再列出这些条目。
+                                // SR 自带界面，CM 中不再列出这些条目。
                                 object[] tags = new object[] { new ConfigurationManagerAttributes { Order = order, Browsable = false, HideSetting = true } };
                                 _fEntryDesc.SetValue(e, new ConfigDescription(d != null ? d.Description : "", d != null ? d.AcceptableValues : null, tags));
                             }
@@ -73,14 +71,14 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("Configuration Manager 排序", __ex); }
         }
 
-        //枚举下拉选项缓存：键为 entry 而非 Type —— RowEnumAllowed 的过滤结果依赖 entry，按 Type 缓存会串台。
+        // 枚举下拉选项缓存：键为 entry（RowEnumAllowed 依赖 entry，按 Type 会串台）。
     internal static readonly Dictionary<ConfigEntryBase, object[]> _enumOptions = new Dictionary<ConfigEntryBase, object[]>();
     internal static int _enumOptionsVersion = -1;   // 上次清空时的 _entryVersion
     internal static int EnumOptionsVersion { get { return _enumOptionsVersion; } set { _enumOptionsVersion = value; } }
 
         private static void SetValue(ConfigEntryBase entry, object value) {
             try {
-                //类型归一化：int 条目必须收到 int，否则 BepInEx 抛异常导致滑块无效
+                // 类型归一化：int 条目必须收到 int，否则 BepInEx 抛异常导致滑块无效
                 if (value != null) {
                     Type st = entry.SettingType;
                     if (st == typeof(int) && !(value is int)) value = Mathf.RoundToInt(Convert.ToSingle(value));
@@ -92,7 +90,7 @@ public partial class SR {
                     ApplyEventSystemGate();
                 }
                 MarkConfigDirty(entry.ConfigFile);
-                //外部改值时清空编辑框缓存；编辑框自身提交的那一帧不清，否则会吃掉小数点。
+                // 外部改值时清编辑框缓存；编辑框自身提交的那一帧不清，否则会吃掉小数点。
                 if (_editSelfFrame != Time.frameCount) _editText.Remove(entry);
             } catch (Exception ex) {
                 SR.LogWarn("配置修改失败: " + ex.Message);
@@ -100,11 +98,10 @@ public partial class SR {
         }
 
         private static List<ConfigEntryBase> InternalSectionEntries() {
-            //复用 SectionEntries 的按版本缓存（过滤规则一致：段名 + RowVisible）。
             return SectionEntries(_selectedInternalSection);
         }
 
-        //设置页条目按类别的分组顺序，与 config 绑定顺序一致，插件组最后。
+        // 设置页条目分组顺序，与 config 绑定顺序一致，插件组最后。
         private static readonly string[][] _settingsGroups = new string[][] {
             new[] { "按键", Keys.OpenKey, Keys.BlockInput },
             new[] { "界面", Keys.UiScale, Keys.WinWidth, Keys.WinHeight, Keys.WinX, Keys.WinY, Keys.Language },
@@ -122,8 +119,7 @@ public partial class SR {
 
         internal static void RenderSettingsPage(float colWidth) {
             try {
-                // 页面滚动恢复：NoPageScrollBars 现在是"每帧声明、用后清零"（见 SR.Window），
-                // 否则设置页也会被当成"页面不滚动"——这是自检页滚不动的直接原因。
+                // 必须显式关页面滚动：NoPageScrollBars 用后清零，否则设置页会被当成不滚动。
                 SRApi.NoPageScrollBars = false;
                 GUILayout.Space(Sc(4));
                 RenderSettingsEntries(colWidth);
@@ -136,12 +132,11 @@ public partial class SR {
             bool pluginListDrawn = false;
             foreach (ConfigEntryBase entry in SettingsEntries()) {
                 any = true;
-                // Tick Profiling 只在自检页的「帧钩子」卡里显示；通用页重复显示会让两个勾选框互相打架。
+                // Tick Profiling 只在自检页显示，通用页重复会让两个勾选框打架。
                 if (entry.Definition.Key == "Tick Profiling") continue;
-                //栏目宽度专用行：滑块 + [-]/[+] 步进
                 if (entry.Definition.Key == Keys.SidebarWidth) { RenderSidebarWidthRow(); continue; }
                 string g = SettingsGroup(entry.Definition.Key);
-                //外部插件清单排在"界面"分组之后
+                // 外部插件清单排在"界面"分组之后
                 if (!pluginListDrawn && lastGroup == "界面" && (g == null || g != "界面")) {
                     pluginListDrawn = true;
                     GUILayout.Space(Sc(4));
@@ -177,16 +172,16 @@ public partial class SR {
             GUILayout.EndHorizontal();
         }
 
-        //同时更新即时值与配置项（布局立即生效并持久化）。
+        // 同时更新即时值与配置项。
         private static void SetSidebarWidth(int px) {
-            // 上限跟窗口走：自定义宽度再大也不能把内容区挤没（用户反馈"超出界面还能拖"）。
+            // 上限跟窗口走：自定义宽度不能把内容区挤没。
             float cap = Mathf.Clamp(SRApi.ContentArea.width * 0.55f, 100f, 320f);
             px = Mathf.Clamp(px, 0, Mathf.RoundToInt(cap));
             _sidebarW = px;
             if (_sidebarWEntry != null) _sidebarWEntry.Value = px;
         }
 
-        //设置页条目列表：按条目版本缓存；比 SectionEntries 多一条组合键内部条目过滤，故单独缓存。
+        // 设置页条目列表：按版本缓存；比 SectionEntries 多一条组合键过滤。
         private static List<ConfigEntryBase> _settingsCache;
         private static int _settingsCacheVer = -1;
         private static List<ConfigEntryBase> SettingsEntries() {
@@ -195,9 +190,8 @@ public partial class SR {
             if (_internalConfig != null) {
                 foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
                     if (e.Definition.Section != "Settings") continue;
-                    //这些项在会话页 / 搜索栏已有开关，设置页不再渲染（可见性由功能经 SRApi.RowFilters 注册）
+                    // 会话页 / 搜索栏已有开关的项不在此渲染（可见性经 SRApi.RowFilters 注册）
                     if (!SR.RowVisible(e)) continue;
-                    //组合键修饰键的内部持久化条目（RegisterComboEntry 建立），不在设置页显示
                     if (e.Definition.Key.StartsWith(Keys.ComboPrefix)) continue;
                     if (e.Definition.Key == Keys.SidebarOrder) continue; //侧栏顺序由拖动维护
                     result.Add(e);
@@ -208,38 +202,31 @@ public partial class SR {
             return result;
         }
 
-        //可点击的条目标签：左键恢复默认值，右键绑定快捷键；说明固定 3 行，第 4 行由核心追加默认值 / 按键。
-        //hotkey 为 null 时仅 bool 条目接入 "row:段.键" 自动快捷键。
+        // 可点击标签：左键恢复默认值，右键绑定快捷键；hotkey 为 null 时仅 bool 条目接入自动快捷键。
         private static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey = null) {
             GUIContent c2 = content;
             ConfigEntry<KeyCode> hk = hotkey; //只认功能显式传入的键
             try {
                 string tip = content.tooltip != null ? content.tooltip : "";
-                //第 4 行：已绑键时显示“按键：X”，否则显示“默认：X”；都没有则不追加。
-                //右键提示并入同一行，保证悬浮提示仍为 3 + 1 行。
-                // 统一组装（用户要求）：是什么 → 做什么 → 注意事项 → 默认值 → 按键。
-                // 以前第 4 行是「默认值 或 按键」二选一，且未绑定时整行消失；现在默认值固定第 4 行，
-                // 支持右键绑定的条目再补第 5 行（未绑定时提示「右键设置/删除快捷键」）。
+                // 提示顺序：是什么 → 做什么 → 注意 → 默认值 → 按键。
                 tip = ComposeTip(entry, tip, hk);
                 if (hk != null) {
-                    //绑定的键（录制中为 [...]）跟在标签后，宽度按需放宽
                     string txt = content.text + KeySuffix(hk);
                     c2 = new GUIContent(txt, tip);
                 } else if (tip != content.tooltip) {
                     c2 = new GUIContent(content.text, tip);
                 }
-                //宽度只按文字实际宽度 + 内边距占位，只收缩不放大；带键位后缀时按需放宽到窗口可用宽度。
+                // 宽度只按文字宽 + 内边距，只收缩不放大；带键位后缀时放宽到可用宽度。
                 float need = _label.CalcSize(c2).x + Sc(8);
                 if (need < w) w = Mathf.Max(Sc(24), need);
                 else if (hk != null) w = Mathf.Min(need, Mathf.Max(w, _winWidth - SidebarWidth() - Sc(24)));
             } catch (Exception __ex) { Guard.Log("条目默认值处理", __ex); }
             if (GUILayout.Button(c2, _label, GUILayout.Width(w), GUILayout.Height(h))) {
-                //只认左键：右键用于绑定快捷键，不可同时重置默认值
                 Event evLbl = Event.current;
                 if (evLbl == null || evLbl.button == 0) {
                     if (entry != null) {
                         try {
-                            // 编辑框（字符串）点标签 = 清空；其余条目 = 恢复默认值/默认键
+                            // 编辑框（字符串）点标签 = 清空，其余条目 = 恢复默认值
                             entry.BoxedValue = entry.SettingType == typeof(string) ? (object)"" : entry.DefaultValue;
                         } catch (Exception __ex) { Guard.Log("恢复条目默认值", __ex); }
                     }
@@ -249,7 +236,6 @@ public partial class SR {
                     if (_capturing == entry) _capturing = null;
                 }
             }
-            //右键命中区：标签 + 右侧 44px
             if (hk != null) RegisterRowHotkey(hk);
         }
 
@@ -258,7 +244,7 @@ public partial class SR {
         private static List<ConfigEntryBase> _visCache;
         private static List<ConfigEntryBase> VisibleEntries(ConfigFile config) {
             if (config == null) return new List<ConfigEntryBase>();
-            //按条目版本缓存（外部插件页每个 OnGUI 事件都会调用）。
+            // 按条目版本缓存（外部插件页每个 OnGUI 事件都会调用）。
             if (_visCache != null && _visCfg == config && _visVer == _entryVersion) return _visCache;
             List<ConfigEntryBase> result = new List<ConfigEntryBase>();
             foreach (ConfigEntryBase e in AllEntries(config)) {
@@ -268,8 +254,7 @@ public partial class SR {
             return result;
         }
 
-        //取配置条目：优先用 ConfigFile 显式实现的 IDictionary.Values（GetConfigEntries 已过时）。
-        //未实现该接口的旧版 BepInEx 回退到过时方法。
+        // 取条目优先用 ConfigFile 显式实现的 IDictionary.Values（GetConfigEntries 已过时）。
         private static readonly ConfigEntryBase[] NoEntries = new ConfigEntryBase[0];
         private static IEnumerable<ConfigEntryBase> AllEntries(ConfigFile config) {
             if (config == null) return NoEntries;
@@ -280,7 +265,7 @@ public partial class SR {
 #pragma warning restore CS0618
         }
 
-        //侧栏宽度：0 = 自动，>0 = 用户拖动设定的宽度。
+        // 侧栏宽度：0 = 自动，>0 = 用户拖动设定值。
         private static float _sidebarW = 0f;
         internal static float SidebarW { get { return _sidebarW; } set { _sidebarW = value; } }
         private static bool _sidebarResizing;
@@ -289,21 +274,19 @@ public partial class SR {
         internal static ConfigEntry<int> SidebarWEntry { get { return _sidebarWEntry; } set { _sidebarWEntry = value; } }
         private static ConfigEntry<string> _sidebarOrderEntry; //侧栏自定义顺序（逗号分隔），拖动列头时写回
         internal static ConfigEntry<string> SidebarOrderEntry { get { return _sidebarOrderEntry; } set { _sidebarOrderEntry = value; } }
-        //侧栏栏目拖拽排序不做坐标命中判定：条目画在 BeginArea / ScrollView 内，鼠标事件为屏幕坐标，两者换算不稳定。
-        //改用 GUIUtility.hotControl 判定按下项，并以鼠标纵向位移 ÷ 行高判定目标行。
+        // 栏目拖拽排序不做坐标命中（条目在滚动区内），改用 hotControl + 鼠标纵向位移判目标行。
 
-        //按配置中的自定义顺序重排侧栏栏目，未记录的新栏目排到末尾。
-        //本方法是唯一产出三份列表的地方：_allSections（全量）、_userHiddenSections（"!" 前缀）、_internalSections（显示项）。
+        // 按配置的自定义顺序重排侧栏栏目（新栏目排末尾）；本方法唯一产出三份栏目列表。
         private static void ApplyCustomSidebarOrder() {
             try {
                 string ord = _sidebarOrderEntry != null ? _sidebarOrderEntry.Value : null;
                 List<string> all = new List<string>();
                 HashSet<string> hid = new HashSet<string>();
-                //先按改名映射改写段名，再做死条目判定：栏目改名后旧串里的旧名匹配不到真实栏目。
+                // 先按改名映射改写段名，再做死条目判定。
                 if (!string.IsNullOrEmpty(ord)) ord = RemapSidebarOrderNames(ord);
-                //剔除匹配不到真实栏目的死条目，须在字母序判定之前完成。
+                // 剔除匹配不到真实栏目的死条目，须在字母序判定之前。
                 if (!string.IsNullOrEmpty(ord)) ord = DropDeadSidebarOrderNames(ord);
-                //识别纯字母序的 Sidebar Order（非用户自定义）并忽略，避免其永久覆盖默认 rank 顺序。
+                // 纯字母序的 Sidebar Order 视为非自定义并忽略，避免永久覆盖默认 rank 顺序。
                 if (!string.IsNullOrEmpty(ord)) {
                     List<string> probe = new List<string>();
                     foreach (string raw0 in ord.Split(',')) {
@@ -313,7 +296,6 @@ public partial class SR {
                         if (n0.Length > 0 && !probe.Contains(n0)) probe.Add(n0);
                     }
                     List<string> sorted = new List<string>(probe);
-                    //须用 OrdinalIgnoreCase：改名后段名大小写可能变化，Ordinal 会漏判字母序。
                     sorted.Sort(delegate(string a, string b) { return string.Compare(a, b, StringComparison.OrdinalIgnoreCase); });
                     bool alphabetical = probe.Count > 1;
                     for (int i = 0; alphabetical && i < probe.Count; i++)
@@ -331,7 +313,7 @@ public partial class SR {
                         if (h) hid.Add(n);
                     }
                 }
-                //不再按键名字母序补位：RebuildSections 已按各功能注册的 SR.Nav(键, rank) 排好默认顺序。
+                // 不按字母序补位：默认顺序已由各功能注册的 SR.Nav 排好。
                 for (int i = 0; i < _internalSections.Count; i++) {
                     string s2 = _internalSections[i];
                     if (!all.Contains(s2)) all.Add(s2);
@@ -342,7 +324,7 @@ public partial class SR {
                 foreach (string h2 in hid) _userHiddenSections.Add(h2);
                 _internalSections.Clear();
                 for (int i = 0; i < all.Count; i++) if (!_userHiddenSections.Contains(all[i])) _internalSections.Add(all[i]);
-                //清洗结果与默认值一致时落盘清除死条目，避免每帧重演；正常自定义顺序不会被抹掉。
+                // 清洗结果与默认值一致时落盘清除，避免每帧重演。
                 string cleaned = string.Join(",", _internalSections.ToArray());
                 if (_sidebarOrderEntry != null && !string.IsNullOrEmpty(ord)
                     && _sidebarOrderEntry.Value != null && _sidebarOrderEntry.Value != cleaned
@@ -351,13 +333,13 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("应用侧栏自定义顺序", __ex); }
         }
 
-        //侧栏顺序串中段名的改名映射（旧名 -> 新名）。与 ConfigMigration.SectionMap 不同：后者迁移 cfg 段名。
+        // 侧栏顺序串的段名改名映射；与 ConfigMigration.SectionMap（迁移 cfg 段名）不同。
         private static readonly Dictionary<string, string> SidebarOrderRenames = new Dictionary<string, string> {
             { "建造增强", "build" },
             { "Builder Enhancements", "build" },
         };
 
-        //按映射改写 Sidebar Order 中的旧段名，保留 ! 前缀与原顺序。
+        // 按映射改写 Sidebar Order 的旧段名，保留 ! 前缀与原顺序。
         private static string RemapSidebarOrderNames(string ord) {
             if (string.IsNullOrEmpty(ord)) return ord;
             List<string> parts = new List<string>();
@@ -378,7 +360,7 @@ public partial class SR {
             return changed ? string.Join(",", parts.ToArray()) : ord;
         }
 
-        //剔除 Sidebar Order 中匹配不到真实栏目的死条目；判定依据为 _internalSections。
+        // 剔除匹配不到真实栏目的死条目，判定依据为 _internalSections。
         private static string DropDeadSidebarOrderNames(string ord) {
             if (string.IsNullOrEmpty(ord)) return ord;
             HashSet<string> live = new HashSet<string>(_internalSections);
@@ -396,13 +378,11 @@ public partial class SR {
             return string.Join(",", parts.ToArray());
         }
 
-        // 设置页的栏目顺序块：按住列头拖动调整顺序（用左键，IMGUI 对左键的拖动 / 松开事件可靠）。
-        // 排序状态由 SRApi.TableArgs 持有（见 EnsureOrdArgs / RenderSidebarOrder）。
+        // 设置页栏目顺序块：按住列头拖动调序；状态由 SRApi.TableArgs 持有。
 
-        // 自定义栏目 = 无数据行的 SR 列表，只用其表头：列头即侧栏栏目名，拖动改顺序，右键隐藏，Shift+右键还原。
+        // 自定义栏目 = 无数据行的 SR 列表，只用表头：拖动改序，右键隐藏，Shift+右键还原。
         private static readonly List<int> _ordVis = new List<int>();
         private static readonly HashSet<int> _ordHidden = new HashSet<int>();
-        // 拖拽与列宽状态是 TableArgs 的实例字段，须跨帧持有。
         private static SRApi.TableArgs _ordArgs;
         private static int _ordN = -1;
         private static float[] _ordColW;
@@ -422,7 +402,6 @@ public partial class SR {
             _ordArgs.vertical = false;
             _ordArgs.hideable = true; _ordArgs.reorderable = true; _ordArgs.resizable = true;
             _ordArgs.vis = _ordVis; _ordArgs.hidden = _ordHidden;
-            //当前显示顺序
             _ordOrder = new int[n];
             for (int i = 0; i < n; i++) _ordOrder[i] = i;
             _ordArgs.order = _ordOrder;
@@ -433,17 +412,15 @@ public partial class SR {
             _ordArgs.applyOrder = delegate(int[] o) {
                 try {
                     if (o == null || o.Length != _ordN || SR._sidebarOrderEntry == null) return;
-                    //核心重建后会以当前顺序回调 applyOrder 做归一化，相同则跳过，避免把显示顺序固化进配置。
+                    // 核心重建后按当前顺序回调归一化，相同则跳过，避免把显示顺序固化进配置。
                     bool same = _ordOrder != null && _ordOrder.Length == o.Length;
                     for (int i = 0; same && i < o.Length; i++) if (_ordOrder[i] != o[i]) same = false;
                     if (same) return;
                     string[] names = new string[_ordN];
                     for (int i = 0; i < _ordN; i++) names[i] = SR._allSections[o[i]];
                     SR._sidebarOrderEntry.Value = string.Join(",", names);
-                    //o 是列下标置换，RebuildSections 随后会按新序重建 _allSections；
-                    //保留旧置换会让下一帧用过期的列映射，故置空，下次绘制时重建为恒等序。
+                    // o 是列下标置换，保留旧置换会让下一帧用过期的列映射，故置空待重建。
                     _ordOrder = null;   //置空 -> EnsureOrdArgs/下一次绘制时重建为恒等序
-                    //写完顺序立即重建侧栏，否则 _internalSections 仍为旧序
                     SR.RebuildSectionsPublic(false);
                 } catch (Exception __ex) { Guard.Log("保存栏目顺序", __ex); }
                 };
@@ -459,25 +436,21 @@ public partial class SR {
                                   "Drag a header to reorder; right-click a header to hide a section; Shift+right-click to restore."));
                 int n = SR._allSections.Count;
                 EnsureOrdArgs(n);
-                //高度贴合内容：横向列头仅 Sc(24) 高，横向溢出由内部滚动兜住。
                 GUILayout.BeginVertical(GUILayout.Height(Sc(30)));
                 SRApi.TableArgs a = _ordArgs;
                 _ordHidden.Clear(); _ordVis.Clear();
                 for (int i = 0; i < n; i++) {
                     if (SR._userHiddenSections.Contains(SR._allSections[i])) _ordHidden.Add(i); else _ordVis.Add(i);
                 }
-                //sum = 可见列头的总宽（列头横向排列），作为盒宽传给 GetRect；溢出由内部滚动兜住。
                 float sum = 0f; for (int i = 0; i < _ordVis.Count; i++) sum += SR.Ctl.Sc(_ordColW[_ordVis[i]]);
                 if (sum < Sc(60)) sum = Sc(60);
                 GUILayout.Space(Sc(2));
-                //列表内部滚动：滚动条隐藏，滚轮仍可用
-                // 不再套内层滚动区：嵌套 BeginScrollView 会让设置页排版错位。
+                // 不套内层滚动区：嵌套 BeginScrollView 会让设置页排版错位。
                 a.box = GUILayoutUtility.GetRect(sum, Sc(24));   //横向列头：高度固定 24px
                 a.stripW = sum;
                 if (_ordOrder == null) { _ordOrder = new int[n]; for (int i = 0; i < n; i++) _ordOrder[i] = i; a.order = _ordOrder; }   //恒等序兜底
                 a.mp = Event.current != null ? Event.current.mousePosition : Vector2.zero;
                 SR.TableDraw(a);
-                // （内层滚动区已移除）
                 for (int i = 0; i < n; i++) {
                     bool hid = _ordHidden.Contains(i);
                     if (hid != SR._userHiddenSections.Contains(SR._allSections[i])) SR.SetSectionHidden(SR._allSections[i], hid);
@@ -487,12 +460,12 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("自定义栏目", __ex); }
         }
         private static float SidebarWidth() {
-            //拖动中读即时值 _sidebarW，否则读栏目宽度配置项
+            // 拖动中读即时值，否则读配置项
             float w = 0f;
             if (_sidebarResizing) w = _sidebarW;
             if (w <= 0f && _sidebarWEntry != null) w = _sidebarWEntry.Value;
             if (w <= 0f) w = _sidebarW;
-            //先判 w 再算自动宽度：CalcAutoSidebarWidth 需逐项 CalcSize，而本方法每帧被调用十几次。
+            // 先判 w 再算自动宽度：CalcAutoSidebarWidth 需逐项 CalcSize，而本方法每帧调用十几次。
             float cap = Mathf.Clamp(SRApi.ContentArea.width * 0.55f, 100f, 320f);
             if (w > 0f) return Mathf.Clamp(w, 100f, cap);
             return Mathf.Min(CalcAutoSidebarWidth(), cap);
@@ -501,7 +474,7 @@ public partial class SR {
         private static int _autoSbKey;
         private static float _autoSbW = -1f;
         private static float CalcAutoSidebarWidth() {
-            //按集合 / 语言 / 缩放缓存；缓存键用哈希折叠，避免每帧重建长字符串。
+            // 按集合 / 语言 / 缩放缓存，键用哈希折叠以免每帧重建长字符串。
             int key = 17;
             key = key * 31 + _internalSections.Count;
             for (int i = 0; i < _internalSections.Count; i++) key = key * 31 + _internalSections[i].GetHashCode();
@@ -522,16 +495,14 @@ public partial class SR {
             return _autoSbW;
         }
 
-        //当前 RenderControl 的调用来源是否为内部条目（滑块路径据此决定是否绘制同行附加控件）。
     internal static bool _curIsInternal = true;
     internal static bool CurIsInternal { get { return _curIsInternal; } set { _curIsInternal = value; } }
-        //同行附加控件的本帧已绘制记录（条目 + 帧号），防重复渲染。
+        // 同行附加控件的本帧已绘制记录（条目 + 帧号）。
         private static ConfigEntryBase _followDoneEntry;
         private static int _followDoneFrame = -1;
 
         private static float EntryNameWidth() {
-            //按 模式 / 分区 / 语言版本 / 条目版本 / 缩放 / 外部插件 哈希缓存列宽，避免每帧 CalcSize。
-            //必须含 LangVer（外部语言包下 _langEn 恒为 false）与 _entryVersion（惰性绑定会新增条目）。
+            // 列宽按 模式 / 分区 / 语言版本 / 条目版本 / 缩放 / 外部插件 哈希缓存；必须含 LangVer 与 _entryVersion。
             PluginEntry __pe = CurrentExternalPlugin();
             int key = 17;
             key = key * 31 + _mode.GetHashCode();
@@ -555,7 +526,6 @@ public partial class SR {
             return _nameWCached;
         }
 
-        //名称实测宽度按条目缓存（_nameLabel 为 wordWrap 样式，测量较贵；一帧至少 Layout + Repaint 两趟）。
         private static readonly Dictionary<ConfigEntryBase, float> _nameTextW = new Dictionary<ConfigEntryBase, float>();
         private static int _nameTextWVer = -1;
         private static float NameTextWidth(ConfigEntryBase entry, string name) {
@@ -568,12 +538,10 @@ public partial class SR {
             return w;
         }
 
-        //某 section 的可见条目（供功能自绘页拼装页面，自动应用功能注册的行可见性）。
-        //按 section 缓存，条目表版本变化时整体失效。
+        // 某 section 的可见条目；按 section 缓存，条目版本变化即失效。
         private static readonly Dictionary<string, List<ConfigEntryBase>> _secCache = new Dictionary<string, List<ConfigEntryBase>>();
         private static readonly Dictionary<string, int> _secCacheVer = new Dictionary<string, int>();
-        //兜底自检：每 30 帧抽查一次 ConfigFile 的条目总数，变化即让所有按版本缓存的表失效。
-        //NoteEntryBound 负责当帧立即失效，这里是最迟半秒的保险。
+        // 兜底：每 30 帧抽查条目总数，变化即让按版本缓存的表失效。
         private static int _cfgCountSeen = -1;
         private static int _cfgCountAtFrame = -9999;
         private static void SyncEntryVersionFromConfig() {
@@ -592,13 +560,12 @@ public partial class SR {
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
-        //public：功能（独立程序集）按段取条目表以渲染自己的页面。
+        // public：功能按段取条目表以渲染自己的页面。
         public static List<ConfigEntryBase> SectionEntries(string section) {
             SyncEntryVersionFromConfig();
             int ver = _entryVersion;
             List<ConfigEntryBase> cached;
             int oldVer;
-            //两步显式判定，不依赖 && 的求值顺序；cached != null 用于排除字典中值为 null 的项。
             bool haveCache = _secCache.TryGetValue(section, out cached);
             bool haveVer = _secCacheVer.TryGetValue(section, out oldVer);
             if (haveCache && haveVer && oldVer == ver && cached != null) return cached;
@@ -615,13 +582,12 @@ public partial class SR {
             return cached;
         }
 
-        //条目表版本号与按 "段\t键" 的查找缓存。
-        //组合键 / [Reflection] / 自动快捷键条目为惰性 Bind：未命中回退全表扫描，且只缓存命中结果。
+        // 条目表版本号与按 "段\t键" 的查找缓存。
         private static readonly Dictionary<string, ConfigEntryBase> _entryCache = new Dictionary<string, ConfigEntryBase>();
     internal static int _entryVersion ;
     internal static int EntryVersion { get { return _entryVersion; } set { _entryVersion = value; } }
 
-        //public：功能惰性 Bind 出新条目后调用本方法使条目缓存失效。
+        // public：惰性 Bind 出新条目后调用以使缓存失效。
 
         public static void NoteEntryBound() { _entryVersion++; }
 
@@ -643,8 +609,7 @@ public partial class SR {
                     return e;
                 }
             }
-            // 未命中也缓存（null）：否则拼错/已删除的键会每帧 O(n) 全表扫描。
-            // 条目表变化时 ClearEntryCache 会整体失效，不会读到过期结果。
+            // 未命中也缓存 null，否则错键每帧全表扫描。
             _entryCache[k] = null;
             return null;
         }
@@ -653,7 +618,6 @@ public partial class SR {
             try {
                 if (entry == null || entry.DefaultValue == null) return "";
                 object dv = entry.DefaultValue;
-                // 数值类：默认值后面补上"范围"，这是参数自身的信息，不是另一行固定文案
                 string range = "";
                 try {
                     object av = entry.Description != null ? entry.Description.AcceptableValues : null;
@@ -671,18 +635,18 @@ public partial class SR {
                         }
                     }
                 } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-                //开关文本须用 UseEn：语言包 FallbackId="English" 时 _langEn 为 false，写死会造成中英混排。
+                // 开关文本须用 UseEn：语言包下 _langEn 为 false，写死会中英混排。
                 if (dv is bool) return ((bool)dv) ? (UseEn ? "ON" : "开") : (UseEn ? "OFF" : "关");
                 if (dv is float) return ((float)dv).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + range;
                 if (dv is int) return ((int)dv).ToString() + range;
-                //KeyCode 也是 Enum，必须先判；未绑定（None）视为无默认值，不追加默认行。
+                // KeyCode 也是 Enum 须先判；未绑定（None）视为无默认值，不追加默认行。
                 if (dv is KeyCode) { KeyCode kc = (KeyCode)dv; return kc == KeyCode.None ? "" : KeyDisplayName(kc); }
                 if (dv is System.Enum) return EnumDisplayName(dv.ToString());
                 return Convert.ToString(dv, System.Globalization.CultureInfo.InvariantCulture);
             } catch { return ""; }
         }
 
-        //渲染某栏目的通用设置条目（供注册了自绘页但仍需通用设置列表的栏目使用）。
+        // 渲染某栏目的通用设置条目。
         public static void RenderSectionEntries(string section, System.Func<ConfigEntryBase, bool> filter = null) {
             try {
                 float colWidth = EntryNameWidth();
@@ -695,7 +659,7 @@ public partial class SR {
         }
 
 
-        // 紧凑行判定：任一注册的 RowCompact 钩子命中即算（单钩子异常走 Guard.Log，5 秒去重不刷屏）。
+        // 紧凑行判定：任一 RowCompact 钩子命中即算。
         private static bool CompactRow(ConfigEntryBase entry) {
             List<Func<ConfigEntryBase, bool>> hooks = SRApi.RowCompact;
             if (hooks == null || hooks.Count == 0) return false;
@@ -707,14 +671,13 @@ public partial class SR {
         }
 
         private static void RenderEntryRow(ConfigEntryBase entry, bool isInternal, float colWidth) {
-            //条目可能因功能未初始化 / 键改名而取不到，为 null 时直接返回。
+            // 条目可能因功能未初始化 / 键改名而取不到，null 时直接返回。
             if (entry == null) return;
             string name = isInternal ? ZhKey(entry) : entry.Definition.Key;
-            //描述：中文模式取 ZhDesc 或配置描述；英文模式只取英文表。
             string desc;
             if (UseEn) {
                 desc = isInternal ? ZhDesc(entry) : null;
-                //仅外部条目回退其自带的 ConfigDescription（本身为英文）；内部条目不可回退 Bind 时的中文说明。
+                // 仅外部条目回退自带 ConfigDescription（英文）；内部条目不可回退中文说明。
                 if (desc == null && !isInternal && entry.Description != null) desc = entry.Description.Description;
                 if (desc == null) desc = "";
             } else {
@@ -722,7 +685,7 @@ public partial class SR {
                 desc = zhDesc != null ? zhDesc
                     : (entry.Description != null && entry.Description.Description != null ? entry.Description.Description : "");
             }
-            //按本行控件的实际占宽从可用空间扣除，供名称列自适应（复选框约 34，键位 / 下拉约 170）。
+            // 按本行控件占宽扣除，供名称列自适应（复选框约 34，键位 / 下拉约 170）。
             float reserve = Sc(180);
             object cval = entry.BoxedValue;
             if (cval is bool) reserve = Sc(34);
@@ -730,25 +693,20 @@ public partial class SR {
                 float hookW = SR.RowComboWidth(entry);
                 if (hookW > 0f) reserve = Sc(hookW + 8);
             }
-            //标签宽度取本行文字实测宽度，nameW 仅为上限（超出则截断 / 换行），使控件紧贴标签。
             float avail = Mathf.Max(Sc(140), _winWidth - SidebarWidth() - Sc(24));
             float textW = NameTextWidth(entry, name);
             float cap = Mathf.Max(Sc(50), avail - reserve);
             float nameW = Mathf.Min(Mathf.Max(colWidth, Sc(50)), cap);
-            // 标签列默认统一宽度（同栏目内控件左边缘对齐）；命中 RowCompact 的行例外：
-            // 标签宽 = 文字宽（+小间距），控件紧贴标签 —— 会话 / 建造页要的就是这种观感。
+            // 标签列默认统一宽度（同栏目控件左缘对齐）；RowCompact 行标签宽 = 文字宽 + 小间距。
             float nameTw = CompactRow(entry) ? Mathf.Min(textW, nameW) : nameW;
-            //名称列包在垂直组内才能获得完整高度，否则 CJK 字形下沉 / 换行会被裁。
-            //Begin/End 必须成对：中途抛异常而未闭合分组会让后续控件全部落错分组。
+            // 名称列须包在垂直组内才获得完整高度，否则 CJK 字形下沉 / 换行会被裁。
             GUILayout.BeginHorizontal();
             try {
                 GUILayout.BeginVertical(GUILayout.Width(nameTw));
                 try {
-                    //整串走 RowTip（按 entry 缓存，语言或条目变化时由 NameCacheSync 清空）。
                     string tip = RowTip(entry, desc);
                     if (GUILayout.Button(new GUIContent(name, tip),
                         _nameLabel, GUILayout.Width(nameTw), GUILayout.Height(TextHeight(name, nameTw)))) {
-                        //只认左键：右键用于绑定快捷键，不可同时重置默认值
                         Event evName = Event.current;
                         if (evName == null || evName.button == 0) {
                             try { entry.BoxedValue = entry.DefaultValue; } catch (Exception __ex) { Guard.Log("恢复条目默认值(点击名称)", __ex); }
@@ -759,8 +717,6 @@ public partial class SR {
                         }
                     }
                 } finally { GUILayout.EndVertical(); }
-                //排版约定：控件紧贴其标签右侧。名称标签宽度即 nameTw，其后不插 FlexibleSpace，
-                //也不做主控件列对齐补白，避免在控件与标签之间留白。
                 GUILayout.Space(Sc(6));
                 RenderControl(entry);
                 RenderFollowUp(entry, isInternal);
@@ -768,11 +724,9 @@ public partial class SR {
             GUILayout.Space(Sc(2));
         }
 
-        //绘制同一行的同伴键位与附加控件。
-        //滑块路径会先 EndHorizontal 再 return，故它须在自己的水平组内调用本方法。
+        // 绘制同一行的同伴键位与附加控件；滑块路径会先 EndHorizontal，故须在自己的水平组内调用。
         private static void RenderFollowUp(ConfigEntryBase entry, bool isInternal) {
             try {
-                //滑块路径与外层 RenderEntryRow 都会调用本方法，同一条目同帧只渲染一次。
                 if (_followDoneEntry == entry && _followDoneFrame == Time.frameCount) return;
                 _followDoneEntry = entry; _followDoneFrame = Time.frameCount;
                 string companionKey = isInternal ? SR.RowCompanion(entry) : null;
@@ -790,7 +744,7 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("同行附加控件", __ex); }
         }
 
-        //文本高度 + CJK 字形下沉余量，避免标签裁剪；缓存为两层字典（文本 -> [宽度, 缩放, 高度]）。
+        // 文本高度 + CJK 下沉余量；两层字典缓存。
         private static float TextHeight(string text, float width) {
             try {
                 List<float[]> list;
@@ -808,15 +762,13 @@ public partial class SR {
             }
         }
 
-        //Dear ImGui 风格水平滑块：轨道 + 填充段 + 圆形把手（三态）；左键拖动或点击轨道跳转，悬停滚轮微调。
-        //输入与热区交给 GUI.HorizontalSlider（由引擎维护 hotControl），外观自绘；返回值与传入值不同即提交。
+        // ImGui 风格水平滑块：轨道 + 填充段 + 圆形把手（三态）；输入与热区交给 GUI.HorizontalSlider，外观自绘。
 
-        //原生 slider 用的两个不可见样式：只取其输入与热区，外观自绘。
     internal static GUIStyle _sliderNative ;
     internal static GUIStyle SliderNative { get { return _sliderNative; } set { _sliderNative = value; } }
     internal static GUIStyle _sliderNativeThumb ;
     internal static GUIStyle SliderNativeThumb { get { return _sliderNativeThumb; } set { _sliderNativeThumb = value; } }
-        //上次提交给配置的值（抑制未变化时的重复写盘）
+        // 上次提交给配置的值（抑制未变化时的重复写盘）
     internal static readonly System.Collections.Generic.Dictionary<ConfigEntryBase, float> _sliderLastWritten =
             new System.Collections.Generic.Dictionary<ConfigEntryBase, float>();
 
@@ -836,25 +788,20 @@ public partial class SR {
 
 
 
-        //下拉框（全 mod 唯一实现）：按钮与展开列表同属一个纵向组，列表落在按钮正下方并对齐。
-        //展开当帧不绘制列表（当帧新建控件无 Layout 记录），跳过帧号按条目记录；width 传入前已 Sc() 过。
+        // 下拉框（全 mod 唯一实现）：按钮与列表同一纵向组；展开当帧不绘制列表（无 Layout 记录）。
     internal static readonly Dictionary<ConfigEntryBase, int> _comboSkipFrame = new Dictionary<ConfigEntryBase, int>();
 
-        //展开列表的滚动起点（按条目记录，最多可见 8 项）。
     internal static readonly Dictionary<ConfigEntryBase, int> _comboScroll = new Dictionary<ConfigEntryBase, int>();
-        //编辑框自身提交配置的帧号（该帧不清 _editText，避免吃掉小数点）
+        // 编辑框自身提交配置的帧号（该帧不清 _editText，避免吃掉小数点）
     internal static int _editSelfFrame = -1;
     internal static int EditSelfFrame { get { return _editSelfFrame; } set { _editSelfFrame = value; } }
-        //下拉框"点外面关闭"：不靠坐标（下拉框矩形在滚动区内容坐标系里），而是 MouseDown 这一帧若无下拉框认领
-        //（ComboMouseDownSeen），则在 ManagerUI.OnGUI 末尾全部收起。
+        // 点外面关闭：不靠坐标，MouseDown 帧无下拉框认领则帧尾全部收起。
         internal static int _comboSeenFrame = -1;
         internal static int ComboSeenFrame { get { return _comboSeenFrame; } set { _comboSeenFrame = value; } }
 
 
 
-        // 滚轮所有权：控件在被 hover 时声明独占；帧首把本帧声明转存为上一帧声明，滚动仲裁读上一帧声明，
-        // 有则整体放弃滚动（滚动容器的处理发生在控件提交之前，故只能读上一帧）。
-        // 中心化 hover 裁决（借鉴 ItemHoverable）：一帧内只有第一个判定通过的控件算 hovered，叠放控件须显式 AllowOverlap。
+        // 滚轮所有权与 hover 裁决：一帧内只有第一个判定通过的控件算 hovered；滚动容器先于控件提交，故读上一帧。
         //控件高度（设计像素）：0 = 默认 26；功能可覆盖自己页面的控件高度
         public static float ControlHeight;
         //内容区原点偏移，供事件坐标与内容坐标换算

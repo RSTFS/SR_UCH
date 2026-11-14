@@ -9,16 +9,15 @@ using UnityEngine;
 
 namespace SR_UCH.Tweaks {
     // 关卡边界（实验）：解除制作关卡时的空间边界限制，与满度上限无关。
-    // 四条路：实体墙 size 归零 / 光标边界换 Huge / 相机取景边界 / 方块 IgnoreBounds；改动均记录原值，可逐项还原。
+    // 四条路：实体墙 size 归零 / 光标边界换 Huge / 相机取景边界 / 方块 IgnoreBounds；均记录原值可还原。
     [SrFeature("sr.levelboundsunlock", "LevelBoundsUnlock", "1.0")]
     public class LevelBoundsUnlock : ITweak {
         private static ConfigEntry<bool> _on;   // 主开关
         private static ConfigEntry<int> _radius;
 
         internal static string Status = "（尚未探测：打开上面的开关后约 1 秒出现结果）";
-        // 方块越界放置并入主开关：Placeable.IgnoreBounds 是纯 bool，CanPlaceCheck 直接读，不经物理回调。
-        // 新方块由 PiecePlacedEvent 即时打标（见 PieceIgnoreListener），全场扫描只在开启/换场景后做有限次。
-        // 关闭时一律走 Restore() 逐项还原（按 _colOrig/_fixWas/_igWas/_curOrig 等记录的原值写回）。
+        // 方块越界放置并入主开关：IgnoreBounds 是纯 bool，CanPlaceCheck 直接读。
+        // 新方块由 PiecePlacedEvent 即时打标，全场扫描只在开启 / 换场景后做有限次；关闭时一律走 Restore 还原。
         private static bool WallsOn { get { return _on != null && _on.Value; } }
         private static bool CursorOn { get { return _on != null && _on.Value; } }
         private static bool CameraOn { get { return _on != null && _on.Value; } }
@@ -30,12 +29,10 @@ namespace SR_UCH.Tweaks {
         // 供 RemoveUI3 判断主开关；判据含 SRApi.GateMaster，与 Reeval/Tick 一致。
         internal static bool MasterOn { get { return _on != null && _on.Value && SRApi.GateMaster; } }
 
-        // 原值记录：关闭开关时逐项还原（换场景则整体作废，见 Reset）
         private static readonly Dictionary<Collider2D, Vector2> _colOrig = new Dictionary<Collider2D, Vector2>();
         private static readonly Dictionary<MonoBehaviour, bool> _fixWas = new Dictionary<MonoBehaviour, bool>();
-        // _fixWas 兼作"被动过的相机控制器"清单：关闭时不按原值还原 enabled，
-        // 而是清 isCameraConfigured 并重新启用，让游戏组件自己重新接管相机。
-        // 光标边界原值：只记 boundary（Bounds），不使用 SetBounds(Collider2D) 重载。
+        // fixWas 兼作"被动过的相机控制器"清单：关闭时不按原值还原 enabled，而是清 isCameraConfigured 并重新启用。
+        // 光标边界原值只记 boundary，不用 SetBounds(Collider2D) 重载。
         private static readonly Dictionary<PiecePlacementCursor, Bounds> _curOrig = new Dictionary<PiecePlacementCursor, Bounds>();
         private static readonly Dictionary<Placeable, bool> _igWas = new Dictionary<Placeable, bool>();
         private static readonly HashSet<Placeable> _aliveBuf = new HashSet<Placeable>();
@@ -49,10 +46,8 @@ namespace SR_UCH.Tweaks {
         private static int _hardNoteR = int.MinValue;
         private static int _hardNoteN = -1;
         private static string _hardNoteCam;
-        // _zcOrig/_zcHas 为相机边界快照，供 Restore 还原。
         private static Bounds _zcOrig = new Bounds(Vector3.zero, Vector3.zero);
         private static bool _zcHas;
-        // ZoomCamera 原本的 enabled（Restore 时按原状还原）。
         private static bool _zcWasEnabled;
         // 相机是否被改过：未改过时 Restore 不得动 zc.enabled。
         private static bool _zcTouched;
@@ -60,11 +55,10 @@ namespace SR_UCH.Tweaks {
         private static bool _camDiagDone;
         private static bool _applied;
 
-        // 缓存：Level / 光标 / 相机 / FixCamera / 墙引用
         private static readonly global::Level[] _noLevels = new global::Level[0];
         private static global::Level[] _lvCache = null;
         private static int _lvCacheAt = -9999;
-        // 墙扫描的节流时钟必须独立于 Levels 的时钟：共用会让 FindObjectsOfType<Level>() 缓存永久失效。
+        // 墙扫描时钟必须独立于 Levels 的时钟，共用会让 Level 扫描缓存永久失效。
         private static int _wallScanAt = -9999;
         private static readonly PiecePlacementCursor[] _noCursors = new PiecePlacementCursor[0];
         private static PiecePlacementCursor[] _cursors = _noCursors;
@@ -73,15 +67,12 @@ namespace SR_UCH.Tweaks {
         private static int _zcAt = -9999;
         private static FixCameraToBoundaries[] _fixers = new FixCameraToBoundaries[0];
         private static int _fixersAt = -9999;
-        // 三面实体墙的碰撞体引用：只在缺失时扫描。
         private static readonly BoxCollider2D[] _wallCol = new BoxCollider2D[3];
 
-        // BlankLevel 场景（level4）中三面实体墙的对象名。
         private static readonly string[] SolidWallNames = { "TopBoundary", "LeftBoundary", "RightBoundary" };
-        // 三面墙是 BoxCollider2D，size=(1,1) 靠 transform.scale 撑开 -> size 置 Vector2.zero 即解除；放大无效且会连同精灵变形。
-        // 判据为「BLANKLEVEL + 四边齐全」，不判游戏模式。界外的黑来自无背景时的相机清除色，与相机无关。
+        // size 置零即解除（靠 transform.scale 撑开，放大无效且精灵变形）；判据为 BLANKLEVEL + 四边齐全。
         private static void SelfReg() {
-            // 两处反射均需登记，否则改名后静默返回 null（表现为解除边界无效）。
+            // 两处反射均需登记，否则改名后静默返回 null（表现为解除无效）。
             SRApi.Ref.Override("Cursor.boundary", "解除关卡边界：放置光标边界快照");
             SRApi.Ref.Override("ZoomCamera.frame", "解除关卡边界：相机取景框");
             SRApi.LocKey("Experiments", "Level Bounds", "解除关卡边界", null);
@@ -90,7 +81,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc("Experiments", "Level Bounds Radius", "硬解锁半径\n光标与相机能到关卡外多远\n不限上限；1＝贴着光标；仅主开关开启时生效", "Hard unlock radius\nhow far the cursor and camera reach outside the level\nno upper limit; 1 = at the cursor; main switch only");
         }
 
-        // 新放置的方块：立即设置 IgnoreBounds（只处理这一个对象，不做全场景扫描）。
         private class PieceIgnoreListener : GameEvent.IGameEventListener {
             public void handleEvent(GameEvent.GameEvent e) {
                 try {
@@ -109,10 +99,9 @@ namespace SR_UCH.Tweaks {
                 SelfReg();
                 _on = plugin.Config.Bind("Experiments", "Level Bounds", false,
                     "解除关卡边界：实体墙 + 相机取景 + 光标范围 + 方块越界（与满度上限无关）。");
-                // 半径不带 AcceptableValueRange，取值不限范围。
                 _radius = plugin.Config.Bind("Experiments", "Level Bounds Radius", DefaultHardRadiusInt,
                     "硬解除能走多远. 不限范围, 填 1 就是贴着光标走.");
-                // 一次性迁移仍为历史默认值的旧配置（改过的不动）；标记放 [Internal] 段，不渲染也不被当孤儿键清掉。
+                // 一次性迁移仍为旧默认值的配置；标记放 [Internal] 段，不渲染也不被当孤儿键清掉。
                 ConfigEntry<bool> lbDefaults = plugin.Config.Bind("Internal", "Level Bounds Defaults v3", false,
                     "内部：硬解除半径的默认值已迁移（200）");
                 if (!lbDefaults.Value) {
@@ -122,9 +111,9 @@ namespace SR_UCH.Tweaks {
                     } catch (Exception __ex) { SRApi.Guard.Log("边界默认值迁移", __ex); }
                 }
 
-                // 事件驱动即时重评估，Tick 仅作兜底（面板关闭/页面切走时 Tick 可能不跑）。
+                // 事件驱动即时重评估，Tick 仅作兜底（面板关闭时 Tick 可能不跑）。
                 if (_on != null) _on.SettingChanged += (s, e) => Reeval();
-                // 半径变更走轻量刷新（只重跑 ApplyHardBounds，幂等），不触发 Reeval 的全流程重扫。
+                // 半径变更只重跑 ApplyHardBounds（幂等），不触发 Reeval 的全流程重扫。
                 if (_radius != null) _radius.SettingChanged += (s, e) => { if (_on != null && _on.Value) { try { ApplyHardBounds(); } catch (Exception __ex) { SRApi.Guard.Log("边界半径刷新", __ex); } } };
                 // 半径不挂 SettingChanged，Tick 每帧会调 ApplyHardBounds，改完下一帧自然生效。
                 // 旧的子项键已无任何 Config.Bind，统一由 SR.ConfigMigration 的 RemoveKeys 清理。
@@ -141,7 +130,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("关卡边界 初始化", __ex); }
         }
 
-        // 事件驱动的重新评估：开则应用、关则还原；幂等，不依赖 Tick。
+        // 事件驱动重评估：开则应用、关则还原；幂等，不依赖 Tick。
         private static void Reeval() {
             try {
                 if (_on == null) return;
@@ -149,7 +138,7 @@ namespace SR_UCH.Tweaks {
                 bool on = _on.Value && SRApi.GateMaster;
                 if (on) {
                     _applied = true;
-                    // 刚打开就立刻解一次 UI3（不等边界重放的节拍）。
+                    // 刚打开就立刻解一次 UI3，不等边界重放的节拍。
                     if (RemoveUI3.WantOn) {
                         try { RemoveUI3.Tick(true); } catch (Exception __ui0) { SRApi.Guard.Log("解除UI3/即时", __ui0); }
                     }
@@ -168,11 +157,8 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("关卡边界 重评估", __ex); }
         }
 
-        // 扫描策略（用户指定）：
-        //   打开开关 / 换场景 → 立刻开始**全速扫描**（每帧都扫），一帧也不等；
-        //   扫到了（三面墙全部拿到，或确认本关没有）→ 立刻停止扫描；
-        //   没扫到 → 超时（ScanTimeout 秒）自动停止，之后只维持已生效的解绑，不再扫；
-        //   换场景 → 重新全速扫描一次。
+        // 扫描策略：打开开关 / 换场景后全速逐帧扫描；扫到（墙齐或确认本关没有）即停；
+        // 未扫到则超时自动停止，之后只维持已生效的解绑。
         private const float ScanTimeout = 3f;
         private static float _scanDeadline = -1f;
         private static bool _scanRunning;
@@ -193,7 +179,6 @@ namespace SR_UCH.Tweaks {
                     if (_applied) { Restore(); _applied = false; }
                     return;
                 }
-                // 换场景：清掉旧引用并重新全速扫描。
                 int __scene = -9999;
                 try { __scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle; } catch { /* 静默：取不到场景就沿用上一次 */ }
                 if (__scene != _scanScene) {
@@ -208,7 +193,6 @@ namespace SR_UCH.Tweaks {
 
                 _tick++;
                 _applied = true;
-                // 全速扫描阶段：每帧都扫墙 / 都试一次 UI3；扫到就停。
                 if (WallsOn) {
                     EnsureWalls(scanning);
                     if (scanning && WallsResolved()) { _scanRunning = false; }
@@ -216,7 +200,7 @@ namespace SR_UCH.Tweaks {
                 if (RemoveUI3.WantOn) {
                     try { RemoveUI3.Tick(scanning); } catch (Exception __ui) { SRApi.Guard.Log("解除UI3/并入", __ui); }
                 }
-                // 解绑本身是幂等写值：扫描阶段每帧一次，之后 4Hz 维持（开销只有几次字段赋值）。
+                // 解绑是幂等写值：扫描阶段每帧一次，之后 4Hz 维持。
                 if (scanning || _tick % 60 == 0) {
                     ApplyCursorPiece(true);
                     OpenSolidWalls(WallsOn);
@@ -230,9 +214,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("关卡边界 Tick", __ex); }
         }
 
-        // 三面实体墙：只在引用缺失时扫场景。
-        // fullSpeed = 扫描阶段：每帧都扫，不节流（用户要求"打开就全速扫"）；
-        // 否则低频维持（场景里后生成的情形兜底）。
+        // 三面实体墙：只在引用缺失时扫场景（fullSpeed = 扫描阶段不节流，否则低频维持）。
         private static int _wallScanTries;
         private static int _wallScanScene = -1;
         private const int WallScanMaxTries = 240;   // 全速时约 4 秒；仍找不到就认为本关没有这三面墙
@@ -243,7 +225,6 @@ namespace SR_UCH.Tweaks {
             _wallScanAt = -9999;
         }
 
-        // "扫到了"：三面墙都有引用，或已确认本关没有（扫描次数用尽）。
         private static bool WallsResolved() {
             for (int i = 0; i < _wallCol.Length; i++) if (_wallCol[i] == null) return _wallScanTries >= WallScanMaxTries;
             return true;
@@ -261,8 +242,7 @@ namespace SR_UCH.Tweaks {
             _wallScanAt = Time.frameCount;
             _wallScanTries++;
             try {
-                // 墙名是已知常量：直接按名查找，避免 FindObjectsOfType<GameObject>() 的
-                // "全场景数组分配 + 数千对象遍历"（进关卡卡顿尖峰的主要来源）。
+                // 墙名是已知常量：直接按名查找，避免 FindObjectsOfType 的全场景分配与遍历。
                 for (int k = 0; k < SolidWallNames.Length; k++) {
                     if (_wallCol[k] != null) continue;
                     GameObject g = GameObject.Find(SolidWallNames[k]);
@@ -273,10 +253,9 @@ namespace SR_UCH.Tweaks {
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
-        // 双向：want=true 置零、false 写回原值；原值记在 _colOrig，Restore 会整体清空。
         private static void OpenSolidWalls(bool want) {
             try {
-                // 改 collider.size 后必须 SyncPhysics()：宽相不重建会让 CheckColliding 的 InBounds 被打回 false 而放不下。
+                // 改 size 后必须 SyncPhysics()：宽相不重建会让 InBounds 被打回 false 而放不下。
                 bool changed = false;
                 for (int i = 0; i < 3; i++) {
                     BoxCollider2D bc = _wallCol[i];
@@ -304,16 +283,15 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("解除实体墙", __ex); }
         }
 
-        // 相机取景集合不干预：界外的黑来自无背景时的相机清除色，属背景问题。
-        // CamNote() 为只读诊断，把取景框/相机/光标坐标打到状态行，不改任何相机状态。
+        // 相机取景集合不干预：界外的黑来自无背景时的相机清除色。
+        // CamNote() 为只读诊断，只输出坐标不改相机状态。
 
         // 挂在「相机」子开关上（默认关）：关闭时完全不碰相机，开启时禁用游戏组件并保证 ZoomCamera 开启。
         private static void SuppressFixCamera(bool want) {
             try {
                 FixCameraToBoundaries[] fs = Fixers();
                 if (!want) {
-                    // 关闭时不能只还原 enabled：FixCameraToBoundaries 配置完会置 isCameraConfigured 并自关，
-                    // 须清该字段并强制 enabled=true 让它重新接管相机，再把 ZoomCamera.enabled 按原值还回。
+                    // 关闭时不能只还原 enabled：FixCameraToBoundaries 配置完会置 isCameraConfigured 并自关，须清该字段并重新启用。
                     if (_fixWas.Count == 0 && fs.Length == 0) return;
                     int nb = 0;
                     // ① 曾记录的控制器（可能已不在当前扫描结果里）
@@ -344,8 +322,7 @@ namespace SR_UCH.Tweaks {
                     if (!_fixWas.ContainsKey(f)) _fixWas[f] = f.enabled;
                     if (f.enabled) f.enabled = false;
                 }
-                // FixCameraToBoundaries.Update 会关闭 ZoomCamera 并自行接管相机；
-                // 禁用该组件后必须重新打开 ZoomCamera，否则相机无人接管（表现为解除边界无效）。
+                // FixCameraToBoundaries 会关闭 ZoomCamera 并自行接管；禁用该组件后必须重开 ZoomCamera，否则相机无人接管。
                 ZoomCamera zc = Zc();
                 if (zc != null) {
                     if (!_zcTouched) { _zcWasEnabled = zc.enabled; _zcTouched = true; }   // 只在首次记录原值
@@ -372,11 +349,10 @@ namespace SR_UCH.Tweaks {
             try {
                 bool on = PieceIgnoreOn;
                 Placeable[] all = UnityEngine.Object.FindObjectsOfType<Placeable>();
-                // 本场景最多扫 IgScanMaxTries 次（覆盖加载后生成的物件）；此后新方块由放置事件即时处理。
+                // 本场景最多扫 IgScanMaxTries 次；此后新方块由放置事件处理。
                 if (_igScans >= IgScanMaxTries) return;
                 _igScans++;
-                // _igWas 为强引用字典，且游戏销毁方块时不派发事件；以本轮扫描到的集合为权威，剔除已销毁的键。
-                // 复用静态缓冲：每 30 帧一次全场景扫描，不再每轮新建 HashSet（满图 500+ 方块时是明显 GC 尖峰）。
+                // _igWas 是强引用字典且销毁方块不派发事件，故以本轮扫描集合为权威剔除；复用静态缓冲避免 GC 尖峰。
                 HashSet<Placeable> alive = null;
                 if (_igWas.Count > 0) { _aliveBuf.Clear(); alive = _aliveBuf; }
                 for (int i = 0; i < all.Length; i++) {
@@ -399,15 +375,13 @@ namespace SR_UCH.Tweaks {
         }
 
 
-        // 改运行中 Collider2D 的 size 后同步物理宽相（游戏自身只改序列化编辑器数据，不调 SyncTransforms）。
-        // 不改 enabled：那是 Level.EnablePlacementBounds 的职责。
+        // 改运行中 Collider2D 的 size 后同步物理宽相；不改 enabled：那是 Level.EnablePlacementBounds 的职责。
         private static void SyncPhysics() {
             try { Physics2D.SyncTransforms(); }
             catch (Exception __ex) { SRApi.Guard.Log("同步物理宽相", __ex); }
         }
 
-        // 硬解除半径的默认值与兜底值，取值不限范围。
-        // 半径必须 > 0：零尺寸 bounds 会让 ZoomCamera 取景框塌成一个点，光标侧的夹取也会被整段跳过。
+        // 硬解除半径默认值，取值不限范围；半径必须 > 0，零尺寸 bounds 会让 ZoomCamera 取景框塌成一点。
         private const int DefaultHardRadiusInt = 200;
         private const float DefaultHardRadius = 200f;   // 兜底半径，与默认值一致
         private static float HardRadius() {
@@ -460,7 +434,7 @@ namespace SR_UCH.Tweaks {
             } catch { return false; }
         }
 
-        // 写回已记录的光标原值：光标子开关关闭与功能关闭两条路径共用，避免原值残留。
+        // 写回已记录的光标原值（光标子开关关闭与功能关闭共用，避免原值残留）。
         private static void RestoreCursorBounds(string why) {
             if (_curOrig.Count == 0) return;
             int nb = 0;
@@ -472,17 +446,15 @@ namespace SR_UCH.Tweaks {
             if (nb > 0) SRApi.LogInfo("[关卡边界] " + why + "，已还原 " + nb + " 个光标");
         }
 
-        // 上次写入的硬解除半径：半径没变就不重复 SetBounds（评审 4.3：原来每帧都在写）。
+        // 上次写入的硬解除半径：没变就不重复 SetBounds。
         private static float _hardRadiusApplied = float.NaN;
 
         private static void ApplyHardBounds() {
             try {
                 if (_on == null || !_on.Value) return;
                 float r = HardRadius();
-                // 半径没变且本场景已经写过：跳过（光标位置会变，所以只有半径同值还不行，
-                // 见下面仍按"光标/地图换了"判定的部分；这里只挡纯重复写）。
+                // 半径没变且本场景已写过就跳过，只挡纯重复写。
                 int n = 0;
-                // NaN（还没写过）也算变化
                 bool radiusChanged = float.IsNaN(_hardRadiusApplied) || Mathf.Abs(_hardRadiusApplied - r) >= 0.0001f;
                 if (CursorOn) {
                     PiecePlacementCursor[] curs = Cursors();
@@ -491,9 +463,7 @@ namespace SR_UCH.Tweaks {
                         if (c == null) continue;
                         Bounds cb;
                         if (ReadCursorBounds(c, out cb) && !_curOrig.ContainsKey(c)) _curOrig[c] = cb;
-                        // 只用 SetBounds(Bounds)，它只写 boundary 字段；
-                        // SetBounds(Collider2D) 会改写 boundingCollider（即 CheckColliding.CheckBounds 的来源），改错后再也放不下。
-                        // 半径没变且本帧光标边界已是 Huge：不重复写（省掉每帧一次 setter + 结构体构造）。
+                        // 只用 SetBounds(Bounds) 写 boundary；SetBounds(Collider2D) 会改写 boundingCollider，改错后再也放不下。
                         Bounds want = Huge(c.transform.position);
                         if (!radiusChanged && cb.size.x > 1e6f) continue;
                         try { c.SetBounds(want); n++; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -504,8 +474,7 @@ namespace SR_UCH.Tweaks {
                 }
                 string cam;
                 {
-                    // 相机取景边界写 Huge(LevelCenter())：派对盒阶段 targets/boxes 为空，取景框直接取 boundary，会被拉爆；
-                    // 故整段挂在「相机」子开关上，关闭时不写相机一个字节。
+                    // 相机取景写 Huge(LevelCenter())：派对盒阶段 targets/boxes 为空，取景框会被拉爆，故整段挂在「相机」子开关上。
                     if (CameraOn) {
                         ZoomCamera zc = Zc();
                         if (zc != null) {
@@ -521,7 +490,7 @@ namespace SR_UCH.Tweaks {
                         cam = "相机=不动";
                     }
                 }
-                // 每帧调用：直接比较三个值，避免每帧拼字符串（脏标记只在变化时重建文案）。
+                // 每帧只比较三个值，脏标记只在变化时重建文案。
             if ((int)r != _hardNoteR || n != _hardNoteN || !string.Equals(cam, _hardNoteCam, StringComparison.Ordinal)) {
                 _hardNoteR = (int)r; _hardNoteN = n; _hardNoteCam = cam;
                 _hardNote = "硬解除 r=" + (int)r + " 光标×" + n + " " + cam;
@@ -529,12 +498,10 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { _hardNote = "硬解除失败:" + __ex.Message; SRApi.Guard.Log("关卡边界-硬解除", __ex); }
         }
 
-        // 缓存
         private const int CursorRefreshEvery = 600;   // 10 秒兜底：正常只在换场景时重扫
         private static PiecePlacementCursor[] Cursors() {
             int f = Time.frameCount;
-            // 换场景由 SceneHook 清空缓存；场景内只有"新玩家加入"会新增光标，
-            // 所以这里保留 10 秒兜底即可，不必每 2 秒全扫一次。
+            // 换场景由 SceneHook 清空缓存；场景内只有新玩家加入会新增光标，10 秒兜底即可。
             if (_cursors != null && _cursors.Length > 0 && f - _cursorsAt < CursorRefreshEvery) return _cursors;
             _cursorsAt = f;
             try {
@@ -586,7 +553,6 @@ namespace SR_UCH.Tweaks {
             return Vector3.zero;
         }
 
-        // 状态行：逐条列出生效项 + 相机取景诊断。
         private static void BuildStatus() {
             try {
                 List<string> bits = new List<string>();
@@ -612,7 +578,6 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { Status = "状态生成失败：" + __ex.Message; SRApi.Guard.Log("关卡边界 状态", __ex); }
         }
 
-        // 相机取景诊断：输出取景框尺寸、相机位置、光标坐标与边界快照尺寸。
         private static string CamNote() {
             try {
                 ZoomCamera zc = Zc();
@@ -643,7 +608,6 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("相机诊断", __ex); return "相机诊断失败"; }
         }
 
-        // 还原：把改过的每一项按原值写回。
         internal static void Restore() {
             List<string> rb = new List<string>();
             try {
@@ -655,7 +619,7 @@ namespace SR_UCH.Tweaks {
                     bc.size = kv.Value;
                     nc++;   // 只写 size，不碰 enabled
                 }
-                // 改过 collider.size 后同步物理宽相，让 trigger 关系立即重建，否则放置校验会判"放不下"。
+                // 同步物理宽相，让 trigger 关系立即重建，否则放置校验会判"放不下"。
                 SyncPhysics();
                 _colOrig.Clear();
                 rb.Add("碰撞体×" + nc);
@@ -671,8 +635,7 @@ namespace SR_UCH.Tweaks {
                 foreach (KeyValuePair<PiecePlacementCursor, Bounds> kv in _curOrig) {
                     if (kv.Key == null) continue;
                     try {
-                        // 一律 SetBounds(Bounds)，只还原 boundary。
-                        // SetBounds(Collider2D) 会改写 boundingCollider（全库无复位代码），改错后只有切场景能恢复。
+                        // 一律 SetBounds(Bounds) 只还原 boundary；SetBounds(Collider2D) 会改写 boundingCollider 且无复位途径。
                         kv.Key.SetBounds(kv.Value);
                         ncur++;
                     } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -682,23 +645,20 @@ namespace SR_UCH.Tweaks {
                 ZoomCamera zc = Zc();
                 if (zc != null && _zcHas) { try { zc.SetBounds(_zcOrig); rb.Add("相机=原快照"); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
                 _zcHas = false;
-                // 仅在相机项开过（_zcTouched）且原值本为关闭时把 ZoomCamera.enabled 关回，其余情况不动。
+                // 仅相机项开过且原值本为关闭时把 ZoomCamera.enabled 关回，其余情况不动。
                 if (_zcTouched) { try { ZoomCamera zr = Zc(); if (zr != null && !_zcWasEnabled && zr.enabled) zr.enabled = false; } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
                 _zcTouched = false;
                 Status = "（已还原为游戏原值）" + string.Join(" ", rb.ToArray());
             } catch (Exception __ex) { Status = "（还原异常：" + __ex.Message + "）已还原：" + string.Join(" ", rb.ToArray()); SRApi.Guard.Log("关卡边界 还原", __ex); }
             _hardNote = null;
-            // 与 Reset 对齐：清除"只告警一次"的标志，关闭后再开启仍能看到诊断。
             _camDiagDone = false;
         }
 
-        // 换场景：Level / 相机 / 光标 / 方块均为新对象，旧原值字典整体作废。
+        // 换场景：Level / 相机 / 光标 / 方块都是新对象，旧原值字典整体作废。
         private static void Reset() {
             _igScans = 0;
-            // 不再把 *At 时间戳打成 -9999：Reset 由 dismiss 钩子频繁触发（面板开关/开局都会），
-            // 打掉时间戳等于让 Cursors()/Levels() 的缓存失效，每帧重新 FindObjectsOfType ——
-            // 这正是 tick 剖析里 关卡边界-应用 长期 4ms 的来源。场景换了对象自然为 null，调用方已有判空。
-
+            // 不要把 *At 时间戳清成 -9999：Reset 会被频繁触发，清掉等于让 Cursors()/Levels() 缓存失效，
+            // 退回每帧 FindObjectsOfType；场景换了对象自然为 null，调用方已判空。
             _igScans = 0;
 
             _colOrig.Clear();
@@ -718,8 +678,7 @@ namespace SR_UCH.Tweaks {
             _camDiagDone = false;
             _applied = false;
             Status = "（换场景：已重置，等待下次应用）";
-            // 注意：不要在这里清 _tick / _nextApplyAt —— 面板开关会频繁触发 Reset，
-            // 清掉它们等于让 2Hz 门限失效，于是每帧都跑一遍重活（tick 剖析里 4ms 就是这么来的）。
+            // 不要清 _tick / _nextApplyAt：Reset 频繁触发，清掉会让 2Hz 门限失效而每帧跑重活。
         }
 
         private static void Dismiss() {
