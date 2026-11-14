@@ -697,6 +697,11 @@ namespace SR_UCH.Tweaks {
         // ============ 对外展示 ============
 
         public static string Desc() {
+            // 同帧内 UI 与通知各调一次；用核心的按帧缓存只算一遍（帧号变了自动重算）。
+            return SRApi.Cache.FrameSig("chaos.desc", delegate { return DescCore(); });
+        }
+
+        private static string DescCore() {
             if (!_ready || _active.Count == 0) return null;
             var parts = new List<string>();
             for (int i = 0; i < _active.Count; i++) {

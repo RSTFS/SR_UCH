@@ -13,6 +13,7 @@
 # 规则：SR_UCH\Features\*.cs 只允许使用本文件列出的 SRApi.* 成员；新增 API 必须同时改代码与本清单（-Check / CI 会拦）。
 BlockInput
 BlockWindowDrag
+Cache
 CanControlLocally
 CanDoHost
 ClaimWheelArea

@@ -1418,6 +1418,26 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static void LocDesc(string sec, string key, string zh, string en) { Action<string, string, string, string> f = _locDesc; if (f != null) f(sec, key, zh, en); }
         // 一次登记「显示名 + 悬浮说明」：功能层原来每条都要写两行 LocKey/LocDesc，
         // 漏一行就会在中文界面显示英文键名（牌池扩到 17 张时漏过 4 张）。descZh 为空时只登记显示名。
+        // 每帧签名/结果缓存：同一帧内同一 key 只算一次。
+        // 预设页与联机页原来各自手写 *_Signature() 字段缓存，忘记失效就会"改了筛选列表不动"；
+        // 用这个助手可以按"帧"天然失效，不必再手动维护版本号。
+        public static class Cache {
+            private static readonly Dictionary<string, object> _vals = new Dictionary<string, object>();
+            private static readonly Dictionary<string, int> _frames = new Dictionary<string, int>();
+            public static T FrameSig<T>(string key, Func<T> compute) {
+                if (string.IsNullOrEmpty(key) || compute == null) return compute != null ? compute() : default(T);
+                int f = Time.frameCount;
+                int hit;
+                object v;
+                if (_frames.TryGetValue(key, out hit) && hit == f && _vals.TryGetValue(key, out v) && v is T) return (T)v;
+                T nv = compute();
+                _frames[key] = f;
+                _vals[key] = nv;
+                return nv;
+            }
+            public static void Clear() { _vals.Clear(); _frames.Clear(); }
+        }
+
         public static void LocPair(string sec, string key, string zh, string en, string descZh = null, string descEn = null) {
             LocKey(sec, key, zh, en);
             if (!string.IsNullOrEmpty(descZh) || !string.IsNullOrEmpty(descEn)) LocDesc(sec, key, descZh ?? zh, descEn ?? en);
