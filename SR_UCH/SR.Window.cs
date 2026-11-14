@@ -832,6 +832,13 @@ public partial class SR {
                 } catch (Exception __ex) { Guard.Log("地图/取景 onPreCull", __ex); }
             }
 
+            // 每帧调用的静态委托：避免 Update/OnGUI 每趟 new 闭包（GC 抖动）。
+            private static readonly Action _actTick = SR.Tick;
+            private static readonly Action _actOpenKey = SR.CheckOpenKey;
+            private static readonly Action _actHotkeys = SR.CheckHotkeys;
+            private static readonly Action _actDrawGui = SR.DrawGUI;
+            private static readonly Action _actPostWheel = SR.PostGuiWheel;
+
             private void Update() {
                 // 延迟到首帧：其它 tweak 可能在 Initialize 之后才注册配置，提前扫描会漏。
                 if (!_startup) {
@@ -844,9 +851,9 @@ public partial class SR {
                 }
                 // 视野 / 地图的快捷键由功能自己用 SR.RegisterTick 注册；滚轮缩放走 OnGUI 末尾的 SR.PostGuiWheel。
                 // 每帧调度做异常隔离：任一步抛异常不跳过后续步骤；Guard.Try 自带 5 秒去重。
-                Guard.Try("每帧 Tick", () => SR.Tick());
-                Guard.Try("面板开关键", () => SR.CheckOpenKey());
-                Guard.Try("自动快捷键", () => SR.CheckHotkeys());
+                Guard.Try("每帧 Tick", _actTick);
+                Guard.Try("面板开关键", _actOpenKey);
+                Guard.Try("自动快捷键", _actHotkeys);
                 // 取景生效点：Camera.onPreCull（渲染前，最后生效）+ ZoomCamera.Update 后缀。
             }
 
@@ -854,9 +861,9 @@ public partial class SR {
                 // 先记按键：界面正在吞输入时，ComboKeyDown 还能靠这条记录命中。
                 try { SR.RecordGuiKeyEvent(Event.current); } catch (Exception __gk) { SR.Guard.Log("OnGUI 记录按键", __gk); }
                 // 分开包：DrawGUI 抛异常时滚轮收口仍要执行。
-                Guard.Try("绘制面板", () => SR.DrawGUI());
+                Guard.Try("绘制面板", _actDrawGui);
                 // 滚轮仲裁收口：必须在 DrawGUI 之后（界面件已处理完本帧滚轮，Input 读轴的缩放才不会抢滚轮）。
-                Guard.Try("滚轮收口", () => SR.PostGuiWheel());
+                Guard.Try("滚轮收口", _actPostWheel);
                 // 点在下拉框以外 = 收起展开的下拉框：判据是"MouseDown 这一帧无下拉框认领"，不靠坐标
                 // （下拉框矩形在滚动区内容坐标系里）。放在 DrawGUI 之后，按钮自身切换已跑完。
                 Event __ce = Event.current;

@@ -78,14 +78,17 @@ public partial class SR {
         private static int _nameCacheVer = -1;
 
         // LocDynamic：条目显示名随游戏语言/内容变化时节流重注册（同一语言下同名不重复写）。
-        private static readonly Dictionary<ConfigEntryBase, string> _dynNames = new Dictionary<ConfigEntryBase, string>();
+        // 每帧可能被调用（如牌池名），不拼签名串：直接比语言版本 + 中英文引用/相等。
+        private struct DynName { public string Zh, En; public int Lang; }
+        private static readonly Dictionary<ConfigEntryBase, DynName> _dynNames = new Dictionary<ConfigEntryBase, DynName>();
         internal static void LocDynamic(ConfigEntryBase e, string zh, string en) {
             try {
                 if (e == null) return;
-                string sig = (_langVer.ToString()) + "|" + (zh ?? "") + "|" + (en ?? "");
-                string old;
-                if (_dynNames.TryGetValue(e, out old) && old == sig) return;
-                _dynNames[e] = sig;
+                zh = zh ?? ""; en = en ?? "";
+                DynName old;
+                if (_dynNames.TryGetValue(e, out old) && old.Lang == _langVer
+                    && string.Equals(old.Zh, zh) && string.Equals(old.En, en)) return;
+                _dynNames[e] = new DynName { Zh = zh, En = en, Lang = _langVer };
                 LocKey(e.Definition.Section, e.Definition.Key, zh, en);
             } catch (Exception __ld) { Guard.Log("动态条目名", __ld); }
         }
