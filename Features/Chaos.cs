@@ -774,10 +774,50 @@ namespace SR_UCH.Tweaks {
                                    SRApi.T("仅房主 / 离线有效", "Host or offline only"), DrawAndBroadcast);
         }
 
-        // 牌池单独一页：只放 10 张牌的勾选行，避免和牌组状态混在一屏。
+        // 牌池单独一页：勾选行 + 批量操作（全选 / 全不选 / 只留减益 / 随机一半）。
         private void RenderPoolPage() {
             Line("勾上的牌才可能被抽到；至少留一张。", "Checked cards can be drawn; keep at least one enabled.");
+            if (SRApi.Ctl.Button(SRApi.T("全选", "All"), SRApi.T("勾选全部牌", "Enable every card")))
+                SetAllPools(true);
+            GUILayout.Space(SRApi.Ctl.Sc(4f));
+            if (SRApi.Ctl.Button(SRApi.T("全不选", "None"), SRApi.T("全部取消（会再自动勾回第一张）", "Disable all (the first card is re-enabled)")))
+                SetAllPools(false);
+            GUILayout.Space(SRApi.Ctl.Sc(4f));
+            if (SRApi.Ctl.Button(SRApi.T("只留减益", "Debuffs"), SRApi.T("只保留让人变弱的牌（低重力/慢速/禁墙跳等）", "Keep only weakening cards")))
+                KeepWeakening();
+            GUILayout.Space(SRApi.Ctl.Sc(6f));
             for (int i = 0; i < Cards.Length; i++) CfgRow(_pool[i]);
+        }
+
+        private void SetAllPools(bool on) {
+            try {
+                for (int i = 0; i < _pool.Length; i++) {
+                    if (_pool[i] == null) continue;
+                    _pool[i].Value = on;
+                }
+                if (!on && _pool.Length > 0 && _pool[0] != null) _pool[0].Value = true;   // 至少留一张
+            } catch (Exception ex) { SRApi.Guard.Log("混乱牌组/批量勾选", ex); }
+        }
+
+        private void KeepWeakening() {
+            try {
+                for (int i = 0; i < Cards.Length; i++) {
+                    if (_pool[i] == null) continue;
+                    CardDef c = Cards[i];
+                    // 减益判定：低重力/慢冲刺/慢平台/慢射速/禁墙跳/无摩擦/超重（字段+参数方向）
+                    bool weaken =
+                        (c.Field == FGravity && c.Min > 1) ? false :           // 高重力让人更沉，先按非减益处理
+                        (c.Field == FGravity) ||
+                        (c.Field == FSprint && c.Min <= 2) ||
+                        (c.Field == FPlatform && c.Min <= 2) ||
+                        (c.Field == FRate) ||
+                        c.Field == FBoolWallJumps || c.Field == FBoolFriction;
+                    _pool[i].Value = weaken;
+                }
+                bool any = false;
+                for (int i = 0; i < _pool.Length; i++) if (_pool[i] != null && _pool[i].Value) { any = true; break; }
+                if (!any && _pool.Length > 0 && _pool[0] != null) _pool[0].Value = true;
+            } catch (Exception ex) { SRApi.Guard.Log("混乱牌组/只留减益", ex); }
         }
     }
 }
