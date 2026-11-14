@@ -70,6 +70,8 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<int> _tableHEntry;
         // 运行期快照：配置变化回调里即时更新，供每帧渲染读取
         private static int _sortMode;
+        private static int _sortColOverride = -1;   // 表头点击排序的临时覆盖（-1 = 用 Sort Mode 下拉）
+        private static bool _sortAsc = true;
         // 存储根目录缓存
         private static string _rootDir;
 
@@ -361,7 +363,16 @@ namespace SR_UCH.Tweaks {
                 if (a == null) return 1;
                 if (b == null) return -1;
                 int c;
-                if (SortMode == 1) c = string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+                if (_sortColOverride >= 0) {
+                    switch (_sortColOverride) {
+                        case ColName: c = string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase); break;
+                        case ColLevel: c = string.Compare(a.LevelName ?? a.Level, b.LevelName ?? b.Level, StringComparison.OrdinalIgnoreCase); break;
+                        case ColMode: c = string.Compare(ModeText(a.Mode), ModeText(b.Mode), StringComparison.OrdinalIgnoreCase); break;
+                        case ColTime: c = a.TimeUtc.CompareTo(b.TimeUtc); break;
+                        default: c = 0; break;
+                    }
+                    if (!_sortAsc) c = -c;
+                } else if (SortMode == 1) c = string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
                 else c = b.TimeUtc.CompareTo(a.TimeUtc);
                 if (c != 0) return c;
                 return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
@@ -586,12 +597,13 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string ColumnTitle(int ci) {
+            string __arrow = (ci == _sortColOverride && ci != ColAction) ? (_sortAsc ? " ▲" : " ▼") : "";
             switch (ci) {
-                case ColName: return SRApi.T("名称", "Name");
-                case ColLevel: return _levelShowCode ? SRApi.T("关卡代码", "Level code") : SRApi.T("关卡", "Level");
-                case ColMode: return SRApi.T("模式", "Mode");
+                case ColName: return SRApi.T("名称", "Name") + __arrow;
+                case ColLevel: return (_levelShowCode ? SRApi.T("关卡代码", "Level code") : SRApi.T("关卡", "Level")) + __arrow;
+                case ColMode: return SRApi.T("模式", "Mode") + __arrow;
                 case ColMods: return SRApi.T("数据", "Data");
-                case ColTime: return SRApi.T("时间", "Time");
+                case ColTime: return SRApi.T("时间", "Time") + __arrow;
                 case ColAction: return SRApi.T("操作", "Actions");
                 default: return "";
             }

@@ -20,6 +20,12 @@ namespace SR_UCH.Tweaks {
         // ================= 页面二：预设列表 =================
         private static void RenderListPage() {
             SRApi.NoPageScrollBars = true;   // 填充模式：页头固定，只有列表自己滚
+            // Esc：取消二次确认（键盘用户不必再点空白处）。
+            try {
+                Event __esc = Event.current;
+                if (__esc != null && __esc.type == EventType.KeyDown && __esc.keyCode == KeyCode.Escape
+                    && !string.IsNullOrEmpty(_pendingKey)) { ClearPending(); __esc.Use(); }
+            } catch (Exception __ee) { SRApi.Guard.Log("预设列表/Esc 取消确认", __ee); }
             string pendingBefore = _pendingKey;
             try {
                 EnsureLoaded();
@@ -156,8 +162,14 @@ namespace SR_UCH.Tweaks {
                 _args.resetAll = delegate { ResetTable(); };
                 _args.defaultColW = DefColW;
                 _args.click = delegate(int ci) {
-                    if (ci != ColLevel) return;
-                    _levelShowCode = !_levelShowCode;
+                    if (ci == ColAction) return;
+                    // 表头点击排序（照 ImGui Table SortSpecs 的交互）：点一次升序、再点降序；点其它列切换主排序。
+                    // Shift+点「关卡」仍保留原来的"名称/代码"切换。
+                    Event __ce = Event.current;
+                    if (ci == ColLevel && __ce != null && __ce.shift) { _levelShowCode = !_levelShowCode; return; }
+                    if (_sortColOverride == ci) _sortAsc = !_sortAsc;
+                    else { _sortColOverride = ci; _sortAsc = true; }
+                    try { _scrollRows.y = 0f; } catch (Exception __sc2) { SRApi.Guard.Log("预设列表/排序回顶", __sc2); }
                 };
                 _args.sortCol = -1;
                 _args.headerCells = _headerCells;
