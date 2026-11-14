@@ -55,3 +55,8 @@ _patchAudited
 _refAudited
 _refWarned
 _startupAudited
+_removedKeysLog
+_appliedRemovals
+_appliedOldKeys
+_appliedOldSections
+_appliedMoves
