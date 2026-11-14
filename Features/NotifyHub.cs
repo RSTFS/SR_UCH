@@ -51,6 +51,10 @@ namespace SR_UCH.Tweaks {
             public float EnterAt;     // 入场动画起点；0 = 尚未开始（续期不重播入场）
             public float DyingAt;     // >0 = 正在退场（淡出 + 侧滑），到时从列表移除
             public Action Action;     // 可选动作按钮（NotifyEx 才带；点击后执行并关闭本条）
+            // 文本高度缓存：CalcHeight 每帧对每张卡都算一次很贵，只有文本/宽度/字号变化才重算。
+            public float CachedH, CachedW;
+            public int CachedFs;
+            public string CachedText;
             public float VisY;        // 绘制纵向位置（新卡插入/退场时平滑让位）
             public bool VisSet;       // VisY 是否已初始化
         }
@@ -427,7 +431,16 @@ namespace SR_UCH.Tweaks {
             float total = 0f;
             for (int i = 0; i < n; i++) {
                 Notice it = _visible[i];
-                float th = Mathf.Max(22f * s, _label.CalcHeight(new GUIContent(it.Text), w - pad * 2f - 14f * s));
+                float __tw = w - pad * 2f - 14f * s;
+                int __fs = _label.fontSize;
+                float th;
+                if (it.CachedH > 0f && ReferenceEquals(it.CachedText, it.Text)
+                    && Mathf.Abs(it.CachedW - __tw) < 0.01f && it.CachedFs == __fs) {
+                    th = it.CachedH;
+                } else {
+                    th = Mathf.Max(22f * s, _label.CalcHeight(new GUIContent(it.Text), __tw));
+                    it.CachedH = th; it.CachedText = it.Text; it.CachedW = __tw; it.CachedFs = __fs;
+                }
                 heights[i] = th + pad * 2f + gap;
                 if (it.DyingAt > 0f || drawnCount < cap) { draw[i] = true; drawnCount++; total += heights[i]; }
             }

@@ -256,6 +256,8 @@ namespace SR_UCH.Tweaks {
         private static readonly Func<int, float> _rowAlphaFn = delegate(int r) { return IsJoinable(_shownLobbies[r]) ? 1f : 0.55f; };
         private static readonly Func<string> _emptyHintFn = delegate { return SRApi.T("（没有符合筛选的房间）", "(no lobbies match the filters)"); };
         private static readonly Action _joinDownReset = delegate { _joinDownRow = -1; };
+        private static readonly Func<int, string> _tipFn = delegate (int ci) { return TipText(ci); };
+        private static readonly Action<int> _clickFn = delegate (int ci) { HeaderClickOnce(ci); };
 
         private static void DrawTableRows(Rect box, float headerH, float rowH, float stripW, float rowsH, float viewW, Vector2 mp) {
             // _rowRows 必须与 _rowRectsPage 一起清空：两者是"行矩形 -> _shownLobbies 下标"的一一对应。
@@ -269,7 +271,7 @@ namespace SR_UCH.Tweaks {
             // 核心画表头需要列标题回调，缺失会导致表头空白。
             _tableArgs.title = _titleFn;
             // 表头悬停说明交给核心的 tip 回调（核心负责 inBox/单元格命中并设置 GUI.tooltip）。
-            _tableArgs.tip = TipText;
+            _tableArgs.tip = _tipFn;
             _tableArgs.pinTitle = SRApi.T(Titles[JoinCol], TitlesEn[JoinCol]);
         // 隐藏列交由核心 TableDraw 处理（右键隐藏 / Shift+右键还原全部）。
         _tableArgs.hidden = _hiddenCols; _tableArgs.hideable = true;
@@ -281,7 +283,7 @@ namespace SR_UCH.Tweaks {
         _tableArgs.applyOrder = _applyOrderFn;
             // Shift+右键 = 还原全部：接到本表自己的还原例程 ResetTable。
             _tableArgs.resetAll = _resetAllFn;
-        _tableArgs.click = HeaderClickOnce;
+        _tableArgs.click = _clickFn;
             // 表头 Shift+左键（核心在 MouseDown 派发，修饰键可靠）：质量列切换系数显示。
             _tableArgs.headerShiftClick = _headerShiftFn;
             // 行右键（核心派发，钉住操作列不算行命中）：隐藏该房间。
