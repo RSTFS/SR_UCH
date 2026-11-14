@@ -99,6 +99,36 @@ namespace SR_UCH {
             public static MethodInfo Method(Type owner, string name, Type[] parameters, string feature) { Func<Type, string, Type[], string, MethodInfo> f = MethodArgsFn; return f != null ? f(owner, name, parameters, feature) : null; }
             public static void Override(string member, string feature) { Action<string, string> f = OverrideFn; if (f != null) f(member, feature); }
         }
+        // 注入状态登记：MissingSinks() 只能反射 delegate 字段，覆盖不到"非委托状态"通道
+        // （例如 Storage 的根目录注入）。核心可把这类状态登记成 (名称, 就绪判定)，自检统一检查。
+        public static class Sinks {
+            private static readonly Dictionary<string, Func<bool>> _states = new Dictionary<string, Func<bool>>();
+            private static readonly List<string> _order = new List<string>();
+            public static void State(string name, Func<bool> ready) {
+                try {
+                    if (string.IsNullOrEmpty(name) || ready == null) return;
+                    if (!_states.ContainsKey(name)) _order.Add(name);
+                    _states[name] = ready;
+                } catch (Exception) { return; }
+            }
+            // 未就绪的状态通道名（空数组 = 全部就绪）。
+            public static string[] MissingStates() {
+                List<string> miss = new List<string>();
+                try {
+                    for (int i = 0; i < _order.Count; i++) {
+                        string n = _order[i];
+                        Func<bool> f;
+                        if (!_states.TryGetValue(n, out f) || f == null) { miss.Add(n); continue; }
+                        bool ok = false;
+                        try { ok = f(); } catch (Exception) { ok = false; }
+                        if (!ok) miss.Add(n);
+                    }
+                } catch (Exception) { return miss.ToArray(); }
+                return miss.ToArray();
+            }
+            public static int StateCount { get { return _order.Count; } }
+        }
+
         public static class Guard {
             private static readonly Dictionary<string, int> _lastWarn = new Dictionary<string, int>();
             // 最近异常环形缓冲（16 条）：自检页「最近异常」卡与支持包用；不参与去重/计数逻辑。

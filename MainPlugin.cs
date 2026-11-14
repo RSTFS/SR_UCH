@@ -174,6 +174,7 @@ namespace SR_UCH {
                 try {
                     string __root = System.IO.Path.Combine(BepInEx.Paths.ConfigPath, "SR_UCH_data");
                     SRApi.Storage.SetRoot(__root);
+                    SRApi.Sinks.State("Storage", delegate { return SRApi.Storage.Ready; });
                 } catch (Exception __st) { SRApi.Guard.Log("注入存储根目录", __st); }
             });
             SinkStep("LocDynamic", delegate () {

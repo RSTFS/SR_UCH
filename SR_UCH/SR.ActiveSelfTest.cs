@@ -29,6 +29,9 @@ public partial class SR {
         _stResults = new List<string>();
         _stPass = 0; _stFail = 0;
         try {
+            string[] missStates = SRApi.Sinks.MissingStates();
+            StCheck(T("API 状态通道", "API state channels"), missStates == null || missStates.Length == 0,
+                missStates != null && missStates.Length > 0 ? string.Join(", ", missStates) : T("全部就绪", "all ready"));
             string[] miss = SRApi.MissingSinks();
             StCheck(T("API 通道注入", "API sinks injected"), miss == null || miss.Length == 0,
                 miss != null && miss.Length > 0 ? (T("缺 ", "missing ") + miss.Length) : null);
