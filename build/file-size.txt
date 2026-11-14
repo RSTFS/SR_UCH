@@ -4,4 +4,3 @@
 # 格式：相对仓库根的路径=行数
 SR_UCH/SR.Contracts.cs=1650
 SR_UCH/SR.Core.cs=1172
-SR_UCH/SR.Ctl.cs=1051
