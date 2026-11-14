@@ -97,7 +97,7 @@ namespace SR_UCH.Tweaks {
         private static bool _modeFilterOpen;
         // 类型筛选（运行期状态，不落配置）："" = 全部，preset = 预设，local = 游戏本地保存关卡。
         // 默认「预设」：打开页面先只显示预设库，需要时再切到全部/本地。
-        private static string _typeFilter = "preset";
+        private static string _typeFilter = "";   // 默认「全部」（presets + 本地存档），否则只剩自己保存的几条
         private static bool _typeFilterOpen;
         // 加载模式（运行期状态，不落配置）："" = 默认（跟随预设自身保存的模式，保持原有行为）；
         // 否则为 GameState.GameMode 的 ToString，加载/重载时强制使用该模式。
@@ -267,6 +267,11 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterPage(Section, "save", "预设保存", "Save", 10, Render);
             SRApi.RegisterPage(Section, "list", "预设列表", "List", 20, RenderListPage);
             SRApi.RegisterPageWheel(OnListPageWheel);   // 帧尾兜底：绘制期没取到滚轮时由窗口派发
+            // 与「联机」列表一致：填充页没有页面滚动区，滚轮由列表自己接（窗口按栏目派发）。
+            SRApi.Ctl.RegisterFillScroll("presets", delegate (float __w) {
+                try { ApplyListWheel(PageWheelSign * Mathf.Sign(__w) * Mathf.Max(1f, Mathf.Abs(__w))); }
+                catch (Exception __fw) { SRApi.Guard.Log("布局预设/填充页滚轮", __fw); }
+            });
             // 页面关掉了滚动，列表要自己吃滚轮：只有页面级钩子能在滚动区建立之前拿到事件。
             // 填充页兜底：帧尾若滚轮没被任何控件/钩子消费，直接滚本列表（不依赖命中框）
             // 重载锁自愈：TickReloadLock 写好了却从未注册，等于"超时兜底"根本不存在，
