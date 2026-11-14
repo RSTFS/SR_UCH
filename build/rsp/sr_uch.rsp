@@ -27,6 +27,7 @@ MainPlugin.cs
 SR_UCH\SR.Contracts.cs
 SR_UCH\SR.Core.Audit.cs
 SR_UCH\SR.Core.cs
+SR_UCH\SR.Hooks.cs
 SR_UCH\SR.Ctl.Table.cs
 SR_UCH\SR.Ctl.Rows.cs
 SR_UCH\SR.Ctl.cs
