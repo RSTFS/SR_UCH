@@ -202,10 +202,13 @@ public partial class SR {
         // 统一按钮：带悬浮说明（页面里不要再写裸 GUILayout.Button）
         public static bool Button(string label, string tip, float width = 0f, float height = 0f) {
             GUIContent c = string.IsNullOrEmpty(tip) ? new GUIContent(label) : new GUIContent(label, tip);
-            if (width > 0f && height > 0f) return GUILayout.Button(c, SR.Ctl.Btn, GUILayout.Width(Sc(width)), GUILayout.Height(Sc(height)));
-            if (width > 0f) return GUILayout.Button(c, SR.Ctl.Btn, GUILayout.Width(Sc(width)));
-            if (height > 0f) return GUILayout.Button(c, SR.Ctl.Btn, GUILayout.Height(Sc(height)));
-            return GUILayout.Button(c, SR.Ctl.Btn);
+            bool clicked;
+            if (width > 0f && height > 0f) clicked = GUILayout.Button(c, SR.Ctl.Btn, GUILayout.Width(Sc(width)), GUILayout.Height(Sc(height)));
+            else if (width > 0f) clicked = GUILayout.Button(c, SR.Ctl.Btn, GUILayout.Width(Sc(width)));
+            else if (height > 0f) clicked = GUILayout.Button(c, SR.Ctl.Btn, GUILayout.Height(Sc(height)));
+            else clicked = GUILayout.Button(c, SR.Ctl.Btn);
+            // 长按连发：刷新派对盒这类按钮不用狂点（与 HotkeyButton 同一套节流，按 label 分桶）。
+            return clicked || SR.HoldRepeatFor("btn:" + (label ?? ""));
         }
 
         public static void WrapLabel(string text) { SR.WrapLabel(text); }
@@ -592,6 +595,8 @@ public partial class SR {
         // 长按连发：按住按钮 0.45 秒后每 0.12 秒再触发一次（刷新派对盒这类操作不用狂点）。
         private static readonly Dictionary<string, float> _holdNext = new Dictionary<string, float>();
         private static readonly Dictionary<string, bool> _holdPrimed = new Dictionary<string, bool>();
+
+        internal static bool HoldRepeatFor(string id) { return HoldRepeat(id); }
 
         private static bool HoldRepeat(string id) {
             try {
