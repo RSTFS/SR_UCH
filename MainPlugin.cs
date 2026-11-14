@@ -291,6 +291,9 @@ namespace SR_UCH {
                     delegate { return SR.Env.SceneName; },
                     delegate { return SR.Env.InTreehouse; });
             });
+            SinkStep("ButtonRow", delegate () {
+                SRApi.Ctl.SetButtonRowSink(delegate (string[] __l, float[] __w, float __h) { return SR.Ctl.ButtonRow(__l, __w, __h); });
+            });
             SinkStep("Misc", delegate () {
                 SRApi.SetMiscSinks(
                     delegate (ConfigEntryBase __e) { return (int)SR.KeyComboMod(__e); },

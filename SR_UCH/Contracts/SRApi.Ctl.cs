@@ -199,6 +199,13 @@ namespace SR_UCH {
             public static float SidebarWidth() { Func<float> f = _sidebarWidth; return f != null ? f() : 0f; }
             public static float WinWidth { get { Func<float> f = _winWidth; return f != null ? f() : 0f; } }
             public static void SetValue(ConfigEntryBase entry, object value) { Action<ConfigEntryBase, object> f = _setValue; if (f != null) f(entry, value); }
+            // 一排等宽按钮（功能页工具栏用）：返回被点击的下标，-1 = 没有。宽度 <=0 时按文字自适应。
+            private static Func<string[], float[], float, int> _buttonRow;
+            public static void SetButtonRowSink(Func<string[], float[], float, int> f) { _buttonRow = f; }
+            public static int ButtonRow(string[] labels, float[] widths, float height) {
+                Func<string[], float[], float, int> f = _buttonRow;
+                return f != null ? f(labels, widths, height) : -1;
+            }
             public static bool HotkeyActionButton(string label, string tooltip, ConfigEntry<KeyCode> keyEntry, float width, bool bindable) { Func<string, string, ConfigEntry<KeyCode>, float, bool, bool> f = _hotkeyActionButton; return f != null && f(label, tooltip, keyEntry, width, bindable); }
             public static bool HotkeyActionButton(string label, string tooltip, ConfigEntry<KeyCode> keyEntry) { return HotkeyActionButton(label, tooltip, keyEntry, 0f, false); }
             public static bool HotkeyButton(string id, string label, string tooltip, Action action, float width, float height) { Func<string, string, string, Action, float, float, bool> f = _hotkeyButton; return f != null && f(id, label, tooltip, action, width, height); }

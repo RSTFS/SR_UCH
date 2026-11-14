@@ -90,7 +90,9 @@ Features\Experiments.RemoveUi3.cs
 Features\Experiments.Scene.cs
 Features\FreePlay.cs
 Features\FreePlay.Grid.cs
+Features\FreePlay.Map.cs
 Features\FreePlay.Self.cs
+Features\FreePlay.SpawnPoint.cs
 Features\HUD.Content.cs
 Features\HUD.cs
 Features\HUD.Draw.cs

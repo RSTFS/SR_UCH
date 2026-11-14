@@ -26,6 +26,26 @@ public partial class SR {
         public static Color ThemePanelBg { get { return new Color(0.08f, 0.08f, 0.09f, 0.96f); } }
         public static float ControlH() { return SR.ControlH(); }
 
+        // 一排等宽按钮（功能页工具栏用）：返回被点击的下标，-1 = 没有；宽 <=0 时按文字自适应。
+        public static int ButtonRow(string[] labels, float[] widths, float height) {
+            if (labels == null || labels.Length == 0) return -1;
+            int hit = -1;
+            float h = height > 0f ? Sc(height) : ControlH();
+            GUILayout.BeginHorizontal();
+            try {
+                for (int i = 0; i < labels.Length; i++) {
+                    if (string.IsNullOrEmpty(labels[i])) continue;
+                    float w = (widths != null && i < widths.Length && widths[i] > 0f) ? Sc(widths[i]) : 0f;
+                    bool clicked = w > 0f
+                        ? GUILayout.Button(labels[i], SR.Ctl.Btn, GUILayout.Width(w), GUILayout.Height(h))
+                        : GUILayout.Button(labels[i], SR.Ctl.Btn, GUILayout.Height(h));
+                    if (clicked) hit = i;
+                }
+                GUILayout.FlexibleSpace();
+            } finally { GUILayout.EndHorizontal(); }
+            return hit;
+        }
+
 
 
 

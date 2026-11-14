@@ -113,7 +113,7 @@ namespace SR_UCH {
         // Version：功能清单契约的破坏性基线，与 SR.ApiVersion 独立演进。
         public const int Version = 2;
         // ApiLevel：SRApi 门面 API 的 additive 等级，每新增一个 public 成员 +1；删除/改签名必须抬 Version。
-        public const int ApiLevel = 5;   // 当前 5（TableArgs.cellClick 由核心派发）；3 起有 TableArgs.Create/Validate
+        public const int ApiLevel = 6;   // 6 起有 Ctl.ButtonRow；5 起有 TableArgs.cellClick
     }
 
         // 跨功能共享的时间常量：Level.* 与 BuildingPresets 共用同一份值，改一处即同步。

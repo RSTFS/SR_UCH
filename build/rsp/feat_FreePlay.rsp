@@ -26,4 +26,6 @@
 /r:"bin\Release\SR_UCH.dll"
 Features\FreePlay.cs
 Features\FreePlay.Grid.cs
+Features\FreePlay.Map.cs
 Features\FreePlay.Self.cs
+Features\FreePlay.SpawnPoint.cs
