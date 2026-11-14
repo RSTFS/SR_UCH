@@ -54,7 +54,8 @@ namespace SR_UCH.Tweaks {
         }
 
         private static ConfigEntry<bool> _enabled, _native, _quiet, _onScreen;
-        private static ConfigEntry<int> _maxVisible, _toastSeconds, _corner, _cardW, _cardAlpha, _cardScale;
+        private static ConfigEntry<int> _maxVisible, _toastSeconds, _corner, _cardW, _cardAlpha, _cardScale, _animMs;
+        private static ConfigEntry<bool> _animOn;
         private static bool _cornerOpen;   // 停靠角下拉的展开态（每帧从核心 EditOpen 语义走）
 
         private static readonly List<Notice> _history = new List<Notice>();
@@ -113,6 +114,10 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Card Width",
                 "卡片宽度\n浮层卡片像素宽度（120-340），默认 170。",
                 "Card width\nOverlay card width in pixels. Range 120-340, default 170.");
+            SRApi.LocKey(Sec, "Animate", "启用动画", "Animate");
+            SRApi.LocDesc(Sec, "Animate", "启用动画\n浮层的出现/消失动画总开关。", "Animate\nEnable overlay show/hide animations.");
+            SRApi.LocKey(Sec, "Anim Ms", "动画时长(毫秒)", "Animation ms");
+            SRApi.LocDesc(Sec, "Anim Ms", "动画时长\n出现与消失的动画时长（80-400 毫秒），默认 180。", "Animation ms\nShow/hide duration in milliseconds. 80-400, default 180.");
             SRApi.LocKey(Sec, "Card Scale", "浮层缩放", "Overlay scale");
             SRApi.LocDesc(Sec, "Card Scale",
                 "浮层缩放\n整个浮层按百分比缩放（80-160），默认 100。",
@@ -139,6 +144,7 @@ namespace SR_UCH.Tweaks {
                     case "Corner": min = 0.0f; max = 3.0f; return true;
                     case "Card Opacity": min = 20.0f; max = 100.0f; return true;
                     case "Card Scale": min = 80.0f; max = 160.0f; return true;
+                    case "Anim Ms": min = 80.0f; max = 400.0f; return true;
                     case "Card Width": min = 100.0f; max = 300.0f; return true;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("数值滑块范围", __ex); }
@@ -156,6 +162,9 @@ namespace SR_UCH.Tweaks {
                 new ConfigDescription("每条通知停留秒数（1-5）。", new AcceptableValueRange<int>(1, 5)));
             _cardW = plugin.Config.Bind(Sec, "Card Width", 200,
                 new ConfigDescription("浮层卡片像素宽度（100-300）。", new AcceptableValueRange<int>(100, 300)));
+            _animOn = plugin.Config.Bind(Sec, "Animate", true, "浮层的出现/消失动画总开关。");
+            _animMs = plugin.Config.Bind(Sec, "Anim Ms", 180,
+                new ConfigDescription("出现与消失的动画时长（80-400 毫秒）。", new AcceptableValueRange<int>(80, 400)));
             _cardScale = plugin.Config.Bind(Sec, "Card Scale", 100,
                 new ConfigDescription("整个浮层的缩放百分比（80-160）。", new AcceptableValueRange<int>(80, 160)));
             _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 86,
@@ -387,10 +396,12 @@ namespace SR_UCH.Tweaks {
                     // 动画：出现时 0.18 秒淡入 + 从停靠侧滑入 8px；消失前 0.22 秒淡出。
                     float age = Mathf.Max(0f, now - n.At);
                     float left = Mathf.Max(0f, n.Until - now);
-                    float anim = Mathf.Clamp01(age / 0.18f);
-                    if (left < 0.22f) anim *= Mathf.Clamp01(left / 0.22f);
+                    float dIn = Mathf.Max(0.001f, _animMs.Value / 1000f);
+                    float dOut = dIn * 1.2f;
+                    float anim = _animOn.Value ? Mathf.Clamp01(age / dIn) : 1f;
+                    if (_animOn.Value && left < dOut) anim *= Mathf.Clamp01(left / dOut);
                     anim = anim * anim * (3f - 2f * anim);                 // smoothstep，起落都不生硬
-                    float slide = (1f - Mathf.Clamp01(age / 0.18f)) * 8f * s;
+                    float slide = _animOn.Value ? (1f - Mathf.Clamp01(age / Mathf.Max(0.001f, _animMs.Value / 1000f))) * 8f * s : 0f;
                     float ax = x + ((corner == 2 || corner == 3) ? -slide : slide);
                     float aa = Mathf.Clamp01(anim);
                     Color prevGui = GUI.color;
@@ -459,6 +470,8 @@ namespace SR_UCH.Tweaks {
             CfgRow(_cardW);
             CfgRow(_cardAlpha);
             CfgRow(_cardScale);
+            CfgRow(_animOn);
+            CfgRow(_animMs);
             // 停靠角改用下拉：0 右下 / 1 右上 / 2 左下 / 3 左上。
             {
                 int[] vals = new int[] { 0, 1, 2, 3 };

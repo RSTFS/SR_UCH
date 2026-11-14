@@ -85,6 +85,9 @@ namespace SR_UCH.Tweaks {
             new CardDef("高跳跃",   "High jump",        TabletRule.ModifierJumpSpeed,          FJump,          false, 2, 3),
             new CardDef("快冲刺",   "Fast sprint",      TabletRule.ModifierSprintSpeed,        FSprint,        false, 2, 4),
             new CardDef("快平台",   "Fast platforms",   TabletRule.ModifierPlatformSpeed,      FPlatform,      false, 2, 4),
+            new CardDef("超重",     "Crushing gravity", TabletRule.ModifierGravity,            FGravity,       false, 3, 3),
+            new CardDef("龟速冲刺", "Crawl sprint",     TabletRule.ModifierSprintSpeed,        FSprint,        false, 1, 1),
+            new CardDef("停滞平台", "Frozen platforms", TabletRule.ModifierPlatformSpeed,      FPlatform,      false, 1, 1),
         };
 
         private struct ActiveCard { public int Id, Param; public ActiveCard(int id, int param) { Id = id; Param = param; } }
