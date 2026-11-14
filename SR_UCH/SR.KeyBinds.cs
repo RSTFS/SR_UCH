@@ -642,6 +642,8 @@ public partial class SR {
         private static int _kcBuiltEntryVersion = -1;
         private static bool _kcDirty = true;
         internal static void MarkKeyCenterDirty() { _kcDirty = true; }
+        // 按键中心/主动自检用：只读数量，避免其它分部文件直接碰私有字段（分区守卫要求）。
+        internal static int HotkeyCount { get { return _hkItems != null ? _hkItems.Count : 0; } }
 
         private static string KeyCenterAutoLabel(string id) {
             HkItem it;

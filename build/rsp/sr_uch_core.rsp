@@ -29,6 +29,7 @@ SR_UCH\Contracts\SRApi.cs
 SR_UCH\Contracts\SRApi.Ctl.cs
 SR_UCH\Contracts\SRApi.Misc.cs
 SR_UCH\Contracts\SRApi.Table.cs
+SR_UCH\SR.ActiveSelfTest.cs
 SR_UCH\SR.CmAttributes.cs
 SR_UCH\SR.ColorPicker.cs
 SR_UCH\SR.Compat.cs

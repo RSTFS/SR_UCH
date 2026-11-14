@@ -33,6 +33,7 @@ public partial class SR {
                   .Append("  反射: ").Append(SR.AuditRefOk).Append("/").Append(SR.AuditRefTotal).AppendLine();
                 sb.Append("功能: ").Append(Features.Count).Append("  问题: ").Append(Features.ProblemCount).AppendLine();
                 sb.Append("第三方插件: ").AppendLine(CompatSummary());
+                sb.Append("启动耗时: ").AppendLine(SR.BootTimings ?? "(未记录)");
                 sb.Append("API 注入: ").Append(SRApi.SinkCount()).Append("/").Append(SRApi.SinkTotal()).AppendLine();
                 string[] miss = SRApi.MissingSinks();
                 if (miss != null && miss.Length > 0) sb.Append("缺失注入: ").AppendLine(string.Join(",", miss));
@@ -148,6 +149,10 @@ public partial class SR {
                             AuditLabel(T("最近一次", "Last") + "：" + SR.Guard.LastWhat + " - " + (SR.Guard.LastError ?? ""));
                         try { AuditLabel(SR.AttributionReport()); } catch (Exception __at) { Guard.Log("自检/归因", __at); }
                     });
+
+                // ---- 主动自检 / 最近异常 ----
+                RenderActiveSelfTestCard();
+                RenderGuardRecentCard();
 
                 // ---- 键位冲突卡 ----
                 List<SR.KeyConflict> conflicts = SR.FindKeyConflicts();

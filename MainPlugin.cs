@@ -45,20 +45,31 @@ namespace SR_UCH {
             // 这里失败也必须留下一条 ERROR + 一条可 grep 的标记行，并把已完成的阶段记清楚。
             string stage = "start";
             try {
-                stage = "PatchOwnConfigFile"; PatchOwnConfigFile();
-                stage = "SetupStandaloneConfig"; SetupStandaloneConfig();
-                stage = "MigrateLegacyConfigNames"; MigrateLegacyConfigNames();
+                // 启动阶段计时（自检页/诊断报告/日志各留一份）：慢启动时能直接看出卡在哪个阶段。
+                System.Text.StringBuilder __boot = new System.Text.StringBuilder();
+                System.Diagnostics.Stopwatch __sw = System.Diagnostics.Stopwatch.StartNew();
+                System.Action<string, System.Action> __run = (nm, act) => {
+                    stage = nm;
+                    long __before = __sw.ElapsedMilliseconds;
+                    act();
+                    __boot.Append(nm).Append('=').Append(__sw.ElapsedMilliseconds - __before).Append("ms ");
+                };
+                __run("PatchOwnConfigFile", PatchOwnConfigFile);
+                __run("SetupStandaloneConfig", SetupStandaloneConfig);
+                __run("MigrateLegacyConfigNames", MigrateLegacyConfigNames);
                 // 程序集解析：外部功能 / 语言包 DLL 只引用 SR_UCH.dll（不引用 BepInEx），全局注册一次。
-                stage = "AssemblyResolve"; AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
-                stage = "InjectApiSinks"; InjectApiSinks();
-                stage = "InitializeTweaks"; InitializeTweaks();
+                __run("AssemblyResolve", delegate { AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve; });
+                __run("InjectApiSinks", InjectApiSinks);
+                __run("InitializeTweaks", delegate { InitializeTweaks(); });
                     // 外部功能 DLL / 语言包 DLL：一个 DLL 一个功能（ITweak）或一门语言（ILanguagePack）；
                 // 放在本程序集扫描与 EX 之后（EX 的硬编码路径不受影响）。
-                stage = "LoadExternal"; LoadExternal();
+                __run("LoadExternal", LoadExternal);
                 // 装配完成后补扫一轮 ITweak（audit P0-1）：EX / 外部 DLL 若漏在 ExLoader 的反射路径之外，
                 // 还能被主扫描发现并初始化；EX 自己做了幂等，两条路都走也只初始化一次。
-                stage = "InitializeTweaks(late)"; InitializeTweaks(true);
-                stage = "RebuildFeatureManifest"; RebuildFeatureManifest();   // 含功能清单登记 + 启动自检 + 自检日志
+                __run("InitializeTweaks(late)", delegate { InitializeTweaks(true); });
+                __run("RebuildFeatureManifest", RebuildFeatureManifest);   // 含功能清单登记 + 启动自检 + 自检日志
+                try { SR.BootTimings = __boot.ToString().TrimEnd(); } catch (Exception __bt) { SRApi.Guard.Log("启动耗时/记录", __bt); }
+                try { ModLogger.LogInfo("[SR.Boot] 启动耗时: " + (SR.BootTimings ?? "?")); } catch (Exception __bl) { SRApi.Guard.Log("启动耗时/日志", __bl); }
             } catch (Exception __aw) {
                 try {
                     ModLogger.LogError("[SR.Boot] 启动失败于阶段 " + stage + "：" + __aw);

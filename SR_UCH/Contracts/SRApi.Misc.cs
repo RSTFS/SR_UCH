@@ -92,8 +92,20 @@ namespace SR_UCH {
         }
         public static class Guard {
             private static readonly Dictionary<string, int> _lastWarn = new Dictionary<string, int>();
+            // 最近异常环形缓冲（16 条）：自检页「最近异常」卡与支持包用；不参与去重/计数逻辑。
+            private const int RecentCap = 16;
+            private static readonly string[] _recent = new string[RecentCap];
+            private static int _recentNext, _recentTotal;
             public static string LastWhat, LastError;
             public static int WarnCount;
+            public static int RecentTotal { get { return _recentTotal; } }
+            // 最近记录（最新在前）；无记录返回空数组。
+            public static string[] Recent() {
+                int n = _recentTotal < RecentCap ? _recentTotal : RecentCap;
+                string[] r = new string[n];
+                for (int i = 0; i < n; i++) r[i] = _recent[(_recentNext - 1 - i + RecentCap * 2) % RecentCap];
+                return r;
+            }
 
             public static void Try(string what, Action action) {
                 try { action(); } catch (Exception ex) { Warn(what, ex); }
@@ -112,6 +124,9 @@ namespace SR_UCH {
                     LastWhat = what;
                     LastError = ex != null ? (ex.GetType().Name + ": " + ex.Message) : "未知错误";
                     WarnCount++;
+                    _recent[_recentNext] = what + " — " + LastError;
+                    _recentNext = (_recentNext + 1) % RecentCap;
+                    _recentTotal++;
                     SRApi.Warn("[Guard] " + what + " 失败: " + (ex != null ? ex.Message : "未知错误"));
                 } catch (Exception __ex) {
                     try { LastWhat = what; LastError = "Warn 自身失败: " + __ex.GetType().Name; } catch { /* 静默：非关键路径，失败可直接忽略 */ }

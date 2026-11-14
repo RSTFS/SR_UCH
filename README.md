@@ -41,8 +41,11 @@ The **Settings** page is a single page; **Self-check** and **Notifications** mov
 The **Self-check** footer entry opens a card-style health report: one verdict card (with **Rescan**, **Copy
 report**, **Write to log**), a *Targets & config* card that turns amber and lists the broken entries
 when a name-bound patch target or reflection member disappears, an *Other plugins* card listing
-plugins loaded from `BepInEx\plugins` with known conflict/note verdicts, and a *Frame hooks* card for
-the per-hook cost. If a game update breaks part of the features, this is the first place to look. Hook
+plugins loaded from `BepInEx\plugins` with known conflict/note verdicts, a *Hotkey center* card (all auto
+hotkeys and manual keys, clearable, duplicates flagged), an *Active self-test* card (runs API/patch/slot/
+notify/config/key checks and exports a single-file **support bundle** with the diagnostic report and log
+tail, path copied to clipboard), a *Recent errors* card (last 16 Guard records), and a *Frame hooks* card
+for the per-hook cost. If a game update breaks part of the features, this is the first place to look. Hook
 profiling is off by default (its switch lives in that card) so it does not spam the log.
 
 ---
