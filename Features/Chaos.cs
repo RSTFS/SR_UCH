@@ -678,14 +678,9 @@ namespace SR_UCH.Tweaks {
 
         // 牌面边框色：让玩家变强 = 增益（绿），变弱 = 减益（红），两边都占/纯整活 = 中性（蓝）。
         private static Color CardTint(CardDef c) {
-            if (c.Field == FBoolDance) return CardBuff;
-            if (c.Field == FBoolWallJumps || c.Field == FBoolFriction || c.Field == FBoolMirror || c.Field == FBoolPlayerCol) return CardDebuff;
-            if (c.Field == FGravity) return c.Min <= 1 ? CardBuff : CardDebuff;          // 低重力有益，高重力/超重有害
-            if (c.Field == FJump) return c.Min >= 2 ? CardBuff : CardDebuff;
-            if (c.Field == FSprint) return c.Min >= 2 ? CardBuff : CardDebuff;   // 快冲刺 Min=2
-            if (c.Field == FPlatform) return c.Min >= 2 ? CardBuff : CardDebuff; // 快平台 Min=2
-            if (c.Field == FRate) return CardDebuff;                                      // 慢射速 = 减益
-            return CardNeutral;
+            // 分类规则在 ChaosLogic（无 Unity 依赖，单元测试覆盖）；这里只做颜色映射。
+            int kind = ChaosLogic.TintKind(c.IsBool, c.Field, c.Min);
+            return kind == 0 ? CardBuff : kind == 1 ? CardDebuff : CardNeutral;
         }
 
         private void RenderActiveCards() {

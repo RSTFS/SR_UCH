@@ -94,18 +94,9 @@ namespace SR_UCH.Tweaks {
         // 过滤条件（原 VisiblePresets 内的判断，原样保留语义）。
         private static bool PassPresetFilter(PresetInfo p) {
             try {
-                string q = (_search ?? "").Trim();
-                if (string.Equals(_typeFilter, "preset", StringComparison.Ordinal) && p.IsLocal) return false;
-                if (string.Equals(_typeFilter, "local", StringComparison.Ordinal) && !p.IsLocal) return false;
-                if (!string.IsNullOrEmpty(_levelFilter)
-                    && !string.Equals(p.Level, _levelFilter, StringComparison.OrdinalIgnoreCase)) return false;
-                if (!string.IsNullOrEmpty(_modeFilter)
-                    && !string.Equals(p.Mode, _modeFilter, StringComparison.OrdinalIgnoreCase)) return false;
-                if (q.Length > 0) {
-                    // 只按名称搜索（用户要求）：关卡/模式已有专门的下拉筛选，文本搜索只负责命名。
-                    if (!ContainsText(p.Name, q)) return false;
-                }
-                return true;
+                // 纯逻辑在 PresetFilterLogic（无 Unity 依赖，单元测试覆盖）。
+                return PresetFilterLogic.Pass(p.Name, p.Level, p.Mode, p.IsLocal,
+                    _typeFilter, _levelFilter, _modeFilter, _search);
             } catch { return false; }
         }
 

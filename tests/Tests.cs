@@ -31,6 +31,7 @@ namespace SR_UCH.Tests {
             TestSinksAndFallbacks();
             TestStoragePath();
             TestTableArgsCreate();
+            TestFeatureLogic();
 
             Console.WriteLine("  通过 " + _pass + " / 失败 " + _fail);
             if (_fail > 0) { Console.WriteLine("== 有失败 ❌ =="); return 1; }
@@ -251,6 +252,29 @@ namespace SR_UCH.Tests {
             Eq("TableArgs.Create 合法参数无问题", 0, a.Validate().Length);
             var bad = SRApi.TableArgs.Create(new Rect(0, 0, 400, 200), new float[] { 100f, 100f }, vis, 2, null, null);
             Check("TableArgs.Validate 能报缺回调", bad.Validate().Length > 0);
+        }
+
+        // 功能层纯逻辑（从功能类里抽出的无依赖 helper）：分级 / 归一化 / 筛选 / 牌面分类。
+        private static void TestFeatureLogic() {
+            string[] high = { "失败", "拒绝" };
+            string[] low = { "已保存", "已开启" };
+            Eq("NotifyLogic.Classify 高优先级", 2, SR_UCH.Tweaks.NotifyLogic.Classify("操作失败", "", high, low));
+            Eq("NotifyLogic.Classify 低优先级", 0, SR_UCH.Tweaks.NotifyLogic.Classify("已保存", "reset", high, low));
+            Eq("NotifyLogic.Classify 普通", 1, SR_UCH.Tweaks.NotifyLogic.Classify("普通提示", "", high, low));
+            Eq("NotifyLogic.Norm 去数字/小写", "abc def", SR_UCH.Tweaks.NotifyLogic.Norm("abc 12 Def"));
+            Check("PresetFilterLogic.全部通过", SR_UCH.Tweaks.PresetFilterLogic.Pass("n", "L", "M", true, "", "", "", ""));
+            Check("PresetFilterLogic.preset 排除本地", !SR_UCH.Tweaks.PresetFilterLogic.Pass("n", "L", "M", true, "preset", "", "", ""));
+            Check("PresetFilterLogic.local 排除预设", !SR_UCH.Tweaks.PresetFilterLogic.Pass("n", "L", "M", false, "local", "", "", ""));
+            Check("PresetFilterLogic.关卡过滤", !SR_UCH.Tweaks.PresetFilterLogic.Pass("n", "L", "M", false, "", "OTHER", "", ""));
+            Check("PresetFilterLogic.搜索命中", SR_UCH.Tweaks.PresetFilterLogic.Pass("My Preset", "L", "M", false, "", "", "", "preset"));
+            Check("PresetFilterLogic.搜索未命中", !SR_UCH.Tweaks.PresetFilterLogic.Pass("My Preset", "L", "M", false, "", "", "", "zzz"));
+            Eq("ChaosLogic 低重力=增益", 0, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 0, 1));
+            Eq("ChaosLogic 高重力=减益", 1, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 0, 2));
+            Eq("ChaosLogic 快冲刺=增益", 0, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 2, 2));
+            Eq("ChaosLogic 跳舞=增益", 0, SR_UCH.Tweaks.ChaosLogic.TintKind(true, 9, 0));
+            Eq("ChaosLogic 镜像=减益", 1, SR_UCH.Tweaks.ChaosLogic.TintKind(true, 10, 0));
+            Eq("ChaosLogic 慢射速=减益", 1, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 4, 1));
+            Eq("ChaosLogic 未知字段=中性", 2, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 7, 1));
         }
 
         // 契约版本单调递增：外部模块按它握手，倒退会让 DLL 静默失效。

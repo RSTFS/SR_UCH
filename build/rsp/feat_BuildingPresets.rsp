@@ -29,6 +29,7 @@ Features\BuildingPresets.Filter.cs
 Features\BuildingPresets.Io.cs
 Features\BuildingPresets.List.cs
 Features\BuildingPresets.Load.cs
+Features\BuildingPresets.Logic.cs
 Features\BuildingPresets.Mods.cs
 Features\BuildingPresets.Save.cs
 Features\BuildingPresets.Ui.cs

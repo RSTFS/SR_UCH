@@ -65,12 +65,14 @@ Features\BuildingPresets.Filter.cs
 Features\BuildingPresets.Io.cs
 Features\BuildingPresets.List.cs
 Features\BuildingPresets.Load.cs
+Features\BuildingPresets.Logic.cs
 Features\BuildingPresets.Mods.cs
 Features\BuildingPresets.Save.cs
 Features\BuildingPresets.Ui.cs
 Features\BuildingPresets.Util.cs
 Features\BuildingTools.cs
 Features\Chaos.cs
+Features\Chaos.Logic.cs
 Features\CharacterAuto.cs
 Features\Chat.cs
 Features\Chat.Log.cs
@@ -96,6 +98,7 @@ Features\Level.Reload.cs
 Features\Level.Snapshot.cs
 Features\Level.Tool.cs
 Features\NotifyHub.cs
+Features\NotifyHub.Logic.cs
 Features\Online.cs
 Features\Online.Filters.cs
 Features\Online.Join.cs

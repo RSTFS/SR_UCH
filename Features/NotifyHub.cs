@@ -337,28 +337,10 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        private static int Classify(string text, string tag) {
-            string all = text + " " + (tag ?? "");
-            for (int i = 0; i < HighWords.Length; i++) if (Contains(all, HighWords[i])) return 2;
-            for (int i = 0; i < LowWords.Length; i++) if (Contains(all, LowWords[i])) return 0;
-            return 1;
-        }
-
-        private static bool Contains(string s, string w) {
-            return !string.IsNullOrEmpty(s) && s.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        /// <summary>归一化：去数字（倒计时会变）、截前 48 字，作为同类合并键。</summary>
-        private static string Norm(string s) {
-            StringBuilder sb = new StringBuilder(48);
-            for (int i = 0; i < s.Length && sb.Length < 48; i++) {
-                char c = s[i];
-                if (char.IsDigit(c)) continue;
-                if (char.IsWhiteSpace(c)) { if (sb.Length > 0 && sb[sb.Length - 1] != ' ') sb.Append(' '); continue; }
-                sb.Append(char.ToLowerInvariant(c));
-            }
-            return sb.ToString();
-        }
+        // 分级 / 归一的实现放在 NotifyHub.Logic.cs（无 Unity 依赖，单元测试覆盖）。
+        private static int Classify(string text, string tag) { return NotifyLogic.Classify(text, tag, HighWords, LowWords); }
+        private static bool Contains(string s, string w) { return NotifyLogic.Contains(s, w); }
+        private static string Norm(string s) { return NotifyLogic.Norm(s); }
 
         /// <summary>对局中判定：拿不到场景信息时返回 false（宁可不静默，也不吞掉提示）。</summary>
         private static bool InMatch() {

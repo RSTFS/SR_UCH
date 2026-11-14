@@ -69,6 +69,9 @@ $sources = @()
 foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $root 'SR_UCH\Contracts') -Filter '*.cs' -File | Sort-Object Name)) {
     $sources += ('"' + $f.FullName + '"')
 }
+foreach ($f in @('Chaos.Logic.cs','NotifyHub.Logic.cs','BuildingPresets.Logic.cs')) {
+    $sources += ('"' + (Join-Path (Join-Path $root 'Features') $f) + '"')
+}
 $sources += ('"' + (Join-Path (Join-Path $root 'tests') 'Tests.cs') + '"')
 $sources += ('"' + (Join-Path (Join-Path $root 'tests') 'UnityStubs.cs') + '"')
 

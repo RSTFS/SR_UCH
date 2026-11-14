@@ -29,6 +29,14 @@ jobs:
         shell: pwsh
         run: ./build/guards-schema.ps1
 
+  rsp-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 构建清单与磁盘源码一致性（不需要游戏）
+        shell: pwsh
+        run: ./build/gen-rsp.ps1 -Verify
+
   unit-tests:
     runs-on: ubuntu-latest
     steps:

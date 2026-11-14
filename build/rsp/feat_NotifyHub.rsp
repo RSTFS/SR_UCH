@@ -1,4 +1,4 @@
-/nologo
+﻿/nologo
 /target:library
 /out:bin\Release\SR_UCH_NotifyHub.dll
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\mscorlib.dll"
@@ -25,3 +25,4 @@
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 /r:"bin\Release\SR_UCH.dll"
 Features\NotifyHub.cs
+Features\NotifyHub.Logic.cs
