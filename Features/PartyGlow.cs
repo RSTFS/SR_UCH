@@ -25,7 +25,7 @@ using BepInEx.Configuration;
 using UnityEngine;
 
 namespace SR_UCH.Tweaks {
-    [SrFeature("sr.partyglow", "品质光芒", "1.0", Provides = new string[] { "sr.brief.rarest" })]
+    [SrFeature("sr.partyglow", "品质光芒", "1.0")]
     public class PartyGlow : ITweak {
         private const string Sec = "品质光芒";
         private const string GlowName = "SR_UCH_RarityGlow";
@@ -47,7 +47,6 @@ namespace SR_UCH.Tweaks {
         private static readonly float[] TierAlpha = { 0.22f, 0.36f, 0.52f, 0.68f, 0.84f, 1.00f };
         private static readonly int[] TierMaxWeight = { int.MaxValue, 2000, 1000, 700, 500, 200 };
 
-        private static IFeatureHost _mp;
         private static ConfigEntry<bool> _enabled, _breathe;
         private static ConfigEntry<string>[] _tierColors;   // 六档自定义颜色（十六进制）
         private static ConfigEntry<int> _strength, _size;
@@ -55,14 +54,7 @@ namespace SR_UCH.Tweaks {
         private static Material[] _addMats;         // 六档各一份加色材质（共享同一份时颜色会被最后一件覆盖）
         private static bool _addShaderTried;
         private static Shader _addShader;
-        private static Sprite[] _glowShapes;        // 6 档形状贴图（可读性页开启时）
         private static float _nextScan;
-        // 可读性适配（软依赖）：只查槽位名，缺 DLL 时零 miss、零副作用。
-        private static Func<bool> _aShape, _aContrast;
-        private static int _aTries;
-        private static float _aNext;
-        private static readonly int[] _tierCount = new int[7];   // 索引 6 = 禁用件数
-        private static int _totalSeen;
         private static int _wMin = int.MaxValue, _wMax = 0;   // 本盒出现过的权重范围（相对分档用）
 
         // ============ 生命周期 ============
@@ -112,18 +104,20 @@ namespace SR_UCH.Tweaks {
         }
 
         public void Initialize(IFeatureHost plugin) {
-            _mp = plugin;
-            _enabled = _mp.Config.Bind(Sec, "Enabled", true, "按当前概率给派对盒里的道具加一圈品质光晕；纯本地视觉，联机各端各画各的。");
-            _strength = _mp.Config.Bind(Sec, "Strength", 80, new ConfigDescription("光晕不透明度百分比（20-150）。", new AcceptableValueRange<int>(20, 150)));
+            _enabled = plugin.Config.Bind(Sec, "Enabled", true, "按当前概率给派对盒里的道具加一圈品质光晕；纯本地视觉，联机各端各画各的。");
+            _strength = plugin.Config.Bind(Sec, "Strength", 80, new ConfigDescription("光晕不透明度百分比（20-150）。", new AcceptableValueRange<int>(20, 150)));
             _tierColors = new ConfigEntry<string>[6];
             for (int i = 0; i < 6; i++) {
-                _tierColors[i] = _mp.Config.Bind(Sec, "Tier Color " + i, "#" + ColorUtility.ToHtmlStringRGB(TierColorDefault[i]),
+                int ti = i;
+                _tierColors[i] = plugin.Config.Bind(Sec, "Tier Color " + i, "#" + ColorUtility.ToHtmlStringRGB(TierColorDefault[i]),
                     "第 " + (i + 1) + " 档（" + TierZh[i] + "）的光晕颜色，十六进制 #RRGGBB。");
                 TierColor[i] = ParseColor(_tierColors[i].Value, TierColorDefault[i]);
+                // 改 cfg 文件 / 其它入口改值也要立即重算颜色表，不必重启。
+                _tierColors[i].SettingChanged += (s2, e2) => { TierColor[ti] = ParseColor(_tierColors[ti].Value, TierColorDefault[ti]); };
                 SRApi.LocKey(Sec, "Tier Color " + i, TierZh[i] + "颜色", TierEn[i] + " color");
             }
-            _size = _mp.Config.Bind(Sec, "Size", 180, new ConfigDescription("光晕相对道具包围盒的尺寸百分比（100-300）。", new AcceptableValueRange<int>(100, 300)));
-            _breathe = _mp.Config.Bind(Sec, "Breathe", false, "轻微呼吸脉动。用缩放时间驱动：梦境定格时它会跟着静止。");
+            _size = plugin.Config.Bind(Sec, "Size", 180, new ConfigDescription("光晕相对道具包围盒的尺寸百分比（100-300）。", new AcceptableValueRange<int>(100, 300)));
+            _breathe = plugin.Config.Bind(Sec, "Breathe", false, "轻微呼吸脉动。用缩放时间驱动：梦境定格时它会跟着静止。");
 
             SRApi.LocSec(Sec, "品质光芒", "Rarity Glow");
 
@@ -131,7 +125,7 @@ namespace SR_UCH.Tweaks {
             SRApi.Nav(Sec, 120);                 // 实验(100) 之后
             SRApi.RegisterPage(Sec, "Glow", "品质光芒", "Rarity Glow", 10, RenderPage);
             SRApi.RegisterTick("品质光芒-扫描", Tick);
-            Slots.Provide("sr.brief.rarest", (Func<string>)(() => BriefRarest()));
+            SRApi.OnShutdown("品质光芒", Shutdown);
             _enabled.SettingChanged += (s, e) => { if (!_enabled.Value) RemoveAll(); };
         }
 
@@ -142,25 +136,14 @@ namespace SR_UCH.Tweaks {
                 catch (Exception ex) { SRApi.Guard.Log("品质光芒/释放贴图", ex); }
                 _glowSprite = null;
             }
-            if (_glowShapes != null) {
-                for (int i = 0; i < _glowShapes.Length; i++) {
-                    if (_glowShapes[i] == null) continue;
-                    try { UnityEngine.Object.Destroy(_glowShapes[i]); }
-                    catch (Exception ex) { SRApi.Guard.Log("品质光芒/释放形状贴图", ex); }
-                }
-                _glowShapes = null;
-            }
         }
 
-        // ============ 每帧扫描（按帧对象缓存 + 0.2s 节流） ============
+        // ============ 每帧扫描（按帧对象缓存 + 0.05s 节流） ============
 
         private static void Tick() {
-            BindA11y();
             if (!_enabled.Value || Time.unscaledTime < _nextScan) return;
             _nextScan = Time.unscaledTime + ScanInterval;
             try {
-                for (int i = 0; i < _tierCount.Length; i++) _tierCount[i] = 0;
-                _totalSeen = 0;
                 _wMin = int.MaxValue; _wMax = 0;
 
                 PickableBlock[] all = SRApi.FrameObjects<PickableBlock>();
@@ -182,10 +165,8 @@ namespace SR_UCH.Tweaks {
                 for (int i = 0; i < all.Length; i++) {
                     PickableBlock pb = all[i];
                     if (pb == null || !pb.InPartybox) continue;      // 只处理派对盒里的，场上已放置的不碰
-                    _totalSeen++;
                     int tier = TierOf(pb);
-                    if (tier < 0) { _tierCount[6]++; HideGlow(pb); continue; }
-                    _tierCount[tier]++;
+                    if (tier < 0) { HideGlow(pb); continue; }
                     ApplyGlow(pb, tier);
                 }
             } catch (Exception ex) { SRApi.Guard.Log("品质光芒/扫描", ex); }
@@ -240,7 +221,7 @@ namespace SR_UCH.Tweaks {
                 go.layer = 5;                                  // 与 PartyBox:87360 一致
                 go.transform.SetParent(holder, false);
                 sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite = EnsureSprite(tier);
+                sr.sprite = EnsureSoft();
                 // 跟道具同一排序层，但排在它后面，绝不遮住本体
                 SpriteRenderer refSr = FirstArt(pb);
                 sr.sortingLayerName = refSr != null ? refSr.sortingLayerName : "Background 2";
@@ -251,7 +232,7 @@ namespace SR_UCH.Tweaks {
                 if (sr == null) return;
             }
             sr.enabled = true;
-            sr.sprite = EnsureSprite(tier);
+            sr.sprite = EnsureSoft();
             Material __mat = AddMat(tier);
             if (__mat != null) sr.sharedMaterial = __mat;
 
@@ -280,9 +261,8 @@ namespace SR_UCH.Tweaks {
             if (_breathe.Value) a *= 0.86f + 0.14f * Mathf.Sin(Time.time * 2.2f + pb.GetInstanceID() * 0.37f);
             Color c = TierColor[tier];
             sr.color = new Color(c.r, c.g, c.b, Mathf.Clamp01(a));
-            Material __tm = AddMat(tier);
-            if (__tm != null) {
-                try { __tm.SetColor("_TintColor", new Color(c.r, c.g, c.b, Mathf.Clamp01(a))); }
+            if (__mat != null) {
+                try { __mat.SetColor("_TintColor", new Color(c.r, c.g, c.b, Mathf.Clamp01(a))); }
                 catch (Exception __tc) { SRApi.Guard.Log("品质光芒/tint", __tc); }
             }
         }
@@ -316,26 +296,7 @@ namespace SR_UCH.Tweaks {
             return null;
         }
 
-        // ============ 可读性适配：形状贴图 ============
-
-        private static void BindA11y() {
-            if (_aTries >= 6 || Time.unscaledTime < _aNext) return;
-            _aTries++; _aNext = Time.unscaledTime + 2f;
-            foreach (string n in Slots.Names) {
-                if (n == "sr.a11y.shapeLabels" && _aShape == null) _aShape = Slots.Require<Func<bool>>(n);
-                else if (n == "sr.a11y.highContrast" && _aContrast == null) _aContrast = Slots.Require<Func<bool>>(n);
-            }
-        }
-        private static bool AShape() {
-            try { return _aShape != null && _aShape(); }
-            catch (Exception ex) { SRApi.Guard.Log("品质光芒/形状", ex); return false; }
-        }
-        private static bool AContrast() {
-            try { return _aContrast != null && _aContrast(); }
-            catch (Exception ex) { SRApi.Guard.Log("品质光芒/对比", ex); return false; }
-        }
-
-        /// <summary>按档取贴图：可读性页开启「形状图案」时用六档不同纹理，否则退回同一圈柔光。</summary>
+        /// <summary>六档共用一张"中心亮、向外平滑衰减"的径向柔光；档位差异靠颜色、尺寸与亮度体现。</summary>
         private static Sprite EnsureSoft() {
             if (_glowSprite != null) return _glowSprite;
             const int N = 128;
@@ -363,32 +324,6 @@ namespace SR_UCH.Tweaks {
             return _glowSprite;
         }
 
-        private static Sprite EnsureSprite(int tier) {
-            // 六档共用同一张"中心亮、向外平滑衰减"的径向柔光；档位差异靠颜色、尺寸与亮度体现。
-            // （以前的环带形状在实机里看起来就是"画圈"，用户明确要求改成道具自身发光。）
-            return EnsureSoft();
-        }
-
-        /// <summary>图例里的形状小标记：只用 DrawFill 的小矩形拼，不依赖字体符号。</summary>
-        private static void DrawShapeMark(Rect r, int tier, Color c) {
-            float u = r.width / 6f;
-            Color on = new Color(c.r, c.g, c.b, 1f);
-            for (int i = 0; i < 6; i++) {
-                bool show;
-                switch (tier) {
-                    case 0: show = (i % 2 == 0); break;
-                    case 1: show = true; break;
-                    case 2: show = (i == 0 || i == 1 || i == 4 || i == 5); break;
-                    case 3: show = (i % 2 == 1); break;
-                    case 4: show = (i % 4 < 2); break;
-                    default: show = (i == 0 || i == 2 || i == 3 || i == 5); break;
-                }
-                if (!show) continue;
-                float h = (tier == 5 && (i == 2 || i == 3)) ? r.height : r.height * 0.55f;
-                SRApi.DrawFill(new Rect(r.x + i * u + u * 0.12f, r.y + (r.height - h) * 0.5f, u * 0.76f, h), on);
-            }
-        }
-
         private static void RemoveAll() {
             try {
                 PickableBlock[] all = SRApi.FrameObjects<PickableBlock>();
@@ -399,26 +334,11 @@ namespace SR_UCH.Tweaks {
                     if (g != null) UnityEngine.Object.Destroy(g.gameObject);
                 }
             } catch (Exception ex) { SRApi.Guard.Log("品质光芒/清理", ex); }
-            for (int i = 0; i < _tierCount.Length; i++) _tierCount[i] = 0;
-            _totalSeen = 0;
-        }
-
-        /// <summary>派对盒里出现的最高品质；没有道具时返回 null（扫描每 0.2 秒更新一次）。</summary>
-        public static string BriefRarest() {
-            if (!_enabled.Value || _totalSeen <= 0) return null;
-            for (int t = 5; t >= 0; t--) {
-                if (_tierCount[t] <= 0) continue;
-                return SRApi.T("本盒最稀有：" + TierZh[t] + " ×" + _tierCount[t] + "（共 " + _totalSeen + " 件）",
-                               "Rarest in box: " + TierEn[t] + " x" + _tierCount[t] + " (" + _totalSeen + " items)");
-            }
-            return null;
         }
 
         // ============ 页面 ============
 
-        private static void Line(string zh, string en) {
-            GUILayout.Label(SRApi.T(zh, en), SRApi.Ctl.LabelWrap);
-        }
+        private static GUIContent[] _tierLabels;   // 每档标签缓存：只为避免每帧新建 6 个 GUIContent
 
         private void RenderPage() {
             CfgRow(_enabled);
@@ -427,9 +347,12 @@ namespace SR_UCH.Tweaks {
             CfgRow(_breathe);
             // 六档颜色走核心取色器（带色块、调色板、HSV/RGB/Hex 编辑）；改完立即重建颜色表。
             if (_tierColors != null) {
+                if (_tierLabels == null) {
+                    _tierLabels = new GUIContent[6];
+                    for (int i = 0; i < 6; i++) _tierLabels[i] = new GUIContent(TierZh[i] + " / " + TierEn[i]);
+                }
                 for (int i = 0; i < _tierColors.Length; i++) {
-                    GUIContent lab = new GUIContent(TierZh[i] + " / " + TierEn[i]);
-                    if (SRApi.Ctl.ColorEdit(lab, _tierColors[i], SRApi.Ctl.Sc(200f), SRApi.Ctl.Sc(24f)))
+                    if (SRApi.Ctl.ColorEdit(_tierLabels[i], _tierColors[i], SRApi.Ctl.Sc(200f), SRApi.Ctl.Sc(24f)))
                         TierColor[i] = ParseColor(_tierColors[i].Value, TierColorDefault[i]);
                 }
             }

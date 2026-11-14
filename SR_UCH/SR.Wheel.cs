@@ -13,8 +13,6 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
     public partial class SR {
         internal static class Wheel {
-            internal const int PrioControl = 0;   // 兼容旧签名
-
             private static bool _hasEvent;
             private static float _pending;        // 上滚为正（一次滚轮 = ±1）
             private static Vector2 _mouse;        // 事件趟的鼠标（屏幕坐标）
@@ -74,26 +72,6 @@ namespace SR_UCH.Tweaks {
                 return false;
             }
 
-            // 在页面滚动视图建立**之前**命中：滚动视图会先吃掉滚轮，控件永远等不到事件。
-            internal static bool TryHoverApply(float wheel) {
-                if (Mathf.Abs(wheel) < 0.01f) return false;
-                foreach (Fb __f in _fb.Values) {
-                    Rect r = __f.Rect;
-                    Vector2 mp = _mouse;
-                    try { if (Event.current != null) mp = Event.current.mousePosition; } catch (Exception __m) { SR.Guard.Log("滚轮/命中鼠标", __m); }
-                    if (!HitAny(r, mp)) continue;
-                    bool __used = false;
-                    try { __used = __f.Apply(wheel); } catch (Exception __ex) { SR.Guard.Log("滚轮/提前命中", __ex); }
-                    if (!__used) continue;                 // 控件到头了：不算消费，留给后面
-                    _pending = 0f;                         // 已消费：清待处理量，避免页面再滚一次
-                    LastDecision = "hover";
-                    return true;
-                }
-                return false;
-            }
-
-
-            internal static void ClearFallback() { _fb.Clear(); }
             internal static string LastDecision = "none";   // 诊断：谁取走了这一格
 
             private static int _pendFrame = -1;

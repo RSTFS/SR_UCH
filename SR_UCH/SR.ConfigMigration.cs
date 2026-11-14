@@ -516,11 +516,6 @@ namespace SR_UCH.Tweaks {
             row.AddRange(keys);
             _xRemovals.Add(row.ToArray()); _xPending = true;
         }
-        // 整段退役：文件层面不动（键由 Remove 清），只让侧栏不再把它当栏目显示（复用 NavHide）。
-        public static void Retire(string section) {
-            if (string.IsNullOrEmpty(section)) return;
-            try { SR.NavHide(section); } catch (Exception __ex) { SR.Guard.Log("退役段隐藏", __ex); }
-        }
 
         // 原子替换配置文件的唯一实现：写 .tmp -> File.Replace 并留 .bak，失败退回“先备份再覆盖写”。
         public static bool WriteCfgAtomic(string cfgPath, string text, string logTag) {

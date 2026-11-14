@@ -245,150 +245,6 @@ public partial class SR {
         // 悬浮提示框（在 OnGUI 末尾统一绘制；功能页无需关心）
         public static void DrawTooltip(Vector2 mp) { SR.DrawTooltip(mp); }
 
-        // 样式（深色主题，见 SR.Styles.cs）
-        // 表格列偏好的统一持久化组件（三处表格共用）：格式 "o=0,1,2;h=1,3;w=..."
-        public class TablePrefs {
-            private readonly BepInEx.Configuration.ConfigEntry<string> _entry;
-            private readonly int _count;
-            private long _sig; // 上次落盘的签名（SaveIfDirty 用，避免每帧写盘）
-            public int[] Order;
-            public readonly System.Collections.Generic.HashSet<int> Hidden = new System.Collections.Generic.HashSet<int>();
-            private float[] _savedW;   //配置里读到的列宽（下标->像素）
-            private bool _applied;     //是否已把 _savedW 套用过一次（见 BindWidths）
-            private float[] _widths;   //调用方当前使用的列宽数组（由 BindWidths 绑定）
-            private float[] _defaults; //首次绑定时的默认列宽（供"还原全部"用）
-
-            public TablePrefs(BepInEx.Configuration.ConfigEntry<string> entry, int count) {
-                _entry = entry; _count = Mathf.Max(1, count);
-                Order = new int[_count];
-                for (int i = 0; i < _count; i++) Order[i] = i;
-                Load();
-                _sig = Sig();
-            }
-
-            public void Load() {
-                try {
-                    if (_entry == null || string.IsNullOrEmpty(_entry.Value)) return;
-                    // 旧格式（只存纯列顺序、无 o=/h= 前缀）按列顺序读。
-                    if (_entry.Value.IndexOf('=') < 0) {
-                        List<int> legacy = new List<int>();
-                        foreach (string raw in _entry.Value.Split(',')) {
-                            int v;
-                            if (int.TryParse(raw.Trim(), out v) && v >= 0 && v < _count && !legacy.Contains(v)) legacy.Add(v);
-                        }
-                        if (legacy.Count > 0) {
-                            for (int k = 0; k < _count; k++) if (!legacy.Contains(k)) legacy.Add(k);
-                            Order = legacy.ToArray();
-                        }
-                        return;
-                    }
-                    foreach (string part in _entry.Value.Split(';')) {
-                        string p = part.Trim();
-                        if (p.StartsWith("o=")) {
-                            List<int> ord = new List<int>();
-                            foreach (string raw in p.Substring(2).Split(',')) {
-                                int v;
-                                if (int.TryParse(raw.Trim(), out v) && v >= 0 && v < _count && !ord.Contains(v)) ord.Add(v);
-                            }
-                            for (int k = 0; k < _count; k++) if (!ord.Contains(k)) ord.Add(k);
-                            Order = ord.ToArray();
-                        } else if (p.StartsWith("w=")) {
-                            foreach (string pair in p.Substring(2).Split(',')) {
-                                string[] kv = pair.Split(':');
-                                int idx; float wv;
-                                if (kv.Length != 2 || !int.TryParse(kv[0].Trim(), out idx) || !float.TryParse(kv[1].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out wv)) continue;
-                                if (idx < 0 || idx >= _count) continue;
-                                if (_savedW == null) _savedW = new float[_count];
-                                _savedW[idx] = wv;
-                            }
-                        } else if (p.StartsWith("h=")) {
-                            Hidden.Clear();
-                            foreach (string raw in p.Substring(2).Split(',')) {
-                                int v;
-                                if (int.TryParse(raw.Trim(), out v) && v >= 0 && v < _count) Hidden.Add(v);
-                            }
-                        }
-                    }
-                    // 读到“全部隐藏”时一次性修掉（至少留一列）。
-                    if (Hidden.Count >= _count) {
-                        List<int> __hs = new List<int>(Hidden);
-                        Hidden.Clear();
-                        for (int __k = 1; __k < __hs.Count; __k++) Hidden.Add(__hs[__k]);
-                    }
-                } catch (Exception __ex) { Guard.Log("表格列偏好读取", __ex); }
-            }
-
-            // 把配置里存的列宽套到调用方的列宽数组上（页面先填默认值，再调这里覆盖）；只套用一次。
-            public void BindWidths(float[] colW) {
-                if (colW == null) return;
-                // 首次绑定前页面刚填好默认值，留一份作“还原全部”的基准。
-                if (_defaults == null || _defaults.Length != colW.Length) _defaults = (float[])colW.Clone();
-                _widths = colW;
-                if (_applied || _savedW == null) return;
-                for (int i = 0; i < _savedW.Length && i < colW.Length; i++) if (_savedW[i] > 0f) colW[i] = _savedW[i];
-                _applied = true;
-            }
-
-            // 64 位 FNV 折叠签名（零分配），供 SaveIfDirty 判脏。
-            private long Sig() {
-                unchecked {
-                    ulong h = 1469598103934665603UL;
-                    h = (h ^ 0x9E3779B97F4A7C15UL) * 1099511628211UL;
-                    for (int i = 0; i < Order.Length; i++) { h = (h ^ (uint)Order[i]) * 1099511628211UL; h = (h ^ 0x2DUL) * 1099511628211UL; }
-                    h = (h ^ 0x7CUL) * 1099511628211UL;
-                    foreach (int hh in Hidden) { h = (h ^ (uint)hh) * 1099511628211UL; h = (h ^ 0x2DUL) * 1099511628211UL; }
-                    h = (h ^ 0x7CUL) * 1099511628211UL;
-                    if (_widths != null) for (int i = 0; i < _widths.Length; i++) { h = (h ^ (uint)Mathf.RoundToInt(_widths[i])) * 1099511628211UL; h = (h ^ 0x2DUL) * 1099511628211UL; }
-                    return (long)h;
-                }
-            }
-
-            public void Save() {
-                try {
-                    if (_entry == null) return;
-                    System.Text.StringBuilder sb = new System.Text.StringBuilder();
-                    sb.Append("o=");
-                    for (int i = 0; i < Order.Length; i++) { if (i > 0) sb.Append(','); sb.Append(Order[i]); }
-                    sb.Append(";h=");
-                    bool first = true;
-                    foreach (int h in Hidden) { if (!first) sb.Append(','); first = false; sb.Append(h); }
-                    // 列宽（像素，整数；页面每次都用默认值初始化，整份写出即可）
-                    if (_widths != null && _widths.Length > 0) {
-                        sb.Append(";w=");
-                        for (int i = 0; i < _widths.Length; i++) {
-                            if (i > 0) sb.Append(',');
-                            sb.Append(i).Append(':').Append(Mathf.RoundToInt(Mathf.Max(0f, _widths[i])));
-                        }
-                    }
-                    _entry.Value = sb.ToString();
-                    // 回写 _savedW：与 _widths 同步，否则下一帧会用旧值覆盖回去并反复判脏写盘。
-                    if (_widths != null && _widths.Length > 0) {
-                        if (_savedW == null || _savedW.Length != _widths.Length) _savedW = new float[_widths.Length];
-                        for (int i = 0; i < _widths.Length; i++) _savedW[i] = _widths[i];
-                    }
-                    _sig = Sig();
-                } catch (Exception __ex) { Guard.Log("表格列偏好保存", __ex); }
-            }
-
-            // 每帧调用：顺序/隐藏列被改动时才落盘。
-            //还原全部：列序回默认、取消隐藏、列宽回默认（对应 Shift+右键）
-            public void ResetAll() {
-                try {
-                    for (int i = 0; i < Order.Length; i++) Order[i] = i;
-                    Hidden.Clear();
-                    _savedW = null;
-                    if (_widths != null && _defaults != null) {
-                        int n = Mathf.Min(_defaults.Length, _widths.Length);
-                        for (int i = 0; i < n; i++) _widths[i] = _defaults[i];
-                    }
-                    Save();
-                } catch (Exception __ex) { Guard.Log("表格列偏好还原", __ex); }
-            }
-
-            public void SaveIfDirty() {
-                if (Sig() != _sig) Save();
-            }
-        }
 
         // 绝对矩形复选框（表格钉住列用）：与设置页开关同款 —— CheckOn/CheckOff 样式 + 勾选贴图叠加。
         public static bool CheckboxAt(Rect r, bool value, string tip) {
@@ -415,7 +271,6 @@ public partial class SR {
         public static bool ForceZh { get { return _forceZh; } set { _forceZh = value; } }
         // 滑块提交为“值变了就写”（ImGui 的 v_last 模式）：取 DrawSlider 返回值，变了就调本方法或 SetValue。
         public static Dictionary<ConfigEntryBase, bool> EditOpen { get { return _editOpen; } }
-        public static Dictionary<ConfigEntryBase, string> EditText { get { return _editText; } }
         // 配置落盘节流 + 条目缓存失效的门面（外部 DLL 无需访问 SR 的 internal 成员）。
         public static void MarkConfigDirty(ConfigFile cfg) { SR.MarkConfigDirty(cfg); }
         public static void NoteEntryBound() { SR.NoteEntryBound(); }
@@ -527,7 +382,8 @@ public partial class SR {
         internal static float CaptureStartedAt;
         // 供窗口层判断是否正在录键（失焦/切场景时用它决定要不要取消）。
         internal static bool IsCapturingKey { get { return _capturing != null; } }
-        private const float CaptureTimeoutSeconds = 5f;
+        // 录制超时（秒）：窗口层用它判断是否自动放弃卡住的录制。
+        internal const float CaptureTimeoutSeconds = 5f;
 
         /// 超时/异常时的兜底取消：清状态并丢弃未提交的录制序列。
         internal static void CancelCapture() {
@@ -723,9 +579,6 @@ public partial class SR {
             try { _tipKey = null; _tipLines = new string[0]; _tipContent.text = ""; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
-        // 悬浮提示显示延迟（参考 Dear ImGui 的 tooltip 延迟）与淡入，避免鼠标扫过控件时提示乱闪。
-        private const float TipDelay = 0.2f;
-        private const float TipFade = 0.12f;
         // 悬浮文本专用样式：零内边距，高度由整块 CalcHeight 得出（不再逐行累加，避免虚高）。
         private static GUIStyle _tipText;
         private static GUIStyle TipTextStyle() {
@@ -807,8 +660,6 @@ public partial class SR {
     public delegate bool RowFilterFn(ConfigEntryBase entry);
     public delegate string RowCompanionFn(ConfigEntryBase entry);
     public delegate bool RowSliderFn(ConfigEntryBase entry, out float min, out float max, out string fmt);
-    public delegate float RowComboWidthFn(ConfigEntryBase entry);
-    public delegate bool RowEnumFilterFn(ConfigEntryBase entry, string enumName, int value);
     // 字符串条目的下拉候选扩展点：命中即用下拉框渲染该条目。
     // values = 落盘值，displayNames = 界面显示（两者等长）。
     public delegate bool RowComboOptionsFn(ConfigEntryBase entry, out string[] values, out string[] displayNames);

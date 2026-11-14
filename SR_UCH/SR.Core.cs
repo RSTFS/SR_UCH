@@ -94,7 +94,6 @@ public partial class SR : ITweak {
         // 补丁侧自检：反射遍历 SR 自己与引用了 SR_UCH 的功能 DLL，读每条 [HarmonyPatch] 特性
         // （类级与方法级合并），逐个验证按名绑定的目标方法是否还存在（无需改补丁写法）。
         private static bool _patchAudited;
-        public static int PatchAuditBad;   // 失效的补丁目标数（供 UI 提示"某些功能不可用"）
 
 
 
@@ -284,8 +283,6 @@ public partial class SR : ITweak {
 
         // 豁免来源登记：谁在提权必须可见（设置页显示 + 首次登记写日志）。
         public static readonly List<string> OverrideSources = new List<string>();
-        // 只允许白名单程序集登记豁免；其它来源一律拒绝并记录（防止任意插件静默提权）。
-        private static readonly string[] OverrideAllowedAssemblies = new string[] { "" };   // "" = 核心自身调用
         // 找"真正发起登记的程序集"：跳过核心自身（含契约层 SRApi）的栈帧，
         // 这样经 SRApi 转发的外部调用才能识别为发起方，而不是误判成 SR_UCH。
         private static string CallerAssembly() {
@@ -363,12 +360,6 @@ public partial class SR : ITweak {
         public static bool HostOverride { get { return AnyTrue(_hostOverrides); } }
         // 冻结角色：打开面板 / 地图时冻结自己的角色
         public static bool PauseGame { get { return AnyTrue(_pauseProviders); } }
-
-
-        // 共用提示文案（高频消息只生成一次），各功能直接用 SR.Msg。
-        public static class Msg {
-
-        }
 
         // 每帧钩子：功能在 Initialize 里 RegisterTick 注册，SR.Tick 按注册顺序逐个 try/catch 调用。
         // 功能不需被 SR 编译期引用。同一套机制还有 RegisterFrameEnd 钩子（DrawGUI 退出前调用）。

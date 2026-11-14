@@ -27,13 +27,10 @@ using BepInEx.Configuration;
 using UnityEngine;
 
 namespace SR_UCH.Tweaks {
-    [SrFeature("sr.notifyhub", "通知中心", "1.0", Provides = new string[] { "sr.notify.hook", "sr.notify.priority" })]
+    [SrFeature("sr.notifyhub", "通知中心", "1.0", Provides = new string[] { "sr.notify.hook" })]
     public class NotifyHub : ITweak {
         private const string Sec = "通知中心";
         private const string HookSlot = "sr.notify.hook";
-        private const string RecSlot = "sr.rec.note";
-        private const string ReopenSlot = "sr.notify.reopenProposal";
-        private const int PageSize = 20;
 
         // 2 高（要动手 / 出错） 1 中（一般反馈） 0 低（纯确认）
         private static readonly string[] HighWords = {
@@ -50,7 +47,6 @@ namespace SR_UCH.Tweaks {
             public int Level;
             public float At, Until;
             public int Count = 1;
-            public bool Reopenable;
         }
 
         private static ConfigEntry<bool> _enabled, _native, _quiet, _onScreen;
@@ -60,17 +56,14 @@ namespace SR_UCH.Tweaks {
 
         private static readonly List<Notice> _history = new List<Notice>();
         private static readonly List<Notice> _visible = new List<Notice>();
-        private static Action<string> _aRecNote;
-        private static Action _aReopen;
-        private static Func<float> _aFont;
-        private static Func<bool> _aContrast;
-        private static Func<float> _aExtra;
-        private static int _bindTries;
-        private static float _nextBind;
 
         private static Texture2D _white;
         private static GUIStyle _label, _small, _btn;
         private static HubUI _ui;
+
+        // 自己 Provide 的委托实例：注销时按值匹配，避免误删之后注册的实现。
+        private static readonly System.Collections.Generic.Dictionary<string, object> _provided =
+            new System.Collections.Generic.Dictionary<string, object>();
 
         // ============ 生命周期 ============
 
@@ -108,12 +101,12 @@ namespace SR_UCH.Tweaks {
                 "Max visible\nHow many toasts show at once. Range 1-6.");
             SRApi.LocKey(Sec, "Toast Seconds", "停留秒数", "Toast seconds");
             SRApi.LocDesc(Sec, "Toast Seconds",
-                "停留秒数\n每条通知停留秒数（2-15），可读性页可以再加秒。",
-                "Toast seconds\nSeconds each toast stays. Range 2-15; readability can extend it.");
+                "停留秒数\n每条通知停留秒数（1-5）。",
+                "Toast seconds\nSeconds each toast stays. Range 1-5.");
             SRApi.LocKey(Sec, "Card Width", "卡片宽度", "Card width");
             SRApi.LocDesc(Sec, "Card Width",
-                "卡片宽度\n浮层卡片像素宽度（120-340），默认 170。",
-                "Card width\nOverlay card width in pixels. Range 120-340, default 170.");
+                "卡片宽度\n浮层卡片像素宽度（100-300），默认 200。",
+                "Card width\nOverlay card width in pixels. Range 100-300, default 200.");
             SRApi.LocKey(Sec, "Animate", "启用动画", "Animate");
             SRApi.LocDesc(Sec, "Animate", "启用动画\n浮层的出现/消失动画总开关。", "Animate\nEnable overlay show/hide animations.");
             SRApi.LocKey(Sec, "Anim Ms", "动画时长(毫秒)", "Animation ms");
@@ -182,11 +175,8 @@ namespace SR_UCH.Tweaks {
 
             // 核心 NotifyImpl 会惰性查这个名字；Provide 之后所有来源的提示都会进 OnNotify。
             Func<string, string, bool> __hook = (t, g) => OnNotify(t, g); _provided[HookSlot] = __hook; Slots.Provide(HookSlot, __hook);
-            // 对局播报复用同一套优先级口径（0 低 / 1 中 / 2 高），不再自己维护关键词表。
-            Func<string, string, int> __prio = (t, g) => Classify(t, g); _provided["sr.notify.priority"] = __prio; Slots.Provide("sr.notify.priority", __prio);
 
-            _bindTries = 0;
-            _nextBind = Time.unscaledTime + 0.5f;
+            SRApi.OnShutdown("通知中心", Shutdown);
             if (_ui == null) {
                 GameObject go = new GameObject("SR_UCH_NotifyHub");
                 UnityEngine.Object.DontDestroyOnLoad(go);
@@ -194,48 +184,24 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 槽位注销：必须传“自己的委托”，否则契约层在 expected==null 时会无条件删除，
-        // 可能把之后注册的实现一起删掉。
-        private static readonly System.Collections.Generic.Dictionary<string, object> _provided =
-            new System.Collections.Generic.Dictionary<string, object>();
-
-        // ITweak 没有 Shutdown 契约；留一个对称入口，将来契约补齐时可直接调用。
+        // 关机/卸载入口（经 SRApi.OnShutdown 注册）：注销槽位、销毁自建对象与贴图。
+        // 槽位必须传自己的委托，否则契约层 expected==null 时会无条件删除。
         public void Shutdown() {
             object impl;
             if (_provided.TryGetValue(HookSlot, out impl) && impl is Func<string, string, bool>) Slots.Retract(HookSlot, impl);
-            if (_provided.TryGetValue("sr.notify.priority", out impl) && impl is Func<string, string, int>) Slots.Retract("sr.notify.priority", impl);
             if (_ui != null) { try { UnityEngine.Object.Destroy(_ui.gameObject); } catch (Exception ex) { SRApi.Guard.Log("通知中心/销毁对象", ex); } _ui = null; }
             if (_white != null) { try { UnityEngine.Object.Destroy(_white); } catch (Exception ex) { SRApi.Guard.Log("通知中心/销毁贴图", ex); } _white = null; }
         }
 
-        // ============ 软依赖绑定（只查名字，不产生槽位缺失记录） ============
+        // ============ 过期清理 ============
 
         private static void Tick() {
             try {
-                if (_bindTries < 6 && Time.unscaledTime >= _nextBind) {
-                    _bindTries++;
-                    BindSlots();
-                    _nextBind = Time.unscaledTime + 2f;
-                }
                 float now = Time.unscaledTime;
                 for (int i = _visible.Count - 1; i >= 0; i--) if (_visible[i].Until <= now) _visible.RemoveAt(i);
 
             } catch (Exception ex) { SRApi.Guard.Log("通知中心/Tick", ex); }
         }
-
-        private static void BindSlots() {
-            foreach (string n in Slots.Names) {
-                if (n == RecSlot && _aRecNote == null) _aRecNote = Slots.Require<Action<string>>(n);
-                else if (n == ReopenSlot && _aReopen == null) _aReopen = Slots.Require<Action>(n);
-                else if (n == "sr.a11y.fontScale" && _aFont == null) _aFont = Slots.Require<Func<float>>(n);
-                else if (n == "sr.a11y.highContrast" && _aContrast == null) _aContrast = Slots.Require<Func<bool>>(n);
-                else if (n == "sr.a11y.extraSeconds" && _aExtra == null) _aExtra = Slots.Require<Func<float>>(n);
-            }
-        }
-
-        private static float AFont() { try { return _aFont != null ? Mathf.Clamp(_aFont(), 0.8f, 1.6f) : 1f; } catch (Exception ex) { SRApi.Guard.Log("通知中心/字号", ex); return 1f; } }
-        private static bool AContrast() { try { return _aContrast != null && _aContrast(); } catch (Exception ex) { SRApi.Guard.Log("通知中心/对比", ex); return false; } }
-        private static float AExtra() { try { return _aExtra != null ? Mathf.Clamp(_aExtra(), 0f, 20f) : 0f; } catch (Exception ex) { SRApi.Guard.Log("通知中心/加秒", ex); return 0f; } }
 
         // ============ 通知入口（核心 NotifyImpl 调用） ============
 
@@ -244,10 +210,10 @@ namespace SR_UCH.Tweaks {
         /// <summary>返回 true = 已接管屏幕显示；false = 让核心照旧用游戏原生提示。</summary>
         private static bool OnNotify(string text, string tag) {
             if (_enabled == null || !_enabled.Value) return false;
-            // 「退回游戏原生提示」只让出屏幕，不跳过收口：历史、合并、分级、写记录器照常进行。
-            // 否则那个开关就变成「整个功能关掉」，与配置说明和历史回看的设计相矛盾。
+            // 「退回游戏原生提示」只让出屏幕，不跳过收口：合并、分级照常进行。
+            // 否则那个开关就变成「整个功能关掉」，与配置说明的设计相矛盾。
             bool native = _native == null || _native.Value;
-            // 防重入：写记录器 / 恢复提案的回调若将来也发提示，这里直接放行给原生通道，
+            // 防重入：外部回调若也发提示，这里直接放行给原生通道，
             // 绝不形成 Notify -> OnNotify -> Notify 的无限递归。
             if (_inNotify) return false;
             if (string.IsNullOrEmpty(text)) return !native;         // 空提示不占历史
@@ -256,8 +222,7 @@ namespace SR_UCH.Tweaks {
                 float now = Time.unscaledTime;
                 int level = Classify(text, tag);
                 string key = (tag ?? "") + "|" + Norm(text);
-                bool reopenable = Contains(text, "提案") || Contains(text, "proposal");
-                float stay = Mathf.Clamp(_toastSeconds.Value, 2f, 15f) + AExtra();
+                float stay = Mathf.Clamp(_toastSeconds.Value, 1f, 5f);
 
                 // 同类合并：3 秒窗口内同 key 只累加计数并续期，不再插入新行。
                 // 必须全表扫：命中后会把该条的 At 刷新为 now，但它仍留在 List 的旧位置；
@@ -286,7 +251,7 @@ namespace SR_UCH.Tweaks {
 
                 Notice n = new Notice();
                 n.Text = text; n.Tag = tag ?? ""; n.Key = key; n.Level = level;
-                n.At = now; n.Until = now + stay; n.Reopenable = reopenable;
+                n.At = now; n.Until = now + stay;
 
                 _history.Add(n);
                 // 只保留最近的内部缓冲（用于合并去重），不再对外提供历史页。
@@ -379,13 +344,12 @@ namespace SR_UCH.Tweaks {
         private static void DrawToast() {
             if (_enabled == null || !_enabled.Value || !_onScreen.Value || _visible.Count == 0 || Event.current == null) return;
             EnsureStyles();
-            float s = AFont() * Mathf.Clamp(_cardScale.Value / 160f, 0.5f, 1.0f);
-            bool hc = AContrast();
+            float s = Mathf.Clamp(_cardScale.Value / 160f, 0.5f, 1.0f);
             _label.fontSize = Mathf.RoundToInt(12f * s);
             _small.fontSize = Mathf.RoundToInt(12f * s);
-            _label.normal.textColor = hc ? Color.white : new Color(0.94f, 0.96f, 0.99f, 1f);
+            _label.normal.textColor = new Color(0.94f, 0.96f, 0.99f, 1f);
 
-            float w = Mathf.Clamp(_cardW.Value * s, 100f, 300f);   // 默认 170 ≈ 原 300 的一半，可在设置里调
+            float w = Mathf.Clamp(_cardW.Value * s, 100f, 300f);   // 默认 200；s = 整层缩放
             float pad = 8f * s;
             float now = Time.unscaledTime;
 
@@ -423,7 +387,7 @@ namespace SR_UCH.Tweaks {
                     GUI.color = new Color(1f, 1f, 1f, aa);
                     Rect box = new Rect(ax, y, w, h);
                     float cardA = Mathf.Clamp01(_cardAlpha.Value / 100f) * aa;
-                    Fill(box, new Color(0.06f, 0.08f, 0.11f, hc ? Mathf.Min(1f, cardA + 0.08f) : cardA));
+                    Fill(box, new Color(0.06f, 0.08f, 0.11f, cardA));
                     // 左侧优先级色条：颜色之外还有「长短」这一重编码（高=最长）。
                     Color bar = n.Level == 2 ? new Color(1f, 0.55f, 0.22f, 1f)
                               : n.Level == 1 ? new Color(0.36f, 0.72f, 1f, 1f)
@@ -459,18 +423,6 @@ namespace SR_UCH.Tweaks {
                 GUI.depth = prevDepth;
                 GUI.color = prevColor;
             }
-        }
-
-        // ============ 历史页 ============
-
-        private static void Line(string zh, string en) {
-            GUILayout.Label(SRApi.T(zh, en), SRApi.Ctl.LabelWrap);
-        }
-
-        private static string OneLine(string s) {
-            if (string.IsNullOrEmpty(s)) return "";
-            string t = s.Replace("\n", " ").Replace("\r", " ");
-            return t.Length > 90 ? t.Substring(0, 90) + "..." : t;
         }
 
         // ============ 设置页 ============

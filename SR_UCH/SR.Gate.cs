@@ -67,8 +67,6 @@ public partial class SR {
             //对局中：不在树屋、且当前有对局控制器（回合进行中）。
             public static bool InMatch { get { EnvSync(); return _inMatch; } }
 
-            public static bool InMainMenu { get { try { return SceneName == "MainMenu"; } catch { return false; } } }
-
 
             // 本机即权威（房主）；无服务器在跑（离线/单机/本地派对）时本机即权威。
             public static bool IsHost { get { EnvSync(); return _isHost; } }

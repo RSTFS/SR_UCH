@@ -24,9 +24,6 @@ public partial class SR {
         internal const int SectionGapTop = 8;
         internal const int SectionGapBottom = 6;
 
-        // Solid() 创建过的纹理（重建时统一销毁，audit 07-P0-4）
-        private static readonly System.Collections.Generic.List<Texture2D> _styleTex = new System.Collections.Generic.List<Texture2D>();
-
         private static Texture2D Solid(Color c) {
             Texture2D t = new Texture2D(1, 1);
             t.SetPixel(0, 0, c);
@@ -128,8 +125,6 @@ public partial class SR {
         private static readonly Color _cFrameHover = new Color(0.3f, 0.32f, 0.36f, 1f);
         private static readonly Color _cCapture = new Color(0.5f, 0.3f, 0.12f, 1f);
         private static readonly Color _cText = new Color(0.92f, 0.92f, 0.95f, 1f);
-        // 输入框里被选中文本的高亮色（用户要求：蓝色，不要游戏默认的暖色）
-        private static readonly Color _cTextSelect = new Color(0.30f, 0.55f, 1f, 1f);
 
         //保存原始选择色：必须在第一次改写之前调用。
         private static void EnsureOrigSelColor() {
@@ -139,8 +134,6 @@ public partial class SR {
         }
         //绘制结束后还原全局选择色（GUI.skin 为全局共享皮肤）。
         // 供 SR.Window 在每次 OnGUI 趟写回（共享皮肤可能被别的插件改回暖色）
-        internal static Color TextSelectColor { get { return _cTextSelect; } }
-
         internal static void RestoreSkinSelectionColor() {
             try { if (_origSelColorSaved && GUI.skin != null) GUI.skin.settings.selectionColor = _origSelColor; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }

@@ -37,9 +37,7 @@ public partial class SR {
         public static void RegisterOverlay(Action draw) {
             if (draw != null && !_overlays.Contains(draw)) _overlays.Add(draw);
         }
-        // 扩展点使用情况（给设置页的自检块显示）
-        public static int OverlayCount { get { return _overlays.Count; } }
-        public static int UiBlockProviderCount { get { return _uiBlockProviders.Count; } }
+        // 扩展点使用情况由各功能自己的自检块统计，核心不再单独暴露计数。
         public static void DrawOverlays() {
             for (int i = 0; i < _overlays.Count; i++) {
                 try { _overlays[i](); } catch (Exception __ex) { Guard.Log("绘制功能覆盖层", __ex); }

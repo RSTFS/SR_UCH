@@ -2,7 +2,6 @@
 BuildingPresets.cs|Section|Table Height
 Chat.Window.cs|Sec|Defaults v3
 Chat.Window.cs|Sec|Key Defaults v2
-FreePlay.Self.cs|Sec|Crouch Move Key
 FreePlay.Self.cs|Sec|Fly Key
 FreePlay.Self.cs|Sec|God Mode Key
 FreePlay.Self.cs|Sec|Ignore Collision Key

@@ -21,12 +21,6 @@ public partial class SR {
             } catch { return Sc(80f); }
         }
 
-        // 稳定的区域 id（同一配置条目永远同一个 id，跨帧/跨趟都不会重复建表）
-        private static string RowKey(ConfigEntryBase e) {
-            try { return e == null ? "?" : (e.Definition.Section + "/" + e.Definition.Key); }
-            catch { return "?"; }
-        }
-
         // 点标签恢复默认值（复选框/滑块/编辑框/下拉通用）：只处理左键 MouseDown，且指针在标签矩形内。
         private static void ResetOnLabelClick(Rect labelRect, ConfigEntryBase e) {
             try {

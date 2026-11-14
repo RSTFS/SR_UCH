@@ -88,9 +88,7 @@ namespace SR_UCH.Tweaks {
             Snapshot
         }
 
-        // 实时列表的重建节流：事件标脏后最快 RealtimeMinInterval 重建一次，避免每帧遍历上千个 AllPlaceables。
-        // RealtimeFallbackInterval 兜底重建事件未覆盖的变化（重载 / 快照重建）。
-        private const float RealtimeMinInterval = 0.033f;   // ≈30Hz：足够"实时"，又不会每帧全量扫描
+        // 实时列表的兜底重建间隔：放置/销毁事件未覆盖的变化（重载 / 快照重建）靠它兜住。
         private const float RealtimeFallbackInterval = 0.2f; // 事件漏掉的场景变化兜底
         private static bool _listDirty; // 有变化待刷新（由放置/销毁事件置位）
         private static float _lastListRebuildAt = -999f; // 上次全量重建的时刻
@@ -584,7 +582,7 @@ namespace SR_UCH.Tweaks {
           } catch (Exception __ex) { SRApi.Guard.Log("DestroyBlocks.RebuildList", __ex); }
         }
 
-        // 实时列表：按住切换键期间的节流重建，最快 RealtimeMinInterval 一次；不按切换键或暂存模式下不会被调用。
+        // 实时列表：按住切换键期间按"计数变化/事件脏标记"重建；不按切换键或暂存模式下不会被调用。
         // 同 RebuildList：跑在 GameControl.Update 链路上，异常不能外泄。
         private static void TickRealtimeList() {
           try {

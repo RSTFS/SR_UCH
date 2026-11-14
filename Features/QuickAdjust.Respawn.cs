@@ -9,17 +9,6 @@ namespace SR_UCH.Tweaks {
     // 重生页面的 UI（重生延迟 / 出生无敌 / 炮弹卡死）也归这里。
     internal static partial class RespawnTools {
 
-        // 「死亡无计分板」功能已删除（用户要求），这里保留空实现以免改动调用点。
-        internal static void RenderNoScoreboardRow() { return; }
-
-        private static void RenderNoScoreboardRowOld() {
-            try {
-                ConfigEntryBase ns = SRApi.Ctl.FindEntry(Sec, "No Death Scoreboard");
-                if (ns != null) QuickAdjust.PageRow(SRApi.T("死亡无计分板", "No death scoreboard"),
-                    SRApi.T("挑战模式死亡时不显示记分板\n只在死亡且尚未通关时生效", "skips the scoreboard when you die in challenge only while dead and not yet succeeded"), ns);
-            } catch (Exception __ex) { SRApi.Guard.Log("重生/记分板行", __ex); }
-        }
-
         // 由「挑战」页调用：重生分区（跟在挑战分区下面）
         internal static void RenderRespawnSection() {
             try {

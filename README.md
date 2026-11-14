@@ -35,11 +35,10 @@ On first launch a config file `BepInEx\config\SR_UCH_data.cfg` is generated.
 | UI language | English by default; switch to Chinese on the Settings page |
 | Rebind keys | Click the key box in the panel: `Esc` clears, `Shift+Esc` cancels |
 
-The **Settings** page has two tabs pinned at the top (**General** / **Self-check**); `Ctrl` + wheel
-switches between them, and **Reset defaults** sits at the right end of that bar (it deliberately
-leaves the window size/position and the sidebar width alone).
+The **Settings** page is a single page; **Self-check** and **Notifications** moved to the footer bar.
+(There is no longer a "Reset defaults" button, and no tabs to switch.)
 
-The **Self-check** tab is a card-style health report: one verdict card (with **Rescan**, **Copy
+The **Self-check** footer entry opens a card-style health report: one verdict card (with **Rescan**, **Copy
 report**, **Write to log**), a *Targets & config* card that turns amber and lists the broken entries
 when a name-bound patch target or reflection member disappears, and a *Frame hooks* card for the
 per-hook cost. If a game update breaks part of the features, this is the first place to look. Hook
@@ -110,8 +109,8 @@ chance = rarer = brighter (reversible on the page).
   `FilterOverride`), with `GameSettings.GetBlockFrequency` + `TabletBlockList.GetWeightFromStepValue`
   as fallback. It is **not** the prefab's base rarity.
 - Six tiers: Flood / Common / Fine / Rare / Epic / Legendary. Items with weight 0 (never picked
-  this match) stay dark. Strength, size, breathing pulse, inverted coloring and the legend are
-  all configurable.
+  this match) stay dark. Strength, size and breathing pulse are all configurable, plus a per-tier
+  color picker.
 - The halo is a **child of each pickable** (one procedurally generated radial-gradient sprite per
   session), sorted behind the item on the same layer. It is found/updated via `Transform.Find`
   and is completely stateless -- when the item goes away, the halo goes with it. No strong-reference
@@ -119,7 +118,8 @@ chance = rarer = brighter (reversible on the page).
 - Purely local visuals: probabilities are already synced, so every client computes and draws its
   own. No network traffic, no edits to the original material / SpriteRenderer, no effect on draw
   odds, no new patches / reflection / threads.
-- The page shows live per-tier counts from the party box (0.2s throttle, core per-frame object cache).
+- Halo spread grows with the tier (1.6–2.2× the item's bounds), so it reads as light spilling from
+  the item itself.
 
 ### Notification Hub
 

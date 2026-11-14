@@ -44,13 +44,5 @@ namespace SR_UCH {
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式页/渲染", __ex); }
         }
 
-        // 「其它」子页：地图网格（SR 自己实现，不依赖 EX）
-        private static void RenderGridTab() {
-            try {
-                // 不按模式隐藏/灰显：照常显示，效果由各功能自己在非自由模式下跳过
-                FreePlayGrid.RenderOtherPage();
-            } catch (Exception __ex) { SRApi.Guard.Log("自由模式页/其它", __ex); }
-        }
-
     }
 }

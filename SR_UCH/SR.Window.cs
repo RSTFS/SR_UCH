@@ -301,7 +301,7 @@ public partial class SR {
             // 外部模块页按钮右键绑键由按钮绘制当帧自判（跨帧登记矩形会因行数变化而位移，绑错键）。
             // 快捷键录制：单键 / 修饰键 + 主键 / 多普通键序列；整块只在非 Layout 事件里跑（Layout 阶段 Use() 会打断布局）。
             // 捕获自愈：录制期间若事件被别处消费（或行被切走），_capturing 会一直挂着并让所有热键失效。
-            if (_capturing != null && Time.unscaledTime - SR.CaptureStartedAt > 5f) {
+            if (_capturing != null && Time.unscaledTime - SR.CaptureStartedAt > SR.CaptureTimeoutSeconds) {
                 // CancelCapture 原子清 _capturing/_recSeq/_recHeld，所以同一帧后面的提交分支不会跑，
                 // 不会写入半截序列（audit 04-P0-2 的结论）。这里只把日志改成不会误报"失败: 未知错误"。
                 Guard.Log("按键录制超时，已自动取消", null);
@@ -527,7 +527,7 @@ public partial class SR {
             if (_mode == Mode.Internal) SR.RenderPageTabs(_selectedInternalSection);
             if (_mode == Mode.Internal) SR.RenderPageHeader(_selectedInternalSection);
             // ================= 滚轮：唯一入口（仲裁器） =================
-            // 旧实现这里还有一套"Hover 盾 / WheelClaim / WheelDeltaSet"的并行机制，它会先把事件
+            // 旧实现这里还有一套"Hover 盾 / 声明独占 / 帧内滚轮量"的并行机制，它会先把事件
             // 改成 Used，导致仲裁器收不到滚轮（列表、滑块因此"有时灵有时不灵"）。整套已删除。
             // ================= 滚轮 =================
             // 事件已在 FrameStart 里被记成"待处理量"并 e.Use()（没有别的控件会再滚）。

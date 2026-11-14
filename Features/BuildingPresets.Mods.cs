@@ -173,10 +173,6 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/切换数据模式", __ex); }
         }
 
-
-        private const string RulesetsDirName = "rulesets";
-
-
         private static string ModValueText(ModDef d, string raw) {
             try {
                 if (string.IsNullOrEmpty(raw)) return "";

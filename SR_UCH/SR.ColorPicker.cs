@@ -331,11 +331,6 @@ public partial class SR {
             return w + Sc(8f);
         }
 
-        // 按钮宽度：按文字实测宽度 + 内边距，英文/其它语言不截断。
-        private static float BtnW(string text) {
-            return TextW(text, Ctl.Btn) + Sc(12f);
-        }
-
         private static void HoverTip(Rect r, string tip) {
             try {
                 Event ev = Event.current;
@@ -646,57 +641,6 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("调色板 Hex", __ex); }
             GUILayout.EndHorizontal();
             if (!string.Equals(s.HexEdit, SRApi.ColorHex.ToHex(PickerColor(s)))) s.TextPending = true;
-        }
-
-        // 复制 / 粘贴 / 还原默认（剪贴板走 GUIUtility.systemCopyBuffer）。
-        private static void DrawActions(ConfigEntryBase e, State s, float pw) {
-            float h = Ctl.ControlH();
-            string copy = T("复制", "Copy"), paste = T("粘贴", "Paste"), reset = T("还原默认", "Reset");
-            float gap = Sc(6f);
-            float copyW = BtnW(copy), pasteW = BtnW(paste), resetW = BtnW(reset);
-            float total = copyW + pasteW + resetW + 2f * gap;
-            float budget = Mathf.Max(Sc(60f), pw - Sc(24f));
-            if (total > budget && total > 0f) {
-                float k = budget / total;
-                copyW *= k; pasteW *= k; resetW *= k; gap *= k;
-            }
-            GUILayout.BeginHorizontal();
-            try {
-                if (GUILayout.Button(new GUIContent(copy, T("把当前颜色复制到系统剪贴板", "copy the current color to the system clipboard")),
-                    Ctl.Btn, GUILayout.Width(copyW), GUILayout.Height(h))) {
-                    try { GUIUtility.systemCopyBuffer = SRApi.ColorHex.ToHex(PickerColor(s)); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-                }
-                GUILayout.Space(gap);
-                if (GUILayout.Button(new GUIContent(paste, T("从剪贴板读取 #RRGGBB；格式非法则忽略", "paste #RRGGBB from the clipboard; invalid text is ignored")),
-                    Ctl.Btn, GUILayout.Width(pasteW), GUILayout.Height(h))) {
-                    Color c;
-                    if (SRApi.ColorHex.ParseHex(GUIUtility.systemCopyBuffer, out c)) { Apply(e, s, c, true, true); SyncText(s, true); }
-                }
-                GUILayout.Space(gap);
-                if (GUILayout.Button(new GUIContent(reset, T("写回该颜色键的默认值", "write back the default value of this color key")),
-                    Ctl.Btn, GUILayout.Width(resetW), GUILayout.Height(h))) Reset(e);
-                GUILayout.FlexibleSpace();
-            } catch (Exception __ex) { Guard.Log("调色板操作", __ex); }
-            GUILayout.EndHorizontal();
-        }
-
-        // 复制 / 粘贴 / 还原默认（内联版：放在顶栏同一行、收起按钮左边）。
-        private static void DrawActionsInline(ConfigEntryBase e, State s, float h) {
-            string copy = T("复制", "Copy"), paste = T("粘贴", "Paste"), reset = T("还原默认", "Reset");
-            float gap = Sc(4f);
-            if (GUILayout.Button(new GUIContent(copy, T("把当前颜色复制到系统剪贴板", "copy the current color to the system clipboard")),
-                Ctl.Btn, GUILayout.Width(BtnW(copy)), GUILayout.Height(h))) {
-                try { GUIUtility.systemCopyBuffer = SRApi.ColorHex.ToHex(PickerColor(s)); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-            }
-            GUILayout.Space(gap);
-            if (GUILayout.Button(new GUIContent(paste, T("从剪贴板读取 #RRGGBB；格式非法则忽略", "paste #RRGGBB from the clipboard; invalid text is ignored")),
-                Ctl.Btn, GUILayout.Width(BtnW(paste)), GUILayout.Height(h))) {
-                Color c;
-                if (SRApi.ColorHex.ParseHex(GUIUtility.systemCopyBuffer, out c)) { Apply(e, s, c, true, true); SyncText(s, true); }
-            }
-            GUILayout.Space(gap);
-            if (GUILayout.Button(new GUIContent(reset, T("写回该颜色键的默认值", "write back the default value of this color key")),
-                Ctl.Btn, GUILayout.Width(BtnW(reset)), GUILayout.Height(h))) Reset(e);
         }
 
         // 当前 H 对应的 S/V 方块贴图：像素 (x,y) = HSV(H, x/(w-1), y/(h-1))。

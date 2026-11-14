@@ -37,8 +37,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 
 namespace SR_UCH.Tweaks {
-    [SrFeature("sr.chaos", "Chaos", "2.2", Provides = new string[] {
-        "sr.cast.pool" })]
+    [SrFeature("sr.chaos", "Chaos", "2.2")]
     public class Chaos : ITweak {
         private const string Sec = "混乱牌组";
 
@@ -68,7 +67,7 @@ namespace SR_UCH.Tweaks {
         private static int _drawSeq;   // 抽牌序号：保证每次重抽的随机种子都不同（否则 TickCount 同毫秒会抽出同一张）
         private const int FBoolWallJumps = 8, FBoolDance = 9, FBoolMirror = 10, FBoolPlayerCol = 12, FBoolFriction = 13;
 
-        // 10 张牌：4 个数值规则（含同规则不同档的高重力）+ 5 个布尔。
+        // 17 张牌：5 个数值规则的多档取值（重力 / 跳跃 / 冲刺 / 平台 / 射速）+ 5 个布尔规则。
         private static readonly CardDef[] Cards = new CardDef[] {
             new CardDef("低重力",   "Low gravity",      TabletRule.ModifierGravity,            FGravity,       false, 1, 2),
             new CardDef("高重力",   "High gravity",     TabletRule.ModifierGravity,            FGravity,       false, 2, 2),
@@ -95,7 +94,6 @@ namespace SR_UCH.Tweaks {
             public bool WallJumps, Dance, Mirror, PlayerCol, Friction;
         }
 
-        private static IFeatureHost _mp;
         private static ConfigEntry<bool> _enabled, _announce;
         private static ConfigEntry<int> _everyRounds, _maxActive;
         private static ConfigEntry<KeyCode> _drawKey;
@@ -114,14 +112,6 @@ namespace SR_UCH.Tweaks {
         private static readonly Dictionary<int, RosterEntry> _roster = new Dictionary<int, RosterEntry>();
         private static bool _helloSent;
         private static float _nextHelloAt;
-        // 房客提案：单槽待审，默认 20 秒过期（unscaledTime，梦境定格时也照走）。
-        // 过期后留一份快照，通知页里能「重新打开」。
-        // 可读性适配（软依赖）：只查槽位名，缺 DLL 时零 miss、零副作用。
-        private static Func<float> _aExtra;
-        // 对局播报（软依赖）：抽牌后主动通知，让房客在原生聊天窗里看见牌面。
-        private static Action<string> _aCastRound;
-        private static int _aTries;
-        private static float _aNext;
 
         // ============ 生命周期 ============
 
@@ -214,17 +204,16 @@ namespace SR_UCH.Tweaks {
         }
 
         public void Initialize(IFeatureHost plugin) {
-            _mp = plugin;
-            _enabled = _mp.Config.Bind(Sec, "Enabled", false, "树屋里选牌组，每回合抽牌改变规则；关闭即还原。");
-            _everyRounds = _mp.Config.Bind(Sec, "EveryNRounds", 1, new ConfigDescription("几回合抽一次：1 = 每个摆放阶段都抽。", new AcceptableValueRange<int>(1, 5)));
-            _maxActive = _mp.Config.Bind(Sec, "MaxActive", 1, new ConfigDescription("最多同时生效几张牌。", new AcceptableValueRange<int>(1, 4)));
-            _announce = _mp.Config.Bind(Sec, "Announce", true, "抽牌时在屏幕上提示本回合牌面。");
-            _drawKey = _mp.Config.Bind(Sec, "RerollKey", KeyCode.None, "房主按此键立刻重抽一张。");
+            _enabled = plugin.Config.Bind(Sec, "Enabled", false, "树屋里选牌组，每回合抽牌改变规则；关闭即还原。");
+            _everyRounds = plugin.Config.Bind(Sec, "EveryNRounds", 1, new ConfigDescription("几回合抽一次：1 = 每个摆放阶段都抽。", new AcceptableValueRange<int>(1, 5)));
+            _maxActive = plugin.Config.Bind(Sec, "MaxActive", 1, new ConfigDescription("最多同时生效几张牌。", new AcceptableValueRange<int>(1, 4)));
+            _announce = plugin.Config.Bind(Sec, "Announce", true, "抽牌时在屏幕上提示本回合牌面。");
+            _drawKey = plugin.Config.Bind(Sec, "RerollKey", KeyCode.None, "房主按此键立刻重抽一张。");
 
             _pool = new ConfigEntry<bool>[Cards.Length];
             for (int i = 0; i < Cards.Length; i++) {
                 var c = Cards[i];
-                _pool[i] = _mp.Config.Bind(Sec, c.En, true, "是否进入随机池：" + c.Zh);
+                _pool[i] = plugin.Config.Bind(Sec, c.En, true, "是否进入随机池：" + c.Zh);
                 // 本地化跟着牌表走：以后加牌不用再记得补 LocKey（此前扩到 14 张只登记了 10 张）。
                 SRApi.LocPair(Sec, c.En, c.Zh, c.En,
                               c.Zh + "\n勾选后才可能被抽到。", c.En + "\ncheck to include it in the draw pool.");
@@ -234,20 +223,19 @@ namespace SR_UCH.Tweaks {
 
             SRApi.RegisterKey("混乱牌组-重抽", _drawKey, "press");
 
-            // 通知治理中心的历史页用这个槽位把过期提案恢复到待审状态。
             // 对局播报：开局公告读本局启用的牌池（不是固定牌序，牌是逐回合随机抽的）。
-            Slots.Provide("sr.cast.pool", (Func<string>)(() => PoolText()));
             // 上一版漏了栏目登记：侧栏会显示英文 id 且排序靠后。补上中英名与顺序。
             SRApi.LocSec(Sec, "混乱牌组", "Chaos Deck");
             RegUi();
             SRApi.Nav(Sec, 130);
-            // 每帧钩子：重抽键、握手、提案过期、软依赖绑定、对局播报推送都在 Tick 里。
+            // 每帧钩子：重抽键与握手都在 Tick 里。
             // 此前这里漏了注册，整个每帧调度线是死的（重抽键完全无效）。
             SRApi.RegisterTick("混乱牌组-每帧", Tick);
             SRApi.RegisterPage(Sec, "Deck", "牌组", "Deck", 118, RenderPage);
             SRApi.RegisterPage(Sec, "Pool", "牌池", "Card pool", 130, RenderPoolPage);
+            SRApi.OnShutdown("混乱牌组", Shutdown);
 
-            // 静态幂等：ITweak 没有 Shutdown 契约，重复 Initialize 不能叠加监听器。
+            // 静态幂等：重复 Initialize 不能叠加监听器（关机回调按名字覆盖，天然幂等）。
             if (_listener == null) {
                 _listener = new ChaosListener(this);
                 GameEventManager.ChangeListener<GameEvent.StartPhaseEvent>(_listener, true);
@@ -258,7 +246,7 @@ namespace SR_UCH.Tweaks {
             _ready = true;
         }
 
-        // ITweak 当前没有 Shutdown 契约，这个方法不会被调用；留对称入口供契约补齐时直接使用。
+        // 关机/卸载回调（经 SRApi.OnShutdown 注册）：解监听、撤规则。
         public void Shutdown() {
             if (_listener != null) {
                 GameEventManager.ChangeListener<GameEvent.StartPhaseEvent>(_listener, false);
@@ -276,7 +264,6 @@ namespace SR_UCH.Tweaks {
             if (_enabled.Value == false) return;                       // 总开关关掉后不跑任何每帧逻辑
             // 用项目的组合键框架：Shift/Ctrl 组合能用，且聊天框打字时让路（裸 Input.GetKeyDown 会误触发）。
             if (IsAuthority && SRApi.ComboKeyDown(_drawKey)) DrawAndBroadcast();
-            BindA11y();
             SendHelloOnce();
         }
 
@@ -379,7 +366,6 @@ namespace SR_UCH.Tweaks {
             RebuildLocal();
             string drawn = Desc() ?? "-";
             if (_announce.Value) SRApi.NotifyT("混乱牌组：{0}", "Chaos: {0}", drawn);
-            NotifyCastRound(drawn);   // 房客在原生聊天窗里也看得见本回合牌面
         }
 
         private int ParamFor(int id, System.Random rng) {
@@ -573,48 +559,6 @@ namespace SR_UCH.Tweaks {
             _applied = true;
         }
 
-        // ============ 房客提案（复用同一条规则消息通道） ============
-
-        private static int RandomCardId() {
-            var chosen = new List<int>();
-            for (int i = 0; i < Cards.Length; i++) if (_pool[i] != null && _pool[i].Value) chosen.Add(i);
-            if (chosen.Count == 0) return -1;
-            return chosen[new System.Random(Environment.TickCount).Next(chosen.Count)];
-        }
-
-        // 可读性适配：提案等待时间 = 20 秒 + 可读性页的加秒（0-20 秒）。
-        private static void BindA11y() {
-            if (_aTries >= 6 || Time.unscaledTime < _aNext) return;
-            _aTries++; _aNext = Time.unscaledTime + 2f;
-            foreach (string n in Slots.Names) {
-                if (n == "sr.a11y.extraSeconds" && _aExtra == null) _aExtra = Slots.Require<Func<float>>(n);
-                else if (n == "sr.cast.round" && _aCastRound == null) _aCastRound = Slots.Require<Action<string>>(n);
-            }
-        }
-
-        /// <summary>抽牌后主动通知对局播报；由生产方触发，不靠事件顺序猜回合边界。</summary>
-        private static void NotifyCastRound(string cards) {
-            if (_aCastRound == null || string.IsNullOrEmpty(cards)) return;
-            try { _aCastRound(cards); }
-            catch (Exception ex) { SRApi.Guard.Log("混乱牌组/通知播报", ex); }
-        }
-
-        /// <summary>本局启用的牌池（跟随界面语言）；开局公告用，不是预先生成的牌序。</summary>
-        private static string PoolText() {
-            var parts = new List<string>();
-            for (int i = 0; i < Cards.Length; i++) {
-                if (_pool != null && _pool[i] != null && _pool[i].Value)
-                    parts.Add(SRApi.T(Cards[i].Zh, Cards[i].En));
-            }
-            if (parts.Count == 0) return SRApi.T("（牌池为空）", "(empty pool)");
-            return string.Join(SRApi.T("、", ", "), parts.ToArray())
-                 + SRApi.T("（共 ", " (") + parts.Count + SRApi.T(" 张）", " cards)");
-        }
-        private static float AExtra() {
-            try { return _aExtra != null ? Mathf.Clamp(_aExtra(), 0f, 20f) : 0f; }
-            catch (Exception ex) { SRApi.Guard.Log("混乱牌组/可读性加秒", ex); return 0f; }
-        }
-        /// <summary>把最近一条过期提案恢复成待审，并重新计时；只由房主/离线权威端生效。</summary>
         // ============ 对外展示 ============
 
         public static string Desc() {

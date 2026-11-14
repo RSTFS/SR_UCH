@@ -119,29 +119,6 @@ public partial class SR {
             return null;
         }
 
-        // 恢复默认：把设置段里所有条目写回各自的默认值（不动「自检」页的诊断开关以外的内容）。
-        // 窗口几何（WinWidth/WinHeight/WinX/WinY）与侧栏宽度一起复位会让窗口"跳走"，
-        // 用户点"恢复默认"并不期望改变窗口位置/大小（audit 08-P0-03），所以显式跳过。
-        private static void ResetAllDefaults() {
-            try {
-                int n = 0, skipped = 0;
-                foreach (ConfigEntryBase e in SettingsEntries()) {
-                    if (e == null || e.Definition == null) continue;
-                    if (e.Definition.Section != "Settings") continue;
-                    string k = e.Definition.Key;
-                    if (k == Keys.WinWidth || k == Keys.WinHeight || k == Keys.WinX || k == Keys.WinY
-                        || k == Keys.SidebarWidth) { skipped++; continue; }
-                    try { e.BoxedValue = e.DefaultValue; n++; } catch (Exception __one) { Guard.Log("恢复默认 " + e.Definition.Key, __one); }
-                }
-                SRApi.Notify(skipped > 0
-                    ? T("已恢复默认：" + n + " 项（窗口位置/大小与侧栏宽度保持不变）",
-                        "Defaults restored: " + n + " (window geometry and sidebar width untouched)")
-                    : T("已恢复默认：" + n + " 项", "Defaults restored: " + n));
-                SRApi.LogInfo("[设置] 恢复默认 " + n + " 项，跳过窗口几何/侧栏 " + skipped + " 项");
-            } catch (Exception __ex) { Guard.Log("恢复默认", __ex); }
-        }
-
-        // 常驻页签栏（画在滚动区之外）：[通用] [自检] ……… [恢复默认]
         internal static void RenderSettingsPage(float colWidth) {
             try {
                 // 页面滚动恢复：NoPageScrollBars 现在是"每帧声明、用后清零"（见 SR.Window），
@@ -1123,26 +1100,12 @@ public partial class SR {
 
         // 滚轮所有权：控件在被 hover 时声明独占；帧首把本帧声明转存为上一帧声明，滚动仲裁读上一帧声明，
         // 有则整体放弃滚动（滚动容器的处理发生在控件提交之前，故只能读上一帧）。
-    internal static bool _wheelClaimCur ;
-    internal static bool _wheelClaimPrev ;
-    internal static int _wheelClaimFrame = -1;
-
-
         // 中心化 hover 裁决（借鉴 ItemHoverable）：一帧内只有第一个判定通过的控件算 hovered，叠放控件须显式 AllowOverlap。
-    internal static int _hoverFrame = -1;
-    internal static bool _hoverTaken ;
-
-
-
-
-        internal static bool WheelClaimedPrev { get { try { return _wheelClaimPrev; } catch { return false; } } }
         //控件高度（设计像素）：0 = 默认 26；功能可覆盖自己页面的控件高度
         public static float ControlHeight;
         //内容区原点偏移，供事件坐标与内容坐标换算
         internal static Vector2 AreaOffset;
         internal static bool WheelShieldHit;
-        //本帧待用的滚轮量：滚动区在 ScrollWheel 趟经 WheelDeltaSet 记下，控件经 WheelDeltaTake 取用（取用即清）。
-    internal static float _wheelDelta ;
 
 
 

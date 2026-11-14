@@ -739,25 +739,6 @@ namespace SR_UCH.Tweaks {
             return DefColW[ColAction];
         }
 
-        // 表格列设置落盘/日志用的小工具（逗号分隔，便于对照 cfg）。
-        private static string JoinInts(int[] a) {
-            try {
-                if (a == null) return "";
-                string[] p = new string[a.Length];
-                for (int i = 0; i < a.Length; i++) p[i] = a[i].ToString(CultureInfo.InvariantCulture);
-                return string.Join(",", p);
-            } catch { return ""; }
-        }
-
-        private static string JoinFloats(float[] a) {
-            try {
-                if (a == null) return "";
-                string[] p = new string[a.Length];
-                for (int i = 0; i < a.Length; i++) p[i] = Mathf.RoundToInt(a[i]).ToString(CultureInfo.InvariantCulture);
-                return string.Join(",", p);
-            } catch { return ""; }
-        }
-
         // 列序归一化：只允许前 4 列换位，操作列强制固定在最后；非法/缺列时补回默认相对顺序。
         private static int[] NormalizeOrder(int[] src) {
             int[] def = new int[ColCount];

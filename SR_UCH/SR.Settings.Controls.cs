@@ -280,38 +280,9 @@ namespace SR_UCH.Tweaks {
             } catch { return Sc(44); }
         }
 
-        //本控件是否赢得本帧 hover；allowOverlap = true 时无视先到先得（叠放控件用）
-        internal static bool HoverTest(Rect r, bool allowOverlap = false) {
-            try {
-                Event e = Event.current;
-                if (e == null) return false;
-                if (_hoverFrame != Time.frameCount) { _hoverFrame = Time.frameCount; _hoverTaken = false; }
-                if (!r.Contains(e.mousePosition)) return false;
-                if (!allowOverlap && _hoverTaken) return false;   //先到先得
-                _hoverTaken = true;
-                return true;
-            } catch { return false; }
-        }
-
-        internal static void WheelClaimNewFrame() {
-            try {
-                if (_wheelClaimFrame == Time.frameCount) return;
-                _wheelClaimFrame = Time.frameCount;
-                _wheelClaimPrev = _wheelClaimCur;
-                _wheelClaimCur = false;
-            } catch (Exception __ex) { Guard.Log("WheelClaimNewFrame", __ex); }
-        }
-
-        public static void WheelClaim() { try { _wheelClaimCur = true; } catch (Exception __ex) { Guard.Log("WheelClaim", __ex); } }
-
-        internal static void WheelDeltaSet(float d) { try { _wheelDelta = d; } catch (Exception __ex) { Guard.Log("WheelDeltaSet", __ex); } }
-
-        internal static float WheelDeltaTake() { try { float d = _wheelDelta; _wheelDelta = 0f; return d; } catch { return 0f; } }
-
         internal static void ResetWheelState() {
             try {
-                _wheelClaimPrev = false; _wheelClaimCur = false; _wheelClaimFrame = -1;
-                WheelShieldHit = false; _wheelDelta = 0f;
+                WheelShieldHit = false;
                 _sliderLastWritten.Clear();   //跨场景后配置可能已变，清空已写入值表
             } catch (Exception __ex) { Guard.Log("ResetWheelState", __ex); }
         }

@@ -229,8 +229,6 @@ public partial class SR {
         private static float _attrAt;
         internal static string AttributionError = "";
 
-        internal static bool AttributionReady { get { return _attrDone; } }
-
         internal static void InitAttribution() {
             try {
                 _attrArmed = true;

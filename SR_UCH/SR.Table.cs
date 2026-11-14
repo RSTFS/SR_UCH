@@ -651,10 +651,8 @@ public partial class SR {
         public Color LineStrong = new Color(0.31f, 0.31f, 0.35f, 1f);
         public Color LineLight = new Color(0.23f, 0.23f, 0.25f, 1f);
         public Color RowAltBg = new Color(1f, 1f, 1f, 0.06f);
-        public Color RowBg = new Color(0.14f, 0.14f, 0.16f, 1f);   // 行区不透明底（钉住列垫底用）
     }
     private static readonly TableStyle _tableStyle = new TableStyle();
-    public static TableStyle DefaultTableStyle { get { return _tableStyle; } }
     private static TableStyle CurStyle { get { return _tableStyle; } }
 
 }

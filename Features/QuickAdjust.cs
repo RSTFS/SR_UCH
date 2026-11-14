@@ -69,19 +69,6 @@ namespace SR_UCH.Tweaks {
             return null;
         }
 
-        // QuickAdjust 的自动重试调用：返回 true 表示还在延迟窗口内，本次不要发重试。
-        internal static bool ShouldWaitForDelay(int networkNumber) {
-            try {
-                float d = DelaySeconds;
-                if (d <= 0.01f) return false;
-                float since;
-                if (!_deadSince.TryGetValue(networkNumber, out since)) { _deadSince[networkNumber] = Time.unscaledTime; return true; }
-                if (Time.unscaledTime - since < d) return true;
-                _deadSince.Remove(networkNumber);
-                return false;
-            } catch (Exception __ex) { SRApi.Guard.Log("重生/延迟判定", __ex); return false; }
-        }
-
         private static void Tick() {
             try {
                 if (!SRApi.GateMaster || !ModeOk()) { _cannonStuckAt = -1f; return; }
@@ -373,8 +360,6 @@ public partial class QuickAdjust : ITweak {
                 SRApi.T("长按 B 的等待阈值（Character.SuicideTime）：挑战模式重试游戏默认 0.5 秒。\n范围 0-2，0.1 步进",
                         "Hold-B threshold (Character.SuicideTime): vanilla 0.5s for challenge retry.\nrange 0-2 in 0.1 steps"),
                 qrh, 0f, 2f, "0.0");
-            // 挑战分区的最后一条：死亡不弹记分板
-            RespawnTools.RenderNoScoreboardRow();
             // 分区二：重生（与挑战合并到同一页，分区在挑战下面）
             RespawnTools.RenderRespawnSection();
         } catch (Exception __ex) { SRApi.Guard.Log("快速调整/挑战页", __ex); }

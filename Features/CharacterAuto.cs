@@ -636,23 +636,6 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("角色/随机整套", __ex); }
         }
 
-        private static void ApplyRandom(Outfit[] all, Outfit.OutfitType type) {
-            List<Outfit> cand = new List<Outfit>();
-            for (int i = 0; i < all.Length; i++) {
-                Outfit o = all[i];
-                if (o == null || o.outfitType != type || o.followThisOutfit != null) continue;
-                if (!o.Unlocked && !o.TempUnlocked) continue;
-                cand.Add(o);
-            }
-            if (cand.Count == 0) return;
-            cand.Sort(delegate (Outfit a, Outfit b) { return string.Compare(a.name, b.name, StringComparison.Ordinal); });
-            Outfit sel = cand[UnityEngine.Random.Range(0, cand.Count)];
-            for (int i = 0; i < all.Length; i++) {
-                Outfit o = all[i];
-                if (o != null && o.outfitType == type && o.followThisOutfit == null) o.on = ReferenceEquals(o, sel);
-            }
-        }
-
         private static string BuildStatus() {
             try {
                 LobbyManager lm = LobbyManager.instance;
