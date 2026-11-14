@@ -11,8 +11,9 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace SR_UCH.Tweaks {
-    [SrFeature("sr.destroyblocks", "DestroyBlocks", "1.0", Provides = new string[] {
-        "DestroyBlocks.PlayerPlacedBlocks", "DestroyBlocks.AttributeToHost" })]
+    [SrFeature("sr.destroyblocks", "DestroyBlocks", "1.0",
+        Modes = (int)(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay),
+        Provides = new string[] { "DestroyBlocks.PlayerPlacedBlocks", "DestroyBlocks.AttributeToHost" })]
     public class DestroyBlocks : ITweak {
         private static IFeatureHost _mp; // 仅用于读 Config（契约类型）
         private static int _index;
@@ -428,8 +429,9 @@ namespace SR_UCH.Tweaks {
             if (!SRApi.GateMaster) return;
             if (!Enabled) return;
             if (SRApi.Typing) return; 
-            // 仅派对 / 创意 / 自由建造模式；已接入 IgnoreModeLimit 豁免。
-            if (!SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay)) return;
+            // 仅派对 / 创意 / 自由建造模式；模式掩码声明在 [SrFeature].Modes 上，
+            // 由核心 FeatureAllowed 统一判定（IgnoreModeLimit 豁免已内置）。
+            if (!SRApi.FeatureAllowed(typeof(DestroyBlocks))) return;
             // 权限：只有房主能真正删除；房客照样可以按住切换键高亮、滚轮换目标、看信息条（只读）。
             // 房客按删除键时给一次明确提示，避免"按了没反应"的困惑。
             bool canDestroy = SRApi.CanControlLocally || AllowClientsOn;
