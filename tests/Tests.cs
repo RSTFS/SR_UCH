@@ -29,6 +29,7 @@ namespace SR_UCH.Tests {
             TestSlots();
             TestFeatureManifest();
             TestSinksAndFallbacks();
+            TestStoragePath();
 
             Console.WriteLine("  通过 " + _pass + " / 失败 " + _fail);
             if (_fail > 0) { Console.WriteLine("== 有失败 ❌ =="); return 1; }
@@ -217,6 +218,28 @@ namespace SR_UCH.Tests {
             MainThread.Assert("ut.mainthread");
             MainThread.Enable(false);
             Check("主线程 Assert 不抛异常", true);
+        }
+
+        // 统一存储（绝对路径版）：原子写、UTF-8 无 BOM、读回、覆盖、删除。
+        private static void TestStoragePath() {
+            // 注意：%TEMP% 在测试宿主进程里会被拒绝写（UnauthorizedAccessException，沙箱 ACL），
+            // 所以用测试程序自己的目录（构建产物目录天然可写）做真实文件回归。
+            string dir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "sr_store_test");
+            try { System.IO.Directory.CreateDirectory(dir); } catch (Exception) { }
+            string file = System.IO.Path.Combine(dir, "a_" + Guid.NewGuid().ToString("N") + ".txt");
+            try {
+                Check("Storage.WriteAtomicPath", SRApi.Storage.WriteAtomicPath(file, "hello"));
+                Eq("Storage.ReadPath 往返", "hello", SRApi.Storage.ReadPath(file));
+                Check("Storage.WriteAtomicPath 覆盖", SRApi.Storage.WriteAtomicPath(file, "world"));
+                Eq("Storage 覆盖后读回", "world", SRApi.Storage.ReadPath(file));
+                byte[] bytes = System.IO.File.Exists(file) ? System.IO.File.ReadAllBytes(file) : null;
+                Check("Storage 无 BOM", bytes != null && bytes.Length >= 5 && !(bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF));
+                Eq("Storage.ReadPath 缺文件返回 null", (object)null, SRApi.Storage.ReadPath(file + ".missing"));
+            } finally {
+                try { if (System.IO.File.Exists(file)) System.IO.File.Delete(file); } catch (Exception) { }
+                try { if (System.IO.File.Exists(file + ".tmp")) System.IO.File.Delete(file + ".tmp"); } catch (Exception) { }
+                try { if (System.IO.Directory.Exists(dir)) System.IO.Directory.Delete(dir, true); } catch (Exception) { }
+            }
         }
 
         // 契约版本单调递增：外部模块按它握手，倒退会让 DLL 静默失效。

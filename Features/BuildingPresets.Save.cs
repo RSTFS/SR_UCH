@@ -181,18 +181,11 @@ namespace SR_UCH.Tweaks {
         }
 
         // 原子写文本文件：同目录写 .tmp，成功后替换目标；失败时保留原文件（绝不留下半截文件）。
+        // 统一走核心存储（契约 SRApi.Storage.WriteAtomicPath）：临时文件 + 替换 + UTF-8 无 BOM，
+        // 不再在功能层重复实现一遍（历史出过截断/BOM 事故）。
         private static void WriteFileAtomic(string path, string text) {
-            try {
-                if (string.IsNullOrEmpty(path)) return;
-                string tmp = path + ".tmp";
-                File.WriteAllText(tmp, text ?? "", new UTF8Encoding(false));
-                if (File.Exists(path)) {
-                    try { File.Replace(tmp, path, null); return; }
-                    catch (Exception __rp) { SRApi.Guard.Log("布局预设/原子替换", __rp); }
-                }
-                File.Copy(tmp, path, true);
-                try { File.Delete(tmp); } catch (Exception __dt) { SRApi.Guard.Log("布局预设/删除临时文件", __dt); }
-            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/原子写", __ex); }
+            if (string.IsNullOrEmpty(path)) return;
+            if (!SRApi.Storage.WriteAtomicPath(path, text)) SRApi.LogWarn("[布局预设] 原子写失败: " + path);
         }
 
         private static void SaveIndex() {

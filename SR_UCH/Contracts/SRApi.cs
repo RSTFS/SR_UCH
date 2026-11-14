@@ -66,6 +66,29 @@ namespace SR_UCH {
                     return System.IO.File.ReadAllText(path, System.Text.Encoding.UTF8);
                 } catch { return null; }
             }
+            // 绝对路径版本：功能已有自己的目录布局（如布局预设）时直接复用同一套原子写。
+            public static bool WriteAtomicPath(string fullPath, string text) {
+                try {
+                    if (string.IsNullOrEmpty(fullPath)) return false;
+                    string tmp = fullPath + ".tmp";
+                    System.IO.File.WriteAllText(tmp, text ?? "", new System.Text.UTF8Encoding(false));
+                    if (System.IO.File.Exists(fullPath)) {
+                        try { System.IO.File.Replace(tmp, fullPath, null); return true; }
+                        catch (Exception) { System.IO.File.Copy(tmp, fullPath, true); }
+                    } else {
+                        System.IO.File.Move(tmp, fullPath);
+                        return true;
+                    }
+                    System.IO.File.Delete(tmp);
+                    return true;
+                } catch (Exception) { return false; }
+            }
+            public static string ReadPath(string fullPath) {
+                try {
+                    if (string.IsNullOrEmpty(fullPath) || !System.IO.File.Exists(fullPath)) return null;
+                    return System.IO.File.ReadAllText(fullPath, System.Text.Encoding.UTF8);
+                } catch (Exception) { return null; }
+            }
             public static bool Exists(string feature, string file) {
                 try { string p = PathOf(feature, file); return !string.IsNullOrEmpty(p) && System.IO.File.Exists(p); }
                 catch { return false; }
