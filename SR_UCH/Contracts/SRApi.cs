@@ -490,6 +490,14 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static void LocDesc(string sec, string key, string zh, string en) { Action<string, string, string, string> f = _locDesc; if (f != null) f(sec, key, zh, en); }
         // 一次登记「显示名 + 悬浮说明」：功能层原来每条都要写两行 LocKey/LocDesc，
         // 漏一行就会在中文界面显示英文键名（牌池扩到 17 张时漏过 4 张）。descZh 为空时只登记显示名。
+        // 动态条目名：会随游戏语言/内容变化的名字（如游戏自己的规则名）。核心按语言版本节流重注册，
+        // 功能不用自己维护"变了才 LocKey"的缓存。
+        private static Action<ConfigEntryBase, string, string> _locDynamic;
+        public static void SetLocDynamicSink(Action<ConfigEntryBase, string, string> f) { _locDynamic = f; }
+        public static void LocDynamic(ConfigEntryBase entry, string zh, string en) {
+            Action<ConfigEntryBase, string, string> f = _locDynamic;
+            if (f != null) f(entry, zh, en);
+        }
         public static void LocPair(string sec, string key, string zh, string en, string descZh = null, string descEn = null) {
             LocKey(sec, key, zh, en);
             if (!string.IsNullOrEmpty(descZh) || !string.IsNullOrEmpty(descEn)) LocDesc(sec, key, descZh ?? zh, descEn ?? en);

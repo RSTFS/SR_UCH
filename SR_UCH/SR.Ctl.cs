@@ -146,7 +146,10 @@ public partial class SR {
         // 某 section 的可见条目（已应用功能注册的行可见性过滤）。
         public static List<ConfigEntryBase> SectionEntries(string section) { return SR.SectionEntries(section); }
         // 条目行与名称列宽
-        public static void DrawEntryRow(ConfigEntryBase entry, float colWidth) { SR.RenderEntryRow(entry, true, colWidth); }
+        public static void DrawEntryRow(ConfigEntryBase entry, float colWidth) {
+            if (colWidth <= 0f) colWidth = Sc(180f);   // 默认标签列宽（契约的默认宽度重载走这里）
+            SR.RenderEntryRow(entry, true, colWidth);
+        }
         public static float EntryNameWidth() { return SR.EntryNameWidth(); }
         public static float TextHeight(string text, float width) { return SR.TextHeight(text, width); }
         // 滑块（松左键提交；intStep = 整数步进）

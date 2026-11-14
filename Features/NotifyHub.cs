@@ -92,7 +92,7 @@ namespace SR_UCH.Tweaks {
         // 那样 LocKey / LocDesc 登记不会被消费，界面上也没有任何配置项名称。
         // 列宽与核心 Sc() 同坐标系；契约层未暴露 EntryNameWidth，故用固定 180 设计像素。
         private static void CfgRow(ConfigEntryBase e) {
-            SRApi.Ctl.DrawEntryRow(e, SRApi.Ctl.Sc(180f));
+            SRApi.Ctl.DrawEntryRow(e);
         }
 
         // 本页配置行的显示名与悬浮说明：缺 LocKey 时中文界面回退英文键名，

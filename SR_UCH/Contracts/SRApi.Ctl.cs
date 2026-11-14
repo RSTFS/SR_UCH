@@ -183,6 +183,8 @@ namespace SR_UCH {
             public static ConfigEntryBase FindEntry(string section, string key) { Func<string, string, ConfigEntryBase> f = _findEntry; return f != null ? f(section, key) : null; }
             public static List<ConfigEntryBase> SectionEntries(string section) { Func<string, List<ConfigEntryBase>> f = _sectionEntries; return f != null ? f(section) : null; }
             public static void DrawEntryRow(ConfigEntryBase entry, float colWidth) { Action<ConfigEntryBase, float> f = _drawEntryRow; if (f != null) f(entry, colWidth); }
+            // 默认宽度版本：功能页不用再各写一份 CfgRow(e){ DrawEntryRow(e, Sc(180)) }。
+            public static void DrawEntryRow(ConfigEntryBase entry) { DrawEntryRow(entry, 0f); }
             public static float TextHeight(string text, float width) { Func<string, float, float> f = _textHeight; return f != null ? f(text, width) : 0f; }
             public static float DrawSlider(Rect rect, float value, float min, float max, bool intStep) { Func<Rect, float, float, float, bool, float> f = _drawSlider; return f != null ? f(rect, value, min, max, intStep) : value; }
             public static float DrawSlider(Rect rect, float value, float min, float max) { return DrawSlider(rect, value, min, max, false); }

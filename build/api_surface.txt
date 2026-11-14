@@ -112,3 +112,4 @@ RegisterKey
 NotifyArgs
 NotifyExFn
 FeatureAllowed
+LocDynamic

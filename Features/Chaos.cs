@@ -122,7 +122,7 @@ namespace SR_UCH.Tweaks {
         // 那样 LocKey / LocDesc 登记不会被消费，界面上也没有任何配置项名称。
         // 列宽与核心 Sc() 同坐标系；契约层未暴露 EntryNameWidth，故用固定 180 设计像素。
         private static void CfgRow(ConfigEntryBase e) {
-            SRApi.Ctl.DrawEntryRow(e, SRApi.Ctl.Sc(180f));
+            SRApi.Ctl.DrawEntryRow(e);
         }
 
         // 本页配置行的显示名与悬浮说明：缺 LocKey 时中文界面回退英文键名，
@@ -811,10 +811,7 @@ namespace SR_UCH.Tweaks {
                 string gm = GameRuleName(c.Rule);
                 // 同一规则有多张牌（如低/高重力）时游戏名相同，追加本功能的档位名区分。
                 string label = string.IsNullOrEmpty(gm) ? ours : (gm == ours ? gm : gm + " · " + ours);
-                if (_poolLabelCache[i] != label) {
-                    _poolLabelCache[i] = label;
-                    SRApi.LocKey(Sec, c.En, label, label);   // 行名跟随游戏语言；悬浮说明仍是本功能的牌效
-                }
+                SRApi.LocDynamic(_pool[i], label, label);   // 行名跟随游戏语言（核心节流重注册）
                 CfgRow(_pool[i]);   // 标准复选框行（不是按钮）
             }
         }

@@ -77,6 +77,19 @@ public partial class SR {
         private static int _nameCacheLangVer = -1;   //缓存对应的语言版本
         private static int _nameCacheVer = -1;
 
+        // LocDynamic：条目显示名随游戏语言/内容变化时节流重注册（同一语言下同名不重复写）。
+        private static readonly Dictionary<ConfigEntryBase, string> _dynNames = new Dictionary<ConfigEntryBase, string>();
+        internal static void LocDynamic(ConfigEntryBase e, string zh, string en) {
+            try {
+                if (e == null) return;
+                string sig = (_langVer.ToString()) + "|" + (zh ?? "") + "|" + (en ?? "");
+                string old;
+                if (_dynNames.TryGetValue(e, out old) && old == sig) return;
+                _dynNames[e] = sig;
+                LocKey(e.Definition.Section, e.Definition.Key, zh, en);
+            } catch (Exception __ld) { Guard.Log("动态条目名", __ld); }
+        }
+
         private static bool NameCacheSync() {
             bool en = UseEn;
             if (_nameCacheLangVer != _langVer || _nameCacheVer != EntryVersion) {
