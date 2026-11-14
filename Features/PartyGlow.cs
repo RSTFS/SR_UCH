@@ -95,14 +95,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Breathe",
                 "呼吸脉动\n轻微呼吸脉动。用缩放时间驱动：梦境定格时它会跟着静止。",
                 "Breathe\nGentle pulse driven by scaled time; stops while Dream freezes the clock.");
-            SRApi.LocKey(Sec, "Invert", "反向着色", "Invert rarity");
-            SRApi.LocDesc(Sec, "Invert",
-                "反向着色\n反向着色：概率越高越亮（默认概率越低品质越高）。",
-                "Invert rarity\nReverse the mapping: higher probability becomes brighter. Default: rarer = brighter.");
-            SRApi.LocKey(Sec, "Legend", "显示图例与统计", "Show legend");
-            SRApi.LocDesc(Sec, "Legend",
-                "显示图例与统计\n在本页显示品质图例与当前派对盒里的件数统计。",
-                "Show legend\nShow the six-tier legend and counts for the current party box on this page.");
             if (!_uiReg) { _uiReg = true; SRApi.RowSliders.Add(UiSlider); }
         }
 
@@ -432,6 +424,7 @@ namespace SR_UCH.Tweaks {
             CfgRow(_strength);
             CfgRow(_size);
             CfgRow(_breathe);
+            if (_tierColors != null) for (int i = 0; i < _tierColors.Length; i++) CfgRow(_tierColors[i]);
 
         }
     }

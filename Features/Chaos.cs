@@ -158,14 +158,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "RerollKey",
                 "重抽快捷键\n房主按此键立刻重抽一张。",
                 "Reroll key\nHost: press to draw a new card immediately.");
-            SRApi.LocKey(Sec, "AllowProposals", "允许房客提案", "Allow guest proposals");
-            SRApi.LocDesc(Sec, "AllowProposals",
-                "允许房客提案\n房主：是否接收房客的提案（房客按提案键发来，房主在本页采纳或忽略）。",
-                "Allow guest proposals\nHost: accept card proposals sent by guests; adopt or ignore on this page.");
-            SRApi.LocKey(Sec, "ProposeKey", "提案快捷键", "Propose key");
-            SRApi.LocDesc(Sec, "ProposeKey",
-                "提案快捷键\n房客按此键向房主提案一张牌；离线本机即房主，请直接用重抽键。",
-                "Propose key\nGuest: press to propose a card to the host. Offline, use the reroll key instead.");
             SRApi.LocKey(Sec, "Low gravity", "低重力", "Low gravity");
             SRApi.LocDesc(Sec, "Low gravity",
                 "低重力\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
@@ -234,6 +226,9 @@ namespace SR_UCH.Tweaks {
             for (int i = 0; i < Cards.Length; i++) {
                 var c = Cards[i];
                 _pool[i] = _mp.Config.Bind(Sec, c.En, true, "是否进入随机池：" + c.Zh);
+                // 本地化跟着牌表走：以后加牌不用再记得补 LocKey（此前扩到 14 张只登记了 10 张）。
+                SRApi.LocKey(Sec, c.En, c.Zh, c.En);
+                SRApi.LocDesc(Sec, c.En, c.Zh + "\n勾选后才可能被抽到。", c.En + "\ncheck to include it in the draw pool.");
             }
 
             _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) RestoreAll(); };

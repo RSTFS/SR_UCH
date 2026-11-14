@@ -109,14 +109,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Toast Seconds",
                 "停留秒数\n每条通知停留秒数（2-15），可读性页可以再加秒。",
                 "Toast seconds\nSeconds each toast stays. Range 2-15; readability can extend it.");
-            SRApi.LocKey(Sec, "History Limit", "历史上限", "History limit");
-            SRApi.LocDesc(Sec, "History Limit",
-                "历史上限\n历史保留条数上限（100-2000），超出丢最旧。",
-                "History limit\nMax history entries kept; oldest dropped. Range 100-2000.");
-            SRApi.LocKey(Sec, "Write To Recorder", "写入关卡记录", "Write to recorder");
-            SRApi.LocDesc(Sec, "Write To Recorder",
-                "写入关卡记录\n把中/高优先级通知写进关卡记录器的时间线（软依赖）。",
-                "Write to recorder\nWrite medium/high priority toasts into the level recorder timeline (soft dependency).");
             SRApi.LocKey(Sec, "Card Width", "卡片宽度", "Card width");
             SRApi.LocDesc(Sec, "Card Width",
                 "卡片宽度\n浮层卡片像素宽度（120-340），默认 170。",
@@ -133,18 +125,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Corner",
                 "浮层停靠角\n浮层停靠位置：0 右下 / 1 右上 / 2 左下 / 3 左上。",
                 "Overlay corner\n0 bottom-right / 1 top-right / 2 bottom-left / 3 top-left.");
-            SRApi.LocKey(Sec, "Open Key", "打开历史快捷键", "Open history key");
-            SRApi.LocDesc(Sec, "Open Key",
-                "打开历史快捷键\n打开设置面板回看历史的快捷键。",
-                "Open history key\nOpen the settings panel on the history page.");
-            SRApi.LocKey(Sec, "Copy Key", "复制结果快捷键", "Copy key");
-            SRApi.LocDesc(Sec, "Copy Key",
-                "复制结果快捷键\n一键复制当前筛选结果的快捷键。",
-                "Copy key\nCopy the current filtered result.");
-            SRApi.LocKey(Sec, "Clear Key", "清空历史快捷键", "Clear history key");
-            SRApi.LocDesc(Sec, "Clear Key",
-                "清空历史快捷键\n清空历史的快捷键。",
-                "Clear history key\nClear the notification history.");
             if (!_uiReg) { _uiReg = true; SRApi.RowSliders.Add(UiSlider); }
         }
 
@@ -156,7 +136,6 @@ namespace SR_UCH.Tweaks {
                 switch (e.Definition.Key) {
                     case "Max Visible": min = 1.0f; max = 6.0f; return true;
                     case "Toast Seconds": min = 1.0f; max = 5.0f; return true;
-                    case "History Limit": min = 100.0f; max = 2000.0f; return true;
                     case "Corner": min = 0.0f; max = 3.0f; return true;
                     case "Card Opacity": min = 20.0f; max = 100.0f; return true;
                     case "Card Scale": min = 80.0f; max = 160.0f; return true;
