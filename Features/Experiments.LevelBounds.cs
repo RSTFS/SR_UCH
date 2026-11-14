@@ -217,13 +217,13 @@ namespace SR_UCH.Tweaks {
                     try { RemoveUI3.Tick(scanning); } catch (Exception __ui) { SRApi.Guard.Log("解除UI3/并入", __ui); }
                 }
                 // 解绑本身是幂等写值：扫描阶段每帧一次，之后 4Hz 维持（开销只有几次字段赋值）。
-                if (scanning || _tick % 15 == 0) {
+                if (scanning || _tick % 30 == 0) {
                     ApplyCursorPiece(true);
                     OpenSolidWalls(WallsOn);
                     ApplyHardBounds();
                     SuppressFixCamera(CameraOn);
                 }
-                if (!scanning && (_tick % 30 == 0)) {
+                if (!scanning && (_tick % 60 == 0)) {
                     ApplyAllPiecesIgnore();
                     BuildStatus();
                 }

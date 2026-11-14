@@ -59,6 +59,19 @@ namespace SR_UCH.Tweaks {
 
         private static Character LocalCharacter() {
             try {
+                // 优先走游戏自己的静态列表（零查找成本）；FrameObjects<Character> 会做一次全场景
+                // FindObjectsOfType（约 2ms），落在本钩子上就是"重生-轮询"平均 2.7ms 的来源。
+                List<Character> all = Character.AllCharacters;
+                if (all != null) {
+                    for (int i = 0; i < all.Count; i++) {
+                        Character c = all[i];
+                        if (c == null) continue;
+                        if (c.hasAuthority) return c;
+                        Player lp = c.LocalPlayer;
+                        if (lp != null && lp.PlayerCharacter == c) return c;
+                    }
+                    return null;
+                }
                 foreach (Character c in SRApi.FrameObjects<Character>()) {
                     if (c == null) continue;
                     if (c.hasAuthority) return c;

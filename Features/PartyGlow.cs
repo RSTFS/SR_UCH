@@ -57,6 +57,8 @@ namespace SR_UCH.Tweaks {
         private static float _nextScan;
         private static int _wMin = int.MaxValue, _wMax = 0;   // 本盒出现过的权重范围（相对分档用）
         private static int[] _wCache = new int[0];            // 本轮扫描每件道具的权重（两遍扫描共用）
+        // 权重按实例缓存：GetItemFilterWeight 每次扫描都重算全盒是主要开销；实例本局不变，缓存后只算新道具。
+        private static readonly System.Collections.Generic.Dictionary<int, int> _wById = new System.Collections.Generic.Dictionary<int, int>();
         // 我们创建过的光晕 Transform 弱登记：只用于清理，不参与分级/查询。
         // 光晕本身仍是道具的子对象，道具消失时随之销毁；这里只为「帧对象缓存为空时关功能」兜底（审计 O-7）。
         private static readonly List<Transform> _made = new List<Transform>();
@@ -163,7 +165,13 @@ namespace SR_UCH.Tweaks {
                     try {
                         Placeable __pl = pb0.placeablePrefab;
                         if (__pl != null) {
-                            int __w = BlockGroup.GetItemFilterWeight(__pl, 1);
+                            int __id = pb0.GetInstanceID();
+                            int __w;
+                            if (!_wById.TryGetValue(__id, out __w)) {
+                                __w = BlockGroup.GetItemFilterWeight(__pl, 1);
+                                if (_wById.Count > Mathf.Max(64, all.Length * 4)) _wById.Clear();
+                                _wById[__id] = __w;
+                            }
                             _wCache[i] = __w;
                             if (__w > 0) { if (__w < _wMin) _wMin = __w; if (__w > _wMax) _wMax = __w; }
                         }

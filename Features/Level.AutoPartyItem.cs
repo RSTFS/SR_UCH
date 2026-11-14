@@ -56,14 +56,13 @@ public class AutoPartyItem : ITweak {
     private static void Tick() {
         try {
             TickHoverPick();   // 挑选流程每帧推进（它自己有节流），不能被下面的 0.15s 轮询挡住
+            // 先做便宜的总开关判断：关闭时不要每帧 FindObjectsOfType（原来在开关判断之前，功能关着也白扫）。
+            if (_enabled == null || !_enabled.Value) { _armedAt = -1f; return; }
+            if (!SRApi.GateMaster) return;
             // 开箱序号：光标从"未挑选"变成"正在挑选"就是新的一次开箱。
-            // 不能用派对盒实例 ID 记账（大厅里是同一个实例反复复用）。
             PartyPickCursor seen = LocalCursor();
             if (seen != null && !_cursorWasPicking) { _openSeq++; _armedAt = -1f; _hpAttempts = 0; }
             _cursorWasPicking = seen != null;
-
-            if (_enabled == null || !_enabled.Value) { _armedAt = -1f; return; }
-            if (!SRApi.GateMaster) return;
             if (Time.unscaledTime < _nextAt) return;
             // 派对盒正在刷新/关闭：本帧不动作，避免对着已被销毁的旧盒子取道具（冲突修复）
             if (Time.unscaledTime < LevelPartyBox.BoxBusyUntil) { _armedAt = -1f; return; }
@@ -95,7 +94,7 @@ public class AutoPartyItem : ITweak {
     // 本地玩家自己的派对盒光标：有权威、已启用、正处于挑选状态。
     private static PartyPickCursor LocalCursor() {
         try {
-            PartyPickCursor[] cursors = UnityEngine.Object.FindObjectsOfType<PartyPickCursor>();
+            PartyPickCursor[] cursors = SRApi.FrameObjects<PartyPickCursor>();   // 按帧缓存，避免每帧全场景 FindObjectsOfType
             if (cursors == null) return null;
             for (int i = 0; i < cursors.Length; i++) {
                 PartyPickCursor c = cursors[i];
