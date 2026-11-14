@@ -270,7 +270,8 @@ namespace SR_UCH.Tweaks {
             }
             float scaleX = Mathf.Max(0.01f, holder.lossyScale.x);
             // 光晕比包围盒大一圈（×2.6）：光要"散"出去，而不是贴着道具画一圈边。
-            float tierSpread = 2.2f + 0.18f * Mathf.Clamp(tier, 0, 5);
+            // 贴附：光斑只比道具大一圈（1.6–2.2 倍），能量集中在道具本体上，而不是糊成一片背景光。
+            float tierSpread = 1.6f + 0.12f * Mathf.Clamp(tier, 0, 5);
             float localSize = worldSize * tierSpread * (_size.Value / 100f) / scaleX;
             g.localPosition = holder.InverseTransformPoint(worldCenter);
             g.localScale = new Vector3(localSize, localSize, 1f);
