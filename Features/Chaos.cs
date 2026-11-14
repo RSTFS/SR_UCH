@@ -220,6 +220,18 @@ namespace SR_UCH.Tweaks {
                               c.Zh + "\n勾选后才可能被抽到。", c.En + "\ncheck to include it in the draw pool.");
             }
 
+            // 混乱牌组「不存盘」（用户要求第一种）：启动时把本功能所有配置强制回到默认值，
+            // 上一局写在 cfg 里的值一律不继承——效果上等于每次启动都是全新会话。
+            // （cfg 文件仍可能被设置页写回，但下次启动会被这里覆盖，用户永远看不到"上次的设置还在"。）
+            try {
+                _enabled.Value = false;
+                _everyRounds.Value = 1;
+                _maxActive.Value = 1;
+                _announce.Value = true;
+                _drawKey.Value = KeyCode.None;
+                for (int __i = 0; __i < _pool.Length; __i++) if (_pool[__i] != null) _pool[__i].Value = true;
+            } catch (Exception __rs) { SRApi.Guard.Log("混乱牌组/会话重置", __rs); }
+
             _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) RestoreAll(); };
 
             SRApi.RegisterKey("混乱牌组-重抽", _drawKey, "press");

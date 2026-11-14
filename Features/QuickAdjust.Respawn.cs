@@ -28,11 +28,12 @@ namespace SR_UCH.Tweaks {
                             _delay.Value = SyncedVanillaDelay > 0f ? Mathf.Round(SyncedVanillaDelay * 10f) / 10f : 0f;
                         GUILayout.Label(vanilla, SRApi.Ctl.LabelWrap);
                     } else {
-                        QuickAdjust.PageSlider(SRApi.T("重生延迟", "Respawn delay"),
-                            SRApi.T("死亡后等多少秒再自动重生\n0 = 立即重生\n点下面按钮可恢复游戏默认", "seconds to wait after death before respawning\n0 = respawn instantly\nuse the button below to restore the game default"),
-                            _delay, 0f, 3f, "0.0");
-                        if (SRApi.Ctl.Button(SRApi.T("恢复游戏默认", "Restore game default"), SRApi.T("恢复为跟随游戏原版的重生延迟", "Go back to the game's own respawn delay"), SRApi.Ctl.Sc(160), SRApi.Ctl.Sc(24)))
-                            _delay.Value = -1f;
+                        // 用核心统一滑条：**点击标签即恢复默认**（默认值 = -1 = 跟随游戏原版），
+                        // 与本仓库所有滑条行的设计一致，不再额外放「恢复默认」按钮。
+                        SRApi.Ctl.RowSlider(SRApi.T("重生延迟", "Respawn delay"),
+                            SRApi.T("死亡后等多少秒再自动重生\n0 = 立即重生\n点击本行标签恢复游戏默认",
+                                    "seconds to wait after death before respawning\n0 = respawn instantly\nclick this label to restore the game default"),
+                            _delay, 0f, 3f, "0.0", QuickAdjust.PageLabelWidth() / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)));
                     }
                 }
                 if (_invincible != null) QuickAdjust.PageSlider(SRApi.T("出生无敌", "Spawn invincibility"),

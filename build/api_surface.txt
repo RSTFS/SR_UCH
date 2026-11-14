@@ -107,3 +107,4 @@ WheelArea
 WheelFrame
 WheelLayer
 SelfToggleButton
+RowCombo

@@ -55,11 +55,9 @@ namespace SR_UCH.Tweaks {
             public bool VisSet;       // VisY 是否已初始化
         }
 
-        private static ConfigEntry<bool> _enabled, _quiet;
-        private static ConfigEntry<int> _maxVisible, _corner, _cardW, _cardAlpha, _cardScale, _animMs;
+        private static ConfigEntry<bool> _enabled;
+        private static ConfigEntry<int> _maxVisible, _corner, _cardW, _cardAlpha, _cardScale, _fontSize;
         private static ConfigEntry<float> _toastSeconds;
-        private static ConfigEntry<bool> _animOn;
-        private static bool _cornerOpen;   // 停靠角下拉的展开态（每帧从核心 EditOpen 语义走）
         private static bool _toastFixing;  // 停留秒数归整到 0.5 步进时的递归保护
 
         private static readonly List<Notice> _history = new List<Notice>();
@@ -73,8 +71,9 @@ namespace SR_UCH.Tweaks {
         // 由 DrawToast 每次绘制时写入，Tick 读取（OnGUI 每帧多趟，取最后一趟的结果即可）。
         private static bool _hoverAny;
 
-        private static float AnimIn() { return Mathf.Max(0.001f, _animMs.Value / 1000f); }
-        private static float AnimOut() { return Mathf.Max(0.001f, _animMs.Value / 1000f * 0.9f); }
+        // 动画固定内置（用户要求删除「启用动画 / 动画时长」两项配置）。
+        private static float AnimIn() { return 0.22f; }
+        private static float AnimOut() { return 0.20f; }
 
         private static Texture2D _white;
         private static GUIStyle _label, _btn;
@@ -102,10 +101,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Enabled",
                 "启用通知中心\n统一接管所有屏幕提示：分级、合并、静默。",
                 "Enable notification hub\nTake over all screen toasts: priority, merging, quiet mode and history.");
-            SRApi.LocKey(Sec, "Quiet In Match", "对局中静默", "Quiet in match");
-            SRApi.LocDesc(Sec, "Quiet In Match",
-                "对局中静默\n对局中静默低/中优先级提示（唯一会主动不显示的情况）；高优先级照常弹。",
-                "Quiet in match\nSuppress low/medium priority toasts during a match (the only case we deliberately hide); high priority still pops.");
             SRApi.LocKey(Sec, "Max Visible", "同时显示条数", "Max visible");
             SRApi.LocDesc(Sec, "Max Visible",
                 "同时显示条数\n浮层最多同时显示几条（1-6）。",
@@ -114,14 +109,14 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Toast Seconds",
                 "停留秒数\n每条通知停留多长时间。\n按 0.5 秒为一档。",
                 "Toast seconds\nHow long each toast stays.\n0.5 s per step.");
+            SRApi.LocKey(Sec, "Font Size", "文字大小", "Font size");
+            SRApi.LocDesc(Sec, "Font Size",
+                "文字大小\n正文文字的大小。\n越大越容易看清，但同样内容占的空间更多。",
+                "Font size\nSize of the toast text.\nLarger is easier to read but takes more room.");
             SRApi.LocKey(Sec, "Card Width", "卡片宽度", "Card width");
             SRApi.LocDesc(Sec, "Card Width",
-                "卡片宽度\n浮层卡片的像素宽度。",
-                "Card width\nOverlay card width in pixels.");
-            SRApi.LocKey(Sec, "Animate", "启用动画", "Animate");
-            SRApi.LocDesc(Sec, "Animate", "启用动画\n浮层的出现/消失动画总开关。", "Animate\nEnable overlay show/hide animations.");
-            SRApi.LocKey(Sec, "Anim Ms", "动画时长(毫秒)", "Animation ms");
-            SRApi.LocDesc(Sec, "Anim Ms", "动画时长\n出现与消失的动画时长。", "Animation ms\nShow and hide animation duration.");
+                "卡片宽度\n浮层卡片的像素宽度。\n越宽可容纳的正文越多。",
+                "Card width\nOverlay card width in pixels.\nWider cards fit more text.");
             SRApi.LocKey(Sec, "Card Scale", "浮层缩放", "Overlay scale");
             SRApi.LocDesc(Sec, "Card Scale",
                 "浮层缩放\n整个浮层按百分比缩放。\n百分比越大卡片越大。",
@@ -148,8 +143,8 @@ namespace SR_UCH.Tweaks {
                     case "Corner": min = 0.0f; max = 3.0f; return true;
                     case "Card Opacity": min = 20.0f; max = 100.0f; return true;
                     case "Card Scale": min = 100.0f; max = 300.0f; return true;
-                    case "Anim Ms": min = 80.0f; max = 400.0f; return true;
-                    case "Card Width": min = 100.0f; max = 300.0f; return true;
+                    case "Card Width": min = 100.0f; max = 500.0f; return true;
+                    case "Font Size": min = 10.0f; max = 32.0f; return true;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("数值滑块范围", __ex); }
             return false;
@@ -160,16 +155,18 @@ namespace SR_UCH.Tweaks {
             // 旧配置项已删除：打开通知中心 = 用通知中心；关闭 = 交回游戏原生提示。
             try { SRApi.Migration.Remove(Sec, "Use Native Toast"); } catch (Exception __mr) { SRApi.Guard.Log("通知中心/清理旧键1", __mr); }
             try { SRApi.Migration.Remove(Sec, "Show On Screen"); } catch (Exception __mr2) { SRApi.Guard.Log("通知中心/清理旧键2", __mr2); }
-            _quiet = plugin.Config.Bind(Sec, "Quiet In Match", false, "对局中静默低/中优先级提示（这是唯一会主动不显示的情况）；高优先级照常弹。");
             _maxVisible = plugin.Config.Bind(Sec, "Max Visible", 3,
                 new ConfigDescription("浮层最多同时显示几条（1-6）。", new AcceptableValueRange<int>(1, 6)));
             _toastSeconds = plugin.Config.Bind(Sec, "Toast Seconds", 1.5f,
                 new ConfigDescription("每条通知停留秒数（0.5-5，步进 0.5）。", new AcceptableValueRange<float>(0.5f, 5f)));
-            _cardW = plugin.Config.Bind(Sec, "Card Width", 240,
-                new ConfigDescription("浮层卡片像素宽度（100-300）。", new AcceptableValueRange<int>(100, 300)));
-            _animOn = plugin.Config.Bind(Sec, "Animate", true, "浮层的出现/消失动画总开关。");
-            _animMs = plugin.Config.Bind(Sec, "Anim Ms", 220,
-                new ConfigDescription("出现与消失的动画时长（80-400 毫秒）。", new AcceptableValueRange<int>(80, 400)));
+            _cardW = plugin.Config.Bind(Sec, "Card Width", 300,
+                new ConfigDescription("浮层卡片像素宽度（100-500）。", new AcceptableValueRange<int>(100, 500)));
+            _fontSize = plugin.Config.Bind(Sec, "Font Size", 17,
+                new ConfigDescription("正文文字大小（10-32）。", new AcceptableValueRange<int>(10, 32)));
+            // 旧配置项已删除，启动时从 cfg 清理。
+            try { SRApi.Migration.Remove(Sec, "Quiet In Match"); } catch (Exception __mq) { SRApi.Guard.Log("通知中心/清理静默键", __mq); }
+            try { SRApi.Migration.Remove(Sec, "Animate"); } catch (Exception __ma) { SRApi.Guard.Log("通知中心/清理动画键", __ma); }
+            try { SRApi.Migration.Remove(Sec, "Anim Ms"); } catch (Exception __mm) { SRApi.Guard.Log("通知中心/清理动画时长键", __mm); }
             _cardScale = plugin.Config.Bind(Sec, "Card Scale", 200,
                 new ConfigDescription("整个浮层的缩放百分比（100-300）。", new AcceptableValueRange<int>(100, 300)));
             _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 64,
@@ -314,12 +311,8 @@ namespace SR_UCH.Tweaks {
                 _history.Add(n);
                 while (_history.Count > 64) _history.RemoveAt(0);
 
-                // 对局中静默是唯一"故意不显示"的分支，其余一律排队上屏。
-                bool quiet = _quiet != null && _quiet.Value && level < 2 && InMatch();
-                if (!quiet) {
-                    _visible.Add(n);
-                    SortTrim();
-                }
+                _visible.Add(n);
+                SortTrim();
                 return true;
             } catch (Exception ex) {
                 SRApi.Guard.Log("通知中心/收口", ex);
@@ -392,7 +385,7 @@ namespace SR_UCH.Tweaks {
             EnsureStyles();
             float s = Mathf.Clamp(_cardScale.Value / 160f, 0.6f, 1.8f);
             // 参考 imgui-notify 的观感：更大的字号/内边距，卡片最宽不超过屏幕 1/3。
-            _label.fontSize = Mathf.RoundToInt(22f * s);
+            _label.fontSize = Mathf.RoundToInt((_fontSize != null ? _fontSize.Value : 17) * s);
             _label.normal.textColor = new Color(0.94f, 0.96f, 0.99f, 1f);
 
             float w = Mathf.Clamp(_cardW.Value * s, 120f, Mathf.Min(Screen.width / 3f, 700f));
@@ -408,7 +401,7 @@ namespace SR_UCH.Tweaks {
                 _animDt = Mathf.Clamp(Time.unscaledDeltaTime, 0f, 0.05f);
             }
             // 纵向位置过渡：指数逼近、帧率无关；关掉动画时直接把位置对齐目标。
-            float k = (_animOn.Value && _animDt > 0.001f) ? (1f - Mathf.Exp(-14f * _animDt)) : 1f;
+            float k = (_animDt > 0.001f) ? (1f - Mathf.Exp(-14f * _animDt)) : 1f;
 
             // 一次最多画 Max Visible 条；超出的排队（退场中的必须继续画完，不能瞬间消失）。
             int cap = Mathf.Clamp(_maxVisible.Value, 1, 6);
@@ -460,7 +453,7 @@ namespace SR_UCH.Tweaks {
                         if (nt.ShownAt <= 0f) nt.ShownAt = now;
                     }
                     float aa = 1f;
-                    if (_animOn.Value) {
+                    {
                         float age = Mathf.Max(0f, now - nt.EnterAt);
                         float t = Mathf.Clamp01(age / dIn);
                         float ease = 1f - (1f - t) * (1f - t) * (1f - t);
@@ -518,7 +511,7 @@ namespace SR_UCH.Tweaks {
                     // 只显示正文（用户要求去掉「xN」计数）。
                     // 文本区底部 +2px 缓冲：游戏字体最后一笔常被 CalcSize 少算，
                     // 不加缓冲时"y/g/p"这类下伸笔画的最后一行会被裁掉（用户实测 1px 仍偏紧）。
-                    GUI.Label(new Rect(ax + pad, y + pad * 0.6f, w - pad * 2f - 6f * s, h - pad * 1.6f + 2f), nt.Text, _label);
+                    GUI.Label(new Rect(ax + pad, y + pad * 0.6f, w - pad * 2f - 6f * s, h - pad * 1.6f), nt.Text, _label);
                     // 底部剩余时间条：从满格开始缩短（排队期间还没上屏，不画消耗）。
                     float life = Mathf.Clamp01(1f - Mathf.Max(0f, now - nt.ShownAt) / Mathf.Max(0.4f, nt.Stay));
                     Fill(new Rect(ax + barW, y + h - 3f * s, (w - barW) * life, 3f * s),
@@ -536,28 +529,24 @@ namespace SR_UCH.Tweaks {
 
         private void RenderOptionsPage() {
             CfgRow(_enabled);
-            CfgRow(_quiet);
             CfgRow(_maxVisible);
             CfgRow(_toastSeconds);
+            CfgRow(_fontSize);
             CfgRow(_cardW);
             CfgRow(_cardAlpha);
             CfgRow(_cardScale);
-            CfgRow(_animOn);
-            CfgRow(_animMs);
-            // 停靠角改用下拉：0 右下 / 1 右上 / 2 左下 / 3 左上。
+            // 停靠位置：标签「位置」+ 右侧下拉（四种位置），默认右下。
             {
-                int[] vals = new int[] { 0, 1, 2, 3 };
+                string[] vals = new string[] { "0", "1", "2", "3" };
                 string[] labels = new string[] {
-                    SRApi.T("停靠位置：右下", "Position: bottom-right"),
-                    SRApi.T("停靠位置：右上", "Position: top-right"),
-                    SRApi.T("停靠位置：左下", "Position: bottom-left"),
-                    SRApi.T("停靠位置：左上", "Position: top-left")
+                    SRApi.T("右下", "bottom-right"),
+                    SRApi.T("右上", "top-right"),
+                    SRApi.T("左下", "bottom-left"),
+                    SRApi.T("左上", "top-left")
                 };
-                int cur = Mathf.Clamp(_corner.Value, 0, 3);
-                bool open = _cornerOpen;
-                int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, SRApi.Ctl.Sc(180f));
-                _cornerOpen = open;
-                if (sel >= 0 && sel < vals.Length) _corner.Value = vals[sel];
+                SRApi.Ctl.RowCombo(SRApi.T("位置", "Position"),
+                    SRApi.T("通知浮层停在屏幕的哪个角。", "Which screen corner the toasts dock to."),
+                    _corner, vals, labels, SRApi.Ctl.Sc(160f));
             }
 
         }
