@@ -8,7 +8,7 @@ function Ok2([string]$m)  { Write-Host ('  [ OK ] ' + $m) }
 function Bad2([string]$m) { Write-Host ('  [FAIL] ' + $m); $script:ok = $false }
 
 $files = @()
-foreach ($d in @('Features','SR_UCH')) {
+foreach ($d in @('Features','SR_UCH','SR_UCH\Contracts')) {
     $p = Join-Path $Root $d
     if (Test-Path -LiteralPath $p) { $files += @(Get-ChildItem -LiteralPath $p -Filter *.cs -File) }
 }

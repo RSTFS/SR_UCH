@@ -667,7 +667,7 @@ namespace SR_UCH.Tweaks {
             try {
                 // 先查对方：自己准备动手时，关卡重载正在跑就必须拦下（对方忙时自己也要等）。
                 try {
-                    Func<bool> other = Slots.Require<Func<bool>>("level.reloadBusy");
+                    Func<bool> other = Slots.Require<Func<bool>>(SRApi.SlotKeys.LevelReloadBusy);
                     if (other != null && other()) {
                         // 对方锁有自己的自愈；如果它一直不放，至少让日志说明"卡在谁身上"（audit A-9）。
                         _otherBusySince = _otherBusySince < 0f ? Time.unscaledTime : _otherBusySince;

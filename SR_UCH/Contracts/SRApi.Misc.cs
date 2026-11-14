@@ -17,6 +17,8 @@ namespace SR_UCH {
             public const string NotifyHook = "sr.notify.hook";           // Func<string,string,bool> 通知治理钩子
             public const string NotifyHub2 = "sr.notify.hub2";           // NotifyExFn 带元数据/动作的通知钩子
             public const string SelfTestToken = "sr.selftest.token";     // 自检往返用的临时对象
+            public const string LevelReloadBusy = "level.reloadBusy";    // 关卡重载锁（Level 提供，预设等待消费）
+            public const string PresetsReloadBusy = "presets.reloadBusy";// 预设注入后等待游戏消费
         }
         public sealed class FooterButton {
             public string Id, LabelZh, LabelEn; public Action OnClick;
