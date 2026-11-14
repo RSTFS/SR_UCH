@@ -218,7 +218,6 @@ namespace SR_UCH.Tweaks {
         // 关机/卸载入口（经 SRApi.OnShutdown 注册）：注销槽位、销毁自建对象与贴图。
         // 槽位必须传自己的委托，否则契约层 expected==null 时会无条件删除。
         public void Shutdown() {
-            object impl;
             foreach (System.Collections.Generic.KeyValuePair<string, object> kv in _provided) {
                 try { if (kv.Value != null) Slots.Retract(kv.Key, kv.Value); }
                 catch (Exception __rt) { SRApi.Guard.Log("通知中心/注销槽位", __rt); }

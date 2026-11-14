@@ -152,7 +152,7 @@ function Invoke-Build([string]$rsp, [string]$name) {
     }
     Write-Host "==> 编译 $name ..."
     # 死代码守卫：未使用的私有字段 / 只写不读 / 从未赋值（CS0169 / CS0414 / CS0649）直接算编译失败
-    $deadCodeWarn = '/warnaserror:CS0169,CS0414,CS0649'
+    $deadCodeWarn = '/warnaserror:CS0168,CS0169,CS0414,CS0649'   # CS0168 未使用变量也纳入死代码门禁
     if ($csc.EndsWith('.dll')) { & dotnet $csc "@$rsp" $deadCodeWarn } else { & $csc "@$rsp" $deadCodeWarn }
     if ($LASTEXITCODE -ne 0) { Write-Host "$name 编译失败"; exit 1 }
     Write-Host "    $name OK"
