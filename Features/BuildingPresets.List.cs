@@ -153,11 +153,11 @@ namespace SR_UCH.Tweaks {
             float tableH = Mathf.Max(minH, __bottom - probe.y);
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true),
                 GUILayout.Height(tableH));
-            // 关键：box 可能被布局算到可见区外（窗口缩放/页面头高度变化时），直接拿 box.height 当行区会把
-            // rowsH 虚高 → maxY 被压小 → "能滚但滚不到最后几行"。用核心唯一几何把行区收敛成屏幕真实可见高度。
+            // 关键：box 可能被布局算到可见区外（窗口缩放/页头变高/底栏变化时），直接拿 box.height 当行区会把
+            // rowsH 虚高 → maxY 被压小 → "能滚但滚不到最后几行"。用核心唯一几何把行区收敛成屏幕真实可见高度，
+            // 并把 box 底边夹到"页面内容底界"（= 底栏上沿），窗口/底栏变化时表格每帧都跟着变。
+            if (box.yMax > __bottom) box.height = Mathf.Max(headerH + rowH * 2f, __bottom - box.y);
             float rowsH = SRApi.Ctl.ScrollRowsH(box, headerH, __bottom, rowH);
-            float rowsBottom = box.y + headerH + rowsH;
-            if (box.yMax > rowsBottom) box.height = Mathf.Max(headerH + rowsH, box.height) - headerH;
             _listMaxY = SRApi.Ctl.TableMaxScrollY(visible.Count, rowH, rowsH);
             _maxScrollY = _listMaxY;
             _rowsHCache = rowsH;
