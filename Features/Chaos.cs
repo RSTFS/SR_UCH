@@ -756,7 +756,9 @@ namespace SR_UCH.Tweaks {
                                    SRApi.T("仅房主 / 离线有效", "Host or offline only"), DrawAndBroadcast);
         }
 
-        // 牌池单独一页：勾选行 + 批量操作（全选 / 全不选 / 只留减益 / 随机一半）。
+        // 牌池单独一页：搜索 + 按「数值规则 / 布尔规则」分组勾选 + 批量操作（全选 / 全不选 / 只留减益）。
+        private static string _poolQuery;   // 牌池页搜索词（空 = 全部）
+
         private void RenderPoolPage() {
             Line("勾上的牌才可能被抽到；至少留一张。", "Checked cards can be drawn; keep at least one enabled.");
             if (SRApi.Ctl.Button(SRApi.T("全选", "All"), SRApi.T("勾选全部牌", "Enable every card")))
@@ -768,7 +770,43 @@ namespace SR_UCH.Tweaks {
             if (SRApi.Ctl.Button(SRApi.T("只留减益", "Debuffs"), SRApi.T("只保留让人变弱的牌（低重力/慢速/禁墙跳等）", "Keep only weakening cards")))
                 KeepWeakening();
             GUILayout.Space(SRApi.Ctl.Sc(6f));
-            for (int i = 0; i < Cards.Length; i++) CfgRow(_pool[i]);
+
+            // 搜索框单独一行（不新增布局组）：牌名 / 英文名 / 效果说明都能命中。
+            string q = SRApi.ClearableTextField(_poolQuery ?? "", 24, SRApi.Ctl.SearchBox,
+                GUILayout.Width(SRApi.Ctl.Sc(200f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
+            if (q != null && q != _poolQuery) _poolQuery = q;
+            if (!string.IsNullOrEmpty(_poolQuery)) {
+                int hit = 0;
+                for (int i = 0; i < Cards.Length; i++) if (PoolMatch(i)) hit++;
+                Line("匹配 " + hit + " / " + Cards.Length + " 张（清空搜索框显示全部）。",
+                     hit + " / " + Cards.Length + " cards match (clear the search box to show all).");
+            }
+
+            RenderPoolGroup(true);    // 数值规则
+            RenderPoolGroup(false);   // 布尔规则
+        }
+
+        // 分组渲染：搜索时只显示命中的牌；整组都没命中就整组隐藏（不留空标题）。
+        private void RenderPoolGroup(bool numeric) {
+            bool any = false;
+            for (int i = 0; i < Cards.Length; i++) {
+                if (Cards[i].IsBool == numeric && PoolMatch(i)) { any = true; break; }
+            }
+            if (!any) return;
+            SRApi.Ctl.SectionTitle("- " + SRApi.T(numeric ? "数值规则" : "布尔规则", numeric ? "Numeric rules" : "Boolean rules") + " -");
+            for (int i = 0; i < Cards.Length; i++) {
+                if (Cards[i].IsBool == numeric && PoolMatch(i)) CfgRow(_pool[i]);
+            }
+        }
+
+        private static bool PoolMatch(int i) {
+            if (string.IsNullOrEmpty(_poolQuery)) return true;
+            CardDef c = Cards[i];
+            return ContainsText(c.Zh) || ContainsText(c.En) || ContainsText(c.TipZh) || ContainsText(c.TipEn);
+        }
+
+        private static bool ContainsText(string s) {
+            return !string.IsNullOrEmpty(s) && s.IndexOf(_poolQuery, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private void SetAllPools(bool on) {

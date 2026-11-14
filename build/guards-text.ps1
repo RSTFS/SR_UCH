@@ -1,5 +1,7 @@
-﻿# 文本类机械守卫（不需要游戏 DLL / 不需要 csc）：可在本地与 GitHub Actions 直接运行
+﻿param([switch]$NoExit)   # -NoExit：被 dot-source 时只跑检查、不 exit（供 _tools/build_sr_uch.ps1 -Check 复用）
+# 文本类机械守卫（不需要游戏 DLL / 不需要 csc）：可在本地与 GitHub Actions 直接运行
 # 用法：pwsh build\guards-text.ps1      退出码 0 = 全绿，1 = 有失败
+# 被 _tools\build_sr_uch.ps1 -Check dot-source 时用 -NoExit：只跑检查，不 exit。
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
@@ -475,6 +477,6 @@ Check-SilentCatch
 Check-TipComposer
 Check-FileSize
 Check-UiConventions
-if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); exit 1 }
+if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); if (-not $NoExit) { exit 1 }; return }
 Write-Host '== 文本类守卫全部通过 ✅ =='
-exit 0
+if (-not $NoExit) { exit 0 }

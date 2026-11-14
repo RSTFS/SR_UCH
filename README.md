@@ -83,7 +83,8 @@ and can see the current rule in the vanilla rules UI. The host is excluded by th
   broadcast, not a seed, so every client applies exactly the same card; guests never roll locally.
 - **17 cards** -- low/high gravity, weak jump, slow sprint, slow platforms, no wall jumps, mirror
   controls, dance invincibility, player collisions and frictionless. Each can be switched off in
-  the card pool. Rate of fire, game speed, character size, camera flip and doomsday are excluded
+  the card pool, which also has a search box (name / effect) and splits the list into numeric and
+  boolean rule groups. Rate of fire, game speed, character size, camera flip and doomsday are excluded
   on purpose: the first two rewrite `Time.timeScale` (conflicting with Time Control), the rest
   touch the camera or require rebuilding renderers.
 - **Controls** -- draw interval, max simultaneous cards, draw announcement, reroll hotkey, and the
