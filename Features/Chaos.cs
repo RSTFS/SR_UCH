@@ -233,6 +233,8 @@ namespace SR_UCH.Tweaks {
 
             _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) RestoreAll(); };
 
+            SRApi.NetMagic.Register("chaos.signal", Magic);
+            SRApi.NetMagic.Register("chaos.card", CardMagic);
             SRApi.RegisterKey("混乱牌组-重抽", _drawKey, "press", delegate {
                 if (!IsAuthority || !ModeAllowed()) return;
                 if (_enabled != null && _enabled.Value) DrawAndBroadcast();

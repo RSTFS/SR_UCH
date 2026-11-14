@@ -99,6 +99,30 @@ namespace SR_UCH {
             public static MethodInfo Method(Type owner, string name, Type[] parameters, string feature) { Func<Type, string, Type[], string, MethodInfo> f = MethodArgsFn; return f != null ? f(owner, name, parameters, feature) : null; }
             public static void Override(string member, string feature) { Action<string, string> f = OverrideFn; if (f != null) f(member, feature); }
         }
+        // 网络魔数注册表：各功能把 MsgGameRuleSet 的 magic 号登记进来，自检断言唯一，
+        // 避免以后再加通道时撞号（现在散在核心/混乱牌组的常量里，只能靠注释互相提醒）。
+        public static class NetMagic {
+            private static readonly Dictionary<string, int> _byName = new Dictionary<string, int>();
+            private static readonly Dictionary<int, string> _byValue = new Dictionary<int, string>();
+            private static readonly List<string> _conflicts = new List<string>();
+            public static bool Register(string name, int value) {
+                try {
+                    if (string.IsNullOrEmpty(name)) return false;
+                    string owner;
+                    if (_byValue.TryGetValue(value, out owner)) {
+                        if (owner != name) _conflicts.Add(name + "=" + value + " 与 " + owner + " 冲突");
+                        return false;
+                    }
+                    _byName[name] = value; _byValue[value] = name;
+                    return true;
+                } catch (Exception) { return false; }
+            }
+            public static string[] Conflicts() {
+                try { return _conflicts.ToArray(); } catch (Exception) { return new string[0]; }
+            }
+            public static int Registered { get { try { return _byValue.Count; } catch (Exception) { return 0; } } }
+        }
+
         // 注入状态登记：MissingSinks() 只能反射 delegate 字段，覆盖不到"非委托状态"通道
         // （例如 Storage 的根目录注入）。核心可把这类状态登记成 (名称, 就绪判定)，自检统一检查。
         public static class Sinks {

@@ -37,6 +37,7 @@ public partial class SR {
         try {
             _compatListener = new CompatListener();
             GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(_compatListener, true);
+            SRApi.NetMagic.Register("core.compat", CompatMagic);
             RegisterTick("联机兼容握手", NetTick);
             LogInfo("[SR.Net] 联机版本握手已启用（联机时每 " + (int)CompatInterval + " 秒比对一次功能签名）");
         } catch (Exception __ex) { Guard.Log("联机握手/初始化", __ex); }

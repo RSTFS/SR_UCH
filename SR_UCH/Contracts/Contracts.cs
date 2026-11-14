@@ -131,7 +131,7 @@ namespace SR_UCH {
         public const int Version = 2;
         // ApiLevel：SRApi 门面 API 的 additive 等级。每新增一个 public 成员 +1；删除/改签名属于破坏性变更，
         // 必须抬 Version。功能可用 MinApiLevel 声明"至少需要哪个 API 等级"，核心低于它时同样判为不兼容。
-        public const int ApiLevel = 1;
+        public const int ApiLevel = 2;   // 2：新增 NetMagic/SlotKeys/Sinks 等门面
     }
 
     // 跨功能共享的时间常量（audit P2⑧）：以前 45s / 25s 在 Level.* 与 BuildingPresets 各写一份，

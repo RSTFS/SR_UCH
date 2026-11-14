@@ -29,6 +29,9 @@ public partial class SR {
         _stResults = new List<string>();
         _stPass = 0; _stFail = 0;
         try {
+            string[] magicConf = SRApi.NetMagic.Conflicts();
+            StCheck(T("网络魔数唯一", "Network magics unique"), magicConf == null || magicConf.Length == 0,
+                magicConf != null && magicConf.Length > 0 ? string.Join("; ", magicConf) : T("已登记 ", "registered ") + SRApi.NetMagic.Registered);
             string[] missStates = SRApi.Sinks.MissingStates();
             StCheck(T("API 状态通道", "API state channels"), missStates == null || missStates.Length == 0,
                 missStates != null && missStates.Length > 0 ? string.Join(", ", missStates) : T("全部就绪", "all ready"));
