@@ -651,6 +651,9 @@ public partial class SR : ITweak {
         private static int _guiKeyAt;
         private static readonly List<KeyCode> _guiKeys = new List<KeyCode>();
 
+        // 本帧是否有 IMGUI 记录的按键事件（CheckHotkeys 无输入短路用）。
+        internal static bool GuiKeyThisFrame { get { return _guiKeys.Count > 0 && Time.frameCount - _guiKeyAt <= 1; } }
+
         internal static void RecordGuiKeyEvent(Event e) {
             try {
                 if (e == null || e.type != EventType.KeyDown) return;

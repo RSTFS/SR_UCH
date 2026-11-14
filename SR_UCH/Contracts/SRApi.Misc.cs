@@ -120,6 +120,8 @@ namespace SR_UCH {
                     int now = Environment.TickCount;
                     int last;
                     if (what != null && _lastWarn.TryGetValue(what, out last) && unchecked((uint)(now - last)) < 5000u) return;
+                    // 去重表只增不减：异常风暴时（what 动态拼接）加容量上限，超过即整体清空（去重语义可容忍重置）。
+                    if (what != null && _lastWarn.Count > 512) _lastWarn.Clear();
                     if (what != null) _lastWarn[what] = now;
                     LastWhat = what;
                     LastError = ex != null ? (ex.GetType().Name + ": " + ex.Message) : "未知错误";

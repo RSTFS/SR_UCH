@@ -639,8 +639,11 @@ public partial class SR {
         public static void CheckHotkeys() {
             // 每个条目的回调单独隔离：一个功能抛异常不影响其余快捷键。
             try { HkInitAll(); } catch (Exception __ex) { Guard.Log("初始化自动快捷键", __ex); }
-            CheckRegisteredKeyActions();   // 功能登记的键位动作（核心统一轮询）
+            CheckRegisteredKeyActions();   // 功能登记的键位动作（核心统一轮询；hold 类需每帧）
             if (_capturing != null) return; //正在录制按键：不触发
+            // 本帧没有任何按键事件时不必遍历全部快捷键（ComboKeyDown 是边沿触发）。
+            // 注意：hold 语义的键位动作不在这里，已在上一行统一处理。
+            if (!UnityEngine.Input.anyKeyDown && !SR.GuiKeyThisFrame) return;
             for (int i = 0; i < _hkItems.Count; i++) {
                 HkItem it = _hkItems[i];
                 try {
