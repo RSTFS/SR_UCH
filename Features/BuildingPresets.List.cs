@@ -15,6 +15,7 @@ namespace SR_UCH.Tweaks {
     public partial class BuildingPresets {
         private static int _listWheelFrame = -1;   // 本帧滚轮是否已经应用过
         private static float _listMaxY;            // 本帧列表滚动上限（page hook 兜底用）
+        private static float _sbGrabY;            // 竖向滚动条拖动抓取偏移（核心 TableScrollbarFor 用）
 
         // ================= 页面二：预设列表 =================
         private static void RenderListPage() {
@@ -169,6 +170,14 @@ namespace SR_UCH.Tweaks {
                         : SRApi.T("没有匹配当前搜索的预设。", "No presets match the current search.");
                 };
                 _hiddenBeforeTable = _hiddenCols.Count;
+                // 滚轮入口照联机列表：绘制期就地在表格矩形上取用（表格区域优先于页面钩子）。
+                try {
+                    float __wheelNow = SRApi.Ctl.WheelPoll("presets.table", box);
+                    if (Mathf.Abs(__wheelNow) > 0.01f) {
+                        _listWheelFrame = Time.frameCount;
+                        ApplyListWheel(__wheelNow);
+                    }
+                } catch (Exception __wp) { SRApi.Guard.Log("预设列表/区域滚轮", __wp); }
                 // 滚轮交给核心（TableWheelInput 与 TableDraw 语义完全一致：ScrollWheel 事件、
                 // box 命中、maxY>0 才滚、到边界不消费）。**在绘制前**调用，先改 scrollY 再绘制。
                 if (e != null) {
@@ -180,6 +189,15 @@ namespace SR_UCH.Tweaks {
                 }
                 _args.scrollY = _scrollRows.y;
                 SRApi.TableDraw(_args);
+                // 竖向滚动条：几何/绘制/输入交给核心（与联机列表一致，不再自绘）。
+                try { SRApi.Ctl.TableScrollbarFor(_args, e, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y); }
+                catch (Exception __sb) { SRApi.Guard.Log("预设列表/滚动条", __sb); }
+                // 光标：拖列宽 / 悬停表头（与联机列表一致）。
+                if (_args.dragCol >= 0) SRApi.CursorResize = true;
+                if (e != null && box.Contains(mp) && _headerCells != null) {
+                    for (int __hc = 0; __hc < _headerCells.Count; __hc++)
+                        if (_headerCells[__hc].Contains(mp)) { SRApi.CursorMove = true; break; }
+                }
                 // 核心把拖列宽的结果写进 _drawW：同步回持久化宽度（漏了这段 = 表头宽度永远改不动）。
                 for (int i = 0; i < _colW.Length && i < _drawW.Length; i++) {
                     if (i == ColAction) continue;
