@@ -265,8 +265,8 @@ Everything below runs **without the game installed** (contract layer is compiled
 ```powershell
 ./build/run-tests.ps1 -NoGame    # contract layer must compile + 13 assertions (dotnet, net8.0)
 ./build/run-tests.ps1            # same tests through csc against the real BepInEx when a game is present
-./build/guards-text.ps1          # 13 text guards (API allow-list, layer boundaries, rsp coverage,
-                                 # encoding, tooltip shapes, silent-catch and file-size ratchets)
+./build/guards-text.ps1          # text guards (API allow-list, layer boundaries, rsp coverage +
+                                 # generated-list consistency, encoding, tooltips, ratchets)
 ```
 
 CI runs both jobs (`.github/workflows/guards.yml`): `text-guards` and `unit-tests`, so a pull request
@@ -276,7 +276,7 @@ The heavier checks (full build through the rsp chain, split-mode build, csproj b
 self-test comparison) need the game's reference assemblies and stay local:
 
 ```powershell
-./_tools/build_sr_uch.ps1 -All -Check     # mechanical guards incl. build + self-test baseline
+./build/build.ps1 -All -Check            # mechanical guards incl. build + self-test baseline
 ./build/check-selftest.ps1                # compare the last log's [SR.SelfTest] line with the baseline
 ```
 

@@ -24,10 +24,10 @@
 /r:"%GAME%\BepInEx\core\0Harmony.dll"
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 /r:"bin\Release\SR_UCH.dll"
-Features\Level.cs
 Features\Level.AutoPartyItem.cs
+Features\Level.cs
 Features\Level.PartyBomb.cs
 Features\Level.PartyBox.cs
-Features\Level.Tool.cs
 Features\Level.Reload.cs
 Features\Level.Snapshot.cs
+Features\Level.Tool.cs

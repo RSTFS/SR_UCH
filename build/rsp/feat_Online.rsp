@@ -24,9 +24,9 @@
 /r:"%GAME%\BepInEx\core\0Harmony.dll"
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 /r:"bin\Release\SR_UCH.dll"
-Features\Online.Filters.cs
 Features\Online.cs
-Features\Online.Table.cs
-Features\Online.LobbyList.cs
+Features\Online.Filters.cs
 Features\Online.Join.cs
+Features\Online.LobbyList.cs
+Features\Online.Table.cs
 Features\Online.Watchdog.cs

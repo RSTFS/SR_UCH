@@ -24,7 +24,7 @@
 /r:"%GAME%\BepInEx\core\0Harmony.dll"
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 /r:"bin\Release\SR_UCH.dll"
-Features\Experiments.cs
 Features\Experiments.Bounds.cs
+Features\Experiments.cs
 Features\Experiments.Misc.cs
 Features\Experiments.Scene.cs

@@ -23,7 +23,7 @@ MainPlugin.cs                 入口：BepInEx 插件；配置外置到 SR_UCH_d
 SR_UCH/SR.Contracts.cs        契约层（SRApi）：功能能用的一切 API；可独立编译
 SR_UCH/SR.*.cs                实现层（partial class SR）：窗口 / 控件 / 表格 / 键位 / 门控 / 迁移
 Features/*.cs                 功能层：每个文件一组 [SrFeature] 类，实现 ITweak
-build/                        构建脚本 + rsp 清单 + 守卫 + 单元测试
+build/                        构建脚本 + rsp 生成器/清单 + 守卫 + 单元测试
 ```
 
 **方向约束（有守卫检查）**
@@ -356,12 +356,13 @@ SRApi.ComboKeyDown(keyEntry) / SRApi.ComboKeyHeld(keyEntry)
 ## 8. 构建 / 守卫 / 部署
 
 ```powershell
-cd D:\RS_TFS\CC\SR_UCH\build
-.\build.ps1                  # 合并模式（默认发布形态）
-.\build.ps1 -All             # 合并 + EX + Others
-.\build.ps1 -Split           # 拆分模式：核心 + 每个功能一个 DLL
-.\build.ps1 -Check           # 守卫：契约独立编译 / rsp 精确覆盖 / csproj 可编
-.\build.ps1 -All -Deploy     # 构建并部署到游戏（游戏关着再跑）
+cd D:\RS_TFS\CC\SR_UCH
+.\build\build.ps1            # 合并模式（默认发布形态）
+.\build\build.ps1 -All       # 合并 + EX（工作区有 ..\SR_UCH_EX 时）
+.\build\build.ps1 -Others    # 再编 ..\Others 下的独立插件
+.\build\build.ps1 -Split     # 拆分模式：核心 + 每个功能一个 DLL
+.\build\build.ps1 -Check     # 守卫：清单生成一致性 / 契约独立编译 / rsp 覆盖 / csproj 可编
+.\build\build.ps1 -All -Deploy   # 构建并部署到游戏（游戏关着再跑）
 ```
 
 ```powershell
@@ -372,11 +373,13 @@ cd D:\RS_TFS\CC\SR_UCH\build
 .\update-silent-catch.ps1
 ```
 
-**新增功能文件时**（三条都要做，漏一条就"装了等于没装"）：
+**新增功能文件时**：清单由磁盘源码生成，**不再手改**。
 
-1. `build/rsp/sr_uch.rsp` 加 `Features\X.cs`
-2. 若支持拆分：`build/rsp/feat_X.rsp`（照抄现有 rsp 改输出名与末行）+ 两个构建脚本的 `$rspFeatures` 都加
-3. `build/rsp/sr_uch.rsp` 加绝对路径（工具链用）
+1. 把源码放进 `Features\`，文件名前缀 = 功能名（同前缀 = 同一功能，如 `Level.*.cs` 都归 `feat_Level`）；
+2. 跑一次 `build\gen-rsp.ps1`（直接 `build\build.ps1` 也会自动生成）；
+3. `build\build.ps1 -Check` 会校验清单与磁盘一致，CI 的 `guards-text.ps1` 也会跑同一份生成器。
+
+特例清单仍手写：`sr_uch_contracts.rsp`（契约定向编译）、`sr_uch_ex.rsp`（EX 仓库）、`others\*.rsp`（独立插件）。
 
 ---
 

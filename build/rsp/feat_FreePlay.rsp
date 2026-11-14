@@ -24,6 +24,6 @@
 /r:"%GAME%\BepInEx\core\0Harmony.dll"
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 /r:"bin\Release\SR_UCH.dll"
+Features\FreePlay.cs
 Features\FreePlay.Grid.cs
 Features\FreePlay.Self.cs
-Features\FreePlay.cs

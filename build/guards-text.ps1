@@ -102,21 +102,14 @@ function Check-RspCoverage {
     if ($extra.Count -gt 0) { Bad ('sr_uch.rsp 多出源文件: ' + (($extra | Select-Object -First 6) -join ', ')) }
     if ($miss.Count -eq 0 -and $extra.Count -eq 0) { Ok ('rsp 精确覆盖全部 ' + $disk.Count + ' 个源文件') }
 
-    # 拆分构建：feat_*.rsp 文件 与 构建脚本 $rspFeatures 必须双向一致。
-    # 以前只校验合并模式，导致「文件在、列表漏」时 -Split 静默少编一个功能（整栏消失）。
-    $buildPs1 = Join-Path $Root 'build\build.ps1'
-    if (Test-Path $buildPs1) {
-        $listTxt = Get-Content $buildPs1 -Raw
-        $m = [regex]::Match($listTxt, '(?s)\$rspFeatures\s*=\s*@\((.*?)\)')
-        if ($m.Success) {
-            $inList = @([regex]::Matches($m.Groups[1].Value, "'(feat_[^']+\.rsp)'") | ForEach-Object { $_.Groups[1].Value })
-            $onDisk = @(Get-ChildItem (Join-Path $Root 'build\rsp') -Filter 'feat_*.rsp' -File | ForEach-Object { $_.Name })
-            $listMiss = @($onDisk | Where-Object { $inList -notcontains $_ })
-            $listGhost = @($inList | Where-Object { $onDisk -notcontains $_ })
-            if ($listMiss.Count -gt 0) { Bad ('$rspFeatures 漏了 feat 文件: ' + ($listMiss -join ', ')) }
-            if ($listGhost.Count -gt 0) { Bad ('$rspFeatures 列了不存在的 feat 文件: ' + ($listGhost -join ', ')) }
-            if ($listMiss.Count -eq 0 -and $listGhost.Count -eq 0) { Ok ('拆分构建清单与 feat 文件一致（' + $inList.Count + ' 个）') }
-        }
+    # 拆分构建：清单由 build/gen-rsp.ps1 从磁盘生成（build.ps1 的 $rspFeatures 也由 feat_*.rsp 推导），
+    # 这里直接跑生成器的 -Verify（-NoExit 不退出本脚本），保证 CI 也能发现"手改清单/漏生成"。
+    $gen = Join-Path $Root 'build\gen-rsp.ps1'
+    if (Test-Path -LiteralPath $gen) {
+        $before = $fail
+        . $gen -Verify -NoExit
+        if ($script:RspVerifyBad -gt 0) { Bad ('构建清单与磁盘源码不一致：' + $script:RspVerifyBad + ' 处（运行 build\gen-rsp.ps1 重新生成）') }
+        elseif ($fail -eq $before) { Ok '拆分构建清单由磁盘源码生成且一致' }
     }
 }
 

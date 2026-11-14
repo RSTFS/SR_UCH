@@ -215,7 +215,7 @@
 ```powershell
 .\build\run-tests.ps1 -NoGame    # 契约层必须编译通过 + 13 条断言（dotnet, net8.0）
 .\build\run-tests.ps1            # 有游戏时同样的测试走 csc + 真实 BepInEx
-.\build\guards-text.ps1          # 13 项文本守卫（API 白名单、层边界、rsp 覆盖、
+.\build\guards-text.ps1          # 文本守卫（API 白名单、层边界、rsp 覆盖与生成一致性、
                                  # 编码、悬浮条目形状、静默 catch 与文件行数棘轮）
 ```
 
@@ -225,7 +225,7 @@ CI（`.github/workflows/guards.yml`）跑两个 job：`text-guards` 与 `unit-te
 更重的检查（完整 rsp 构建、拆分构建、csproj 构建、运行时自检比对）需要游戏引用程序集，只在本地跑：
 
 ```powershell
-.\_tools\build_sr_uch.ps1 -All -Check     # 机械守卫：含构建与自检基线
+.\build\build.ps1 -All -Check            # 机械守卫：含构建与自检基线
 .\build\check-selftest.ps1                # 把日志里的 [SR.SelfTest] 行与基线比对
 ```
 
