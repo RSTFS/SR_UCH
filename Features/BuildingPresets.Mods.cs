@@ -285,13 +285,7 @@ namespace SR_UCH.Tweaks {
                 if (col == ColMods) {
                     string tip = DataPreviewTip(p);
                     if (!string.IsNullOrEmpty(tip)) GUI.tooltip = tip;
-                    if (e.type == EventType.MouseDown && e.button == 0) { _cellDownRow = row; _cellDownCol = col; }
-                    if (e.type == EventType.MouseUp && e.button == 0) {
-                        // 必须是"同一格里按下再松开"，否则拖列宽/拖滚动条时松手会误切
-                        if (_cellDownRow == row && _cellDownCol == col) { CycleDataMode(p); e.Use(); }
-                        _cellDownRow = -1; _cellDownCol = -1;
-                        return;
-                    }
+                    // 左键三态切换改由核心 cellClick 派发（见 _cellClickFn），这里只负责悬浮提示。
                 }
                 if (col == ColName && e.type == EventType.MouseDown && e.button == 1) {
                     // IsLocal 的含义是"游戏本地关卡存档"（snapshots 目录里的 .xml），
@@ -302,8 +296,6 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/行内单元格", __ex); }
         }
 
-        private static int _cellDownRow = -1;   // 左键按下的行（数据列三态切换的守卫）
-        private static int _cellDownCol = -1;   // 左键按下的列
 
         // 鼠标 x 落在可视列的哪一列（与核心 DrawTableCells 同一套排布）。
         private static int ColumnAtX(float x) {

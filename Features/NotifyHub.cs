@@ -554,18 +554,16 @@ namespace SR_UCH.Tweaks {
             CfgRow(_cardW);
             CfgRow(_fontSize);
             CfgRow(_cardAlpha);
-            // 停靠位置：四个互斥的开关按钮（不用下拉，避免下拉在滚动页里的定位/滚轮问题）。
-            GUILayout.BeginHorizontal();
-            GUILayout.Label(SRApi.T("位置", "Position"), _label, GUILayout.Width(SRApi.Ctl.Sc(160f)));
-            int __cornerNow = _corner != null ? Mathf.Clamp(_corner.Value, 0, 3) : 0;
-            string[] __cornerLabels = new string[] {
-                SRApi.T("右下", "bottom-right"), SRApi.T("右上", "top-right"),
-                SRApi.T("左下", "bottom-left"), SRApi.T("左上", "top-left") };
-            for (int i = 0; i < 4; i++) {
-                if (SRApi.Ctl.SelfToggleButton(__cornerLabels[i], SRApi.T("把通知浮层停在这个角", "Dock the toasts to this corner"), i == __cornerNow, null))
-                    _corner.Value = i;
+            // 停靠位置：核心统一下拉框（用户要求用核心的下拉，不用自绘按钮）。
+            {
+                string[] vals = new string[] { "0", "1", "2", "3" };
+                string[] labels = new string[] {
+                    SRApi.T("右下", "bottom-right"), SRApi.T("右上", "top-right"),
+                    SRApi.T("左下", "bottom-left"), SRApi.T("左上", "top-left") };
+                SRApi.Ctl.RowCombo(SRApi.T("位置", "Position"),
+                    SRApi.T("通知浮层停在屏幕的哪个角。", "Which screen corner the toasts dock to."),
+                    _corner, vals, labels, SRApi.Ctl.Sc(140f));
             }
-            GUILayout.EndHorizontal();
 
         }
 

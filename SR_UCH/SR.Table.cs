@@ -307,6 +307,21 @@ public partial class SR {
             } else if (__ce.type == EventType.MouseUp && __ce.button == 0) {
                 int __clicked = (a.rowHover >= 0 && a.rowHover == _rowDownRow) ? a.rowHover : -1;
                 _rowDownRow = -1;
+                if (__clicked >= 0 && a.cellClick != null) {
+                    try {
+                        Vector2 __mp = __ce.mousePosition;
+                        if (a.pinW <= 0f || __mp.x < a.pinX) {
+                            float __x = a.box.x - a.scrollX;
+                            for (int __k = 0; __k < a.vis.Count; __k++) {
+                                int __ci = a.vis[__k];
+                                if (__ci == a.pinCol) continue;
+                                float __w = Sc(a.colW != null && __ci < a.colW.Length ? a.colW[__ci] : 60f);
+                                if (__mp.x >= __x && __mp.x < __x + __w) { a.cellClick(__clicked, __ci); break; }
+                                __x += __w;
+                            }
+                        }
+                    } catch (Exception __cc) { Guard.Log("表格单元格点击", __cc); }
+                }
                 if (__clicked >= 0) {
                     if (a.rowClick != null) { try { a.rowClick(__clicked); } catch (Exception __rc) { Guard.Log("表格行点击", __rc); } }
                     float __now = Time.unscaledTime;
@@ -463,6 +478,7 @@ public partial class SR {
     public static bool TableWheelInput(Event e, Rect box, Vector2 mp, float maxX, float maxY,
         ref Vector2 scrollCols, ref Vector2 scrollRows) {
         if (e == null || e.type != EventType.ScrollWheel || !box.Contains(mp)) return false;
+        if (SR.Wheel.CtrlHeld) return false;   // Ctrl+滚轮留给页面（切页/缩放），列表不消费
         float amt = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
         // Shift+滚轮横向滚动；无纵向余量时自动转横向。
         if (e.shift && maxX > 0f) {

@@ -89,6 +89,7 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<bool> _skipTreehouse;   // 跳过树屋流程（联机直接替换关卡，风险自负）
         private static bool _actionHitThisFrame;   // 本帧是否命中操作按钮（空白处取消二次确认）
         private static ConfigEntry<int> _sortModeEntry;
+        private static ConfigEntry<string> _filterTypeEntry, _filterLevelEntry, _filterModeEntry;
         private static ConfigEntry<string> _colWidthsEntry;
         private static ConfigEntry<string> _colOrderEntry;
         private static ConfigEntry<string> _colHiddenEntry;
@@ -248,6 +249,19 @@ namespace SR_UCH.Tweaks {
                         new AcceptableValueRange<int>(SortModeMin, SortModeMax)));
                 _sortMode = _sortModeEntry.Value;
                 _sortModeEntry.SettingChanged += delegate { _sortMode = _sortModeEntry.Value; };
+                // 类型/关卡/模式筛选落盘（搜索框不存：临时输入，存了下次打开列表会"莫名其妙少一截"）。
+                _filterTypeEntry = plugin.Config.Bind(Section, "Filter Type", "",
+                    "列表页类型筛选：空=全部 / preset=仅预设 / local=仅本地存档");
+                _filterLevelEntry = plugin.Config.Bind(Section, "Filter Level", "",
+                    "列表页关卡筛选：空=全部，其余为关卡场景名");
+                _filterModeEntry = plugin.Config.Bind(Section, "Filter Mode", "",
+                    "列表页模式筛选：空=全部，其余为模式名");
+                _typeFilter = _filterTypeEntry.Value ?? "";
+                _levelFilter = _filterLevelEntry.Value ?? "";
+                _modeFilter = _filterModeEntry.Value ?? "";
+                _filterTypeEntry.SettingChanged += delegate { _typeFilter = _filterTypeEntry.Value ?? ""; };
+                _filterLevelEntry.SettingChanged += delegate { _levelFilter = _filterLevelEntry.Value ?? ""; };
+                _filterModeEntry.SettingChanged += delegate { _modeFilter = _filterModeEntry.Value ?? ""; };
                 _skipTreehouse = plugin.Config.Bind(Section, "Skip Treehouse", false,
                     "跳过树屋流程：勾选后联机替换关卡不再先回树屋，而是直接替换场景（房客的 SelectedLevel 可能不同步，风险自负）。");
                 // 旧配置可能残留已弃用的 2/3：夹回 0（时间）。
@@ -315,6 +329,18 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Section, "Max Presets",
                 "预设数量上限\n列表最多保留多少条预设\n范围 1-100；只限制新保存，不删磁盘文件",
                 "Preset count limit\nhow many presets the list keeps\n1-100; limits new saves only, never deletes files");
+            SRApi.LocKey(Section, "Filter Type", "类型筛选", "Filter type");
+            SRApi.LocDesc(Section, "Filter Type",
+                "列表页的类型筛选（会存盘）\n全部 / 仅预设 / 仅本地存档\n默认「全部」",
+                "List type filter (persisted)\nall / presets only / local saves only\ndefault: all");
+            SRApi.LocKey(Section, "Filter Level", "关卡筛选", "Filter level");
+            SRApi.LocDesc(Section, "Filter Level",
+                "列表页的关卡筛选（会存盘）\n空 = 全部关卡\n其余为关卡场景名",
+                "List level filter (persisted)\nempty = all levels\notherwise a level scene name");
+            SRApi.LocKey(Section, "Filter Mode", "模式筛选", "Filter mode");
+            SRApi.LocDesc(Section, "Filter Mode",
+                "列表页的模式筛选（会存盘）\n空 = 全部模式\n其余为保存时的模式名",
+                "List mode filter (persisted)\nempty = all modes\notherwise the mode the preset was saved in");
             SRApi.LocKey(Section, "Sort Mode", "列表排序", "Sort mode");
             SRApi.LocDesc(Section, "Sort Mode",
                 "列表排序方式\n0＝按时间（新到旧），1＝按名称\n由列表页的排序下拉维护",

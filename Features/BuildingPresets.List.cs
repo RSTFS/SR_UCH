@@ -47,6 +47,14 @@ namespace SR_UCH.Tweaks {
         private static readonly Action<int, Rect, int> _pinDrawFn = delegate (int row, Rect r, int vi) { DrawActionButtons(_visibleCache, row, r); };
         private static readonly Action<int> _rowRightClickFn = delegate (int row) { StartRenameVisibleRow(row); };
         private static readonly Action<int> _rowDoubleClickFn = delegate (int row) { DoubleClickVisibleRow(row); };
+        private static readonly Action<int, int> _cellClickFn = delegate (int row, int col) {
+            try {
+                if (col != ColMods) return;
+                List<PresetInfo> vis = _visibleCache;
+                if (vis == null || row < 0 || row >= vis.Count || vis[row] == null) return;
+                CycleDataMode(vis[row]);
+            } catch (Exception __cc2) { SRApi.Guard.Log("预设列表/单元格点击", __cc2); }
+        };
 
         // 双击行 = 加载该预设（与操作列「加载」同一动作）。
         private static void DoubleClickVisibleRow(int row) {
@@ -254,6 +262,7 @@ namespace SR_UCH.Tweaks {
                 _args.pinDraw = _pinDrawFn;
                 _args.rowRightClick = _rowRightClickFn;
                 _args.rowDoubleClick = _rowDoubleClickFn;
+                _args.cellClick = _cellClickFn;
                 _args.emptyHint = _emptyHintFn;
 
                 _hiddenBeforeTable = _hiddenCols.Count;

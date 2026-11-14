@@ -92,6 +92,12 @@ namespace SR_UCH.Tweaks {
         }
 
         // 过滤条件（原 VisiblePresets 内的判断，原样保留语义）。
+        // 筛选值落盘（节流由核心配置系统/FlushConfig 统一处理）。
+        private static void SetFilterValue(ConfigEntry<string> e, string v) {
+            try { if (e != null) { e.Value = v ?? ""; SRApi.Ctl.MarkConfigDirty(e.ConfigFile); } }
+            catch (Exception __fv) { SRApi.Guard.Log("布局预设/筛选落盘", __fv); }
+        }
+
         private static bool PassPresetFilter(PresetInfo p) {
             try {
                 // 纯逻辑在 PresetFilterLogic（无 Unity 依赖，单元测试覆盖）。
@@ -116,7 +122,7 @@ namespace SR_UCH.Tweaks {
                     _levelOptLabels = labels;
                 }
                 SRApi.Ctl.FilterCombo("关卡", _levelOptVals, _levelOptLabels,
-                    delegate { return _levelFilter; }, delegate(string v) { _levelFilter = v; },
+                    delegate { return _levelFilter; }, delegate(string v) { SetFilterValue(_filterLevelEntry, v); _levelFilter = v; },
                     ref _levelFilterOpen, "", W(110));
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/渲染关卡筛选", __ex); }
         }
@@ -159,7 +165,7 @@ namespace SR_UCH.Tweaks {
                     _modeOptLabels = labels;
                 }
                 SRApi.Ctl.FilterCombo("模式", _modeOptVals, _modeOptLabels,
-                    delegate { return _modeFilter; }, delegate(string v) { _modeFilter = v; },
+                    delegate { return _modeFilter; }, delegate(string v) { SetFilterValue(_filterModeEntry, v); _modeFilter = v; },
                     ref _modeFilterOpen, "", W(110));
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/渲染模式筛选", __ex); }
         }
@@ -201,7 +207,7 @@ namespace SR_UCH.Tweaks {
                     SRApi.T("本地", "Local")
                 };
                 SRApi.Ctl.FilterCombo("类型", vals, labels,
-                    delegate { return _typeFilter; }, delegate(string v) { _typeFilter = v; },
+                    delegate { return _typeFilter; }, delegate(string v) { SetFilterValue(_filterTypeEntry, v); _typeFilter = v; },
                     ref _typeFilterOpen, "preset", W(110));
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/渲染类型筛选", __ex); }
         }

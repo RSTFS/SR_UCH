@@ -70,6 +70,7 @@ namespace SR_UCH {
             public System.Action<int> rowClick;             //左键 MouseUp 命中非钉住列区域时回调行号
             public System.Action<int> rowDoubleClick;
             public System.Action<int> rowRightClick;   // 右键单击行（MouseUp 右键，仅在行上）
+            public System.Action<int, int> cellClick;  // 左键在行单元格上松开（行号, 数据列下标）；钉住列不算
             public System.Action<int> headerShiftClick; // Shift+左键单击表头（参数=数据列下标）
             public float scrollbarAlpha;   // 滚动条淡入淡出透明度（核心维护）       //0.35 秒内同一行左键点击两次时回调
             public bool hoverHighlight = true;              //rowHover >= 0 时核心在行矩形上叠一层很淡的高亮
