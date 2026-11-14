@@ -13,7 +13,6 @@ namespace SR_UCH {
     [SrFeature("sr.freeplay.self", "SelfState", "1.0")]
     public class SelfState : ITweak {
         private const string Sec = "自由模式";
-        private const string SlotIsPlayerPlaced = "DestroyBlocks.IsPlayerPlaced";
 
         private static ConfigEntry<bool> _invincible, _godMode, _fly, _ignoreCollision;
         private static ConfigEntry<KeyCode> _invincibleKey, _godModeKey, _flyKey, _ignoreCollisionKey;

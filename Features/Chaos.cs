@@ -108,8 +108,8 @@ namespace SR_UCH.Tweaks {
         private static int _roundSeen;
         private static float _lastPlaceAt = -100f;   // 上次进入摆放阶段的时刻（去重：刷新派对盒会重入 PLACE）
         private struct RosterEntry {
-            public string Ver; public float At;
-            public RosterEntry(string v, float a) { Ver = v; At = a; }
+            public float At;
+            public RosterEntry(float a) { At = a; }
         }
         private static readonly Dictionary<int, RosterEntry> _roster = new Dictionary<int, RosterEntry>();
         private static bool _helloSent;
@@ -507,7 +507,8 @@ namespace SR_UCH.Tweaks {
             if (!_ready || !IsOnline() || !NetClientActive()) return;
             if (_helloSent && Time.unscaledTime < _nextHelloAt) return;
             _helloSent = true;
-            _nextHelloAt = Time.unscaledTime + 8f;   // 周期性重发，覆盖晚加入的房客
+            // UCH 锁房、没有中途加入，8 秒一刷纯属冗余流量；降到 30 秒只为换局/重连兜底。
+            _nextHelloAt = Time.unscaledTime + 30f;
             // 名单带时间戳：退出房间 / 换局后旧条目 60 秒过期，不会一直显示幽灵端。
             float now = Time.unscaledTime;
             var dead = new List<int>();
@@ -537,8 +538,8 @@ namespace SR_UCH.Tweaks {
             // 自己的带外信号（None + 魔数）。
             if (m.NewRule == TabletRule.None && (m.Value2 >> 8) == Magic) {
                 int op = m.Value2 & 0xFF;
-                if (op == OpHello && m.Value >= 0 && m.Value != LocalNetworkNumber())
-                    _roster[m.Value] = new RosterEntry("2.2", Time.unscaledTime);
+                if (op == OpHello && m.Value >= 0 && m.Value < 8 && m.Value != LocalNetworkNumber())
+                    _roster[m.Value] = new RosterEntry(Time.unscaledTime);
                 
                 return;
             }
@@ -563,15 +564,37 @@ namespace SR_UCH.Tweaks {
 
         // ============ 对外展示 ============
 
+        // 同一 Rule 只有最后写进去的那张真正生效（房主重建与房客端接收都是后写覆盖前写）。
+        // 显示也按「每条规则的最后一张」收口：以前房主抽到两张同规则牌时会画两张，
+        // 房客端只收到/只留一张，两端牌面不一致。
+        private static readonly int[] _effIdx = new int[4];
+        private static int EffectiveIndexes() {
+            int n = 0;
+            for (int i = _active.Count - 1; i >= 0 && n < _effIdx.Length; i--) {
+                int id = _active[i].Id;
+                if (id < 0 || id >= Cards.Length) continue;
+                TabletRule rule = Cards[id].Rule;
+                bool dup = false;
+                for (int k = 0; k < n; k++) if (Cards[_active[_effIdx[k]].Id].Rule == rule) { dup = true; break; }
+                if (!dup) _effIdx[n++] = i;
+            }
+            // 翻转回抽牌顺序（从后往前收集是为了「后写者优先」）。
+            for (int a = 0, b = n - 1; a < b; a++, b--) { int t = _effIdx[a]; _effIdx[a] = _effIdx[b]; _effIdx[b] = t; }
+            return n;
+        }
+
         public static string Desc() {
             // 同帧内 UI 与通知各调一次；用核心的按帧缓存只算一遍（帧号变了自动重算）。
             return SRApi.Cache.FrameSig("chaos.desc", delegate { return DescCore(); });
         }
 
         private static string DescCore() {
-            if (!_ready || _active.Count == 0) return null;
+            if (!_ready) return null;
+            int n = EffectiveIndexes();
+            if (n == 0) return null;
             var parts = new List<string>();
-            for (int i = 0; i < _active.Count; i++) {
+            for (int k = 0; k < n; k++) {
+                int i = _effIdx[k];
                 var c = Cards[_active[i].Id];
                 // 播报要发给房客，牌面必须跟随房主界面语言；简报同样受益。
                 string name = SRApi.T(c.Zh, c.En);
@@ -587,7 +610,7 @@ namespace SR_UCH.Tweaks {
             var parts = new List<string>();
             foreach (var kv in _roster) {
                 if (kv.Key == me || now - kv.Value.At > RosterTtl) continue;
-                parts.Add("#" + kv.Key + " " + kv.Value.Ver);
+                parts.Add("#" + kv.Key);
             }
             string tail = parts.Count > 0
                 ? string.Join(SRApi.T("、", ", "), parts.ToArray())
@@ -640,7 +663,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private void RenderActiveCards() {
-            int n = _active.Count;
+            int n = EffectiveIndexes();
             if (n <= 0) { Line("（未生效）", "(none)"); return; }
             EnsureCardStyles();
             float h = SRApi.Ctl.Sc(52f);
@@ -648,11 +671,33 @@ namespace SR_UCH.Tweaks {
             // 先占住整行高度：抽到 0/1/多张时页面不会跳，也不会因为卡片内容变化抖高度。
             Rect area = GUILayoutUtility.GetRect(0f, h, GUILayout.ExpandWidth(true));
             float cw = Mathf.Max(SRApi.Ctl.Sc(72f), Mathf.Floor((area.width - gap * (n - 1)) / Mathf.Max(1, n)));
-            for (int i = 0; i < n; i++) {
-                int id = _active[i].Id;
-                if (id < 0 || id >= Cards.Length) continue;
-                DrawCard(new Rect(area.x + i * (cw + gap), area.y, cw, h), Cards[id], _active[i].Param);
+            for (int k = 0; k < n; k++) {
+                int i = _effIdx[k];
+                DrawCard(new Rect(area.x + k * (cw + gap), area.y, cw, h), Cards[_active[i].Id], _active[i].Param);
             }
+            DrawCardLegend();
+        }
+
+        // 三色小图例：色边含义写在卡上不如画出来直观（详细说明仍在分区提示里）。
+        private static void DrawCardLegend() {
+            float h = SRApi.Ctl.Sc(14f);
+            float chip = SRApi.Ctl.Sc(10f);
+            Rect area = GUILayoutUtility.GetRect(0f, h, GUILayout.ExpandWidth(true));
+            _cardEffect.fontSize = Mathf.RoundToInt(SRApi.Ctl.Sc(10f));
+            float x = area.x;
+            float y = area.y + (h - chip) * 0.5f;
+            CardLegendItem(ref x, y, chip, CardBuff, "增益", "buff");
+            CardLegendItem(ref x, y, chip, CardDebuff, "减益", "debuff");
+            CardLegendItem(ref x, y, chip, CardNeutral, "中性", "neutral");
+        }
+
+        private static void CardLegendItem(ref float x, float y, float chip, Color tint, string zh, string en) {
+            SRApi.DrawFill(new Rect(x, y, chip, chip), tint);
+            string text = SRApi.T(zh, en);
+            float w;
+            try { w = _cardEffect.CalcSize(new GUIContent(text)).x; } catch { w = SRApi.Ctl.Sc(36f); }
+            GUI.Label(new Rect(x + chip + SRApi.Ctl.Sc(3f), y - SRApi.Ctl.Sc(2f), w + SRApi.Ctl.Sc(2f), chip + SRApi.Ctl.Sc(4f)), text, _cardEffect);
+            x += chip + SRApi.Ctl.Sc(3f) + w + SRApi.Ctl.Sc(12f);
         }
 
         private static void DrawCard(Rect r, CardDef c, int param) {

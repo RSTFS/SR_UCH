@@ -56,6 +56,7 @@ namespace SR_UCH.Tweaks {
         private static Shader _addShader;
         private static float _nextScan;
         private static int _wMin = int.MaxValue, _wMax = 0;   // 本盒出现过的权重范围（相对分档用）
+        private static int[] _wCache = new int[0];            // 本轮扫描每件道具的权重（两遍扫描共用）
 
         // ============ 生命周期 ============
 
@@ -148,36 +149,37 @@ namespace SR_UCH.Tweaks {
 
                 PickableBlock[] all = SRApi.FrameObjects<PickableBlock>();
                 if (all == null) return;
-                // 第一遍：先把全盒权重范围统计完。边扫边分级会让"第一件只有它自己"落回绝对阈值、
-                // 第二件起才走相对分档 —— 同一盒用两套相反标准，六档分布会乱。
+                if (_wCache.Length < all.Length) _wCache = new int[all.Length];
+                // 第一遍：先把全盒权重范围统计完，并把每件道具的权重缓存下来（第二遍不再重算）。
+                // 边扫边分级会让"第一件只有它自己"落回绝对阈值、第二件起才走相对分档 —— 同一盒
+                // 用两套相反标准，六档分布会乱。
                 for (int i = 0; i < all.Length; i++) {
                     PickableBlock pb0 = all[i];
+                    _wCache[i] = -1;
                     if (pb0 == null || !pb0.InPartybox) continue;
                     try {
                         Placeable __pl = pb0.placeablePrefab;
                         if (__pl != null) {
                             int __w = BlockGroup.GetItemFilterWeight(__pl, (int)__pl.BaseRarity);
+                            _wCache[i] = __w;
                             if (__w > 0) { if (__w < _wMin) _wMin = __w; if (__w > _wMax) _wMax = __w; }
                         }
                     } catch (Exception __ww) { SRApi.Guard.Log("品质光芒/权重范围", __ww); }
                 }
-                // 第二遍：按完整范围分级并上光。
+                // 第二遍：按完整范围分级并上光（权重直接用第一遍的缓存，省掉一半 GetItemFilterWeight）。
                 for (int i = 0; i < all.Length; i++) {
                     PickableBlock pb = all[i];
                     if (pb == null || !pb.InPartybox) continue;      // 只处理派对盒里的，场上已放置的不碰
-                    int tier = TierOf(pb);
+                    int tier = TierOf(pb, _wCache[i]);
                     if (tier < 0) { HideGlow(pb); continue; }
                     ApplyGlow(pb, tier);
                 }
             } catch (Exception ex) { SRApi.Guard.Log("品质光芒/扫描", ex); }
         }
 
-        /// <summary>派对盒实际抽取权重 → 品质档。优先用与 PartyBox 完全同源的 GetItemFilterWeight。</summary>
-        private static int TierOf(PickableBlock pb) {
-            int w = -1;
+        /// <summary>派对盒实际抽取权重 → 品质档（w 为第一遍扫描缓存的权重，-1 = 没有 prefab 权重）。</summary>
+        private static int TierOf(PickableBlock pb, int w) {
             try {
-                Placeable pl = pb.placeablePrefab;
-                if (pl != null) w = BlockGroup.GetItemFilterWeight(pl, (int)pl.BaseRarity);
                 if (w < 0 && pb.blockSerializeIndex >= 0) {
                     int step = GameSettings.GetInstance().GetBlockFrequency(pb.blockSerializeIndex);
                     w = TabletBlockList.GetWeightFromStepValue(step);
@@ -187,7 +189,7 @@ namespace SR_UCH.Tweaks {
             // 相对分档（修复"整盒只有一个颜色"）：权重是"每多少件出一件"的绝对值，
             // 同一盒里常常全部落在同一个绝对阈值里 → 六档只出一档。
             // 改为按本盒出现过的权重做对数插值：最轻（概率最高）→ 泛滥，最重（最稀有）→ 传说。
-            // 权重记录在扫描阶段（见 RenderTick：_wMin/_wMax）。
+            // 权重记录在扫描阶段（见 Tick：_wMin/_wMax）。
             if (_wMax > _wMin && _wMin > 0) {
                 float lo = Mathf.Log(_wMin), hi = Mathf.Log(_wMax);
                 // 权重 = "每多少件出一件"：越小越稀有 → 高档位。pos 按稀有度取反。

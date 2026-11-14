@@ -76,6 +76,30 @@ if (-not $ghost.Count -and -not $miss.Count) {
     Ok2 ('槽位图完整（提供 ' + $provided.Count + ' 个 / 需要 ' + ($need | Sort-Object -Unique).Count + ' 个；可选外部槽位 ' + $optUsed.Count + ' 个；动态 ' + $dynamic + ' 处未静态核对）')
 }
 
+# ---------- 1b) 孤儿槽位棘轮：Provide 了但全仓库没有任何 Require（只减不增） ----------
+$needSet = @{}
+foreach ($k in $need) { $needSet[$k] = $true }
+$orphans = @($provided.Keys | Where-Object { -not $needSet.ContainsKey($_) } | Sort-Object -Unique)
+$orPath = Join-Path $PSScriptRoot 'slot-orphan.txt'
+$orBase = @{}
+if (Test-Path -LiteralPath $orPath) {
+    foreach ($l in [IO.File]::ReadAllLines($orPath)) {
+        $s = $l.Trim()
+        if ($s -and -not $s.StartsWith('#')) { $orBase[$s] = $true }
+    }
+}
+if ($WriteBaseline) {
+    [IO.File]::WriteAllText($orPath, ((@('# 孤儿槽位基线：Provide 了但本仓库没有 Require 的槽位名；只减不增。',
+        '# 注意：本守卫只扫 SR_UCH 仓库；被独立 EX 模块消费的槽位会出现在这里（属正常，不要删空）。') + $orphans) -join "`n") + "`n", (New-Object Text.UTF8Encoding($true)))
+    Write-Host ('已写入孤儿槽位基线: ' + $orPath + '（' + $orphans.Count + ' 条）')
+} else {
+    $orNew = @($orphans | Where-Object { -not $orBase.ContainsKey($_) })
+    $orStale = @($orBase.Keys | Where-Object { $orphans -notcontains $_ })
+    if ($orNew.Count) { Bad2 ('新增提供但无人 Require 的槽位: ' + ($orNew -join ', ')) }
+    if ($orStale.Count) { Write-Host ('  [ 注意 ] slot-orphan.txt 里有 ' + $orStale.Count + ' 条已不再孤儿，可删') }
+    if (-not $orNew.Count) { Ok2 ('无新增孤儿槽位（提供但无人 Require：' + $orphans.Count + ' 个，均在基线内）') }
+}
+
 # ---------- 2) 本地化覆盖（棘轮：基线内的允许，新增必须失败） ----------
 $bindKeys = @{}
 $lockPairs = @{}

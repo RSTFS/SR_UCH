@@ -1,5 +1,5 @@
 // 方块破坏：列出现场方块、按玩家归属筛选、远程销毁。
-// 槽位（对外 Provide）：DestroyBlocks.IsPlayerPlaced / PlayerPlacedBlocks / AttributeToHost。
+// 槽位（对外 Provide）：DestroyBlocks.PlayerPlacedBlocks / AttributeToHost。
 // 权限模型：默认只有房主能真正删除；房客可以用同样的键高亮、选中、看信息条，按删除键不生效。
 using System;
 using System.Collections.Generic;
@@ -12,7 +12,7 @@ using UnityEngine.UI;
 
 namespace SR_UCH.Tweaks {
     [SrFeature("sr.destroyblocks", "DestroyBlocks", "1.0", Provides = new string[] {
-        "DestroyBlocks.IsPlayerPlaced", "DestroyBlocks.PlayerPlacedBlocks", "DestroyBlocks.AttributeToHost" })]
+        "DestroyBlocks.PlayerPlacedBlocks", "DestroyBlocks.AttributeToHost" })]
     public class DestroyBlocks : ITweak {
         private static IFeatureHost _mp; // 仅用于读 Config（契约类型）
         private static int _index;
@@ -360,11 +360,13 @@ namespace SR_UCH.Tweaks {
             _netListener = netListener;
 
             // 归属登记同样走槽位，避免与关卡功能产生编译期引用（拆分编译会 CS0103）。
-            // 三个槽位必须在这里 Provide：Level.Snapshot 经 Slots.Require 取 AttributeToHost，
+            // 两个槽位必须在这里 Provide：Level.Snapshot 经 Slots.Require 取 AttributeToHost，
             // 少了这一行快照方块不会登记房主（列表里看不到、清场也带不走）。
-            Slots.Provide(SlotIsPlayerPlaced, (Func<Placeable, bool>)IsPlayerPlaced);
-            Slots.Provide(SlotPlayerPlacedBlocks, (Func<List<Placeable>>)PlayerPlacedBlocks);
-            Slots.Provide(SlotAttributeToHost, (Action<List<Placeable>>)AttributeToHost);
+            // 委托实例存进局部变量：注销时按值匹配，避免误删后来注册的实现（与通知中心同一处理）。
+            Func<List<Placeable>> __ppb = PlayerPlacedBlocks;
+            Action<List<Placeable>> __ath = AttributeToHost;
+            Slots.Provide(SlotPlayerPlacedBlocks, __ppb);
+            Slots.Provide(SlotAttributeToHost, __ath);
             // 关机时把自己提供的槽位摘掉：否则宿主代码仍能 Require 到已失效的实现。
             SRApi.OnShutdown("方块破坏/槽位", delegate {
                 try {
@@ -381,10 +383,9 @@ namespace SR_UCH.Tweaks {
                         }
                         SceneManager.activeSceneChanged -= OnSceneChanged;
                     } catch (Exception __ul) { SRApi.Guard.Log("方块破坏/注销监听", __ul); }
-                    Slots.Retract(SlotIsPlayerPlaced, null);
-                    Slots.Retract(SlotPlayerPlacedBlocks, null);
-                    Slots.Retract(SlotAttributeToHost, null);
-                    SRApi.LogInfo("[方块破坏] 已注销 3 个对外槽位");
+                    Slots.Retract(SlotPlayerPlacedBlocks, __ppb);
+                    Slots.Retract(SlotAttributeToHost, __ath);
+                    SRApi.LogInfo("[方块破坏] 已注销 2 个对外槽位");
                 } catch (Exception __rt) { SRApi.Guard.Log("方块破坏/注销槽位", __rt); }
             });
         }
@@ -404,7 +405,6 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        private const string SlotIsPlayerPlaced = "DestroyBlocks.IsPlayerPlaced";
         private const string SlotPlayerPlacedBlocks = "DestroyBlocks.PlayerPlacedBlocks";
         private const string SlotAttributeToHost = "DestroyBlocks.AttributeToHost";
 
@@ -682,11 +682,6 @@ namespace SR_UCH.Tweaks {
             _infoTarget = null;
             _infoTagTried = false;
         }
-        // 供外部模块调用：是否为玩家放置的道具（关卡自带布局与系统件不算）。
-        public static bool IsPlayerPlaced(Placeable p) {
-            try { return ResolveInfo(p) != null; } catch { return false; }
-        }
-
         // 周期修剪归属表：清掉已销毁（== null 对 Unity 对象成立）或已标记销毁的键。
         // 30 秒一次、只在字典非空时遍历，开销可忽略；不在每帧做是为了不干扰按住删除的热路径。
         private static void PrunePlacementsIfDue() {
