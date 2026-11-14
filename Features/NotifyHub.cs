@@ -538,6 +538,30 @@ namespace SR_UCH.Tweaks {
                 if (sel >= 0 && sel < vals.Length) _corner.Value = vals[sel];
             }
 
+            // ---- 测试 / 验收辅助：走真实提示通道（分级 / 合并 / 静默 / 原生回退都生效）----
+            SRApi.Ctl.SectionTitle("- " + SRApi.T("测试通知", "Test notifications") + " -",
+                SRApi.T("点一下就能看到真实提示：高优先级描边、\u00d7N 合并、连发排队、动画过渡。",
+                        "Fire real notices to verify outline, xN merge, queueing and transitions."));
+            if (SRApi.Ctl.Button(SRApi.T("高优先级（要动手）", "High priority"), SRApi.T("发送一条失败/要处理的提示", "Send a failure/actionable notice")))
+                SRApi.Notify(SRApi.T("测试：操作失败，需要处理", "Test: operation failed, action needed"));
+            GUILayout.Space(SRApi.Ctl.Sc(3f));
+            if (SRApi.Ctl.Button(SRApi.T("一般优先级", "Normal priority"), SRApi.T("发送一条普通反馈", "Send a normal notice")))
+                SRApi.Notify(SRApi.T("测试：这是一条一般提示", "Test: a normal notice"));
+            GUILayout.Space(SRApi.Ctl.Sc(3f));
+            if (SRApi.Ctl.Button(SRApi.T("低优先级（纯确认）", "Low priority"), SRApi.T("发送一条纯确认提示", "Send a plain confirmation")))
+                SRApi.Notify(SRApi.T("测试：已保存", "Test: saved"));
+            GUILayout.Space(SRApi.Ctl.Sc(3f));
+            if (SRApi.Ctl.Button(SRApi.T("连发 5 条（验证排队）", "Burst 5 (verify queue)"), SRApi.T("快速连发不同内容，检查是否依次显示、不被吞", "Fire 5 distinct notices to verify queueing"))) {
+                for (int i = 0; i < 5; i++) SRApi.Notify(SRApi.T("测试连发 ", "Test burst ") + (i + 1));
+            }
+            GUILayout.Space(SRApi.Ctl.Sc(3f));
+            if (SRApi.Ctl.Button(SRApi.T("同一条 ×3（验证合并）", "Same x3 (verify merge)"), SRApi.T("连发同内容，检查显示为 x3", "Fire the same notice 3x to verify xN merge"))) {
+                string same = SRApi.T("测试：同一条消息合并", "Test: same message merge");
+                for (int i = 0; i < 3; i++) SRApi.Notify(same);
+            }
+            GUILayout.Space(SRApi.Ctl.Sc(3f));
+            if (SRApi.Ctl.Button(SRApi.T("清空待显示队列", "Clear pending queue"), SRApi.T("丢掉所有还没上屏的通知（只影响显示）", "Drop all queued notices (display only)")))
+                ClearPending();
         }
 
         // 常驻组件：面板关闭时 DrawGUI 会早退，覆盖层走不到，所以必须自己挂 OnGUI。

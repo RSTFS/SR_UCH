@@ -754,6 +754,19 @@ namespace SR_UCH.Tweaks {
                  "Before every draw the previous rules are re-broadcast at their original values, so guest rules never accumulate round over round.");
             SRApi.Ctl.HotkeyButton("chaos.reroll", SRApi.T("重抽", "Draw"),
                                    SRApi.T("仅房主 / 离线有效", "Host or offline only"), DrawAndBroadcast);
+
+            // ---- 测试 / 验收辅助：离线也能验证卡片布局、图例与"同规则只显示一张" ----
+            SRApi.Ctl.SectionTitle("- " + SRApi.T("测试", "Test") + " -",
+                SRApi.T("模拟抽牌只在本机生效：验证卡片布局、颜色图例、同规则收口；不会发网络消息（离线/单机）。",
+                        "Local-only test draw: verifies card layout, legend and same-rule collapse; no network traffic (offline/single player)."));
+            Line("当前记录 " + _active.Count + " 张 → 实际显示 " + EffectiveIndexes() + " 张（同规则只留最后一张）。",
+                 "Recorded: " + _active.Count + " -> actually shown: " + EffectiveIndexes() + " (last card wins per rule).");
+            if (!IsAuthority) Line("当前不是房主/离线权威端：抽牌测试无效。", "Not host/offline authority: test draw is a no-op.");
+            if (SRApi.Ctl.Button(SRApi.T("测试：立即抽一组牌", "Test: draw now"), SRApi.T("仅房主/离线有效；用于验收牌面卡片", "Host/offline only; for verifying the card display"))) {
+                if (!IsAuthority) SRApi.Notify(SRApi.T("仅房主/离线可以抽牌", "Only host/offline can draw"));
+                else if (_enabled == null || !_enabled.Value) SRApi.Notify(SRApi.T("先打开总开关再测试", "Enable the feature first"));
+                else DrawAndBroadcast();
+            }
         }
 
         // 牌池单独一页：搜索 + 按「数值规则 / 布尔规则」分组勾选 + 批量操作（全选 / 全不选 / 只留减益）。
