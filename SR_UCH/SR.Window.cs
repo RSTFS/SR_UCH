@@ -582,6 +582,7 @@ public partial class SR {
             SRApi.Diag("mode=" + _mode + " section=" + _selectedInternalSection);
             SRApi.Diag("areaH=" + __areaH.ToString("0.0") + " usedTop=" + __usedTop.ToString("0.0") + " barH=" + __barH.ToString("0.0"));
             SRApi.Diag("viewport=" + SRApi.PageViewportHeight.ToString("0.0") + " footerTop=" + (__areaH - __barH).ToString("0.0") + " scrollY=" + _scroll.y.ToString("0.0"));
+            Ctl.ComboWheelIntercept();   // 下拉框上的滚轮：在 ScrollView 之前截走，页面就不会被滚
             bool __noScroll = ScrollViewLatchedForThisFrame();
 
             // 填充页（预设 / 联机）不建立滚动区：它们把列表高度算到"底栏上沿"，

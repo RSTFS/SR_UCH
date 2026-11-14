@@ -276,6 +276,44 @@ public partial class SR {
         public static bool ForceZh { get { return _forceZh; } set { _forceZh = value; } }
         // 滑块提交为“值变了就写”（ImGui 的 v_last 模式）：取 DrawSlider 返回值，变了就调本方法或 SetValue。
         public static Dictionary<ConfigEntryBase, bool> EditOpen { get { return _editOpen; } }
+        // 下拉框矩形登记（上一帧）：窗口在 BeginScrollView 之前据此把滚轮事件截走，
+        // ScrollView 就不会先把整页滚掉（之后 WheelPoll 仍能用 Input.mouseScrollDelta 换选项）。
+        private static System.Collections.Generic.List<Rect> _comboRectsCur = new System.Collections.Generic.List<Rect>();
+        private static System.Collections.Generic.List<Rect> _comboRectsPrev = new System.Collections.Generic.List<Rect>();
+        internal static void ComboFrameBegin() {
+            try {
+                System.Collections.Generic.List<Rect> tmp = _comboRectsPrev;
+                _comboRectsPrev = _comboRectsCur;
+                _comboRectsCur = tmp;
+                _comboRectsCur.Clear();
+            } catch (Exception __cb) { Guard.Log("下拉框矩形/帧切换", __cb); }
+        }
+        internal static void NoteComboRect(Rect r) {
+            try {
+                if (r.width > 1f && r.height > 1f && _comboRectsCur.Count < 128) _comboRectsCur.Add(r);
+            } catch (Exception __cn) { Guard.Log("下拉框矩形/登记", __cn); }
+        }
+        private static int _comboRectFrame = -1;   // ComboFrameBegin 每帧一次的锁存
+        // 窗口在 BeginScrollView 之前调用：鼠标悬停在下拉框上时把滚轮事件截走 + 清掉待处理量，
+        // 这样 ScrollView 不会先滚整页，而下拉框自己的 WheelPoll（读 Input）仍能换选项。
+        internal static void ComboWheelIntercept() {
+            try {
+                if (Time.frameCount != _comboRectFrame) { _comboRectFrame = Time.frameCount; ComboFrameBegin(); }
+                Event __e = Event.current;
+                if (__e != null && __e.type == EventType.ScrollWheel && ComboUnderMouse(__e.mousePosition)) {
+                    SR.Wheel.TakeRemaining(false);
+                    __e.Use();
+                }
+            } catch (Exception __ci) { Guard.Log("下拉框滚轮/拦截", __ci); }
+        }
+
+        internal static bool ComboUnderMouse(Vector2 mp) {
+            try {
+                for (int i = 0; i < _comboRectsPrev.Count; i++) if (_comboRectsPrev[i].Contains(mp)) return true;
+            } catch (Exception __cu) { Guard.Log("下拉框矩形/命中", __cu); }
+            return false;
+        }
+
         // 是否有下拉框处于展开状态：页面滚动区据此让出滚轮（否则滚轮切换下拉项时整页跟着滑）。
         internal static int _comboOpenFrame = -1;
         internal static void NoteComboOpen() { _comboOpenFrame = Time.frameCount; }

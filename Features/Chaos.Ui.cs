@@ -150,7 +150,7 @@ namespace SR_UCH.Tweaks {
                 CfgRow(_announce);
             }
             if (!ModeAllowed())
-                Line("仅派对 / 创意模式可用（超级模式可无视模式限制）。", "Party / Creative only (super mode bypasses mode limits).");
+                Line("仅派对 / 创意模式可用。", "Party / Creative only.");
 
             // 本机开关关掉时，牌面只作跟踪（房主规则仍然生效），必须明说，不能让页面假称"未生效"。
             if (_enabled != null && !_enabled.Value)

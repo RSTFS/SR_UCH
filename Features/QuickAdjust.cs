@@ -23,8 +23,8 @@ namespace SR_UCH.Tweaks {
         // QuickAdjust 的自动重试用来判断"还要等多久"。
         internal static float DelaySeconds { get { try { return _delay != null ? Mathf.Clamp(_delay.Value, 0f, 3f) : 0f; } catch { return 0f; } } }
 
-        // 模式门控一律走契约统一入口：它已含 EX「超级模式（无视模式限制）」豁免。
-        // 直接读 GameSettings.GameMode 的功能在超级模式下会失效（用户要求：所有模式限制都要能被超级模式无视）。
+        // 模式门控一律走契约统一入口：它已含统一模式豁免。
+        // 直接读 GameSettings.GameMode 的功能不走统一门控，模式豁免会失效。
         private static bool ModeOk() {
             try { return SRApi.GateModeAllows(SRApi.ModeMask.Challenge | SRApi.ModeMask.Freeplay); }
             catch (Exception __ex) { SRApi.Guard.Log("重生/模式判定", __ex); return false; }

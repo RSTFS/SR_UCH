@@ -183,7 +183,7 @@ public partial class Experiments : ITweak
         // 自由模式判定：自由相机只在该模式生效（其它模式相机由玩法控制）。
         internal static bool FreeplayMode() {
             try {
-                // 走统一模式门控：开了"超级模式（无视模式限制）"后，非自由模式也能用自由相机
+                // 走统一模式门控：开了统一模式豁免后，非自由模式也能用自由相机
                 return SRApi.FeatureAllowed(typeof(FreeCam));
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机/判断自由模式", __ex); return false; }
         }
@@ -194,7 +194,7 @@ public partial class Experiments : ITweak
                 // （按键边沿由核心 RegisterKey 负责，这里不再轮询 ComboKeyDown。）
                 if (!SRApi.GateMaster) return;
                 // 开关始终可以切换；是否生效由 ApplyToCamera 里的模式门控决定
-                // （非自由模式 = 开了也不动相机，超级模式可无视）。
+                // （非自由模式 = 开了也不动相机，模式豁免可放行）。
                 if (_on != null) { _on.Value = !_on.Value; try { SRApi.Ctl.MarkConfigDirty(_on.ConfigFile); } catch { /* 静默：保存失败不影响功能 */ } }
                 // 模式受限：触发即跳过，不弹提示。
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 快捷键", __ex); }

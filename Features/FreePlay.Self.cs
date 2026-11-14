@@ -1,7 +1,7 @@
 // 自由模式 · 自身状态（完全由 SR 自己实现，不依赖 EX）。
 // 开关：无敌 / 完美无敌 / 飞天 / 无视碰撞。全部只对本地自己生效。
-// 以前这套在 EX 里（ExModule.Core/Other），用户要求 SR 的自身状态必须独立 → 整块搬到这里，
-// EX 里对应的 UI、配置、补丁、槽位全部删除。
+// 早期这套在外部模块里，用户要求 SR 的自身状态必须独立 → 整块搬到这里，
+// 外部模块里对应的 UI、配置、补丁、槽位全部删除。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -18,7 +18,7 @@ namespace SR_UCH {
         private static ConfigEntry<KeyCode> _invincibleKey, _godModeKey, _flyKey, _ignoreCollisionKey;
 
         // 统一门控：EX 的"总开关"语义在 SR 侧就是 GateMaster（设置页 All Enabled）。
-        // 自由模式的功能只在自由模式生效（超级模式经由 GateModeAllows 的豁免自动放行）；
+        // 自由模式的功能只在自由模式生效（统一门控的豁免会自动放行）；
         // 开关本身照常可以打开/关闭，只是非自由模式下"开了无效"。
         private static bool On(ConfigEntry<bool> e) {
             return e != null && e.Value && SRApi.GateMaster && SRApi.FeatureAllowed(typeof(SelfState));

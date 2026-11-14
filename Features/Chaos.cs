@@ -301,7 +301,7 @@ namespace SR_UCH.Tweaks {
         private static bool NetClientActive() { try { return NetworkClient.active; } catch { return false; } }
         private static Modifiers SafeMods() { try { return Modifiers.GetInstance(); } catch { return null; } }
         private static bool IsOnline() { var lm = SafeLobby(); return lm != null && lm.IsInOnlineGame; }
-        // 混乱牌组只在对局允许的模式里生效：派对 / 创意（超级模式由 GateModeAllows 豁免）。
+        // 混乱牌组只在对局允许的模式里生效：派对 / 创意（模式豁免由统一门控处理）。
         // 其它模式一律静默跳过：不抽牌、不接收、不弹提示。
         private static bool ModeAllowed() {
             try {

@@ -46,7 +46,7 @@ internal static class RespawnDelayTimingPatch {
     // 只按角色存会让"先在挑战开过、再回自由关掉"还原成挑战的值。
     private static readonly Dictionary<long, float[]> _orig = new Dictionary<long, float[]>();
 
-    // 当前模式位（GateModeAllows 对所有"模式位掩码"回答 true 表示该位命中；超级模式会让多位同时为真，不影响一致性）。
+    // 当前模式位（GateModeAllows 对所有"模式位掩码"回答 true 表示该位命中；模式豁免会让多位同时为真，不影响一致性）。
     private static int ModeKey() {
         int m = 0;
         if (SRApi.GateModeAllows(SRApi.ModeMask.Freeplay)) m |= 1;

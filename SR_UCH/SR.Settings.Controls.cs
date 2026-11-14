@@ -324,6 +324,7 @@ namespace SR_UCH.Tweaks {
                 if (entry != null) _comboSkipFrame[entry] = Time.frameCount; //展开当帧不绘制列表
             }
             Rect boxRect = GUILayoutUtility.GetLastRect();
+            SR.Ctl.NoteComboRect(boxRect);   // 收起态：滚轮在这里换选项，窗口据此拦截页面滚动
             // 锁存键必须**每个下拉框唯一**：以前 entry 为 null 时键是 "combo:?:宽度"，
             // 一个页面里多个 entry=null、同宽度的下拉框会共用同一份锁存值 ——
             // 点开其中一个，其它几个也跟着把自己的列表画出来（用户反馈：点一个全都展开了）。
@@ -410,6 +411,7 @@ namespace SR_UCH.Tweaks {
                     __first = __sc;
                 }
                 int __last = Mathf.Min(options.Length, __first + __visN);
+                SR.Ctl.NoteComboRect(new Rect(boxRect.x, boxRect.yMax, width, CtlH() * (__last - __first)));
                 for (int i = __first; i < __last; i++) {
                     bool isSel = options[i] == current;
                     if (GUILayout.Button(options[i], isSel ? _selItem : _item, GUILayout.Width(width), GUILayout.Height(CtlH()))) clicked = i;

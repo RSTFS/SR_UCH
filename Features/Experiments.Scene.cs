@@ -167,7 +167,12 @@ public partial class Experiments : ITweak
                 // Skip 会把游戏的 SkipBool 置真且没有取消入口：这里立刻清回 false，
                 // 保证"只关这一次"，下一次加载照常走（与「跳过加载动画」开关互不影响）。
                 try { ClearSkip(sp); } catch (Exception __cs) { SRApi.Guard.Log("关闭遮罩/清SkipBool", __cs); }
-                if (_closeLoadUi != null && _closeLoadUi.Value) CloseLoadingUi();
+                if (_closeLoadUi != null && _closeLoadUi.Value) {
+                    CloseLoadingUi();
+                    // 开启「同时关闭加载界面」时，连加载动画（splash 根对象）一起关闭：停用后动画/音效都不再推进。
+                    try { if (sp != null && sp.gameObject != null) sp.gameObject.SetActive(false); }
+                    catch (Exception __sa) { SRApi.Guard.Log("关闭遮罩/关闭加载动画", __sa); }
+                }
                 Note = closed ? SRApi.T("已关闭一次遮罩", "Mask closed once")
                               : SRApi.T("遮罩不在可关闭状态", "Mask is not in a closable state");
                 SRApi.LogInfo("[实验.场景] " + Note);

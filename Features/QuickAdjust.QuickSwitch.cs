@@ -47,7 +47,7 @@ namespace SR_UCH.Tweaks {
             if (!SRApi.GateMaster || (SRApi.Typing) || !IsLocalCharacter(__instance)) return;
             try
             {
-                // 模式门控统一走 GateModeAllows（已含 IgnoreModeLimit 豁免）。
+                // 模式门控统一走 GateModeAllows（已含模式豁免）。
                 bool freeplayHold = QuickSwitchOn && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay);
                 bool challengeHold = !freeplayHold && QuickRetryFastOn && SRApi.GateModeAllows(SRApi.ModeMask.Challenge);
                 if (freeplayHold)
@@ -115,7 +115,7 @@ namespace SR_UCH.Tweaks {
             {
                 return;
             }
-            // 模式门控统一走 GateModeAllows（已含 IgnoreModeLimit 豁免，模式取不到时一律不放行）。
+            // 模式门控统一走 GateModeAllows（已含模式豁免，模式取不到时一律不放行）。
             if (SRApi.GateModeAllows(SRApi.ModeMask.Challenge))
             {
                 bool dead = !__instance.Success && (__instance.Dead || __instance.Dying || __instance.LocallyDead);
