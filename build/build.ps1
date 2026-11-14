@@ -459,6 +459,20 @@ if ($Deploy) {
             }
         }
     }
+    # 发布可追溯：在插件目录写版本文件（git 短 hash + 构建时间 + 契约 ApiLevel）。
+    try {
+        $hash = (& git -C $Root rev-parse --short HEAD 2>$null)
+        if (-not $hash) { $hash = 'unknown' }
+        $apiLv = '?'
+        $contracts = Join-Path $Root 'SR_UCH\Contracts\Contracts.cs'
+        if (Test-Path -LiteralPath $contracts) {
+            $mm = [regex]::Match([IO.File]::ReadAllText($contracts), 'public\s+const\s+int\s+ApiLevel\s*=\s*(\d+)')
+            if ($mm.Success) { $apiLv = $mm.Groups[1].Value }
+        }
+        $verLine = 'SR_UCH ' + $hash + '  built ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '  ApiLevel ' + $apiLv
+        [IO.File]::WriteAllText((Join-Path $plugins 'SR_UCH.version.txt'), $verLine, (New-Object System.Text.UTF8Encoding($false)))
+        Write-Host ('已写入版本文件: ' + $verLine)
+    } catch { Write-Host ('版本文件写入失败（忽略）: ' + $_.Exception.Message) }
 }
 if ($Separate -and $Deploy) {
     # 阶段B1：分离模式下契约程序集作为依赖放进 BepInEx\core（BepInEx 会先加载 core 里的程序集）
