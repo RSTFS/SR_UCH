@@ -435,12 +435,12 @@ namespace SR_UCH.Tweaks {
 
                     // 只显示通知正文（用户要求去掉「提示/已办/重要」这类前缀）。
                     string head = n.Count > 1 ? "x" + n.Count : null;
-                    // 文本区底部 +1px 缓冲：游戏字体最后一笔常被 CalcSize 少算 1px，
-                    // 不加缓冲时"y/g/p"这类下伸笔画的最后一行会被裁掉。
+                    // 文本区底部 +2px 缓冲：游戏字体最后一笔常被 CalcSize 少算，
+                    // 不加缓冲时"y/g/p"这类下伸笔画的最后一行会被裁掉（用户实测 1px 仍偏紧）。
                     if (head != null)
                         GUI.Label(new Rect(ax + pad, y + 1f * s, w - pad * 2f, 14f * s), head, _small);
                     GUI.Label(new Rect(ax + pad, y + pad * 0.5f + (head != null ? 16f * s : 0f),
-                                       w - pad * 2f - 6f * s, h - pad - (head != null ? 16f * s : 0f) + 1f),
+                                       w - pad * 2f - 6f * s, h - pad - (head != null ? 16f * s : 0f) + 2f),
                               n.Text, _label);
                     // 底部剩余时间条：长度随剩余比例缩短，一眼看出还来得及点。
                     float life = n.Until > n.At ? Mathf.Clamp01((n.Until - now) / (n.Until - n.At)) : 0f;
