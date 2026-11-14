@@ -45,8 +45,14 @@ namespace SR_UCH.Tweaks {
         private sealed class Notice {
             public string Text, Tag, Key;
             public int Level;
-            public float At, Until;
             public int Count = 1;
+            public float At;          // 最近一次到达时刻（合并窗口 / 排序用）
+            public float Stay;        // 每次显示时长（秒）
+            public float ShownAt;     // 首次真正上屏的时刻；0 = 还在排队（排队期间不开始过期）
+            public float EnterAt;     // 入场动画起点；0 = 尚未开始（续期不重播入场）
+            public float DyingAt;     // >0 = 正在退场（淡出 + 侧滑），到时从列表移除
+            public float VisY;        // 绘制纵向位置（新卡插入/退场时平滑让位）
+            public bool VisSet;       // VisY 是否已初始化
         }
 
         private static ConfigEntry<bool> _enabled, _native, _quiet, _onScreen;
@@ -56,6 +62,14 @@ namespace SR_UCH.Tweaks {
 
         private static readonly List<Notice> _history = new List<Notice>();
         private static readonly List<Notice> _visible = new List<Notice>();
+        // 排队上限：Max Visible 只决定「一次画几条」，超出的排队等前一条退场后再上屏，
+        // 因此快速连发也不会互相顶掉；只有排到 16 条还放不下才丢最旧的。
+        private const int PendingCap = 16;
+        private static int _animFrame = -1;   // 一帧内 OnGUI 会跑多趟：动画时间每帧只取一次
+        private static float _animDt;
+
+        private static float AnimIn() { return Mathf.Max(0.001f, _animMs.Value / 1000f); }
+        private static float AnimOut() { return Mathf.Max(0.001f, _animMs.Value / 1000f * 0.9f); }
 
         private static Texture2D _white;
         private static GUIStyle _label, _small, _btn;
@@ -85,16 +99,16 @@ namespace SR_UCH.Tweaks {
                 "Enable notification hub\nTake over all screen toasts: priority, merging, quiet mode and history.");
             SRApi.LocKey(Sec, "Use Native Toast", "使用原生提示", "Use native toast");
             SRApi.LocDesc(Sec, "Use Native Toast",
-                "使用原生提示\n退回游戏原生提示（本功能只记历史，不改屏幕显示）。",
-                "Use native toast\nFall back to the game's own toasts; history is still recorded, display is untouched.");
+                "使用原生提示\n退回游戏原生提示：不接管屏幕，全部提示交给游戏自带样式显示。",
+                "Use native toast\nHand all toasts back to the game's own display; the overlay never takes over, so nothing is swallowed.");
             SRApi.LocKey(Sec, "Show On Screen", "显示局内浮层", "Show on-screen overlay");
             SRApi.LocDesc(Sec, "Show On Screen",
-                "显示局内浮层\n在局内显示一条可折叠的通知浮层；关掉后只保留历史页。",
-                "Show on-screen overlay\nShow a foldable overlay during play; off keeps only the history page.");
+                "显示局内浮层\n在局内显示自绘通知浮层；关掉后提示回到游戏原生样式（不会吞消息）。",
+                "Show on-screen overlay\nShow the custom overlay during play; off falls back to the game's own toasts so nothing is swallowed.");
             SRApi.LocKey(Sec, "Quiet In Match", "对局中静默", "Quiet in match");
             SRApi.LocDesc(Sec, "Quiet In Match",
-                "对局中静默\n对局中静默低/中优先级提示（仍进历史）；高优先级照常弹。",
-                "Quiet in match\nSuppress low/medium priority toasts during a match (still recorded); high priority still pops.");
+                "对局中静默\n对局中静默低/中优先级提示（唯一会主动不显示的情况）；高优先级照常弹。",
+                "Quiet in match\nSuppress low/medium priority toasts during a match (the only case we deliberately hide); high priority still pops.");
             SRApi.LocKey(Sec, "Max Visible", "同时显示条数", "Max visible");
             SRApi.LocDesc(Sec, "Max Visible",
                 "同时显示条数\n浮层最多同时显示几条（1-6）。",
@@ -146,9 +160,9 @@ namespace SR_UCH.Tweaks {
 
         public void Initialize(IFeatureHost plugin) {
             _enabled = plugin.Config.Bind(Sec, "Enabled", true, "统一接管所有屏幕提示：分级、合并、静默。");
-            _native = plugin.Config.Bind(Sec, "Use Native Toast", false, "退回游戏原生提示（本功能只记历史，不改屏幕显示）。");
-            _onScreen = plugin.Config.Bind(Sec, "Show On Screen", true, "在局内显示一条可折叠的通知浮层；关掉后只保留历史页。");
-            _quiet = plugin.Config.Bind(Sec, "Quiet In Match", false, "对局中静默低/中优先级提示（仍进历史）；高优先级照常弹。");
+            _native = plugin.Config.Bind(Sec, "Use Native Toast", false, "退回游戏原生提示：不接管屏幕，全部提示交给游戏自带样式显示（不会出现两边都不显示）。");
+            _onScreen = plugin.Config.Bind(Sec, "Show On Screen", true, "在局内显示自绘通知浮层；关掉后提示回到游戏原生样式（不会吞掉消息）。");
+            _quiet = plugin.Config.Bind(Sec, "Quiet In Match", false, "对局中静默低/中优先级提示（这是唯一会主动不显示的情况）；高优先级照常弹。");
             _maxVisible = plugin.Config.Bind(Sec, "Max Visible", 3,
                 new ConfigDescription("浮层最多同时显示几条（1-6）。", new AcceptableValueRange<int>(1, 6)));
             _toastSeconds = plugin.Config.Bind(Sec, "Toast Seconds", 2,
@@ -172,6 +186,10 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterFooterButton(Sec, "通知", "Notify", null);
             SRApi.RegisterPage(Sec, "HubOptions", "通知设置", "Settings", 20, RenderOptionsPage);
             SRApi.RegisterTick("通知中心-绑定与过期", Tick);
+            // 关掉自绘浮层的开关时清空待显示队列：否则重新打开会把过期旧消息一次性弹出来。
+            _native.SettingChanged += (s2, e2) => { if (_native.Value) ClearPending(); };
+            _onScreen.SettingChanged += (s2, e2) => { if (!_onScreen.Value) ClearPending(); };
+            _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) ClearPending(); };
 
             // 核心 NotifyImpl 会惰性查这个名字；Provide 之后所有来源的提示都会进 OnNotify。
             Func<string, string, bool> __hook = (t, g) => OnNotify(t, g); _provided[HookSlot] = __hook; Slots.Provide(HookSlot, __hook);
@@ -198,9 +216,31 @@ namespace SR_UCH.Tweaks {
         private static void Tick() {
             try {
                 float now = Time.unscaledTime;
-                for (int i = _visible.Count - 1; i >= 0; i--) if (_visible[i].Until <= now) _visible.RemoveAt(i);
-
+                float outDur = AnimOut();
+                for (int i = _visible.Count - 1; i >= 0; i--) {
+                    Notice n = _visible[i];
+                    if (n.DyingAt > 0f) {
+                        if (now - n.DyingAt >= outDur) _visible.RemoveAt(i);   // 退场播完再真正移除
+                        continue;
+                    }
+                    // 只有真正上屏过的才开始计时：排队期间不消耗停留时间，
+                    // 否则连发一批消息时，排在后面的还没轮到就"过期"了（表现为漏消息）。
+                    if (n.ShownAt > 0f && now - n.ShownAt >= Mathf.Max(0.4f, n.Stay)) n.DyingAt = now;
+                }
             } catch (Exception ex) { SRApi.Guard.Log("通知中心/Tick", ex); }
+        }
+
+        private static void ClearPending() {
+            try { _visible.Clear(); _history.Clear(); } catch (Exception ex) { SRApi.Guard.Log("通知中心/清空队列", ex); }
+        }
+
+        // 队列排序 + 上限：高优先级在前，同级新的在前（Level 相同按到达时间倒序）。
+        private static void SortTrim() {
+            _visible.Sort(delegate (Notice a, Notice b) {
+                int c = b.Level.CompareTo(a.Level);
+                return c != 0 ? c : b.At.CompareTo(a.At);
+            });
+            while (_visible.Count > PendingCap) _visible.RemoveAt(_visible.Count - 1);
         }
 
         // ============ 通知入口（核心 NotifyImpl 调用） ============
@@ -210,13 +250,14 @@ namespace SR_UCH.Tweaks {
         /// <summary>返回 true = 已接管屏幕显示；false = 让核心照旧用游戏原生提示。</summary>
         private static bool OnNotify(string text, string tag) {
             if (_enabled == null || !_enabled.Value) return false;
-            // 「退回游戏原生提示」只让出屏幕，不跳过收口：合并、分级照常进行。
-            // 否则那个开关就变成「整个功能关掉」，与配置说明的设计相矛盾。
+            // 「退回原生提示」和「关掉局内浮层」都表示我们不上屏：必须把屏幕交回核心，
+            // 否则核心以为已处理、浮层又没画，消息就彻底消失了（旧逻辑正是这样吞消息的）。
             bool native = _native == null || _native.Value;
+            if (native || _onScreen == null || !_onScreen.Value) return false;
             // 防重入：外部回调若也发提示，这里直接放行给原生通道，
             // 绝不形成 Notify -> OnNotify -> Notify 的无限递归。
             if (_inNotify) return false;
-            if (string.IsNullOrEmpty(text)) return !native;         // 空提示不占历史
+            if (string.IsNullOrEmpty(text)) return true;         // 空提示不占队列，但已接管屏幕
             _inNotify = true;
             try {
                 float now = Time.unscaledTime;
@@ -225,8 +266,6 @@ namespace SR_UCH.Tweaks {
                 float stay = Mathf.Clamp(_toastSeconds.Value, 1f, 5f);
 
                 // 同类合并：3 秒窗口内同 key 只累加计数并续期，不再插入新行。
-                // 必须全表扫：命中后会把该条的 At 刷新为 now，但它仍留在 List 的旧位置；
-                // 一旦"时间已旧"的条目先被遇到就 break，后面刚续期的新条目反而扫不到（合并偶发失效）。
                 Notice merged = null;
                 for (int i = _history.Count - 1; i >= 0; i--) {
                     if (_history[i].Key != key) continue;
@@ -235,44 +274,43 @@ namespace SR_UCH.Tweaks {
                 }
                 if (merged != null) {
                     merged.Count++;
-                    merged.Until = now + stay;
                     merged.At = now;
-                    // 屏幕上还挂着这张卡时一并刷新计数与停留时间：
-                    // 以前只改数据不更新看板，连点几次看起来像"没反应/漏了一条"。
-                    for (int vi = 0; vi < _visible.Count; vi++) {
-                        if (_visible[vi].Key != key) continue;
-                        _visible[vi].Count = merged.Count;
-                        _visible[vi].Until = merged.Until;
-                        _visible[vi].At = now;
-                        break;
+                    merged.Stay = stay;
+                    merged.Level = Mathf.Max(merged.Level, level);
+                    // 已经不在队列里（上一轮已经显示完并移除了）：重新排队，保证同一条消息
+                    // 在 3 秒窗口内再次出现时不会被"合并掉"而完全看不到。
+                    bool queued = false;
+                    for (int vi = 0; vi < _visible.Count; vi++) if (_visible[vi].Key == key) { queued = true; break; }
+                    if (queued) {
+                        bool wasDying = merged.DyingAt > 0f;
+                        merged.DyingAt = 0f;
+                        merged.ShownAt = now;      // 已在屏上：续满停留时间，不重播入场动画
+                        if (wasDying) merged.EnterAt = 0f;   // 退场中被续期：重新淡入
+                    } else {
+                        merged.ShownAt = 0f;       // 重新排队：等轮到它再开始计时
+                        merged.EnterAt = 0f;
+                        merged.DyingAt = 0f;
+                        merged.VisSet = false;
+                        _visible.Add(merged);
+                        SortTrim();
                     }
-                    return !native;
+                    return true;
                 }
 
                 Notice n = new Notice();
                 n.Text = text; n.Tag = tag ?? ""; n.Key = key; n.Level = level;
-                n.At = now; n.Until = now + stay;
+                n.At = now; n.Stay = stay;
 
                 _history.Add(n);
-                // 只保留最近的内部缓冲（用于合并去重），不再对外提供历史页。
                 while (_history.Count > 64) _history.RemoveAt(0);
 
-                bool quiet = _quiet.Value && level < 2 && InMatch();
-                if (!native && !quiet && _onScreen.Value) {
+                // 对局中静默是唯一"故意不显示"的分支，其余一律排队上屏。
+                bool quiet = _quiet != null && _quiet.Value && level < 2 && InMatch();
+                if (!quiet) {
                     _visible.Add(n);
-                    int max = Mathf.Clamp(_maxVisible.Value, 1, 6);
-                    // 高优先级排最前：要动手的卡片永远在最上面。
-                    // 同级时新的排前面：以前只按 Level 排序（不稳定），超上限时 RemoveAt(末尾)
-                    // 可能把刚到的消息丢掉 → 表现为"通知不灵敏、偶尔漏消息"。
-                    _visible.Sort(delegate (Notice a, Notice b) {
-                        int c = b.Level.CompareTo(a.Level);
-                        return c != 0 ? c : b.At.CompareTo(a.At);
-                    });
-                    while (_visible.Count > max) _visible.RemoveAt(_visible.Count - 1);
+                    SortTrim();
                 }
-
-                // 写进关卡记录器时间线：低优先级的纯确认不写，避免刷屏。
-                return !native;
+                return true;
             } catch (Exception ex) {
                 SRApi.Guard.Log("通知中心/收口", ex);
                 return false;   // 出错时退回原生显示，宁可多弹一条也不能丢提示
@@ -342,7 +380,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void DrawToast() {
-            if (_enabled == null || !_enabled.Value || !_onScreen.Value || _visible.Count == 0 || Event.current == null) return;
+            if (_enabled == null || !_enabled.Value || _onScreen == null || !_onScreen.Value || _visible.Count == 0 || Event.current == null) return;
             EnsureStyles();
             float s = Mathf.Clamp(_cardScale.Value / 160f, 0.5f, 1.0f);
             _label.fontSize = Mathf.RoundToInt(12f * s);
@@ -351,50 +389,92 @@ namespace SR_UCH.Tweaks {
 
             float w = Mathf.Clamp(_cardW.Value * s, 100f, 300f);   // 默认 200；s = 整层缩放
             float pad = 8f * s;
+            float gap = 4f * s;
             float now = Time.unscaledTime;
+            float dIn = AnimIn();
+            float dOut = AnimOut();
 
-            // 先算总高，再从停靠角反推起点；条目按优先级从高到低自上而下排。
-            float[] heights = new float[_visible.Count];
-            float total = 0f;
-            for (int i = 0; i < _visible.Count; i++) {
-                float th = Mathf.Max(18f * s, _label.CalcHeight(new GUIContent(_visible[i].Text), w - pad * 2f - 14f * s));
-                heights[i] = th + pad * 2f + 4f * s;
-                total += heights[i] + 4f * s;
+            // 一帧里 OnGUI 会跑多趟（Layout/Repaint/事件），动画时间只能取一次。
+            if (_animFrame != Time.frameCount) {
+                _animFrame = Time.frameCount;
+                _animDt = Mathf.Clamp(Time.unscaledDeltaTime, 0f, 0.05f);
             }
+            // 纵向位置过渡：指数逼近、帧率无关；关掉动画时直接把位置对齐目标。
+            float k = (_animOn.Value && _animDt > 0.001f) ? (1f - Mathf.Exp(-14f * _animDt)) : 1f;
+
+            // 一次最多画 Max Visible 条；超出的排队（退场中的必须继续画完，不能瞬间消失）。
+            int cap = Mathf.Clamp(_maxVisible.Value, 1, 6);
+            int n = _visible.Count;
+            float[] heights = new float[n];
+            bool[] draw = new bool[n];
+            int drawnCount = 0;
+            float total = 0f;
+            for (int i = 0; i < n; i++) {
+                Notice it = _visible[i];
+                float th = Mathf.Max(18f * s, _label.CalcHeight(new GUIContent(it.Text), w - pad * 2f - 14f * s));
+                heights[i] = th + pad * 2f + gap;
+                if (it.DyingAt > 0f || drawnCount < cap) { draw[i] = true; drawnCount++; total += heights[i]; }
+            }
+            if (drawnCount == 0) return;
+            // 被更高优先级挤到画面外的卡片退回排队：不消耗它的停留时间，等下次轮到再完整显示，
+            // 否则"来了更重要的提示"会把正在显示的低优先级提示挤掉、而且它还没看满时间就过期了。
+            for (int i = 0; i < n; i++) {
+                if (draw[i]) continue;
+                Notice it = _visible[i];
+                if (it.DyingAt > 0f) continue;
+                if (it.ShownAt > 0f) { it.ShownAt = 0f; it.EnterAt = 0f; it.VisSet = false; }
+            }
+
             int corner = Mathf.Clamp(_corner.Value, 0, 3);
             float x = (corner == 2 || corner == 3) ? 12f : Screen.width - w - 12f;
-            float y = (corner == 0 || corner == 2) ? Screen.height - total - 12f : 12f;
+            float yStart = (corner == 0 || corner == 2) ? Screen.height - total - 12f : 12f;
+            bool fromLeft = (corner == 2 || corner == 3);
 
             int prevDepth = GUI.depth;
             Color prevColor = GUI.color;
             try {
                 GUI.depth = 3;   // 比局内简报(2) 更靠上；finally 还原，不污染全局
-                for (int i = 0; i < _visible.Count; i++) {
-                    Notice n = _visible[i];
+                float target = yStart;
+                for (int i = 0; i < n; i++) {
+                    if (!draw[i]) continue;
+                    Notice nt = _visible[i];
                     float h = heights[i];
-                    // 动画：出现时 0.18 秒淡入 + 从停靠侧滑入 8px；消失前 0.22 秒淡出。
-                    float age = Mathf.Max(0f, now - n.At);
-                    float left = Mathf.Max(0f, n.Until - now);
-                    float dIn = Mathf.Max(0.001f, _animMs.Value / 1000f);
-                    float dOut = dIn * 1.2f;
-                    float anim = _animOn.Value ? Mathf.Clamp01(age / dIn) : 1f;
-                    if (_animOn.Value && left < dOut) anim *= Mathf.Clamp01(left / dOut);
-                    anim = anim * anim * (3f - 2f * anim);                 // smoothstep，起落都不生硬
-                    float slide = _animOn.Value ? (1f - Mathf.Clamp01(age / Mathf.Max(0.001f, _animMs.Value / 1000f))) * 8f * s : 0f;
-                    float ax = x + ((corner == 2 || corner == 3) ? -slide : slide);
-                    float aa = Mathf.Clamp01(anim);
+                    // 位置过渡：新卡插到上面 / 前一条退场，都会让目标 Y 变化；这里平滑过去，
+                    // 而不是让整列卡片瞬移（这就是"过渡"的第二层）。
+                    if (!nt.VisSet) { nt.VisY = target; nt.VisSet = true; }
+                    else nt.VisY = (k >= 1f) ? target : Mathf.Lerp(nt.VisY, target, k);
+                    float y = nt.VisY;
+
+                    // 入场：淡入 + 从停靠侧滑入 10px（三次缓出）；退场：淡出 + 同侧滑出。
+                    if (nt.EnterAt <= 0f) {
+                        nt.EnterAt = now;
+                        if (nt.ShownAt <= 0f) nt.ShownAt = now;
+                    }
+                    float aa = 1f;
+                    if (_animOn.Value) {
+                        float age = Mathf.Max(0f, now - nt.EnterAt);
+                        float t = Mathf.Clamp01(age / dIn);
+                        float ease = 1f - (1f - t) * (1f - t) * (1f - t);
+                        aa = ease;
+                    }
+                    if (nt.DyingAt > 0f) aa *= Mathf.Clamp01(1f - (now - nt.DyingAt) / dOut);
+                    aa = Mathf.Clamp01(aa);
+                    float slide = (aa < 1f) ? (1f - aa) * 10f * s : 0f;
+                    float ax = x + (fromLeft ? -slide : slide);
+
                     Color prevGui = GUI.color;
                     GUI.color = new Color(1f, 1f, 1f, aa);
                     Rect box = new Rect(ax, y, w, h);
                     float cardA = Mathf.Clamp01(_cardAlpha.Value / 100f) * aa;
                     Fill(box, new Color(0.06f, 0.08f, 0.11f, cardA));
                     // 左侧优先级色条：颜色之外还有「长短」这一重编码（高=最长）。
-                    Color bar = n.Level == 2 ? new Color(1f, 0.55f, 0.22f, 1f)
-                              : n.Level == 1 ? new Color(0.36f, 0.72f, 1f, 1f)
+                    Color bar = nt.Level == 2 ? new Color(1f, 0.55f, 0.22f, 1f)
+                              : nt.Level == 1 ? new Color(0.36f, 0.72f, 1f, 1f)
                               : new Color(0.55f, 0.60f, 0.66f, 1f);
-                    Fill(new Rect(ax, y, (n.Level == 2 ? 6f : 3f) * s, h), new Color(bar.r, bar.g, bar.b, aa));
+                    float barW = (nt.Level == 2 ? 6f : 3f) * s;
+                    Fill(new Rect(ax, y, barW, h), new Color(bar.r, bar.g, bar.b, aa));
                     // 高优先级加一圈同色描边：颜色之外再给一层"更醒目"的编码（不新增素材）。
-                    if (n.Level == 2) {
+                    if (nt.Level == 2) {
                         Color oc = new Color(bar.r, bar.g, bar.b, 0.55f * aa);
                         float t = Mathf.Max(1f, 1f * s);
                         Fill(new Rect(box.x, box.y, box.width, t), oc);
@@ -404,20 +484,20 @@ namespace SR_UCH.Tweaks {
                     }
 
                     // 只显示通知正文（用户要求去掉「提示/已办/重要」这类前缀）。
-                    string head = n.Count > 1 ? "x" + n.Count : null;
+                    string head = nt.Count > 1 ? "x" + nt.Count : null;
                     // 文本区底部 +2px 缓冲：游戏字体最后一笔常被 CalcSize 少算，
                     // 不加缓冲时"y/g/p"这类下伸笔画的最后一行会被裁掉（用户实测 1px 仍偏紧）。
                     if (head != null)
                         GUI.Label(new Rect(ax + pad, y + 1f * s, w - pad * 2f, 14f * s), head, _small);
                     GUI.Label(new Rect(ax + pad, y + pad * 0.5f + (head != null ? 16f * s : 0f),
                                        w - pad * 2f - 6f * s, h - pad - (head != null ? 16f * s : 0f) + 2f),
-                              n.Text, _label);
-                    // 底部剩余时间条：长度随剩余比例缩短，一眼看出还来得及点。
-                    float life = n.Until > n.At ? Mathf.Clamp01((n.Until - now) / (n.Until - n.At)) : 0f;
-                    Fill(new Rect(ax + (n.Level == 2 ? 6f : 3f) * s, y + h - 3f * s, (w - (n.Level == 2 ? 6f : 3f) * s) * life, 3f * s),
+                              nt.Text, _label);
+                    // 底部剩余时间条：从满格开始缩短（排队期间还没上屏，不画消耗）。
+                    float life = Mathf.Clamp01(1f - Mathf.Max(0f, now - nt.ShownAt) / Mathf.Max(0.4f, nt.Stay));
+                    Fill(new Rect(ax + barW, y + h - 3f * s, (w - barW) * life, 3f * s),
                          new Color(bar.r, bar.g, bar.b, 0.85f * aa));
                     GUI.color = prevGui;
-                    y += h + 4f * s;
+                    target += h;
                 }
             } finally {
                 GUI.depth = prevDepth;

@@ -92,12 +92,12 @@ and can see the current rule in the vanilla rules UI. The host is excluded by th
 - **Always reversible** -- rule values are snapshotted at match start. Turning the deck off or
   ending the match re-broadcasts each rule's original treehouse value (so guests without the mod
   revert too), restores the host's local copy, and tells modded guests to clear their card display.
-- **Room mod roster** -- a periodic handshake on the same rule message shows which players have
-  the mod installed. All messages arrive over the server connection on a client, so the handshake
-  identifies senders by local player number rather than `conn.connectionId`.
-  `None` + magic channel and only the host acts on it: a pending card appears on the Chaos page
-  with Accept / Ignore, expiring after 20 seconds (extendable and reopenable from Notification Hub). Accepting still uses the real rule broadcast,
-  so guests without the mod change too. Offline you are the host -- just use the reroll key.
+- **Room mod roster** -- a periodic handshake (30 s) on the same rule message shows which players
+  have the mod installed. All messages arrive over the server connection on a client, so the
+  handshake identifies senders by local player number rather than `conn.connectionId`.
+  Only the host (or the local machine offline) draws; guests receive the result on the `None` +
+  magic channel and just apply it. There is no approval/proposal flow: offline you are the host,
+  just use the reroll key.
 - Uses only rules and message types the game already has: **no new Harmony patches, no new msgType,
   no new reflection registrations, no camera changes, no spawned objects, no threads**.
 
@@ -128,16 +128,21 @@ One place for every screen toast. All notice sources (core, `Notify`, `NotifyT`,
 converge on `SR.Notify.cs`'s `NotifyImpl`, so a single optional hook in the core collects them
 without touching any call site or changing behaviour when the feature is absent.
 
-- Priority tiers: things you must act on (guest proposals, failures, refusals) > normal feedback >
+- Priority tiers: things you must act on (failures, refusals, blocks) > normal feedback >
   plain confirmations. Same-source duplicates within 3 s merge into one `xN` row.
-- **Quiet in match** silences low/normal toasts on screen (they still go to history); high priority
-  always shows. A **Use Native Toast** switch restores the game's own toasts as a zero-risk rollback.
-- History page: filter by level / text / reopenable, paginate, expand a row for full text, copy or
-  export to `BepInEx\config\SR_UCH\notices.txt`, clear all.
-- Expired Chaos proposals can be **reopened** from history, so a 20-second window is no longer
-  "miss it and it is gone". Medium/high notices are also written into the Level Recorder timeline.
-- A self-owned `MonoBehaviour.OnGUI` strip shows the newest notices in the game view with a
-  priority colour bar, a shape-coded length marker and a shrinking lifetime bar.
+- **Nothing gets swallowed**: if either **Use Native Toast** or **Show On Screen** is off, the hub
+  hands the screen back to the game's own toasts instead of taking over and showing nothing.
+  **Quiet in match** is the only deliberate suppression (low/normal during a match); high priority still pops.
+- **No drops under bursts**: Max Visible only decides how many cards are drawn at once; extra
+  messages queue (up to 16) and slide in as earlier cards expire. A card's dwell time only starts
+  once it is actually on screen, so a long queue never makes later messages expire unseen.
+- A self-owned `MonoBehaviour.OnGUI` strip draws the cards: a priority colour bar (with a
+  length-coded bar), a shrinking lifetime bar, and a same-colour outline for high priority.
+- **Transitions**: cards fade + slide in from the docked side, the whole column eases to its new
+  positions when cards are inserted or removed, and cards fade + slide out before being removed.
+- Appearance: card width (100-300, default 200), opacity (20-100%), layer scale (80-160%), corner
+  (bottom-right/top-right/bottom-left/top-left), max visible (1-6), dwell seconds (1-5), animation
+  toggle and duration (80-400 ms).
 
 ### Player Tracker
 
