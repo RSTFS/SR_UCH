@@ -117,14 +117,13 @@ namespace SR_UCH.Tweaks {
             CancelPendingOnBlank(pendingBefore);
         }
 
-        // 唯一应用入口：notches > 0 = 向下滚。
+        // 唯一应用入口：入参与 Wheel.Value / WheelPoll 同号 —— **上滚为正**（下滚为负）。
+        // 以前按"正 = 向下"写，与核心 TableWheelInput（e.delta.y 向下为正）方向对冲 → 列表滚不动。
+        // 步长统一为 Sc(56)（与联机列表一致，不再每个列表一套手感）。
         private static void ApplyListWheel(float notches) {
-            // 没有滚轮时**不做任何夹取**：Layout / Repaint 两趟算出的 box.height 可能不同，
-            // 每帧无条件 Clamp 会把刚滚到的位置夹回去（表现为"滚一下弹回顶部/滚不动"）。
             if (Mathf.Abs(notches) < 0.01f) return;
-            float rowH = SRApi.Ctl.TableRowH();
             float before = _scrollRows.y;
-            _scrollRows.y = Mathf.Clamp(_scrollRows.y + notches * rowH * 3f, 0f, _listMaxY);
+            _scrollRows.y = Mathf.Clamp(_scrollRows.y - notches * SRApi.Ctl.Sc(56f), 0f, _listMaxY);
             if (Mathf.Abs(_scrollRows.y - before) > 0.01f) {
                 try { SRApi.MarkWheelUsed(); } catch { /* 静默：非关键路径 */ }
             }
@@ -140,6 +139,8 @@ namespace SR_UCH.Tweaks {
             try {
                 if (Time.frameCount - _listPageFrame > 2) return false;   // 不是本页
                 if (Mathf.Abs(wheel) < 0.0001f) return false;
+                // 命中测试：只有鼠标在表格矩形上才归列表滚（否则在搜索框/工具行上滚也会带动列表）。
+                if (_tableBox.width <= 1f || !_tableBox.Contains(mouse)) return false;
                 if (_listWheelFrame == Time.frameCount) return true;      // 绘制期已经滚过
                 _listWheelFrame = Time.frameCount;
                 float notches = Mathf.Abs(wheel) < 0.5f ? 1f : Mathf.Round(Mathf.Abs(wheel));
@@ -173,6 +174,9 @@ namespace SR_UCH.Tweaks {
             float rowsH = SRApi.Ctl.ScrollRowsH(box, headerH, __bottom, rowH);
             _listMaxY = SRApi.Ctl.TableMaxScrollY(visible.Count, rowH, rowsH);
             _maxScrollY = _listMaxY;
+            // 每帧把滚动位置夹回当前 maxY（与联机 Online.Table.cs 同一行）：窗口缩放/切页/页头高度变化后，
+            // scrollY 不会停留在旧上限，也不会出现"到底了还差一行"或滚过头的空表体。
+            _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _listMaxY);
             _rowsHCache = rowsH;
             _listPageFrame = Time.frameCount;
 
@@ -254,16 +258,19 @@ namespace SR_UCH.Tweaks {
 
                 _hiddenBeforeTable = _hiddenCols.Count;
                 // 滚轮入口照联机列表：绘制期就地在表格矩形上取用（表格区域优先于页面钩子）。
+                bool __wheelHandled = false;
                 try {
                     float __wheelNow = SRApi.Ctl.WheelPoll("presets.table", box);
                     if (Mathf.Abs(__wheelNow) > 0.01f) {
                         _listWheelFrame = Time.frameCount;
+                        __wheelHandled = true;
                         ApplyListWheel(__wheelNow);
                     }
                 } catch (Exception __wp) { SRApi.Guard.Log("预设列表/区域滚轮", __wp); }
                 // 滚轮交给核心（TableWheelInput 与 TableDraw 语义完全一致：ScrollWheel 事件、
                 // box 命中、maxY>0 才滚、到边界不消费）。**在绘制前**调用，先改 scrollY 再绘制。
-                if (e != null) {
+                // 绘制期 WheelPoll 已经滚过就跳过：两条入口都滚会变双倍步长（联机列表也是这个问题）。
+                if (e != null && !__wheelHandled) {
                     try {
                         // 核心吃掉滚轮后必须打帧锁：否则同一帧的帧尾 page hook 会再滚一次（一格滚两倍）。
                         if (SRApi.TableWheelInput(e, box, mp, _maxScrollX, _listMaxY, ref _scrollCols, ref _scrollRows))

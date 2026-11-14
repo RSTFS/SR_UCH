@@ -293,7 +293,7 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterPage(Section, "list", "预设列表", "List", 20, RenderListPage);
             SRApi.RegisterPageWheel(OnListPageWheel);   // 帧尾兜底：绘制期没取到滚轮时由窗口派发
             // 与「联机」列表一致：填充页没有页面滚动区，滚轮由列表自己接（窗口按栏目派发）。
-            SRApi.Ctl.RegisterFillScroll("presets", delegate (float __w) {
+            SRApi.Ctl.RegisterFillScroll(Section, delegate (float __w) {
                 try { ApplyListWheel(PageWheelSign * Mathf.Sign(__w) * Mathf.Max(1f, Mathf.Abs(__w))); }
                 catch (Exception __fw) { SRApi.Guard.Log("布局预设/填充页滚轮", __fw); }
             });
