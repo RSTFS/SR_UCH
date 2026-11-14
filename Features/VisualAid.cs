@@ -119,9 +119,14 @@ namespace SR_UCH.Tweaks {
                 _useDistance.SettingChanged += (s, e) => Refresh();
                 _distance.SettingChanged += (s, e) => Refresh();
 
-                SRApi.RegisterKey("视觉辅助-开关", _toggleKey, "toggle");
+                SRApi.RegisterKey("视觉辅助-开关", _toggleKey, "press", delegate {
+                    try {
+                        if (_toggleKey == null || _enabled == null) return;
+                        _enabled.Value = !_enabled.Value;
+                        SRApi.Ctl.MarkConfigDirty(_enabled.ConfigFile);
+                    } catch (Exception __vk) { SRApi.Guard.Log("视觉辅助/开关键", __vk); }
+                });
                 // 快捷键与 Enable 开关逻辑相连：按一下就切换同一个配置开关（与页面复选框等价）。
-                SRApi.RegisterTick("视觉辅助-开关键", PollToggleKey);
 
                 _conflict = DetectCamHog();
                 if (_conflict) SRApi.LogWarn("视觉辅助：检测到 CamHog，已让位（避免两边同时改透明度）。");
@@ -133,18 +138,6 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void Shutdown() { _shutdown = true; RestoreAll(); }
-        private static int _keyFrame = -1;
-        private static void PollToggleKey() {
-            if (_toggleKey == null || _enabled == null) return;
-            if (_keyFrame == Time.frameCount) return;   // 一帧只判定一次（OnGUI 多趟不重复触发）
-            _keyFrame = Time.frameCount;
-            try {
-                if (!SRApi.ComboKeyDown(_toggleKey)) return;
-                _enabled.Value = !_enabled.Value;
-                try { SRApi.Ctl.MarkConfigDirty(_enabled.ConfigFile); } catch (Exception __md) { SRApi.Guard.Log("视觉辅助/保存开关", __md); }
-            } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/开关键", __ex); }
-        }
-
         // 不透明度步进 10：滑条/手输都收敛到整十（0,10,...,100），避免出现 37% 这种值。
         private static void FixOpacityStep() {
             if (_fixingOpacity || _opacityPercent == null) return;

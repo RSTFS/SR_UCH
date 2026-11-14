@@ -108,8 +108,7 @@ public partial class Experiments : ITweak
                 _followSpeed = plugin.Config.Bind("自由模式", "Free Camera Speed", 1f,
                     new ConfigDescription("相机跟随角色的速度倍数（0-10，每次 0.5，1 = 游戏原值；与自由相机开关无关）",
                         new AcceptableValueRange<float>(0f, 10f)));
-                SRApi.RegisterKey("实验-自由相机", _key, "press");
-                SRApi.RegisterTick("KEY_FREECAM", CheckKey);
+                SRApi.RegisterKey("实验-自由相机", _key, "press", CheckKey);
                 SRApi.RegisterWheelHook(WheelZoom);
                 // 启动时不再"强制重置并写盘"（评审 G8：会覆盖用户手动保存的设置，且每次启动都写 cfg）。
                 // 只修非法值：FOV 超出范围时回落到默认 10；开关状态完全交给用户/会话控制。
@@ -192,8 +191,8 @@ public partial class Experiments : ITweak
         internal static void CheckKey() {
             try {
                 // 总开关必须在此判定，否则关闭模组后快捷键仍能改游戏相机。
+                // （按键边沿由核心 RegisterKey 负责，这里不再轮询 ComboKeyDown。）
                 if (!SRApi.GateMaster) return;
-                if (!SRApi.ComboKeyDown(_key)) return;
                 // 开关始终可以切换；是否生效由 ApplyToCamera 里的模式门控决定
                 // （非自由模式 = 开了也不动相机，超级模式可无视）。
                 if (_on != null) { _on.Value = !_on.Value; try { SRApi.Ctl.MarkConfigDirty(_on.ConfigFile); } catch { /* 静默：保存失败不影响功能 */ } }

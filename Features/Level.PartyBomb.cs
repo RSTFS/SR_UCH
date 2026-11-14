@@ -173,17 +173,8 @@ namespace SR_UCH.Tweaks {
                 SRApi.LocDesc("Level", "Drop Held Piece", "放弃道具按键\n派对阶段丢弃手上的道具（游戏原生通道）\n请勿删除边界墙和出生方块，删了无法复原", "Drop held piece\ndiscards the held piece during the pick phase via the game channel\nnever delete boundary walls or spawn blocks - it cannot be undone");
                 _key = plugin.Config.Bind("Level", "Drop Held Piece", KeyCode.None,
                     "按这个键就把手上拿着的那块丢掉（走游戏原生通道, 全员可见）, 填 None 就是不绑键.");
-                SRApi.RegisterKey("关卡-放弃道具", _key, "press");
-                SRApi.RegisterTick("KEY_DROP", Tick);
+                SRApi.RegisterKey("关卡-放弃道具", _key, "press", Perform);
             } catch (Exception __ex) { SRApi.Guard.Log("放弃道具 初始化", __ex); }
-        }
-
-        private static void Tick() {
-                // 不做帧取模节流：一次点按可能只有 50-100ms，取模会整段漏掉（"不跟手"）。
-                // ComboKeyDown 内部已按帧缓存，每帧调用开销可忽略。
-            if (_key == null || _key.Value == KeyCode.None) return;
-            if (!SRApi.ComboKeyDown(_key)) return;
-            Perform();
         }
 
         // 执行放弃道具；门控集中在此处。
