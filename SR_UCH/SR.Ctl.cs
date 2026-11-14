@@ -210,7 +210,7 @@ public partial class SR {
             else if (height > 0f) clicked = GUILayout.Button(c, SR.Ctl.Btn, GUILayout.Height(Sc(height)));
             else clicked = GUILayout.Button(c, SR.Ctl.Btn);
             // 长按连发：刷新派对盒这类按钮不用狂点（与 HotkeyButton 同一套节流，按 label 分桶）。
-            return clicked || SR.HoldRepeatFor("btn:" + (label ?? ""));
+            return clicked;
         }
 
         public static void WrapLabel(string text) { SR.WrapLabel(text); }
@@ -453,12 +453,9 @@ public partial class SR {
             // 按钮：左键永远执行动作；绑定用右键。
             if (clicked && evBtn != 0) clicked = false; //右键绝不触发左键动作
             if (key != null && e != null) TryBindByRightClick(key, GUILayoutUtility.GetLastRect());
-            return (clicked && !capturing) || HoldRepeat(id);
+            return clicked && !capturing;
         }
 
-        // 长按连发：按住按钮 0.45 秒后每 0.12 秒再触发一次（刷新派对盒这类操作不用狂点）。
-        private static readonly Dictionary<string, float> _holdNext = new Dictionary<string, float>();
-        private static readonly Dictionary<string, bool> _holdPrimed = new Dictionary<string, bool>();
 
         // 可折叠分区（功能层经 SRApi.Ctl.SectionBegin/SectionEnd 使用）。
         private static readonly HashSet<string> _secClosed = new HashSet<string>();
@@ -477,28 +474,7 @@ public partial class SR {
 
         internal static void SectionEnd() { GUILayout.EndVertical(); }
 
-        internal static bool HoldRepeatFor(string id) { return HoldRepeat(id); }
 
-        private static bool HoldRepeat(string id) {
-            try {
-                if (string.IsNullOrEmpty(id)) return false;
-                bool held = Input.GetMouseButton(0);
-                Rect r = GUILayoutUtility.GetLastRect();
-                bool over = r.width > 0f && r.Contains(Event.current != null ? Event.current.mousePosition : Vector2.zero);
-                float now = Time.unscaledTime;
-                if (!held || !over) { _holdPrimed[id] = false; _holdNext.Remove(id); return false; }
-                bool primed;
-                if (!_holdPrimed.TryGetValue(id, out primed) || !primed) {
-                    _holdPrimed[id] = true;
-                    _holdNext[id] = now + 0.45f;
-                    return false;
-                }
-                float due;
-                if (!_holdNext.TryGetValue(id, out due) || now < due) return false;
-                _holdNext[id] = now + 0.12f;
-                return true;
-            } catch (Exception __hr) { SRApi.Guard.Log("按钮长按连发", __hr); return false; }
-        }
 
         // 与 HotkeyButton 相同（右键可绑键、点击执行），但悬浮提示里不追加“右键：绑定/删除快捷键”。
         public static bool HotkeyButtonNoHint(string id, string label, string tooltip, Action action, float width = 0f, float height = 0f) {

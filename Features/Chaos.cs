@@ -106,7 +106,6 @@ namespace SR_UCH.Tweaks {
         private static Snapshot _snap;
         private static bool _hasSnapshot, _applied, _ready;
         private static int _roundSeen;
-        private static float _lastPlaceAt = -100f;   // 上次进入摆放阶段的时刻（去重：刷新派对盒会重入 PLACE）
         private struct RosterEntry {
             public float At;
             public RosterEntry(float a) { At = a; }
@@ -332,11 +331,6 @@ namespace SR_UCH.Tweaks {
             // 若在这里 RebuildLocal()，会用「已被房主改过的值」Capture 快照，
             // 再用空的 _active 还原，把房主的牌冲掉 —— 联机规则不同步的老坑。
             if (!IsAuthority) return;
-            // 刷新派对盒 / 重载关卡会再次广播 PLACE 阶段，但那是同一回合：
-            // 3 秒内重复进入按一次算，否则"刷新一下盒子就自动重抽"。
-            float now = Time.unscaledTime;
-            if (now - _lastPlaceAt < 3f) return;
-            _lastPlaceAt = now;
             _roundSeen++;
             if (_roundSeen % Mathf.Max(1, _everyRounds.Value) == 0) DrawAndBroadcast();
             else if (_applied) RebuildLocal();
@@ -767,10 +761,9 @@ namespace SR_UCH.Tweaks {
         // 牌池单独一页：按「数值规则 / 布尔规则」分组勾选 + 批量操作（全选 / 全不选 / 仅增益 / 仅减益）。
 
         private void RenderPoolPage() {
-            Line("勾上的牌才可能被抽到；至少留一张。", "Checked cards can be drawn; keep at least one enabled.");
-            // 四个批量操作同排一行（高度略高于普通按钮）。
+            // 四个批量操作同排一行（紧凑按钮，避免占掉过多列表空间）。
             GUILayout.BeginHorizontal();
-            float bh = SRApi.Ctl.Sc(30f), bw = SRApi.Ctl.Sc(84f);
+            float bh = SRApi.Ctl.Sc(24f), bw = SRApi.Ctl.Sc(64f);
             if (SRApi.Ctl.Button(SRApi.T("全选", "All"), SRApi.T("勾选全部牌", "Enable every card"), bw, bh)) SetAllPools(true);
             GUILayout.Space(SRApi.Ctl.Sc(4f));
             if (SRApi.Ctl.Button(SRApi.T("全不选", "None"), SRApi.T("全部取消（会再自动勾回第一张）", "Disable all (the first card is re-enabled)"), bw, bh)) SetAllPools(false);
@@ -786,20 +779,24 @@ namespace SR_UCH.Tweaks {
         }
 
         // 分组渲染：按数值/布尔规则分成两块（顺序固定，结构不随勾选变化）。
+        // 配置条目显示名缓存：游戏名/语言变化时才重注册 LocKey（每帧重注册会让本地化缓存抖动）。
+        private static string[] _poolLabelCache;
+
         private void RenderPoolGroup(bool numeric) {
             SRApi.Ctl.SectionTitle("- " + SRApi.T(numeric ? "数值规则" : "布尔规则", numeric ? "Numeric rules" : "Boolean rules") + " -");
+            if (_poolLabelCache == null) _poolLabelCache = new string[Cards.Length];
             for (int i = 0; i < Cards.Length; i++) {
                 if (Cards[i].IsBool != numeric || _pool[i] == null) continue;
                 CardDef c = Cards[i];
                 string ours = SRApi.T(c.Zh, c.En);
                 string gm = GameRuleName(c.Rule);
-                // 同一规则有多张牌（如低/高重力）时，游戏名相同，追加本功能的档位名区分。
+                // 同一规则有多张牌（如低/高重力）时游戏名相同，追加本功能的档位名区分。
                 string label = string.IsNullOrEmpty(gm) ? ours : (gm == ours ? gm : gm + " · " + ours);
-                string tip = SRApi.T(c.TipZh, c.TipEn);
-                if (SRApi.Ctl.SelfToggleButton(label, tip, _pool[i].Value, null)) {
-                    _pool[i].Value = !_pool[i].Value;
-                    try { SRApi.Ctl.MarkConfigDirty(_pool[i].ConfigFile); } catch (Exception __md) { SRApi.Guard.Log("混乱牌组/保存牌池", __md); }
+                if (_poolLabelCache[i] != label) {
+                    _poolLabelCache[i] = label;
+                    SRApi.LocKey(Sec, c.En, label, label);   // 行名跟随游戏语言；悬浮说明仍是本功能的牌效
                 }
+                CfgRow(_pool[i]);   // 标准复选框行（不是按钮）
             }
         }
 

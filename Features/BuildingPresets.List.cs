@@ -70,42 +70,23 @@ namespace SR_UCH.Tweaks {
         }
 
         // ================= 列表本体 =================
-        private static int _rowsHFrame = -1;      // 行区高度锁定的帧号
-        private static float _rowsHFrameValue;    // 该帧锁定的行区高度
 
         private static void RenderListTable(List<PresetInfo> visible) {
             float rowH = SRApi.Ctl.TableRowH();
             float headerH = SRApi.Ctl.TableHeaderH();
             float minH = headerH + rowH * 2f;
 
-            // 控件创建全部在 try 之外：Layout / Repaint 两趟必须创建同样多的控件。
+            // 与「联机」列表同一套布局（用户要求照联机列表做）：
+            //   probe 取表格顶 → 表格高 = 页面内容底 − 表格顶 → 行区 = 表格高 − 表头。
+            // 不再用 ContentArea/ScrollRowsH 自己算一套（多套口径就是"列表只剩一行"的根因）。
             Rect probe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
-            // 底界改走核心的自适应高度助手（联机列表用的是同一个）：
-            // 它把"标题栏 26 + 内边距 2 + 底栏"统一扣掉，预设列表底边因此与联机列表一致、直接贴住底栏，
-            // 不再各自用 ContentArea.height - FooterHeight 算一套（两套口径会差 2-28px，表现为底部留白）。
-            float tableH = SRApi.TableAutoHeight(probe.y, minH);
+            float tableH = Mathf.Max(minH, SRApi.PageContentBottom - probe.y);
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true),
                 GUILayout.Height(tableH));
-
-            // 行区必须收敛到**屏幕真实可见底**（核心所有相位都用 rowsH 当视口高）：
-            // 以前直接拿 box.height - headerH，box 一旦伸到屏幕外，rowsH 就虚高 →
-            // 核心以为"一屏画得完"（把行画到屏幕外），maxY 同时被压成 0 → 彻底滚不动。
-            // box 是屏幕坐标（ContentArea 以窗口左上角为原点）：可见底 = 内容区底 − 底栏高度。
-            // 以前漏了 ContentArea.y，窗口有纵向偏移时 rowsH 被压成一行（"列表只剩一条、也连不上底栏"）。
-            float screenBottom = SRApi.ContentArea.y + SRApi.ContentArea.height - SRApi.FooterHeight;
-            float rowsTop = box.y + headerH;
-            // 每帧只算一次行区高度：Layout 与 Repaint 两趟的 box/probe 可能差几像素，
-            // 各算一遍会让 _listMaxY 在同一帧里跳变 → 滚到下面时列表"突变"。
-            if (_rowsHFrame != Time.frameCount) {
-                _rowsHFrame = Time.frameCount;
-                _rowsHFrameValue = SRApi.Ctl.ScrollRowsH(box, headerH, screenBottom, rowH);
-            }
-            float rowsH = _rowsHFrameValue;
-            float contentH = Mathf.Max(0, visible.Count) * rowH;
-            _listMaxY = SRApi.Ctl.ScrollMaxY(visible.Count, rowH, rowsH);
+            float rowsH = Mathf.Max(SRApi.Ctl.Sc(20f), box.height - headerH);
+            _listMaxY = SRApi.Ctl.TableMaxScrollY(visible.Count, rowH, rowsH);
             _maxScrollY = _listMaxY;
             _rowsHCache = rowsH;
-            box.height = headerH + rowsH;   // 裁剪框也收敛（否则 clip 底边在屏幕外）
             _listPageFrame = Time.frameCount;
 
             try {

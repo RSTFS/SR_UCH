@@ -55,10 +55,12 @@ namespace SR_UCH.Tweaks {
             public bool VisSet;       // VisY 是否已初始化
         }
 
-        private static ConfigEntry<bool> _enabled, _native, _quiet, _onScreen;
-        private static ConfigEntry<int> _maxVisible, _toastSeconds, _corner, _cardW, _cardAlpha, _cardScale, _animMs;
+        private static ConfigEntry<bool> _enabled, _quiet;
+        private static ConfigEntry<int> _maxVisible, _corner, _cardW, _cardAlpha, _cardScale, _animMs;
+        private static ConfigEntry<float> _toastSeconds;
         private static ConfigEntry<bool> _animOn;
         private static bool _cornerOpen;   // 停靠角下拉的展开态（每帧从核心 EditOpen 语义走）
+        private static bool _toastFixing;  // 停留秒数归整到 0.5 步进时的递归保护
 
         private static readonly List<Notice> _history = new List<Notice>();
         private static readonly List<Notice> _visible = new List<Notice>();
@@ -100,14 +102,6 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Enabled",
                 "启用通知中心\n统一接管所有屏幕提示：分级、合并、静默。",
                 "Enable notification hub\nTake over all screen toasts: priority, merging, quiet mode and history.");
-            SRApi.LocKey(Sec, "Use Native Toast", "使用原生提示", "Use native toast");
-            SRApi.LocDesc(Sec, "Use Native Toast",
-                "使用原生提示\n退回游戏原生提示：不接管屏幕，全部提示交给游戏自带样式显示。",
-                "Use native toast\nHand all toasts back to the game's own display; the overlay never takes over, so nothing is swallowed.");
-            SRApi.LocKey(Sec, "Show On Screen", "显示局内浮层", "Show on-screen overlay");
-            SRApi.LocDesc(Sec, "Show On Screen",
-                "显示局内浮层\n在局内显示自绘通知浮层；关掉后提示回到游戏原生样式（不会吞消息）。",
-                "Show on-screen overlay\nShow the custom overlay during play; off falls back to the game's own toasts so nothing is swallowed.");
             SRApi.LocKey(Sec, "Quiet In Match", "对局中静默", "Quiet in match");
             SRApi.LocDesc(Sec, "Quiet In Match",
                 "对局中静默\n对局中静默低/中优先级提示（唯一会主动不显示的情况）；高优先级照常弹。",
@@ -118,24 +112,24 @@ namespace SR_UCH.Tweaks {
                 "Max visible\nHow many toasts show at once. Range 1-6.");
             SRApi.LocKey(Sec, "Toast Seconds", "停留秒数", "Toast seconds");
             SRApi.LocDesc(Sec, "Toast Seconds",
-                "停留秒数\n每条通知停留秒数（1-5）。",
-                "Toast seconds\nSeconds each toast stays. Range 1-5.");
+                "停留秒数\n每条通知停留多长时间。\n按 0.5 秒为一档。",
+                "Toast seconds\nHow long each toast stays.\n0.5 s per step.");
             SRApi.LocKey(Sec, "Card Width", "卡片宽度", "Card width");
             SRApi.LocDesc(Sec, "Card Width",
-                "卡片宽度\n浮层卡片像素宽度（100-300），默认 200。",
-                "Card width\nOverlay card width in pixels. Range 100-300, default 200.");
+                "卡片宽度\n浮层卡片的像素宽度。",
+                "Card width\nOverlay card width in pixels.");
             SRApi.LocKey(Sec, "Animate", "启用动画", "Animate");
             SRApi.LocDesc(Sec, "Animate", "启用动画\n浮层的出现/消失动画总开关。", "Animate\nEnable overlay show/hide animations.");
             SRApi.LocKey(Sec, "Anim Ms", "动画时长(毫秒)", "Animation ms");
-            SRApi.LocDesc(Sec, "Anim Ms", "动画时长\n出现与消失的动画时长（80-400 毫秒），默认 180。", "Animation ms\nShow/hide duration in milliseconds. 80-400, default 180.");
+            SRApi.LocDesc(Sec, "Anim Ms", "动画时长\n出现与消失的动画时长。", "Animation ms\nShow and hide animation duration.");
             SRApi.LocKey(Sec, "Card Scale", "浮层缩放", "Overlay scale");
             SRApi.LocDesc(Sec, "Card Scale",
-                "浮层缩放\n整个浮层按百分比缩放（80-160），默认 100。",
-                "Overlay scale\nScale the whole overlay in percent. Range 80-160. 160 is the baseline size.");
+                "浮层缩放\n整个浮层按百分比缩放。\n百分比越大卡片越大。",
+                "Overlay scale\nScale the whole overlay in percent.\nLarger values give larger cards.");
             SRApi.LocKey(Sec, "Card Opacity", "卡片不透明度", "Card opacity");
             SRApi.LocDesc(Sec, "Card Opacity",
-                "卡片不透明度\n浮层卡片背景的不透明度百分比（20-100），默认 64。",
-                "Card opacity\nOverlay card background opacity in percent. Range 20-100, default 64.");
+                "卡片不透明度\n浮层卡片背景的不透明程度。",
+                "Card opacity\nBackground opacity of overlay cards.");
             SRApi.LocKey(Sec, "Corner", "停靠位置", "Overlay position");
             SRApi.LocDesc(Sec, "Corner",
                 "浮层停靠角\n浮层停靠位置：0 右下 / 1 右上 / 2 左下 / 3 左上。",
@@ -150,12 +144,12 @@ namespace SR_UCH.Tweaks {
                 if (e == null || e.Definition.Section != Sec) return false;
                 switch (e.Definition.Key) {
                     case "Max Visible": min = 1.0f; max = 6.0f; return true;
-                    case "Toast Seconds": min = 1.0f; max = 5.0f; return true;
+                    case "Toast Seconds": min = 0.5f; max = 5.0f; fmt = "0.0"; return true;
                     case "Corner": min = 0.0f; max = 3.0f; return true;
                     case "Card Opacity": min = 20.0f; max = 100.0f; return true;
-                    case "Card Scale": min = 80.0f; max = 160.0f; return true;
+                    case "Card Scale": min = 100.0f; max = 300.0f; return true;
                     case "Anim Ms": min = 80.0f; max = 400.0f; return true;
-                    case "Card Width": min = 160.0f; max = 480.0f; return true;
+                    case "Card Width": min = 100.0f; max = 300.0f; return true;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("数值滑块范围", __ex); }
             return false;
@@ -163,21 +157,22 @@ namespace SR_UCH.Tweaks {
 
         public void Initialize(IFeatureHost plugin) {
             _enabled = plugin.Config.Bind(Sec, "Enabled", true, "统一接管所有屏幕提示：分级、合并、静默。");
-            _native = plugin.Config.Bind(Sec, "Use Native Toast", false, "退回游戏原生提示：不接管屏幕，全部提示交给游戏自带样式显示（不会出现两边都不显示）。");
-            _onScreen = plugin.Config.Bind(Sec, "Show On Screen", true, "在局内显示自绘通知浮层；关掉后提示回到游戏原生样式（不会吞掉消息）。");
+            // 旧配置项已删除：打开通知中心 = 用通知中心；关闭 = 交回游戏原生提示。
+            try { SRApi.Migration.Remove(Sec, "Use Native Toast"); } catch (Exception __mr) { SRApi.Guard.Log("通知中心/清理旧键1", __mr); }
+            try { SRApi.Migration.Remove(Sec, "Show On Screen"); } catch (Exception __mr2) { SRApi.Guard.Log("通知中心/清理旧键2", __mr2); }
             _quiet = plugin.Config.Bind(Sec, "Quiet In Match", false, "对局中静默低/中优先级提示（这是唯一会主动不显示的情况）；高优先级照常弹。");
             _maxVisible = plugin.Config.Bind(Sec, "Max Visible", 3,
                 new ConfigDescription("浮层最多同时显示几条（1-6）。", new AcceptableValueRange<int>(1, 6)));
-            _toastSeconds = plugin.Config.Bind(Sec, "Toast Seconds", 3,
-                new ConfigDescription("每条通知停留秒数（1-5）。", new AcceptableValueRange<int>(1, 5)));
-            _cardW = plugin.Config.Bind(Sec, "Card Width", 320,
-                new ConfigDescription("浮层卡片像素宽度（160-480；上限同时受屏幕宽度 1/3 限制）。", new AcceptableValueRange<int>(160, 480)));
+            _toastSeconds = plugin.Config.Bind(Sec, "Toast Seconds", 1.5f,
+                new ConfigDescription("每条通知停留秒数（0.5-5，步进 0.5）。", new AcceptableValueRange<float>(0.5f, 5f)));
+            _cardW = plugin.Config.Bind(Sec, "Card Width", 240,
+                new ConfigDescription("浮层卡片像素宽度（100-300）。", new AcceptableValueRange<int>(100, 300)));
             _animOn = plugin.Config.Bind(Sec, "Animate", true, "浮层的出现/消失动画总开关。");
             _animMs = plugin.Config.Bind(Sec, "Anim Ms", 220,
                 new ConfigDescription("出现与消失的动画时长（80-400 毫秒）。", new AcceptableValueRange<int>(80, 400)));
-            _cardScale = plugin.Config.Bind(Sec, "Card Scale", 160,
-                new ConfigDescription("整个浮层的缩放百分比（80-160）。", new AcceptableValueRange<int>(80, 160)));
-            _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 85,
+            _cardScale = plugin.Config.Bind(Sec, "Card Scale", 200,
+                new ConfigDescription("整个浮层的缩放百分比（100-300）。", new AcceptableValueRange<int>(100, 300)));
+            _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 64,
                 new ConfigDescription("浮层卡片背景不透明度百分比（20-100）。", new AcceptableValueRange<int>(20, 100)));
             _corner = plugin.Config.Bind(Sec, "Corner", 0,
                 new ConfigDescription("浮层停靠位置：0 右下 / 1 右上 / 2 左下 / 3 左上。", new AcceptableValueRange<int>(0, 3)));
@@ -192,10 +187,17 @@ namespace SR_UCH.Tweaks {
             SRApi.NavHide(Sec);
             SRApi.RegisterPage(Sec, "HubOptions", "通知设置", "Settings", 20, RenderOptionsPage);
             SRApi.RegisterTick("通知中心-绑定与过期", Tick);
-            // 关掉自绘浮层的开关时清空待显示队列：否则重新打开会把过期旧消息一次性弹出来。
-            _native.SettingChanged += (s2, e2) => { if (_native.Value) ClearPending(); };
-            _onScreen.SettingChanged += (s2, e2) => { if (!_onScreen.Value) ClearPending(); };
+            // 关掉通知中心时清空待显示队列：否则重新打开会把过期旧消息一次性弹出来。
             _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) ClearPending(); };
+            // 停留秒数按 0.5 步进：滑条/手输都收敛（防递归用标志位）。
+            _toastSeconds.SettingChanged += (s2, e2) => {
+                if (_toastFixing) return;
+                try {
+                    float v = Mathf.Clamp(_toastSeconds.Value, 0.5f, 5f);
+                    float r = Mathf.Round(v * 2f) / 2f;
+                    if (Mathf.Abs(r - v) > 0.001f) { _toastFixing = true; _toastSeconds.Value = r; _toastFixing = false; }
+                } catch (Exception __ts) { SRApi.Guard.Log("通知中心/停留步进", __ts); }
+            };
 
             // 核心 NotifyImpl 会惰性查这个名字；Provide 之后所有来源的提示都会进 OnNotify。
             Func<string, string, bool> __hook = (t, g) => OnNotify(t, g); _provided[HookSlot] = __hook; Slots.Provide(HookSlot, __hook);
@@ -260,11 +262,8 @@ namespace SR_UCH.Tweaks {
 
         /// <summary>返回 true = 已接管屏幕显示；false = 让核心照旧用游戏原生提示。</summary>
         private static bool OnNotify(string text, string tag) {
+            // 打开通知中心 = 由本功能接管；关闭 = 返回 false，由核心交回游戏原生提示。
             if (_enabled == null || !_enabled.Value) return false;
-            // 「退回原生提示」和「关掉局内浮层」都表示我们不上屏：必须把屏幕交回核心，
-            // 否则核心以为已处理、浮层又没画，消息就彻底消失了（旧逻辑正是这样吞消息的）。
-            bool native = _native == null || _native.Value;
-            if (native || _onScreen == null || !_onScreen.Value) return false;
             // 防重入：外部回调若也发提示，这里直接放行给原生通道，
             // 绝不形成 Notify -> OnNotify -> Notify 的无限递归。
             if (_inNotify) return false;
@@ -274,7 +273,7 @@ namespace SR_UCH.Tweaks {
                 float now = Time.unscaledTime;
                 int level = Classify(text, tag);
                 string key = (tag ?? "") + "|" + Norm(text);
-                float stay = Mathf.Clamp(_toastSeconds.Value, 1f, 5f);
+                float stay = Mathf.Clamp(_toastSeconds.Value, 0.5f, 5f);
 
                 // 同类合并：3 秒窗口内同 key 只累加计数并续期，不再插入新行。
                 Notice merged = null;
@@ -389,14 +388,14 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void DrawToast() {
-            if (_enabled == null || !_enabled.Value || _onScreen == null || !_onScreen.Value || _visible.Count == 0 || Event.current == null) return;
+            if (_enabled == null || !_enabled.Value || _visible.Count == 0 || Event.current == null) return;
             EnsureStyles();
-            float s = Mathf.Clamp(_cardScale.Value / 160f, 0.5f, 1.0f);
+            float s = Mathf.Clamp(_cardScale.Value / 160f, 0.6f, 1.8f);
             // 参考 imgui-notify 的观感：更大的字号/内边距，卡片最宽不超过屏幕 1/3。
-            _label.fontSize = Mathf.RoundToInt(15f * s);
+            _label.fontSize = Mathf.RoundToInt(22f * s);
             _label.normal.textColor = new Color(0.94f, 0.96f, 0.99f, 1f);
 
-            float w = Mathf.Clamp(_cardW.Value * s, 200f, Mathf.Min(Screen.width / 3f, 600f));
+            float w = Mathf.Clamp(_cardW.Value * s, 120f, Mathf.Min(Screen.width / 3f, 700f));
             float pad = 10f * s;
             float gap = 6f * s;
             float now = Time.unscaledTime;
@@ -537,8 +536,6 @@ namespace SR_UCH.Tweaks {
 
         private void RenderOptionsPage() {
             CfgRow(_enabled);
-            CfgRow(_native);
-            CfgRow(_onScreen);
             CfgRow(_quiet);
             CfgRow(_maxVisible);
             CfgRow(_toastSeconds);

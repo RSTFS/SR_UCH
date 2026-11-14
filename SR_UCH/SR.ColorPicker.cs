@@ -358,12 +358,13 @@ public partial class SR {
                 float rightW = Mathf.Max(Sc(120f), pw - leftW - Sc(12f));
                 GUILayout.BeginHorizontal();
                 try {
+                    Rect leftBlock = default(Rect);
                     GUILayout.BeginVertical(GUILayout.Width(leftW + hueW + gap));
-                    try { DrawSvBlock(e, s, leftW + hueW + gap); } finally { GUILayout.EndVertical(); }
+                    try { DrawSvBlock(e, s, leftW + hueW + gap); } finally { GUILayout.EndVertical(); leftBlock = GUILayoutUtility.GetLastRect(); }
                     GUILayout.Space(Sc(10f));
                     GUILayout.BeginVertical(GUILayout.Width(rightW));
                     try {
-                        DrawPaletteGrid(e, s, rightW);
+                        DrawPaletteGrid(e, s, rightW, leftBlock.height);
                         GUILayout.Space(Sc(4f));
                         // H/S/V 与 Hex 共用同一标签列：取当前语言里最宽的文本 + 8px。
                         float labelW = LabelCol(T("色相", "Hue"), T("饱和", "Sat"), T("明度", "Val"), "Hex");
@@ -534,11 +535,16 @@ public partial class SR {
         }
 
         // 24 色网格，点击即应用；当前色用黑白双描边高亮。
-        private static void DrawPaletteGrid(ConfigEntryBase e, State s, float pw) {
+        private static void DrawPaletteGrid(ConfigEntryBase e, State s, float pw, float targetH = 0f) {
             float gap = Sc(3f);
-            float cw = Mathf.Clamp((pw - (PaletteCols - 1) * gap) / PaletteCols, Sc(10f), Sc(28f));
+            float cw = Mathf.Clamp((pw - (PaletteCols - 1) * gap) / PaletteCols, Sc(12f), Sc(40f));
             float ch = Mathf.Clamp(cw * 0.85f, Sc(16f), Sc(22f));
             int rows = (Palette.Length + PaletteCols - 1) / PaletteCols;
+            // 调色板高度与左侧 SV 方块对齐（用户要求）：按左栏高度反推色块高度。
+            float ch2 = targetH > Sc(20f)
+                ? Mathf.Clamp((targetH - (rows - 1) * gap) / rows, Sc(12f), Sc(40f))
+                : ch;
+            ch = ch2;
             Rect box = GUILayoutUtility.GetRect(PaletteCols * cw + (PaletteCols - 1) * gap, rows * ch + (rows - 1) * gap);
             Color cur = Quant(PickerColor(s));
             for (int i = 0; i < Palette.Length; i++) {

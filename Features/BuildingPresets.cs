@@ -363,7 +363,7 @@ namespace SR_UCH.Tweaks {
             } catch { return 0; }
         }
 
-        // 当前搜索过滤（名称 / 关卡 / 模式）+ 关卡下拉筛选 + 排序后的可见列表。
+        // 当前搜索过滤（只搜名称）+ 关卡/模式下拉筛选 + 排序后的可见列表。
         private static readonly SRApi.TableSource<PresetInfo> _visSource = new SRApi.TableSource<PresetInfo>();
 
         private static List<PresetInfo> _visibleCache;   // 当前表格的可见行（供数据列悬浮预览取预设）
