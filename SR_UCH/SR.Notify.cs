@@ -13,7 +13,7 @@ public partial class SR {
         // NotifyEx 核心入口：优先交给通知中心的新钩子（可画动作按钮/精确分级），否则退回普通提示。
         internal static void NotifyEx(SRApi.NotifyArgs a) {
             try {
-                SRApi.NotifyExFn hook = Slots.Require<SRApi.NotifyExFn>("sr.notify.hub2");
+                SRApi.NotifyExFn hook = Slots.Require<SRApi.NotifyExFn>(SRApi.SlotKeys.NotifyHub2);
                 if (hook != null && hook(a)) return;
                 Notify(a != null ? a.Text : "");
             } catch (Exception __ne) { Guard.Log("通知中心/NotifyEx 转发", __ne); }
@@ -57,7 +57,7 @@ public partial class SR {
         // 也不改变任何原有行为（只是每 2 秒遍历一次已登记槽位名，开销可忽略）。
         // 所有提示（SRApi.Notify / NotifyT / NotifyTag / 核心直接调 SR.Notify）都汇到 NotifyImpl，
         // 因此一个钩子即可统一收口，无需改动任何调用点。
-        private const string NotifyHookSlot = "sr.notify.hook";
+        private const string NotifyHookSlot = SRApi.SlotKeys.NotifyHook;
         private static Func<string, string, bool> _notifyHook;
         private static float _notifyHookNext;
 

@@ -43,9 +43,9 @@ public partial class SR {
 
             object token = new object();
             int slotBefore = Slots.Count;
-            Slots.Provide("sr.selftest.token", token);
-            object got = Slots.Require<object>("sr.selftest.token");
-            Slots.Retract("sr.selftest.token", token);
+            Slots.Provide(SRApi.SlotKeys.SelfTestToken, token);
+            object got = Slots.Require<object>(SRApi.SlotKeys.SelfTestToken);
+            Slots.Retract(SRApi.SlotKeys.SelfTestToken, token);
             StCheck(T("槽位往返", "Slots round-trip"),
                 ReferenceEquals(token, got) && Slots.Count == slotBefore,
                 slotBefore + " -> " + Slots.Count);

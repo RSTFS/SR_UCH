@@ -127,8 +127,11 @@ namespace SR_UCH {
     // 契约版本（对应 SMAPI 的 minimumApiVersion）：核心只增不改地推进这个数字；
     // 功能用 [SrFeature] 的 MinContract 声明所需版本，核心低于它时记录"契约不兼容"。
     public static class SRContract {
-        // Version：功能清单契约（ITweak/IFeatureHost/Slots）的版本；与 SR.ApiVersion（EX 接口版本）独立演进。
+        // Version：功能清单契约（ITweak/IFeatureHost/Slots）的破坏性基线；与 SR.ApiVersion（EX 接口版本）独立演进。
         public const int Version = 2;
+        // ApiLevel：SRApi 门面 API 的 additive 等级。每新增一个 public 成员 +1；删除/改签名属于破坏性变更，
+        // 必须抬 Version。功能可用 MinApiLevel 声明"至少需要哪个 API 等级"，核心低于它时同样判为不兼容。
+        public const int ApiLevel = 1;
     }
 
     // 跨功能共享的时间常量（audit P2⑧）：以前 45s / 25s 在 Level.* 与 BuildingPresets 各写一份，
@@ -148,17 +151,18 @@ namespace SR_UCH {
         public int Rank { get; set; }                 //侧栏顺序建议值（越小越前）
         public string[] DependsOn { get; set; }       //依赖的功能 id；缺失时记录并降级运行
         public string[] Provides { get; set; }        //本功能会写入的槽位名（冲突检测用）
-        public int MinContract { get; set; }          //所需最低契约版本
+        public int MinContract { get; set; }          //所需最低破坏性契约版本（SRContract.Version）
+        public int MinApiLevel { get; set; }          //所需最低 additive API 等级（SRContract.ApiLevel）
         public int Modes { get; set; }                //允许的游戏模式位（SRApi.ModeMask 的整型值；0 = 不限）
         public SrFeatureAttribute(string id, string name, string version) {
-            Id = id; Name = name; Version = version; Rank = 120; MinContract = SRContract.Version; Modes = 0;
+            Id = id; Name = name; Version = version; Rank = 120; MinContract = SRContract.Version; MinApiLevel = 0; Modes = 0;
         }
     }
 
     // 一条功能清单记录：核心在扫描 ITweak 时填充，界面/日志只读。
     public sealed class FeatureInfo {
         public string Id, Name, Version;
-        public int Rank, MinContract, Modes;
+        public int Rank, MinContract, MinApiLevel, Modes;
         public string[] DependsOn, Provides;
         public Type Impl;
         public bool ManifestMissing;                  // true = 该类没有 [SrFeature]（旧式/第三方未声明）
@@ -168,7 +172,8 @@ namespace SR_UCH {
         public override string ToString() {
             string s = Id + " " + Version;
             if (ManifestMissing) s += "（未声明清单）";
-            if (ContractTooNew) s += "（要求契约 v" + MinContract + "，当前 v" + SRContract.Version + "）";
+            if (ContractTooNew) s += "（要求契约 v" + MinContract + " / API " + MinApiLevel
+                + "，当前 v" + SRContract.Version + " / API " + SRContract.ApiLevel + "）";
             if (MissingDeps.Count > 0) s += "（缺依赖: " + string.Join(", ", MissingDeps.ToArray()) + "）";
             if (ConflictSlots.Count > 0) s += "（槽位冲突: " + string.Join(", ", ConflictSlots.ToArray()) + "）";
             if (Modes != 0) s += "（模式受限）";
@@ -203,12 +208,12 @@ namespace SR_UCH {
                 if (attrs != null && attrs.Length > 0) {
                     SrFeatureAttribute a = (SrFeatureAttribute)attrs[0];
                     fi.Id = a.Id; fi.Name = a.Name; fi.Version = a.Version; fi.Rank = a.Rank;
-                    fi.MinContract = a.MinContract; fi.DependsOn = a.DependsOn; fi.Provides = a.Provides;
+                    fi.MinContract = a.MinContract; fi.MinApiLevel = a.MinApiLevel; fi.DependsOn = a.DependsOn; fi.Provides = a.Provides;
                     fi.Modes = a.Modes;
                     fi.ManifestMissing = false;
                 }
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-            fi.ContractTooNew = fi.MinContract > SRContract.Version;
+            fi.ContractTooNew = fi.MinContract > SRContract.Version || fi.MinApiLevel > SRContract.ApiLevel;
             return fi;
         }
         // 扫描所有已加载程序集里的 ITweak 实现（内置 + 外部 + EX），重建功能表并解析依赖

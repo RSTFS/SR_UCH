@@ -26,10 +26,10 @@ using BepInEx.Configuration;
 using UnityEngine;
 
 namespace SR_UCH.Tweaks {
-    [SrFeature("sr.notifyhub", "通知中心", "1.0", Provides = new string[] { "sr.notify.hook" })]
+    [SrFeature("sr.notifyhub", "通知中心", "1.0", Provides = new string[] { SRApi.SlotKeys.NotifyHook })]
     public class NotifyHub : ITweak {
         private const string Sec = "通知中心";
-        private const string HookSlot = "sr.notify.hook";
+        private const string HookSlot = SRApi.SlotKeys.NotifyHook;
 
         // 2 高（要动手 / 出错） 1 中（一般反馈） 0 低（纯确认）
         private static readonly string[] HighWords = {
@@ -204,7 +204,7 @@ namespace SR_UCH.Tweaks {
             Func<string, string, bool> __hook = (t, g) => OnNotify(t, g); _provided[HookSlot] = __hook; Slots.Provide(HookSlot, __hook);
             // 新钩子：带级别/动作的通知（NotifyEx）。旧钩子保留给普通 Notify。
             SRApi.NotifyExFn __hook2 = delegate (SRApi.NotifyArgs a) { return OnNotifyEx(a); };
-            Slots.Provide("sr.notify.hub2", __hook2);
+            Slots.Provide(SRApi.SlotKeys.NotifyHub2, __hook2);
 
             SRApi.OnShutdown("通知中心", Shutdown);
             if (_ui == null) {

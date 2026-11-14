@@ -17,6 +17,8 @@ namespace SR_UCH {
             private static string _root = "";
             public static void SetRoot(string root) { try { _root = root ?? ""; } catch (Exception) { _root = ""; } }
             public static string RootOf { get { return _root; } }
+            // 核心是否已注入根目录：false 时所有写都会失败，功能应视为"存储不可用"而不是静默成功。
+            public static bool Ready { get { return !string.IsNullOrEmpty(_root); } }
             private static string SafeName(string s) {
                 try {
                     if (string.IsNullOrEmpty(s)) return "_";

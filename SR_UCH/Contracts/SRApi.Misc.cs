@@ -11,6 +11,13 @@ using BepInEx.Logging;
 
 namespace SR_UCH {
     public static partial class SRApi {
+
+        // 槽位名常量：Slots.Provide/Require/Retract 以前是裸字符串，拼错只会静默失效；统一从这里取。
+        public static class SlotKeys {
+            public const string NotifyHook = "sr.notify.hook";           // Func<string,string,bool> 通知治理钩子
+            public const string NotifyHub2 = "sr.notify.hub2";           // NotifyExFn 带元数据/动作的通知钩子
+            public const string SelfTestToken = "sr.selftest.token";     // 自检往返用的临时对象
+        }
         public sealed class FooterButton {
             public string Id, LabelZh, LabelEn; public Action OnClick;
             public FooterButton(string id, string zh, string en, Action onClick) { Id = id; LabelZh = zh; LabelEn = en; OnClick = onClick; }

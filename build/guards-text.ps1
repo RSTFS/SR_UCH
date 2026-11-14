@@ -20,6 +20,15 @@ function Check-ApiSurface {
     foreach ($l in [System.IO.File]::ReadAllLines($api)) {
         $s = $l.Trim(); if ($s -and -not $s.StartsWith('#')) { $allow[$s] = $true }
     }
+    # 自动放行契约层 public 成员与嵌套类型（契约是唯一事实来源；新增 API 不再需要手工加白名单）。
+    # api_surface.txt 仍作为"显式登记/禁用"清单，下面的真实存在检查继续生效。
+    $contractDir2 = Join-Path $Root 'SR_UCH\Contracts'
+    if (Test-Path -LiteralPath $contractDir2) {
+        foreach ($cf in Get-ChildItem -LiteralPath $contractDir2 -Filter '*.cs' -File) {
+            $src = Read-Text $cf.FullName
+            foreach ($m in [regex]::Matches($src, '(?m)^\s*public[^;\r\n]*?(\w+)\s*[({;=]')) { $allow[$m.Groups[1].Value] = $true }
+        }
+    }
     $bad = @{}
     foreach ($f in Get-ChildItem -LiteralPath $feat -Filter '*.cs' -File) {
         $txt = Read-Text $f.FullName
@@ -29,7 +38,7 @@ function Check-ApiSurface {
         }
     }
     if ($bad.Count -gt 0) { Bad ('功能层使用了白名单外的 SRApi.* 成员: ' + (($bad.Keys | Sort-Object) -join ', ')) }
-    else { Ok ('API 棘轮：功能层只使用白名单内的 SRApi.* 成员（白名单 ' + $allow.Count + ' 个）') }
+    else { Ok ('API 棘轮：功能层只使用白名单内的 SRApi.* 成员（白名单 ' + $allow.Keys.Count + ' 个）') }
     # 白名单条目必须真实存在于契约层：防止 API 删除后留下假条目，或手滑写错名字。
     $contractDir = Join-Path $Root 'SR_UCH\Contracts'
     if (Test-Path -LiteralPath $contractDir) {
@@ -39,7 +48,7 @@ function Check-ApiSurface {
             if (-not [regex]::IsMatch($csrc, '(?m)^\s*(?:\[[^\]]*\]\s*)*(?:public|internal)\s+[^\r\n]*\b' + [regex]::Escape($n) + '\b')) { $fake[$n] = $true }
         }
         if ($fake.Count -gt 0) { Bad ('白名单条目在契约层不存在: ' + (($fake.Keys | Sort-Object) -join ', ')) }
-        else { Ok ('白名单条目均真实存在于契约层（' + $allow.Count + ' 个）') }
+        else { Ok ('白名单条目均真实存在于契约层（' + $allow.Keys.Count + ' 个）') }
     }
 }
 
@@ -294,7 +303,7 @@ function Check-RegionFields {
     if ($bad.Count -gt 0) {
         Bad ('SR 分区越界：' + $bad.Count + ' 个 private 字段被其它分部文件使用，且未登记：' + (($bad | Select-Object -First 5) -join '; '))
     } else {
-        Ok ('SR 分区未新增越界字段（已登记 ' + $allow.Count + ' 个：见 build/region-access.txt）')
+        Ok ('SR 分区未新增越界字段（已登记 ' + $allow.Keys.Count + ' 个：见 build/region-access.txt）')
     }
 }
 
