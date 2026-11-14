@@ -30,6 +30,7 @@ namespace SR_UCH.Tests {
             TestFeatureManifest();
             TestSinksAndFallbacks();
             TestStoragePath();
+            TestTableArgsCreate();
 
             Console.WriteLine("  通过 " + _pass + " / 失败 " + _fail);
             if (_fail > 0) { Console.WriteLine("== 有失败 ❌ =="); return 1; }
@@ -240,6 +241,16 @@ namespace SR_UCH.Tests {
                 try { if (System.IO.File.Exists(file + ".tmp")) System.IO.File.Delete(file + ".tmp"); } catch (Exception) { }
                 try { if (System.IO.Directory.Exists(dir)) System.IO.Directory.Delete(dir, true); } catch (Exception) { }
             }
+        }
+
+        // TableArgs.Create/Validate：合法参数返回空列表；缺表头/行回调要能报出来。
+        private static void TestTableArgsCreate() {
+            var vis = new System.Collections.Generic.List<int> { 0, 1 };
+            var a = SRApi.TableArgs.Create(new Rect(0, 0, 400, 200), new float[] { 100f, 100f }, vis, 2,
+                delegate (int c) { return "c" + c; }, delegate (int r) { return new string[] { "a", "b" }; });
+            Eq("TableArgs.Create 合法参数无问题", 0, a.Validate().Length);
+            var bad = SRApi.TableArgs.Create(new Rect(0, 0, 400, 200), new float[] { 100f, 100f }, vis, 2, null, null);
+            Check("TableArgs.Validate 能报缺回调", bad.Validate().Length > 0);
         }
 
         // 契约版本单调递增：外部模块按它握手，倒退会让 DLL 静默失效。

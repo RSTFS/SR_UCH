@@ -17,7 +17,7 @@ namespace SR_UCH {
             public bool Enabled = true;
             public System.Action OnClick;
         }
-                    public sealed class TableArgs {
+                    public sealed partial class TableArgs {
             public Rect box;                 //表格外框（屏幕坐标）
             public Rect rowsClip;            //行区裁剪矩形（命中和绘制共用）
             public float headerH, rowH, rowsH, stripW;
@@ -74,6 +74,39 @@ namespace SR_UCH {
             public float scrollbarAlpha;   // 滚动条淡入淡出透明度（核心维护）       //0.35 秒内同一行左键点击两次时回调
             public bool hoverHighlight = true;              //rowHover >= 0 时核心在行矩形上叠一层很淡的高亮
             }
+    public sealed partial class TableArgs { 
+        // 带默认值的构造入口 + 必填校验：表格页少写样板，漏填（表头 title / 行回调等）能被自检/日志抓到。
+        public static TableArgs Create(Rect box, float[] colW, List<int> vis, int rowCount,
+                                       System.Func<int, string> title, System.Func<int, string[]> rowCells) {
+            TableArgs a = new TableArgs();
+            a.box = box; a.rowsClip = box;   // 页面会用真实表头/行区覆盖；这里给合法初值
+            a.colW = colW; a.vis = vis; a.rowCount = rowCount;
+            a.title = title; a.rowCells = rowCells;
+            a.hidden = new HashSet<int>();
+            a.headerCells = new List<Rect>(); a.headerCols = new List<int>();
+            a.rowRects = new List<Rect>(); a.rowRows = new List<int>();
+            a.pinRects = new List<Rect>(); a.pinRows = new List<int>();
+            a.drawHeader = true; a.resizable = true; a.reorderable = true; a.hideable = true;
+            a.sortCol = -1; a.sortAsc = true; a.hoverHighlight = true;
+            return a;
+        }
+        // 返回参数问题列表（空 = 合法）。核心 TableDraw 每帧调用一次并按问题签名去重记日志。
+        public string[] Validate() {
+            List<string> p = new List<string>();
+            try {
+                if (box.width <= 1f || box.height <= 1f) p.Add("box 尺寸无效");
+                if (colW == null || colW.Length == 0) p.Add("colW 为空");
+                if (vis == null) p.Add("vis 为空");
+                if (rowCount < 0) p.Add("rowCount < 0");
+                if (!vertical && rowsClip.height <= 0f && rowCount > 0) p.Add("rowsClip 高度无效");
+                if (drawHeader && title == null) p.Add("需要表头但缺少 title 回调");
+                if (rowCells == null && rowCount > 0) p.Add("有行但缺少 rowCells 回调");
+                if (pinCol >= 0 && (colW == null || pinCol >= colW.Length)) p.Add("pinCol 越界");
+                if (order != null && colW != null && order.Length != colW.Length) p.Add("order 长度与 colW 不一致");
+            } catch (Exception) { p.Add("Validate 自身异常"); }
+            return p.ToArray();
+        }
+    }
     public sealed class TableState {
         private readonly BepInEx.Configuration.ConfigEntry<string> _w, _o, _h;
         private readonly float[] _defaultW;
