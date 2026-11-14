@@ -86,8 +86,8 @@ and can see the current rule in the vanilla rules UI. The host is excluded by th
   the card pool. Rate of fire, game speed, character size, camera flip and doomsday are excluded
   on purpose: the first two rewrite `Time.timeScale` (conflicting with Time Control), the rest
   touch the camera or require rebuilding renderers.
-- **Controls** -- draw interval, max simultaneous cards, draw announcement, reroll hotkey, and a
-  live line showing the active cards.
+- **Controls** -- draw interval, max simultaneous cards, draw announcement, reroll hotkey, and the
+  page renders each active card as a card (name + effect + green buff / red debuff / blue neutral border).
 - **Always reversible** -- rule values are snapshotted at match start. Turning the deck off or
   ending the match re-broadcasts each rule's original treehouse value (so guests without the mod
   revert too), restores the host's local copy, and tells modded guests to clear their card display.

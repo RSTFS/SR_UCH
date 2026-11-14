@@ -54,12 +54,13 @@ namespace SR_UCH.Tweaks {
 
         private struct CardDef {
             public string Zh, En;
+            public string TipZh, TipEn;
             public TabletRule Rule;
             public int Field;
             public bool IsBool;
             public int Min, Max;
-            public CardDef(string zh, string en, TabletRule rule, int field, bool isBool, int min, int max) {
-                Zh = zh; En = en; Rule = rule; Field = field; IsBool = isBool; Min = min; Max = max;
+            public CardDef(string zh, string en, string tipZh, string tipEn, TabletRule rule, int field, bool isBool, int min, int max) {
+                Zh = zh; En = en; TipZh = tipZh; TipEn = tipEn; Rule = rule; Field = field; IsBool = isBool; Min = min; Max = max;
             }
         }
 
@@ -68,24 +69,25 @@ namespace SR_UCH.Tweaks {
         private const int FBoolWallJumps = 8, FBoolDance = 9, FBoolMirror = 10, FBoolPlayerCol = 12, FBoolFriction = 13;
 
         // 17 张牌：5 个数值规则的多档取值（重力 / 跳跃 / 冲刺 / 平台 / 射速）+ 5 个布尔规则。
+        // 每张牌带一句人话效果（牌面卡片第二行）；牌名/效果都走 SRApi.T，跟随界面语言。
         private static readonly CardDef[] Cards = new CardDef[] {
-            new CardDef("低重力",   "Low gravity",      TabletRule.ModifierGravity,            FGravity,       false, 1, 2),
-            new CardDef("高重力",   "High gravity",     TabletRule.ModifierGravity,            FGravity,       false, 2, 2),
-            new CardDef("弱跳跃",   "Weak jump",        TabletRule.ModifierJumpSpeed,          FJump,          false, 1, 3),
-            new CardDef("慢冲刺",   "Slow sprint",      TabletRule.ModifierSprintSpeed,        FSprint,        false, 1, 4),
-            new CardDef("慢平台",   "Slow platforms",   TabletRule.ModifierPlatformSpeed,      FPlatform,      false, 1, 4),
-            new CardDef("禁墙跳",   "No wall jumps",    TabletRule.ModifierWallJumpsDisabled,  FBoolWallJumps, true,  0, 0),
-            new CardDef("镜像操作", "Mirror controls",  TabletRule.ModifierMirrorControls,     FBoolMirror,    true,  0, 0),
-            new CardDef("跳舞无敌", "Dance invincible", TabletRule.ModifierDanceInvincibility, FBoolDance,     true,  0, 0),
-            new CardDef("玩家互撞", "Player colliding", TabletRule.ModifierPlayerPlayerCollisions, FBoolPlayerCol, true, 0, 0),
-            new CardDef("无摩擦",   "Frictionless",     TabletRule.ModifierFrictionless,       FBoolFriction,  true,  0, 0),
-            new CardDef("慢射速",   "Slow fire rate",   TabletRule.ModifierRateOfFire,         FRate,          false, 1, 3),
-            new CardDef("高跳跃",   "High jump",        TabletRule.ModifierJumpSpeed,          FJump,          false, 2, 3),
-            new CardDef("快冲刺",   "Fast sprint",      TabletRule.ModifierSprintSpeed,        FSprint,        false, 2, 4),
-            new CardDef("快平台",   "Fast platforms",   TabletRule.ModifierPlatformSpeed,      FPlatform,      false, 2, 4),
-            new CardDef("超重",     "Crushing gravity", TabletRule.ModifierGravity,            FGravity,       false, 3, 3),
-            new CardDef("龟速冲刺", "Crawl sprint",     TabletRule.ModifierSprintSpeed,        FSprint,        false, 1, 1),
-            new CardDef("停滞平台", "Frozen platforms", TabletRule.ModifierPlatformSpeed,      FPlatform,      false, 1, 1),
+            new CardDef("低重力",   "Low gravity",      "重力变轻，跳得更高",       "Lighter gravity, floatier jumps",      TabletRule.ModifierGravity,            FGravity,       false, 1, 2),
+            new CardDef("高重力",   "High gravity",     "重力加重，下落更快",       "Heavier gravity, faster falls",        TabletRule.ModifierGravity,            FGravity,       false, 2, 2),
+            new CardDef("弱跳跃",   "Weak jump",        "跳跃高度降低",             "Lower jumps",                          TabletRule.ModifierJumpSpeed,          FJump,          false, 1, 3),
+            new CardDef("慢冲刺",   "Slow sprint",      "冲刺速度变慢",             "Slower sprinting",                     TabletRule.ModifierSprintSpeed,        FSprint,        false, 1, 4),
+            new CardDef("慢平台",   "Slow platforms",   "平台移动变慢",             "Platforms move slower",                TabletRule.ModifierPlatformSpeed,      FPlatform,      false, 1, 4),
+            new CardDef("禁墙跳",   "No wall jumps",    "不能蹬墙跳",               "Wall jumps disabled",                  TabletRule.ModifierWallJumpsDisabled,  FBoolWallJumps, true,  0, 0),
+            new CardDef("镜像操作", "Mirror controls",  "左右操作反转",             "Left/right reversed",                  TabletRule.ModifierMirrorControls,     FBoolMirror,    true,  0, 0),
+            new CardDef("跳舞无敌", "Dance invincible", "跳舞时无敌",               "Invincible while dancing",             TabletRule.ModifierDanceInvincibility, FBoolDance,     true,  0, 0),
+            new CardDef("玩家互撞", "Player colliding", "玩家之间会碰撞",           "Players collide with each other",      TabletRule.ModifierPlayerPlayerCollisions, FBoolPlayerCol, true, 0, 0),
+            new CardDef("无摩擦",   "Frictionless",     "地面打滑，难以减速",       "Slippery, hard to stop",               TabletRule.ModifierFrictionless,       FBoolFriction,  true,  0, 0),
+            new CardDef("慢射速",   "Slow fire rate",   "射箭速度变慢",             "Slower rate of fire",                  TabletRule.ModifierRateOfFire,         FRate,          false, 1, 3),
+            new CardDef("高跳跃",   "High jump",        "跳跃高度提升",             "Higher jumps",                         TabletRule.ModifierJumpSpeed,          FJump,          false, 2, 3),
+            new CardDef("快冲刺",   "Fast sprint",      "冲刺速度提升",             "Faster sprinting",                     TabletRule.ModifierSprintSpeed,        FSprint,        false, 2, 4),
+            new CardDef("快平台",   "Fast platforms",   "平台移动变快",             "Platforms move faster",                TabletRule.ModifierPlatformSpeed,      FPlatform,      false, 2, 4),
+            new CardDef("超重",     "Crushing gravity", "重力极重，跳跃困难",       "Very heavy gravity, hard to jump",     TabletRule.ModifierGravity,            FGravity,       false, 3, 3),
+            new CardDef("龟速冲刺", "Crawl sprint",     "冲刺慢到接近走路",         "Sprint barely faster than walking",    TabletRule.ModifierSprintSpeed,        FSprint,        false, 1, 1),
+            new CardDef("停滞平台", "Frozen platforms", "平台几乎不动",             "Platforms barely move",                TabletRule.ModifierPlatformSpeed,      FPlatform,      false, 1, 1),
         };
 
         private struct ActiveCard { public int Id, Param; public ActiveCard(int id, int param) { Id = id; Param = param; } }
@@ -599,6 +601,81 @@ namespace SR_UCH.Tweaks {
             GUILayout.Label(SRApi.T(zh, en), SRApi.Ctl.LabelWrap);
         }
 
+        // ============ 当前牌面：一张牌画成一张卡片（名称 + 效果 + 增益/减益色边） ============
+
+        private static GUIStyle _cardTitle, _cardEffect;
+        private static readonly Color CardBuff = new Color(0.42f, 0.88f, 0.54f, 1f);   // 增益：绿
+        private static readonly Color CardDebuff = new Color(0.96f, 0.48f, 0.40f, 1f); // 减益：红橙
+        private static readonly Color CardNeutral = new Color(0.56f, 0.72f, 1f, 1f);   // 中性/混合：蓝
+
+        private static void EnsureCardStyles() {
+            if (_cardTitle != null) return;
+            _cardTitle = new GUIStyle(GUI.skin.label);
+            _cardTitle.fontStyle = FontStyle.Bold;
+            _cardTitle.wordWrap = false;
+            _cardTitle.clipping = TextClipping.Clip;
+            _cardTitle.alignment = TextAnchor.MiddleLeft;
+            _cardTitle.padding = new RectOffset(0, 0, 0, 0);
+            _cardTitle.margin = new RectOffset(0, 0, 0, 0);
+            _cardTitle.normal.textColor = new Color(0.96f, 0.97f, 1f, 1f);
+            _cardEffect = new GUIStyle(GUI.skin.label);
+            _cardEffect.wordWrap = true;
+            _cardEffect.clipping = TextClipping.Clip;
+            _cardEffect.alignment = TextAnchor.UpperLeft;
+            _cardEffect.padding = new RectOffset(0, 0, 0, 0);
+            _cardEffect.margin = new RectOffset(0, 0, 0, 0);
+            _cardEffect.normal.textColor = new Color(0.78f, 0.81f, 0.87f, 1f);
+        }
+
+        // 牌面边框色：让玩家变强 = 增益（绿），变弱 = 减益（红），两边都占/纯整活 = 中性（蓝）。
+        private static Color CardTint(CardDef c) {
+            if (c.Field == FBoolDance) return CardBuff;
+            if (c.Field == FBoolWallJumps || c.Field == FBoolFriction || c.Field == FBoolMirror || c.Field == FBoolPlayerCol) return CardDebuff;
+            if (c.Field == FGravity) return c.Min <= 1 ? CardBuff : CardDebuff;          // 低重力有益，高重力/超重有害
+            if (c.Field == FJump) return c.Min >= 2 ? CardBuff : CardDebuff;
+            if (c.Field == FSprint) return c.Min >= 3 ? CardBuff : CardDebuff;
+            if (c.Field == FPlatform) return c.Min >= 3 ? CardBuff : CardDebuff;
+            if (c.Field == FRate) return CardDebuff;                                      // 慢射速 = 减益
+            return CardNeutral;
+        }
+
+        private void RenderActiveCards() {
+            int n = _active.Count;
+            if (n <= 0) { Line("（未生效）", "(none)"); return; }
+            EnsureCardStyles();
+            float h = SRApi.Ctl.Sc(52f);
+            float gap = SRApi.Ctl.Sc(6f);
+            // 先占住整行高度：抽到 0/1/多张时页面不会跳，也不会因为卡片内容变化抖高度。
+            Rect area = GUILayoutUtility.GetRect(0f, h, GUILayout.ExpandWidth(true));
+            float cw = Mathf.Max(SRApi.Ctl.Sc(72f), Mathf.Floor((area.width - gap * (n - 1)) / Mathf.Max(1, n)));
+            for (int i = 0; i < n; i++) {
+                int id = _active[i].Id;
+                if (id < 0 || id >= Cards.Length) continue;
+                DrawCard(new Rect(area.x + i * (cw + gap), area.y, cw, h), Cards[id], _active[i].Param);
+            }
+        }
+
+        private static void DrawCard(Rect r, CardDef c, int param) {
+            Color tint = CardTint(c);
+            float bw = Mathf.Max(1f, SRApi.Ctl.Sc(2f));
+            // 底色 + 四边色条（不用圆角面板：卡片每帧重画，纯矩形最省）
+            SRApi.DrawFill(r, new Color(0.10f, 0.115f, 0.15f, 0.94f));
+            SRApi.DrawFill(new Rect(r.x, r.y, r.width, bw), tint);
+            SRApi.DrawFill(new Rect(r.x, r.yMax - bw, r.width, bw), tint);
+            SRApi.DrawFill(new Rect(r.x, r.y, bw, r.height), tint);
+            SRApi.DrawFill(new Rect(r.xMax - bw, r.y, bw, r.height), tint);
+
+            float pad = SRApi.Ctl.Sc(6f);
+            float titleH = SRApi.Ctl.Sc(17f);
+            Rect inner = new Rect(r.x + pad, r.y + SRApi.Ctl.Sc(4f), r.width - pad * 2f, r.height - SRApi.Ctl.Sc(9f));
+            _cardTitle.fontSize = Mathf.RoundToInt(SRApi.Ctl.Sc(13f));
+            _cardEffect.fontSize = Mathf.RoundToInt(SRApi.Ctl.Sc(10f));
+            GUI.Label(new Rect(inner.x, inner.y, inner.width, titleH), SRApi.T(c.Zh, c.En), _cardTitle);
+            string effect = SRApi.T(c.TipZh, c.TipEn);
+            if (!c.IsBool) effect += " · " + SRApi.T("值 ", "value ") + param;
+            GUI.Label(new Rect(inner.x, inner.y + titleH, inner.width, inner.height - titleH), effect, _cardEffect);
+        }
+
         private void RenderPage() {
             // 配置项一律走核心统一渲染；核心层没有裸 Toggle/Slider/Label 控件。
             CfgRow(_enabled);
@@ -606,7 +683,10 @@ namespace SR_UCH.Tweaks {
             CfgRow(_maxActive);
             CfgRow(_announce);
 
-            Line("当前牌面：" + (Desc() ?? "（未生效）"), "Active: " + (Desc() ?? "(none)"));
+            SRApi.Ctl.SectionTitle("- " + SRApi.T("当前牌面", "Active cards") + " -",
+                SRApi.T("本回合生效的规则牌：绿边 = 增益，红边 = 减益，蓝边 = 中性。",
+                        "Rules in effect this round: green = buff, red = debuff, blue = neutral."));
+            RenderActiveCards();
             Line(RosterText() ?? "房内 mod 清单：仅本机（离线）", RosterText() ?? "Room roster: this machine only (offline)");
 
             Line("牌池在「牌池」页勾选（勾上才可能被抽到）。", "Pick the drawable cards on the Card pool page.");
