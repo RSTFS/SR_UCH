@@ -670,7 +670,20 @@ namespace SR_UCH.Tweaks {
                     SRApi.LogWarn("[布局预设] 预设文件过大，已拒绝加载: " + path + " (" + len + " bytes)");
                     return null;
                 }
-                string xml = File.ReadAllText(path, Encoding.UTF8);
+                string xml = null;
+                try { xml = File.ReadAllText(path, Encoding.UTF8); }
+                catch (Exception __rx) { SRApi.Guard.Log("布局预设/读取主文件", __rx); }
+                if (string.IsNullOrEmpty(xml)) {
+                    // 主文件读不出来（写坏/被占用/截断）时回退到覆盖前留的 .bak，避免整条预设直接丢失。
+                    try {
+                        string bak = path + ".bak";
+                        if (File.Exists(bak)) {
+                            xml = File.ReadAllText(bak, Encoding.UTF8);
+                            if (!string.IsNullOrEmpty(xml)) SRApi.LogWarn("[布局预设] 主预设读取失败，已回退备份: " + bak);
+                        }
+                    } catch (Exception __rb) { SRApi.Guard.Log("布局预设/读取备份", __rb); }
+                }
+                if (string.IsNullOrEmpty(xml)) return null;
                 if (!string.IsNullOrEmpty(xml) && xml.Length > MaxImportChars) {
                     SRApi.Notify(SRApi.T("预设文件过大，已拒绝加载（上限约 2MB）", "Preset file is too large and was not loaded (limit about 2MB)"));
                     return null;

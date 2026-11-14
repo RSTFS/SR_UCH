@@ -21,6 +21,14 @@ jobs:
         shell: pwsh
         run: ./build/guards-text.ps1
 
+  schema-guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 运行结构守卫（槽位图 / 本地化覆盖）
+        shell: pwsh
+        run: ./build/guards-schema.ps1
+
   unit-tests:
     runs-on: ubuntu-latest
     steps:
