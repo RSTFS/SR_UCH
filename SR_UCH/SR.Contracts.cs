@@ -1319,6 +1319,9 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             // 存 object 而非委托：注入点在 SR.Ctl 首次被使用（早于任何页面渲染，但晚于 MainPlugin 的缺失通道自检），
             // 用委托字段会被 SRApi.MissingSinks() 误报为"未注入"（与 TableAutoHeight / HotkeyButtonNoHint 同一处理）。
             private static object _colorEdit, _colorSwatch, _colorPanel, _colorPreview, _colorReset;
+            private static Func<string, string, string, bool> _sectionBegin;
+            private static Action _sectionEnd;
+            public static void WireSection(Func<string, string, string, bool> begin, Action end) { _sectionBegin = begin; _sectionEnd = end; }
             public static void WireColorPicker(ColorEditFn edit, ColorSwatchFn swatch, ColorPanelFn panel,
                                                ColorPreviewFn preview, ColorResetFn reset) {
                 _colorEdit = edit; _colorSwatch = swatch; _colorPanel = panel; _colorPreview = preview; _colorReset = reset;
@@ -1418,9 +1421,22 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static void LocDesc(string sec, string key, string zh, string en) { Action<string, string, string, string> f = _locDesc; if (f != null) f(sec, key, zh, en); }
         // 一次登记「显示名 + 悬浮说明」：功能层原来每条都要写两行 LocKey/LocDesc，
         // 漏一行就会在中文界面显示英文键名（牌池扩到 17 张时漏过 4 张）。descZh 为空时只登记显示名。
+        public static void LocPair(string sec, string key, string zh, string en, string descZh = null, string descEn = null) {
+            LocKey(sec, key, zh, en);
+            if (!string.IsNullOrEmpty(descZh) || !string.IsNullOrEmpty(descEn)) LocDesc(sec, key, descZh ?? zh, descEn ?? en);
+        }
+
+        // 可折叠分区：标题行可点，展开时后续内容缩进在框内（按 id 记住本次会话的折叠状态）。
+        private static Func<string, string, string, bool> _sectionBegin;
+        private static Action _sectionEnd;
+        public static void WireSection(Func<string, string, string, bool> begin, Action end) { _sectionBegin = begin; _sectionEnd = end; }
+        public static bool SectionBegin(string id, string title, string tip = null) { Func<string, string, string, bool> f = _sectionBegin; return f != null && f(id, title, tip); }
+        public static void SectionEnd() { Action f = _sectionEnd; if (f != null) f(); }
+
         // 每帧签名/结果缓存：同一帧内同一 key 只算一次。
         // 预设页与联机页原来各自手写 *_Signature() 字段缓存，忘记失效就会"改了筛选列表不动"；
         // 用这个助手可以按"帧"天然失效，不必再手动维护版本号。
+
         public static class Cache {
             private static readonly Dictionary<string, object> _vals = new Dictionary<string, object>();
             private static readonly Dictionary<string, int> _frames = new Dictionary<string, int>();
@@ -1438,10 +1454,6 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             public static void Clear() { _vals.Clear(); _frames.Clear(); }
         }
 
-        public static void LocPair(string sec, string key, string zh, string en, string descZh = null, string descEn = null) {
-            LocKey(sec, key, zh, en);
-            if (!string.IsNullOrEmpty(descZh) || !string.IsNullOrEmpty(descEn)) LocDesc(sec, key, descZh ?? zh, descEn ?? en);
-        }
         public static void LocEnum(string name, string zh) { Action<string, string> f = _locEnum; if (f != null) f(name, zh); }
         public static string CurrentLanguageId { get { Func<string> f = _currentLanguageId; return f != null ? f() : "English"; } }
         public static int LangVer { get { Func<int> f = _langVer; return f != null ? f() : 0; } }

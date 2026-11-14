@@ -16,7 +16,7 @@ public partial class SR {
 
         // 颜色调色板自注入：核心在 Ctl 首次被访问时把实现挂到契约层门面。
         // 放在这里而不是 MainPlugin 的注入清单里 —— 新增 Set*Sinks 会要求 MainPlugin 同步改（该文件由他人收尾）。
-        static Ctl() { SR.ColorPicker.Wire(); }
+        static Ctl() { SR.ColorPicker.Wire(); SRApi.Ctl.WireSection(SectionBegin, SectionEnd); }
 
         // UI 缩放系数（各页像素尺寸都乘它）
         public static float Sc(float v) { return SR.Sc(v); }
@@ -595,6 +595,23 @@ public partial class SR {
         // 长按连发：按住按钮 0.45 秒后每 0.12 秒再触发一次（刷新派对盒这类操作不用狂点）。
         private static readonly Dictionary<string, float> _holdNext = new Dictionary<string, float>();
         private static readonly Dictionary<string, bool> _holdPrimed = new Dictionary<string, bool>();
+
+        // 可折叠分区（功能层经 SRApi.Ctl.SectionBegin/SectionEnd 使用）。
+        private static readonly HashSet<string> _secClosed = new HashSet<string>();
+
+        internal static bool SectionBegin(string id, string title, string tip) {
+            GUILayout.BeginVertical(GUI.skin.box);
+            bool open = !_secClosed.Contains(id);
+            GUIContent c = string.IsNullOrEmpty(tip) ? new GUIContent((open ? "\u25BC " : "\u25B6 ") + title)
+                                                      : new GUIContent((open ? "\u25BC " : "\u25B6 ") + title, tip);
+            if (GUILayout.Button(c, SR.Ctl.Btn, GUILayout.Height(Sc(24)))) {
+                if (open) _secClosed.Add(id); else _secClosed.Remove(id);
+                open = !open;
+            }
+            return open;
+        }
+
+        internal static void SectionEnd() { GUILayout.EndVertical(); }
 
         internal static bool HoldRepeatFor(string id) { return HoldRepeat(id); }
 
