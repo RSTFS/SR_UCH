@@ -587,12 +587,16 @@ public partial class SR {
             // 填充页（预设 / 联机）不建立滚动区：它们把列表高度算到"底栏上沿"，
             // 再套一层滚动区只会把列表裁到视口内、而列表自己仍以为可见 → maxY 与实际不符（滑不到底）。
             bool __useScrollView = !__noScroll;
+            Vector2 __scrollBeforeWheel = _scroll;
             if (__useScrollView) {
                 _scroll = GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUIStyle.none, GUILayout.ExpandHeight(true));
             } else {
                 _scroll = Vector2.zero;   // 填充页没有页面滚动
             }
             if (_scroll != pageBefore) WheelFrame = Time.frameCount; // 页面滚动区吃掉了滚轮
+            // 下拉框展开时滚轮只给下拉列表用：撤销页面滚动区的滚动量（否则切换下拉项时整页跟着滑）。
+            if (Event.current != null && Event.current.type == EventType.ScrollWheel && Ctl.AnyComboOpen())
+                _scroll = __scrollBeforeWheel;
             ConfigFile curConfig = _mode == Mode.Internal
                 ? _internalConfig
                 : (_mode == Mode.External && CurrentExternalPlugin() != null ? CurrentExternalPlugin().config : null);

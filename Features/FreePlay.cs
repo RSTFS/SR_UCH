@@ -12,7 +12,8 @@ namespace SR_UCH {
 
         public void Initialize(IFeatureHost plugin) {
             try {
-                SRApi.LocKey(Sec, "FreePlay Page", "自由模式", "Freeplay");
+                SRApi.LocSec(Sec, "自由模式", "FreePlay");   // 侧栏栏目中英名（缺 LocSec 时英文界面仍显示中文）
+                SRApi.LocKey(Sec, "FreePlay Page", "自由模式", "FreePlay");
                 // 侧栏栏目必须显式 Nav 注册：_navOrder 只由 SR.Nav 填充，
                 // 只调 RegisterPage 的栏目不会出现在左栏（这就是"加了但侧栏没有"的原因）。
                 SRApi.Nav(Sec, 100);

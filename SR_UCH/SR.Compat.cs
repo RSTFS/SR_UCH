@@ -127,52 +127,5 @@ public partial class SR {
         return p.Known ? T("无已知冲突", "clear") : T("未测试", "untested");
     }
 
-    internal static void RenderCompatCard() {
-        try {
-            EnsureCompat();
-            int conflict = 0, note = 0;
-            for (int i = 0; i < _compatPlugins.Count; i++) {
-                if (_compatPlugins[i].Level >= 2) conflict++;
-                else if (_compatPlugins[i].Level == 1) note++;
-            }
-            string summary;
-            if (_compatPlugins.Count == 0) summary = T("未检测到其它插件", "no other plugins detected");
-            else summary = T("已装 " + _compatPlugins.Count + " 个：冲突 " + conflict + " · 注意 " + note,
-                             _compatPlugins.Count + " installed: " + conflict + " conflict(s), " + note + " note(s)");
-            Card(conflict == 0, T("第三方插件", "Other plugins"), summary, delegate {
-                if (_compatPlugins.Count == 0) {
-                    AuditLabel(T("（从 BepInEx\\plugins 加载的其它插件会列在这里；SR 自己的 DLL 不计入）",
-                                 "(other plugins loaded from BepInEx\\plugins are listed here; SR's own DLLs are excluded)"));
-                    return;
-                }
-                for (int i = 0; i < _compatPlugins.Count; i++) {
-                    CompatPlugin p = _compatPlugins[i];
-                    string head = (p.Level >= 2 ? "▲ " : p.Level == 1 ? "▲ " : p.Known ? "● " : "○ ")
-                        + p.Name + (string.IsNullOrEmpty(p.Version) ? "" : " " + p.Version)
-                        + "  ·  " + CompatVerdict(p);
-                    AuditLabel(head);
-                    AuditLabel("    " + T(p.Zh, p.En));
-                }
-                GUILayout.Space(Sc(4));
-                AuditLabel(T("说明：结论来自对本机插件的静态分析（解析程序集/DLL 补丁目标），不是运行时互测；"
-                             + "「未测试」只代表 SR 还没分析过它，不代表会冲突。",
-                             "Notes: conclusions come from static analysis of installed plugins (assembly/member targets), "
-                             + "not live co-op testing; \"untested\" only means SR has not analysed it yet -- not that it conflicts."));
-            });
-        } catch (Exception __ex) { Guard.Log("自检/第三方插件", __ex); }
-    }
-
-    // 供启动日志用的一行（不含换行）。
-    internal static string CompatOneLine() {
-        try {
-            EnsureCompat();
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < _compatPlugins.Count; i++) {
-                if (i > 0) sb.Append(", ");
-                sb.Append(_compatPlugins[i].Name);
-            }
-            return sb.Length > 0 ? sb.ToString() : "(none)";
-        } catch (Exception __ex) { Guard.Log("兼容性/一行", __ex); return "?"; }
-    }
 }
 }

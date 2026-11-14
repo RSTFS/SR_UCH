@@ -175,11 +175,10 @@ public partial class Experiments : ITweak
                 if (_on != null && _on.Value) { float v = CurrentFov(); _fov.Value = Mathf.Clamp(v, MinFov, MaxFov); _savedFov = v; Camera g = GameCamera(); if (g != null) { try { if (g.orthographic) g.orthographicSize = _fov.Value; else g.fieldOfView = _fov.Value; } catch { /* 静默：非关键路径，失败可直接忽略 */ } } }
                 // 通知要带逻辑：受到模式限制的功能，在非自由模式下"开了也不生效"要说明白，
                 // 而不是只报一个"开"（用户会在非自由模式里以为功能坏了）。
-                if (_on != null && _on.Value && !FreeplayMode())
-                    SRApi.Notify(SRApi.T("仅自由模式", "Freeplay only"));
-                else
-                    SRApi.Notify((_on != null && _on.Value) ? SRApi.T("自由相机：开", "Free camera: ON")
-                                                             : SRApi.T("自由相机：关（已还原）", "Free camera: OFF (restored)"));
+                // 模式受限时静默跳过（用户要求：不要「仅XX模式」提示）。
+                if (_on != null && _on.Value && !FreeplayMode()) return;
+                SRApi.Notify((_on != null && _on.Value) ? SRApi.T("自由相机：开", "Free camera: ON")
+                                                         : SRApi.T("自由相机：关（已还原）", "Free camera: OFF (restored)"));
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 开关变化", __ex); }
         }
         // 自由模式判定：自由相机只在该模式生效（其它模式相机由玩法控制）。
@@ -198,7 +197,7 @@ public partial class Experiments : ITweak
                 // 开关始终可以切换；是否生效由 ApplyToCamera 里的模式门控决定
                 // （非自由模式 = 开了也不动相机，超级模式可无视）。
                 if (_on != null) { _on.Value = !_on.Value; try { SRApi.Ctl.MarkConfigDirty(_on.ConfigFile); } catch { /* 静默：保存失败不影响功能 */ } }
-                if (_on != null && _on.Value && !FreeplayMode()) SRApi.Notify(SRApi.T("仅自由模式", "Freeplay only"));
+                // 模式受限：触发即跳过，不弹提示。
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 快捷键", __ex); }
         }
     

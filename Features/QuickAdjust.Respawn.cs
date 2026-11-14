@@ -15,9 +15,26 @@ namespace SR_UCH.Tweaks {
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("重生", "Respawn") + " -",
                     SRApi.T("重生延迟、出生无敌、炮弹卡死自动重生（挑战/自由通用）。",
                             "Respawn delay, spawn invincibility and cannon-stuck respawn (challenge and freeplay)."));
-                if (_delay != null) QuickAdjust.PageSlider(SRApi.T("重生延迟", "Respawn delay"),
-                    SRApi.T("死亡后等多少秒再自动重生\n默认值就是游戏原版数值，可自行调大调小\n0 = 立即重生", "seconds to wait after death before respawning\ndefaults to the game's own value; adjust freely\n0 = respawn instantly"),
-                    _delay, 0f, 3f, "0.0");
+                if (_delay != null) {
+                    if (_delay.Value < 0f) {
+                        // 默认 = 跟随游戏原版（-1 哨兵）：首次进入对局读到原值后显示出来。
+                        string vanilla = SyncedVanillaDelay >= 0f
+                            ? SRApi.T("游戏默认（原版 " + SyncedVanillaDelay.ToString("0.0") + " 秒）",
+                                      "Game default (vanilla " + SyncedVanillaDelay.ToString("0.0") + "s)")
+                            : SRApi.T("游戏默认（进入对局后显示原版数值）", "Game default (shown after entering a match)");
+                        if (SRApi.Ctl.Button(SRApi.T("重生延迟：改为自定义", "Respawn delay: use custom"),
+                                SRApi.T("从游戏原版值开始调；之后可用「恢复游戏默认」回来", "Start from the vanilla value; use Restore to go back"),
+                                SRApi.Ctl.Sc(200), SRApi.Ctl.Sc(24)))
+                            _delay.Value = SyncedVanillaDelay > 0f ? Mathf.Round(SyncedVanillaDelay * 10f) / 10f : 0f;
+                        GUILayout.Label(vanilla, SRApi.Ctl.LabelWrap);
+                    } else {
+                        QuickAdjust.PageSlider(SRApi.T("重生延迟", "Respawn delay"),
+                            SRApi.T("死亡后等多少秒再自动重生\n0 = 立即重生\n点下面按钮可恢复游戏默认", "seconds to wait after death before respawning\n0 = respawn instantly\nuse the button below to restore the game default"),
+                            _delay, 0f, 3f, "0.0");
+                        if (SRApi.Ctl.Button(SRApi.T("恢复游戏默认", "Restore game default"), SRApi.T("恢复为跟随游戏原版的重生延迟", "Go back to the game's own respawn delay"), SRApi.Ctl.Sc(160), SRApi.Ctl.Sc(24)))
+                            _delay.Value = -1f;
+                    }
+                }
                 if (_invincible != null) QuickAdjust.PageSlider(SRApi.T("出生无敌", "Spawn invincibility"),
                     SRApi.T("每次出生后的无敌秒数\n游戏原生重生后是 1 秒\n挑战/自由模式", "seconds of invincibility after each spawn\nvanilla gives 1s after respawn\nchallenge and freeplay"),
                     _invincible, 0f, 10f, "0.0");
@@ -29,6 +46,8 @@ namespace SR_UCH.Tweaks {
 
         // 首次同步标记：把游戏原版的重生延迟填进配置
         internal static bool _respawnDelaySynced;
+        // 读到的游戏原版重生延迟（-1 = 还没读到）；用于在页面上显示"游戏默认"的实际值。
+        internal static float SyncedVanillaDelay = -1f;
 
     }
 

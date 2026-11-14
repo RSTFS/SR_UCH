@@ -93,6 +93,7 @@ namespace SR_UCH.Tweaks {
 
         internal static void SetDelayFromVanilla(float v) {
             if (_delay == null) return;
+            RespawnTools.SyncedVanillaDelay = v;
             _delay.Value = Mathf.Clamp(Mathf.Round(v * 10f) / 10f, 0f, 3f);
         }
 

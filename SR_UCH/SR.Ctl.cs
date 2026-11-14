@@ -273,6 +273,12 @@ public partial class SR {
         public static bool ForceZh { get { return _forceZh; } set { _forceZh = value; } }
         // 滑块提交为“值变了就写”（ImGui 的 v_last 模式）：取 DrawSlider 返回值，变了就调本方法或 SetValue。
         public static Dictionary<ConfigEntryBase, bool> EditOpen { get { return _editOpen; } }
+        // 是否有下拉框处于展开状态：页面滚动区据此让出滚轮（否则滚轮切换下拉项时整页跟着滑）。
+        internal static bool AnyComboOpen() {
+            try { foreach (KeyValuePair<ConfigEntryBase, bool> kv in _editOpen) if (kv.Value) return true; }
+            catch (Exception __ex) { Guard.Log("下拉框展开状态", __ex); }
+            return false;
+        }
         // 配置落盘节流 + 条目缓存失效的门面（外部 DLL 无需访问 SR 的 internal 成员）。
         public static void MarkConfigDirty(ConfigFile cfg) { SR.MarkConfigDirty(cfg); }
         public static void NoteEntryBound() { SR.NoteEntryBound(); }

@@ -75,7 +75,7 @@ namespace SR_UCH.Tweaks {
         private static float AnimOut() { return Mathf.Max(0.001f, _animMs.Value / 1000f * 0.9f); }
 
         private static Texture2D _white;
-        private static GUIStyle _label, _small, _btn;
+        private static GUIStyle _label, _btn;
         private static HubUI _ui;
 
         // 自己 Provide 的委托实例：注销时按值匹配，避免误删之后注册的实现。
@@ -155,7 +155,7 @@ namespace SR_UCH.Tweaks {
                     case "Card Opacity": min = 20.0f; max = 100.0f; return true;
                     case "Card Scale": min = 80.0f; max = 160.0f; return true;
                     case "Anim Ms": min = 80.0f; max = 400.0f; return true;
-                    case "Card Width": min = 100.0f; max = 300.0f; return true;
+                    case "Card Width": min = 160.0f; max = 480.0f; return true;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("数值滑块范围", __ex); }
             return false;
@@ -168,16 +168,16 @@ namespace SR_UCH.Tweaks {
             _quiet = plugin.Config.Bind(Sec, "Quiet In Match", false, "对局中静默低/中优先级提示（这是唯一会主动不显示的情况）；高优先级照常弹。");
             _maxVisible = plugin.Config.Bind(Sec, "Max Visible", 3,
                 new ConfigDescription("浮层最多同时显示几条（1-6）。", new AcceptableValueRange<int>(1, 6)));
-            _toastSeconds = plugin.Config.Bind(Sec, "Toast Seconds", 2,
+            _toastSeconds = plugin.Config.Bind(Sec, "Toast Seconds", 3,
                 new ConfigDescription("每条通知停留秒数（1-5）。", new AcceptableValueRange<int>(1, 5)));
-            _cardW = plugin.Config.Bind(Sec, "Card Width", 200,
-                new ConfigDescription("浮层卡片像素宽度（100-300）。", new AcceptableValueRange<int>(100, 300)));
+            _cardW = plugin.Config.Bind(Sec, "Card Width", 320,
+                new ConfigDescription("浮层卡片像素宽度（160-480；上限同时受屏幕宽度 1/3 限制）。", new AcceptableValueRange<int>(160, 480)));
             _animOn = plugin.Config.Bind(Sec, "Animate", true, "浮层的出现/消失动画总开关。");
-            _animMs = plugin.Config.Bind(Sec, "Anim Ms", 180,
+            _animMs = plugin.Config.Bind(Sec, "Anim Ms", 220,
                 new ConfigDescription("出现与消失的动画时长（80-400 毫秒）。", new AcceptableValueRange<int>(80, 400)));
             _cardScale = plugin.Config.Bind(Sec, "Card Scale", 160,
                 new ConfigDescription("整个浮层的缩放百分比（80-160）。", new AcceptableValueRange<int>(80, 160)));
-            _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 64,
+            _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 85,
                 new ConfigDescription("浮层卡片背景不透明度百分比（20-100）。", new AcceptableValueRange<int>(20, 100)));
             _corner = plugin.Config.Bind(Sec, "Corner", 0,
                 new ConfigDescription("浮层停靠位置：0 右下 / 1 右上 / 2 左下 / 3 左上。", new AcceptableValueRange<int>(0, 3)));
@@ -378,8 +378,6 @@ namespace SR_UCH.Tweaks {
             _label = new GUIStyle(GUI.skin.label);
             _label.wordWrap = true; _label.clipping = TextClipping.Clip;
             _label.normal.textColor = new Color(0.94f, 0.96f, 0.99f, 1f);
-            _small = new GUIStyle(_label);
-            _small.fontStyle = FontStyle.Bold;
             _btn = new GUIStyle(GUI.skin.button);
         }
 
@@ -394,13 +392,13 @@ namespace SR_UCH.Tweaks {
             if (_enabled == null || !_enabled.Value || _onScreen == null || !_onScreen.Value || _visible.Count == 0 || Event.current == null) return;
             EnsureStyles();
             float s = Mathf.Clamp(_cardScale.Value / 160f, 0.5f, 1.0f);
-            _label.fontSize = Mathf.RoundToInt(12f * s);
-            _small.fontSize = Mathf.RoundToInt(12f * s);
+            // 参考 imgui-notify 的观感：更大的字号/内边距，卡片最宽不超过屏幕 1/3。
+            _label.fontSize = Mathf.RoundToInt(15f * s);
             _label.normal.textColor = new Color(0.94f, 0.96f, 0.99f, 1f);
 
-            float w = Mathf.Clamp(_cardW.Value * s, 100f, 300f);   // 默认 200；s = 整层缩放
-            float pad = 8f * s;
-            float gap = 4f * s;
+            float w = Mathf.Clamp(_cardW.Value * s, 200f, Mathf.Min(Screen.width / 3f, 600f));
+            float pad = 10f * s;
+            float gap = 6f * s;
             float now = Time.unscaledTime;
             float dIn = AnimIn();
             float dOut = AnimOut();
@@ -422,7 +420,7 @@ namespace SR_UCH.Tweaks {
             float total = 0f;
             for (int i = 0; i < n; i++) {
                 Notice it = _visible[i];
-                float th = Mathf.Max(18f * s, _label.CalcHeight(new GUIContent(it.Text), w - pad * 2f - 14f * s));
+                float th = Mathf.Max(22f * s, _label.CalcHeight(new GUIContent(it.Text), w - pad * 2f - 14f * s));
                 heights[i] = th + pad * 2f + gap;
                 if (it.DyingAt > 0f || drawnCount < cap) { draw[i] = true; drawnCount++; total += heights[i]; }
             }
@@ -518,14 +516,10 @@ namespace SR_UCH.Tweaks {
                     }
 
                     // 只显示通知正文（用户要求去掉「提示/已办/重要」这类前缀）。
-                    string head = nt.Count > 1 ? "x" + nt.Count : null;
+                    // 只显示正文（用户要求去掉「xN」计数）。
                     // 文本区底部 +2px 缓冲：游戏字体最后一笔常被 CalcSize 少算，
                     // 不加缓冲时"y/g/p"这类下伸笔画的最后一行会被裁掉（用户实测 1px 仍偏紧）。
-                    if (head != null)
-                        GUI.Label(new Rect(ax + pad, y + 1f * s, w - pad * 2f, 14f * s), head, _small);
-                    GUI.Label(new Rect(ax + pad, y + pad * 0.5f + (head != null ? 16f * s : 0f),
-                                       w - pad * 2f - 6f * s, h - pad - (head != null ? 16f * s : 0f) + 2f),
-                              nt.Text, _label);
+                    GUI.Label(new Rect(ax + pad, y + pad * 0.6f, w - pad * 2f - 6f * s, h - pad * 1.6f + 2f), nt.Text, _label);
                     // 底部剩余时间条：从满格开始缩短（排队期间还没上屏，不画消耗）。
                     float life = Mathf.Clamp01(1f - Mathf.Max(0f, now - nt.ShownAt) / Mathf.Max(0.4f, nt.Stay));
                     Fill(new Rect(ax + barW, y + h - 3f * s, (w - barW) * life, 3f * s),
@@ -569,34 +563,6 @@ namespace SR_UCH.Tweaks {
                 if (sel >= 0 && sel < vals.Length) _corner.Value = vals[sel];
             }
 
-            // ---- 测试 / 验收辅助：走真实提示通道（分级 / 合并 / 静默 / 原生回退都生效）----
-            SRApi.Ctl.SectionTitle("- " + SRApi.T("测试通知", "Test notifications") + " -",
-                SRApi.T("点一下就能看到真实提示：高优先级描边、\u00d7N 合并、连发排队、动画过渡。",
-                        "Fire real notices to verify outline, xN merge, queueing and transitions."));
-            if (SRApi.Ctl.Button(SRApi.T("高优先级（要动手）", "High priority"), SRApi.T("发送一条失败/要处理的提示", "Send a failure/actionable notice")))
-                SRApi.Notify(SRApi.T("测试：操作失败，需要处理", "Test: operation failed, action needed"));
-            GUILayout.Space(SRApi.Ctl.Sc(3f));
-            if (SRApi.Ctl.Button(SRApi.T("一般优先级", "Normal priority"), SRApi.T("发送一条普通反馈", "Send a normal notice")))
-                SRApi.Notify(SRApi.T("测试：这是一条一般提示", "Test: a normal notice"));
-            GUILayout.Space(SRApi.Ctl.Sc(3f));
-            if (SRApi.Ctl.Button(SRApi.T("低优先级（纯确认）", "Low priority"), SRApi.T("发送一条纯确认提示", "Send a plain confirmation")))
-                SRApi.Notify(SRApi.T("测试：已保存", "Test: saved"));
-            GUILayout.Space(SRApi.Ctl.Sc(3f));
-            if (SRApi.Ctl.Button(SRApi.T("连发 5 条（验证排队）", "Burst 5 (verify queue)"), SRApi.T("快速连发不同内容，检查是否依次显示、不被吞", "Fire 5 distinct notices to verify queueing"))) {
-                for (int i = 0; i < 5; i++) SRApi.Notify(SRApi.T("测试连发 ", "Test burst ") + (i + 1));
-            }
-            GUILayout.Space(SRApi.Ctl.Sc(3f));
-            if (SRApi.Ctl.Button(SRApi.T("同一条 ×3（验证合并）", "Same x3 (verify merge)"), SRApi.T("连发同内容，检查显示为 x3", "Fire the same notice 3x to verify xN merge"))) {
-                string same = SRApi.T("测试：同一条消息合并", "Test: same message merge");
-                for (int i = 0; i < 3; i++) SRApi.Notify(same);
-            }
-            GUILayout.Space(SRApi.Ctl.Sc(3f));
-            if (SRApi.Ctl.Button(SRApi.T("清空待显示队列", "Clear pending queue"), SRApi.T("丢掉所有还没上屏的通知（只影响显示）", "Drop all queued notices (display only)")))
-                ClearPending();
-            GUILayout.Space(SRApi.Ctl.Sc(4));
-            GUILayout.Label(SRApi.T("提示：鼠标悬停在浮层上会暂停倒计时，左键点击卡片立即关闭。",
-                                     "Tip: hovering pauses the countdown; left-click a card to dismiss it."),
-                SRApi.Ctl.LabelWrap);
         }
 
         // 常驻组件：面板关闭时 DrawGUI 会早退，覆盖层走不到，所以必须自己挂 OnGUI。

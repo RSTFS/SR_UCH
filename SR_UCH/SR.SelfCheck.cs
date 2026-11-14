@@ -105,7 +105,7 @@ public partial class SR {
                             string kindTxt = kindRaw == "补丁" ? T("补丁", "Patch") : kindRaw == "反射" ? T("反射", "Reflection") : kindRaw;
                             string tgt = issues[i].Target ?? "";
                             // 行高下限统一取核心 TableRowH()（与所有列表一致）。
-                            float h = Mathf.Max(_label.CalcHeight(new GUIContent(tgt), Sc(320)), Ctl.TableRowH());
+                            float h = Mathf.Max(_labelWrap.CalcHeight(new GUIContent(tgt), Sc(320)), Ctl.TableRowH());
                             GUILayout.BeginHorizontal();
                             GUILayout.Label("✗ " + kindTxt, _label, GUILayout.Width(Sc(64)), GUILayout.Height(h));
                             GUILayout.Label(tgt, _labelWrap, GUILayout.Width(Sc(320)), GUILayout.Height(h));
@@ -173,9 +173,6 @@ public partial class SR {
 
                 // ---- 按键中心（自动快捷键 + 手动键位）----
                 RenderKeyCenterCard();
-
-                // ---- 第三方插件兼容性卡 ----
-                RenderCompatCard();
 
                 // ---- 性能卡 ----
                 // 开关关闭时不刷新：不读采样、不重算，卡片只显示一行提示（勾选框在卡片里）。
@@ -273,7 +270,11 @@ public partial class SR {
                         __e.Use();
                     }
                 }
-                if (open) { GUILayout.Space(Sc(4)); body(); }
+                if (open) {
+                    GUILayout.Space(Sc(4));
+                    // body 抛异常也必须先把布局组收掉，否则后续帧所有控件/按钮都会失效（"按钮点不动"）。
+                    try { body(); } catch (Exception __b) { Guard.Log("自检卡片内容 " + title, __b); }
+                }
                 GUILayout.EndVertical();
                 GUILayout.Space(Sc(4));
             } catch (Exception __ex) { Guard.Log("自检卡片 " + title, __ex); }

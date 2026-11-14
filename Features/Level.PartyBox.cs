@@ -148,7 +148,7 @@ public class LevelPartyBox : ITweak {
             try {
                 BoxBusyUntil = Time.unscaledTime + BoxBusySeconds;   // 重建期间喂自动道具"别动"
                 VersusControl vc = UnityEngine.Object.FindObjectOfType<VersusControl>();
-                if (vc == null) { SRApi.Notify(SRApi.T("请先进入派对模式对局", "Not in a party match")); return; }
+                if (vc == null) return;   // 非派对模式：静默跳过（不弹提示）
                 PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
                 if (pb == null) { SRApi.Notify(SRApi.T("未找到派对盒", "Party box not found")); return; }
                 // 权限判定走 SRApi.CanDoHost()：道具由房主端生成并需服务器广播，提示文案由 SR 统一给出。
@@ -198,7 +198,7 @@ public class LevelPartyBox : ITweak {
             try {
                 BoxBusyUntil = Time.unscaledTime + BoxBusySeconds;   // 关闭期间喂自动道具"别动"
                 VersusControl vc = UnityEngine.Object.FindObjectOfType<VersusControl>();
-                if (vc == null) { SRApi.Notify(SRApi.T("请先进入派对模式对局", "Not in a party match")); return; }
+                if (vc == null) return;   // 非派对模式：静默跳过（不弹提示）
                 // 相位推进是服务器权限（原生 RPC 也只在房主侧发）。
                 if (!SRApi.CanDoHost()) return;
                 // placementTimer / showingPlacementWarning 是 VersusControl 的 protected 字段，必须走 SRApi.Ref.Field 并登记。

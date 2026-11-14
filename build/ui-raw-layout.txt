@@ -1,4 +1,4 @@
-﻿# 功能层手写 GUILayout.BeginHorizontal 的次数基线（只允许减少）
+# 功能层手写 GUILayout.BeginHorizontal 的次数基线（只允许减少）
 Features/BuildingPresets.cs=0
 Features/BuildingPresets.Ui.cs=6
 Features/BuildingTools.cs=1
@@ -12,3 +12,4 @@ Features/Level.Tool.cs=1
 Features/Online.cs=3
 Features/Online.Filters.cs=1
 Features/QuickAdjust.cs=4
+Features/Chaos.cs=1

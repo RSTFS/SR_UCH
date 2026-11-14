@@ -39,6 +39,7 @@ namespace SR_UCH.Tweaks {
         private static float _alpha;
         private static bool _conflict;   // CamHog 已加载 → 本功能让位
         private static bool _shutdown;   // 核心卸载/重载
+        private static bool _fixingOpacity;   // 防止"改成整十"再次触发事件造成递归
         private static bool _uiReg;
 
         private static float Alpha { get { return _alpha; } }
@@ -89,7 +90,7 @@ namespace SR_UCH.Tweaks {
             try {
                 SelfReg();
                 _enabled = plugin.Config.Bind(Sec, "Enabled", false, "淡化/隐藏其他玩家，只影响本机画面。");
-                _opacityPercent = plugin.Config.Bind(Sec, "Opacity", 30,
+                _opacityPercent = plugin.Config.Bind(Sec, "Opacity", 50,
                     new ConfigDescription("其他玩家的不透明度（0 = 完全隐藏，100 = 原样）。", new AcceptableValueRange<int>(0, 100)));
                 _useDistance = plugin.Config.Bind(Sec, "Use Distance", true, "只在距离内淡化其他玩家（关闭 = 全部淡化）。");
                 _distance = plugin.Config.Bind(Sec, "Distance", 5,
@@ -98,7 +99,7 @@ namespace SR_UCH.Tweaks {
 
                 Refresh();
                 _enabled.SettingChanged += (s, e) => Refresh();
-                _opacityPercent.SettingChanged += (s, e) => Refresh();
+                _opacityPercent.SettingChanged += (s, e) => { FixOpacityStep(); Refresh(); };
                 _useDistance.SettingChanged += (s, e) => Refresh();
                 _distance.SettingChanged += (s, e) => Refresh();
 
@@ -114,6 +115,16 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void Shutdown() { _shutdown = true; }
+
+        // 不透明度步进 10：滑条/手输都收敛到整十（0,10,...,100），避免出现 37% 这种值。
+        private static void FixOpacityStep() {
+            if (_fixingOpacity || _opacityPercent == null) return;
+            try {
+                int v = Mathf.Clamp(_opacityPercent.Value, 0, 100);
+                int r = Mathf.Clamp(Mathf.RoundToInt(v / 10f) * 10, 0, 100);
+                if (r != v) { _fixingOpacity = true; _opacityPercent.Value = r; _fixingOpacity = false; }
+            } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/整十步进", __ex); }
+        }
 
         private static void Refresh() {
             try {
@@ -214,10 +225,6 @@ namespace SR_UCH.Tweaks {
             CfgRow(_opacityPercent);
             CfgRow(_useDistance);
             CfgRow(_distance);
-            GUILayout.Space(SRApi.Ctl.Sc(4));
-            GUILayout.Label(SRApi.T("提示：本页所有设置只影响你自己的画面；对局内也可用快捷键临时开关。",
-                                     "All settings here are local to your own picture; use the hotkey to toggle in-game."),
-                SRApi.Ctl.LabelWrap);
         }
     }
 }

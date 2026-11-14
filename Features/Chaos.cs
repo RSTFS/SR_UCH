@@ -264,6 +264,7 @@ namespace SR_UCH.Tweaks {
         public void Tick() {
             if (!_ready) return;
             if (_enabled.Value == false) return;                       // 总开关关掉后不跑任何每帧逻辑
+            if (!ModeAllowed()) return;                                 // 限制模式：静默跳过
             // 用项目的组合键框架：Shift/Ctrl 组合能用，且聊天框打字时让路（裸 Input.GetKeyDown 会误触发）。
             if (IsAuthority && SRApi.ComboKeyDown(_drawKey)) DrawAndBroadcast();
             SendHelloOnce();
@@ -287,6 +288,12 @@ namespace SR_UCH.Tweaks {
         private static bool NetClientActive() { try { return NetworkClient.active; } catch { return false; } }
         private static Modifiers SafeMods() { try { return Modifiers.GetInstance(); } catch { return null; } }
         private static bool IsOnline() { var lm = SafeLobby(); return lm != null && lm.IsInOnlineGame; }
+        // 混乱牌组只在对局允许的模式里生效：派对 / 创意（超级模式由 GateModeAllows 豁免）。
+        // 其它模式一律静默跳过：不抽牌、不接收、不弹提示。
+        private static bool ModeAllowed() {
+            try { return SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative); }
+            catch (Exception __ex) { SRApi.Guard.Log("混乱牌组/模式判定", __ex); return false; }
+        }
         private static bool IsHostSelf() { var lm = SafeLobby(); return lm != null && lm.IsHost; }
 
         private static bool IsAuthority {
@@ -345,6 +352,7 @@ namespace SR_UCH.Tweaks {
         // ============ 抽牌与广播 ============
 
         private void DrawAndBroadcast() {
+            if (!ModeAllowed()) return;                                 // 限制模式：静默跳过
             var chosen = new List<int>();
             for (int i = 0; i < Cards.Length; i++) if (_pool[i] != null && _pool[i].Value) chosen.Add(i);
             if (chosen.Count == 0) return;
@@ -550,6 +558,7 @@ namespace SR_UCH.Tweaks {
             // 注：本机开关关掉也要继续「只跟踪不生效」——规则是房主广播的，游戏照样写进
             // Modifiers；如果这里按 _enabled 早退，页面会显示「未生效」而规则其实在生效（审计 P2-7）。
             if (!IsOnline() || IsHostSelf()) return;
+            if (!ModeAllowed()) return;                                 // 限制模式：不接收牌面
             if ((m.Value2 >> 16) != CardMagic) return;
             int op2 = (m.Value2 >> 8) & 0xFF;
             int card = m.Value2 & 0xFF;
@@ -729,10 +738,15 @@ namespace SR_UCH.Tweaks {
 
         private void RenderPage() {
             // 配置项一律走核心统一渲染；核心层没有裸 Toggle/Slider/Label 控件。
-            CfgRow(_enabled);
-            CfgRow(_everyRounds);
-            CfgRow(_maxActive);
-            CfgRow(_announce);
+            // 限制模式（非派对/创意）下整页配置置灰：触发即跳过，不弹提示。
+            using (SRApi.Ctl.Disabled(!ModeAllowed())) {
+                CfgRow(_enabled);
+                CfgRow(_everyRounds);
+                CfgRow(_maxActive);
+                CfgRow(_announce);
+            }
+            if (!ModeAllowed())
+                Line("仅派对 / 创意模式可用（超级模式可无视模式限制）。", "Party / Creative only (super mode bypasses mode limits).");
 
             // 本机开关关掉时，牌面只作跟踪（房主规则仍然生效），必须明说，不能让页面假称"未生效"。
             if (_enabled != null && !_enabled.Value)
@@ -742,84 +756,37 @@ namespace SR_UCH.Tweaks {
                 SRApi.T("本回合生效的规则牌：绿边 = 增益，红边 = 减益，蓝边 = 中性。",
                         "Rules in effect this round: green = buff, red = debuff, blue = neutral."));
             RenderActiveCards();
-            Line(RosterText() ?? "房内 mod 清单：仅本机（离线）", RosterText() ?? "Room roster: this machine only (offline)");
-
-            Line("牌池在「牌池」页勾选（勾上才可能被抽到）。", "Pick the drawable cards on the Card pool page.");
-
-            Line("说明：仅房主需要安装；房客未安装时由游戏原生规则生效，房客能看到规则变化但看不到本页。",
-                 "Only the host needs the mod. Guests without it still get the vanilla rule change, but cannot see this page.");
-            Line("混乱牌组用规则消息的高位魔数认领自己的消息，其它功能与手动改规则都不会被误解析。",
-                 "Chaos Deck claims its rule messages with a high-bit magic, so other features and manual rule edits are never misread.");
-            Line("每次抽牌前会先把上一回合的规则按原值重发，房客的规则不会逐回合累积。",
-                 "Before every draw the previous rules are re-broadcast at their original values, so guest rules never accumulate round over round.");
             SRApi.Ctl.HotkeyButton("chaos.reroll", SRApi.T("重抽", "Draw"),
                                    SRApi.T("仅房主 / 离线有效", "Host or offline only"), DrawAndBroadcast);
-
-            // ---- 测试 / 验收辅助：离线也能验证卡片布局、图例与"同规则只显示一张" ----
-            SRApi.Ctl.SectionTitle("- " + SRApi.T("测试", "Test") + " -",
-                SRApi.T("模拟抽牌只在本机生效：验证卡片布局、颜色图例、同规则收口；不会发网络消息（离线/单机）。",
-                        "Local-only test draw: verifies card layout, legend and same-rule collapse; no network traffic (offline/single player)."));
-            Line("当前记录 " + _active.Count + " 张 → 实际显示 " + EffectiveIndexes() + " 张（同规则只留最后一张）。",
-                 "Recorded: " + _active.Count + " -> actually shown: " + EffectiveIndexes() + " (last card wins per rule).");
-            if (!IsAuthority) Line("当前不是房主/离线权威端：抽牌测试无效。", "Not host/offline authority: test draw is a no-op.");
-            if (SRApi.Ctl.Button(SRApi.T("测试：立即抽一组牌", "Test: draw now"), SRApi.T("仅房主/离线有效；用于验收牌面卡片", "Host/offline only; for verifying the card display"))) {
-                if (!IsAuthority) SRApi.Notify(SRApi.T("仅房主/离线可以抽牌", "Only host/offline can draw"));
-                else if (_enabled == null || !_enabled.Value) SRApi.Notify(SRApi.T("先打开总开关再测试", "Enable the feature first"));
-                else DrawAndBroadcast();
-            }
         }
 
-        // 牌池单独一页：搜索 + 按「数值规则 / 布尔规则」分组勾选 + 批量操作（全选 / 全不选 / 只留减益）。
-        private static string _poolQuery;   // 牌池页搜索词（空 = 全部）
+        // 牌池单独一页：按「数值规则 / 布尔规则」分组勾选 + 批量操作（全选 / 全不选 / 仅增益 / 仅减益）。
 
         private void RenderPoolPage() {
             Line("勾上的牌才可能被抽到；至少留一张。", "Checked cards can be drawn; keep at least one enabled.");
-            if (SRApi.Ctl.Button(SRApi.T("全选", "All"), SRApi.T("勾选全部牌", "Enable every card")))
-                SetAllPools(true);
+            // 四个批量操作同排一行（高度略高于普通按钮）。
+            GUILayout.BeginHorizontal();
+            float bh = SRApi.Ctl.Sc(30f), bw = SRApi.Ctl.Sc(84f);
+            if (SRApi.Ctl.Button(SRApi.T("全选", "All"), SRApi.T("勾选全部牌", "Enable every card"), bw, bh)) SetAllPools(true);
             GUILayout.Space(SRApi.Ctl.Sc(4f));
-            if (SRApi.Ctl.Button(SRApi.T("全不选", "None"), SRApi.T("全部取消（会再自动勾回第一张）", "Disable all (the first card is re-enabled)")))
-                SetAllPools(false);
+            if (SRApi.Ctl.Button(SRApi.T("全不选", "None"), SRApi.T("全部取消（会再自动勾回第一张）", "Disable all (the first card is re-enabled)"), bw, bh)) SetAllPools(false);
             GUILayout.Space(SRApi.Ctl.Sc(4f));
-            if (SRApi.Ctl.Button(SRApi.T("只留减益", "Debuffs"), SRApi.T("只保留让人变弱的牌（低重力/慢速/禁墙跳等）", "Keep only weakening cards")))
-                KeepWeakening();
+            if (SRApi.Ctl.Button(SRApi.T("仅增益", "Buffs"), SRApi.T("只保留对自己有利的牌（高跳/快跑/跳舞无敌等）", "Keep only beneficial cards"), bw, bh)) KeepBeneficial();
+            GUILayout.Space(SRApi.Ctl.Sc(4f));
+            if (SRApi.Ctl.Button(SRApi.T("仅减益", "Debuffs"), SRApi.T("只保留让人受限/变弱的牌（低重力/慢速/禁墙跳等）", "Keep only weakening cards"), bw, bh)) KeepHarmful();
+            GUILayout.EndHorizontal();
             GUILayout.Space(SRApi.Ctl.Sc(6f));
-
-            // 搜索框单独一行（不新增布局组）：牌名 / 英文名 / 效果说明都能命中。
-            string q = SRApi.ClearableTextField(_poolQuery ?? "", 24, SRApi.Ctl.SearchBox,
-                GUILayout.Width(SRApi.Ctl.Sc(200f)), GUILayout.Height(SRApi.Ctl.Sc(24f)));
-            if (q != null && q != _poolQuery) _poolQuery = q;
-            if (!string.IsNullOrEmpty(_poolQuery)) {
-                int hit = 0;
-                for (int i = 0; i < Cards.Length; i++) if (PoolMatch(i)) hit++;
-                Line("匹配 " + hit + " / " + Cards.Length + " 张（清空搜索框显示全部）。",
-                     hit + " / " + Cards.Length + " cards match (clear the search box to show all).");
-            }
 
             RenderPoolGroup(true);    // 数值规则
             RenderPoolGroup(false);   // 布尔规则
         }
 
-        // 分组渲染：搜索时只显示命中的牌；整组都没命中就整组隐藏（不留空标题）。
+        // 分组渲染：按数值/布尔规则分成两块（顺序固定，结构不随勾选变化）。
         private void RenderPoolGroup(bool numeric) {
-            bool any = false;
-            for (int i = 0; i < Cards.Length; i++) {
-                if (Cards[i].IsBool == numeric && PoolMatch(i)) { any = true; break; }
-            }
-            if (!any) return;
             SRApi.Ctl.SectionTitle("- " + SRApi.T(numeric ? "数值规则" : "布尔规则", numeric ? "Numeric rules" : "Boolean rules") + " -");
             for (int i = 0; i < Cards.Length; i++) {
-                if (Cards[i].IsBool == numeric && PoolMatch(i)) CfgRow(_pool[i]);
+                if (Cards[i].IsBool == numeric) CfgRow(_pool[i]);
             }
-        }
-
-        private static bool PoolMatch(int i) {
-            if (string.IsNullOrEmpty(_poolQuery)) return true;
-            CardDef c = Cards[i];
-            return ContainsText(c.Zh) || ContainsText(c.En) || ContainsText(c.TipZh) || ContainsText(c.TipEn);
-        }
-
-        private static bool ContainsText(string s) {
-            return !string.IsNullOrEmpty(s) && s.IndexOf(_poolQuery, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private void SetAllPools(bool on) {
@@ -832,25 +799,27 @@ namespace SR_UCH.Tweaks {
             } catch (Exception ex) { SRApi.Guard.Log("混乱牌组/批量勾选", ex); }
         }
 
-        private void KeepWeakening() {
+        // 牌池批量筛选用的倾向分类（与 Cards 顺序一一对应）：+1 增益 / 0 中性 / -1 减益。
+        private static readonly sbyte[] CardMood = new sbyte[] {
+            -1, -1, -1, -1, -1, -1, -1,   // 低重力 / 高重力 / 弱跳跃 / 慢冲刺 / 慢平台 / 禁墙跳 / 镜像
+             1,  0, -1, -1,               // 跳舞无敌 / 玩家互撞(中性) / 无摩擦 / 慢射速
+             1,  1,  1,                   // 高跳跃 / 快冲刺 / 快平台
+            -1, -1, -1                    // 超重 / 龟速冲刺 / 停滞平台
+        };
+
+        private void ApplyPoolMood(int sign) {
             try {
                 for (int i = 0; i < Cards.Length; i++) {
                     if (_pool[i] == null) continue;
-                    CardDef c = Cards[i];
-                    // 减益判定：低重力/慢冲刺/慢平台/慢射速/禁墙跳/无摩擦/超重（字段+参数方向）
-                    bool weaken =
-                        (c.Field == FGravity && c.Min > 1) ? false :           // 高重力让人更沉，先按非减益处理
-                        (c.Field == FGravity) ||
-                        (c.Field == FSprint && c.Min <= 2) ||
-                        (c.Field == FPlatform && c.Min <= 2) ||
-                        (c.Field == FRate) ||
-                        c.Field == FBoolWallJumps || c.Field == FBoolFriction;
-                    _pool[i].Value = weaken;
+                    _pool[i].Value = i < CardMood.Length && CardMood[i] == sign;
                 }
                 bool any = false;
                 for (int i = 0; i < _pool.Length; i++) if (_pool[i] != null && _pool[i].Value) { any = true; break; }
-                if (!any && _pool.Length > 0 && _pool[0] != null) _pool[0].Value = true;
-            } catch (Exception ex) { SRApi.Guard.Log("混乱牌组/只留减益", ex); }
+                if (!any && _pool.Length > 0 && _pool[0] != null) _pool[0].Value = true;   // 至少留一张
+            } catch (Exception ex) { SRApi.Guard.Log("混乱牌组/按倾向筛选", ex); }
         }
+
+        private void KeepBeneficial() { ApplyPoolMood(1); }
+        private void KeepHarmful() { ApplyPoolMood(-1); }
     }
 }

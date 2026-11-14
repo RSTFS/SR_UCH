@@ -102,14 +102,13 @@ public partial class SR {
                 }
                 for (int i = 0; i < _stResults.Count; i++) {
                     string line = _stResults[i];
-                    GUILayout.BeginHorizontal();
                     Color prev = GUI.color;
                     try {
                         if (line.StartsWith("✗")) GUI.color = new Color(1f, 0.72f, 0.35f);
                         else if (line.StartsWith("✓")) GUI.color = new Color(0.62f, 0.92f, 0.62f);
-                        GUILayout.Label(line, _labelWrap, GUILayout.ExpandWidth(true), GUILayout.Height(Ctl.TableRowH()));
+                        // 用 AuditLabel：按可用宽度实测高度，长行会换行且不会被裁（之前用固定行高被裁）。
+                        AuditLabel(line);
                     } finally { GUI.color = prev; }
-                    GUILayout.EndHorizontal();
                 }
             });
         } catch (Exception __ex) { Guard.Log("自检/主动自检卡", __ex); }

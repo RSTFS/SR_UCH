@@ -100,10 +100,10 @@ namespace SR_UCH {
             if (e == null) return;
             e.Value = !e.Value;
             MarkDirty(e);
-            // 开关照常可开可关；受模式限制时**只提示「仅自由模式」**（用户要求：不要后缀）。
+            // 模式受限时静默跳过：不改变开关、不弹提示（等价于复选框不勾选）。
             bool inMode = true;
             try { inMode = SRApi.GateModeAllows(SRApi.ModeMask.Freeplay); } catch { inMode = true; }
-            if (e.Value && !inMode) { SRApi.Notify(SRApi.T("仅自由模式", "Freeplay only")); return; }
+            if (!inMode) return;
             SRApi.Notify(SRApi.T(zh, en) + (e.Value ? SRApi.T("：开", ": on") : SRApi.T("：关", ": off")));
         }
 

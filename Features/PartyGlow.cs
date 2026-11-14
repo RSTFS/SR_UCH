@@ -370,23 +370,12 @@ namespace SR_UCH.Tweaks {
             if (_tierColors != null) {
                 if (_tierLabels == null) {
                     _tierLabels = new GUIContent[6];
-                    for (int i = 0; i < 6; i++) _tierLabels[i] = new GUIContent(TierZh[i] + " / " + TierEn[i]);
+                    for (int i = 0; i < 6; i++) _tierLabels[i] = new GUIContent(SRApi.T(TierZh[i], TierEn[i]));
                 }
                 for (int i = 0; i < _tierColors.Length; i++) {
                     if (SRApi.Ctl.ColorEdit(_tierLabels[i], _tierColors[i], SRApi.Ctl.Sc(200f), SRApi.Ctl.Sc(24f)))
                         TierColor[i] = ParseColor(_tierColors[i].Value, TierColorDefault[i]);
                 }
-            }
-
-            // ---- 诊断 / 验收辅助：光晕是道具子对象，正常会随道具消失；这里用于检查清理路径 ----
-            SRApi.Ctl.SectionTitle("- " + SRApi.T("诊断", "Diagnostics") + " -",
-                SRApi.T("查看登记的光晕数量并手动清理；用于验收切换开关 / 换场景后是否有残留。",
-                        "Show tracked glow count and clear manually; use it to verify no residue after toggling or scene changes."));
-            PruneMade();
-            GUILayout.Label(SRApi.T("当前登记光晕：" + _made.Count + " 个", "Tracked glow objects: " + _made.Count), SRApi.Ctl.LabelWrap);
-            if (SRApi.Ctl.Button(SRApi.T("清理所有光晕", "Clear all glows"), SRApi.T("立即销毁本功能创建的全部光晕对象", "Destroy every glow object created by this feature"))) {
-                RemoveAll();
-                SRApi.Notify(SRApi.T("已清理品质光芒光晕", "Glow objects cleared"));
             }
 
         }
