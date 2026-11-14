@@ -145,6 +145,7 @@ namespace SR_UCH {
             });
             SinkStep("Notify", delegate () {
                 SRApi.SetNotifySink(delegate (string __t) { SR.Notify(__t); });
+                SRApi.SetNotifyExSink(delegate (SRApi.NotifyArgs __a) { SR.NotifyEx(__a); });
             });
             SinkStep("Ref", delegate () {
                 SRApi.Ref.SetSinks(

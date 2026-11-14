@@ -8,7 +8,16 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
 public partial class SR {
 
-// 分区：Notify（统一提示 / 值拼接 / 日志门面 / 屏幕合并与通道降级）
+// 分区：Notify（统一提示 / 值拼接 / 日志门面 / 屏幕合并与通道降级 / 带元数据的 NotifyEx）
+
+        // NotifyEx 核心入口：优先交给通知中心的新钩子（可画动作按钮/精确分级），否则退回普通提示。
+        internal static void NotifyEx(SRApi.NotifyArgs a) {
+            try {
+                SRApi.NotifyExFn hook = Slots.Require<SRApi.NotifyExFn>("sr.notify.hub2");
+                if (hook != null && hook(a)) return;
+                Notify(a != null ? a.Text : "");
+            } catch (Exception __ne) { Guard.Log("通知中心/NotifyEx 转发", __ne); }
+        }
 
         // 统一提示：游戏原生 UserMessage（屏幕上那行字）+ BepInEx 日志。
         // Notify 纯文本 / Notify(文本, 值...) 文本 + 值 / NotifyT 双语 + 值 / NotifyTag 指定来源；实现只有 NotifyImpl 一份。

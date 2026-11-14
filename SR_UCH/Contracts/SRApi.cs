@@ -13,6 +13,14 @@ namespace SR_UCH {
     public static partial class SRApi {   // 门面主体；其余成员见同目录 SRApi.*.cs（同一个 partial 类）
         private static Action<string> _info, _warn, _error;
         private static Action<string> _notify;
+        // 通知元数据通道（可选）：带显式级别 / 动作按钮的通知。未实现时退回普通 Notify。
+        public sealed class NotifyArgs {
+            public string Text, Tag;
+            public int Level;          // 0 普通 / 1 注意 / 2 重要（-1 = 按旧逻辑按文本猜）
+            public Action Action;      // 可选动作（通知中心会画一个按钮，点击执行后通知关闭）
+        }
+        public delegate bool NotifyExFn(NotifyArgs args);
+        private static Action<NotifyArgs> _notifyEx;
         // 注入前的日志缓冲（audit 02-P0-1）：SetLogSinks 自己也是门面通道，
         // 在它之前调用的 LogInfo/LogWarn 会静默丢弃，于是"功能不工作但界面安静"。
         // 这里用 32 条环形缓冲 + Debug 兜底，注入后一次性补发。
@@ -42,6 +50,17 @@ namespace SR_UCH {
             _preLogCount = 0;
         }
         public static void SetNotifySink(Action<string> notify) { _notify = notify; }
+        public static void SetNotifyExSink(Action<NotifyArgs> notifyEx) { _notifyEx = notifyEx; }
+        public static void NotifyEx(NotifyArgs args) {
+            try {
+                Action<NotifyArgs> n = _notifyEx;
+                if (n != null) { n(args); return; }
+                if (_notify != null && args != null) _notify(args.Text ?? "");
+            } catch (Exception __ne) { SRApi.LogWarn("[NotifyEx] " + __ne.GetType().Name); }
+        }
+        public static void NotifyEx(string text, int level, string tag, Action action) {
+            NotifyEx(new NotifyArgs { Text = text, Tag = tag, Level = level, Action = action });
+        }
 
         // 关掉管理器：功能页要打开游戏自己的界面（规则书/修改器/积分）时必须先收起本面板，
         // 否则输入被本面板冻结，游戏界面点不动。

@@ -109,3 +109,5 @@ WheelLayer
 SelfToggleButton
 RowCombo
 RegisterKey
+NotifyArgs
+NotifyExFn

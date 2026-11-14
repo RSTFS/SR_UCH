@@ -51,6 +51,7 @@ namespace SR_UCH.Tweaks {
             public float ShownAt;     // 首次真正上屏的时刻；0 = 还在排队（排队期间不开始过期）
             public float EnterAt;     // 入场动画起点；0 = 尚未开始（续期不重播入场）
             public float DyingAt;     // >0 = 正在退场（淡出 + 侧滑），到时从列表移除
+            public Action Action;     // 可选动作按钮（NotifyEx 才带；点击后执行并关闭本条）
             public float VisY;        // 绘制纵向位置（新卡插入/退场时平滑让位）
             public bool VisSet;       // VisY 是否已初始化
         }
@@ -198,6 +199,9 @@ namespace SR_UCH.Tweaks {
 
             // 核心 NotifyImpl 会惰性查这个名字；Provide 之后所有来源的提示都会进 OnNotify。
             Func<string, string, bool> __hook = (t, g) => OnNotify(t, g); _provided[HookSlot] = __hook; Slots.Provide(HookSlot, __hook);
+            // 新钩子：带级别/动作的通知（NotifyEx）。旧钩子保留给普通 Notify。
+            SRApi.NotifyExFn __hook2 = delegate (SRApi.NotifyArgs a) { return OnNotifyEx(a); };
+            Slots.Provide("sr.notify.hub2", __hook2);
 
             SRApi.OnShutdown("通知中心", Shutdown);
             if (_ui == null) {
@@ -258,7 +262,14 @@ namespace SR_UCH.Tweaks {
         private static bool _inNotify;
 
         /// <summary>返回 true = 已接管屏幕显示；false = 让核心照旧用游戏原生提示。</summary>
-        private static bool OnNotify(string text, string tag) {
+        private static bool OnNotify(string text, string tag) { return HandleNotify(text, tag, -1, null); }
+
+        private static bool OnNotifyEx(SRApi.NotifyArgs a) {
+            if (a == null) return false;
+            return HandleNotify(a.Text, a.Tag, a.Level, a.Action);
+        }
+
+        private static bool HandleNotify(string text, string tag, int levelOverride, Action action) {
             // 打开通知中心 = 由本功能接管；关闭 = 返回 false，由核心交回游戏原生提示。
             if (_enabled == null || !_enabled.Value) return false;
             // 防重入：外部回调若也发提示，这里直接放行给原生通道，
@@ -268,7 +279,7 @@ namespace SR_UCH.Tweaks {
             _inNotify = true;
             try {
                 float now = Time.unscaledTime;
-                int level = Classify(text, tag);
+                int level = levelOverride >= 0 ? Mathf.Clamp(levelOverride, 0, 2) : Classify(text, tag);
                 string key = (tag ?? "") + "|" + Norm(text);
                 float stay = Mathf.Clamp(_toastSeconds.Value, 0.5f, 5f);
 
@@ -281,6 +292,7 @@ namespace SR_UCH.Tweaks {
                 }
                 if (merged != null) {
                     merged.Count++;
+                    if (action != null) merged.Action = action;
                     merged.At = now;
                     merged.Stay = stay;
                     merged.Level = Mathf.Max(merged.Level, level);
@@ -305,7 +317,7 @@ namespace SR_UCH.Tweaks {
                 }
 
                 Notice n = new Notice();
-                n.Text = text; n.Tag = tag ?? ""; n.Key = key; n.Level = level;
+                n.Text = text; n.Tag = tag ?? ""; n.Key = key; n.Level = level; n.Action = action;
                 n.At = now; n.Stay = stay;
 
                 _history.Add(n);
@@ -523,7 +535,15 @@ namespace SR_UCH.Tweaks {
                         GUI.color = new Color(bar.r, bar.g, bar.b, aa);
                         GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(2f), y + pad * 0.6f, SRApi.Ctl.Sc(16f) * s, h - pad * 1.6f), __symTxt, _sym);
                         GUI.color = new Color(1f, 1f, 1f, aa);
-                        GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(18f) * s, y + pad * 0.6f, w - pad * 2f - SRApi.Ctl.Sc(20f) * s, h - pad * 1.6f), nt.Text, _label);
+                        float __actW = nt.Action != null ? SRApi.Ctl.Sc(56f) * s : 0f;
+                        GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(18f) * s, y + pad * 0.6f, w - pad * 2f - SRApi.Ctl.Sc(20f) * s - __actW, h - pad * 1.6f), nt.Text, _label);
+                        if (nt.Action != null) {
+                            if (GUI.Button(new Rect(box.xMax - __actW - SRApi.Ctl.Sc(6f), y + (h - SRApi.Ctl.Sc(22f) * s) * 0.5f, __actW, SRApi.Ctl.Sc(22f) * s),
+                                    SRApi.T("撤销", "Undo"), _btn)) {
+                                Action __do = nt.Action; nt.Action = null; nt.DyingAt = now;
+                                try { __do(); } catch (Exception __ad) { SRApi.Guard.Log("通知动作", __ad); }
+                            }
+                        }
                     } finally { GUI.color = __symPrev; }
                     // 悬浮时右上角显示关闭按钮（ImGuiNotify 的 optional dismiss）。
                     if (hovered) {
