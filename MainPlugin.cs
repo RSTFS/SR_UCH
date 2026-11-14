@@ -35,6 +35,7 @@ namespace SR_UCH {
         // 不在这里 Unpatch：Harmony 的补丁表随程序集卸载，强行 UnpatchAll 反而可能打断
         // 正在退出的游戏对象；回调负责的只是"我们自己创建的对象与订阅"。
         private void OnDestroy() {
+            try { SR.NetShutdown(); } catch (Exception __ns) { SRApi.Guard.Log("联机握手/注销", __ns); }
             try { SR.RunShutdowns(); } catch (Exception __sd) { try { ModLogger.LogWarning("[SR] 关机回调执行失败: " + __sd.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         }
 
@@ -68,6 +69,7 @@ namespace SR_UCH {
                 // 还能被主扫描发现并初始化；EX 自己做了幂等，两条路都走也只初始化一次。
                 __run("InitializeTweaks(late)", delegate { InitializeTweaks(true); });
                 __run("RebuildFeatureManifest", RebuildFeatureManifest);   // 含功能清单登记 + 启动自检 + 自检日志
+                __run("NetHandshake", SR.NetInit);   // 联机版本/功能握手（纯提示，不改游戏状态）
                 try { SR.BootTimings = __boot.ToString().TrimEnd(); } catch (Exception __bt) { SRApi.Guard.Log("启动耗时/记录", __bt); }
                 try { ModLogger.LogInfo("[SR.Boot] 启动耗时: " + (SR.BootTimings ?? "?")); } catch (Exception __bl) { SRApi.Guard.Log("启动耗时/日志", __bl); }
             } catch (Exception __aw) {

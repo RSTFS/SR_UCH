@@ -70,6 +70,9 @@ The panel has sections on the left and pages on the right. Listed by section bel
 ### Online
 
 - **Online Room List** -- filter by region, mode, progress, full / not-full and more; sort, refresh and join.
+- **Version/feature handshake**: while online, peers exchange an SR feature signature every 20 s over the
+  game's existing out-of-band message channel (no game state is touched). A toast appears when the
+  feature sets / contract versions differ, so "why does our UI differ" has a direct answer.
 
 ### Chaos Deck
 

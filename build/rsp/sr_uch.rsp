@@ -48,6 +48,7 @@ SR_UCH\SR.Hooks.cs
 SR_UCH\SR.Input.cs
 SR_UCH\SR.KeyBinds.cs
 SR_UCH\SR.Localization.cs
+SR_UCH\SR.Net.cs
 SR_UCH\SR.Notify.cs
 SR_UCH\SR.Plugins.cs
 SR_UCH\SR.SelfCheck.cs
