@@ -735,6 +735,13 @@ namespace SR_UCH.Tweaks {
             // 「无视对象」已删除（用户要求）：清掉它的两个键（开关 + 快捷键）。
             text = RemoveKeys(text, "自由模式", new[] { "Ignore Objects", "Ignore Objects Key" });
             text = RemoveKeys(text, "EX", new[] { "Ignore Objects", "Ignore Objects Key" });
+            // 「蹲移」也已删除：上面把两个键从 EX 搬过来只是历史迁移，搬完没有代码再读，
+            // 直接清掉，否则它们会以"配置孤儿键"长期留在 cfg 里（EX 老段里的残留同样清）。
+            text = RemoveKeys(text, "自由模式", new[] { "Crouch Move", "Crouch Move Key" });
+            text = RemoveKeys(text, "EX", new[] { "Crouch Move", "Crouch Move Key" });
+            // 「房客提案」已删除（用户的提案功能整条删除）：段本身是混乱牌组的活段，
+            // 只清它留下的两个死键。
+            text = RemoveKeys(text, "混乱牌组", new[] { "AllowProposals", "ProposeKey" });
             // 地图网格移入 SR 的"自由模式"段（早期在 [EX]/[Freeplay]）：搬值保证老配置继续生效。
             // 2.0 起改回"复用游戏自带的 Graphpaper"，只保留「常显网格」一个开关——
             // 亮度/淡出距离/颜色三个键随自制网格一起删除，老配置里的残留值在这里清掉。

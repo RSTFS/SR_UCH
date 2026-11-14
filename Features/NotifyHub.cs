@@ -184,6 +184,9 @@ namespace SR_UCH.Tweaks {
             RegUi();
             // 底栏入口（设置右侧），不再占用侧栏栏目（用户要求）。
             SRApi.RegisterFooterButton(Sec, "通知", "Notify", null);
+            // 本功能有 cfg 段但没有侧栏栏目：显式声明"不单独成栏目"，否则启动自检会把它
+            // 当成"没登记归属的兜底段"告警（栏目审计同时也会跳过底栏覆盖的段，双保险）。
+            SRApi.NavHide(Sec);
             SRApi.RegisterPage(Sec, "HubOptions", "通知设置", "Settings", 20, RenderOptionsPage);
             SRApi.RegisterTick("通知中心-绑定与过期", Tick);
             // 关掉自绘浮层的开关时清空待显示队列：否则重新打开会把过期旧消息一次性弹出来。

@@ -385,6 +385,13 @@ public partial class SR {
                     string sec = e.Definition.Section;
                     if (string.IsNullOrEmpty(sec)) continue;
                     if (_navHidden.Contains(sec) || _navRank.ContainsKey(sec)) continue;   // 已声明归属或已隐藏
+                    // 已在底栏注册按钮的段由底栏承载，不会以兜底页出现，不算未登记归属。
+                    bool footerSec = false;
+                    for (int k = 0; k < SRApi.FooterButtons.Count; k++) {
+                        SRApi.FooterButton fb = SRApi.FooterButtons[k];
+                        if (fb != null && fb.Id == sec) { footerSec = true; break; }
+                    }
+                    if (footerSec) continue;
                     if (seen.Contains(sec)) continue;
                     seen.Add(sec);
                     FallbackSectionCount++;
