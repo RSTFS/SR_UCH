@@ -5,7 +5,7 @@
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
-$fail = 0
+$script:fail = 0
 function Ok($m)   { Write-Host ("  [ OK ] " + $m) }
 function Bad($m)  { Write-Host ("  [FAIL] " + $m); $script:fail++ }
 
@@ -31,9 +31,9 @@ function Check-ApiSurface {
     if ($bad.Count -gt 0) { Bad ('功能层使用了白名单外的 SRApi.* 成员: ' + (($bad.Keys | Sort-Object) -join ', ')) }
     else { Ok ('API 棘轮：功能层只使用白名单内的 SRApi.* 成员（白名单 ' + $allow.Count + ' 个）') }
     # 白名单条目必须真实存在于契约层：防止 API 删除后留下假条目，或手滑写错名字。
-    $contract = Join-Path $Root 'SR_UCH\SR.Contracts.cs'
-    if (Test-Path -LiteralPath $contract) {
-        $csrc = Read-Text $contract
+    $contractDir = Join-Path $Root 'SR_UCH\Contracts'
+    if (Test-Path -LiteralPath $contractDir) {
+        $csrc = (@(Get-ChildItem -LiteralPath $contractDir -Filter '*.cs' -File | ForEach-Object { Read-Text $_.FullName }) -join "`n")
         $fake = @{}
         foreach ($n in $allow.Keys) {
             if (-not [regex]::IsMatch($csrc, '(?m)^\s*(?:\[[^\]]*\]\s*)*(?:public|internal)\s+[^\r\n]*\b' + [regex]::Escape($n) + '\b')) { $fake[$n] = $true }
@@ -45,17 +45,20 @@ function Check-ApiSurface {
 
 # ---------- 2) 契约层不得出现实现层标识 ----------
 function Check-ContractBoundary {
-    $f = Join-Path $Root 'SR_UCH\SR.Contracts.cs'
-    if (-not (Test-Path $f)) { Bad '缺少 SR_UCH\SR.Contracts.cs'; return }
-    $bad = @(); $ln = 0
-    foreach ($line in [System.IO.File]::ReadAllLines($f)) {
-        $ln++
-        $s = $line.Trim()
-        if ($s.StartsWith('//') -or $s.StartsWith('*') -or $s.StartsWith('/*')) { continue }
-        $code = [regex]::Replace($s, '"(?:[^"\\]|\\.)*"', '""')
-        $i = $code.IndexOf('//'); if ($i -ge 0) { $code = $code.Substring(0, $i) }
-        if ([regex]::IsMatch($code, '\b(MainPlugin|ConfigMigration|SRHost)\b') -or
-            [regex]::IsMatch($code, '(?<![A-Za-z_.])SR\.')) { $bad += ("第 $ln 行: " + $s) }
+    $dir = Join-Path $Root 'SR_UCH\Contracts'
+    if (-not (Test-Path -LiteralPath $dir)) { Bad '缺少 SR_UCH\Contracts 目录'; return }
+    $bad = @()
+    foreach ($f in Get-ChildItem -LiteralPath $dir -Filter '*.cs' -File) {
+        $ln = 0
+        foreach ($line in [System.IO.File]::ReadAllLines($f.FullName)) {
+            $ln++
+            $s = $line.Trim()
+            if ($s.StartsWith('//') -or $s.StartsWith('*') -or $s.StartsWith('/*')) { continue }
+            $code = [regex]::Replace($s, '"(?:[^"\\]|\\.)*"', '""')
+            $i = $code.IndexOf('//'); if ($i -ge 0) { $code = $code.Substring(0, $i) }
+            if ([regex]::IsMatch($code, '\b(MainPlugin|ConfigMigration|SRHost)\b') -or
+                [regex]::IsMatch($code, '(?<![A-Za-z_.])SR\.')) { $bad += ($f.Name + ' 第 ' + $ln + ' 行: ' + $s) }
+        }
     }
     if ($bad.Count -gt 0) { Bad ('契约层引用了实现层标识: ' + ($bad[0])) }
     else { Ok '契约层不含实现层标识（边界可验证）' }
@@ -493,6 +496,6 @@ Check-TipComposer
 Check-FileSize
 Check-UiConventions
 Check-DocScripts
-if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); if (-not $NoExit) { exit 1 }; return }
+if ($script:fail -gt 0) { Write-Host ('== 有 ' + $script:fail + ' 项未通过 ❌ =='); if (-not $NoExit) { exit 1 }; return }
 Write-Host '== 文本类守卫全部通过 ✅ =='
 if (-not $NoExit) { exit 0 }

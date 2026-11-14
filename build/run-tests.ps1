@@ -1,5 +1,5 @@
 ﻿# SR_UCH 最小单元测试（item 5）
-# 只测纯逻辑：编译「契约层 SR.Contracts.cs + tests\Tests.cs + 两个桩文件」成控制台程序，直接运行。
+# 只测纯逻辑：编译「契约层 SR_UCH\Contracts\*.cs + tests\Tests.cs + 两个桩文件」成控制台程序，直接运行。
 # 依赖：mscorlib / System / System.Core / BepInEx（ConfigEntry 等）；UnityEngine 由 tests\UnityStubs.cs 提供，
 #       不引用游戏里的 UnityEngine.*.dll（脱离 Unity 运行时加载会 TypeLoadException）。
 # 两条路径：
@@ -65,11 +65,12 @@ $refs = @(
     '/r:"' + (Join-Path $GameDir 'BepInEx\core\BepInEx.dll') + '"'
 )
 
-$sources = @(
-    '"' + (Join-Path $root 'SR_UCH\SR.Contracts.cs') + '"',
-    '"' + (Join-Path (Join-Path $root 'tests') 'Tests.cs') + '"',
-    '"' + (Join-Path (Join-Path $root 'tests') 'UnityStubs.cs') + '"'
-)
+$sources = @()
+foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $root 'SR_UCH\Contracts') -Filter '*.cs' -File | Sort-Object Name)) {
+    $sources += ('"' + $f.FullName + '"')
+}
+$sources += ('"' + (Join-Path (Join-Path $root 'tests') 'Tests.cs') + '"')
+$sources += ('"' + (Join-Path (Join-Path $root 'tests') 'UnityStubs.cs') + '"')
 
  $cscArgs = @('/nologo', '/target:exe', ('/out:"' + $outExe + '"')) + $refs + $sources
 Write-Host '== 编译测试程序 =='

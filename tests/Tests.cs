@@ -1,5 +1,5 @@
 // SR_UCH 最小单元测试（item 5）：只测"纯逻辑"，不碰 Unity / 游戏程序集。
-// 依赖：SR_UCH/SR.Contracts.cs（契约层可独立编译：只引用 BCL + BepInEx）里的 ColorHex。
+// 依赖：SR_UCH/Contracts/*.cs（契约层可独立编译：只引用 BCL + BepInEx）里的 ColorHex。
 // 运行：build\run-tests.ps1（csc 编译本文件 + 契约层 → 直接跑，失败返回非 0）
 using System;
 using System.Collections.Generic;

@@ -11,4 +11,8 @@
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.IMGUIModule.dll"
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.InputLegacyModule.dll"
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.TextRenderingModule.dll"
-SR_UCH\SR.Contracts.cs
+SR_UCH\Contracts\Contracts.cs
+SR_UCH\Contracts\SRApi.cs
+SR_UCH\Contracts\SRApi.Ctl.cs
+SR_UCH\Contracts\SRApi.Misc.cs
+SR_UCH\Contracts\SRApi.Table.cs

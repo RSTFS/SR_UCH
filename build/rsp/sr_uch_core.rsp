@@ -24,10 +24,14 @@
 /r:"%GAME%\BepInEx\core\0Harmony.dll"
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
 MainPlugin.cs
+SR_UCH\Contracts\Contracts.cs
+SR_UCH\Contracts\SRApi.cs
+SR_UCH\Contracts\SRApi.Ctl.cs
+SR_UCH\Contracts\SRApi.Misc.cs
+SR_UCH\Contracts\SRApi.Table.cs
 SR_UCH\SR.CmAttributes.cs
 SR_UCH\SR.ColorPicker.cs
 SR_UCH\SR.ConfigMigration.cs
-SR_UCH\SR.Contracts.cs
 SR_UCH\SR.Core.Audit.cs
 SR_UCH\SR.Core.cs
 SR_UCH\SR.Ctl.cs

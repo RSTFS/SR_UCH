@@ -93,7 +93,7 @@ if (-not $csc) {
 if (-not $csc) { Write-Host '找不到 csc：需要 dotnet SDK（含 Roslyn），或把 roslyn_toolset 放回 _tools\'; exit 1 }
 Write-Host "csc: $csc"
 $rspDir = Join-Path $PSScriptRoot '.cache'
-# -Separate：契约层（SR.Contracts.cs）单独编成一个程序集（SR.Contracts.dll），功能与 EX 只依赖它。
+# -Separate：契约层（SR_UCH\Contracts\*.cs）单独编成一个程序集（SR.Contracts.dll），功能与 EX 只依赖它。
 # 仓库内不存在 _tools 构建链，这里直接用同一份 sr_uch_contracts.rsp（守卫 1 用的也是它）。
 if ($Separate) { Write-Host '== 分离模式：先编译契约程序集（SR.Contracts.dll）==' }
 $rspMain = Join-Path $rspDir 'sr_uch.rsp'          # 合并模式：核心 + 全部功能
@@ -165,7 +165,7 @@ function Invoke-ContractCheck {
     if (-not (Test-Path $rsp)) { Write-Host '  [FAIL] 缺少 sr_uch_contracts.rsp'; return $false }
     if ($csc.EndsWith('.dll')) { & dotnet $csc "@$rsp" '/warnaserror:CS0169,CS0414,CS0649' 2>&1 | Out-Null } else { & $csc "@$rsp" '/warnaserror:CS0169,CS0414,CS0649' 2>&1 | Out-Null }
     if ($LASTEXITCODE -ne 0) { Write-Host '  [FAIL] 契约层不能独立编译 -> 契约文件里引用了实现'; return $false }
-    Write-Host '  [ OK ] 契约层（SR.Contracts.cs）可独立编译'
+    Write-Host '  [ OK ] 契约层（Contracts\*.cs）可独立编译'
     return $true
 }
 function Get-RspSources([string]$rsp) {
@@ -230,10 +230,10 @@ function Invoke-MigrationRuleCheck {
 }
 function Invoke-SinkCoverageCheck {
     # P0-1：契约层每个 Set*Sinks 注入点都必须在 MainPlugin 里被调用（静态可验证，不需要跑游戏）。
-    $contract = Join-Path $Root 'SR_UCH\SR.Contracts.cs'
+    $contractDir = Join-Path $Root 'SR_UCH\Contracts'
     $main = Join-Path $Root 'MainPlugin.cs'
-    if (-not (Test-Path -LiteralPath $contract) -or -not (Test-Path -LiteralPath $main)) { Write-Host '  [FAIL] 缺少契约层或 MainPlugin'; return $false }
-    $ctext = [System.IO.File]::ReadAllText($contract)
+    if (-not (Test-Path -LiteralPath $contractDir) -or -not (Test-Path -LiteralPath $main)) { Write-Host '  [FAIL] 缺少契约层目录或 MainPlugin'; return $false }
+    $ctext = (@(Get-ChildItem -LiteralPath $contractDir -Filter '*.cs' -File | ForEach-Object { [System.IO.File]::ReadAllText($_.FullName) }) -join "`n")
     $mtext = [System.IO.File]::ReadAllText($main)
     $bad = @(); $total = 0
     foreach ($m in [regex]::Matches($ctext, 'public static void (Set\w+Sinks)\s*\(')) {
@@ -256,8 +256,9 @@ function Invoke-RepoTextGuards {
     if (-not (Test-Path -LiteralPath $g)) { Write-Host '  [FAIL] 缺少 build/guards-text.ps1'; return $false }
     $oldLoc = Get-Location
     try {
+        $script:fail = 0
         . $g -NoExit
-        if ($fail -gt 0) { Write-Host '  [FAIL] 文本类守卫（guards-text.ps1）未通过'; return $false }
+        if ($script:fail -gt 0) { Write-Host '  [FAIL] 文本类守卫（guards-text.ps1）未通过'; return $false }
     } catch {
         Write-Host ('  [FAIL] 文本类守卫执行异常: ' + $_.Exception.Message)
         return $false

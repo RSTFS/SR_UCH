@@ -10,7 +10,7 @@
 | 目标 | 做法 |
 |---|---|
 | 一个 BepInEx 插件提供所有增强 | 合并模式只出一个 `SR_UCH.dll`；拆分模式按功能出 DLL，两种模式产物互斥 |
-| 功能可独立开发/裁剪 | 功能只依赖**契约层**（`SR.Contracts.cs`），不引用核心实现 |
+| 功能可独立开发/裁剪 | 功能只依赖**契约层**（`SR_UCH/Contracts/*.cs`），不引用核心实现 |
 | 改游戏但尽量不破坏联机 | 所有改动走游戏自己的事件/消息/Command，不自己造同步协议 |
 | 出问题能定位 | 统一 `Guard` 日志（去重）、启动自检（补丁/反射/门控/孤儿键）、帧钩子剖析 |
 
@@ -20,7 +20,7 @@
 
 ```
 MainPlugin.cs                 入口：BepInEx 插件；配置外置到 SR_UCH_data.cfg；扫描并初始化 ITweak
-SR_UCH/SR.Contracts.cs        契约层（SRApi）：功能能用的一切 API；可独立编译
+SR_UCH/Contracts/*.cs         契约层（SRApi，partial 拆分）：功能能用的一切 API；可独立编译
 SR_UCH/SR.*.cs                实现层（partial class SR）：窗口 / 控件 / 表格 / 键位 / 门控 / 迁移
 Features/*.cs                 功能层：每个文件一组 [SrFeature] 类，实现 ITweak
 build/                        构建脚本 + rsp 生成器/清单 + 守卫 + 单元测试
@@ -391,7 +391,8 @@ cd D:\RS_TFS\CC\SR_UCH\build
 2. 跑一次 `build\gen-rsp.ps1`（直接 `build\build.ps1` 也会自动生成）；
 3. `build\build.ps1 -Check` 会校验清单与磁盘一致，CI 的 `guards-text.ps1` 也会跑同一份生成器。
 
-特例清单仍手写：`sr_uch_contracts.rsp`（契约定向编译）、`sr_uch_ex.rsp`（EX 仓库）、`plugins\*.rsp`（独立插件）。
+契约清单 `sr_uch_contracts.rsp` 也由生成器从 `SR_UCH\Contracts\*.cs` 生成；
+仍手写的只剩 `sr_uch_ex.rsp`（EX 仓库）与 `plugins\*.rsp`（独立插件）。
 
 `build\build.ps1` 的编译统一带 `/warnaserror:CS0169,CS0414,CS0649`：死字段（未使用/只写不读/从未赋值）会直接
 让构建失败；`-Check` = 清单一致性 + 契约独立编译 + csproj + 注入点 + 文本守卫（与 CI 同源）+ 结构守卫。

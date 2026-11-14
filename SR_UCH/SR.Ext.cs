@@ -10,7 +10,7 @@ public partial class SR {
 // 分区：Ext（通用扩展点：Provide/Require 槽位、UI 阻塞、覆盖层、相机视图、场景/收起/滚轮钩子）
 
         // 通用扩展点：核心不认识任何功能，槽位名与形状由功能自己决定，新增功能不改 SR 文件。
-        // 1) 键值槽位：提供方 Provide、使用方 Require，只约定"槽位名 + 委托签名"；实现在 SR.Contracts.cs 的 Slots 里。
+        // 1) 键值槽位：提供方 Provide、使用方 Require，只约定"槽位名 + 委托签名"；实现在 SR_UCH\Contracts\ 的 Slots 里。
         public static void Provide(string slot, object impl) { Slots.Provide(slot, impl); }
         public static T Require<T>(string slot) where T : class {
             return Slots.Require<T>(slot);
