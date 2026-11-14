@@ -113,9 +113,9 @@ namespace SR_UCH.Tweaks {
             new System.Collections.Generic.Dictionary<string, string[]>();
         private const int CellStoreMax = 256;
         // 按帧缓存每个房间的单元格文本：IMGUI 一帧有 Layout+Repaint+多个输入事件，避免重复计算。
-        private static readonly System.Collections.Generic.Dictionary<Matchmaker.LobbyListInfo, string[]> _cellCache =
+        private static readonly System.Collections.Generic.Dictionary<Matchmaker.LobbyListInfo, string[]> _cellRowsCache =
             new System.Collections.Generic.Dictionary<Matchmaker.LobbyListInfo, string[]>();
-        private static int _cellCacheFrame = -1;
+        private static int _cellRowsFrame = -1;
         // 房间稳定键：优先平台房间 id，其次 UnityMatchID，最后退回房主名（保证非空时总能命中缓存）。
         private static string CellKey(Matchmaker.LobbyListInfo li) {
             try {
@@ -128,9 +128,9 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string[] CellTexts(Matchmaker.LobbyListInfo li) {
-            if (_cellCacheFrame != Time.frameCount) { _cellCacheFrame = Time.frameCount; _cellCache.Clear(); }
+            if (_cellRowsFrame != Time.frameCount) { _cellRowsFrame = Time.frameCount; _cellRowsCache.Clear(); }
             string[] hit;
-            if (_cellCache.TryGetValue(li, out hit)) return hit;
+            if (_cellRowsCache.TryGetValue(li, out hit)) return hit;
             string key = CellKey(li);
             string[] buf;
             if (string.IsNullOrEmpty(key) || !_cellStore.TryGetValue(key, out buf) || buf == null || buf.Length != ColCount) {
@@ -149,7 +149,7 @@ namespace SR_UCH.Tweaks {
             buf[8] = FlagsText(li);
             buf[CombinedCol] = li.CombinedHealthSkill.ToString(CultureInfo.InvariantCulture);
             buf[JoinCol] = "";
-            _cellCache[li] = buf;
+            _cellRowsCache[li] = buf;
             return buf;
         }
 
@@ -253,6 +253,7 @@ namespace SR_UCH.Tweaks {
         private static readonly Action _resetAllFn = delegate { ResetTable(); };
         private static readonly Action<int> _headerShiftFn = delegate(int ci) { if (ci == QualityCol) ToggleQualityCoeff("core header"); };
         private static readonly Func<int, string[]> _rowCellsFn = delegate(int r) { return CellTexts(_shownLobbies[r]); };
+
         private static readonly Func<int, float> _rowAlphaFn = delegate(int r) { return IsJoinable(_shownLobbies[r]) ? 1f : 0.55f; };
         private static readonly Func<string> _emptyHintFn = delegate { return SRApi.T("（没有符合筛选的房间）", "(no lobbies match the filters)"); };
         private static readonly Action _joinDownReset = delegate { _joinDownRow = -1; };

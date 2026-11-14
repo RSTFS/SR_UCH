@@ -95,6 +95,14 @@ namespace SR_UCH {
                 try { string p = PathOf(feature, file); return !string.IsNullOrEmpty(p) && System.IO.File.Exists(p); }
                 catch { return false; }
             }
+            // 原子写前备份：把现有文件复制为 <path>.bak（保存流程用；读坏时可手工/以后自动回滚）。
+            public static bool BackupPath(string fullPath) {
+                try {
+                    if (string.IsNullOrEmpty(fullPath) || !System.IO.File.Exists(fullPath)) return false;
+                    System.IO.File.Copy(fullPath, fullPath + ".bak", true);
+                    return true;
+                } catch (Exception) { return false; }
+            }
             public static bool Delete(string feature, string file) {
                 try {
                     string p = PathOf(feature, file);

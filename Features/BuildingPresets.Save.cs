@@ -185,6 +185,8 @@ namespace SR_UCH.Tweaks {
         // 不再在功能层重复实现一遍（历史出过截断/BOM 事故）。
         private static void WriteFileAtomic(string path, string text) {
             if (string.IsNullOrEmpty(path)) return;
+            // 覆盖前留一份 .bak：index/预设写坏时至少还有上一版可恢复（写失败不阻断主流程）。
+            try { SRApi.Storage.BackupPath(path); } catch (Exception __bk) { SRApi.Guard.Log("布局预设/备份", __bk); }
             if (!SRApi.Storage.WriteAtomicPath(path, text)) SRApi.LogWarn("[布局预设] 原子写失败: " + path);
         }
 

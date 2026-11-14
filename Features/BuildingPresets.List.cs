@@ -20,7 +20,24 @@ namespace SR_UCH.Tweaks {
         // 表格回调委托只建一次（每次绘制都 new 会逐帧产生垃圾）：全部只引用静态成员。
         private static readonly Func<int, string> _titleFn = delegate (int ci) { return ColumnTitle(ci); };
         private static readonly Func<int, string> _tipFn = delegate (int ci) { return ColumnTip(ci); };
-        private static readonly Func<int, string[]> _rowCellsFn = delegate (int r) { return RowCells(_visibleCache, r); };
+        // 行文本按帧缓存：表格每帧多趟绘制，RowCells 会重复格式化关卡名/模式/时间。
+        private static int _rowCellsFrame = -1;
+        private static List<PresetInfo> _rowCellsSrc;
+        private static readonly List<string[]> _rowCellsCache = new List<string[]>();
+        private static string[] RowCellsCached(int r) {
+            try {
+                if (_rowCellsFrame != Time.frameCount || !ReferenceEquals(_rowCellsSrc, _visibleCache)) {
+                    _rowCellsFrame = Time.frameCount;
+                    _rowCellsSrc = _visibleCache;
+                    _rowCellsCache.Clear();
+                    int n = _visibleCache != null ? _visibleCache.Count : 0;
+                    for (int i = 0; i < n; i++) _rowCellsCache.Add(RowCells(_visibleCache, i));
+                }
+                if (r >= 0 && r < _rowCellsCache.Count) return _rowCellsCache[r];
+            } catch (Exception __rc) { SRApi.Guard.Log("预设列表/行文本缓存", __rc); }
+            return _visibleCache != null && r >= 0 && r < _visibleCache.Count ? RowCells(_visibleCache, r) : null;
+        }
+        private static readonly Func<int, string[]> _rowCellsFn = delegate (int r) { return RowCellsCached(r); };
         private static readonly Action<int[]> _applyOrderFn = delegate (int[] o) { _order = o; SaveCols(); };
         private static readonly Action _saveOrderFn = delegate { SaveCols(); };
         private static readonly Action _resetAllFn = delegate { ResetTable(); };
