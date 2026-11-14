@@ -31,6 +31,16 @@ function Resolve2([string]$file, [string]$arg) {
     foreach ($e in $consts.GetEnumerator()) {
         if ($e.Key.EndsWith('|' + $short)) { return $e.Value }
     }
+    # 新增：按"名字"跨文件解析（支持 const string HookSlot = SRApi.SlotKeys.NotifyHook 这类链式常量，
+    # SlotKeys 自身是字面量 const，能在这里兜底命中）。
+    $g = Join-Path $Root 'SR_UCH\Contracts'
+    if (Test-Path -LiteralPath $g) {
+        foreach ($f in Get-ChildItem -LiteralPath $g -Filter '*.cs' -File) {
+            foreach ($m2 in [regex]::Matches([IO.File]::ReadAllText($f.FullName), 'const\s+string\s+' + [regex]::Escape($short) + '\s*=\s*"([^"]+)"')) {
+                return $m2.Groups[1].Value
+            }
+        }
+    }
     return $null
 }
 

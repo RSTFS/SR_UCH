@@ -204,6 +204,7 @@ namespace SR_UCH.Tweaks {
             Func<string, string, bool> __hook = (t, g) => OnNotify(t, g); _provided[HookSlot] = __hook; Slots.Provide(HookSlot, __hook);
             // 新钩子：带级别/动作的通知（NotifyEx）。旧钩子保留给普通 Notify。
             SRApi.NotifyExFn __hook2 = delegate (SRApi.NotifyArgs a) { return OnNotifyEx(a); };
+            _provided[SRApi.SlotKeys.NotifyHub2] = __hook2;   // 关机时也要 Retract（此前漏了这个）
             Slots.Provide(SRApi.SlotKeys.NotifyHub2, __hook2);
 
             SRApi.OnShutdown("通知中心", Shutdown);
@@ -218,7 +219,11 @@ namespace SR_UCH.Tweaks {
         // 槽位必须传自己的委托，否则契约层 expected==null 时会无条件删除。
         public void Shutdown() {
             object impl;
-            if (_provided.TryGetValue(HookSlot, out impl) && impl is Func<string, string, bool>) Slots.Retract(HookSlot, impl);
+            foreach (System.Collections.Generic.KeyValuePair<string, object> kv in _provided) {
+                try { if (kv.Value != null) Slots.Retract(kv.Key, kv.Value); }
+                catch (Exception __rt) { SRApi.Guard.Log("通知中心/注销槽位", __rt); }
+            }
+            _provided.Clear();
             if (_ui != null) { try { UnityEngine.Object.Destroy(_ui.gameObject); } catch (Exception ex) { SRApi.Guard.Log("通知中心/销毁对象", ex); } _ui = null; }
             if (_white != null) { try { UnityEngine.Object.Destroy(_white); } catch (Exception ex) { SRApi.Guard.Log("通知中心/销毁贴图", ex); } _white = null; }
         }
@@ -520,15 +525,7 @@ namespace SR_UCH.Tweaks {
                         GUI.color = new Color(bar.r, bar.g, bar.b, aa);
                         GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(2f), y + pad * 0.6f, SRApi.Ctl.Sc(16f) * s, h - pad * 1.6f), __symTxt, _sym);
                         GUI.color = new Color(1f, 1f, 1f, aa);
-                        float __actW = nt.Action != null ? SRApi.Ctl.Sc(56f) * s : 0f;
-                        GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(18f) * s, y + pad * 0.6f, w - pad * 2f - SRApi.Ctl.Sc(20f) * s - __actW, h - pad * 1.6f), nt.Text, _label);
-                        if (nt.Action != null) {
-                            if (GUI.Button(new Rect(box.xMax - __actW - SRApi.Ctl.Sc(6f), y + (h - SRApi.Ctl.Sc(22f) * s) * 0.5f, __actW, SRApi.Ctl.Sc(22f) * s),
-                                    SRApi.T("撤销", "Undo"), _btn)) {
-                                Action __do = nt.Action; nt.Action = null; nt.DyingAt = now;
-                                try { __do(); } catch (Exception __ad) { SRApi.Guard.Log("通知动作", __ad); }
-                            }
-                        }
+                        GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(18f) * s, y + pad * 0.6f, w - pad * 2f - SRApi.Ctl.Sc(20f) * s, h - pad * 1.6f), nt.Text, _label);
                     } finally { GUI.color = __symPrev; }
                     // 悬浮时右上角显示关闭按钮（ImGuiNotify 的 optional dismiss）。
                     if (hovered) {
@@ -558,19 +555,18 @@ namespace SR_UCH.Tweaks {
             CfgRow(_cardW);
             CfgRow(_fontSize);
             CfgRow(_cardAlpha);
-            // 停靠位置：标签「位置」+ 右侧下拉（四种位置），默认右下。
-            {
-                string[] vals = new string[] { "0", "1", "2", "3" };
-                string[] labels = new string[] {
-                    SRApi.T("右下", "bottom-right"),
-                    SRApi.T("右上", "top-right"),
-                    SRApi.T("左下", "bottom-left"),
-                    SRApi.T("左上", "top-left")
-                };
-                SRApi.Ctl.RowCombo(SRApi.T("位置", "Position"),
-                    SRApi.T("通知浮层停在屏幕的哪个角。", "Which screen corner the toasts dock to."),
-                    _corner, vals, labels, SRApi.Ctl.Sc(120f));
+            // 停靠位置：四个互斥的开关按钮（不用下拉，避免下拉在滚动页里的定位/滚轮问题）。
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(SRApi.T("位置", "Position"), _label, GUILayout.Width(SRApi.Ctl.Sc(160f)));
+            int __cornerNow = _corner != null ? Mathf.Clamp(_corner.Value, 0, 3) : 0;
+            string[] __cornerLabels = new string[] {
+                SRApi.T("右下", "bottom-right"), SRApi.T("右上", "top-right"),
+                SRApi.T("左下", "bottom-left"), SRApi.T("左上", "top-left") };
+            for (int i = 0; i < 4; i++) {
+                if (SRApi.Ctl.SelfToggleButton(__cornerLabels[i], SRApi.T("把通知浮层停在这个角", "Dock the toasts to this corner"), i == __cornerNow, null))
+                    _corner.Value = i;
             }
+            GUILayout.EndHorizontal();
 
         }
 

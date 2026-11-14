@@ -13,3 +13,4 @@ Features/Online.cs=3
 Features/Online.Filters.cs=1
 Features/QuickAdjust.cs=4
 Features/Chaos.Ui.cs=1
+Features/NotifyHub.cs=1

@@ -338,6 +338,18 @@ public partial class SR {
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
         }
 
+        // 右栏内容总高度（用于让 SV 正方形边长 = 右栏高度）：色板网格 + HSV×3 + RGB + HEX + 间距。
+        private static float RightColumnH(float rightW) {
+            try {
+                float gap = Sc(3f);
+                float cw = Mathf.Clamp((rightW - (PaletteCols - 1) * gap) / PaletteCols, Sc(10f), Sc(28f));
+                float ch = Mathf.Clamp(cw * 0.85f, Sc(16f), Sc(22f));
+                int rows = (Palette.Length + PaletteCols - 1) / PaletteCols;
+                float paletteH = rows * ch + (rows - 1) * gap;
+                return paletteH + Sc(4f) + 3f * Ctl.ControlH() + Sc(4f) + Ctl.ControlH() + Ctl.ControlH() + Sc(6f);
+            } catch (Exception) { return Sc(160f); }
+        }
+
         private static void DrawPanel(ConfigEntryBase e, State s) {
             s.Frame = Time.frameCount;
             Event ev = Event.current;
@@ -352,20 +364,25 @@ public partial class SR {
                 DrawHeader(e, s, pw);
                 GUILayout.Space(Sc(6f));
 
-                // 两列：左边 SV 方块 + 色相条；右边 色板 / HSV / RGB / HEX
+                // 两列：左边 SV 方块 + 色相条；右边 色板 / HSV / RGB / HEX。
+                // 用户要求：SV 方块必须是**正方形**，且高度与右栏内容对齐。
+                // 做法：先按"右栏内容高度"求方块边长（右栏宽度反过来由剩余空间决定，迭代 3 次收敛），
+                // 方块边长 = 右栏高度 = 正方形边长；色相条同高。
                 float hueW = Sc(24f), gap = Sc(8f);
-                float leftW = Mathf.Min(Sc(150f), Mathf.Max(Sc(72f), pw - hueW - gap - Sc(8f)));
-                float rightW = Mathf.Max(Sc(120f), pw - leftW - Sc(12f));
+                float side = Sc(150f);
+                float rightW = 0f;
+                for (int __it = 0; __it < 3; __it++) {
+                    rightW = Mathf.Max(Sc(120f), pw - side - hueW - gap - Sc(12f));
+                    float __need = RightColumnH(rightW);
+                    float __next = Mathf.Clamp(__need, Sc(72f), Mathf.Max(Sc(72f), pw - Sc(120f) - hueW - gap - Sc(12f)));
+                    if (Mathf.Abs(__next - side) < 0.5f) { side = __next; break; }
+                    side = __next;
+                }
+                rightW = Mathf.Max(Sc(120f), pw - side - hueW - gap - Sc(12f));
                 GUILayout.BeginHorizontal();
                 try {
-                    GUILayout.BeginVertical(GUILayout.Width(leftW + hueW + gap));
-                    try {
-                        // 左侧 SV 方块的高度与右栏内容对齐（用户要求：调明度/饱和度那个方块加高）。
-                        float paletteRows = (24 + PaletteCols - 1) / PaletteCols;
-                        float rightH = paletteRows * Sc(24f) + (paletteRows - 1) * Sc(4f) + Sc(4f)
-                                     + 3f * Ctl.ControlH() + Sc(4f) + 2f * Ctl.ControlH() + Sc(6f);
-                        DrawSvBlock(e, s, leftW + hueW + gap, rightH);
-                    } finally { GUILayout.EndVertical(); }
+                    GUILayout.BeginVertical(GUILayout.Width(side + hueW + gap));
+                    try { DrawSvBlock(e, s, side); } finally { GUILayout.EndVertical(); }
                     GUILayout.Space(Sc(10f));
                     GUILayout.BeginVertical(GUILayout.Width(rightW));
                     try {
@@ -411,17 +428,15 @@ public partial class SR {
             GUILayout.EndHorizontal();
         }
 
-        // 色板主体：左边饱和度×明度方块，右边竖向色相条（ImGui ColorPicker3 布局）。
-        private static void DrawSvBlock(ConfigEntryBase e, State s, float pw, float targetH = 0f) {
+        // 色板主体：左边饱和度×明度**正方形**，右边竖向色相条（同高）。
+        private static void DrawSvBlock(ConfigEntryBase e, State s, float side) {
             float hueW = Sc(24f), gap = Sc(8f);
-            float side = Mathf.Min(Sc(150f), Mathf.Max(Sc(72f), pw - hueW - gap - Sc(8f)));
-            float h = targetH > side ? targetH : side;   // 高度对齐右栏；宽度保持原正方形宽
             Rect sq = default(Rect), hb = default(Rect);
             GUILayout.BeginHorizontal();
             try {
-                sq = GUILayoutUtility.GetRect(side, h);
+                sq = GUILayoutUtility.GetRect(side, side);   // 正方形：宽=高=右栏内容高度
                 GUILayout.Space(gap);
-                hb = GUILayoutUtility.GetRect(hueW, h);
+                hb = GUILayoutUtility.GetRect(hueW, side);
                 GUILayout.FlexibleSpace();
             } finally { GUILayout.EndHorizontal(); }
             DrawSvSquare(e, s, sq);

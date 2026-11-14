@@ -460,10 +460,15 @@ namespace SR_UCH.Tweaks {
             }
             // 3) 房主自己（被 !IsHost 挡住）本地还原；房客端不碰 Modifiers。
             if (_hasSnapshot && IsAuthority) { var m = SafeMods(); if (m != null) RestoreLocal(m); }
-            _active.Clear();
+            if (IsAuthority) {
+                _active.Clear();
+                _hasSnapshot = false;
+                _roundSeen = 0;
+            } else {
+                // 房客：规则是房主广播的，游戏仍会写进 Modifiers；关本机开关只清"已应用"标记，
+                // 牌面继续跟踪（页面显示"未生效"而不是牌面消失）。
+            }
             _applied = false;
-            _hasSnapshot = false;
-            _roundSeen = 0;
         }
 
         private static int SnapshotValue(int field) {
@@ -562,7 +567,7 @@ namespace SR_UCH.Tweaks {
                 int op = m.Value2 & 0xFF;
                 if (op == OpHello && m.Value >= 0 && m.Value < 8 && m.Value != LocalNetworkNumber())
                     _roster[m.Value] = new RosterEntry(Time.unscaledTime);
-                
+                else if (op == OpRestore) { _active.Clear(); _applied = false; }
                 return;
             }
 

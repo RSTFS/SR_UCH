@@ -150,6 +150,8 @@ namespace SR_UCH.Tweaks {
 
         private static void Refresh() {
             try {
+                _shutdown = false;   // 热重载后静态字段会保留：复位关机标记，否则功能永久失效
+                if (!_conflict && Time.frameCount % 300 == 0) _conflict = DetectCamHog();   // CamHog 可能后加载
                 _on = _enabled != null && _enabled.Value;
                 if (!_on) RestoreAll();   // 关开关：把已经淡化的角色还原，别让游戏一直沿用我们的 currentOpacity
                 _useDist = _useDistance == null || _useDistance.Value;

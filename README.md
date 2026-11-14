@@ -91,8 +91,12 @@ and can see the current rule in the vanilla rules UI. The host is excluded by th
 - **17 cards** -- low/high gravity, weak jump, slow sprint, slow platforms, no wall jumps, mirror
   controls, dance invincibility, player collisions and frictionless. Each can be switched off in
   the card pool, which splits the list into numeric and boolean rule groups (no search box).
-  Game speed, character size, camera flip and doomsday are excluded on purpose; the slow-fire-rate
-  card is included (it only touches the rule value, not `Time.timeScale`).
+  Game speed, character size, camera flip and doomsday are excluded on purpose. The slow-fire-rate
+  card is **included, with a known asymmetry**: the game's `OnModifiersDynamicChange()` (triggered on
+  guests only, since the host is guarded by `!IsHost`) also refreshes `Time.timeScale`. If the host
+  and guest time scales differ for any reason (pause menu, another mod), guests get forced back to
+  `GameSpeed` while the host does not. It only affects this one card; remove it from the pool if you
+  care about that edge case.
 - **Controls** -- draw interval, max simultaneous cards, draw announcement, reroll hotkey, and the
   page renders each active card as a card (name + effect + green buff / red debuff / blue neutral border).
 - **Always reversible** -- rule values are snapshotted at match start. Turning the deck off or

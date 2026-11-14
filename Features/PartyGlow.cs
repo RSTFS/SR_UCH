@@ -163,7 +163,7 @@ namespace SR_UCH.Tweaks {
                     try {
                         Placeable __pl = pb0.placeablePrefab;
                         if (__pl != null) {
-                            int __w = BlockGroup.GetItemFilterWeight(__pl, (int)__pl.BaseRarity);
+                            int __w = BlockGroup.GetItemFilterWeight(__pl, 1);
                             _wCache[i] = __w;
                             if (__w > 0) { if (__w < _wMin) _wMin = __w; if (__w > _wMax) _wMax = __w; }
                         }
@@ -266,12 +266,10 @@ namespace SR_UCH.Tweaks {
 
             float a = TierAlpha[tier] * (_strength.Value / 100f);
             if (_breathe.Value) a *= 0.86f + 0.14f * Mathf.Sin(Time.time * 2.2f + pb.GetInstanceID() * 0.37f);
+            // 只写顶点色：Additive shader 是 i.color × _TintColor × tex，颜色写两遍会被平方（偏暗偏色），
+            // 且同档共享材质的 tint 会被最后扫描的那件覆盖、呼吸相位串扰。材质 tint 保持白色。
             Color c = TierColor[tier];
             sr.color = new Color(c.r, c.g, c.b, Mathf.Clamp01(a));
-            if (__mat != null) {
-                try { __mat.SetColor("_TintColor", new Color(c.r, c.g, c.b, Mathf.Clamp01(a))); }
-                catch (Exception __tc) { SRApi.Guard.Log("品质光芒/tint", __tc); }
-            }
         }
 
         // 每档一份材质：六档共用一份时，同一帧里每件道具都会改写它，

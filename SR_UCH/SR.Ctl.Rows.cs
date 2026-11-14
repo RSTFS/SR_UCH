@@ -52,13 +52,8 @@ public partial class SR {
                 if (!labelRect.Contains(ev.mousePosition)) return;
                 object dv = e.SettingType == typeof(string) ? (object)"" : e.DefaultValue;
                 if (!object.Equals(e.BoxedValue, dv)) {
-                    object __old = e.BoxedValue;
                     SetValue(e, dv);
-                    // 带「撤销」动作：点击通知上的按钮恢复原值（NotifyEx 的核心化用法示例）。
-                    SRApi.NotifyEx(T("已恢复默认值", "Reset to default"), 0, "reset", delegate {
-                        try { SetValue(e, __old); SRApi.Notify(T("已撤销", "Undone")); }
-                        catch (Exception __un) { Guard.Log("统一行/撤销恢复默认", __un); }
-                    });
+                    SRApi.Notify(T("已恢复默认值", "Reset to default"));
                 }
                 ev.Use();
             } catch (Exception __ex) { Guard.Log("统一行/恢复默认", __ex); }
