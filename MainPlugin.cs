@@ -169,6 +169,11 @@ namespace SR_UCH {
                 SRApi.Ctl.SetCheckStylesSink(delegate () { return SR.Ctl.CheckOn; }, delegate () { return SR.Ctl.CheckOff; });
                 SRApi.Ctl.SetForceZhSink(delegate () { return SR.Ctl.ForceZh; }, delegate (bool __v) { SR.Ctl.ForceZh = __v; });
             });
+            SinkStep("KeyAction", delegate () {
+                SRApi.SetKeyActionSink(delegate (string __n, ConfigEntry<KeyCode> __e, string __m, Action __a) {
+                    SR.RegisterKeyAction(__n, __e, __m, __a);
+                });
+            });
             SinkStep("Section", delegate () {
                 // 可折叠分区：契约层两处门面都接上（顶层 SRApi 与 Ctl 子门面各自持有委托字段）。
                 SRApi.WireSection(SR.SectionBegin, SR.SectionEnd);

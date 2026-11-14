@@ -234,7 +234,10 @@ namespace SR_UCH.Tweaks {
 
             _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) RestoreAll(); };
 
-            SRApi.RegisterKey("混乱牌组-重抽", _drawKey, "press");
+            SRApi.RegisterKey("混乱牌组-重抽", _drawKey, "press", delegate {
+                if (!IsAuthority || !ModeAllowed()) return;
+                if (_enabled != null && _enabled.Value) DrawAndBroadcast();
+            });
 
             // 对局播报：开局公告读本局启用的牌池（不是固定牌序，牌是逐回合随机抽的）。
             // 上一版漏了栏目登记：侧栏会显示英文 id 且排序靠后。补上中英名与顺序。
@@ -276,8 +279,6 @@ namespace SR_UCH.Tweaks {
             if (!_ready) return;
             if (_enabled.Value == false) return;                       // 总开关关掉后不跑任何每帧逻辑
             if (!ModeAllowed()) return;                                 // 限制模式：静默跳过
-            // 用项目的组合键框架：Shift/Ctrl 组合能用，且聊天框打字时让路（裸 Input.GetKeyDown 会误触发）。
-            if (IsAuthority && SRApi.ComboKeyDown(_drawKey)) DrawAndBroadcast();
             SendHelloOnce();
         }
 

@@ -330,6 +330,7 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         private static Action<Action<Camera>> _cameraView;
         private static Action<string, Action, Action> _pageChrome;
         private static Action<string, ConfigEntry<KeyCode>, string> _registerKey;
+        private static Action<string, ConfigEntry<KeyCode>, string, Action> _registerKeyAction;
         private static Func<ConfigEntry<KeyCode>, bool> _comboKeyDown, _comboKeyHeld;
         private static Action<string, Func<ConfigEntryBase, bool>> _renderSectionEntries;
         private static Func<string, List<ConfigEntryBase>> _sectionEntries2;
@@ -401,6 +402,13 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static void RegisterCameraView(Action<Camera> apply) { Action<Action<Camera>> f = _cameraView; if (f != null) f(apply); }
         public static void RegisterPageChrome(string section, Action header, Action footer) { Action<string, Action, Action> f = _pageChrome; if (f != null) f(section, header, footer); }
         public static void RegisterKey(string name, ConfigEntry<KeyCode> entry, string mode) { Action<string, ConfigEntry<KeyCode>, string> f = _registerKey; if (f != null) f(name, entry, mode); }
+        // 键位动作核心化：功能只声明"哪个键 + 模式 + 做什么"，由核心每帧统一轮询触发
+        // （press = 按下边沿一次；toggle = 边沿一次，切换由功能自己写；hold = 按住期间每帧）。
+        public static void RegisterKey(string name, ConfigEntry<KeyCode> entry, string mode, Action action) {
+            Action<string, ConfigEntry<KeyCode>, string, Action> f = _registerKeyAction;
+            if (f != null) f(name, entry, mode, action);
+        }
+        public static void SetKeyActionSink(Action<string, ConfigEntry<KeyCode>, string, Action> f) { _registerKeyAction = f; }
         public static bool ComboKeyDown(ConfigEntry<KeyCode> entry) { Func<ConfigEntry<KeyCode>, bool> f = _comboKeyDown; return f != null && f(entry); }
         public static bool ComboKeyHeld(ConfigEntry<KeyCode> entry) { Func<ConfigEntry<KeyCode>, bool> f = _comboKeyHeld; return f != null && f(entry); }
         public static void RenderSectionEntries(string section, Func<ConfigEntryBase, bool> filter) { Action<string, Func<ConfigEntryBase, bool>> f = _renderSectionEntries; if (f != null) f(section, filter); }

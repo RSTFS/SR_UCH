@@ -108,3 +108,4 @@ WheelFrame
 WheelLayer
 SelfToggleButton
 RowCombo
+RegisterKey

@@ -149,15 +149,16 @@ namespace SR_UCH {
         public string[] DependsOn { get; set; }       //依赖的功能 id；缺失时记录并降级运行
         public string[] Provides { get; set; }        //本功能会写入的槽位名（冲突检测用）
         public int MinContract { get; set; }          //所需最低契约版本
+        public int Modes { get; set; }                //允许的游戏模式位（SRApi.ModeMask 的整型值；0 = 不限）
         public SrFeatureAttribute(string id, string name, string version) {
-            Id = id; Name = name; Version = version; Rank = 120; MinContract = SRContract.Version;
+            Id = id; Name = name; Version = version; Rank = 120; MinContract = SRContract.Version; Modes = 0;
         }
     }
 
     // 一条功能清单记录：核心在扫描 ITweak 时填充，界面/日志只读。
     public sealed class FeatureInfo {
         public string Id, Name, Version;
-        public int Rank, MinContract;
+        public int Rank, MinContract, Modes;
         public string[] DependsOn, Provides;
         public Type Impl;
         public bool ManifestMissing;                  // true = 该类没有 [SrFeature]（旧式/第三方未声明）
@@ -202,6 +203,7 @@ namespace SR_UCH {
                     SrFeatureAttribute a = (SrFeatureAttribute)attrs[0];
                     fi.Id = a.Id; fi.Name = a.Name; fi.Version = a.Version; fi.Rank = a.Rank;
                     fi.MinContract = a.MinContract; fi.DependsOn = a.DependsOn; fi.Provides = a.Provides;
+                    fi.Modes = a.Modes;
                     fi.ManifestMissing = false;
                 }
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }

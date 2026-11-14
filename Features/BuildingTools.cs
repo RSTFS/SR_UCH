@@ -141,7 +141,10 @@ namespace SR_UCH.Tweaks {
                 "Collision Toggle Key",
                 KeyCode.F1,
                 "Key to toggle the collision override in-game");
-            SRApi.RegisterKey("建造增强-碰撞开关", _toggleCollisionKey, "toggle");
+            SRApi.RegisterKey("建造增强-碰撞开关", _toggleCollisionKey, "press", delegate {
+                if (!SRApi.GateMaster || !Enabled) return;
+                _collisionEntry.Value = !_collisionEntry.Value; Notify(SRApi.T("无视碰撞", "Collision Override"), _collisionEntry.Value);
+            });
             _gridEntry = _mp.Config.Bind(
                 "build",
                 "Grid Override",
@@ -154,7 +157,10 @@ namespace SR_UCH.Tweaks {
                 "Grid Toggle Key",
                 KeyCode.F2,
                 "Key to toggle free placement (grid override) in-game");
-            SRApi.RegisterKey("建造增强-自由放置开关", _toggleGridKey, "toggle");
+            SRApi.RegisterKey("建造增强-自由放置开关", _toggleGridKey, "press", delegate {
+                if (!SRApi.GateMaster || !Enabled) return;
+                _gridEntry.Value = !_gridEntry.Value; Notify(SRApi.T("自由放置", "Free Placement"), _gridEntry.Value);
+            });
 
             // 补丁分两次独立注册（旧版就是这么做的，也是自由放置能生效的关键）：
             // FreePlacementPatch 是**顶层**类，不会被下面这行连带注册，必须自己注册一次；
@@ -163,16 +169,6 @@ namespace SR_UCH.Tweaks {
             catch (Exception e) { SRApi.LogWarn("BuildingTools 补丁失败: " + e.Message); }
             try { Harmony.CreateAndPatchAll(typeof(FreePlacementPatch)); }
             catch (Exception __fp) { SRApi.LogError("自由放置 补丁注册失败: " + __fp.Message); }
-        }
-
-        [HarmonyPatch(typeof(GameState), "Update")]
-        [HarmonyPrefix]
-        static void ToggleKeys() {
-            if (!SRApi.GateMaster) return;
-            if (!Enabled) return;
-            if (SRApi.Typing) return; 
-            if (SRApi.ComboKeyDown(_toggleCollisionKey)) { _collisionEntry.Value = !_collisionEntry.Value; Notify(SRApi.T("无视碰撞", "Collision Override"), _collisionEntry.Value); }
-            if (SRApi.ComboKeyDown(_toggleGridKey)) { _gridEntry.Value = !_gridEntry.Value; Notify(SRApi.T("自由放置", "Free Placement"), _gridEntry.Value); }
         }
 
         private static void Notify(string name, bool state) {

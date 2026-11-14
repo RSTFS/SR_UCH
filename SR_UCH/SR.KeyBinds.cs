@@ -609,9 +609,37 @@ public partial class SR {
         }
 
         // 每帧轮询（SR.Tick 调用）：绑定的键按下 -> 执行动作
+        // ============ 键位动作核心化（RegisterKey 4 参） ============
+        private sealed class KeyAct {
+            public string Name, Mode;
+            public ConfigEntry<KeyCode> Entry;
+            public Action Run;
+        }
+        private static readonly List<KeyAct> _keyActs = new List<KeyAct>();
+
+        public static void RegisterKeyAction(string name, ConfigEntry<KeyCode> entry, string mode, Action action) {
+            if (entry == null || action == null) return;
+            for (int i = 0; i < _keyActs.Count; i++)
+                if (ReferenceEquals(_keyActs[i].Entry, entry)) { _keyActs[i].Mode = mode ?? "press"; _keyActs[i].Run = action; _keyActs[i].Name = name; return; }
+            KeyAct a = new KeyAct(); a.Name = name; a.Mode = mode ?? "press"; a.Entry = entry; a.Run = action;
+            _keyActs.Add(a);
+        }
+
+        private static void CheckRegisteredKeyActions() {
+            for (int i = 0; i < _keyActs.Count; i++) {
+                KeyAct a = _keyActs[i];
+                try {
+                    if (a.Entry == null) continue;
+                    bool fire = (a.Mode == "hold") ? ComboKeyHeld(a.Entry) : ComboKeyDown(a.Entry);
+                    if (fire && a.Run != null) a.Run();
+                } catch (Exception __ex) { Guard.Log("键位动作 " + (a.Name ?? "?"), __ex); }
+            }
+        }
+
         public static void CheckHotkeys() {
             // 每个条目的回调单独隔离：一个功能抛异常不影响其余快捷键。
             try { HkInitAll(); } catch (Exception __ex) { Guard.Log("初始化自动快捷键", __ex); }
+            CheckRegisteredKeyActions();   // 功能登记的键位动作（核心统一轮询）
             if (_capturing != null) return; //正在录制按键：不触发
             for (int i = 0; i < _hkItems.Count; i++) {
                 HkItem it = _hkItems[i];
