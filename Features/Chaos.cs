@@ -38,7 +38,7 @@ using UnityEngine.Networking;
 
 namespace SR_UCH.Tweaks {
     [SrFeature("sr.chaos", "Chaos", "2.2", Provides = new string[] {
-        "sr.notify.reopenProposal", "sr.cast.pool" })]
+        "sr.cast.pool" })]
     public class Chaos : ITweak {
         private const string Sec = "混乱牌组";
 
@@ -46,7 +46,6 @@ namespace SR_UCH.Tweaks {
         private const int Magic = 771;
         private const int OpHello = 1;
         private const int OpRestore = 2;
-        private const int OpPropose = 3;
         // 真实规则消息：Value2 = (CardMagic << 16) | (op << 8) | cardId
         private const int CardMagic = 772;
         private const int OpCardDraw = 4;
@@ -117,10 +116,6 @@ namespace SR_UCH.Tweaks {
         private static float _nextHelloAt;
         // 房客提案：单槽待审，默认 20 秒过期（unscaledTime，梦境定格时也照走）。
         // 过期后留一份快照，通知页里能「重新打开」。
-        private static bool _pendingActive;
-        private static int _pendingCard, _pendingFrom;
-        private static float _pendingAt;
-        private static int _lastExpiredCard = -1, _lastExpiredFrom = -1;
         // 可读性适配（软依赖）：只查槽位名，缺 DLL 时零 miss、零副作用。
         private static Func<float> _aExtra;
         // 对局播报（软依赖）：抽牌后主动通知，让房客在原生聊天窗里看见牌面。
@@ -240,7 +235,6 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterKey("混乱牌组-重抽", _drawKey, "press");
 
             // 通知治理中心的历史页用这个槽位把过期提案恢复到待审状态。
-            Slots.Provide("sr.notify.reopenProposal", (Action)(() => RestoreLastProposal()));
             // 对局播报：开局公告读本局启用的牌池（不是固定牌序，牌是逐回合随机抽的）。
             Slots.Provide("sr.cast.pool", (Func<string>)(() => PoolText()));
             // 上一版漏了栏目登记：侧栏会显示英文 id 且排序靠后。补上中英名与顺序。
@@ -283,15 +277,6 @@ namespace SR_UCH.Tweaks {
             // 用项目的组合键框架：Shift/Ctrl 组合能用，且聊天框打字时让路（裸 Input.GetKeyDown 会误触发）。
             if (IsAuthority && SRApi.ComboKeyDown(_drawKey)) DrawAndBroadcast();
             BindA11y();
-            if (_pendingActive && Time.unscaledTime - _pendingAt > ProposalSeconds()) {
-                _lastExpiredCard = _pendingCard;
-                _lastExpiredFrom = _pendingFrom;
-                if (_announce.Value && _pendingCard >= 0 && _pendingCard < Cards.Length)
-                    SRApi.NotifyT("提案已过期：{0} 号玩家建议的「{1}」未处理（可在通知页里重新打开）",
-                                  "Proposal expired: player {0}'s {1} was not handled (reopen it from notice history)",
-                                  _pendingFrom, SRApi.T(Cards[_pendingCard].Zh, Cards[_pendingCard].En));
-                ClearProposal();
-            }
             SendHelloOnce();
         }
 
@@ -365,7 +350,6 @@ namespace SR_UCH.Tweaks {
             _applied = false;
             _hasSnapshot = false;
             _roundSeen = 0;
-            ClearProposal();
             _roster.Clear();
         }
 
@@ -470,7 +454,6 @@ namespace SR_UCH.Tweaks {
             _applied = false;
             _hasSnapshot = false;
             _roundSeen = 0;
-            ClearProposal();
         }
 
         private static int SnapshotValue(int field) {
@@ -568,17 +551,7 @@ namespace SR_UCH.Tweaks {
                 int op = m.Value2 & 0xFF;
                 if (op == OpHello && m.Value >= 0 && m.Value != LocalNetworkNumber())
                     _roster[m.Value] = new RosterEntry("2.2", Time.unscaledTime);
-                else if (op == OpRestore || op == OpClear) { _applied = false; _active.Clear(); }
-                else if (op == OpPropose && false) {   // 房客提案已删除：收到也忽略（保留消息解析以兼容旧客户端）
-                    int from = m.Value >> 8;
-                    int cardId = m.Value & 0xFF;
-                    if (cardId >= 0 && cardId < Cards.Length) {
-                        _pendingCard = cardId; _pendingFrom = from;
-                        _pendingAt = Time.unscaledTime; _pendingActive = true;
-                        if (_announce.Value) SRApi.NotifyT("{0} 号玩家提案：{1}", "Player {0} proposes: {1}",
-                                                           from, SRApi.T(Cards[cardId].Zh, Cards[cardId].En));
-                    }
-                }
+                
                 return;
             }
 
@@ -607,45 +580,6 @@ namespace SR_UCH.Tweaks {
             for (int i = 0; i < Cards.Length; i++) if (_pool[i] != null && _pool[i].Value) chosen.Add(i);
             if (chosen.Count == 0) return -1;
             return chosen[new System.Random(Environment.TickCount).Next(chosen.Count)];
-        }
-
-        private static void SendProposal(int cardId) {
-            if (cardId < 0 || cardId >= Cards.Length || !NetClientActive()) return;
-            try {
-                int num = LocalNetworkNumber();
-                if (num < 0) num = 0;
-                var msg = new MsgGameRuleSet();
-                msg.NewRule = TabletRule.None;
-                msg.Value = (num << 8) | (cardId & 0xFF);   // 高字节 = 提案人，低字节 = 卡 id
-                msg.Value2 = (Magic << 8) | OpPropose;
-                msg.Valueb = false;
-                LobbyManager.instance.client.Send(NetMsgTypes.GameRuleSet, msg);
-                if (_announce.Value) SRApi.NotifyT("已向房主提案：{0}", "Proposed to host: {0}",
-                                                   SRApi.T(Cards[cardId].Zh, Cards[cardId].En));
-            } catch (Exception ex) { SRApi.Guard.Log("混乱牌组/提案", ex); }
-        }
-
-        private void AcceptProposal() {
-            if (!_pendingActive || !IsAuthority) return;
-            int id = _pendingCard;
-            ClearProposal();
-            if (id < 0 || id >= Cards.Length || _pool[id] == null || !_pool[id].Value) return;
-            BroadcastRestoreRules();
-            if (NetClientActive()) SendSignal(OpClear);
-            _drawSeq++;
-            var rng = new System.Random(Environment.TickCount ^ (_roundSeen * 7919) ^ (_drawSeq * 104729));
-            int param = ParamFor(id, rng);
-            _active.Clear();
-            _active.Add(new ActiveCard(id, param));
-            BroadcastOne(id, param);                   // 未装 mod 的房客由游戏自己写规则
-            RebuildLocal();                            // 房主被 !IsHost 挡住，本地双写
-            string drawn = Desc() ?? "-";
-            if (_announce.Value) SRApi.NotifyT("混乱牌组（房客提案）：{0}", "Chaos (guest proposal): {0}", drawn);
-            NotifyCastRound(drawn);
-        }
-
-        private static void ClearProposal() {
-            _pendingActive = false; _pendingCard = -1; _pendingFrom = -1; _pendingAt = 0f;
         }
 
         // 可读性适配：提案等待时间 = 20 秒 + 可读性页的加秒（0-20 秒）。
@@ -680,20 +614,7 @@ namespace SR_UCH.Tweaks {
             try { return _aExtra != null ? Mathf.Clamp(_aExtra(), 0f, 20f) : 0f; }
             catch (Exception ex) { SRApi.Guard.Log("混乱牌组/可读性加秒", ex); return 0f; }
         }
-        private static float ProposalSeconds() { return 20f + AExtra(); }
-
         /// <summary>把最近一条过期提案恢复成待审，并重新计时；只由房主/离线权威端生效。</summary>
-        private static void RestoreLastProposal() {
-            if (!_ready || !IsAuthority || _lastExpiredCard < 0 || _lastExpiredCard >= Cards.Length) return;
-            _pendingCard = _lastExpiredCard;
-            _pendingFrom = _lastExpiredFrom;
-            _pendingAt = Time.unscaledTime;
-            _pendingActive = true;
-            if (_announce.Value)
-                SRApi.NotifyT("已恢复上一条过期提案：{0}", "Reopened the last expired proposal: {0}",
-                              SRApi.T(Cards[_pendingCard].Zh, Cards[_pendingCard].En));
-        }
-
         // ============ 对外展示 ============
 
         public static string Desc() {
@@ -711,15 +632,6 @@ namespace SR_UCH.Tweaks {
                 parts.Add(c.IsBool ? name : name + " " + _active[i].Param);
             }
             return string.Join(" + ", parts.ToArray());
-        }
-
-        /// <summary>待审提案文本（含剩余秒数）；无待审时返回 null。</summary>
-        public static string BriefPending() {
-            if (!_pendingActive || !IsAuthority) return null;
-            if (_pendingCard < 0 || _pendingCard >= Cards.Length) return null;
-            int left = Mathf.Max(0, Mathf.CeilToInt(ProposalSeconds() - (Time.unscaledTime - _pendingAt)));
-            return SRApi.T("待审提案：" + _pendingFrom + " 号玩家建议「" + Cards[_pendingCard].Zh + "」（" + left + " 秒）\n采纳后立即广播给全场",
-                           "Pending: player " + _pendingFrom + " suggests " + Cards[_pendingCard].En + " (" + left + "s)\nAccept broadcasts it to everyone");
         }
 
         public static string RosterText() {
@@ -752,20 +664,6 @@ namespace SR_UCH.Tweaks {
 
             Line("当前牌面：" + (Desc() ?? "（未生效）"), "Active: " + (Desc() ?? "(none)"));
             Line(RosterText() ?? "房内 mod 清单：仅本机（离线）", RosterText() ?? "Room roster: this machine only (offline)");
-
-            if (_pendingActive && IsAuthority) {
-                Line("待审提案：" + _pendingFrom + " 号玩家建议「" + Cards[_pendingCard].Zh + "」（" + ProposalSeconds().ToString("F0") + " 秒后自动过期）",
-                     "Pending proposal: player " + _pendingFrom + " suggests " + Cards[_pendingCard].En + " (expires in " + ProposalSeconds().ToString("F0") + "s)");
-                SRApi.Ctl.HotkeyButton("chaos.accept", SRApi.T("采纳", "Accept"),
-                                       SRApi.T("按提案抽这一张，广播给全场", "Draw this card and broadcast it"), AcceptProposal);
-                SRApi.Ctl.HotkeyButton("chaos.ignore", SRApi.T("忽略", "Ignore"),
-                                       SRApi.T("丢弃这条提案", "Discard this proposal"), ClearProposal);
-            }
-            if (_lastExpiredCard >= 0 && _lastExpiredCard < Cards.Length && IsAuthority) {
-                SRApi.Ctl.HotkeyButton("chaos.reopen", SRApi.T("恢复上一条过期提案", "Reopen last expired proposal"),
-                                       SRApi.T("把最近一条过期提案放回待审并重新计时", "Put the last expired proposal back into pending with a fresh timer"),
-                                       RestoreLastProposal);
-            }
 
             Line("牌池在「牌池」页勾选（勾上才可能被抽到）。", "Pick the drawable cards on the Card pool page.");
 
