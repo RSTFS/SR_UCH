@@ -297,6 +297,8 @@ namespace SR_UCH.Tweaks {
         // 一帧只允许一个下拉消费滚轮：Layout / Repaint 两趟都会轮询，同一格滚轮
         // 会被两趟各应用一次 → 表现"滚一格跳两格"。
         private static int _comboWheelFrame = -1;
+        // 本帧是否有任意下拉框（含收起态用滚轮换选项）消费了滚轮：窗口据此撤销本帧页面滚动量。
+        internal static bool ComboWheelConsumedThisFrame { get { return _comboWheelFrame == Time.frameCount; } }
 
         private static int NextComboSeq() {
             if (ComboSeqFrame != Time.frameCount) { ComboSeqFrame = Time.frameCount; ComboSeq = 0; }

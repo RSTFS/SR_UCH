@@ -45,6 +45,19 @@ namespace SR_UCH.Tweaks {
         private static readonly Action<int> _clickFn = OnColumnClick;
         private static readonly Func<string> _emptyHintFn = EmptyHintText;
         private static readonly Action<int, Rect, int> _pinDrawFn = delegate (int row, Rect r, int vi) { DrawActionButtons(_visibleCache, row, r); };
+        private static readonly Action<int> _rowRightClickFn = delegate (int row) { StartRenameVisibleRow(row); };
+
+        // 右键行（核心 hit-test 派发）→ 开始内联重命名；只允许自己的预设（IsLocal 是只读存档）。
+        private static void StartRenameVisibleRow(int row) {
+            try {
+                List<PresetInfo> vis = _visibleCache;
+                if (vis == null || row < 0 || row >= vis.Count) return;
+                PresetInfo p = vis[row];
+                if (p == null || p.IsLocal) return;
+                ClearPending();
+                _renameKey = p.Key; _renameText = p.Name; _renameAutoScrolled = false;
+            } catch (Exception __rr) { SRApi.Guard.Log("预设列表/行右键", __rr); }
+        }
 
         private static void OnColumnClick(int ci) {
             if (ci == ColAction) return;
@@ -135,13 +148,16 @@ namespace SR_UCH.Tweaks {
             //   probe 取表格顶 → 表格高 = 页面内容底 − 表格顶 → 行区 = 表格高 − 表头。
             // 不再用 ContentArea/ScrollRowsH 自己算一套（多套口径就是"列表只剩一行"的根因）。
             Rect probe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
-            // 底栏占位要扣掉：之前直接用到 PageContentBottom，表格最后一行会被底栏盖住，
-// 表现为"能滚但滚不到最下面"（最后一行永远在底栏后面）。
-            float __bottom = SRApi.PageContentBottom - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);
+            // 表格高 = 页面内容底 - 表格顶（PageContentBottom 本身已扣掉底栏与标题栏）。
+            float __bottom = SRApi.PageContentBottom - SRApi.Ctl.Sc(2f);
             float tableH = Mathf.Max(minH, __bottom - probe.y);
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true),
                 GUILayout.Height(tableH));
-            float rowsH = Mathf.Max(SRApi.Ctl.Sc(20f), box.height - headerH);
+            // 关键：box 可能被布局算到可见区外（窗口缩放/页面头高度变化时），直接拿 box.height 当行区会把
+            // rowsH 虚高 → maxY 被压小 → "能滚但滚不到最后几行"。用核心唯一几何把行区收敛成屏幕真实可见高度。
+            float rowsH = SRApi.Ctl.ScrollRowsH(box, headerH, __bottom, rowH);
+            float rowsBottom = box.y + headerH + rowsH;
+            if (box.yMax > rowsBottom) box.height = Mathf.Max(headerH + rowsH, box.height) - headerH;
             _listMaxY = SRApi.Ctl.TableMaxScrollY(visible.Count, rowH, rowsH);
             _maxScrollY = _listMaxY;
             _rowsHCache = rowsH;
@@ -219,6 +235,7 @@ namespace SR_UCH.Tweaks {
                 _args.pinRects = _pinRects;
                 _args.pinRows = _pinRows;
                 _args.pinDraw = _pinDrawFn;
+                _args.rowRightClick = _rowRightClickFn;
                 _args.emptyHint = _emptyHintFn;
 
                 _hiddenBeforeTable = _hiddenCols.Count;

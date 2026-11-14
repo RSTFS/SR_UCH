@@ -595,7 +595,8 @@ public partial class SR {
             }
             if (_scroll != pageBefore) WheelFrame = Time.frameCount; // 页面滚动区吃掉了滚轮
             // 下拉框展开时滚轮只给下拉列表用：撤销页面滚动区的滚动量（否则切换下拉项时整页跟着滑）。
-            if (Event.current != null && Event.current.type == EventType.ScrollWheel && Ctl.AnyComboOpen())
+            if (Event.current != null && Event.current.type == EventType.ScrollWheel
+                && (Ctl.AnyComboOpen() || SR.ComboWheelConsumedThisFrame))
                 _scroll = __scrollBeforeWheel;
             ConfigFile curConfig = _mode == Mode.Internal
                 ? _internalConfig
