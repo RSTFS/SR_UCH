@@ -76,6 +76,7 @@ public partial class SR {
         //枚举下拉选项缓存：键为 entry 而非 Type —— RowEnumAllowed 的过滤结果依赖 entry，按 Type 缓存会串台。
     internal static readonly Dictionary<ConfigEntryBase, object[]> _enumOptions = new Dictionary<ConfigEntryBase, object[]>();
     internal static int _enumOptionsVersion = -1;   // 上次清空时的 _entryVersion
+    internal static int EnumOptionsVersion { get { return _enumOptionsVersion; } set { _enumOptionsVersion = value; } }
 
         private static void SetValue(ConfigEntryBase entry, object value) {
             try {
@@ -538,9 +539,13 @@ public partial class SR {
 
         //侧栏宽度：0 = 自动，>0 = 用户拖动设定的宽度。
         private static float _sidebarW = 0f;
+        internal static float SidebarW { get { return _sidebarW; } set { _sidebarW = value; } }
         private static bool _sidebarResizing;
+        internal static bool SidebarResizing { get { return _sidebarResizing; } set { _sidebarResizing = value; } }
         private static ConfigEntry<int> _sidebarWEntry; //设置页栏目宽度滑块（0 = 自动）
+        internal static ConfigEntry<int> SidebarWEntry { get { return _sidebarWEntry; } set { _sidebarWEntry = value; } }
         private static ConfigEntry<string> _sidebarOrderEntry; //侧栏自定义顺序（逗号分隔），拖动列头时写回
+        internal static ConfigEntry<string> SidebarOrderEntry { get { return _sidebarOrderEntry; } set { _sidebarOrderEntry = value; } }
         //侧栏栏目拖拽排序不做坐标命中判定：条目画在 BeginArea / ScrollView 内，鼠标事件为屏幕坐标，两者换算不稳定。
         //改用 GUIUtility.hotControl 判定按下项，并以鼠标纵向位移 ÷ 行高判定目标行。
 
@@ -776,6 +781,7 @@ public partial class SR {
 
         //当前 RenderControl 的调用来源是否为内部条目（滑块路径据此决定是否绘制同行附加控件）。
     internal static bool _curIsInternal = true;
+    internal static bool CurIsInternal { get { return _curIsInternal; } set { _curIsInternal = value; } }
         //同行附加控件的本帧已绘制记录（条目 + 帧号），防重复渲染。
         private static ConfigEntryBase _followDoneEntry;
         private static int _followDoneFrame = -1;
@@ -870,6 +876,7 @@ public partial class SR {
         //组合键 / [Reflection] / 自动快捷键条目为惰性 Bind：未命中回退全表扫描，且只缓存命中结果。
         private static readonly Dictionary<string, ConfigEntryBase> _entryCache = new Dictionary<string, ConfigEntryBase>();
     internal static int _entryVersion ;
+    internal static int EntryVersion { get { return _entryVersion; } set { _entryVersion = value; } }
 
         //public：功能惰性 Bind 出新条目后调用本方法使条目缓存失效。
 
@@ -1063,7 +1070,9 @@ public partial class SR {
 
         //原生 slider 用的两个不可见样式：只取其输入与热区，外观自绘。
     internal static GUIStyle _sliderNative ;
+    internal static GUIStyle SliderNative { get { return _sliderNative; } set { _sliderNative = value; } }
     internal static GUIStyle _sliderNativeThumb ;
+    internal static GUIStyle SliderNativeThumb { get { return _sliderNativeThumb; } set { _sliderNativeThumb = value; } }
         //上次提交给配置的值（抑制未变化时的重复写盘）
     internal static readonly System.Collections.Generic.Dictionary<ConfigEntryBase, float> _sliderLastWritten =
             new System.Collections.Generic.Dictionary<ConfigEntryBase, float>();
@@ -1092,9 +1101,11 @@ public partial class SR {
     internal static readonly Dictionary<ConfigEntryBase, int> _comboScroll = new Dictionary<ConfigEntryBase, int>();
         //编辑框自身提交配置的帧号（该帧不清 _editText，避免吃掉小数点）
     internal static int _editSelfFrame = -1;
+    internal static int EditSelfFrame { get { return _editSelfFrame; } set { _editSelfFrame = value; } }
         //下拉框"点外面关闭"：不靠坐标（下拉框矩形在滚动区内容坐标系里），而是 MouseDown 这一帧若无下拉框认领
         //（ComboMouseDownSeen），则在 ManagerUI.OnGUI 末尾全部收起。
         internal static int _comboSeenFrame = -1;
+        internal static int ComboSeenFrame { get { return _comboSeenFrame; } set { _comboSeenFrame = value; } }
 
 
 
@@ -1116,7 +1127,9 @@ public partial class SR {
 
         // 本帧内 ComboBox 的调用序号（每帧第一趟从 0 开始）。
     internal static int _comboSeqFrame = -1;
+    internal static int ComboSeqFrame { get { return _comboSeqFrame; } set { _comboSeqFrame = value; } }
     internal static int _comboSeq ;
+    internal static int ComboSeq { get { return _comboSeq; } set { _comboSeq = value; } }
 
 
 

@@ -771,8 +771,8 @@ public partial class SR : ITweak {
             try { LoadJsonLanguagePacks(); } catch (Exception __ex) { Guard.Log("加载 JSON 语言包", __ex); }
             // 地图总开关：默认关闭；开启后 M 键开地图，关闭时已打开的地图立即关闭（地图网格等独立功能不受影响）。
             // 设置页栏目宽度：0 = 自动按文字宽度；也可拖动窗口侧栏右缘调整，结果写回本项。
-            _sidebarWEntry = plugin.Config.Bind(Keys.Settings, Keys.SidebarWidth, 0, "左边那一栏有多宽, 单位像素, 填 0 让它自己算. 也可以直接在窗口里拖侧栏右边缘.");
-            _sidebarOrderEntry = plugin.Config.Bind(Keys.Settings, Keys.SidebarOrder, "", "侧栏栏目的先后顺序, 用逗号隔开. 在设置页的栏目顺序那一块用上移下移按钮调, 调完自动写回来.");
+            SidebarWEntry = plugin.Config.Bind(Keys.Settings, Keys.SidebarWidth, 0, "左边那一栏有多宽, 单位像素, 填 0 让它自己算. 也可以直接在窗口里拖侧栏右边缘.");
+            SidebarOrderEntry = plugin.Config.Bind(Keys.Settings, Keys.SidebarOrder, "", "侧栏栏目的先后顺序, 用逗号隔开. 在设置页的栏目顺序那一块用上移下移按钮调, 调完自动写回来.");
             // 用配置版本号一次性清掉历史遗留的 Sidebar Order 脏值（此后拖动的顺序照常保存）。
             try {
                 // 内部版本号绑在隐藏段，不出现在设置页
@@ -781,13 +781,13 @@ public partial class SR : ITweak {
                 // 第二个版本号：清掉栏目改名后残留的旧段名（ApplyCustomSidebarOrder 负责改名映射与剔除死条目）。
                 // v3: HUD / presets added and default order adjusted; drop stale custom sidebar order once.
                 if (__schema.Value < 3) {
-                    _sidebarOrderEntry.Value = "";
+                    SidebarOrderEntry.Value = "";
                     __schema.Value = 3;
                     SR.LogInfo("[SR] sidebar order schema v3: reset to Nav rank default order");
                 }
             } catch (Exception __ex) { Guard.Log("清理侧栏顺序历史值", __ex); }
-            _sidebarW = _sidebarWEntry.Value;
-            _sidebarWEntry.SettingChanged += (s, e) => _sidebarW = _sidebarWEntry.Value;
+            SidebarW = SidebarWEntry.Value;
+            SidebarWEntry.SettingChanged += (s, e) => SidebarW = SidebarWEntry.Value;
             // 加载后清理已迁到 Experiments.cs（section 同时改为 Experiments，界面位置不变）
                     _allEnabledEntry = plugin.Config.Bind(Keys.Settings, Keys.AllEnabled, false, "整个 Mod 的总开关. 关掉以后所有内部功能都不生效, 但每个功能的开关值不会被改掉.\n默认是关的, 改动会自动保存, 下次启动保持上次的状态.");
             AllEnabled = _allEnabledEntry.Value;
@@ -905,14 +905,14 @@ public partial class SR : ITweak {
                     parts.Add(hid ? ("!" + nm) : nm);
                 }
                 if (!found) return;
-                if (_sidebarOrderEntry != null) _sidebarOrderEntry.Value = string.Join(",", parts.ToArray());
+                if (SidebarOrderEntry != null) SidebarOrderEntry.Value = string.Join(",", parts.ToArray());
                 RebuildSections(false);   // 内部已有"选中项被移除 -> 回到第一个"的兜底
             } catch (Exception __ex) { Guard.Log("隐藏侧栏栏目", __ex); }
         }
         // Shift+右键还原：清空 Sidebar Order（排序 + 隐藏存在同一份串里），恢复按 Nav rank 的默认栏目顺序。
         public static void ResetSidebarOrder() {
             try {
-                if (_sidebarOrderEntry != null) _sidebarOrderEntry.Value = "";
+                if (SidebarOrderEntry != null) SidebarOrderEntry.Value = "";
                 _userHiddenSections.Clear();
                 RebuildSections(false);
                 SR.LogInfo("[SR] 已还原侧栏栏目顺序与隐藏状态（回到默认顺序）");

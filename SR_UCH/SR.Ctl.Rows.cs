@@ -108,21 +108,21 @@ public partial class SR {
                     // 精确数值不用再靠一个"更多数值"开关，平时仍是滑块。
                     Event __ev = Event.current;
                     if (__ev != null && __ev.type == EventType.MouseDown && __ev.button == 0 && __ev.control && r.Contains(__ev.mousePosition)) {
-                        _numEdit = e; _numText = cur.ToString("0.###"); __ev.Use();
+                        NumEdit = e; NumText = cur.ToString("0.###"); __ev.Use();
                     }
-                    if (ReferenceEquals(_numEdit, e)) {
-                        string __t = SRApi.ClearableTextField(_numText ?? "", SRApi.Ctl.SearchBox, GUILayout.Width(Sc(90)), GUILayout.Height(Sc(26)));
-                        if (__t != _numText) _numText = __t;
+                    if (ReferenceEquals(NumEdit, e)) {
+                        string __t = SRApi.ClearableTextField(NumText ?? "", SRApi.Ctl.SearchBox, GUILayout.Width(Sc(90)), GUILayout.Height(Sc(26)));
+                        if (__t != NumText) NumText = __t;
                         Event __ke = Event.current;
                         if (__ke != null && __ke.type == EventType.KeyDown) {
                             if (__ke.keyCode == KeyCode.Return || __ke.keyCode == KeyCode.KeypadEnter) {
                                 float __nv2;
-                                if (float.TryParse(_numText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out __nv2)) {
+                                if (float.TryParse(NumText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out __nv2)) {
                                     SetValue(e, Mathf.Clamp(__nv2, min, max));
                                     written = true;
                                 }
-                                _numEdit = null; _numText = null; __ke.Use();
-                            } else if (__ke.keyCode == KeyCode.Escape) { _numEdit = null; _numText = null; __ke.Use(); }
+                                NumEdit = null; NumText = null; __ke.Use();
+                            } else if (__ke.keyCode == KeyCode.Escape) { NumEdit = null; NumText = null; __ke.Use(); }
                         }
                         GUILayout.FlexibleSpace();
                         GUILayout.EndHorizontal();

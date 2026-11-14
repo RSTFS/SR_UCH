@@ -392,18 +392,18 @@ public partial class SR {
                 bool overSbDiv = inSbBand && Mathf.Abs(mouse.x - sbDivX) < Sc(5);
                 if (overSbDiv) CursorResize = true; // 悬停在可拖拽的栏目分隔线上
                 if (e.type == EventType.MouseDown && e.button == 0 && overSbDiv) {
-                    _sidebarResizing = true;
+                    SidebarResizing = true;
                     e.Use();
-                } else if (_sidebarResizing) {
+                } else if (SidebarResizing) {
                     if (e.type == EventType.MouseDrag) {
-                        _sidebarW = mouse.x - winRect.x; // SidebarWidth 内部会 clamp
+                        SidebarW = mouse.x - winRect.x; // SidebarWidth 内部会 clamp
                         e.Use();
                     } else if (e.type == EventType.MouseUp) {
-                        _sidebarResizing = false;
+                        SidebarResizing = false;
                         _dragActive = false;
                         _dirty = true;
                         // 拖动结束写回栏目宽度设置（0 = 自动时不动），会写盘
-                        try { if (_sidebarWEntry != null && _sidebarW > 0f) _sidebarWEntry.Value = Mathf.RoundToInt(_sidebarW); } catch (Exception __ex) { Guard.Log("保存栏目宽度", __ex); }
+                        try { if (SidebarWEntry != null && SidebarW > 0f) SidebarWEntry.Value = Mathf.RoundToInt(SidebarW); } catch (Exception __ex) { Guard.Log("保存栏目宽度", __ex); }
                     }
                 }
             }
@@ -856,7 +856,7 @@ public partial class SR {
                 // 点在下拉框以外 = 收起展开的下拉框：判据是"MouseDown 这一帧无下拉框认领"，不靠坐标
                 // （下拉框矩形在滚动区内容坐标系里）。放在 DrawGUI 之后，按钮自身切换已跑完。
                 Event __ce = Event.current;
-                if (__ce != null && __ce.type == EventType.MouseDown && __ce.button == 0 && _comboSeenFrame != Time.frameCount) CloseOpenCombos();
+                if (__ce != null && __ce.type == EventType.MouseDown && __ce.button == 0 && ComboSeenFrame != Time.frameCount) CloseOpenCombos();
 
             }
         }

@@ -131,7 +131,9 @@ public partial class SR {
 
         // Ctrl+点击滑块后的输入态（同一时刻只编辑一个数值）
         private static ConfigEntryBase _numEdit;
+        internal static ConfigEntryBase NumEdit { get { return _numEdit; } set { _numEdit = value; } }
         private static string _numText;
+        internal static string NumText { get { return _numText; } set { _numText = value; } }
 
 
 
@@ -250,11 +252,11 @@ public partial class SR {
         public static bool CheckboxAt(Rect r, bool value, string tip) {
             bool clicked;
             try {
-                GUIContent c = (value && _checkTex == null) ? new GUIContent("✓", tip) : new GUIContent("", tip);
+                GUIContent c = (value && CheckTex == null) ? new GUIContent("✓", tip) : new GUIContent("", tip);
                 clicked = GUI.Button(r, c, value ? _checkOn : _checkOff);
-                if (value && _checkTex != null) {
+                if (value && CheckTex != null) {
                     float m = r.width * 0.18f;
-                    GUI.DrawTexture(new Rect(r.x + m, r.y + m, r.width - m * 2f, r.height - m * 2f), _checkTex);
+                    GUI.DrawTexture(new Rect(r.x + m, r.y + m, r.width - m * 2f, r.height - m * 2f), CheckTex);
                 }
             } catch { clicked = false; }
             return clicked;

@@ -20,11 +20,11 @@ namespace SR_UCH.Tweaks {
             float trackW = Mathf.Max(1f, rect.width - handleD);
 
             //输入层：不可见的原生 HorizontalSlider，只吃事件与热区，跨趟拖动稳定。
-            if (_sliderNative == null || _sliderNativeThumb == null) {
-                _sliderNative = new GUIStyle();
-                _sliderNativeThumb = new GUIStyle();
-                _sliderNative.normal.background = null;
-                _sliderNativeThumb.normal.background = null;
+            if (SliderNative == null || SliderNativeThumb == null) {
+                SliderNative = new GUIStyle();
+                SliderNativeThumb = new GUIStyle();
+                SliderNative.normal.background = null;
+                SliderNativeThumb.normal.background = null;
             }
             // 滑块的按下/拖动必须阻止窗口拖拽：HorizontalSlider 只认 hotControl，不会置
             // BlockWindowDrag，于是拖滑块的同时整块面板跟着鼠标跑（用户反馈）。
@@ -33,7 +33,7 @@ namespace SR_UCH.Tweaks {
                 if (__se != null && (__se.type == EventType.MouseDown || __se.type == EventType.MouseDrag)
                     && __se.button == 0 && rect.Contains(__se.mousePosition)) BlockWindowDrag = true;
             } catch (Exception __bd) { Guard.Log("滑块/禁止拖窗口", __bd); }
-            float raw = GUI.HorizontalSlider(rect, value, min, max, _sliderNative, _sliderNativeThumb);
+            float raw = GUI.HorizontalSlider(rect, value, min, max, SliderNative, SliderNativeThumb);
             try { if (GUIUtility.hotControl != 0 && rect.Contains(Event.current.mousePosition)) BlockWindowDrag = true; }
             catch (Exception __hc) { Guard.Log("滑块/热控件", __hc); }
 
@@ -109,19 +109,19 @@ namespace SR_UCH.Tweaks {
 
         //带 isInternal 的重载：滑块路径据此决定是否绘制同行附加控件。
         private static void RenderControl(ConfigEntryBase entry, bool isInternal) {
-            _curIsInternal = isInternal;
+            CurIsInternal = isInternal;
             object val = entry.BoxedValue;
             if (val is bool) {
                 //复选框只负责开关（左键切换），快捷键绑定走其左侧标签（见 RestoreLabel / RenderEntryRow）
                 bool b = (bool)val;
-                if (GUILayout.Button(b && _checkTex == null ? "✓" : "", b ? _checkOn : _checkOff, GUILayout.Width(CtlH()), GUILayout.Height(Sc(26)))) {
+                if (GUILayout.Button(b && CheckTex == null ? "✓" : "", b ? _checkOn : _checkOff, GUILayout.Width(CtlH()), GUILayout.Height(Sc(26)))) {
                     SetValue(entry, !b);
                 }
                 //勾贴图叠画在复选框上（底色仍为淡蓝），贴图缺失时回退字形
-                if (b && _checkTex != null) {
+                if (b && CheckTex != null) {
                     Rect __ckr = GUILayoutUtility.GetLastRect();
                     float __ckm = __ckr.width * 0.18f;
-                    GUI.DrawTexture(new Rect(__ckr.x + __ckm, __ckr.y + __ckm, __ckr.width - __ckm * 2f, __ckr.height - __ckm * 2f), _checkTex);
+                    GUI.DrawTexture(new Rect(__ckr.x + __ckm, __ckr.y + __ckm, __ckr.width - __ckm * 2f, __ckr.height - __ckm * 2f), CheckTex);
                 }
             } else if (val is KeyCode) {
                 bool capturing = _capturing == entry;
@@ -153,9 +153,9 @@ namespace SR_UCH.Tweaks {
                 Type et = val.GetType();
                 string cur = EnumDisplayName(val.ToString());
                 //枚举选项按 entry 缓存（值不变，显示名每帧现算）。
-                //条目重建（新 Bind / 配置重读）后旧键会留下陈旧数组 —— 用 _entryVersion 做一次整体失效（audit E-2）。
-                if (_enumOptionsVersion != _entryVersion) {
-                    _enumOptionsVersion = _entryVersion;
+                //条目重建（新 Bind / 配置重读）后旧键会留下陈旧数组 —— 用 EntryVersion 做一次整体失效（audit E-2）。
+                if (EnumOptionsVersion != EntryVersion) {
+                    EnumOptionsVersion = EntryVersion;
                     _enumOptions.Clear();
                 }
                 object[] cachedVals;
@@ -214,7 +214,7 @@ namespace SR_UCH.Tweaks {
                         string __sv = nv.ToString(hfmt);
                         GUILayout.Label(__sv, _label, GUILayout.Width(SliderValueWidth(__sv)), GUILayout.Height(Sc(26)));
                         //附加控件（快捷键框）画在同一水平组内并紧跟数值标签，否则会被拆到别的行去。
-                        RenderFollowUp(entry, _curIsInternal);
+                        RenderFollowUp(entry, CurIsInternal);
                     } finally { GUILayout.EndHorizontal(); }
                     //值变化即写配置
                     SliderSubmit(entry, nv);
@@ -247,7 +247,7 @@ namespace SR_UCH.Tweaks {
                 string ntxt = ClearableTextField(txt, _searchBox, GUILayout.Width(editW), GUILayout.Height(Sc(26)));
                 if (ntxt != txt) {
                     _editText[entry] = ntxt;
-                    _editSelfFrame = Time.frameCount;   //标记改动由编辑框自身发起
+                    EditSelfFrame = Time.frameCount;   //标记改动由编辑框自身发起
                     if (val is int) {
                         int iv;
                         if (int.TryParse(ntxt, NumberStyles.Integer, CultureInfo.InvariantCulture, out iv)) SetValue(entry, iv);
@@ -263,7 +263,7 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        internal static void ComboMouseDownSeen() { _comboSeenFrame = Time.frameCount; }
+        internal static void ComboMouseDownSeen() { ComboSeenFrame = Time.frameCount; }
 
         internal static void CloseOpenCombos() {
             try {
@@ -299,8 +299,8 @@ namespace SR_UCH.Tweaks {
         private static int _comboWheelFrame = -1;
 
         private static int NextComboSeq() {
-            if (_comboSeqFrame != Time.frameCount) { _comboSeqFrame = Time.frameCount; _comboSeq = 0; }
-            return _comboSeq++;
+            if (ComboSeqFrame != Time.frameCount) { ComboSeqFrame = Time.frameCount; ComboSeq = 0; }
+            return ComboSeq++;
         }
 
         private static int ComboBox(ConfigEntryBase entry, string current, Array vals, string[] options, ref bool open, float width = -1f) {

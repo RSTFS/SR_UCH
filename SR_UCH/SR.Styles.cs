@@ -509,6 +509,7 @@ public partial class SR {
 
         //复选框的"勾"贴图（透明底 + 白色勾）：对两段线段逐像素求距离做软边抗锯齿。
         private static Texture2D _checkTex;
+        internal static Texture2D CheckTex { get { return _checkTex; } set { _checkTex = value; } }
         private static Texture2D MakeCheckTex(int size, float thickness) {
             Texture2D t = new Texture2D(size, size, TextureFormat.RGBA32, false);
             Vector2 p0 = new Vector2(size * 0.18f, size * 0.50f);   //起点（左中）

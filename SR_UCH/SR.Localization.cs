@@ -79,9 +79,9 @@ public partial class SR {
 
         private static bool NameCacheSync() {
             bool en = UseEn;
-            if (_nameCacheLangVer != _langVer || _nameCacheVer != _entryVersion) {
+            if (_nameCacheLangVer != _langVer || _nameCacheVer != EntryVersion) {
                 _nameCacheLangVer = _langVer;
-                _nameCacheVer = _entryVersion;
+                _nameCacheVer = EntryVersion;
                 _keyNameCache.Clear();
                 _descTextCache.Clear();
                 _defSuffix.Clear();
