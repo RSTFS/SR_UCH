@@ -426,6 +426,28 @@ function Check-FileSize {
 # UI 约定棘轮：功能层"手写布局组/手写 GUI.enabled"的次数只允许减少。
 # 历史教训：手写 BeginHorizontal 漏 EndHorizontal、漏还原 GUI.enabled，会整页错位/变灰。
 # 新代码请用 SRApi.Ctl 的行控件与 using(SRApi.Ctl.Disabled(...))。
+function Check-DocScripts {
+    # 文档里引用的 .ps1 必须真实存在：脚本改名/搬迁后，README/DESIGN 很容易继续指向旧路径
+    # （本仓库就发生过"文档写 _tools 路径、实际入口已迁到 build/"）。
+    $docs = @('README.md', 'README.zh-CN.md', 'DESIGN.zh-CN.md')
+    $missing = @()
+    $checked = 0
+    foreach ($d in $docs) {
+        $p = Join-Path $Root $d
+        if (-not (Test-Path -LiteralPath $p)) { continue }
+        $txt = Read-Text $p
+        foreach ($m in [regex]::Matches($txt, '([A-Za-z0-9_\-]+\.ps1)')) {
+            $name = $m.Groups[1].Value
+            $checked++
+            if (-not (Test-Path -LiteralPath (Join-Path $Root ('build\' + $name))) -and
+                -not (Test-Path -LiteralPath (Join-Path $Root $name))) { $missing += ($d + ' -> ' + $name) }
+        }
+    }
+    $missing = @($missing | Sort-Object -Unique)
+    if ($missing.Count -gt 0) { Bad ('文档引用了不存在的脚本: ' + (($missing | Select-Object -First 5) -join '; ')) }
+    else { Ok ('文档引用的脚本都存在（检查 ' + $checked + ' 处）') }
+}
+
 function Check-UiConventions {
     $checks = @(
         @{ Name = '裸 GUILayout.BeginHorizontal'; File = 'ui-raw-layout.txt'; Pattern = 'GUILayout\.BeginHorizontal\(' },
@@ -470,6 +492,7 @@ Check-SilentCatch
 Check-TipComposer
 Check-FileSize
 Check-UiConventions
+Check-DocScripts
 if ($fail -gt 0) { Write-Host ('== 有 ' + $fail + ' 项未通过 ❌ =='); if (-not $NoExit) { exit 1 }; return }
 Write-Host '== 文本类守卫全部通过 ✅ =='
 if (-not $NoExit) { exit 0 }

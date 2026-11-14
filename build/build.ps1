@@ -123,7 +123,9 @@ function Invoke-Build([string]$rsp, [string]$name) {
         return
     }
     Write-Host "==> 编译 $name ..."
-    if ($csc.EndsWith('.dll')) { & dotnet $csc "@$rsp" } else { & $csc "@$rsp" }
+    # 死代码守卫：未使用的私有字段 / 只写不读 / 从未赋值（CS0169 / CS0414 / CS0649）直接算编译失败
+    $deadCodeWarn = '/warnaserror:CS0169,CS0414,CS0649'
+    if ($csc.EndsWith('.dll')) { & dotnet $csc "@$rsp" $deadCodeWarn } else { & $csc "@$rsp" $deadCodeWarn }
     if ($LASTEXITCODE -ne 0) { Write-Host "$name 编译失败"; exit 1 }
     Write-Host "    $name OK"
 }
@@ -161,7 +163,7 @@ function Get-OutPath([string]$rsp) {
 function Invoke-ContractCheck {
     $rsp = Join-Path $rspDir 'sr_uch_contracts.rsp'
     if (-not (Test-Path $rsp)) { Write-Host '  [FAIL] 缺少 sr_uch_contracts.rsp'; return $false }
-    if ($csc.EndsWith('.dll')) { & dotnet $csc "@$rsp" 2>&1 | Out-Null } else { & $csc "@$rsp" 2>&1 | Out-Null }
+    if ($csc.EndsWith('.dll')) { & dotnet $csc "@$rsp" '/warnaserror:CS0169,CS0414,CS0649' 2>&1 | Out-Null } else { & $csc "@$rsp" '/warnaserror:CS0169,CS0414,CS0649' 2>&1 | Out-Null }
     if ($LASTEXITCODE -ne 0) { Write-Host '  [FAIL] 契约层不能独立编译 -> 契约文件里引用了实现'; return $false }
     Write-Host '  [ OK ] 契约层（SR.Contracts.cs）可独立编译'
     return $true
