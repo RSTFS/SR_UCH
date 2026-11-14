@@ -217,13 +217,13 @@ namespace SR_UCH.Tweaks {
                     try { RemoveUI3.Tick(scanning); } catch (Exception __ui) { SRApi.Guard.Log("解除UI3/并入", __ui); }
                 }
                 // 解绑本身是幂等写值：扫描阶段每帧一次，之后 4Hz 维持（开销只有几次字段赋值）。
-                if (scanning || _tick % 30 == 0) {
+                if (scanning || _tick % 60 == 0) {
                     ApplyCursorPiece(true);
                     OpenSolidWalls(WallsOn);
                     ApplyHardBounds();
                     SuppressFixCamera(CameraOn);
                 }
-                if (!scanning && (_tick % 60 == 0)) {
+                if (!scanning && (_tick % 120 == 0)) {
                     ApplyAllPiecesIgnore();
                     BuildStatus();
                 }
@@ -257,7 +257,7 @@ namespace SR_UCH.Tweaks {
             try { sceneHandle = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle; } catch { /* 静默：取不到场景沿用上次 */ }
             if (sceneHandle != _wallScanScene) { _wallScanScene = sceneHandle; _wallScanTries = 0; }
             if (_wallScanTries >= WallScanMaxTries) return;   //本场景已放弃：它没有这三面墙
-            if (!fullSpeed && Time.frameCount - _wallScanAt < 15) return;   //维持态才节流
+            if (!fullSpeed && Time.frameCount - _wallScanAt < 60) return;   //维持态才节流（1s 一次即可）
             _wallScanAt = Time.frameCount;
             _wallScanTries++;
             try {

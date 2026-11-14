@@ -137,6 +137,7 @@ namespace SR_UCH.Tweaks {
 
         public void Shutdown() {
             RemoveAll();
+            try { _glowById.Clear(); } catch (Exception __gl) { SRApi.Guard.Log("品质光芒/光晕缓存", __gl); }
             if (_glowSprite != null) {
                 try { UnityEngine.Object.Destroy(_glowSprite); }
                 catch (Exception ex) { SRApi.Guard.Log("品质光芒/释放贴图", ex); }
@@ -214,12 +215,26 @@ namespace SR_UCH.Tweaks {
 
         // ============ 光晕的创建 / 更新 / 移除 ============
 
+        // 光晕对象按道具实例缓存：避免每次扫描都 Transform.Find(名字) + GetComponent（全盒几十件时是主要开销）。
+        private static readonly Dictionary<int, Transform> _glowById = new Dictionary<int, Transform>();
+
+        private static Transform GlowOf(PickableBlock pb) {
+            try {
+                Transform g;
+                if (_glowById.TryGetValue(pb.GetInstanceID(), out g) && g != null) return g;
+            } catch (Exception __gl) { SRApi.Guard.Log("品质光芒/光晕缓存", __gl); }
+            Transform found = null;
+            try { found = Holder(pb).Find(GlowName); } catch (Exception __gl) { SRApi.Guard.Log("品质光芒/光晕缓存", __gl); }
+            if (found != null) { try { _glowById[pb.GetInstanceID()] = found; } catch (Exception __gl) { SRApi.Guard.Log("品质光芒/光晕缓存", __gl); } }
+            return found;
+        }
+
         private static Transform Holder(PickableBlock pb) {
             return pb.ArtHolderTransform != null ? pb.ArtHolderTransform : pb.transform;
         }
 
         private static void HideGlow(PickableBlock pb) {
-            Transform g = Holder(pb).Find(GlowName);
+            Transform g = GlowOf(pb);
             if (g != null) {
                 SpriteRenderer sr = g.GetComponent<SpriteRenderer>();
                 if (sr != null) sr.enabled = false;
@@ -228,7 +243,7 @@ namespace SR_UCH.Tweaks {
 
         private static void ApplyGlow(PickableBlock pb, int tier) {
             Transform holder = Holder(pb);
-            Transform g = holder.Find(GlowName);
+            Transform g = GlowOf(pb);
             SpriteRenderer sr;
             if (g == null) {
                 GameObject go = new GameObject(GlowName);
@@ -242,6 +257,7 @@ namespace SR_UCH.Tweaks {
                 sr.sortingOrder = (refSr != null ? refSr.sortingOrder : 0) - 100;
                 g = go.transform;
                 _made.Add(g);
+                try { _glowById[pb.GetInstanceID()] = g; } catch (Exception __gl) { SRApi.Guard.Log("品质光芒/光晕缓存", __gl); }
             } else {
                 sr = g.GetComponent<SpriteRenderer>();
                 if (sr == null) return;

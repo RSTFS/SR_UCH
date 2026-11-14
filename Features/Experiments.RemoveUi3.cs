@@ -18,7 +18,8 @@ namespace SR_UCH.Tweaks {
         private static int _frame = -9999;
         private static int _hitCount = -1;
         private static int _ui3ScanTries;                     // 本场景已扫描次数（封顶后放弃）
-        private const int Ui3ScanMaxTries = 6;                 // 2.5s × 6 ≈ 15 秒
+        private const int Ui3ScanMaxTries = 3;                 // 维持态：5s × 3 ≈ 15 秒
+        private const int Ui3FullSpeedMaxTries = 12;           // 扫描阶段：最多 12 次全扫（约 0.2s），不再 240 次连续 FindObjectsOfType
         private static float _nextScanAt;    // 下次全扫时间
         private static string _scanScene;    // 上次扫描的场景名（换场景立即重扫）
 
@@ -59,11 +60,13 @@ namespace SR_UCH.Tweaks {
                 if (sc != _scanScene) { _scanScene = sc; _ui3ScanTries = 0; }
                 // 全速阶段：不按 2.5 秒节流；扫到过（_hitCount>0）就直接停。
                 if (_hitCount > 0) return;
-                if (!fullSpeed) { if (_hitCount >= 0 && now < _nextScanAt) return; }
-                if (_ui3ScanTries >= (fullSpeed ? 240 : Ui3ScanMaxTries)) return;
+                if (_hitCount >= 0 && now < _nextScanAt) return;
+                // 全速阶段也只是"尽快"--不是无限全扫：UI3 遮罩要么加载时就在、要么本关没有，
+                // 12 次 × 全场景 FindObjectsOfType<Renderer>() 已经是 ~5-10ms 的峰值来源（用户钩子表 7ms 峰）。
+                if (_ui3ScanTries >= (fullSpeed ? Ui3FullSpeedMaxTries : Ui3ScanMaxTries)) return;
                 _ui3ScanTries++;
-                _nextScanAt = now + 2.5f;
-                Renderer[] all = UnityEngine.Object.FindObjectsOfType<Renderer>();
+                _nextScanAt = now + (fullSpeed ? 0.15f : 5f);
+                Renderer[] all = SRApi.FrameObjects<Renderer>();   // 同帧共享缓存，避免和别的钩子各扫一遍
                 if (all == null) return;
                 int n = 0;
                 for (int i = 0; i < all.Length; i++) {
@@ -78,7 +81,7 @@ namespace SR_UCH.Tweaks {
                 }
                 _hitCount = n;
                 // 命中即停止后续全场景复查（新遮罩由场景切换重置后重新扫描）。
-                if (n > 0) _ui3ScanTries = Ui3ScanMaxTries;
+                if (n > 0) _ui3ScanTries = Ui3FullSpeedMaxTries;
                 Note = n > 0 ? ("已解除 UI3 覆盖：停画 " + n + " 个 Renderer")
                              : "未找到 UI3 层上的 Renderer（本关卡可能没有）";
             } catch (Exception __ex) { SRApi.Guard.Log("应用UI3解除", __ex); }
