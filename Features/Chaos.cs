@@ -107,6 +107,7 @@ namespace SR_UCH.Tweaks {
         private static Snapshot _snap;
         private static bool _hasSnapshot, _applied, _ready;
         private static int _roundSeen;
+        private static float _lastPlaceAt = -100f;   // 上次进入摆放阶段的时刻（去重：刷新派对盒会重入 PLACE）
         private struct RosterEntry {
             public string Ver; public float At;
             public RosterEntry(string v, float a) { Ver = v; At = a; }
@@ -346,6 +347,11 @@ namespace SR_UCH.Tweaks {
             // 若在这里 RebuildLocal()，会用「已被房主改过的值」Capture 快照，
             // 再用空的 _active 还原，把房主的牌冲掉 —— 联机规则不同步的老坑。
             if (!IsAuthority) return;
+            // 刷新派对盒 / 重载关卡会再次广播 PLACE 阶段，但那是同一回合：
+            // 3 秒内重复进入按一次算，否则"刷新一下盒子就自动重抽"。
+            float now = Time.unscaledTime;
+            if (now - _lastPlaceAt < 3f) return;
+            _lastPlaceAt = now;
             _roundSeen++;
             if (_roundSeen % Mathf.Max(1, _everyRounds.Value) == 0) DrawAndBroadcast();
             else if (_applied) RebuildLocal();

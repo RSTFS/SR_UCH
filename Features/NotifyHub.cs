@@ -266,6 +266,15 @@ namespace SR_UCH.Tweaks {
                     merged.Count++;
                     merged.Until = now + stay;
                     merged.At = now;
+                    // 屏幕上还挂着这张卡时一并刷新计数与停留时间：
+                    // 以前只改数据不更新看板，连点几次看起来像"没反应/漏了一条"。
+                    for (int vi = 0; vi < _visible.Count; vi++) {
+                        if (_visible[vi].Key != key) continue;
+                        _visible[vi].Count = merged.Count;
+                        _visible[vi].Until = merged.Until;
+                        _visible[vi].At = now;
+                        break;
+                    }
                     return !native;
                 }
 
