@@ -26,5 +26,7 @@
 /r:"bin\Release\SR_UCH.dll"
 Features\Experiments.Bounds.cs
 Features\Experiments.cs
+Features\Experiments.LevelBounds.cs
 Features\Experiments.Misc.cs
+Features\Experiments.RemoveUi3.cs
 Features\Experiments.Scene.cs

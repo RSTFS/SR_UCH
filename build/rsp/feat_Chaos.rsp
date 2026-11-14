@@ -26,3 +26,4 @@
 /r:"bin\Release\SR_UCH.dll"
 Features\Chaos.cs
 Features\Chaos.Logic.cs
+Features\Chaos.Ui.cs

@@ -12,4 +12,4 @@ Features/Level.Tool.cs=1
 Features/Online.cs=3
 Features/Online.Filters.cs=1
 Features/QuickAdjust.cs=4
-Features/Chaos.cs=1
+Features/Chaos.Ui.cs=1

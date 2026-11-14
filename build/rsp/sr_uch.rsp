@@ -75,6 +75,7 @@ Features\BuildingPresets.Util.cs
 Features\BuildingTools.cs
 Features\Chaos.cs
 Features\Chaos.Logic.cs
+Features\Chaos.Ui.cs
 Features\CharacterAuto.cs
 Features\Chat.cs
 Features\Chat.Log.cs
@@ -82,7 +83,9 @@ Features\Chat.Window.cs
 Features\DestroyBlocks.cs
 Features\Experiments.Bounds.cs
 Features\Experiments.cs
+Features\Experiments.LevelBounds.cs
 Features\Experiments.Misc.cs
+Features\Experiments.RemoveUi3.cs
 Features\Experiments.Scene.cs
 Features\FreePlay.cs
 Features\FreePlay.Grid.cs
