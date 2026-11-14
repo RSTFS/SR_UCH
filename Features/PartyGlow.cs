@@ -29,7 +29,7 @@ namespace SR_UCH.Tweaks {
     public class PartyGlow : ITweak {
         private const string Sec = "品质光芒";
         private const string GlowName = "SR_UCH_RarityGlow";
-        private const float ScanInterval = 0.2f;
+        private const float ScanInterval = 0.05f;   // 道具出现后光晕尽快跟上（原来 0.2s 有明显延迟）
 
         // 6 档：0 泛滥 / 1 普通 / 2 精良 / 3 稀有 / 4 史诗 / 5 传说；-1 = 禁用（不出现）
         private static readonly string[] TierZh = { "泛滥", "普通", "精良", "稀有", "史诗", "传说" };
@@ -114,7 +114,7 @@ namespace SR_UCH.Tweaks {
         public void Initialize(IFeatureHost plugin) {
             _mp = plugin;
             _enabled = _mp.Config.Bind(Sec, "Enabled", true, "按当前概率给派对盒里的道具加一圈品质光晕；纯本地视觉，联机各端各画各的。");
-            _strength = _mp.Config.Bind(Sec, "Strength", 100, new ConfigDescription("光晕不透明度百分比（20-150）。", new AcceptableValueRange<int>(20, 150)));
+            _strength = _mp.Config.Bind(Sec, "Strength", 80, new ConfigDescription("光晕不透明度百分比（20-150）。", new AcceptableValueRange<int>(20, 150)));
             _tierColors = new ConfigEntry<string>[6];
             for (int i = 0; i < 6; i++) {
                 _tierColors[i] = _mp.Config.Bind(Sec, "Tier Color " + i, "#" + ColorUtility.ToHtmlStringRGB(TierColorDefault[i]),

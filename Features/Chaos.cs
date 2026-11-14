@@ -243,14 +243,14 @@ namespace SR_UCH.Tweaks {
             // 对局播报：开局公告读本局启用的牌池（不是固定牌序，牌是逐回合随机抽的）。
             Slots.Provide("sr.cast.pool", (Func<string>)(() => PoolText()));
             // 上一版漏了栏目登记：侧栏会显示英文 id 且排序靠后。补上中英名与顺序。
-            SRApi.LocSec("Chaos", "混乱牌组", "Chaos Deck");
+            SRApi.LocSec(Sec, "混乱牌组", "Chaos Deck");
             RegUi();
-            SRApi.Nav("Chaos", 130);
+            SRApi.Nav(Sec, 130);
             // 每帧钩子：重抽键、握手、提案过期、软依赖绑定、对局播报推送都在 Tick 里。
             // 此前这里漏了注册，整个每帧调度线是死的（重抽键完全无效）。
             SRApi.RegisterTick("混乱牌组-每帧", Tick);
-            SRApi.RegisterPage("Chaos", "Deck", "牌组", "Deck", 118, RenderPage);
-            SRApi.RegisterPage("Chaos", "Pool", "牌池", "Card pool", 130, RenderPoolPage);
+            SRApi.RegisterPage(Sec, "Deck", "牌组", "Deck", 118, RenderPage);
+            SRApi.RegisterPage(Sec, "Pool", "牌池", "Card pool", 130, RenderPoolPage);
 
             // 静态幂等：ITweak 没有 Shutdown 契约，重复 Initialize 不能叠加监听器。
             if (_listener == null) {
@@ -738,7 +738,6 @@ namespace SR_UCH.Tweaks {
             CfgRow(_everyRounds);
             CfgRow(_maxActive);
             CfgRow(_announce);
-            CfgRow(_drawKey);
 
             Line("当前牌面：" + (Desc() ?? "（未生效）"), "Active: " + (Desc() ?? "(none)"));
             Line(RosterText() ?? "房内 mod 清单：仅本机（离线）", RosterText() ?? "Room roster: this machine only (offline)");
@@ -751,8 +750,6 @@ namespace SR_UCH.Tweaks {
                 SRApi.Ctl.HotkeyButton("chaos.ignore", SRApi.T("忽略", "Ignore"),
                                        SRApi.T("丢弃这条提案", "Discard this proposal"), ClearProposal);
             }
-            Line("房客提案走同一条规则消息通道（None + 魔数），只有房主处理；未装 mod 的房客不受影响。",
-                 "Guest proposals ride the same rule message (None + magic); only the host acts on them. Guests without the mod are unaffected.");
             if (_lastExpiredCard >= 0 && _lastExpiredCard < Cards.Length && IsAuthority) {
                 SRApi.Ctl.HotkeyButton("chaos.reopen", SRApi.T("恢复上一条过期提案", "Reopen last expired proposal"),
                                        SRApi.T("把最近一条过期提案放回待审并重新计时", "Put the last expired proposal back into pending with a fresh timer"),
@@ -767,7 +764,7 @@ namespace SR_UCH.Tweaks {
                  "Chaos Deck claims its rule messages with a high-bit magic, so other features and manual rule edits are never misread.");
             Line("每次抽牌前会先把上一回合的规则按原值重发，房客的规则不会逐回合累积。",
                  "Before every draw the previous rules are re-broadcast at their original values, so guest rules never accumulate round over round.");
-            SRApi.Ctl.HotkeyButton("chaos.reroll", SRApi.T("立刻重抽一张", "Draw again now"),
+            SRApi.Ctl.HotkeyButton("chaos.reroll", SRApi.T("重抽", "Draw"),
                                    SRApi.T("仅房主 / 离线有效", "Host or offline only"), DrawAndBroadcast);
         }
 

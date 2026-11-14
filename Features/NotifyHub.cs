@@ -121,11 +121,11 @@ namespace SR_UCH.Tweaks {
             SRApi.LocKey(Sec, "Card Scale", "浮层缩放", "Overlay scale");
             SRApi.LocDesc(Sec, "Card Scale",
                 "浮层缩放\n整个浮层按百分比缩放（80-160），默认 100。",
-                "Overlay scale\nScale the whole overlay in percent. Range 80-160, default 100.");
+                "Overlay scale\nScale the whole overlay in percent. Range 80-160. 160 is the baseline size.");
             SRApi.LocKey(Sec, "Card Opacity", "卡片不透明度", "Card opacity");
             SRApi.LocDesc(Sec, "Card Opacity",
-                "卡片不透明度\n浮层卡片背景的不透明度百分比（20-100），默认 86。",
-                "Card opacity\nOverlay card background opacity in percent. Range 20-100, default 86.");
+                "卡片不透明度\n浮层卡片背景的不透明度百分比（20-100），默认 64。",
+                "Card opacity\nOverlay card background opacity in percent. Range 20-100, default 64.");
             SRApi.LocKey(Sec, "Corner", "停靠位置", "Overlay position");
             SRApi.LocDesc(Sec, "Corner",
                 "浮层停靠角\n浮层停靠位置：0 右下 / 1 右上 / 2 左下 / 3 左上。",
@@ -165,9 +165,9 @@ namespace SR_UCH.Tweaks {
             _animOn = plugin.Config.Bind(Sec, "Animate", true, "浮层的出现/消失动画总开关。");
             _animMs = plugin.Config.Bind(Sec, "Anim Ms", 180,
                 new ConfigDescription("出现与消失的动画时长（80-400 毫秒）。", new AcceptableValueRange<int>(80, 400)));
-            _cardScale = plugin.Config.Bind(Sec, "Card Scale", 100,
+            _cardScale = plugin.Config.Bind(Sec, "Card Scale", 160,
                 new ConfigDescription("整个浮层的缩放百分比（80-160）。", new AcceptableValueRange<int>(80, 160)));
-            _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 86,
+            _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 64,
                 new ConfigDescription("浮层卡片背景不透明度百分比（20-100）。", new AcceptableValueRange<int>(20, 100)));
             _corner = plugin.Config.Bind(Sec, "Corner", 0,
                 new ConfigDescription("浮层停靠位置：0 右下 / 1 右上 / 2 左下 / 3 左上。", new AcceptableValueRange<int>(0, 3)));
@@ -364,7 +364,7 @@ namespace SR_UCH.Tweaks {
         private static void DrawToast() {
             if (_enabled == null || !_enabled.Value || !_onScreen.Value || _visible.Count == 0 || Event.current == null) return;
             EnsureStyles();
-            float s = AFont() * Mathf.Clamp(_cardScale.Value / 100f, 0.8f, 1.6f);
+            float s = AFont() * Mathf.Clamp(_cardScale.Value / 160f, 0.5f, 1.0f);
             bool hc = AContrast();
             _label.fontSize = Mathf.RoundToInt(12f * s);
             _small.fontSize = Mathf.RoundToInt(12f * s);
@@ -424,14 +424,14 @@ namespace SR_UCH.Tweaks {
                         Fill(new Rect(box.xMax - t, box.y, t, box.height), oc);
                     }
 
-                    string head = n.Level == 2 ? SRApi.T("重要", "IMPORTANT")
-                                : n.Level == 1 ? SRApi.T("提示", "INFO") : SRApi.T("已办", "DONE");
-                    GUI.Label(new Rect(ax + pad, y + pad * 0.5f, w - pad * 2f, 16f * s),
-                              head + (n.Count > 1 ? "  x" + n.Count : ""), _small);
+                    // 只显示通知正文（用户要求去掉「提示/已办/重要」这类前缀）。
+                    string head = n.Count > 1 ? "x" + n.Count : null;
                     // 文本区底部 +1px 缓冲：游戏字体最后一笔常被 CalcSize 少算 1px，
                     // 不加缓冲时"y/g/p"这类下伸笔画的最后一行会被裁掉。
-                    GUI.Label(new Rect(ax + pad, y + pad * 0.5f + 16f * s,
-                                       w - pad * 2f - 6f * s, h - pad - 16f * s + 1f),
+                    if (head != null)
+                        GUI.Label(new Rect(ax + pad, y + 1f * s, w - pad * 2f, 14f * s), head, _small);
+                    GUI.Label(new Rect(ax + pad, y + pad * 0.5f + (head != null ? 16f * s : 0f),
+                                       w - pad * 2f - 6f * s, h - pad - (head != null ? 16f * s : 0f) + 1f),
                               n.Text, _label);
                     // 底部剩余时间条：长度随剩余比例缩短，一眼看出还来得及点。
                     float life = n.Until > n.At ? Mathf.Clamp01((n.Until - now) / (n.Until - n.At)) : 0f;
