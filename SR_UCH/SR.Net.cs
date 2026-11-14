@@ -38,6 +38,7 @@ public partial class SR {
             _compatListener = new CompatListener();
             GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(_compatListener, true);
             SRApi.NetMagic.Register("core.compat", CompatMagic);
+            LatencyInit();   // 延迟探测回显（EX 的「延迟」列用；对方只要装 SR 就能被测量）
             RegisterTick("联机兼容握手", NetTick);
             LogInfo("[SR.Net] 联机版本握手已启用（联机时每 " + (int)CompatInterval + " 秒比对一次功能签名）");
         } catch (Exception __ex) { Guard.Log("联机握手/初始化", __ex); }
@@ -50,6 +51,7 @@ public partial class SR {
         } catch (Exception __ex) { Guard.Log("联机握手/注销", __ex); }
         _compatListener = null;
         _compatInited = false;
+        LatencyShutdown();
     }
 
     // 本地签名：所有功能 id 排序后做 FNV-1a，再混入契约版本。
