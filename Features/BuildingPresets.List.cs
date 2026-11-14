@@ -90,7 +90,9 @@ namespace SR_UCH.Tweaks {
             // 行区必须收敛到**屏幕真实可见底**（核心所有相位都用 rowsH 当视口高）：
             // 以前直接拿 box.height - headerH，box 一旦伸到屏幕外，rowsH 就虚高 →
             // 核心以为"一屏画得完"（把行画到屏幕外），maxY 同时被压成 0 → 彻底滚不动。
-            float screenBottom = SRApi.ContentArea.height - SRApi.FooterHeight;
+            // box 是屏幕坐标（ContentArea 以窗口左上角为原点）：可见底 = 内容区底 − 底栏高度。
+            // 以前漏了 ContentArea.y，窗口有纵向偏移时 rowsH 被压成一行（"列表只剩一条、也连不上底栏"）。
+            float screenBottom = SRApi.ContentArea.y + SRApi.ContentArea.height - SRApi.FooterHeight;
             float rowsTop = box.y + headerH;
             // 每帧只算一次行区高度：Layout 与 Repaint 两趟的 box/probe 可能差几像素，
             // 各算一遍会让 _listMaxY 在同一帧里跳变 → 滚到下面时列表"突变"。

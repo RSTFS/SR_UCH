@@ -291,7 +291,11 @@ namespace SR_UCH.Tweaks {
         // 混乱牌组只在对局允许的模式里生效：派对 / 创意（超级模式由 GateModeAllows 豁免）。
         // 其它模式一律静默跳过：不抽牌、不接收、不弹提示。
         private static bool ModeAllowed() {
-            try { return SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative); }
+            try {
+                // 树屋里还没进入具体模式：允许手动重抽（否则「重抽」按钮看起来无效）。
+                if (SRApi.Env.InTreehouse) return true;
+                return SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative);
+            }
             catch (Exception __ex) { SRApi.Guard.Log("混乱牌组/模式判定", __ex); return false; }
         }
         private static bool IsHostSelf() { var lm = SafeLobby(); return lm != null && lm.IsHost; }
@@ -785,7 +789,17 @@ namespace SR_UCH.Tweaks {
         private void RenderPoolGroup(bool numeric) {
             SRApi.Ctl.SectionTitle("- " + SRApi.T(numeric ? "数值规则" : "布尔规则", numeric ? "Numeric rules" : "Boolean rules") + " -");
             for (int i = 0; i < Cards.Length; i++) {
-                if (Cards[i].IsBool == numeric) CfgRow(_pool[i]);
+                if (Cards[i].IsBool != numeric || _pool[i] == null) continue;
+                CardDef c = Cards[i];
+                string ours = SRApi.T(c.Zh, c.En);
+                string gm = GameRuleName(c.Rule);
+                // 同一规则有多张牌（如低/高重力）时，游戏名相同，追加本功能的档位名区分。
+                string label = string.IsNullOrEmpty(gm) ? ours : (gm == ours ? gm : gm + " · " + ours);
+                string tip = SRApi.T(c.TipZh, c.TipEn);
+                if (SRApi.Ctl.SelfToggleButton(label, tip, _pool[i].Value, null)) {
+                    _pool[i].Value = !_pool[i].Value;
+                    try { SRApi.Ctl.MarkConfigDirty(_pool[i].ConfigFile); } catch (Exception __md) { SRApi.Guard.Log("混乱牌组/保存牌池", __md); }
+                }
             }
         }
 
@@ -797,6 +811,25 @@ namespace SR_UCH.Tweaks {
                 }
                 if (!on && _pool.Length > 0 && _pool[0] != null) _pool[0].Value = true;   // 至少留一张
             } catch (Exception ex) { SRApi.Guard.Log("混乱牌组/批量勾选", ex); }
+        }
+
+        // 规则名优先用游戏自己的本地化文本（跟随游戏语言）；取不到再回退本功能的中英文名。
+        private static readonly Dictionary<TabletRule, string> _ruleNameCache = new Dictionary<TabletRule, string>();
+        private static string GameRuleName(TabletRule rule) {
+            string cached;
+            if (_ruleNameCache.TryGetValue(rule, out cached)) return cached;
+            string found = null;
+            try {
+                string en = rule.ToString();
+                // 游戏用 I2 Localization；术语可能是枚举名，也可能带前缀，逐个候选探测。
+                string[] cands = new string[] { en, "Modifiers/" + en, "Modifier_" + en, "RULE_" + en, "Rule_" + en };
+                for (int i = 0; i < cands.Length; i++) {
+                    string t2 = I2.Loc.LocalizationManager.GetTranslation(cands[i], false, 0, true, true, null, null, false);
+                    if (!string.IsNullOrEmpty(t2) && t2 != cands[i]) { found = t2; break; }
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("混乱牌组/游戏规则名", __ex); }
+            _ruleNameCache[rule] = found;
+            return found;
         }
 
         // 牌池批量筛选用的倾向分类（与 Cards 顺序一一对应）：+1 增益 / 0 中性 / -1 减益。

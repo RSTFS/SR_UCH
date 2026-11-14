@@ -72,7 +72,22 @@ namespace SR_UCH.Tweaks {
                 "视觉辅助开关\n对局内临时切换视觉辅助\n可改绑，支持组合键",
                 "Visual aid key\ntoggles the visual aid in-game\nrebindable, combos supported");
 
+            // 开关右侧同一行显示快捷键（与开关逻辑相连：按 F6 就是切换同一个 Enable 开关）。
+            SRApi.RowCompanions.Add(Companion);
+            SRApi.RowFilters.Add(RowVisible);
             if (!_uiReg) { _uiReg = true; SRApi.RowSliders.Add(UiSlider); }
+        }
+
+        // 开关键与开关同行：核心在 Enable 行右侧再画一个「Toggle Key」快捷键控件。
+        private static string Companion(ConfigEntryBase e) {
+            if (e == null || e.Definition.Section != Sec) return null;
+            return e.Definition.Key == "Enabled" ? "Toggle Key" : null;
+        }
+
+        // Toggle Key 不再单独成行（它已经在 Enable 行右侧）。
+        private static bool RowVisible(ConfigEntryBase e) {
+            if (e == null || e.Definition.Section != Sec) return true;
+            return e.Definition.Key != "Toggle Key";
         }
 
         // 数值条目用滑块渲染：范围与 Bind 的 AcceptableValueRange 一致。
@@ -104,6 +119,8 @@ namespace SR_UCH.Tweaks {
                 _distance.SettingChanged += (s, e) => Refresh();
 
                 SRApi.RegisterKey("视觉辅助-开关", _toggleKey, "toggle");
+                // 快捷键与 Enable 开关逻辑相连：按一下就切换同一个配置开关（与页面复选框等价）。
+                SRApi.RegisterTick("视觉辅助-开关键", PollToggleKey);
 
                 _conflict = DetectCamHog();
                 if (_conflict) SRApi.LogWarn("视觉辅助：检测到 CamHog，已让位（避免两边同时改透明度）。");
@@ -115,6 +132,17 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void Shutdown() { _shutdown = true; }
+        private static int _keyFrame = -1;
+        private static void PollToggleKey() {
+            if (_toggleKey == null || _enabled == null) return;
+            if (_keyFrame == Time.frameCount) return;   // 一帧只判定一次（OnGUI 多趟不重复触发）
+            _keyFrame = Time.frameCount;
+            try {
+                if (!SRApi.ComboKeyDown(_toggleKey)) return;
+                _enabled.Value = !_enabled.Value;
+                try { SRApi.Ctl.MarkConfigDirty(_enabled.ConfigFile); } catch (Exception __md) { SRApi.Guard.Log("视觉辅助/保存开关", __md); }
+            } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/开关键", __ex); }
+        }
 
         // 不透明度步进 10：滑条/手输都收敛到整十（0,10,...,100），避免出现 37% 这种值。
         private static void FixOpacityStep() {

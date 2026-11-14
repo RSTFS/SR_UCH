@@ -169,6 +169,11 @@ namespace SR_UCH {
                 SRApi.Ctl.SetCheckStylesSink(delegate () { return SR.Ctl.CheckOn; }, delegate () { return SR.Ctl.CheckOff; });
                 SRApi.Ctl.SetForceZhSink(delegate () { return SR.Ctl.ForceZh; }, delegate (bool __v) { SR.Ctl.ForceZh = __v; });
             });
+            SinkStep("Section", delegate () {
+                // 可折叠分区：契约层两处门面都接上（顶层 SRApi 与 Ctl 子门面各自持有委托字段）。
+                SRApi.WireSection(SR.SectionBegin, SR.SectionEnd);
+                SRApi.Ctl.WireSection(SR.SectionBegin, SR.SectionEnd);
+            });
             SinkStep("Ext", delegate () {
                 SRApi.SetExtSinks(
                     delegate (string __s, int __r) { SR.Nav(__s, __r); },
@@ -462,7 +467,6 @@ namespace SR_UCH {
                 try { FileInfo fi = new FileInfo(dll); if (fi.Exists) { size = fi.Length; when = fi.LastWriteTime; } } catch { /* 静默：取不到元数据就只记路径 */ }
                 ModLogger.LogInfo("[SR.Mod] 外部模块 " + name + (loadedNow ? "（本次加载）" : "（已在内存中）")
                     + " | 文件=" + dll + (size >= 0 ? " | 字节=" + size : "") + (when != DateTime.MinValue ? " | 修改=" + when.ToString("yyyy-MM-dd HH:mm") : ""));
-                ModLogger.LogWarning("[SR.Mod] 提醒：外部模块以完全权限运行（无签名校验）。只安装你信任的 dll。");
             } catch { /* 静默：日志失败不影响加载流程 */ }
         }
 

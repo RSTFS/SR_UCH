@@ -106,3 +106,4 @@ UiOpen
 WheelArea
 WheelFrame
 WheelLayer
+SelfToggleButton
