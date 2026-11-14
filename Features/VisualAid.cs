@@ -41,6 +41,7 @@ namespace SR_UCH.Tweaks {
         private static bool _shutdown;   // 核心卸载/重载
         private static bool _fixingOpacity;   // 防止"改成整十"再次触发事件造成递归
         private static bool _uiReg;
+        private static readonly System.Collections.Generic.HashSet<int> _faded = new System.Collections.Generic.HashSet<int>();   // 被我们改过透明度的角色
 
         private static float Alpha { get { return _alpha; } }
 
@@ -131,7 +132,7 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/初始化", __ex); }
         }
 
-        private static void Shutdown() { _shutdown = true; }
+        private static void Shutdown() { _shutdown = true; RestoreAll(); }
         private static int _keyFrame = -1;
         private static void PollToggleKey() {
             if (_toggleKey == null || _enabled == null) return;
@@ -157,6 +158,7 @@ namespace SR_UCH.Tweaks {
         private static void Refresh() {
             try {
                 _on = _enabled != null && _enabled.Value;
+                if (!_on) RestoreAll();   // 关开关：把已经淡化的角色还原，别让游戏一直沿用我们的 currentOpacity
                 _useDist = _useDistance == null || _useDistance.Value;
                 _dist = _distance != null ? _distance.Value : 5;
                 _alpha = Mathf.Clamp01((_opacityPercent != null ? _opacityPercent.Value : 30) / 100f);
@@ -211,11 +213,36 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void Apply(Character c) {
-            if (!ShouldFade(c)) return;
+            if (c == null) return;
+            if (!ShouldFade(c)) { RestoreOne(c); return; }
+            _faded.Add(c.GetInstanceID());
             float a = Alpha;
             if (c.SpriteRenderer != null) Util_SpriteRenderer.SetAlpha(c.SpriteRenderer, a);
             if (c.HasJetpack && c.JetPackSR != null) Util_SpriteRenderer.SetAlpha(c.JetPackSR, a);
             if (c.nameTag != null) c.nameTag.maxOpacity = a;
+        }
+
+        // 还原一个角色的透明度（只还原我们改过的：调用方先判 _faded）。
+        private static void RestoreOne(Character c) {
+            if (c == null) return;
+            if (!_faded.Remove(c.GetInstanceID())) return;
+            try {
+                if (c.SpriteRenderer != null) Util_SpriteRenderer.SetAlpha(c.SpriteRenderer, 1f);
+                if (c.JetPackSR != null) Util_SpriteRenderer.SetAlpha(c.JetPackSR, 1f);
+                if (c.nameTag != null) c.nameTag.maxOpacity = 1f;
+                CharacterOpacityController oc = c.GetComponent<CharacterOpacityController>();
+                if (oc != null) oc.currentOpacity = 1f;
+            } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/还原", __ex); }
+        }
+
+        // 关闭/关机/冲突：遍历所有角色把改过的透明度清掉（角色可能已销毁，安全跳过）。
+        private static void RestoreAll() {
+            try {
+                if (_faded.Count == 0) return;
+                System.Collections.Generic.List<Character> all = Character.AllCharacters;
+                if (all != null) for (int i = 0; i < all.Count; i++) RestoreOne(all[i]);
+                _faded.Clear();
+            } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/全部还原", __ex); }
         }
 
         [HarmonyPatch(typeof(Character), "Update")]
@@ -230,7 +257,9 @@ namespace SR_UCH.Tweaks {
         [HarmonyPostfix]
         private static void AfterOpacityUpdate(CharacterOpacityController __instance) {
             try {
-                if (__instance != null && ShouldFade(__instance.character)) __instance.currentOpacity = Alpha;
+                if (__instance == null) return;
+                if (ShouldFade(__instance.character)) __instance.currentOpacity = Alpha;
+                else if (__instance.character != null && _faded.Contains(__instance.character.GetInstanceID())) __instance.currentOpacity = 1f;
             } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/透明度", __ex); }
         }
 

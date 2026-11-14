@@ -49,7 +49,6 @@ namespace SR_UCH.Tweaks {
         private const int CardMagic = 772;
         private const int OpCardDraw = 4;
         private const int OpCardRestore = 5;
-        private const int OpClear = 6;          // 只清牌面，不动游戏规则（TabletRule.None）
         private const float RosterTtl = 60f;
 
         private struct CardDef {
@@ -363,6 +362,9 @@ namespace SR_UCH.Tweaks {
         // ============ 抽牌与广播 ============
 
         private void DrawAndBroadcast() {
+            // P0（审查报告）：只有权威端（房主/离线）才能抽牌并广播；按钮是零成本触发路径，必须在源头拦截。
+            if (!IsAuthority) { SRApi.NotifyT("仅房主可抽牌", "Only the host can draw"); return; }
+            if (_enabled == null || !_enabled.Value) return;
             if (!ModeAllowed()) return;                                 // 限制模式：静默跳过
             var chosen = new List<int>();
             for (int i = 0; i < Cards.Length; i++) if (_pool[i] != null && _pool[i].Value) chosen.Add(i);
@@ -372,7 +374,6 @@ namespace SR_UCH.Tweaks {
             // 房主本地 RebuildLocal 会「整体还原再重建」，但没装 mod 的房客只收到
             // 新牌那条规则消息 —— 不发还原，房客的规则会逐回合累积，与房主不一致。
             BroadcastRestoreRules();
-            if (NetClientActive()) SendSignal(OpClear);
 
             _drawSeq++;
             var rng = new System.Random(Environment.TickCount ^ (_roundSeen * 7919) ^ (_drawSeq * 104729));
@@ -589,8 +590,9 @@ namespace SR_UCH.Tweaks {
         // 同一 Rule 只有最后写进去的那张真正生效（房主重建与房客端接收都是后写覆盖前写）。
         // 显示也按「每条规则的最后一张」收口：以前房主抽到两张同规则牌时会画两张，
         // 房客端只收到/只留一张，两端牌面不一致。
-        private static readonly int[] _effIdx = new int[4];
+        private static int[] _effIdx = new int[4];
         private static int EffectiveIndexes() {
+            if (_effIdx == null || _effIdx.Length < Mathf.Min(Cards.Length, 16)) _effIdx = new int[Mathf.Min(Cards.Length, 16)];
             int n = 0;
             for (int i = _active.Count - 1; i >= 0 && n < _effIdx.Length; i--) {
                 int id = _active[i].Id;
@@ -678,8 +680,8 @@ namespace SR_UCH.Tweaks {
             if (c.Field == FBoolWallJumps || c.Field == FBoolFriction || c.Field == FBoolMirror || c.Field == FBoolPlayerCol) return CardDebuff;
             if (c.Field == FGravity) return c.Min <= 1 ? CardBuff : CardDebuff;          // 低重力有益，高重力/超重有害
             if (c.Field == FJump) return c.Min >= 2 ? CardBuff : CardDebuff;
-            if (c.Field == FSprint) return c.Min >= 3 ? CardBuff : CardDebuff;
-            if (c.Field == FPlatform) return c.Min >= 3 ? CardBuff : CardDebuff;
+            if (c.Field == FSprint) return c.Min >= 2 ? CardBuff : CardDebuff;   // 快冲刺 Min=2
+            if (c.Field == FPlatform) return c.Min >= 2 ? CardBuff : CardDebuff; // 快平台 Min=2
             if (c.Field == FRate) return CardDebuff;                                      // 慢射速 = 减益
             return CardNeutral;
         }
@@ -767,8 +769,10 @@ namespace SR_UCH.Tweaks {
                 SRApi.T("本回合生效的规则牌：绿边 = 增益，红边 = 减益，蓝边 = 中性。",
                         "Rules in effect this round: green = buff, red = debuff, blue = neutral."));
             RenderActiveCards();
-            SRApi.Ctl.HotkeyButton("chaos.reroll", SRApi.T("重抽", "Draw"),
-                                   SRApi.T("仅房主 / 离线有效", "Host or offline only"), DrawAndBroadcast);
+            using (SRApi.Ctl.Disabled(!IsAuthority || _enabled == null || !_enabled.Value)) {
+                SRApi.Ctl.HotkeyButton("chaos.reroll", SRApi.T("重抽", "Draw"),
+                                       SRApi.T("仅房主 / 离线有效", "Host or offline only"), DrawAndBroadcast);
+            }
         }
 
         // 牌池单独一页：按「数值规则 / 布尔规则」分组勾选 + 批量操作（全选 / 全不选 / 仅增益 / 仅减益）。
@@ -805,7 +809,7 @@ namespace SR_UCH.Tweaks {
             SRApi.Ctl.SectionTitle("- " + SRApi.T(numeric ? "数值规则" : "布尔规则", numeric ? "Numeric rules" : "Boolean rules") + " -");
             if (_poolLabelCache == null) _poolLabelCache = new string[Cards.Length];
             for (int i = 0; i < Cards.Length; i++) {
-                if (Cards[i].IsBool != numeric || _pool[i] == null) continue;
+                if (Cards[i].IsBool == numeric || _pool[i] == null) continue;   // numeric=true 显示数值牌（IsBool=false）
                 CardDef c = Cards[i];
                 string ours = SRApi.T(c.Zh, c.En);
                 string gm = GameRuleName(c.Rule);
@@ -847,8 +851,8 @@ namespace SR_UCH.Tweaks {
 
         // 牌池批量筛选用的倾向分类（与 Cards 顺序一一对应）：+1 增益 / 0 中性 / -1 减益。
         private static readonly sbyte[] CardMood = new sbyte[] {
-            -1, -1, -1, -1, -1, -1, -1,   // 低重力 / 高重力 / 弱跳跃 / 慢冲刺 / 慢平台 / 禁墙跳 / 镜像
-             1,  0, -1, -1,               // 跳舞无敌 / 玩家互撞(中性) / 无摩擦 / 慢射速
+            1, -1, -1, -1, -1, -1, -1,    // 低重力(有益) / 高重力 / 弱跳跃 / 慢冲刺 / 慢平台 / 禁墙跳 / 镜像
+             1, -1, -1, -1,               // 跳舞无敌 / 玩家互撞 / 无摩擦 / 慢射速
              1,  1,  1,                   // 高跳跃 / 快冲刺 / 快平台
             -1, -1, -1                    // 超重 / 龟速冲刺 / 停滞平台
         };

@@ -62,14 +62,12 @@ public partial class SR {
         private static float _notifyHookNext;
 
         private static Func<string, string, bool> NotifyHook() {
-            if (_notifyHook != null) return _notifyHook;
-            if (Time.unscaledTime < _notifyHookNext) return null;
+            // 每 2 秒复核一次：通知中心 Shutdown 会 Slots.Retract，旧缓存必须失效（审查 P2-4）。
+            if (Time.unscaledTime < _notifyHookNext) return _notifyHook;
             _notifyHookNext = Time.unscaledTime + 2f;
-            foreach (string n in Slots.Names) {
-                if (n != NotifyHookSlot) continue;
-                _notifyHook = Slots.Require<Func<string, string, bool>>(NotifyHookSlot);
-                break;
-            }
+            bool present = false;
+            foreach (string n in Slots.Names) { if (n == NotifyHookSlot) { present = true; break; } }
+            _notifyHook = present ? Slots.Require<Func<string, string, bool>>(NotifyHookSlot) : null;
             return _notifyHook;
         }
 

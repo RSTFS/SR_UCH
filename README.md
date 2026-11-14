@@ -90,20 +90,20 @@ and can see the current rule in the vanilla rules UI. The host is excluded by th
   broadcast, not a seed, so every client applies exactly the same card; guests never roll locally.
 - **17 cards** -- low/high gravity, weak jump, slow sprint, slow platforms, no wall jumps, mirror
   controls, dance invincibility, player collisions and frictionless. Each can be switched off in
-  the card pool, which also has a search box (name / effect) and splits the list into numeric and
-  boolean rule groups. Rate of fire, game speed, character size, camera flip and doomsday are excluded
-  on purpose: the first two rewrite `Time.timeScale` (conflicting with Time Control), the rest
-  touch the camera or require rebuilding renderers.
+  the card pool, which splits the list into numeric and boolean rule groups (no search box).
+  Game speed, character size, camera flip and doomsday are excluded on purpose; the slow-fire-rate
+  card is included (it only touches the rule value, not `Time.timeScale`).
 - **Controls** -- draw interval, max simultaneous cards, draw announcement, reroll hotkey, and the
   page renders each active card as a card (name + effect + green buff / red debuff / blue neutral border).
 - **Always reversible** -- rule values are snapshotted at match start. Turning the deck off or
   ending the match re-broadcasts each rule's original treehouse value (so guests without the mod
   revert too), restores the host's local copy, and tells modded guests to clear their card display.
-- **Room mod roster** -- a periodic handshake (30 s) on the same rule message shows which players
-  have the mod installed. All messages arrive over the server connection on a client, so the
-  handshake identifies senders by local player number rather than `conn.connectionId`.
-  Only the host (or the local machine offline) draws; guests receive the result on the `None` +
-  magic channel and just apply it. There is no approval/proposal flow: offline you are the host,
+- **Version handshake** -- peers exchange an SR feature signature every 20 s; a mismatch toast
+  appears only when **both** sides have the mod installed. A peer with no mod at all cannot be
+  detected this way (it never sends a signature), so "one side not installed" stays silent.
+  Only the host (or the local machine offline) draws; guests receive the result as real rule
+  messages (`CardMagic = 772`) and just apply it. The `None` + `Magic = 771` channel is only used
+  for hello / clear signals, never for actual cards. There is no approval/proposal flow: offline you are the host,
   just use the reroll key.
 - Uses only rules and message types the game already has: **no new Harmony patches, no new msgType,
   no new reflection registrations, no camera changes, no spawned objects, no threads**.
@@ -111,7 +111,7 @@ and can see the current rule in the vanilla rules UI. The host is excluded by th
 ### Rarity Glow
 
 A quality halo around every item in the party box, driven by its **current probability**: lower
-chance = rarer = brighter (reversible on the page).
+chance = rarer = brighter.
 
 - Uses the party box's own draw weight (`BlockGroup.GetItemFilterWeight`, which handles
   `FilterOverride`), with `GameSettings.GetBlockFrequency` + `TabletBlockList.GetWeightFromStepValue`
@@ -151,10 +151,12 @@ converge on `SR.Notify.cs`'s `NotifyImpl`, so a single optional hook in the core
 without touching any call site or changing behaviour when the feature is absent.
 
 - Priority tiers: things you must act on (failures, refusals, blocks) > normal feedback >
-  plain confirmations. Same-source duplicates within 3 s merge into one `xN` row.
-- **Nothing gets swallowed**: if either **Use Native Toast** or **Show On Screen** is off, the hub
-  hands the screen back to the game's own toasts instead of taking over and showing nothing.
-  **Quiet in match** is the only deliberate suppression (low/normal during a match); high priority still pops.
+  plain confirmations. Same-source duplicates within 3 s merge into one notice (cards show the
+  body text only; no `xN` counter anymore). NotifyEx can set the level explicitly.
+- **Single switch**: turning the hub off hands every toast back to the game's own display; there is
+  no separate native/on-screen/quiet option any more.
+- **Actions**: a NotifyEx notice can carry one action button (e.g. Undo); clicking it runs the
+  action and dismisses the card.
 - **No drops under bursts**: Max Visible only decides how many cards are drawn at once; extra
   messages queue (up to 16) and slide in as earlier cards expire. A card's dwell time only starts
   once it is actually on screen, so a long queue never makes later messages expire unseen.
@@ -164,9 +166,9 @@ without touching any call site or changing behaviour when the feature is absent.
   so long notices cannot be swallowed while reading); left-clicking a card starts its fade-out.
 - **Transitions**: cards fade + slide in from the docked side, the whole column eases to its new
   positions when cards are inserted or removed, and cards fade + slide out before being removed.
-- Appearance: card width (100-300, default 200), opacity (20-100%), layer scale (80-160%), corner
-  (bottom-right/top-right/bottom-left/top-left), max visible (1-6), dwell seconds (1-5), animation
-  toggle and duration (80-400 ms).
+- Appearance: card width (100-500, default 300), card scale (100-300, default 200), text size
+  (10-32, default 20), card opacity (20-100, default 64), corner (bottom-right default), max
+  visible (1-6), dwell seconds (0.5-5, default 1.5, step 0.5). Animations are built in (no toggle).
 
 ### Player Tracker
 
