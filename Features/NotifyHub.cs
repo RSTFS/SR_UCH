@@ -129,6 +129,10 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Card Opacity",
                 "卡片不透明度\n浮层卡片背景的不透明程度。",
                 "Card opacity\nBackground opacity of overlay cards.");
+            SRApi.LocKey(Sec, "Opacity Default 72", "不透明度默认值迁移", "Opacity default migration");
+            SRApi.LocDesc(Sec, "Opacity Default 72",
+                "内部标记：卡片不透明度默认值迁移\n从旧默认 64 改成 72 后置真\n用户手动改过的不透明度不会被动",
+                "internal marker for the card-opacity default migration\nset once the old default 64 has been moved to 72\nmanually chosen opacity is left untouched");
             SRApi.LocKey(Sec, "Corner", "停靠位置", "Overlay position");
             SRApi.LocDesc(Sec, "Corner",
                 "浮层停靠角\n浮层停靠位置：0 右下 / 1 右上 / 2 左下 / 3 左上。",
@@ -173,8 +177,18 @@ namespace SR_UCH.Tweaks {
             try { SRApi.Migration.Remove(Sec, "Anim Ms"); } catch (Exception __mm) { SRApi.Guard.Log("通知中心/清理动画时长键", __mm); }
             _cardScale = plugin.Config.Bind(Sec, "Card Scale", 200,
                 new ConfigDescription("整个浮层的缩放百分比（100-300）。", new AcceptableValueRange<int>(100, 300)));
-            _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 64,
+            _cardAlpha = plugin.Config.Bind(Sec, "Card Opacity", 72,
                 new ConfigDescription("浮层卡片背景不透明度百分比（20-100）。", new AcceptableValueRange<int>(20, 100)));
+            // 旧默认值是 64：一次性迁移（只迁移仍是旧默认值的配置，用户手动改过的值不动）。
+            try {
+                ConfigEntry<bool> __mig = plugin.Config.Bind(Sec, "Opacity Default 72", false,
+                    "内部标记：卡片不透明度默认值从 64 迁移到 72 是否已执行");
+                if (!__mig.Value && _cardAlpha.Value == 64) {
+                    _cardAlpha.Value = 72;
+                    __mig.Value = true;
+                    SRApi.Ctl.MarkConfigDirty(__mig.ConfigFile);
+                }
+            } catch (Exception __om) { SRApi.Guard.Log("通知中心/不透明度默认迁移", __om); }
             _corner = plugin.Config.Bind(Sec, "Corner", 0,
                 new ConfigDescription("浮层停靠位置：0 右下 / 1 右上 / 2 左下 / 3 左上。", new AcceptableValueRange<int>(0, 3)));
 
@@ -361,6 +375,7 @@ namespace SR_UCH.Tweaks {
             if (_label != null) return;
             _label = new GUIStyle(GUI.skin.label);
             _label.wordWrap = true; _label.clipping = TextClipping.Clip;
+            _label.alignment = TextAnchor.MiddleLeft;   // 正文在卡片内上下居中（用户要求）
             _label.normal.textColor = new Color(0.94f, 0.96f, 0.99f, 1f);
             _btn = new GUIStyle(GUI.skin.button);
             _sym = new GUIStyle(_label);
