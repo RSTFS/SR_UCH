@@ -255,6 +255,9 @@ public partial class SR : ITweak {
         // 缩放同时作用于布局尺寸与字号（不使用矩阵缩放）
         private static float _scaled = 1f;
         private static float Sc(float v) { return v * _scaled; }
+
+        // 性能计数器（自检页显示）：每帧调度与面板绘制的平滑耗时，用于定位热点（不参与任何逻辑）。
+        internal static float PerfTickAvgMs, PerfGuiAvgMs, PerfTickMaxMs, PerfGuiMaxMs;
         private static UnityEngine.EventSystems.EventSystem _gatedEventSystem;
         private static bool _stylesReady;
         private static GUIStyle _win, _title, _titleLabel, _titleMid, _label, _nameLabel, _labelClip, _labelClipCenter, _secHeaderCenter, _labelWrap, _chatLabel, _chatArea, _secHeader, _item, _selItem, _btn, _btnClip, _frame,

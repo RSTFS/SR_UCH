@@ -17,6 +17,37 @@ namespace SR_UCH.Tweaks {
         private static float _listMaxY;            // 本帧列表滚动上限（page hook 兜底用）
         private static float _sbGrabY;            // 竖向滚动条拖动抓取偏移（核心 TableScrollbarFor 用）
 
+        // 表格回调委托只建一次（每次绘制都 new 会逐帧产生垃圾）：全部只引用静态成员。
+        private static readonly Func<int, string> _titleFn = delegate (int ci) { return ColumnTitle(ci); };
+        private static readonly Func<int, string> _tipFn = delegate (int ci) { return ColumnTip(ci); };
+        private static readonly Func<int, string[]> _rowCellsFn = delegate (int r) { return RowCells(_visibleCache, r); };
+        private static readonly Action<int[]> _applyOrderFn = delegate (int[] o) { _order = o; SaveCols(); };
+        private static readonly Action _saveOrderFn = delegate { SaveCols(); };
+        private static readonly Action _resetAllFn = delegate { ResetTable(); };
+        private static float[] _defColWCache;   // DefColW 是数组字段，直接引用即可（不必每帧新建委托）
+        private static readonly Action<int> _clickFn = OnColumnClick;
+        private static readonly Func<string> _emptyHintFn = EmptyHintText;
+        private static readonly Action<int, Rect, int> _pinDrawFn = delegate (int row, Rect r, int vi) { DrawActionButtons(_visibleCache, row, r); };
+
+        private static void OnColumnClick(int ci) {
+            if (ci == ColAction) return;
+            // 表头点击排序（照 ImGui Table SortSpecs 的交互）：点一次升序、再点降序；点其它列切换主排序。
+            // Shift+点「关卡」仍保留原来的"名称/代码"切换。
+            Event __ce = Event.current;
+            if (ci == ColLevel && __ce != null && __ce.shift) { _levelShowCode = !_levelShowCode; return; }
+            if (_sortColOverride == ci) _sortAsc = !_sortAsc;
+            else { _sortColOverride = ci; _sortAsc = true; }
+            try { _scrollRows.y = 0f; } catch (Exception __sc2) { SRApi.Guard.Log("预设列表/排序回顶", __sc2); }
+        }
+
+        private static string EmptyHintText() {
+            return _presets.Count == 0
+                ? SRApi.T("ℹ\n还没有预设\n到「预设保存」页保存当前布局，或从剪贴板 / 文件导入。",
+                          "ℹ\nNo presets yet\nSave the current layout on the Save page, or import from clipboard / file.")
+                : SRApi.T("ℹ\n没有匹配的预设\n清空搜索或切换筛选条件试试。",
+                          "ℹ\nNo matching presets\nClear the search or change the filters.");
+        }
+
         // ================= 页面二：预设列表 =================
         private static void RenderListPage() {
             SRApi.NoPageScrollBars = true;   // 填充模式：页头固定，只有列表自己滚
@@ -146,31 +177,23 @@ namespace SR_UCH.Tweaks {
                 _args.pinTitle = SRApi.T("操作", "Actions");
                 _args.drawHeader = true;
                 _args.headerLeft = false;
-                _args.title = delegate(int ci) { return ColumnTitle(ci); };
-                _args.tip = ColumnTip;
-                _args.rowCells = delegate(int r) { return RowCells(visible, r); };
+                _args.title = _titleFn;
+                _args.tip = _tipFn;
+                _args.rowCells = _rowCellsFn;
                 _args.rowSelected = null;
                 _args.rowAlpha = null;
                 _args.resizable = true;
                 _args.reorderable = true;
                 _args.order = _order;
-                _args.applyOrder = delegate(int[] o) { _order = o; SaveCols(); };
-                _args.saveOrder = delegate { SaveCols(); };
-                _args.saveWidths = delegate { SaveCols(); };
+                _args.applyOrder = _applyOrderFn;
+                _args.saveOrder = _saveOrderFn;
+                _args.saveWidths = _saveOrderFn;
                 _args.hidden = _hiddenCols;
                 _args.hideable = true;
-                _args.resetAll = delegate { ResetTable(); };
-                _args.defaultColW = DefColW;
-                _args.click = delegate(int ci) {
-                    if (ci == ColAction) return;
-                    // 表头点击排序（照 ImGui Table SortSpecs 的交互）：点一次升序、再点降序；点其它列切换主排序。
-                    // Shift+点「关卡」仍保留原来的"名称/代码"切换。
-                    Event __ce = Event.current;
-                    if (ci == ColLevel && __ce != null && __ce.shift) { _levelShowCode = !_levelShowCode; return; }
-                    if (_sortColOverride == ci) _sortAsc = !_sortAsc;
-                    else { _sortColOverride = ci; _sortAsc = true; }
-                    try { _scrollRows.y = 0f; } catch (Exception __sc2) { SRApi.Guard.Log("预设列表/排序回顶", __sc2); }
-                };
+                _args.resetAll = _resetAllFn;
+                if (_defColWCache == null) _defColWCache = DefColW;
+                _args.defaultColW = _defColWCache;
+                _args.click = _clickFn;
                 _args.sortCol = -1;
                 _args.headerCells = _headerCells;
                 _args.headerCols = _headerCols;
@@ -178,14 +201,9 @@ namespace SR_UCH.Tweaks {
                 _args.rowRows = _rowRows;
                 _args.pinRects = _pinRects;
                 _args.pinRows = _pinRows;
-                _args.pinDraw = delegate(int row, Rect r, int visibleIdx) { DrawActionButtons(visible, row, r); };
-                _args.emptyHint = delegate {
-                    return _presets.Count == 0
-                        ? SRApi.T("ℹ\n还没有预设\n到「预设保存」页保存当前布局，或从剪贴板 / 文件导入。",
-                                  "ℹ\nNo presets yet\nSave the current layout on the Save page, or import from clipboard / file.")
-                        : SRApi.T("ℹ\n没有匹配的预设\n清空搜索或切换筛选条件试试。",
-                                  "ℹ\nNo matching presets\nClear the search or change the filters.");
-                };
+                _args.pinDraw = _pinDrawFn;
+                _args.emptyHint = _emptyHintFn;
+
                 _hiddenBeforeTable = _hiddenCols.Count;
                 // 滚轮入口照联机列表：绘制期就地在表格矩形上取用（表格区域优先于页面钩子）。
                 try {

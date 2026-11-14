@@ -83,6 +83,8 @@ public partial class SR {
             bool ran = _stResults != null && _stResults.Count > 0;
             string summary = !ran ? T("未运行（点下面按钮）", "not run yet (use the button below)")
                 : T("通过 " + pass + " / 失败 " + fail, pass + " passed / " + fail + " failed");
+            summary += "  ·  Tick " + SR.PerfTickAvgMs.ToString("0.00") + "/" + SR.PerfTickMaxMs.ToString("0.00")
+                     + " ms  ·  GUI " + SR.PerfGuiAvgMs.ToString("0.00") + "/" + SR.PerfGuiMaxMs.ToString("0.00") + " ms";
             Card(!ran || fail == 0, T("主动自检", "Active self-test"), summary, delegate {
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button(T("运行自检", "Run self-test"), _btn, GUILayout.Width(Sc(110)), GUILayout.Height(Sc(24))))

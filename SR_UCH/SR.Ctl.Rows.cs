@@ -19,9 +19,24 @@ public partial class SR {
         private static readonly float LabelPadW = Sc(10f);
         private static readonly float LabelSlackW = Sc(60f);
 
+        // 文本宽度缓存：同一标签每帧会被多行控件重复测量；按「语言版本 + UI 缩放」失效。
+        private static readonly Dictionary<string, float> _labelWCache = new Dictionary<string, float>();
+        private static int _labelWCacheLang = -1;
+        private static float _labelWCacheScale = -1f;
+
         internal static float LabelColumnWidth(string label) {
             try {
-                float w = SR.Ctl.Label.CalcSize(SRApi.Ctl.Content(label ?? "")).x + LabelPadW;
+                string __key = label ?? "";
+                float __scale = Sc(1f);
+                if (_labelWCacheLang != _langVer || Mathf.Abs(_labelWCacheScale - __scale) > 0.001f) {
+                    _labelWCache.Clear(); _labelWCacheLang = _langVer; _labelWCacheScale = __scale;
+                }
+                float __cw;
+                if (!_labelWCache.TryGetValue(__key, out __cw)) {
+                    __cw = SR.Ctl.Label.CalcSize(SRApi.Ctl.Content(__key)).x;
+                    _labelWCache[__key] = __cw;
+                }
+                float w = __cw + LabelPadW;
                 if (w > _labelColCur) _labelColCur = w;
                 // 对齐仍用上帧列宽，但不允许比当前标签宽出太多（旧实现会把别的页面的长标签宽度一直带过来）。
                 float __prev = Mathf.Min(_labelColPrev, w + LabelSlackW);

@@ -833,10 +833,27 @@ public partial class SR {
             }
 
             // 每帧调用的静态委托：避免 Update/OnGUI 每趟 new 闭包（GC 抖动）。
-            private static readonly Action _actTick = SR.Tick;
+            private static readonly System.Diagnostics.Stopwatch _perfSw = new System.Diagnostics.Stopwatch();
+            private static void DoTick() {
+                _perfSw.Restart();
+                try { SR.Tick(); } finally {
+                    float ms = (float)_perfSw.Elapsed.TotalMilliseconds;
+                    SR.PerfTickAvgMs += (ms - SR.PerfTickAvgMs) * 0.1f;
+                    if (ms > SR.PerfTickMaxMs) SR.PerfTickMaxMs = ms;
+                }
+            }
+            private static void DoDrawGui() {
+                _perfSw.Restart();
+                try { SR.DrawGUI(); } finally {
+                    float ms = (float)_perfSw.Elapsed.TotalMilliseconds;
+                    SR.PerfGuiAvgMs += (ms - SR.PerfGuiAvgMs) * 0.1f;
+                    if (ms > SR.PerfGuiMaxMs) SR.PerfGuiMaxMs = ms;
+                }
+            }
+            private static readonly Action _actTick = DoTick;
             private static readonly Action _actOpenKey = SR.CheckOpenKey;
             private static readonly Action _actHotkeys = SR.CheckHotkeys;
-            private static readonly Action _actDrawGui = SR.DrawGUI;
+            private static readonly Action _actDrawGui = DoDrawGui;
             private static readonly Action _actPostWheel = SR.PostGuiWheel;
 
             private void Update() {
