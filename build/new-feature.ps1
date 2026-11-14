@@ -36,30 +36,38 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
     [SrFeature("sr.<ID>", "<NAME>", "1.0")]
     public class <NAME> : ITweak {
-        private const string Sec = "<NAME>";           // 配置段名 + 栏目内部键；显示名见下面 LocSec
+        private const string Sec = "<NAME>";           // 配置段名；显示名在 SelfReg 的 LocSec 里给
         private static ConfigEntry<bool> _enabled;
 
-        public void Initialize(IFeatureHost plugin) {
-            _enabled = plugin.Config.Bind(Sec, "Enabled", false, "总开关：打开后本功能才生效。");
-
-            // 文案自注册：缺 LocKey 时中文界面会回退英文键名，缺 LocDesc 时没有悬浮说明。
+        // 只做注册（栏目/页面/文案），不碰游戏对象；在 Initialize 里先于 Bind 调用。
+        private static void SelfReg() {
             SRApi.LocSec(Sec, "<ZH>", "<EN>");
-            SRApi.LocKey(Sec, "Enabled", "启用<ZH>", "Enable <EN>");
-            SRApi.LocDesc(Sec, "Enabled", "启用<ZH>\n打开后本功能才生效。", "Enable <EN>\nTurn on to activate this feature.");
-
-            SRApi.Nav(Sec, <RANK>);                                   // 侧栏栏目顺序（内置 10-130，留空档）
+            SRApi.Nav(Sec, <RANK>);                                       // 侧栏顺序（内置 10-130，留空档）
             SRApi.RegisterPage(Sec, "Main", "主页", "Main", 10, RenderPage);
-            // 需要每帧逻辑时打开；不需要就删掉这行和 Tick：
-            // SRApi.RegisterTick("<NAME>-每帧", Tick);
-            // 需要清理（槽位/对象/监听）时保留并在 Shutdown 里实现：
-            SRApi.OnShutdown("<NAME>", Shutdown);
+            SRApi.LocKey(Sec, "Enabled", "启用<ZH>", "Enable <EN>");
+            SRApi.LocDesc(Sec, "Enabled",
+                "启用<ZH>\n打开后本功能才生效。",
+                "Enable <EN>\nTurn on to activate this feature.");
+        }
+
+        public void Initialize(IFeatureHost plugin) {
+            try {
+                SelfReg();
+                _enabled = plugin.Config.Bind(Sec, "Enabled", false, "总开关：打开后本功能才生效。");
+                // 需要每帧逻辑时打开；不需要就删掉这行和 Tick：
+                // SRApi.RegisterTick("<NAME>-每帧", Tick);
+                // 需要换场景复位时打开：
+                // SRApi.RegisterSceneHook(delegate { /* 清缓存/复位状态 */ });
+                // 需要清理（槽位/对象/监听）时保留：
+                SRApi.OnShutdown("<NAME>", Shutdown);
+            } catch (Exception __ex) { SRApi.Guard.Log("<NAME>/初始化", __ex); }
         }
 
         public void Shutdown() { }
 
         private static void Tick() {
             if (_enabled == null || !_enabled.Value) return;
-            // 每帧逻辑放这里；注意异常不要外泄（核心会兜底，但别依赖它）。
+            // 每帧逻辑放这里；贵的活自己按时间限流。
         }
 
         private static void RenderPage() {

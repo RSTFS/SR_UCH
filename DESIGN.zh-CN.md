@@ -28,7 +28,9 @@ build/                        构建脚本 + rsp 生成器/清单 + 守卫 + 单
 
 **方向约束（有守卫检查）**
 
-- 功能层只允许出现 `SRApi.*`（白名单 110 个符号），不得出现 `SR.*` 实现层标识
+- 功能层只允许出现 `SRApi` 的第一段成员名（白名单 102 条，见 `build/api_surface.txt`；
+  `SRApi.Ctl.*` / `SRApi.Ref.*` / `SRApi.Cache.*` 等子命名空间成员整体放行，不逐条登记），
+  不得出现 `SR.*` 实现层标识
 - 契约层不得引用实现层类型（`sr_uch_contracts.rsp` 独立编译验证）
 - 功能之间**不得编译期互相引用**：需要协作时用 `SRApi.Slots`（能力槽）或事件
 
@@ -36,16 +38,24 @@ build/                        构建脚本 + rsp 生成器/清单 + 守卫 + 单
 
 ## 3. 一个功能长什么样
 
+功能 = `Features\<功能名>.cs`。一个功能可以有多个文件（`Features\<功能名>.*.cs`，同前缀归同一功能/同一份清单）。
+新建时直接用脚手架（会生成符合本仓库约定的骨架）：
+
+```powershell
+.\build\new-feature.ps1 -Name Demo -Zh "示例" -En "Demo" -Rank 60
+```
+
 ```csharp
 [SrFeature("sr.demo", "Demo", "1.0")]          // id / 显示名 / 版本
 public class Demo : ITweak {
-    private const string Sec = "Demo";          // 配置段名 = 栏目名
+    private const string Sec = "Demo";          // 配置段名；中英显示名在 SelfReg 的 LocSec 里给
     private static ConfigEntry<bool> _enabled;
 
-    private static void SelfReg() {             // 只做注册，不碰游戏对象
-        SRApi.LocSec(Sec, "示例", null);         // 段名本地化
-        SRApi.Nav(Sec, 60);                      // 侧栏位置（越小越靠前，避免序号撞车）
-        SRApi.RegisterPage(Sec, Render);         // 单页；多页用 6 参重载
+    // 只做注册（栏目 / 页面 / 文案），不碰游戏对象；在 Initialize 里最先调用。
+    private static void SelfReg() {
+        SRApi.LocSec(Sec, "示例", "Demo");
+        SRApi.Nav(Sec, 60);                     // 侧栏位置（越小越靠前；内置 10-130，留空档）
+        SRApi.RegisterPage(Sec, "Main", "示例", "Demo", 10, Render);
         SRApi.LocKey(Sec, "Enabled", "总开关", "Master switch");
         SRApi.LocDesc(Sec, "Enabled",
             "总开关\n关掉后本功能不做任何事\n只影响本功能，不动其它设置",
@@ -56,22 +66,21 @@ public class Demo : ITweak {
         try {
             SelfReg();
             _enabled = plugin.Config.Bind(Sec, "Enabled", false, "总开关");
-            SRApi.RegisterTick("示例-每帧", Tick);
-            SRApi.RegisterSceneHook(delegate { /* 换场景复位 */ });
-            // 需要读游戏私有成员：登记 + 用 SRApi.Ref
-            SRApi.Ref.Override("SomeClass.privateField", "示例（读取私有字段）");
+            SRApi.RegisterTick("示例-每帧", Tick);   // 不需要就删
+            SRApi.OnShutdown("示例", Shutdown);      // 需要清理（槽位/对象/监听）时保留
+            // 读游戏私有成员要登记 + 用 SRApi.Ref：SRApi.Ref.Override("SomeType.privateField", "示例");
         } catch (Exception __ex) { SRApi.Guard.Log("示例/初始化", __ex); }
     }
 
+    public void Shutdown() { /* 注销槽位 / 销毁自建对象 */ }
     private static void Tick() { /* 每帧；贵的活自己按时间限流 */ }
-
-    private static void Render() { /* 页面 */ }
+    private static void Render() { /* 页面；控件一律走 SRApi.Ctl */ }
 }
 ```
 
 **初始化必须整段 try**：中途抛异常会让功能"静默消失"，而且可能留下 DontDestroyOnLoad 对象。
-
----
+**清单不用手改**：文件放进 `Features\` 后直接构建，`build\gen-rsp.ps1` 会按文件名前缀生成 `feat_<功能>.rsp`；
+`-Check` / CI 会校验清单与磁盘一致。
 
 ## 4. UI 页面的写法
 
@@ -162,7 +171,7 @@ SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderAuto);  /
    控件是在页面绘制时才置 `BlockWindowDrag` 的，而拖窗口判定在页面之前；
    滑块/输入框/表格都要在按下时置 `BlockWindowDrag`，否则拖它们会把整块面板一起拖走。
 
-### 4.3d 列表滚动上限（maxY / maxX）的完整算法### 4.3d 列表滚动上限（maxY / maxX）的完整算法
+### 4.3d 列表滚动上限（maxY / maxX）的完整算法
 
 #### 符号表（全部是**同一套布局坐标**，即 `OnGUI` 的像素单位，已乘过 `Sc()`）
 
@@ -364,11 +373,13 @@ cd D:\RS_TFS\CC\SR_UCH
 .\build\build.ps1 -Check     # 守卫：清单生成一致性 / 契约独立编译 / rsp 覆盖 / csproj 可编
 .\build\build.ps1 -All -Deploy   # 构建并部署到游戏（游戏关着再跑）
 .\build\new-feature.ps1 -Name MyFeature   # 新功能脚手架（生成 Features\MyFeature.cs 骨架）
+.\build\gen-rsp.ps1         # 只重生成 rsp 清单（构建会自动跑；-Verify 只校验）
 ```
 
 ```powershell
 cd D:\RS_TFS\CC\SR_UCH\build
-.\guards-text.ps1        # 文本守卫：编码 / 悬浮条目 3 行 / 裸 catch / 静默 catch 棘轮 / 单文件行数 / 分区字段
+.\guards-text.ps1        # 文本守卫：API 棘轮 / 层边界 / 编码 / 悬浮条目 / 静默 catch / 行数 / 分区字段 /
+                         #   清单生成一致性 / 文档引用脚本存在性 …（CI 跑同一份）
 .\run-tests.ps1          # 单元测试（桩编译 + 断言）
 .\update-file-size.ps1   # 大文件行数基线（新增 >900 行文件要登记）
 .\update-silent-catch.ps1
@@ -380,7 +391,10 @@ cd D:\RS_TFS\CC\SR_UCH\build
 2. 跑一次 `build\gen-rsp.ps1`（直接 `build\build.ps1` 也会自动生成）；
 3. `build\build.ps1 -Check` 会校验清单与磁盘一致，CI 的 `guards-text.ps1` 也会跑同一份生成器。
 
-特例清单仍手写：`sr_uch_contracts.rsp`（契约定向编译）、`sr_uch_ex.rsp`（EX 仓库）、`others\*.rsp`（独立插件）。
+特例清单仍手写：`sr_uch_contracts.rsp`（契约定向编译）、`sr_uch_ex.rsp`（EX 仓库）、`plugins\*.rsp`（独立插件）。
+
+`build\build.ps1` 的编译统一带 `/warnaserror:CS0169,CS0414,CS0649`：死字段（未使用/只写不读/从未赋值）会直接
+让构建失败；`-Check` = 清单一致性 + 契约独立编译 + csproj + 注入点 + 文本守卫（与 CI 同源）+ 结构守卫。
 
 ---
 
@@ -420,15 +434,20 @@ cd D:\RS_TFS\CC\SR_UCH\build
 | `internal` 成员跨文件用 | 拆分构建下跨程序集不可见 | 同文件用 `private`，跨功能用 `SRApi` |
 | 转发 `Guard.Try(string, Action)` 当"能知道成功" | 保存失败仍清脏标记 | 自己 `try/catch`，成功才清 |
 | 功能间直接互相调用 | 拆分构建缺引用直接编译失败 | `Slots` 能力槽 |
+| 手改 rsp 清单 | 新增/删除源文件后漏改一处 = 该功能"装了等于没装"或编出幽灵 | 清单由 `gen-rsp.ps1` 从磁盘生成，`-Check`/CI 校验 |
+| 已删功能只隐藏段、不清死键 | cfg 里长期留孤儿键，启动自检告警 | `ConfigMigration.RemoveKeys` 清键 + `DeletedSections` 隐藏段 |
+| `Slots.Retract(slot, null)` | 契约层在 expected==null 时无条件删除，会误删后注册的实现 | 传自己 Provide 的那个委托实例 |
+| 只有底栏入口却没 `NavHide(段)` | 启动自检误报"没有登记归属的兜底段" | 底栏功能显式 `SRApi.NavHide(Sec)` |
+| 白名单里写二级成员名（如 `Ctl.ColorEdit`） | 守卫只匹配第一段，条目永远匹配不到 = 假条目 | 白名单只写第一段名字；子命名空间整体放行 |
 
 ---
 
 ## 11. 提交前检查清单
 
-- [ ] `-All` 0 error 0 warning
-- [ ] `-Split` 通过（若动了功能文件/rsp）
-- [ ] `-Check` 10/10
-- [ ] `guards-text.ps1` 13/13
+- [ ] `-All` 通过（死字段会以 CS0169/CS0414/CS0649 直接失败）
+- [ ] `-Split` 通过（若动了功能文件；清单会自动重生）
+- [ ] `-Check` 全绿（清单一致性 + 契约独立编译 + rsp 覆盖 + csproj + 注入点 + 文本/结构守卫）
+- [ ] `guards-text.ps1` 全绿（与 CI 同一份实现）
 - [ ] `run-tests.ps1` 通过
 - [ ] 新增可见配置：`LocKey` + 3 行 `LocDesc`
 - [ ] 新增私有反射：`Ref.Override` 登记
