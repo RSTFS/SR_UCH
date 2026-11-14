@@ -231,8 +231,8 @@ namespace SR_UCH.Tweaks {
                 var c = Cards[i];
                 _pool[i] = _mp.Config.Bind(Sec, c.En, true, "是否进入随机池：" + c.Zh);
                 // 本地化跟着牌表走：以后加牌不用再记得补 LocKey（此前扩到 14 张只登记了 10 张）。
-                SRApi.LocKey(Sec, c.En, c.Zh, c.En);
-                SRApi.LocDesc(Sec, c.En, c.Zh + "\n勾选后才可能被抽到。", c.En + "\ncheck to include it in the draw pool.");
+                SRApi.LocPair(Sec, c.En, c.Zh, c.En,
+                              c.Zh + "\n勾选后才可能被抽到。", c.En + "\ncheck to include it in the draw pool.");
             }
 
             _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) RestoreAll(); };

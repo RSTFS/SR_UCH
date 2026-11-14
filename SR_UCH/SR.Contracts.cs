@@ -1416,6 +1416,12 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         public static void LocSec(string sec, string zh, string en) { Action<string, string, string> f = _locSec3; if (f != null) f(sec, zh, en); }
         public static void LocKey(string sec, string key, string zh, string en) { Action<string, string, string, string> f = _locKey; if (f != null) f(sec, key, zh, en); }
         public static void LocDesc(string sec, string key, string zh, string en) { Action<string, string, string, string> f = _locDesc; if (f != null) f(sec, key, zh, en); }
+        // 一次登记「显示名 + 悬浮说明」：功能层原来每条都要写两行 LocKey/LocDesc，
+        // 漏一行就会在中文界面显示英文键名（牌池扩到 17 张时漏过 4 张）。descZh 为空时只登记显示名。
+        public static void LocPair(string sec, string key, string zh, string en, string descZh = null, string descEn = null) {
+            LocKey(sec, key, zh, en);
+            if (!string.IsNullOrEmpty(descZh) || !string.IsNullOrEmpty(descEn)) LocDesc(sec, key, descZh ?? zh, descEn ?? en);
+        }
         public static void LocEnum(string name, string zh) { Action<string, string> f = _locEnum; if (f != null) f(name, zh); }
         public static string CurrentLanguageId { get { Func<string> f = _currentLanguageId; return f != null ? f() : "English"; } }
         public static int LangVer { get { Func<int> f = _langVer; return f != null ? f() : 0; } }

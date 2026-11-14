@@ -51,6 +51,7 @@ ListTableHeight
 LocDesc
 LocEnum
 LocKey
+LocPair
 LocSec
 LogError
 LogInfo
