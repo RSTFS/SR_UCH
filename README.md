@@ -40,8 +40,9 @@ The **Settings** page is a single page; **Self-check** and **Notifications** mov
 
 The **Self-check** footer entry opens a card-style health report: one verdict card (with **Rescan**, **Copy
 report**, **Write to log**), a *Targets & config* card that turns amber and lists the broken entries
-when a name-bound patch target or reflection member disappears, and a *Frame hooks* card for the
-per-hook cost. If a game update breaks part of the features, this is the first place to look. Hook
+when a name-bound patch target or reflection member disappears, an *Other plugins* card listing
+plugins loaded from `BepInEx\plugins` with known conflict/note verdicts, and a *Frame hooks* card for
+the per-hook cost. If a game update breaks part of the features, this is the first place to look. Hook
 profiling is off by default (its switch lives in that card) so it does not spam the log.
 
 ---
@@ -153,6 +154,8 @@ without touching any call site or changing behaviour when the feature is absent.
   once it is actually on screen, so a long queue never makes later messages expire unseen.
 - A self-owned `MonoBehaviour.OnGUI` strip draws the cards: a priority colour bar (with a
   length-coded bar), a shrinking lifetime bar, and a same-colour outline for high priority.
+- **Hover pauses / click dismisses**: hovering freezes the countdown (the lifetime bar stops too,
+  so long notices cannot be swallowed while reading); left-clicking a card starts its fade-out.
 - **Transitions**: cards fade + slide in from the docked side, the whole column eases to its new
   positions when cards are inserted or removed, and cards fade + slide out before being removed.
 - Appearance: card width (100-300, default 200), opacity (20-100%), layer scale (80-160%), corner

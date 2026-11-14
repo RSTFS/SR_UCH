@@ -31,6 +31,7 @@ SR_UCH\Contracts\SRApi.Misc.cs
 SR_UCH\Contracts\SRApi.Table.cs
 SR_UCH\SR.CmAttributes.cs
 SR_UCH\SR.ColorPicker.cs
+SR_UCH\SR.Compat.cs
 SR_UCH\SR.ConfigMigration.cs
 SR_UCH\SR.Core.Audit.cs
 SR_UCH\SR.Core.cs

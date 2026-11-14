@@ -67,6 +67,9 @@ namespace SR_UCH.Tweaks {
         private const int PendingCap = 16;
         private static int _animFrame = -1;   // 一帧内 OnGUI 会跑多趟：动画时间每帧只取一次
         private static float _animDt;
+        // 鼠标悬停在浮层卡片上：暂停过期计时（看长提示时不会被自动吞掉）。
+        // 由 DrawToast 每次绘制时写入，Tick 读取（OnGUI 每帧多趟，取最后一趟的结果即可）。
+        private static bool _hoverAny;
 
         private static float AnimIn() { return Mathf.Max(0.001f, _animMs.Value / 1000f); }
         private static float AnimOut() { return Mathf.Max(0.001f, _animMs.Value / 1000f * 0.9f); }
@@ -220,6 +223,9 @@ namespace SR_UCH.Tweaks {
             try {
                 float now = Time.unscaledTime;
                 float outDur = AnimOut();
+                // 鼠标停在浮层上时冻结所有卡片的时间轴（剩余时间条也一起停）：
+                // 把 ShownAt 往前推 = 已显示时长保持不变，松手后继续从暂停处倒计时。
+                float hoverDt = _hoverAny ? Mathf.Clamp(Time.unscaledDeltaTime, 0f, 0.05f) : 0f;
                 for (int i = _visible.Count - 1; i >= 0; i--) {
                     Notice n = _visible[i];
                     if (n.DyingAt > 0f) {
@@ -228,7 +234,9 @@ namespace SR_UCH.Tweaks {
                     }
                     // 只有真正上屏过的才开始计时：排队期间不消耗停留时间，
                     // 否则连发一批消息时，排在后面的还没轮到就"过期"了（表现为漏消息）。
-                    if (n.ShownAt > 0f && now - n.ShownAt >= Mathf.Max(0.4f, n.Stay)) n.DyingAt = now;
+                    if (n.ShownAt <= 0f) continue;
+                    if (hoverDt > 0f) { n.ShownAt += hoverDt; continue; }
+                    if (now - n.ShownAt >= Mathf.Max(0.4f, n.Stay)) n.DyingAt = now;
                 }
             } catch (Exception ex) { SRApi.Guard.Log("通知中心/Tick", ex); }
         }
@@ -435,6 +443,7 @@ namespace SR_UCH.Tweaks {
 
             int prevDepth = GUI.depth;
             Color prevColor = GUI.color;
+            _hoverAny = false;   // 本趟重新判定；鼠标不在任何卡片上时 Tick 恢复正常倒计时
             try {
                 GUI.depth = 3;   // 比局内简报(2) 更靠上；finally 还原，不污染全局
                 float target = yStart;
@@ -468,8 +477,30 @@ namespace SR_UCH.Tweaks {
                     Color prevGui = GUI.color;
                     GUI.color = new Color(1f, 1f, 1f, aa);
                     Rect box = new Rect(ax, y, w, h);
+                    // 悬停：暂停计时（Tick 读 _hoverAny），并给卡片加一圈浅描边提示"可以停住看"；
+                    // 左键点击：立即开始退场（点击不会穿透到游戏——浮层在 IMGUI 的最上层）。
+                    bool hovered = false;
+                    Event ev = Event.current;
+                    if (ev != null && nt.DyingAt <= 0f) {
+                        hovered = box.Contains(ev.mousePosition);
+                        if (hovered) {
+                            _hoverAny = true;
+                            if (ev.type == EventType.MouseDown && ev.button == 0) {
+                                nt.DyingAt = now;
+                                nt.Stay = 0f;
+                            }
+                        }
+                    }
                     float cardA = Mathf.Clamp01(_cardAlpha.Value / 100f) * aa;
                     Fill(box, new Color(0.06f, 0.08f, 0.11f, cardA));
+                    if (hovered) {
+                        Color hc = new Color(0.95f, 0.97f, 1f, 0.55f * aa);
+                        float ht = Mathf.Max(1f, 1f * s);
+                        Fill(new Rect(box.x, box.y, box.width, ht), hc);
+                        Fill(new Rect(box.x, box.yMax - ht, box.width, ht), hc);
+                        Fill(new Rect(box.x, box.y, ht, box.height), hc);
+                        Fill(new Rect(box.xMax - ht, box.y, ht, box.height), hc);
+                    }
                     // 左侧优先级色条：颜色之外还有「长短」这一重编码（高=最长）。
                     Color bar = nt.Level == 2 ? new Color(1f, 0.55f, 0.22f, 1f)
                               : nt.Level == 1 ? new Color(0.36f, 0.72f, 1f, 1f)
@@ -562,6 +593,10 @@ namespace SR_UCH.Tweaks {
             GUILayout.Space(SRApi.Ctl.Sc(3f));
             if (SRApi.Ctl.Button(SRApi.T("清空待显示队列", "Clear pending queue"), SRApi.T("丢掉所有还没上屏的通知（只影响显示）", "Drop all queued notices (display only)")))
                 ClearPending();
+            GUILayout.Space(SRApi.Ctl.Sc(4));
+            GUILayout.Label(SRApi.T("提示：鼠标悬停在浮层上会暂停倒计时，左键点击卡片立即关闭。",
+                                     "Tip: hovering pauses the countdown; left-click a card to dismiss it."),
+                SRApi.Ctl.LabelWrap);
         }
 
         // 常驻组件：面板关闭时 DrawGUI 会早退，覆盖层走不到，所以必须自己挂 OnGUI。

@@ -32,6 +32,7 @@ public partial class SR {
                 sb.Append("补丁: ").Append(SR.AuditPatchOk).Append("/").Append(SR.AuditPatchTotal)
                   .Append("  反射: ").Append(SR.AuditRefOk).Append("/").Append(SR.AuditRefTotal).AppendLine();
                 sb.Append("功能: ").Append(Features.Count).Append("  问题: ").Append(Features.ProblemCount).AppendLine();
+                sb.Append("第三方插件: ").AppendLine(CompatSummary());
                 sb.Append("API 注入: ").Append(SRApi.SinkCount()).Append("/").Append(SRApi.SinkTotal()).AppendLine();
                 string[] miss = SRApi.MissingSinks();
                 if (miss != null && miss.Length > 0) sb.Append("缺失注入: ").AppendLine(string.Join(",", miss));
@@ -164,6 +165,9 @@ public partial class SR {
                         }
                         if (conflicts.Count == 0) AuditLabel(T("（自动快捷键与右键绑定都在检测范围内；重复时两条动作会同时触发）", "(covers auto hotkeys and right-click bindings; a duplicate fires both actions)"));
                     });
+
+                // ---- 第三方插件兼容性卡 ----
+                RenderCompatCard();
 
                 // ---- 性能卡 ----
                 // 开关关闭时不刷新：不读采样、不重算，卡片只显示一行提示（勾选框在卡片里）。
