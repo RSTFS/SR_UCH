@@ -1,3 +1,7 @@
+> **Current state (2026-11)**: Time Control, Death Report, Match Brief, Level Recorder, Match Profile,
+> Host Console, Match Cast, Readability and the notification history page were removed.
+> Settings is a single page; Self-check and Notifications moved to the **footer bar**.
+
 # SR_UCH
 
 **English** | [简体中文](README.zh-CN.md)
@@ -64,19 +68,6 @@ The panel has sections on the left and pages on the right. Listed by section bel
 
 - **Online Room List** -- filter by region, mode, progress, full / not-full and more; sort, refresh and join.
 
-### Time Control
-
-- **Dream** -- a *local* freeze: `Time.timeScale` goes to 0, so the picture, physics and every hazard
-  stop. The panel and your hotkeys keep working (the whole mod runs on unscaled time). Offline /
-  local party only.
-- No online freeze is provided: the game has no native network message that can set
-  `Time.timeScale` to 0 on a client without the mod, so the old "Time Stop" hybrid was removed.
-- **Freeze Self** -- freezes only your own character (velocity cleared, animation paused, synced to
-  the other players); everyone else keeps moving. Do not enable it together with the EX module's
-  switch of the same name.
-- Both are **forced off at startup** on purpose: a freeze left in the config must never survive
-  a restart. Audio (Wwise) is not driven by `timeScale`, so sound keeps playing while time is stopped.
-
 ### Chaos Deck
 
 Turn the rules that normally stay fixed for a whole match into one card drawn per round.
@@ -91,7 +82,7 @@ and can see the current rule in the vanilla rules UI. The host is excluded by th
 
 - **Host-authoritative draw** -- only the host (or the local machine offline) rolls. The result is
   broadcast, not a seed, so every client applies exactly the same card; guests never roll locally.
-- **10 cards** -- low/high gravity, weak jump, slow sprint, slow platforms, no wall jumps, mirror
+- **17 cards** -- low/high gravity, weak jump, slow sprint, slow platforms, no wall jumps, mirror
   controls, dance invincibility, player collisions and frictionless. Each can be switched off in
   the card pool. Rate of fire, game speed, character size, camera flip and doomsday are excluded
   on purpose: the first two rewrite `Time.timeScale` (conflicting with Time Control), the rest
@@ -104,58 +95,11 @@ and can see the current rule in the vanilla rules UI. The host is excluded by th
 - **Room mod roster** -- a periodic handshake on the same rule message shows which players have
   the mod installed. All messages arrive over the server connection on a client, so the handshake
   identifies senders by local player number rather than `conn.connectionId`.
-- **Guest proposals (2.1)** -- a guest presses a hotkey to suggest one card. It rides the same
   `None` + magic channel and only the host acts on it: a pending card appears on the Chaos page
   with Accept / Ignore, expiring after 20 seconds (extendable and reopenable from Notification Hub). Accepting still uses the real rule broadcast,
   so guests without the mod change too. Offline you are the host -- just use the reroll key.
 - Uses only rules and message types the game already has: **no new Harmony patches, no new msgType,
   no new reflection registrations, no camera changes, no spawned objects, no threads**.
-
-### Death Report
-
-An end-of-match card that tells you how you died. Fully local: no network, no patches,
-no reflection registrations, no game-object references.
-
-- Listens to the game's own `PlayerKilledEvent` (sent from `setupDeath` under
-  `base.hasAuthority`, so only your own character's deaths are recorded), plus
-  `PiecePlacedEvent`, `NewMatchEvent` and `GameEndEvent`.
-- Reports total deaths / rounds, top 3 causes (localised name + count), the round of
-  your first death, self-inflicted deaths, the most likely culprit, and a one-line verdict.
-- **The "suspected culprit" is an inference, not exact attribution.** The game's
-  `PlayerKilledEvent` carries only `Cause` and the victim — `causedByPlayerNumber` is used
-  internally in `setupDeath` to award the killer a point, and online it goes out as a
-  network message rather than landing in the local list. This feature matches the most
-  recent placed block with the same kill type (`Placeable.KillType` / `Name` /
-  `placedByPlayerNumber` are all public), so with several identical blocks it can be wrong.
-  The UI says "suspected" and the whole item can be switched off.
-- Online, `PiecePlaced` network messages supplement placement counts (local
-  `PiecePlacedEvent` only fires on the placer's machine).
-- The card auto-pops in Match Brief (25 s by default, disableable). The settings page keeps
-  the last report with a one-click copy button.
-- Only values are stored (string / int / float), with caps (256 deaths, 512 placements),
-  cleared on a new match — the game sends no event when a block is destroyed, so holding
-  references would read recycled objects.
-
-### Match Brief
-
-A small foldable strip in the **game view** that surfaces the three features above without
-opening the settings panel:
-
-- Time-control state (Dream / Freeze Self), the active Chaos card, the rarest item
-  in the party box, and the room mod roster (optional). **Nothing is drawn when there is nothing
-  to show.**
-- A **pending guest proposal force-expands the strip** into a highlighted card with a countdown
-  and Accept / Ignore buttons. Hidden inside a settings page it would just expire in 20 seconds;
-  expired ones can now be reopened from the Notification Hub history.
-- Four-corner docking plus drag-to-reposition, opacity / scale / fold hotkey; position persists.
-- It is a self-owned persistent `MonoBehaviour.OnGUI`: the core's `RegisterOverlay` is only
-  dispatched while the panel is open (`DrawGUI` returns early when closed), so it cannot host an
-  in-match HUD.
-- All state travels through contract **Slots** (name + BCL delegate). In split builds every
-  feature is its own DLL, so referencing another feature's type directly would not compile.
-  Removing a feature simply removes its line.
-- Button clicks never send network messages from `OnGUI`; they set a frame-stamped intent that
-  Tick executes once, avoiding IMGUI's multiple passes per frame.
 
 ### Rarity Glow
 
@@ -177,58 +121,6 @@ chance = rarer = brighter (reversible on the page).
   odds, no new patches / reflection / threads.
 - The page shows live per-tier counts from the party box (0.2s throttle, core per-frame object cache).
 
-### Level Recorder
-
-A full timeline of everything that happened in a match, two-way linked with Layout Presets.
-Three pages: Timeline / Layouts / Settings.
-
-- Records match start, phases, placements, removals, points, chat, active Chaos cards,
-  preset loads, snapshots, disconnects and match end. The server relays placements / points /
-  chat / finishes to every client, so **a host-only install records the whole room**; guests
-  without the mod simply see no panel.
-- Viewing deliberately avoids a long scrolling list: **filter by kind / round / player / text,
-  paginate, tap a row for details**. Copy the filtered view or the whole match, or export to
-  `BepInEx\config\SR_UCH\records\`. The last match is archived at game end and stays readable.
-- **Layout Presets link**: an optional snapshot each round (via `QuickSaver.GetCurrentXmlSnapshot`)
-  can be saved as a preset in one click; saved presets can also be listed and loaded here.
-  Loading a preset leaves a row on the timeline.
-- Death rows cover the local character only (the game emits `PlayerKilledEvent` only with
-  authority) — this limit is stated in the page and in exports. Values only, no Unity object
-  references; timing uses `unscaledTime`, so it keeps working during a local time freeze.
-
-### Match Profile
-
-Bundles the game's native ruleset **and** this mod's config into a reusable room setup.
-
-- Rules travel through the game's own `MsgApplyRuleset` broadcast (`:46530` / `:111651`), so
-  **guests without the mod still get them**; mod config is host-local. Window size, sidebar width
-  and internal-state keys are excluded, matching Reset defaults.
-- Profiles are line-based text with Base64-encoded XML/config, so they can be copied to a friend
-  or imported from the clipboard. Import rejects `DOCTYPE` and enforces a size cap.
-- **Diff before applying**: the first tap on Apply lists every rule field that would change,
-  diffed against the XML this game version actually generates. Fields that were renamed or removed
-  after a game update are flagged with a warning (warning only, so older profiles still work).
-  Chat-command / clipboard applies skip the confirmation but log the same diff.
-- **Self-check handshake**: after applying, a full rescan runs (patch targets, reflection members,
-  attribution) and the verdict appears in the status line; a manual **Rescan self-check** button
-  runs the same path. A broadcast error or failed rescan rolls host-local config back to the
-  pre-apply snapshot. "No online room" is a known boundary, not a failure.
-- Apply from the **treehouse / before a match**: the handler lives on `TabletRulesScreen`, whose
-  presence in-match is unverified. Offline with no network connection only mod config is restored.
-
-### Host Console
-
-One read-only page with room state (connections / local player number / ping / average ping /
-scene / mode / round) and the status of all five features; one click copies the report to the
-clipboard and writes it to the log.
-
-- **Chat commands**: guests type `/sr help | ping | rules | cards | report | copy | profile <name>`
-  in the vanilla chat window; the host executes and replies in chat (visible to guests without the
-  mod). This is the only guest-to-host channel under a host-only install.
-- Only `profile` writes state, host-only; 1.5 s cooldown. If text chat is disabled in game
-  settings, the game rejects the reply but the host still gets a local toast.
-- No new patches / msgTypes / reflection entries / threads.
-
 ### Notification Hub
 
 One place for every screen toast. All notice sources (core, `Notify`, `NotifyT`, `NotifyTag`)
@@ -245,38 +137,6 @@ without touching any call site or changing behaviour when the feature is absent.
   "miss it and it is gone". Medium/high notices are also written into the Level Recorder timeline.
 - A self-owned `MonoBehaviour.OnGUI` strip shows the newest notices in the game view with a
   priority colour bar, a shape-coded length marker and a shrinking lifetime bar.
-
-### Readability
-
-Removes two barriers the mod suite introduced itself: pure-colour rarity tiers and one-shot
-timers that are too short to react to.
-
-- **Six shape patterns** for the rarity glow (dotted ring / single / double / diagonal stripes /
-  checker / rays), plus explicit text tier names with `[n/6]` numbering in the legend. Colour is
-  no longer the only channel.
-- **Font scale** (80-160%) and **high contrast** apply to Match Brief and the Notification Hub
-  strip; contrast also outlines legend swatches.
-- **Extra seconds** (0-20) extend both the guest-proposal window and toast duration. All four
-  settings are soft adapters exposed through contract Slots: removing this feature simply restores
-  defaults elsewhere.
-- No game font assets are loaded, no patches / msgTypes / reflection entries / threads.
-
-### Match Cast
-
-Sends the status that only the host's screen used to show into the **vanilla chat window**, so
-guests with no mod installed can read it.
-
-- `ChatDisplay.NewChatMessage` posts through `NetMsgTypes.ChatSent`, which the server relays with
-  `NetworkServer.SendToAll` (`:84077` / `:39125`). No new msgType, patch, reflection entry or thread.
-- Opening post: the enabled Chaos card pool (optionally with the rarest piece). Chaos draws
-  randomly **each round**, so there is no fixed deck order to preview; each draw is posted afterwards.
-  End of match: a one-line summary of the Death Report.
-- Throttling reuses the Notification Hub's 3-second same-kind merge and priority tiers, plus a
-  configurable minimum interval, per-round cap and character cap. Removing the hub simply falls back
-  to a fixed priority.
-- If text chat is disabled in the game options (`EmotesOnly` / `ChatAndEmotesOff`) or you are
-  offline, posts degrade to a single local toast on the host. No retries, no spam.
-- Text only: no rules, scores or entities are touched.
 
 ### Player Tracker
 
