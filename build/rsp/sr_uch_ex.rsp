@@ -28,4 +28,5 @@
 ..\SR_UCH_EX\ExModule\ExModule.Ui.cs
 ..\SR_UCH_EX\ExModule\ExModule.Console.cs
 ..\SR_UCH_EX\ExModule\ExModule.Advanced.cs
+..\SR_UCH_EX\ExModule\ExModule.Ping.cs
 /r:"%GAME%\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll"
