@@ -373,6 +373,7 @@ cd D:\RS_TFS\CC\SR_UCH
 .\build\build.ps1 -Check     # 守卫：清单生成一致性 / 契约独立编译 / rsp 覆盖 / csproj 可编
 .\build\build.ps1 -All -Deploy   # 构建并部署到游戏（游戏关着再跑）
 .\build\new-feature.ps1 -Name MyFeature   # 新功能脚手架（生成 Features\MyFeature.cs 骨架）
+.\build\build.ps1 -Features "HUD,Chat"     # 裁剪构建：只把指定功能编进 DLL（Lite 版）
 .\build\gen-rsp.ps1         # 只重生成 rsp 清单（构建会自动跑；-Verify 只校验）
 ```
 

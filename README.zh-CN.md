@@ -236,6 +236,13 @@
 CI（`.github/workflows/guards.yml`）跑两个 job：`text-guards` 与 `unit-tests`，
 破坏契约层或任一棘轮的 PR 会在评审前就变红。
 
+裁剪构建（只把指定功能编进 DLL，选项不写进仓库清单）：
+
+```powershell
+.\build\build.ps1 -Features "HUD,Chat"            # 合并版 Lite
+.\build\build.ps1 -Split -Features "HUD,Chat"    # 拆分版 Lite
+```
+
 更重的检查（完整 rsp 构建、拆分构建、csproj 构建、运行时自检比对）需要游戏引用程序集，只在本地跑：
 
 ```powershell

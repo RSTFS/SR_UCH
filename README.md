@@ -293,6 +293,13 @@ Everything below runs **without the game installed** (contract layer is compiled
 CI runs both jobs (`.github/workflows/guards.yml`): `text-guards` and `unit-tests`, so a pull request
 that breaks the contract layer or a ratchet goes red before review.
 
+Trimmed builds (only the listed features end up in the DLL; the repo manifests are left untouched):
+
+```powershell
+./build/build.ps1 -Features "HUD,Chat"            # merged Lite
+./build/build.ps1 -Split -Features "HUD,Chat"    # split Lite
+```
+
 The heavier checks (full build through the rsp chain, split-mode build, csproj build, runtime
 self-test comparison) need the game's reference assemblies and stay local:
 

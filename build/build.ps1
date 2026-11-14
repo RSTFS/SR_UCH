@@ -5,6 +5,7 @@
 #   .\build\build.ps1 -Split                   拆分模式：核心 SR_Manager.dll + 每个功能一个 SR_UCH_<功能>.dll
 #   .\build\build.ps1 -All                     合并模式 + 再编译 EX 与 Others 下的独立插件
 #   .\build\build.ps1 -Separate                先编契约程序集 SR.Contracts.dll，再按上面的模式构建
+#   .\build\build.ps1 -Features "HUD,Chat"   # 裁剪构建：只把指定功能编进 DLL（Lite 版）
 #   （-Split / -All / -Separate 可组合；全部参数与 _tools 构建链一致）
 # 架构说明：核心 SR_UCH.dll 只提供 UI/控件/注册表/门控，不认识任何功能；
 #   功能源码在 SR_UCH\Features\<功能>.cs，靠 SR_UCH.ITweak + SR 的注册 API 自挂。
@@ -17,7 +18,7 @@
 #     并把文件名加进下面的 $rspFeatures；合并模式的 sr_uch.rsp 也要补上该 .cs。
 # 注：本机无 dotnet SDK 时会自动回退到 tasks\net472\csc.exe。
 # ============================================================
-param([switch]$All, [switch]$Ex, [switch]$Others, [switch]$Split, [switch]$Check, [switch]$Deploy, [switch]$Separate, [string]$GameDir = '', [switch]$ExportAudit, [string]$PluginsDir = '', [string]$Root = (Split-Path -Parent $PSScriptRoot))
+param([switch]$All, [switch]$Ex, [switch]$Others, [switch]$Split, [switch]$Check, [switch]$Deploy, [switch]$Separate, [string]$Features = '', [string]$GameDir = '', [switch]$ExportAudit, [string]$PluginsDir = '', [string]$Root = (Split-Path -Parent $PSScriptRoot))
 # 拆分模式核心的**文件名**（程序集标识仍是 SR_UCH，改名只动文件名）。
 # 目的：与合并模式的 SR_UCH.dll 区分开 —— 否则同一个 bin\Release 里会有两份同名不同内容的核心。
 $splitCoreName = 'SR_Manager'
@@ -105,6 +106,33 @@ $rspOthersDir = Join-Path $rspDir 'plugins'          # 独立插件（工作区�
 # 功能清单 = build\rsp 下的 feat_*.rsp（按文件名排序，无需手工维护列表）
 $rspFeatures = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'rsp') -Filter 'feat_*.rsp' -File |
     Sort-Object Name | ForEach-Object { $_.Name })
+
+# -Features：裁剪构建（Lite 版）。只过滤 build\.cache 里的清单，不动仓库里的 rsp 模板；
+# 下次不带 -Features 构建时 gen-rsp 会重新生成完整清单。
+#   .\build\build.ps1 -Features "HUD,Chat"        → 合并模式只含这两个功能
+#   .\build\build.ps1 -Split -Features "HUD,Chat" → 只编这两个功能 DLL
+if ($Features) {
+    $wantSet = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($w in ($Features.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })) { [void]$wantSet.Add($w) }
+    if ($wantSet.Count -eq 0) { Write-Host '裁剪构建：-Features 为空'; exit 1 }
+    Write-Host ('裁剪构建：只编功能 ' + (($wantSet | Sort-Object) -join ', '))
+    foreach ($rspName in @('sr_uch.rsp', 'sr_uch_core.rsp')) {
+        $rp = Join-Path $cache $rspName
+        if (-not (Test-Path -LiteralPath $rp)) { continue }
+        $kept = New-Object System.Collections.Generic.List[string]
+        foreach ($ln in [System.IO.File]::ReadAllLines($rp)) {
+            $m = [regex]::Match($ln, '^Features\\([^.]+)')
+            if ($m.Success -and -not $wantSet.Contains($m.Groups[1].Value)) { continue }
+            $kept.Add($ln)
+        }
+        [System.IO.File]::WriteAllLines($rp, $kept.ToArray(), (New-Object System.Text.UTF8Encoding($true)))
+    }
+    $rspFeatures = @($rspFeatures | Where-Object {
+        $g = $_ -replace '^feat_', '' -replace '\.rsp$', ''
+        $wantSet.Contains($g)
+    })
+    if ($rspFeatures.Count -eq 0) { Write-Host '裁剪后没有功能可编（检查 -Features 里的功能名）'; exit 1 }
+}
 $outDir = Join-Path $Root 'bin\Release'
 
 # dotnet 不可用时的回退已在上面解析 csc 时处理（net472 csc.exe）
