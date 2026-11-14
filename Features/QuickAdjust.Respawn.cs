@@ -16,25 +16,11 @@ namespace SR_UCH.Tweaks {
                     SRApi.T("重生延迟、出生无敌、炮弹卡死自动重生（挑战/自由通用）。",
                             "Respawn delay, spawn invincibility and cannon-stuck respawn (challenge and freeplay)."));
                 if (_delay != null) {
-                    if (_delay.Value < 0f) {
-                        // 默认 = 跟随游戏原版（-1 哨兵）：首次进入对局读到原值后显示出来。
-                        string vanilla = SyncedVanillaDelay >= 0f
-                            ? SRApi.T("游戏默认（原版 " + SyncedVanillaDelay.ToString("0.0") + " 秒）",
-                                      "Game default (vanilla " + SyncedVanillaDelay.ToString("0.0") + "s)")
-                            : SRApi.T("游戏默认（进入对局后显示原版数值）", "Game default (shown after entering a match)");
-                        if (SRApi.Ctl.Button(SRApi.T("重生延迟：改为自定义", "Respawn delay: use custom"),
-                                SRApi.T("从游戏原版值开始调；之后可用「恢复游戏默认」回来", "Start from the vanilla value; use Restore to go back"),
-                                SRApi.Ctl.Sc(200), SRApi.Ctl.Sc(24)))
-                            _delay.Value = SyncedVanillaDelay > 0f ? Mathf.Round(SyncedVanillaDelay * 10f) / 10f : 0f;
-                        GUILayout.Label(vanilla, SRApi.Ctl.LabelWrap);
-                    } else {
-                        // 用核心统一滑条：**点击标签即恢复默认**（默认值 = -1 = 跟随游戏原版），
-                        // 与本仓库所有滑条行的设计一致，不再额外放「恢复默认」按钮。
-                        SRApi.Ctl.RowSlider(SRApi.T("重生延迟", "Respawn delay"),
-                            SRApi.T("死亡后等多少秒再自动重生\n0 = 立即重生\n点击本行标签恢复游戏默认",
-                                    "seconds to wait after death before respawning\n0 = respawn instantly\nclick this label to restore the game default"),
-                            _delay, 0f, 3f, "0.0", QuickAdjust.PageLabelWidth() / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)));
-                    }
+                    // 默认 0.5 秒；点击标签恢复默认（核心 RowSlider 语义）。
+                    SRApi.Ctl.RowSlider(SRApi.T("重生延迟", "Respawn delay"),
+                        SRApi.T("死亡后等多少秒再自动重生\n0 = 立即重生\n点击本行标签恢复默认",
+                                "seconds to wait after death before respawning\n0 = respawn instantly\nclick this label to restore the default"),
+                        _delay, 0f, 3f, "0.0", QuickAdjust.PageLabelWidth() / Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f)));
                 }
                 if (_invincible != null) QuickAdjust.PageSlider(SRApi.T("出生无敌", "Spawn invincibility"),
                     SRApi.T("每次出生后的无敌秒数\n游戏原生重生后是 1 秒\n挑战/自由模式", "seconds of invincibility after each spawn\nvanilla gives 1s after respawn\nchallenge and freeplay"),

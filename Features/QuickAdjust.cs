@@ -44,7 +44,7 @@ namespace SR_UCH.Tweaks {
                 SelfReg();
                 // 默认 -1 = "还没同步"：第一次进入游戏时会把**游戏原版数值**填进来（见 RespawnDelayTimingPatch）。
                 // 用户明确要求：这个功能的默认值就是原版数值，而不是"0 = 原版"。
-                _delay = plugin.Config.Bind(Sec, "Respawn Delay", -1f,
+                _delay = plugin.Config.Bind(Sec, "Respawn Delay", 0.5f,
                     new ConfigDescription("重生延迟（0-3 秒）。默认值会自动取游戏原版数值；0 = 立即重生", new AcceptableValueRange<float>(-1f, 3f)));
                 _invincible = plugin.Config.Bind(Sec, "Spawn Invincible", 1f, new ConfigDescription("出生无敌（0-10 秒）", new AcceptableValueRange<float>(0f, 10f)));
                 _cannonRespawn = plugin.Config.Bind(Sec, "Cannon Auto Respawn", false, "炮弹卡死：死亡且卡在炮弹里超过 1.5 秒自动重生。");

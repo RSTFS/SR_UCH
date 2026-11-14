@@ -312,6 +312,7 @@ namespace SR_UCH.Tweaks {
             // 抛 "Getting control N's position in a group with only N controls"。
             // 注意 lambda 不能捕获 ref 参数 open，先拷到局部变量。
             bool __openNow = open;
+            if (open) SR.Ctl.NoteComboOpen();   // 本帧有下拉展开：页面滚动区让出滚轮
             bool __skipNow = entry != null && _comboSkipFrame.TryGetValue(entry, out int __sf) && __sf == Time.frameCount;
             GUILayout.BeginVertical(GUILayout.Width(width));
             if (GUILayout.Button(current + "   v", _frame, GUILayout.Width(width), GUILayout.Height(CtlH()))) {

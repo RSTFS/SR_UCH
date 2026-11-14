@@ -161,7 +161,7 @@ namespace SR_UCH.Tweaks {
                 new ConfigDescription("每条通知停留秒数（0.5-5，步进 0.5）。", new AcceptableValueRange<float>(0.5f, 5f)));
             _cardW = plugin.Config.Bind(Sec, "Card Width", 300,
                 new ConfigDescription("浮层卡片像素宽度（100-500）。", new AcceptableValueRange<int>(100, 500)));
-            _fontSize = plugin.Config.Bind(Sec, "Font Size", 17,
+            _fontSize = plugin.Config.Bind(Sec, "Font Size", 20,
                 new ConfigDescription("正文文字大小（10-32）。", new AcceptableValueRange<int>(10, 32)));
             // 旧配置项已删除，启动时从 cfg 清理。
             try { SRApi.Migration.Remove(Sec, "Quiet In Match"); } catch (Exception __mq) { SRApi.Guard.Log("通知中心/清理静默键", __mq); }
@@ -531,10 +531,10 @@ namespace SR_UCH.Tweaks {
             CfgRow(_enabled);
             CfgRow(_maxVisible);
             CfgRow(_toastSeconds);
-            CfgRow(_fontSize);
-            CfgRow(_cardW);
-            CfgRow(_cardAlpha);
             CfgRow(_cardScale);
+            CfgRow(_cardW);
+            CfgRow(_fontSize);
+            CfgRow(_cardAlpha);
             // 停靠位置：标签「位置」+ 右侧下拉（四种位置），默认右下。
             {
                 string[] vals = new string[] { "0", "1", "2", "3" };
@@ -546,7 +546,7 @@ namespace SR_UCH.Tweaks {
                 };
                 SRApi.Ctl.RowCombo(SRApi.T("位置", "Position"),
                     SRApi.T("通知浮层停在屏幕的哪个角。", "Which screen corner the toasts dock to."),
-                    _corner, vals, labels, SRApi.Ctl.Sc(160f));
+                    _corner, vals, labels, SRApi.Ctl.Sc(120f));
             }
 
         }

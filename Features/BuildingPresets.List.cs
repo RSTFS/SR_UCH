@@ -81,7 +81,10 @@ namespace SR_UCH.Tweaks {
             //   probe 取表格顶 → 表格高 = 页面内容底 − 表格顶 → 行区 = 表格高 − 表头。
             // 不再用 ContentArea/ScrollRowsH 自己算一套（多套口径就是"列表只剩一行"的根因）。
             Rect probe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
-            float tableH = Mathf.Max(minH, SRApi.PageContentBottom - probe.y);
+            // 底栏占位要扣掉：之前直接用到 PageContentBottom，表格最后一行会被底栏盖住，
+// 表现为"能滚但滚不到最下面"（最后一行永远在底栏后面）。
+            float __bottom = SRApi.PageContentBottom - SRApi.FooterHeight - SRApi.Ctl.Sc(2f);
+            float tableH = Mathf.Max(minH, __bottom - probe.y);
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.ExpandWidth(true),
                 GUILayout.Height(tableH));
             float rowsH = Mathf.Max(SRApi.Ctl.Sc(20f), box.height - headerH);

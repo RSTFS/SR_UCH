@@ -17,7 +17,9 @@ public partial class SR {
             try {
                 float w = SR.Ctl.Label.CalcSize(SRApi.Ctl.Content(label ?? "")).x + Sc(10);
                 if (w > _labelColCur) _labelColCur = w;
-                return Mathf.Max(Sc(48f), Mathf.Min(Sc(220f), Mathf.Max(_labelColPrev, w)));
+                // 对齐仍用上帧列宽，但不允许比当前标签宽出太多（旧实现会把别的页面的长标签宽度一直带过来）。
+                float __prev = Mathf.Min(_labelColPrev, w + Sc(60f));
+                return Mathf.Max(Sc(48f), Mathf.Min(Sc(180f), Mathf.Max(__prev, w)));
             } catch { return Sc(80f); }
         }
 

@@ -358,13 +358,18 @@ public partial class SR {
                 float rightW = Mathf.Max(Sc(120f), pw - leftW - Sc(12f));
                 GUILayout.BeginHorizontal();
                 try {
-                    Rect leftBlock = default(Rect);
                     GUILayout.BeginVertical(GUILayout.Width(leftW + hueW + gap));
-                    try { DrawSvBlock(e, s, leftW + hueW + gap); } finally { GUILayout.EndVertical(); leftBlock = GUILayoutUtility.GetLastRect(); }
+                    try {
+                        // 左侧 SV 方块的高度与右栏内容对齐（用户要求：调明度/饱和度那个方块加高）。
+                        float paletteRows = (24 + PaletteCols - 1) / PaletteCols;
+                        float rightH = paletteRows * Sc(24f) + (paletteRows - 1) * Sc(4f) + Sc(4f)
+                                     + 3f * Ctl.ControlH() + Sc(4f) + 2f * Ctl.ControlH() + Sc(6f);
+                        DrawSvBlock(e, s, leftW + hueW + gap, rightH);
+                    } finally { GUILayout.EndVertical(); }
                     GUILayout.Space(Sc(10f));
                     GUILayout.BeginVertical(GUILayout.Width(rightW));
                     try {
-                        DrawPaletteGrid(e, s, rightW, leftBlock.height);
+                        DrawPaletteGrid(e, s, rightW);
                         GUILayout.Space(Sc(4f));
                         // H/S/V 与 Hex 共用同一标签列：取当前语言里最宽的文本 + 8px。
                         float labelW = LabelCol(T("色相", "Hue"), T("饱和", "Sat"), T("明度", "Val"), "Hex");
@@ -407,15 +412,16 @@ public partial class SR {
         }
 
         // 色板主体：左边饱和度×明度方块，右边竖向色相条（ImGui ColorPicker3 布局）。
-        private static void DrawSvBlock(ConfigEntryBase e, State s, float pw) {
+        private static void DrawSvBlock(ConfigEntryBase e, State s, float pw, float targetH = 0f) {
             float hueW = Sc(24f), gap = Sc(8f);
             float side = Mathf.Min(Sc(150f), Mathf.Max(Sc(72f), pw - hueW - gap - Sc(8f)));
+            float h = targetH > side ? targetH : side;   // 高度对齐右栏；宽度保持原正方形宽
             Rect sq = default(Rect), hb = default(Rect);
             GUILayout.BeginHorizontal();
             try {
-                sq = GUILayoutUtility.GetRect(side, side);
+                sq = GUILayoutUtility.GetRect(side, h);
                 GUILayout.Space(gap);
-                hb = GUILayoutUtility.GetRect(hueW, side);
+                hb = GUILayoutUtility.GetRect(hueW, h);
                 GUILayout.FlexibleSpace();
             } finally { GUILayout.EndHorizontal(); }
             DrawSvSquare(e, s, sq);
@@ -535,16 +541,11 @@ public partial class SR {
         }
 
         // 24 色网格，点击即应用；当前色用黑白双描边高亮。
-        private static void DrawPaletteGrid(ConfigEntryBase e, State s, float pw, float targetH = 0f) {
+        private static void DrawPaletteGrid(ConfigEntryBase e, State s, float pw) {
             float gap = Sc(3f);
-            float cw = Mathf.Clamp((pw - (PaletteCols - 1) * gap) / PaletteCols, Sc(12f), Sc(40f));
+            float cw = Mathf.Clamp((pw - (PaletteCols - 1) * gap) / PaletteCols, Sc(10f), Sc(28f));
             float ch = Mathf.Clamp(cw * 0.85f, Sc(16f), Sc(22f));
             int rows = (Palette.Length + PaletteCols - 1) / PaletteCols;
-            // 调色板高度与左侧 SV 方块对齐（用户要求）：按左栏高度反推色块高度。
-            float ch2 = targetH > Sc(20f)
-                ? Mathf.Clamp((targetH - (rows - 1) * gap) / rows, Sc(12f), Sc(40f))
-                : ch;
-            ch = ch2;
             Rect box = GUILayoutUtility.GetRect(PaletteCols * cw + (PaletteCols - 1) * gap, rows * ch + (rows - 1) * gap);
             Color cur = Quant(PickerColor(s));
             for (int i = 0; i < Palette.Length; i++) {

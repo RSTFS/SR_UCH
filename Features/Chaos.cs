@@ -783,7 +783,13 @@ namespace SR_UCH.Tweaks {
             if (SRApi.Ctl.Button(SRApi.T("仅增益", "Buffs"), SRApi.T("只保留对自己有利的牌（高跳/快跑/跳舞无敌等）", "Keep only beneficial cards"), bw, bh)) KeepBeneficial();
             GUILayout.Space(SRApi.Ctl.Sc(4f));
             if (SRApi.Ctl.Button(SRApi.T("仅减益", "Debuffs"), SRApi.T("只保留让人受限/变弱的牌（低重力/慢速/禁墙跳等）", "Keep only weakening cards"), bw, bh)) KeepHarmful();
+            GUILayout.Space(SRApi.Ctl.Sc(4f));
+            if (SRApi.Ctl.Button(SRApi.T("反选", "Invert"), SRApi.T("勾选状态全部反转（至少留一张）", "Invert every checkbox (keep at least one)"), bw, bh)) InvertPools();
             GUILayout.EndHorizontal();
+            int __on = 0;
+            for (int i = 0; i < Cards.Length; i++) if (_pool[i] != null && _pool[i].Value) __on++;
+            Line(SRApi.T("已启用 " + __on + " / " + Cards.Length + " 张；勾选后才会进入随机池。", __on + " / " + Cards.Length + " cards enabled; only checked cards can be drawn."),
+                 SRApi.T("已启用 " + __on + " / " + Cards.Length + " 张；勾选后才会进入随机池。", __on + " / " + Cards.Length + " cards enabled; only checked cards can be drawn."));
             GUILayout.Space(SRApi.Ctl.Sc(6f));
 
             RenderPoolGroup(true);    // 数值规则
@@ -859,6 +865,18 @@ namespace SR_UCH.Tweaks {
                 for (int i = 0; i < _pool.Length; i++) if (_pool[i] != null && _pool[i].Value) { any = true; break; }
                 if (!any && _pool.Length > 0 && _pool[0] != null) _pool[0].Value = true;   // 至少留一张
             } catch (Exception ex) { SRApi.Guard.Log("混乱牌组/按倾向筛选", ex); }
+        }
+
+        private void InvertPools() {
+            try {
+                bool any = false;
+                for (int i = 0; i < _pool.Length; i++) {
+                    if (_pool[i] == null) continue;
+                    _pool[i].Value = !_pool[i].Value;
+                    if (_pool[i].Value) any = true;
+                }
+                if (!any && _pool.Length > 0 && _pool[0] != null) _pool[0].Value = true;
+            } catch (Exception ex) { SRApi.Guard.Log("混乱牌组/反选", ex); }
         }
 
         private void KeepBeneficial() { ApplyPoolMood(1); }
