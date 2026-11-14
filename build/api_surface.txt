@@ -1,28 +1,17 @@
-# ---- 一、门面与子命名空间（功能层只经这些入口访问核心） ----
-# ---- 七、页面几何（自绘页按这些量算视口，避免写死高度） ----
-# ---- 三、提示 / 日志 / 本地化 ----
-# ---- 九、绘制与对象查询原语（少量基础图元 + 帧内对象缓存） ----
-# ---- 二、生命周期与运行状态（只读查询 / 门控 / 输入占用） ----
-# ---- 五、通用控件（控件外观与命中一律走这里，不要自绘） ----
-# ---- 八、颜色：统一调色板与颜色文本（核心实现，功能层不再自带解析） ----
-# ---- 六、表格（表头/行/滚动条/动作列/高度自适应与列偏好） ----
-# ---- 四、注册扩展点（栏目 / 页 / 键 / 钩子 / 行扩展） ----
 # SR 功能层 API 白名单（微内核棘轮 / SMAPI 式 API 表面）
-# 分组只是阅读顺序，# 开头为注释；解析器只认非 # 行，组内按字母序。
+# 规则：SR_UCH\Features\*.cs 只允许使用本文件列出的 SRApi 第一段成员名；新增 API 必须同时改代码与本清单（-Check / CI 会拦）。
+# 粒度：只约束第一段（SRApi.X）。SRApi.Ctl / SRApi.Ref / SRApi.Cache 等子命名空间的二级成员整体放行，不逐条登记，
+#       因此本清单不出现 Ctl.ColorEdit 这类条目（写了也永远不会被守卫匹配到）。
+# 条目必须真实存在于 SR_UCH\SR_UCH\SR.Contracts.cs 的 SRApi 里（守卫会校验，防止 API 删掉后留下假条目）。
 # 演进方向（只减不增）：功能层只走契约层门面，实现层随便改都不破坏功能。
-# 规则：SR_UCH\Features\*.cs 只允许使用本文件列出的 SRApi.* 成员；新增 API 必须同时改代码与本清单（-Check / CI 会拦）。
 BlockInput
 BlockWindowDrag
 Cache
 CanControlLocally
 CanDoHost
-ClaimWheelArea
 ClearableTextField
 CloseMenu
-ColorEdit
 ColorHex
-ColorPanel
-ColorSwatch
 ComboKeyDown
 ComboKeyHeld
 ContentArea
@@ -39,16 +28,13 @@ FlushConfig
 FooterHeight
 ForceResetUiState
 FrameObjects
-FromColor32
 GateHost
 GateMaster
 GateModeAllows
 Guard
 HasServer
 HotkeyAction
-HotkeyButtonNoHint
 LangVer
-ListTableHeight
 LocDesc
 LocEnum
 LocKey
@@ -75,8 +61,6 @@ PageScroll
 PageScrollTopY
 PageUsedTop
 PageViewportHeight
-ParseHex
-PreviewColor
 Ref
 RegisterCameraView
 RegisterDismissHook
@@ -92,7 +76,6 @@ RegisterTick
 RegisterTypingProvider
 RegisterWheelHook
 RenderSectionEntries
-ResetColor
 RowCompact
 RowCompanions
 RowExtras
@@ -110,8 +93,6 @@ TableAutoFit
 TableAutoHeight
 TableDragWatchdog
 TableDraw
-TableFitHeight
-TableHeightGripBar
 TableLineStrong
 TableScrollbar
 TableScrollbarFor
@@ -120,8 +101,6 @@ TableSource
 TableState
 TableWheelInput
 TakeWheelEvent
-ToColor32
-ToHex
 Typing
 UiOpen
 WheelArea

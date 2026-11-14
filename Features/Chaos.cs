@@ -547,7 +547,9 @@ namespace SR_UCH.Tweaks {
             // 只认「房主发的、带牌组魔数」的真实规则消息。
             // 玩家在规则书里手动改规则时 Value2 = 0，其它功能发的带外消息魔数也不同
             // —— 都不能被当成抽牌（否则会把牌面搞乱）。
-            if (!IsOnline() || IsHostSelf() || !_enabled.Value) return;
+            // 注：本机开关关掉也要继续「只跟踪不生效」——规则是房主广播的，游戏照样写进
+            // Modifiers；如果这里按 _enabled 早退，页面会显示「未生效」而规则其实在生效（审计 P2-7）。
+            if (!IsOnline() || IsHostSelf()) return;
             if ((m.Value2 >> 16) != CardMagic) return;
             int op2 = (m.Value2 >> 8) & 0xFF;
             int card = m.Value2 & 0xFF;
@@ -664,7 +666,11 @@ namespace SR_UCH.Tweaks {
 
         private void RenderActiveCards() {
             int n = EffectiveIndexes();
-            if (n <= 0) { Line("（未生效）", "(none)"); return; }
+            if (n <= 0) {
+                if (_enabled != null && !_enabled.Value) Line("（本机未启用）", "(off on this machine)");
+                else Line("（未生效）", "(none)");
+                return;
+            }
             EnsureCardStyles();
             float h = SRApi.Ctl.Sc(52f);
             float gap = SRApi.Ctl.Sc(6f);
@@ -728,6 +734,10 @@ namespace SR_UCH.Tweaks {
             CfgRow(_maxActive);
             CfgRow(_announce);
 
+            // 本机开关关掉时，牌面只作跟踪（房主规则仍然生效），必须明说，不能让页面假称"未生效"。
+            if (_enabled != null && !_enabled.Value)
+                Line("本机开关已关：这里只显示收到的牌面，房主规则仍会生效。",
+                     "Switch is off on this machine: cards are display-only; host rules still apply.");
             SRApi.Ctl.SectionTitle("- " + SRApi.T("当前牌面", "Active cards") + " -",
                 SRApi.T("本回合生效的规则牌：绿边 = 增益，红边 = 减益，蓝边 = 中性。",
                         "Rules in effect this round: green = buff, red = debuff, blue = neutral."));

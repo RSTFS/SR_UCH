@@ -57,6 +57,9 @@ namespace SR_UCH.Tweaks {
         private static float _nextScan;
         private static int _wMin = int.MaxValue, _wMax = 0;   // 本盒出现过的权重范围（相对分档用）
         private static int[] _wCache = new int[0];            // 本轮扫描每件道具的权重（两遍扫描共用）
+        // 我们创建过的光晕 Transform 弱登记：只用于清理，不参与分级/查询。
+        // 光晕本身仍是道具的子对象，道具消失时随之销毁；这里只为「帧对象缓存为空时关功能」兜底（审计 O-7）。
+        private static readonly List<Transform> _made = new List<Transform>();
 
         // ============ 生命周期 ============
 
@@ -174,6 +177,7 @@ namespace SR_UCH.Tweaks {
                     if (tier < 0) { HideGlow(pb); continue; }
                     ApplyGlow(pb, tier);
                 }
+                if (_made.Count > 64) PruneMade();   // 跨局累积的已销毁条目
             } catch (Exception ex) { SRApi.Guard.Log("品质光芒/扫描", ex); }
         }
 
@@ -229,6 +233,7 @@ namespace SR_UCH.Tweaks {
                 sr.sortingLayerName = refSr != null ? refSr.sortingLayerName : "Background 2";
                 sr.sortingOrder = (refSr != null ? refSr.sortingOrder : 0) - 100;
                 g = go.transform;
+                _made.Add(g);
             } else {
                 sr = g.GetComponent<SpriteRenderer>();
                 if (sr == null) return;
@@ -327,6 +332,15 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void RemoveAll() {
+            // 首选弱登记：帧对象缓存为空（关功能瞬间 / 道具重建前）时也能把光晕清干净（审计 O-7）。
+            try {
+                for (int i = _made.Count - 1; i >= 0; i--) {
+                    Transform g = _made[i];
+                    if (g != null) UnityEngine.Object.Destroy(g.gameObject);
+                }
+            } catch (Exception ex) { SRApi.Guard.Log("品质光芒/清理登记表", ex); }
+            _made.Clear();
+            // 兜底：帧缓存里还有但我们没登记过的光晕（理论上不会有，防旧版本/手工残留）。
             try {
                 PickableBlock[] all = SRApi.FrameObjects<PickableBlock>();
                 if (all == null) return;
@@ -336,6 +350,11 @@ namespace SR_UCH.Tweaks {
                     if (g != null) UnityEngine.Object.Destroy(g.gameObject);
                 }
             } catch (Exception ex) { SRApi.Guard.Log("品质光芒/清理", ex); }
+        }
+
+        // 道具被销毁后亮着的 Transform 会变成 null，定期从登记表里剔除，避免跨局累积。
+        private static void PruneMade() {
+            for (int i = _made.Count - 1; i >= 0; i--) if (_made[i] == null) _made.RemoveAt(i);
         }
 
         // ============ 页面 ============

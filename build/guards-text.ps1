@@ -28,6 +28,17 @@ function Check-ApiSurface {
     }
     if ($bad.Count -gt 0) { Bad ('功能层使用了白名单外的 SRApi.* 成员: ' + (($bad.Keys | Sort-Object) -join ', ')) }
     else { Ok ('API 棘轮：功能层只使用白名单内的 SRApi.* 成员（白名单 ' + $allow.Count + ' 个）') }
+    # 白名单条目必须真实存在于契约层：防止 API 删除后留下假条目，或手滑写错名字。
+    $contract = Join-Path $Root 'SR_UCH\SR.Contracts.cs'
+    if (Test-Path -LiteralPath $contract) {
+        $csrc = Read-Text $contract
+        $fake = @{}
+        foreach ($n in $allow.Keys) {
+            if (-not [regex]::IsMatch($csrc, '(?m)^\s*(?:\[[^\]]*\]\s*)*(?:public|internal)\s+[^\r\n]*\b' + [regex]::Escape($n) + '\b')) { $fake[$n] = $true }
+        }
+        if ($fake.Count -gt 0) { Bad ('白名单条目在契约层不存在: ' + (($fake.Keys | Sort-Object) -join ', ')) }
+        else { Ok ('白名单条目均真实存在于契约层（' + $allow.Count + ' 个）') }
+    }
 }
 
 # ---------- 2) 契约层不得出现实现层标识 ----------
