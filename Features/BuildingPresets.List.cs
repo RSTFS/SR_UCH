@@ -169,8 +169,10 @@ namespace SR_UCH.Tweaks {
                 _args.pinDraw = delegate(int row, Rect r, int visibleIdx) { DrawActionButtons(visible, row, r); };
                 _args.emptyHint = delegate {
                     return _presets.Count == 0
-                        ? SRApi.T("还没有预设：在「预设保存」页保存当前布局，或从剪贴板 / 文件导入。", "No presets yet: save the current layout on the Save page, or import from clipboard / file.")
-                        : SRApi.T("没有匹配当前搜索的预设。", "No presets match the current search.");
+                        ? SRApi.T("ℹ\n还没有预设\n到「预设保存」页保存当前布局，或从剪贴板 / 文件导入。",
+                                  "ℹ\nNo presets yet\nSave the current layout on the Save page, or import from clipboard / file.")
+                        : SRApi.T("ℹ\n没有匹配的预设\n清空搜索或切换筛选条件试试。",
+                                  "ℹ\nNo matching presets\nClear the search or change the filters.");
                 };
                 _hiddenBeforeTable = _hiddenCols.Count;
                 // 滚轮入口照联机列表：绘制期就地在表格矩形上取用（表格区域优先于页面钩子）。

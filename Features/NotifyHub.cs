@@ -76,7 +76,7 @@ namespace SR_UCH.Tweaks {
         private static float AnimOut() { return 0.20f; }
 
         private static Texture2D _white;
-        private static GUIStyle _label, _btn;
+        private static GUIStyle _label, _btn, _sym;
         private static HubUI _ui;
 
         // 自己 Provide 的委托实例：注销时按值匹配，避免误删之后注册的实现。
@@ -371,6 +371,10 @@ namespace SR_UCH.Tweaks {
             _label.wordWrap = true; _label.clipping = TextClipping.Clip;
             _label.normal.textColor = new Color(0.94f, 0.96f, 0.99f, 1f);
             _btn = new GUIStyle(GUI.skin.button);
+            _sym = new GUIStyle(_label);
+            _sym.alignment = TextAnchor.MiddleCenter;   // 类型符号：✓ / ! / ▲（色盲友好，不只靠颜色）
+            _sym.fontStyle = FontStyle.Bold;
+            _sym.wordWrap = false;
         }
 
         private static void Fill(Rect r, Color c) {
@@ -511,7 +515,21 @@ namespace SR_UCH.Tweaks {
                     // 只显示正文（用户要求去掉「xN」计数）。
                     // 文本区底部 +2px 缓冲：游戏字体最后一笔常被 CalcSize 少算，
                     // 不加缓冲时"y/g/p"这类下伸笔画的最后一行会被裁掉（用户实测 1px 仍偏紧）。
-                    GUI.Label(new Rect(ax + pad, y + pad * 0.6f, w - pad * 2f - 6f * s, h - pad * 1.6f), nt.Text, _label);
+                    // 类型符号（勾/叹号/三角）：只用符号 + 颜色两重编码，不只靠颜色区分。
+                    string __symTxt = nt.Level == 2 ? "▲" : nt.Level == 1 ? "!" : "·";
+                    _sym.fontSize = Mathf.RoundToInt(_label.fontSize * 0.95f);
+                    Color __symPrev = GUI.color;
+                    try {
+                        GUI.color = new Color(bar.r, bar.g, bar.b, aa);
+                        GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(2f), y + pad * 0.6f, SRApi.Ctl.Sc(16f) * s, h - pad * 1.6f), __symTxt, _sym);
+                        GUI.color = new Color(1f, 1f, 1f, aa);
+                        GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(18f) * s, y + pad * 0.6f, w - pad * 2f - SRApi.Ctl.Sc(20f) * s, h - pad * 1.6f), nt.Text, _label);
+                    } finally { GUI.color = __symPrev; }
+                    // 悬浮时右上角显示关闭按钮（ImGuiNotify 的 optional dismiss）。
+                    if (hovered) {
+                        Rect __x = new Rect(ax + w - SRApi.Ctl.Sc(20f) * s, y + SRApi.Ctl.Sc(2f), SRApi.Ctl.Sc(18f) * s, SRApi.Ctl.Sc(18f) * s);
+                        if (GUI.Button(__x, "×", _btn)) nt.DyingAt = now;
+                    }
                     // 底部剩余时间条：从满格开始缩短（排队期间还没上屏，不画消耗）。
                     float life = Mathf.Clamp01(1f - Mathf.Max(0f, now - nt.ShownAt) / Mathf.Max(0.4f, nt.Stay));
                     Fill(new Rect(ax + barW, y + h - 3f * s, (w - barW) * life, 3f * s),

@@ -104,6 +104,8 @@ namespace SR_UCH.Tweaks {
                         delegate { ReturnToTreehouse(); }, SRApi.Ctl.Sc(150), SRApi.Ctl.Sc(26))) ReturnToTreehouse();
                 GUILayout.Space(SRApi.Ctl.Sc(10));
                 RenderListStatus(visible.Count, _presets.Count);
+                GUILayout.Space(SRApi.Ctl.Sc(8));
+                GUILayout.Label(SRApi.T("右键名称=重命名", "right-click a name to rename"), SRApi.Ctl.Label);
                 GUILayout.FlexibleSpace();
             } finally { GUILayout.EndHorizontal(); }
         }

@@ -677,14 +677,14 @@ namespace SR_UCH.Tweaks {
                 int hover = -1;
                 if (p.IsLocal) {
                     // 本地关卡只给「加载」一个按钮
-                    _actLocalActions[0].Label = replacePending ? SRApi.T("确认", "Confirm") : SRApi.T("加载", "Load");
+                    _actLocalActions[0].Label = PendingLabel("加载", "Load", "replace:" + p.Key);
                     if (SRApi.TableActionButtons(r, _actLocalActions, null, ref hover) >= 0) _actionHitThisFrame = true;
                     return;
                 }
                 bool delPending = IsPending("del:" + p.Key);
-                _actActions[ActLoad].Label = replacePending ? SRApi.T("确认", "Confirm") : SRApi.T("加载", "Load");
+                _actActions[ActLoad].Label = PendingLabel("加载", "Load", "replace:" + p.Key);
                 _actActions[ActExport].Label = SRApi.T("导出", "Export");
-                _actActions[ActDelete].Label = delPending ? SRApi.T("确认", "Confirm") : SRApi.T("删除", "Delete");
+                _actActions[ActDelete].Label = PendingLabel("删除", "Delete", "del:" + p.Key);
                 int hit = SRApi.TableActionButtons(r, _actActions, null, ref hover);
                 if (hit >= 0) _actionHitThisFrame = true;
             } catch (Exception __ex) {
@@ -814,8 +814,17 @@ namespace SR_UCH.Tweaks {
             _pendingAt = -1f;
         }
 
+        // 二次确认按钮的倒计时文案：窗口内显示「确认 (2.3s)」。
+        private static string PendingLabel(string zhBase, string enBase, string key) {
+            try {
+                if (!IsPending(key)) return SRApi.T(zhBase, enBase);
+                float left = Mathf.Max(0f, ConfirmWindow - (Time.unscaledTime - _pendingAt));
+                return SRApi.T("确认 (" + left.ToString("0.0") + "s)", "Confirm (" + left.ToString("0.0") + "s)");
+            } catch { return SRApi.T(zhBase, enBase); }
+        }
+
         private static string SaveButtonText() {
-            return IsPendingPrefix("overwrite:") ? SRApi.T("确认覆盖", "Confirm overwrite") : SRApi.T("保存当前布局", "Save layout");
+            return IsPendingPrefix("overwrite:") ? PendingLabel("确认覆盖", "Confirm overwrite", _pendingKey) : SRApi.T("保存当前布局", "Save layout");
         }
 
     }

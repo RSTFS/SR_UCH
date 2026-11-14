@@ -371,9 +371,13 @@ namespace SR_UCH.Tweaks {
                 if (__ke2 != null && __ke2.type == EventType.KeyDown) {
                     int __cur2 = 0;
                     for (int i = 0; i < options.Length; i++) { if (options[i] == current) { __cur2 = i; break; } }
-                    if (__ke2.keyCode == KeyCode.DownArrow) {
-                        int __n3 = (__cur2 + 1) % options.Length;
+                    // Tab / Shift+Tab 也参与选项切换（键盘玩家不必先按方向键）。
+                    bool __next = __ke2.keyCode == KeyCode.DownArrow || (__ke2.keyCode == KeyCode.Tab && !__ke2.shift);
+                    bool __prev2 = __ke2.keyCode == KeyCode.UpArrow || (__ke2.keyCode == KeyCode.Tab && __ke2.shift);
+                    if (__next || __prev2) {
+                        int __n3 = __next ? (__cur2 + 1) % options.Length : (__cur2 - 1 + options.Length) % options.Length;
                         if (vals != null && __n3 < vals.Length) SR.SetValue(entry, vals.GetValue(__n3));
+                        __ke2.Use();
                         __ke2.Use();
                     } else if (__ke2.keyCode == KeyCode.UpArrow) {
                         int __n3 = (__cur2 - 1 + options.Length) % options.Length;

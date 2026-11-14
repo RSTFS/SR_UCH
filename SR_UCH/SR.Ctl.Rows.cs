@@ -13,13 +13,19 @@ public partial class SR {
 
         internal static void EndLabelColumnFrame() { if (Mathf.Abs(_labelColCur - _labelColPrev) > 0.5f) _labelColPrev = _labelColCur; }
 
+        // 标签列统一 token（所有页面/所有行控件共用；间距/上下限只改这里）。
+        private static readonly float LabelMinW = Sc(48f);
+        private static readonly float LabelMaxW = Sc(180f);
+        private static readonly float LabelPadW = Sc(10f);
+        private static readonly float LabelSlackW = Sc(60f);
+
         internal static float LabelColumnWidth(string label) {
             try {
-                float w = SR.Ctl.Label.CalcSize(SRApi.Ctl.Content(label ?? "")).x + Sc(10);
+                float w = SR.Ctl.Label.CalcSize(SRApi.Ctl.Content(label ?? "")).x + LabelPadW;
                 if (w > _labelColCur) _labelColCur = w;
                 // 对齐仍用上帧列宽，但不允许比当前标签宽出太多（旧实现会把别的页面的长标签宽度一直带过来）。
-                float __prev = Mathf.Min(_labelColPrev, w + Sc(60f));
-                return Mathf.Max(Sc(48f), Mathf.Min(Sc(180f), Mathf.Max(__prev, w)));
+                float __prev = Mathf.Min(_labelColPrev, w + LabelSlackW);
+                return Mathf.Max(LabelMinW, Mathf.Min(LabelMaxW, Mathf.Max(__prev, w)));
             } catch { return Sc(80f); }
         }
 
