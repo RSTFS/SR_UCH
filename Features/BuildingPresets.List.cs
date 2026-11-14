@@ -46,6 +46,19 @@ namespace SR_UCH.Tweaks {
         private static readonly Func<string> _emptyHintFn = EmptyHintText;
         private static readonly Action<int, Rect, int> _pinDrawFn = delegate (int row, Rect r, int vi) { DrawActionButtons(_visibleCache, row, r); };
         private static readonly Action<int> _rowRightClickFn = delegate (int row) { StartRenameVisibleRow(row); };
+        private static readonly Action<int> _rowDoubleClickFn = delegate (int row) { DoubleClickVisibleRow(row); };
+
+        // 双击行 = 加载该预设（与操作列「加载」同一动作）。
+        private static void DoubleClickVisibleRow(int row) {
+            try {
+                List<PresetInfo> vis = _visibleCache;
+                if (vis == null || row < 0 || row >= vis.Count) return;
+                PresetInfo p = vis[row];
+                if (p == null) return;
+                if (IsPending("replace:" + p.Key)) ClearPending();
+                LoadPreset(p);
+            } catch (Exception __dc) { SRApi.Guard.Log("预设列表/双击加载", __dc); }
+        }
 
         // 右键行（核心 hit-test 派发）→ 开始内联重命名；只允许自己的预设（IsLocal 是只读存档）。
         private static void StartRenameVisibleRow(int row) {
@@ -55,7 +68,7 @@ namespace SR_UCH.Tweaks {
                 PresetInfo p = vis[row];
                 if (p == null || p.IsLocal) return;
                 ClearPending();
-                _renameKey = p.Key; _renameText = p.Name; _renameAutoScrolled = false;
+                _renameKey = p.Key; _renameText = p.Name; _renameFocusPending = true;
             } catch (Exception __rr) { SRApi.Guard.Log("预设列表/行右键", __rr); }
         }
 
@@ -236,6 +249,7 @@ namespace SR_UCH.Tweaks {
                 _args.pinRows = _pinRows;
                 _args.pinDraw = _pinDrawFn;
                 _args.rowRightClick = _rowRightClickFn;
+                _args.rowDoubleClick = _rowDoubleClickFn;
                 _args.emptyHint = _emptyHintFn;
 
                 _hiddenBeforeTable = _hiddenCols.Count;

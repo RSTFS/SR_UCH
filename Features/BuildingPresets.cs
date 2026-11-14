@@ -38,7 +38,32 @@ namespace SR_UCH.Tweaks {
         // 列宽（设计单位）默认值与允许范围；顺序与 Col* 一致。
         // 操作列的实际默认宽由 DefaultActionColW() 按当前语言按钮文字实时计算（DefColW[ColAction] 仅作兜底）。
         // 名称 / 关卡 / 模式 / 数据 / 时间 / 操作。数据与时间宽度翻倍、关卡 ×1.5（用户要求）。
-        private static readonly float[] DefColW = new float[] { 150f, 84f, 64f, 76f, 96f, 200f };
+        // 默认列宽改为"核心 TableColumn 模板 + 文字实测"推导（与联机/EX 列表同一套）：
+        // 中英文/不同字号都能自适应；换算回设计单位（核心渲染时再 Sc）。
+        private static readonly SRApi.TableColumn[] _presetCols = new SRApi.TableColumn[] {
+            new SRApi.TableColumn { TitleZh = "名称", TitleEn = "Name", TipZh = "预设名称", TipEn = "preset name", MinW = 120f, PadW = 22f, AlignLeft = true },
+            new SRApi.TableColumn { TitleZh = "关卡", TitleEn = "Level", TipZh = "关卡", TipEn = "level", MinW = 64f, PadW = 22f },
+            new SRApi.TableColumn { TitleZh = "模式", TitleEn = "Mode", TipZh = "模式", TipEn = "mode", MinW = 52f, PadW = 22f },
+            new SRApi.TableColumn { TitleZh = "数据", TitleEn = "Data", TipZh = "数据", TipEn = "data", MinW = 64f, PadW = 22f },
+            new SRApi.TableColumn { TitleZh = "时间", TitleEn = "Time", TipZh = "时间", TipEn = "time", MinW = 76f, PadW = 22f },
+            new SRApi.TableColumn { TitleZh = "操作", TitleEn = "Actions", TipZh = "操作", TipEn = "actions", MinW = 200f, PadW = 22f },
+        };
+        private static float[] _defColWComputed;
+        private static float[] DefColW {
+            get {
+                if (_defColWComputed != null) return _defColWComputed;
+                float[] px = null;
+                try { px = SRApi.Ctl.TableColumnWidths(_presetCols); } catch (Exception __cw) { SRApi.Guard.Log("预设列表/默认列宽", __cw); }
+                float scale = Mathf.Max(0.0001f, SRApi.Ctl.Sc(1f));
+                float[] result = new float[ColCount];
+                for (int i = 0; i < ColCount; i++) {
+                    float v = (px != null && i < px.Length) ? px[i] / scale : 80f;
+                    result[i] = Mathf.Clamp(Mathf.Round(v), 40f, 400f);
+                }
+                _defColWComputed = result;
+                return result;
+            }
+        }
         private const float ColWidthMin = 40f;
         private const float ColWidthMax = 600f;
         private const string ColWidthsKey = "Preset Widths";
@@ -86,9 +111,7 @@ namespace SR_UCH.Tweaks {
         private static string _renameKey;
         private static string _renameText;
         // 条件控件的"本帧是否显示"锁存（Layout / Repaint 必须一致，见 DrawInlineRename）。
-        private static int _renameLatchFrame = -1;
-        private static bool _renameLatch;
-        private static bool _renameAutoScrolled;   // 进入重命名后是否已经自动滚过
+        private static bool _renameFocusPending;   // 打开重命名弹窗后是否还要抢一次输入焦点
         private static string _search = "";
         private static string _importPath = "";
         // 关卡筛选（运行期状态，不落配置）："" = 全部；否则为预设 XML 里的 levelSceneName。
@@ -496,91 +519,59 @@ namespace SR_UCH.Tweaks {
 
 
 
-        // 内联重命名：右键名称单元格后，该行名称格就地变成输入框（不再另开编辑条）。
-        // 提交：回车 / 点击别处；取消：Esc。
+        // 重命名弹窗：右键行 → 弹出带输入框 + 确定/取消 的小面板。
+        // 不用"行内输入框"：条件控件/焦点/滚动夹层里太容易失效（用户实测右键无反应）；
+        // 弹窗用绝对矩形绘制，点确定/取消即可，不依赖输入焦点。
         private static void DrawInlineRename() {
             try {
-                // 内联重命名框是**条件控件**：开始/结束编辑都发生在输入事件趟（Layout 之后、
-                // Repaint 之前），如果逐趟按实时状态建控件，Repaint 会比 Layout 多/少建一个，
-                // 直接抛 "Getting control N's position in a group with only N controls"。
-                // 所以"本帧是否显示编辑框"只在当帧第一趟锁存，下一帧才真正显示/收起。
-                if (_renameLatchFrame != Time.frameCount) {
-                    _renameLatchFrame = Time.frameCount;
-                    _renameLatch = !string.IsNullOrEmpty(_renameKey) && _args != null;
-                }
-                if (!_renameLatch) return;
-                if (string.IsNullOrEmpty(_renameKey) || _args == null) return;
-                if (_args.rowRects == null || _args.rowRows == null || _args.vis == null) return;
+                if (string.IsNullOrEmpty(_renameKey)) return;
                 List<PresetInfo> vis = _visibleCache;
-                if (vis == null) return;
-
-                // 目标在"全部可见行"里的下标。
-                int row = -1;
+                if (vis == null) { _renameKey = null; _renameText = null; return; }
+                PresetInfo p = null;
                 for (int i = 0; i < vis.Count; i++) {
-                    if (vis[i] != null && vis[i].Key == _renameKey) { row = i; break; }
+                    if (vis[i] != null && vis[i].Key == _renameKey) { p = vis[i]; break; }
                 }
-                PresetInfo p = (row >= 0 && row < vis.Count) ? vis[row] : null;
                 if (p == null) { _renameKey = null; _renameText = null; return; }
+                if (_args == null || _args.box.width < SRApi.Ctl.Sc(120f)) return;
 
-                // rowRects 只含【当前视口内的行】（TableRowRects 从 first 到 last，rowRows 记真实行号）。
-                // 以前直接用 vis 的下标去索引 rowRects[row] —— 滚动之后输入框会画到别的行上，
-                // 甚至因 row >= rowRects.Count 而完全不画、状态还留着。
-                Rect rowRect = default(Rect);
-                bool onScreen = false;
-                for (int k = 0; k < _args.rowRects.Count && k < _args.rowRows.Count; k++) {
-                    if (_args.rowRows[k] == row) { rowRect = _args.rowRects[k]; onScreen = true; break; }
-                }
-                if (!onScreen) {
-                    // 目标滚出视口：**只在刚进入编辑时**把它滚回来一次。
-                    // 以前每帧都写 _scrollRows.y，只要目标行不在视口里，列表就被永久钉死（划不动）。
-                    if (!_renameAutoScrolled) {
-                        _renameAutoScrolled = true;
-                        _scrollRows.y = Mathf.Max(0f, row * SRApi.Ctl.TableRowH());
-                    }
-                    return;
-                }
-
-                // 名称列横向偏移：必须减 scrollX（与 ColumnAtX 同名列判定一致），并跳过钉住的操作列。
-                // 名称列被隐藏时不画输入框，直接取消编辑。
-                float x = _args.box.x - _args.scrollX;
-                bool found = false;
-                for (int k2 = 0; k2 < _args.vis.Count; k2++) {
-                    int ci = _args.vis[k2];
-                    if (ci == _args.pinCol) continue;
-                    if (ci == ColName) { found = true; break; }
-                    x += SRApi.Ctl.Sc(_colW[ci]);
-                }
-                if (!found) { _renameKey = null; _renameText = null; return; }
-
-                Rect cell = new Rect(x, rowRect.y + W(1f), SRApi.Ctl.Sc(_colW[ColName]) - W(2f), Mathf.Max(W(14f), rowRect.height - W(2f)));
-                GUI.BeginGroup(cell);
-                try {
-                    string typed = SRApi.ClearableTextField(_renameText ?? p.Name, 40, SRApi.Ctl.SearchBox,
-                        GUILayout.Width(cell.width), GUILayout.Height(cell.height));
-                    if (typed != null && typed != _renameText) _renameText = typed;
-                } finally { GUI.EndGroup(); }
+                Rect box = _args.box;
+                float w = Mathf.Min(SRApi.Ctl.Sc(420f), Mathf.Max(SRApi.Ctl.Sc(240f), box.width - SRApi.Ctl.Sc(40f)));
+                float h = SRApi.Ctl.Sc(98f);
+                float x = box.x + (box.width - w) * 0.5f;
+                float y = box.y + Mathf.Max(SRApi.Ctl.Sc(8f), Mathf.Min(box.height * 0.35f, box.height - h - SRApi.Ctl.Sc(8f)));
+                Rect pop = new Rect(x, y, w, h);
 
                 Event e = Event.current;
-                if (e == null) return;
-                if (e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)) {
-                    // 空名不要提交：CommitRename 会拒绝但旧写法无条件清状态，用户刚打的字直接丢了。
-                    if ((_renameText ?? "").Trim().Length == 0) {
-                        SRApi.Notify(SRApi.T("名称不能为空", "The name cannot be empty"));
-                    } else {
-                        CommitRename(p);
-                        _renameKey = null; _renameText = null;
-                    }
-                    e.Use(); return;
+                if (e != null && e.type == EventType.MouseDown && !pop.Contains(e.mousePosition)) {
+                    if ((_renameText ?? "").Trim().Length != 0) CommitRename(p);
+                    else SRApi.Notify(SRApi.T("名称不能为空", "The name cannot be empty"));
+                    _renameKey = null; _renameText = null; e.Use();
+                    return;
                 }
-                if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape) {
+                if (e != null && e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape) {
                     _renameKey = null; _renameText = null; e.Use(); return;
                 }
-                // 点空白提交：不判 e.Used（文本框会先吃掉 MouseDown）。
-                if (e.type == EventType.MouseDown && !cell.Contains(e.mousePosition)) {
-                    if ((_renameText ?? "").Trim().Length != 0) CommitRename(p);
-                    _renameKey = null; _renameText = null;
-                }
-            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/内联重命名", __ex); }
+
+                GUI.BeginGroup(pop);
+                try {
+                    GUI.Box(new Rect(0f, 0f, w, h), GUIContent.none);
+                    GUI.Label(new Rect(SRApi.Ctl.Sc(12f), SRApi.Ctl.Sc(8f), w - SRApi.Ctl.Sc(24f), SRApi.Ctl.Sc(20f)),
+                        SRApi.T("重命名预设", "Rename preset") + "  (" + (p.Name ?? "") + ")");
+                    GUI.SetNextControlName("srPresetRenameField");
+                    string typed = GUI.TextField(new Rect(SRApi.Ctl.Sc(12f), SRApi.Ctl.Sc(34f), w - SRApi.Ctl.Sc(24f), SRApi.Ctl.Sc(26f)),
+                        _renameText ?? p.Name ?? "", 40);
+                    if (typed != _renameText) _renameText = typed;
+                    if (_renameFocusPending) { GUI.FocusControl("srPresetRenameField"); _renameFocusPending = false; }
+                    if (GUI.Button(new Rect(w - SRApi.Ctl.Sc(172f), SRApi.Ctl.Sc(68f), SRApi.Ctl.Sc(76f), SRApi.Ctl.Sc(24f)), SRApi.T("确定", "OK"))) {
+                        if ((_renameText ?? "").Trim().Length != 0) CommitRename(p);
+                        else SRApi.Notify(SRApi.T("名称不能为空", "The name cannot be empty"));
+                        _renameKey = null; _renameText = null;
+                    }
+                    if (GUI.Button(new Rect(w - SRApi.Ctl.Sc(88f), SRApi.Ctl.Sc(68f), SRApi.Ctl.Sc(76f), SRApi.Ctl.Sc(24f)), SRApi.T("取消", "Cancel"))) {
+                        _renameKey = null; _renameText = null;
+                    }
+                } finally { GUI.EndGroup(); }
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/重命名弹窗", __ex); }
         }
 
         // Shift+右键表头：核心还原列宽并清空隐藏列后回调这里，再补一次"列序 + 列宽 + 隐藏"的整表还原并落盘。

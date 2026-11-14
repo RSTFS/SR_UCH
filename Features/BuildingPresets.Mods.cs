@@ -297,7 +297,7 @@ namespace SR_UCH.Tweaks {
                     // IsLocal 的含义是"游戏本地关卡存档"（snapshots 目录里的 .xml），
                     // 那是只读数据、改名会破坏存档映射；**自己的预设**（IsLocal=false）才是可改名的。
                     // 上一版把条件写反成 p.IsLocal，正好只允许给存档改名 → 右键自己的预设没反应。
-                    if (!p.IsLocal) { ClearPending(); _renameKey = p.Key; _renameText = p.Name; _renameAutoScrolled = false; e.Use(); }
+                    if (!p.IsLocal) { ClearPending(); _renameKey = p.Key; _renameText = p.Name; _renameFocusPending = true; e.Use(); }
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/行内单元格", __ex); }
         }
