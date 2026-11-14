@@ -67,7 +67,7 @@ namespace SR_UCH.Tweaks {
         }
 
         // 自绘页：按分区标题 + 条目逐行渲染（分区判据取自 Initialize 里 Bind 的键名）。
-        private static bool IsEnhanceKey(string k) { return k == "Collision Override" || k == "Grid Override" || k == "Free Color" || k == "Free Color Key" || k == "Free Color Key Code" || k == "Box Select" || k == "Box Select Key" || k == "Box Delete Key" || k == "Box Append Key" || k == "Box Same Type"; }
+        private static bool IsEnhanceKey(string k) { return k == "Collision Override" || k == "Grid Override"; }
         private static bool IsLimitKey(string k) { return k == "Lift Build Cap" || k == "Build Cap Value"; }
         private static void RenderPage() {
             float col = Mathf.Max(SRApi.Ctl.Sc(180), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(240));
@@ -76,7 +76,7 @@ namespace SR_UCH.Tweaks {
 
             // 分区按条目键显式划分，不依赖遍历顺序（SectionEntries 按键名排序，顺序与分区无关）。
 
-            // 分区一：建造（无视碰撞 / 自由放置）。自由取色与框选是独立功能，已随功能文件删除。
+            // 分区一：建造（无视碰撞 / 自由放置）。
             SRApi.Ctl.SectionTitle("- " + SRApi.T("建造", "Build") + " -",
                 SRApi.T("建造增强：让方块无视放置规则、按更细的网格自由微调摆放。",
                         "Build: place pieces ignoring the placement rules and snap on a finer grid."));
@@ -119,7 +119,7 @@ namespace SR_UCH.Tweaks {
             for (int i = 0; i < entries.Count; i++) {
                 ConfigEntryBase e = entries[i];
                 if (IsLimitKey(e.Definition.Key)) continue;
-                if (IsEnhanceKey(e.Definition.Key)) continue;   // 已删除的「建造」分区条目一律不再渲染
+                if (IsEnhanceKey(e.Definition.Key)) continue;   // 分区一已渲染过的条目不再重复
                 any = true;
                 SRApi.Ctl.DrawEntryRow(e, col);
             }

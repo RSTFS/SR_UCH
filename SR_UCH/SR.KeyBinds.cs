@@ -102,7 +102,7 @@ public partial class SR {
         }
 
         // 某些路径直接改键位 BoxedValue（重置默认值 / 右键清空）：让序列监听的 watch 列表失效。
-        public static void MarkKeyChanged() { _watchDirty = true; }
+        public static void MarkKeyChanged() { _watchDirty = true; _kcDirty = true; }
 
         // 解析持久化字符串：支持多修饰键 "Shift+Ctrl+Alt"（兼容单值 "Shift"/"Ctrl"/"Alt"）
         private static ComboMod ParseComboMod(string v) {
@@ -626,5 +626,110 @@ public partial class SR {
             }
         }
 
+        // ============ 按键中心（自检页卡片） ============
+        // 列出所有「自动快捷键」（HotkeyButton 惰性建的 Hotkeys 段条目，右键绑定也写在这）
+        // 与「手动键位」（功能配置里的 KeyCode 条目），支持一键清除与重复组合提示。
+        private sealed class KeyCenterRow {
+            public ConfigEntry<KeyCode> Entry;
+            public string Group;    // 分组显示名（本地化）
+            public string Name;     // 条目显示名
+            public string Combo;    // "Ctrl+K" / "未绑定"
+            public bool Dup;        // 与其它条目重复
+            public bool Auto;       // 自动快捷键
+        }
+
+        private static List<KeyCenterRow> _kcRows;
+        private static int _kcBuiltEntryVersion = -1;
+        private static bool _kcDirty = true;
+        internal static void MarkKeyCenterDirty() { _kcDirty = true; }
+
+        private static string KeyCenterAutoLabel(string id) {
+            HkItem it;
+            if (!string.IsNullOrEmpty(id) && _hkById.TryGetValue(id, out it) && it != null)
+                return it.Label ?? it.Id;
+            return id;
+        }
+
+        // 重新采集：只在条目表变化 / 用户点刷新时执行，避免每帧枚举全部配置条目。
+        private static void BuildKeyCenterRows() {
+            _kcRows = new List<KeyCenterRow>();
+            try {
+                if (_internalConfig == null) return;
+                _kcBuiltEntryVersion = EntryVersion;
+                _kcDirty = false;
+                foreach (ConfigEntryBase e in AllEntries(_internalConfig)) {
+                    ConfigEntry<KeyCode> kc = e as ConfigEntry<KeyCode>;
+                    if (kc == null) continue;
+                    KeyCenterRow r = new KeyCenterRow();
+                    r.Entry = kc;
+                    r.Auto = string.Equals(e.Definition.Section, HkSec, StringComparison.Ordinal);
+                    r.Group = r.Auto ? T("自动快捷键", "Auto hotkeys") : ZhSection(e.Definition.Section);
+                    r.Name = r.Auto ? KeyCenterAutoLabel(e.Definition.Key) : ZhKey(kc);
+                    r.Combo = ComboKeyDisplay(kc, kc.Value);
+                    _kcRows.Add(r);
+                }
+                // 重复组合：同一 KeyCode + 同一修饰键（忽略未绑定）
+                for (int i = 0; i < _kcRows.Count; i++) {
+                    if (_kcRows[i].Entry.Value == KeyCode.None) continue;
+                    ComboMod mi = KeyComboMod(_kcRows[i].Entry);
+                    for (int j = i + 1; j < _kcRows.Count; j++) {
+                        if (_kcRows[j].Entry.Value != _kcRows[i].Entry.Value) continue;
+                        if (KeyComboMod(_kcRows[j].Entry) != mi) continue;
+                        _kcRows[i].Dup = true;
+                        _kcRows[j].Dup = true;
+                    }
+                }
+                _kcRows.Sort(delegate (KeyCenterRow a, KeyCenterRow b) {
+                    int c = string.Compare(a.Group, b.Group, StringComparison.Ordinal);
+                    return c != 0 ? c : string.Compare(a.Name, b.Name, StringComparison.Ordinal);
+                });
+            } catch (Exception __ex) { Guard.Log("按键中心/采集", __ex); }
+        }
+
+        internal static void RenderKeyCenterCard() {
+            try {
+                if (_internalConfig == null) return;
+                if (_kcRows == null || _kcDirty || _kcBuiltEntryVersion != EntryVersion) BuildKeyCenterRows();
+                int bound = 0, autoBound = 0, dupRows = 0;
+                for (int i = 0; i < _kcRows.Count; i++) {
+                    if (_kcRows[i].Entry.Value != KeyCode.None) { bound++; if (_kcRows[i].Auto) autoBound++; }
+                    if (_kcRows[i].Dup) dupRows++;
+                }
+                string summary = T("已绑定 " + bound + " 个（自动 " + autoBound + "）· 重复组合 " + dupRows + " 条",
+                                   bound + " bound (" + autoBound + " auto) · " + dupRows + " duplicate row(s)");
+                Card(dupRows == 0, T("按键中心", "Hotkey center"), summary, delegate {
+                    if (GUILayout.Button(T("重新读取键位", "Reload bindings"), _btn, GUILayout.Width(Sc(140)), GUILayout.Height(Sc(24)))) {
+                        MarkKeyCenterDirty();
+                        BuildKeyCenterRows();
+                    }
+                    GUILayout.Space(Sc(4));
+                    if (_kcRows.Count == 0) { AuditLabel(T("（没有可显示的按键条目）", "(no key entries)")); return; }
+                    string lastGroup = null;
+                    for (int i = 0; i < _kcRows.Count; i++) {
+                        KeyCenterRow r = _kcRows[i];
+                        if (r.Group != lastGroup) { lastGroup = r.Group; AuditLabel("- " + (lastGroup ?? "") + " -"); }
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Label((r.Dup ? "⚠ " : "") + r.Name + "  [" + r.Combo + "]", _label,
+                            GUILayout.Width(Sc(420)), GUILayout.Height(Ctl.TableRowH()));
+                        GUILayout.FlexibleSpace();
+                        bool prevEn = GUI.enabled;
+                        try {
+                            GUI.enabled = prevEn && r.Entry.Value != KeyCode.None;
+                            if (GUILayout.Button(T("清除", "Clear"), _btn, GUILayout.Width(Sc(64)), GUILayout.Height(Sc(22)))) {
+                                r.Entry.Value = KeyCode.None;
+                                MarkKeyChanged();
+                                MarkKeyCenterDirty();
+                                Notify(T("已清除按键", "Hotkey cleared"));
+                            }
+                        } finally { GUI.enabled = prevEn; }
+                        GUILayout.EndHorizontal();
+                    }
+                    AuditLabel(T("说明：自动快捷键来自各功能页面的按钮，右键可绑定；手动键位在对应功能页里右键绑定。"
+                                 + "这里是全局清单，清除后回原页面可重新绑定。",
+                                 "Auto hotkeys come from feature-page buttons (right-click to bind); manual keys are bound on their own pages. "
+                                 + "Clear here and rebind on the original page."));
+                });
+            } catch (Exception __ex) { Guard.Log("自检/按键中心", __ex); }
+        }
     }
 }

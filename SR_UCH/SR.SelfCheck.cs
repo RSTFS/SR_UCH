@@ -166,6 +166,9 @@ public partial class SR {
                         if (conflicts.Count == 0) AuditLabel(T("（自动快捷键与右键绑定都在检测范围内；重复时两条动作会同时触发）", "(covers auto hotkeys and right-click bindings; a duplicate fires both actions)"));
                     });
 
+                // ---- 按键中心（自动快捷键 + 手动键位）----
+                RenderKeyCenterCard();
+
                 // ---- 第三方插件兼容性卡 ----
                 RenderCompatCard();
 
