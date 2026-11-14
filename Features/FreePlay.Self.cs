@@ -45,12 +45,11 @@ namespace SR_UCH {
                 _flyKey = plugin.Config.Bind(Sec, "Fly Key", KeyCode.None, "飞天的快捷键。");
                 _ignoreCollisionKey = plugin.Config.Bind(Sec, "Ignore Collision Key", KeyCode.None, "无视碰撞的快捷键。");
 
-                SRApi.RegisterKey("自身状态-无敌", _invincibleKey, "toggle");
-                SRApi.RegisterKey("自身状态-完美无敌", _godModeKey, "toggle");
-                SRApi.RegisterKey("自身状态-飞天", _flyKey, "toggle");
-                SRApi.RegisterKey("自身状态-无视碰撞", _ignoreCollisionKey, "toggle");
+                SRApi.RegisterKey("自身状态-无敌", _invincibleKey, "press", delegate { SelfKey(_invincible, "无敌", "Invincible"); });
+                SRApi.RegisterKey("自身状态-完美无敌", _godModeKey, "press", delegate { SelfKey(_godMode, "完美无敌", "God mode"); });
+                SRApi.RegisterKey("自身状态-飞天", _flyKey, "press", delegate { SelfKey(_fly, "飞天", "Fly"); });
+                SRApi.RegisterKey("自身状态-无视碰撞", _ignoreCollisionKey, "press", delegate { SelfKey(_ignoreCollision, "无视碰撞", "Ignore collision"); });
 
-                SRApi.RegisterTick("自身状态-快捷键", TickKeys);
                 SRApi.RegisterTick("自身状态-穿模", TickIgnore);
                 SRApi.RegisterSceneHook(OnSceneChanged);
                 // 三个补丁类各自独立注册：一个目标不存在只丢那一条，
@@ -80,14 +79,12 @@ namespace SR_UCH {
         }
 
         // ================= 快捷键 =================
-        private static void TickKeys() {
+        // 键位动作统一交给核心轮询（RegisterKey 4 参）；这里只保留"是否允许"与动作本身。
+        private static void SelfKey(ConfigEntry<bool> e, string zh, string en) {
             try {
                 if (!SRApi.GateMaster) return;
                 if (SRApi.Typing) return;
-                if (SRApi.ComboKeyDown(_invincibleKey)) Toggle(_invincible, "无敌", "Invincible");
-                if (SRApi.ComboKeyDown(_godModeKey)) Toggle(_godMode, "完美无敌", "God mode");
-                if (SRApi.ComboKeyDown(_flyKey)) Toggle(_fly, "飞天", "Fly");
-                if (SRApi.ComboKeyDown(_ignoreCollisionKey)) Toggle(_ignoreCollision, "无视碰撞", "Ignore collision");
+                Toggle(e, zh, en);
             } catch (Exception __ex) { SRApi.Guard.Log("自身状态/快捷键", __ex); }
         }
 

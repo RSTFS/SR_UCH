@@ -103,8 +103,14 @@ public class LevelPartyBox : ITweak {
                     "刷新派对盒完整流程的快捷键. 在关卡页的刷新派对盒按钮上右键就能绑, 再右键一次删掉. 按下就直接执行.");
                 _closePartyBoxKey = plugin.Config.Bind("Level", "Close Party Box Key", KeyCode.None,
                     "关闭派对盒快捷键（结束派对盒选择、进入游玩阶段；按下即触发）");
-                SRApi.RegisterKey("关卡-刷新派对盒", _refreshPartyBoxKey, "press");
-                SRApi.RegisterKey("关卡-关闭派对盒", _closePartyBoxKey, "press");
+                SRApi.RegisterKey("关卡-刷新派对盒", _refreshPartyBoxKey, "press", delegate {
+                    try { if (!SRApi.GateMaster) return; RefreshPartyBox(); }
+                    catch (Exception __rk) { SRApi.Guard.Log("派对盒/刷新键", __rk); }
+                });
+                SRApi.RegisterKey("关卡-关闭派对盒", _closePartyBoxKey, "press", delegate {
+                    try { if (!SRApi.GateMaster) return; ClosePartyBox(); }
+                    catch (Exception __ck) { SRApi.Guard.Log("派对盒/关闭键", __ck); }
+                });
                 SRApi.RegisterTick("KEY_PARTYBOX", Tick);
                 // 反射成员登记：游戏改名时启动自检会告警。
                 SRApi.Ref.Override("PartyBox.pieces", "关卡派对盒道具（清场/重抽）");
@@ -120,11 +126,7 @@ public class LevelPartyBox : ITweak {
         // 快捷键轮询：与页面按钮共用同一批动作
         private static void Tick() {
             TickCloseFlush();
-            try {
-                if (!SRApi.GateMaster) return;
-                if (SRApi.ComboKeyDown(_refreshPartyBoxKey)) RefreshPartyBox();
-                if (SRApi.ComboKeyDown(_closePartyBoxKey)) ClosePartyBox();
-            } catch (Exception __ex) { SRApi.Guard.Log("派对盒快捷键", __ex); }
+            // 刷新/关闭快捷键已迁移到核心 RegisterKey（见 Initialize），这里只做每帧收尾。
         }
 
         // 刷新派对盒：完整重走游戏自己的流程（showPartyBox = SetupPartyBoxForRound(true) + ShowBox(IsSecondBox)）。

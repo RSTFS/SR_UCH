@@ -42,15 +42,7 @@ public partial class HUD {
         }
         private static void Tick() {
             try {
-                // 快捷键直接控制「显示 HUD」复选框：关闭时也能用它重新打开，所以放在 IsEnabled 判断之前。
-                try {
-                    if (SRApi.GateMaster && _showKey != null && SRApi.ComboKeyDown(_showKey)) {
-                        if (_enabled != null) {
-                            _enabled.Value = !_enabled.Value;
-                            SRApi.Notify(_enabled.Value ? SRApi.T("HUD：开", "HUD: ON") : SRApi.T("HUD：关", "HUD: OFF"));
-                        }
-                    }
-                } catch (Exception __hk) { SRApi.Guard.Log("HUD/显示键", __hk); }
+                // 显示键已迁移到核心 RegisterKey（HUD.Initialize），这里不再每帧轮询。
                 if (!IsEnabled()) {
                     _hasGame = false;
                     _inLobby = false;

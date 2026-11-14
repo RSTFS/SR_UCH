@@ -416,7 +416,15 @@ namespace SR_UCH.Tweaks {
                 } catch (Exception __ex) { SRApi.Guard.Log("HUD 清理旧键", __ex); }
 
                 // 显示键接入核心键位系统（用于按键显示/冲突提示）。
-                try { SRApi.RegisterKey("HUD-显示键", _showKey, "hold"); }
+                try {
+                    SRApi.RegisterKey("HUD-显示键", _showKey, "press", delegate {
+                        try {
+                            if (!SRApi.GateMaster || _enabled == null) return;
+                            _enabled.Value = !_enabled.Value;
+                            SRApi.Notify(_enabled.Value ? SRApi.T("HUD：开", "HUD: ON") : SRApi.T("HUD：关", "HUD: OFF"));
+                        } catch (Exception __hk) { SRApi.Guard.Log("HUD/显示键", __hk); }
+                    });
+                }
                 catch (Exception __ex) { SRApi.Guard.Log("HUD 键位注册", __ex); }
 
                 SRApi.RegisterTick("HUD", Tick);
