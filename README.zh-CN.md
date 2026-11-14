@@ -87,6 +87,15 @@
 - 纯本地视觉：概率本来就是同步的，各端各算各画；不碰网络、不改原材质 / SpriteRenderer、不影响抽取结果、不新增补丁 / 反射 / 线程。
 - 六档各用一份加色材质（避免共享材质把颜色压成一种）；光斑按档位放大到包围盒的 1.6–2.2 倍，像是从道具里散出来的光。
 
+### 视觉辅助 Visual Aid
+
+淡化 / 隐藏**其他玩家**，方便录屏、截图或看清自己的操作；纯本地画面，不改变玩法、不同步、不影响联机。
+
+- 透明度可调（0 = 完全隐藏，100 = 保持原样）；可选「只在近距离淡化」并设置距离（1-30 米），对局内用快捷键临时开关（默认 F6，可改绑）。
+- 只处理其他玩家：自己、未入座角色、菜单 / 树屋阶段一律不动。实现是 `Character.Update` 与 `CharacterOpacityController.Update` 两个 Postfix，每帧写 alpha / currentOpacity。
+- 检测到 **CamHog**（同思路的现成 mod）已加载时自动让位并在页面提示——两个 mod 同时写透明度会互相覆盖，不如让一个说了算。
+- 只用游戏自己的 public 成员（`Character.SpriteRenderer` / `HasJetpack` / `NameTag.maxOpacity` / `Character.AllCharacters` / `Util_SpriteRenderer.SetAlpha`），零反射、不碰网络。
+
 ### 通知 Notification Hub
 
 把散落在各处的**屏幕提示统一收口**。`Notify`、`NotifyT`、`NotifyTag` 与核心自己的提示全都汇到 `SR.Notify.cs` 的 `NotifyImpl`，所以只在核心留一个可选钩子就能覆盖全部来源，不用改任何调用点；没装这个功能时行为一字不变。

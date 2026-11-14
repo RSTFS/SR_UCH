@@ -122,6 +122,21 @@ chance = rarer = brighter (reversible on the page).
 - Halo spread grows with the tier (1.6–2.2× the item's bounds), so it reads as light spilling from
   the item itself.
 
+### Visual Aid
+
+Fade / hide **other players** for clearer recording or screenshots. Purely local: no gameplay,
+network or sync changes.
+
+- Adjustable opacity (0 = fully hidden, 100 = untouched), optional "fade only when close" with a
+  1-30 unit distance, and an in-game toggle key (default F6, rebindable).
+- Only other players are touched: your character, unseated characters and menu/treehouse phases are
+  left alone. Implemented as two postfixes (`Character.Update` and
+  `CharacterOpacityController.Update`) that write alpha / currentOpacity every frame.
+- If **CamHog** (an existing mod with the same idea) is loaded, this feature yields and says so on
+  the page -- two mods writing opacity every frame would fight each other.
+- Uses only public game members (`Character.SpriteRenderer` / `HasJetpack` / `NameTag.maxOpacity` /
+  `Character.AllCharacters` / `Util_SpriteRenderer.SetAlpha`); no reflection, no network.
+
 ### Notification Hub
 
 One place for every screen toast. All notice sources (core, `Notify`, `NotifyT`, `NotifyTag`)

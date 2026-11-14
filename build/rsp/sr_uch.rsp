@@ -103,3 +103,4 @@ Features\QuickAdjust.cs
 Features\QuickAdjust.QuickSwitch.cs
 Features\QuickAdjust.Respawn.cs
 Features\QuickAdjust.Score.cs
+Features\VisualAid.cs
