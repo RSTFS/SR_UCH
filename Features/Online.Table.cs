@@ -196,7 +196,8 @@ namespace SR_UCH.Tweaks {
                 }
                 }
             } catch (Exception __tbox) { SRApi.Guard.Log("联机表格/命中框", __tbox); }
-            float rowsH = Mathf.Max(SRApi.Ctl.Sc(20), box.height - headerH);
+            // 行区 = 屏幕真实可见高度（box 可能被布局算到可见区外）。
+            float rowsH = SRApi.Ctl.ScrollRowsH(box, headerH, SRApi.PageContentBottom, rowH);
             float contentH = _shownLobbies.Count * rowH;
             float sbW = 0f;
             float viewW = Mathf.Max(SRApi.Ctl.Sc(60), box.width - sbW);

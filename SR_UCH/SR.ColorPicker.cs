@@ -579,7 +579,11 @@ public partial class SR {
             float rowH = Ctl.ControlH();
             float labelW = LabelCol("R", "G", "B");
             float gap = Sc(6f);
-            float fieldW = Mathf.Max(Sc(30f), (pw - 3f * labelW - 2f * gap - Sc(36f)) / 3f);
+            // 数值最小宽度 = "255" 实测 + 内边距：太窄会把三位数截成 "25"。
+            float needW = TextW("255", Ctl.SearchBox) + Sc(18f);
+            float fieldW = Mathf.Max(Sc(46f), needW);
+            float avail = (pw - 3f * labelW - 2f * gap - Sc(12f)) / 3f;
+            if (avail > fieldW) fieldW = avail;
             GUILayout.BeginHorizontal();
             try {
                 for (int i = 0; i < 3; i++) {

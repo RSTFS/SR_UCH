@@ -17,6 +17,8 @@ namespace SR_UCH.Tweaks {
         private static IFeatureHost _mp; // 仅用于读 Config（契约类型）
         private static int _index;
         private static int _wheelFrame = -1;   // 上一帧吃掉滚轮的帧号（防同帧多次加）
+        private static float _wheelPickAt = -1f;   // 最近一次滚轮换目标的时刻（这段时间内不让"跟随旧选中项"覆盖）
+        private static Placeable _wheelPicked;     // 滚轮选中的方块（用于刷新后重新定位）
         private static List<Placeable> Blocks = new List<Placeable>();
         private static bool _altDown;
         private static Placeable _selected;
@@ -432,7 +434,8 @@ namespace SR_UCH.Tweaks {
                 if (RealtimeListOn) TickRealtimeList();
 
                 if (Blocks.Count <= 0) return;
-                Placeable prev = _selected;
+                // 刚用滚轮换过目标：不要再用"上一帧选中项"把它拉回去（否则表现为切一下就弹回）。
+                Placeable prev = (Time.unscaledTime - _wheelPickAt < 0.5f) ? _wheelPicked : _selected;
                 if (prev != null) {
                     for (int i = 0; i < Blocks.Count; i++) {
                         if (Blocks[i] == prev) { _index = i; break; }
@@ -468,14 +471,15 @@ namespace SR_UCH.Tweaks {
                     float wheel = SRApi.TakeWheelEvent();
                     if (wheel != 0f) {
                         _wheelFrame = Time.frameCount;
-                        int __before = _index;
                         _index += wheel > 0f ? 1 : -1;
+                        _wheelPickAt = Time.unscaledTime;
                         SRApi.MarkWheelUsed(); // 滚轮已被选块器吃掉，地图/自由相机让路
                     }
                 }
                 if (_index >= Blocks.Count) _index = 0;
                 if (_index < 0) _index = Blocks.Count - 1;
                 _selected = Blocks[_index];
+                if (Time.unscaledTime - _wheelPickAt < 0.5f) _wheelPicked = _selected;
                 if (_selected != _tintedBlock) {
                     ClearTintGroup();
                     TintGroup(_selected);

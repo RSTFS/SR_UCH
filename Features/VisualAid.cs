@@ -19,6 +19,10 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<int> _opacityPercent;
         private static ConfigEntry<bool> _useDistance;
         private static ConfigEntry<int> _distance;
+        private static ConfigEntry<float> _fadeSeconds;
+        // 每个角色的当前显示 alpha（渐变用）；不透明度切换到目标值而不是瞬跳。
+        private static readonly System.Collections.Generic.Dictionary<int, float> _curAlpha =
+            new System.Collections.Generic.Dictionary<int, float>();
         private static ConfigEntry<KeyCode> _toggleKey;
 
         // 缓存常用值：每帧补丁里不读配置对象，改配置时刷新。
@@ -45,6 +49,14 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Enabled",
                 "启用视觉辅助\n淡化其他玩家，方便看清自己、录屏或截图\n只影响本机画面，不改变游戏状态",
                 "Enable visual aid\nFades other players for a clearer view while recording\nlocal picture only; gameplay is unchanged");
+            SRApi.LocKey(Sec, "Fade Seconds", "淡化时长", "Fade duration");
+            SRApi.LocDesc(Sec, "Fade Seconds",
+                "淡化/恢复的过渡时长\n0 = 立即切换，数值越大越柔和\n范围 0-2 秒",
+                "fade in/out duration\n0 = instant, larger is smoother\nrange 0-2 seconds");
+            SRApi.LocKey(Sec, "Opacity Default 30", "不透明度默认值迁移", "Opacity default migration");
+            SRApi.LocDesc(Sec, "Opacity Default 30",
+                "内部标记：不透明度默认值迁移\n从旧默认 50 改成 30 后置真\n手动改过的不透明度不会被动",
+                "internal marker for the opacity default migration\nset once the old default 50 has been moved to 30\nmanually chosen opacity is left untouched");
             SRApi.LocKey(Sec, "Opacity", "其他玩家不透明度", "Other players opacity");
             SRApi.LocDesc(Sec, "Opacity",
                 "其他玩家不透明度\n0 = 完全隐藏，100 = 保持原样\n只作用于「其他玩家」，自己永远不变",
@@ -94,8 +106,21 @@ namespace SR_UCH.Tweaks {
             try {
                 SelfReg();
                 _enabled = plugin.Config.Bind(Sec, "Enabled", false, "淡化/隐藏其他玩家，只影响本机画面。");
-                _opacityPercent = plugin.Config.Bind(Sec, "Opacity", 50,
+                _opacityPercent = plugin.Config.Bind(Sec, "Opacity", 30,
                     new ConfigDescription("其他玩家的不透明度（0 = 完全隐藏，100 = 原样）。", new AcceptableValueRange<int>(0, 100)));
+                // 旧默认是 50：只迁移仍停在旧默认的配置，用户改过的不动。
+                try {
+                    ConfigEntry<bool> __mig = plugin.Config.Bind(Sec, "Opacity Default 30", false,
+                        "内部标记：不透明度默认值从 50 迁移到 30 是否已执行");
+                    if (!__mig.Value && _opacityPercent.Value == 50) {
+                        _opacityPercent.Value = 30;
+                        __mig.Value = true;
+                        SRApi.Ctl.MarkConfigDirty(__mig.ConfigFile);
+                    }
+                } catch (Exception __om) { SRApi.Guard.Log("视觉辅助/默认值迁移", __om); }
+                _fadeSeconds = plugin.Config.Bind(Sec, "Fade Seconds", 0.35f,
+                    new ConfigDescription("淡化/恢复的过渡时长（秒）；0 = 立即切换。",
+                        new AcceptableValueRange<float>(0f, 2f)));
                 _useDistance = plugin.Config.Bind(Sec, "Use Distance", true, "只在距离内淡化其他玩家（关闭 = 全部淡化）。");
                 _distance = plugin.Config.Bind(Sec, "Distance", 5,
                     new ConfigDescription("淡化距离（1-30）：离本机玩家不超过该距离的其他玩家才淡化。", new AcceptableValueRange<int>(1, 30)));
@@ -195,17 +220,42 @@ namespace SR_UCH.Tweaks {
 
         private static void Apply(Character c) {
             if (c == null) return;
-            if (!ShouldFade(c)) { RestoreOne(c); return; }
-            _faded.Add(c.GetInstanceID());
-            float a = Alpha;
-            if (c.SpriteRenderer != null) Util_SpriteRenderer.SetAlpha(c.SpriteRenderer, a);
-            if (c.HasJetpack && c.JetPackSR != null) Util_SpriteRenderer.SetAlpha(c.JetPackSR, a);
-            if (c.nameTag != null) c.nameTag.maxOpacity = a;
+            bool fade = ShouldFade(c);
+            float target = fade ? Alpha : 1f;
+            int id = c.GetInstanceID();
+            float cur;
+            _curAlpha.TryGetValue(id, out cur);
+            if (_curAlpha.Count == 0) cur = target;      // 首次遇到：直接对齐，避免从 0 淡入
+            float dur = _fadeSeconds != null ? Mathf.Clamp(_fadeSeconds.Value, 0f, 2f) : 0.35f;
+            if (dur <= 0.001f) cur = target;
+            else {
+                // 帧率无关的指数逼近：约 0.25S 内走完 95%。
+                float k = 1f - Mathf.Exp(-(Time.unscaledDeltaTime * 3f) / Mathf.Max(0.01f, dur));
+                cur = Mathf.Lerp(cur, target, Mathf.Clamp01(k));
+                if (Mathf.Abs(cur - target) < 0.004f) cur = target;
+            }
+            if (!fade && Mathf.Abs(cur - 1f) < 0.004f) {
+                _curAlpha.Remove(id);
+                if (_faded.Remove(id)) RestoreOneImmediate(c);   // 已完全恢复：清标记
+                return;
+            }
+            _curAlpha[id] = cur;
+            _faded.Add(id);
+            if (c.SpriteRenderer != null) Util_SpriteRenderer.SetAlpha(c.SpriteRenderer, cur);
+            if (c.HasJetpack && c.JetPackSR != null) Util_SpriteRenderer.SetAlpha(c.JetPackSR, cur);
+            if (c.nameTag != null) c.nameTag.maxOpacity = cur;
         }
 
         private static void RestoreOne(Character c) {
             if (c == null) return;
+            _curAlpha.Remove(c.GetInstanceID());
             if (!_faded.Remove(c.GetInstanceID())) return;
+            RestoreOneImmediate(c);
+        }
+
+        // 无条件把该角色的透明度写回 1（调用方已决定要还原）。
+        private static void RestoreOneImmediate(Character c) {
+            if (c == null) return;
             try {
                 if (c.SpriteRenderer != null) Util_SpriteRenderer.SetAlpha(c.SpriteRenderer, 1f);
                 if (c.JetPackSR != null) Util_SpriteRenderer.SetAlpha(c.JetPackSR, 1f);
@@ -218,6 +268,7 @@ namespace SR_UCH.Tweaks {
         // 关闭/关机/冲突：把所有改过的透明度清掉（角色可能已销毁，安全跳过）。
         private static void RestoreAll() {
             try {
+                _curAlpha.Clear();
                 if (_faded.Count == 0) return;
                 System.Collections.Generic.List<Character> all = Character.AllCharacters;
                 if (all != null) for (int i = 0; i < all.Count; i++) RestoreOne(all[i]);

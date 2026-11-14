@@ -520,9 +520,13 @@ namespace SR_UCH.Tweaks {
             // 高度只算一次，唯一真值 = 页面内容底界；多算法夹取会让 maxY 与可视高度脱节。
             Rect probe = GUILayoutUtility.GetRect(0f, 0f, GUIStyle.none);
             float __minH = SRApi.Ctl.TableHeaderH() + SRApi.Ctl.TableRowH();
-            float boxH = Mathf.Max(__minH, SRApi.PageContentBottom - probe.y);
+            float __bottom = SRApi.PageContentBottom;
+            float boxH = Mathf.Max(__minH, __bottom - probe.y);
             Rect box = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                 GUILayout.Width(availW), GUILayout.Height(boxH));
+            // 底边夹到页面内容底界：内容只比视口多一点点时，box 伸到底栏之下会让行区虚高，
+            // maxY 被压小 → 最后几行滚不出来。
+            if (box.yMax > __bottom) box.height = Mathf.Max(__minH, __bottom - box.y);
 
             TableDraw(box);
             TableInput(box, Event.current);
