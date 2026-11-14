@@ -342,16 +342,7 @@ namespace SR_UCH.Tweaks {
         private static bool Contains(string s, string w) { return NotifyLogic.Contains(s, w); }
         private static string Norm(string s) { return NotifyLogic.Norm(s); }
 
-        /// <summary>对局中判定：拿不到场景信息时返回 false（宁可不静默，也不吞掉提示）。</summary>
-        private static bool InMatch() {
-            try {
-                if (SRApi.Env.InTreehouse) return false;
-                string s = SRApi.Env.SceneName;
-                if (string.IsNullOrEmpty(s)) return false;
-                if (Contains(s, "menu") || Contains(s, "main") || Contains(s, "startup") || Contains(s, "splash")) return false;
-                return true;
-            } catch (Exception ex) { SRApi.Guard.Log("通知中心/判场景", ex); return false; }
-        }
+
 
         // ============ 局内浮层 ============
 

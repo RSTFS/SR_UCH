@@ -508,3 +508,34 @@ Check-DocScripts
 if ($script:fail -gt 0) { Write-Host ('== 有 ' + $script:fail + ' 项未通过 ❌ =='); if (-not $NoExit) { exit 1 }; return }
 Write-Host '== 文本类守卫全部通过 ✅ =='
 if (-not $NoExit) { exit 0 }
+
+# ---------- contract API level discipline: new public members must bump ApiLevel ----------
+function Check-ApiLevel {
+    $basePath = Join-Path $PSScriptRoot 'api_level.txt'
+    if (-not (Test-Path -LiteralPath $basePath)) { Ok 'API level: baseline missing (skipped)'; return }
+    $baseApi = -1; $baseMembers = -1
+    foreach ($l in [IO.File]::ReadAllLines($basePath)) {
+        $s = $l.Trim(); if (-not $s -or $s.StartsWith('#')) { continue }
+        $m = [regex]::Match($s, 'ApiLevel=(\d+)'); if ($m.Success) { $baseApi = [int]$m.Groups[1].Value }
+        $m = [regex]::Match($s, 'members=(\d+)'); if ($m.Success) { $baseMembers = [int]$m.Groups[1].Value }
+    }
+    $dir = Join-Path $Root 'SR_UCH\Contracts'
+    if (-not (Test-Path -LiteralPath $dir)) { Bad 'API level: contracts dir missing'; return }
+    $curApi = -1
+    $src = Read-Text (Join-Path $dir 'Contracts.cs')
+    $m = [regex]::Match($src, 'public\s+const\s+int\s+ApiLevel\s*=\s*(\d+)')
+    if ($m.Success) { $curApi = [int]$m.Groups[1].Value }
+    $curMembers = 0
+    foreach ($f in Get-ChildItem -LiteralPath $dir -Filter '*.cs' -File) {
+        foreach ($l in [IO.File]::ReadAllLines($f.FullName)) { if ($l -match '^\s*public\s') { $curMembers++ } }
+    }
+    if ($baseApi -lt 0 -or $baseMembers -lt 0) { Ok 'API level: baseline invalid (skipped)'; return }
+    if ($curApi -lt $baseApi) { Bad ('API level regressed: ' + $baseApi + ' -> ' + $curApi); return }
+    if ($curMembers -gt $baseMembers -and $curApi -eq $baseApi) {
+        Bad ('contract public members ' + $baseMembers + ' -> ' + $curMembers + ' but ApiLevel still ' + $curApi + ' (bump + run build/update-api-level.ps1)')
+        return
+    }
+    Ok ('API level: ApiLevel ' + $curApi + ' / public members ' + $curMembers + ' (baseline ' + $baseApi + '/' + $baseMembers + ')')
+}
+
+Check-ApiLevel

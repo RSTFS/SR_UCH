@@ -29,6 +29,9 @@ public partial class SR {
         _stResults = new List<string>();
         _stPass = 0; _stFail = 0;
         try {
+            string[] patchMiss; int patchTotal = SR.AuditPatches(out patchMiss);
+            StCheck(T("补丁目标存在", "Patch targets exist"), patchMiss == null || patchMiss.Length == 0,
+                patchMiss != null && patchMiss.Length > 0 ? string.Join(", ", patchMiss) : T("已校验 ", "checked ") + patchTotal);
             string[] magicConf = SRApi.NetMagic.Conflicts();
             StCheck(T("网络魔数唯一", "Network magics unique"), magicConf == null || magicConf.Length == 0,
                 magicConf != null && magicConf.Length > 0 ? string.Join("; ", magicConf) : T("已登记 ", "registered ") + SRApi.NetMagic.Registered);

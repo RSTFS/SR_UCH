@@ -1,10 +1,11 @@
 # 变更记录（自动生成）
 
 > 由 `build/gen-release-notes.ps1` 从 git 历史生成，**不要手工编辑**。
-> 当前 HEAD `8a0a9ce`；契约 ApiLevel `4`。
+> 当前 HEAD `9d26ebd`；契约 ApiLevel `4`。
 
 ## 新功能 / 优化
 
+- feat: 预设读取 .bak 回退、变更记录自动生成、CI 结构守卫 job
 - feat(contract): TableArgs.Create + Validate（必填校验）+ 核心按问题签名记日志（ApiLevel 3）
 - feat(contract): 网络魔数注册表 + 自检唯一性检查（ApiLevel 2）
 - feat(contract): 注入状态通道登记（Sinks.State）+ 自检检查
@@ -21,8 +22,6 @@
 - feat(notify): 重写浮层调度——不漏消息 + 排队 + 平滑过渡
 - feat(chaos): 当前牌面卡片化（牌名 + 效果 + 增益/减益色边）
 - feat(chaos): 整条删除房客提案（死代码清理）
-- feat(core): 可折叠分区 SRApi.Ctl.SectionBegin/SectionEnd
-- feat(core): 按帧缓存 SRApi.Cache.FrameSig；Chaos.Desc 用它
 
 ## 修复
 
@@ -35,7 +34,6 @@
 - fix: 删除权限提醒日志、修复分区通道未注入、快捷键同行、预设列表高度、重抽无效、牌池游戏名
 - fix(ui): 按 17 条反馈重做通知/视觉辅助/混乱牌组/自检/模式限制等界面
 - fix: 启动自检的两条误报 + 清理遗留死键
-- fix(notify): 浮层正文底部缓冲 1px → 2px
 
 ## 性能
 
@@ -64,6 +62,7 @@
 
 ## 杂项
 
+- chore(ex): EX 构建清单加入 ExModule.Ping.cs（延时列新文件）
 - chore: 预设删除清理/残留 .tmp 清扫 + 部署版本文件（git hash/ApiLevel）
 - chore(build): 清理 BuildingTools 旧键名残留；自检新增「按键中心」卡片
 
@@ -73,6 +72,7 @@
 
 ## 测试
 
+- test: 功能层纯逻辑抽离 + 单测覆盖（81 -> 98）+ CI 构建清单 job
 - test: 契约层单测 20 → 73 条（Slots / 功能清单 / 几何 / 通道）
 
 ## 其它

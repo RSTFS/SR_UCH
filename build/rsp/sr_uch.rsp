@@ -52,6 +52,7 @@ SR_UCH\SR.KeyBinds.cs
 SR_UCH\SR.Localization.cs
 SR_UCH\SR.Net.cs
 SR_UCH\SR.Notify.cs
+SR_UCH\SR.PatchAudit.cs
 SR_UCH\SR.Plugins.cs
 SR_UCH\SR.SelfCheck.cs
 SR_UCH\SR.Settings.Controls.cs
