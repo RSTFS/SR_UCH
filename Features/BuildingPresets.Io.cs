@@ -201,6 +201,18 @@ namespace SR_UCH.Tweaks {
 
 
 
+        // 启动/刷新时清理残留的 .tmp（原子写中途退出留下的），只清 24 小时前的，避免误删正在写的文件。
+        private static void SweepStaleTemp() {
+            try {
+                string root = PresetsRoot();
+                if (!Directory.Exists(root)) return;
+                foreach (string f in Directory.GetFiles(root, "*.tmp")) {
+                    try { if ((DateTime.UtcNow - File.GetLastWriteTimeUtc(f)).TotalHours >= 24) File.Delete(f); }
+                    catch (Exception __sd) { SRApi.Guard.Log("布局预设/清理残留临时文件", __sd); }
+                }
+            } catch (Exception __sw) { SRApi.Guard.Log("布局预设/扫描残留临时文件", __sw); }
+        }
+
         private static void DeletePreset(PresetInfo p) {
             try {
                 if (p == null) return;
@@ -217,6 +229,9 @@ namespace SR_UCH.Tweaks {
                         SRApi.Notify(SRApi.T("删除失败：文件被占用？", "Delete failed: file in use?"));
                         return;   // 文件没删掉就不要动索引，避免"索引说没了、磁盘还在"
                     }
+                    // 顺手清理同名残留（原子写临时文件 / 覆盖前备份），避免目录越积越多。
+                    try { if (File.Exists(p.FilePath + ".tmp")) File.Delete(p.FilePath + ".tmp"); } catch (Exception __ct) { SRApi.Guard.Log("布局预设/清理临时文件", __ct); }
+                    try { if (File.Exists(p.FilePath + ".bak")) File.Delete(p.FilePath + ".bak"); } catch (Exception __cb) { SRApi.Guard.Log("布局预设/清理备份", __cb); }
                 }
                 for (int i = _presets.Count - 1; i >= 0; i--) {
                     PresetInfo it = _presets[i];
@@ -345,6 +360,7 @@ namespace SR_UCH.Tweaks {
 
         private static void EnsureLoaded() {
             if (_loaded) return;
+            SweepStaleTemp();
             LoadFromDisk(false);
         }
 
