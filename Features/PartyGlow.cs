@@ -425,7 +425,14 @@ namespace SR_UCH.Tweaks {
             CfgRow(_strength);
             CfgRow(_size);
             CfgRow(_breathe);
-            if (_tierColors != null) for (int i = 0; i < _tierColors.Length; i++) CfgRow(_tierColors[i]);
+            // 六档颜色走核心取色器（带色块、调色板、HSV/RGB/Hex 编辑）；改完立即重建颜色表。
+            if (_tierColors != null) {
+                for (int i = 0; i < _tierColors.Length; i++) {
+                    GUIContent lab = new GUIContent(TierZh[i] + " / " + TierEn[i]);
+                    if (SRApi.Ctl.ColorEdit(lab, _tierColors[i], SRApi.Ctl.Sc(200f), SRApi.Ctl.Sc(24f)))
+                        TierColor[i] = ParseColor(_tierColors[i].Value, TierColorDefault[i]);
+                }
+            }
 
         }
     }
