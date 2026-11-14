@@ -7,8 +7,42 @@ using UnityEngine;
 
 namespace SR_UCH.Tweaks {
     public partial class QuickAdjust {
+        // 换关卡/换房间即失效：百分比只在一局内保持，不再跨房延续。
+        private static string _keepRoom;
+        private static void ResetHandicapOnRoomChange() {
+            try {
+                string room = CurrentRoomKey();
+                if (room == _keepRoom) return;
+                _keepRoom = room;
+                if (_keepHandicap > 0) {
+                    _keepHandicap = 0;               // 停止保持
+                    try { ApplyOwnHandicap(100); } catch (Exception __rh) { SRApi.Guard.Log("评分百分比/换房还原", __rh); }
+                }
+            } catch (Exception __ex) { SRApi.Guard.Log("评分百分比/换房检测", __ex); }
+        }
+
+        // 当前"房间 + 关卡"标识：大厅会话 ID 与场景名任一变化都算换房。
+        private static string CurrentRoomKey() {
+            string lobby = "";
+            try {
+                // 本机玩家的节点 ID（同房间内稳定，换房/重连会变）+ 房主 GSID 共同标识房间。
+                LobbyPlayer lp = FindLocalLobbyPlayer();
+                if (lp != null) lobby = lp.playerNodeID.ToString();
+                if (LobbyManager.instance != null && LobbyManager.instance.lobbySlots != null) {
+                    for (int i = 0; i < LobbyManager.instance.lobbySlots.Length; i++) {
+                        LobbyPlayer slot = LobbyManager.instance.lobbySlots[i] as LobbyPlayer;
+                        if (slot != null && slot.IsHost) { lobby += "@" + (slot.GSID ?? ""); break; }
+                    }
+                }
+            } catch (Exception __rk) { SRApi.Guard.Log("评分百分比/房号", __rk); }
+            string scene = "";
+            try { scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name ?? ""; } catch (Exception __sc) { SRApi.Guard.Log("评分百分比/场景名", __sc); }
+            return lobby + "|" + scene;
+        }
+
         private static void TickKeepHandicap() {
             try {
+                ResetHandicapOnRoomChange();
                 if (_keepHandicap <= 0) return;
                 if (Time.unscaledTime - _keepLastAt < 1f) return;
                 _keepLastAt = Time.unscaledTime;

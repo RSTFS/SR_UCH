@@ -47,6 +47,11 @@ public partial class SR {
         }
 
         private static readonly Dictionary<ConfigEntryBase, State> _states = new Dictionary<ConfigEntryBase, State>();
+        // 独立浮层窗口：点色块打开，画在 SR 窗口之上（覆盖层），不占页面布局、不影响滚动。
+        internal static bool FloatOpen;
+        private static Rect _floatRect;
+        private static bool _floatInit;
+        private const string FloatTitle = "SR_ColorFloat";
         private static ConfigEntryBase _open;   // 当前展开的条目（同一时间只展开一个）
         private static bool _tickHooked;
         private const string HexField = "SR_ColorHex";
@@ -130,17 +135,81 @@ public partial class SR {
                 Ring(r, new Color(1f, 1f, 1f, 0.35f));
                 string tip = T("点击打开/收起调色板", "click to open/close the color picker");
                 if (!GUI.Button(r, new GUIContent("", tip), GUIStyle.none)) return false;
-                if (s.Open) Close(e, s); else Open(e, s);
+                // 独立浮层：点色块打开窗口（不再在页面内展开面板，避免挤动布局与滚动）。
+                if (FloatOpen && ReferenceEquals(_open, e)) { CloseFloat(e, s); return true; }
+                OpenFloat(e, s);
                 return true;
             } catch (Exception __ex) { Guard.Log("颜色色块", __ex); return false; }
         }
 
         public static void Panel(ConfigEntryBase e) {
-            if (e == null) return;
-            State s;
-            if (!_states.TryGetValue(e, out s) || !s.Open) return;
-            try { DrawPanel(e, s); } catch (Exception __ex) { Guard.Log("颜色调色板", __ex); }
+            // 页面内不再内联展开：调色板改为独立浮层（DrawFloat），这里保持空实现以兼容旧调用。
         }
+
+        // 打开/关闭独立浮层窗口。
+        private static void OpenFloat(ConfigEntryBase e, State s) {
+            try {
+                if (_open != null && !ReferenceEquals(_open, e)) {
+                    State prev;
+                    if (_states.TryGetValue(_open, out prev)) Close(_open, prev);
+                }
+                _open = e;
+                s.Open = true;
+                FloatOpen = true;
+                _floatInit = false;
+                Load(s, ReadColor(e));
+            } catch (Exception __ex) { Guard.Log("调色板浮层/打开", __ex); }
+        }
+
+        private static void CloseFloat(ConfigEntryBase e, State s) {
+            try {
+                Close(e, s);          // 提交预览 + 清状态
+                FloatOpen = false;
+            } catch (Exception __ex) { Guard.Log("调色板浮层/关闭", __ex); }
+        }
+
+        // 浮层绘制（由 SR 的覆盖层每帧调用，画在主窗口之上）。
+        internal static void DrawFloat() {
+            if (!FloatOpen || _open == null) return;
+            State s;
+            if (!_states.TryGetValue(_open, out s) || !s.Open) { FloatOpen = false; return; }
+            try {
+                float w = Mathf.Min(Sc(480f), Screen.width - Sc(40f));
+                float h = Sc(338f);
+                if (!_floatInit) {
+                    _floatInit = true;
+                    // 默认停在鼠标附近，但夹进屏幕内。
+                    Vector2 m = Input.mousePosition;
+                    float x = Mathf.Clamp(m.x + Sc(16f), Sc(8f), Mathf.Max(Sc(8f), Screen.width - w - Sc(8f)));
+                    float y = Mathf.Clamp(Screen.height - m.y + Sc(16f), Sc(8f), Mathf.Max(Sc(8f), Screen.height - h - Sc(8f)));
+                    _floatRect = new Rect(x, y, w, h);
+                }
+                _floatRect.width = w; _floatRect.height = h;
+                // 拖动标题栏移动窗口
+                Event ev = Event.current;
+                Rect title = new Rect(_floatRect.x, _floatRect.y, _floatRect.width, Sc(24f));
+                if (ev != null) {
+                    if (ev.type == EventType.MouseDown && ev.button == 0 && title.Contains(ev.mousePosition)) { _floatDrag = true; _floatDragOff = ev.mousePosition - new Vector2(_floatRect.x, _floatRect.y); ev.Use(); }
+                    else if (ev.type == EventType.MouseDrag && _floatDrag) { _floatRect.x = ev.mousePosition.x - _floatDragOff.x; _floatRect.y = ev.mousePosition.y - _floatDragOff.y; ev.Use(); }
+                    else if (ev.type == EventType.MouseUp && _floatDrag) { _floatDrag = false; ev.Use(); }
+                }
+                _floatRect.x = Mathf.Clamp(_floatRect.x, 0f, Mathf.Max(0f, Screen.width - _floatRect.width));
+                _floatRect.y = Mathf.Clamp(_floatRect.y, 0f, Mathf.Max(0f, Screen.height - _floatRect.height));
+                // 圆角面板 + 标题栏
+                GUI.Box(_floatRect, GUIContent.none, Ctl.Footer);
+                GUI.Label(new Rect(title.x + Sc(10f), title.y + Sc(3f), title.width - Sc(46f), Sc(20f)), T("调色板", "Palette"), Ctl.SecHeader);
+                if (GUI.Button(new Rect(title.xMax - Sc(30f), title.y + Sc(3f), Sc(24f), Sc(20f)), "×", Ctl.Btn)) {
+                    CloseFloat(_open, s);
+                    return;
+                }
+                // 内容：复用现有 DrawPanel 布局，但画在浮层矩形内。
+                GUI.BeginGroup(new Rect(_floatRect.x + Sc(8f), _floatRect.y + Sc(26f), _floatRect.width - Sc(16f), _floatRect.height - Sc(34f)));
+                try { DrawPanel(_open, s); } finally { GUI.EndGroup(); }
+            } catch (Exception __ex) { Guard.Log("调色板浮层/绘制", __ex); }
+        }
+
+        private static bool _floatDrag;
+        private static Vector2 _floatDragOff;
 
         public static Color? Preview(ConfigEntryBase e) {
             try {
@@ -336,7 +405,7 @@ public partial class SR {
             bool enter = ev != null && ev.type == EventType.KeyDown
                 && (ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter);
             bool enterText = enter && (IsFocused(HexField) || IsRgbFocused());
-            float pw = PanelWidth();
+            float pw = FloatOpen ? Mathf.Max(Sc(200f), _floatRect.width - Sc(20f)) : PanelWidth();
 
             GUILayout.BeginVertical(GUILayout.Width(pw));
             try {

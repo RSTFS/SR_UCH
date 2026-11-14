@@ -743,6 +743,8 @@ public partial class SR {
             SR.Ctl.EndLabelColumnFrame();   // 标签列宽本帧收敛（下一帧生效）
             }
             DrawOverlays();
+            // 调色板独立浮层：画在所有功能覆盖层之后（最上层），不占页面布局。
+            try { ColorPicker.DrawFloat(); } catch (Exception __cf) { Guard.Log("调色板浮层", __cf); }
         }
 
 // 分区：MonoBehaviour（ManagerUI：Update/LateUpdate/OnGUI 驱动入口）
