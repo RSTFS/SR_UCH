@@ -51,7 +51,7 @@ public partial class Experiments : ITweak
 
     // 自由相机（实验）：经游戏自己的 ZoomCamera 生效，不直接写 Camera.fieldOfView（会被每帧覆盖）。
     // 默认键 F3，滚轮调 FOV（1-64，每格 0.5）；仅开启时消费滚轮，每次启用从相机当前 FOV 起算，关闭时还原。
-    [SrFeature("sr.freecam", "FreeCam", "1.0")]
+    [SrFeature("sr.freecam", "FreeCam", "1.0", Modes = (int)(SRApi.ModeMask.Freeplay))]
     public class FreeCam : ITweak {
         internal const float MinFov = 1f, MaxFov = 64f;   // 视野上限 64（用户要求）
         // 滚轮灵敏度：perspective 与 orthographic 两分支统一使用。
@@ -185,7 +185,7 @@ public partial class Experiments : ITweak
         internal static bool FreeplayMode() {
             try {
                 // 走统一模式门控：开了"超级模式（无视模式限制）"后，非自由模式也能用自由相机
-                return SRApi.GateModeAllows(SRApi.ModeMask.Freeplay);
+                return SRApi.FeatureAllowed(typeof(FreeCam));
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机/判断自由模式", __ex); return false; }
         }
 

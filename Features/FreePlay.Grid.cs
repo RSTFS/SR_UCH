@@ -13,7 +13,7 @@ using SR_UCH.Tweaks;
 using UnityEngine;
 
 namespace SR_UCH {
-    [SrFeature("sr.freeplay.grid", "FreePlayGrid", "2.0")]
+    [SrFeature("sr.freeplay.grid", "FreePlayGrid", "2.0", Modes = (int)(SRApi.ModeMask.Freeplay))]
     public class FreePlayGrid : ITweak {
         private const string Sec = "自由模式";
         private static ConfigEntry<bool> _alwaysOn;
@@ -23,7 +23,7 @@ namespace SR_UCH {
         internal static bool Active {
             get {
                 // 只在自由模式生效（超级模式可无视模式限制）；开关照常可开，非自由模式下无效。
-                try { return SRApi.GateMaster && _alwaysOn != null && _alwaysOn.Value && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay); }
+                try { return SRApi.GateMaster && _alwaysOn != null && _alwaysOn.Value && SRApi.FeatureAllowed(typeof(FreePlayGrid)); }
                 catch { return false; }
             }
         }

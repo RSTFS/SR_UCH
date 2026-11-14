@@ -10,7 +10,7 @@ using SR_UCH.Tweaks;
 using UnityEngine;
 
 namespace SR_UCH {
-    [SrFeature("sr.freeplay.self", "SelfState", "1.0")]
+    [SrFeature("sr.freeplay.self", "SelfState", "1.0", Modes = (int)(SRApi.ModeMask.Freeplay))]
     public class SelfState : ITweak {
         private const string Sec = "自由模式";
 
@@ -21,7 +21,7 @@ namespace SR_UCH {
         // 自由模式的功能只在自由模式生效（超级模式经由 GateModeAllows 的豁免自动放行）；
         // 开关本身照常可以打开/关闭，只是非自由模式下"开了无效"。
         private static bool On(ConfigEntry<bool> e) {
-            return e != null && e.Value && SRApi.GateMaster && SRApi.GateModeAllows(SRApi.ModeMask.Freeplay);
+            return e != null && e.Value && SRApi.GateMaster && SRApi.FeatureAllowed(typeof(SelfState));
         }
 
         // ================= 无敌 / 完美无敌 =================
@@ -102,7 +102,7 @@ namespace SR_UCH {
             MarkDirty(e);
             // 模式受限时静默跳过：不改变开关、不弹提示（等价于复选框不勾选）。
             bool inMode = true;
-            try { inMode = SRApi.GateModeAllows(SRApi.ModeMask.Freeplay); } catch { inMode = true; }
+            try { inMode = SRApi.FeatureAllowed(typeof(SelfState)); } catch { inMode = true; }
             if (!inMode) return;
             SRApi.Notify(SRApi.T(zh, en) + (e.Value ? SRApi.T("：开", ": on") : SRApi.T("：关", ": off")));
         }

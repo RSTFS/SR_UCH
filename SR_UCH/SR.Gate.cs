@@ -150,6 +150,22 @@ public partial class SR {
         // 判本机能否执行纯本地操作（不需要广播能力）；不含 EX 的无视房主豁免，离线时 Env.IsHost 为 true。
         public static bool CanControlLocally { get { return Env.IsHost; } }
 
+        // 功能级模式门控：查 [SrFeature].Modes（找不到功能记录/未声明 = 不限）。
+        internal static bool FeatureAllowed(Type impl) {
+            try {
+                if (impl == null) return true;
+                IList<FeatureInfo> all = Features.All;
+                for (int i = 0; i < all.Count; i++) {
+                    FeatureInfo fi = all[i];
+                    if (fi != null && fi.Impl == impl) {
+                        if (fi.Modes == 0) return true;
+                        return GateModeAllows((ModeMask)fi.Modes);
+                    }
+                }
+            } catch (Exception __fa) { Guard.Log("功能模式门控", __fa); }
+            return true;
+        }
+
         public static bool GateModeAllows(ModeMask allowed) {
             GateContext ctx = _gateCtx;
             if (ctx.OverrideModes) return true;

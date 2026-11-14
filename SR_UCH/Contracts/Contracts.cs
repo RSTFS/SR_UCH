@@ -171,6 +171,7 @@ namespace SR_UCH {
             if (ContractTooNew) s += "（要求契约 v" + MinContract + "，当前 v" + SRContract.Version + "）";
             if (MissingDeps.Count > 0) s += "（缺依赖: " + string.Join(", ", MissingDeps.ToArray()) + "）";
             if (ConflictSlots.Count > 0) s += "（槽位冲突: " + string.Join(", ", ConflictSlots.ToArray()) + "）";
+            if (Modes != 0) s += "（模式受限）";
             return s;
         }
     }

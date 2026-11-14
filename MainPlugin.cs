@@ -170,6 +170,9 @@ namespace SR_UCH {
                 SRApi.Ctl.SetCheckStylesSink(delegate () { return SR.Ctl.CheckOn; }, delegate () { return SR.Ctl.CheckOff; });
                 SRApi.Ctl.SetForceZhSink(delegate () { return SR.Ctl.ForceZh; }, delegate (bool __v) { SR.Ctl.ForceZh = __v; });
             });
+            SinkStep("FeatureGate", delegate () {
+                SRApi.SetFeatureAllowedSink(delegate (Type __t) { return SR.FeatureAllowed(__t); });
+            });
             SinkStep("KeyAction", delegate () {
                 SRApi.SetKeyActionSink(delegate (string __n, ConfigEntry<KeyCode> __e, string __m, Action __a) {
                     SR.RegisterKeyAction(__n, __e, __m, __a);

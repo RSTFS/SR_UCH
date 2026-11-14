@@ -330,6 +330,7 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         // 对局模式门控（与核心 SR.ModeMask 按位一致）与场景环境查询
         [Flags] public enum ModeMask { None = 0, Freeplay = 1, Party = 2, Creative = 4, Challenge = 8 }
         private static Func<int, bool> _gateModeAllows;
+        private static Func<Type, bool> _featureAllowed;
         private static Func<string> _envSceneName;
         private static Func<bool> _envInTreehouse;
         public static void SetGateSinks(Func<int, bool> gateModeAllows, Func<string> envSceneName, Func<bool> envInTreehouse) {
@@ -337,6 +338,10 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         }
         // 当前对局模式是否落在 allowed 位集合内
         public static bool GateModeAllows(ModeMask allowed) { Func<int, bool> f = _gateModeAllows; return f != null && f((int)allowed); }
+        // 功能级模式门控：从 [SrFeature].Modes 元数据读取（0 = 不限），由核心判定当前模式是否放行。
+        // 功能不再各自写 ModeMask 常量 + GateModeAllows，只声明一次元数据。
+        public static bool FeatureAllowed(Type impl) { Func<Type, bool> f = _featureAllowed; return f == null || f(impl); }
+        public static void SetFeatureAllowedSink(Func<Type, bool> f) { _featureAllowed = f; }
         // 场景环境（只读）
 
         // UI 状态/注册门面（窗口尺寸、光标样式、页面注册、按键注册）

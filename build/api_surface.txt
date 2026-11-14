@@ -111,3 +111,4 @@ RowCombo
 RegisterKey
 NotifyArgs
 NotifyExFn
+FeatureAllowed

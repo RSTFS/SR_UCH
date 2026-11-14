@@ -37,7 +37,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 
 namespace SR_UCH.Tweaks {
-    [SrFeature("sr.chaos", "Chaos", "2.2")]
+    [SrFeature("sr.chaos", "Chaos", "2.2", Modes = (int)(SRApi.ModeMask.Party | SRApi.ModeMask.Creative))]
     public class Chaos : ITweak {
         private const string Sec = "混乱牌组";
 
@@ -306,7 +306,7 @@ namespace SR_UCH.Tweaks {
             try {
                 // 树屋里还没进入具体模式：允许手动重抽（否则「重抽」按钮看起来无效）。
                 if (SRApi.Env.InTreehouse) return true;
-                return SRApi.GateModeAllows(SRApi.ModeMask.Party | SRApi.ModeMask.Creative);
+                return SRApi.FeatureAllowed(typeof(Chaos));
             }
             catch (Exception __ex) { SRApi.Guard.Log("混乱牌组/模式判定", __ex); return false; }
         }
