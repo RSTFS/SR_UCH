@@ -82,6 +82,12 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host '编译失败 ❌' -ForegroundColor Red
     exit 2
 }
+# 契约层的静态构造会解析 BepInEx.Configuration 类型（例如 List<Func<ConfigEntryBase,bool>>），
+# 只编译引用不够，运行时必须能在 exe 旁边找到 BepInEx.dll，否则 SRApi 报 TypeInitializationException。
+$bepInExDll = Join-Path $GameDir 'BepInEx\core\BepInEx.dll'
+if (Test-Path -LiteralPath $bepInExDll) {
+    Copy-Item -LiteralPath $bepInExDll -Destination (Join-Path $outDir 'BepInEx.dll') -Force
+}
 
 Write-Host '== 运行测试 =='
 & $outExe

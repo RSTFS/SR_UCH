@@ -26,6 +26,9 @@ namespace SR_UCH.Tests {
             TestColorHex();
             TestContractVersion();
             TestTableScrollMath();
+            TestSlots();
+            TestFeatureManifest();
+            TestSinksAndFallbacks();
 
             Console.WriteLine("  通过 " + _pass + " / 失败 " + _fail);
             if (_fail > 0) { Console.WriteLine("== 有失败 ❌ =="); return 1; }
@@ -74,6 +77,146 @@ namespace SR_UCH.Tests {
             Eq("ToColor32 G=255", (byte)255, c32.g);
             Color back = SRApi.ColorHex.FromColor32(c32);
             Check("FromColor32(ToColor32) 往返", Math.Abs(back.g - 1f) < 0.01f);
+        }
+
+        // Slots（槽位总线）：覆盖 Provide/Require 覆盖语义、类型不符、Retract 只删自己、miss 统计。
+        // 注意：契约里没有 Clear()，测试用唯一槽位名 + 相对计数（Count/MissCount 的 delta）。
+        private static void TestSlots() {
+            int c0 = Slots.Count;
+            object a = new object();
+            object b = new object();
+
+            Slots.Provide("ut.slot", a);
+            Eq("Provide 后 Count+1", c0 + 1, Slots.Count);
+            Check("Require 取回同一引用", ReferenceEquals(a, Slots.Require<object>("ut.slot")));
+
+            // 覆盖语义：后 Provide 的赢（真实用途：EX 覆盖内置实现）
+            Slots.Provide("ut.slot", b);
+            Check("Provide 覆盖后 Require 返回新实现", ReferenceEquals(b, Slots.Require<object>("ut.slot")));
+
+            // Retract(expected) 只删自己提供的：expected 不匹配时不能删别人的
+            Slots.Retract("ut.slot", a);
+            Eq("Retract(expected 不匹配) 不删除", c0 + 1, Slots.Count);
+            Slots.Retract("ut.slot", b);
+            Eq("Retract(expected 匹配) 删除", c0, Slots.Count);
+            Eq("Retract 后 Require 返回 null", (object)null, Slots.Require<object>("ut.slot"));
+
+            // 非法输入：null/空槽位名、null 实现都不得改变注册表
+            int c1 = Slots.Count;
+            Slots.Provide("", a);
+            Slots.Provide(null, a);
+            Slots.Provide("ut.slot.null", null);
+            Eq("非法 Provide 不改变 Count", c1, Slots.Count);
+            Slots.Retract("", null);
+            Slots.Retract(null, null);
+            Slots.Retract("ut.slot.absent", null);
+            Eq("非法 Retract 不改变 Count", c1, Slots.Count);
+            Eq("空槽位名 Require 返回 null", (object)null, Slots.Require<object>(""));
+
+            // 缺槽位：返回 null 并记入自检统计（MissCount 增加、MissNames 能找到）
+            int m0 = Slots.MissCount;
+            Eq("缺槽位 Require 返回 null", (object)null, Slots.Require<object>("ut.slot.absent"));
+            Check("缺槽位记入 MissCount", Slots.MissCount > m0, "before=" + m0 + " after=" + Slots.MissCount);
+            bool named = false;
+            foreach (string n in Slots.MissNames) if (n != null && n.StartsWith("ut.slot.absent")) { named = true; break; }
+            Check("缺槽位名出现在 MissNames", named);
+
+            // 类型不符：已登记但不是要的类型 -> null + 记 miss（带「类型不符」后缀）
+            Slots.Provide("ut.slot.typed", a);
+            Eq("类型不符 Require 返回 null", (object)null, Slots.Require<string>("ut.slot.typed"));
+            bool typedMiss = false;
+            foreach (string n in Slots.MissNames) if (n != null && n.StartsWith("ut.slot.typed")) { typedMiss = true; break; }
+            Check("类型不符记入 MissNames", typedMiss);
+            Slots.Retract("ut.slot.typed", a);
+        }
+
+        // 功能清单：FromType 有/无 [SrFeature]、MinContract 过期、Register 去重、Find、ToString 标记。
+        [SrFeature("ut.basic", "Basic", "1.5", Rank = 7)]
+        private sealed class BasicTweak : ITweak { public void Initialize(IFeatureHost host) { } }
+
+        [SrFeature("ut.dep", "Dep", "1.0", DependsOn = new string[] { "ut.missing.dep" }, Provides = new string[] { "ut.slot.provided" })]
+        private sealed class DepTweak : ITweak { public void Initialize(IFeatureHost host) { } }
+
+        [SrFeature("ut.toonew", "TooNew", "0.1", MinContract = 99)]
+        private sealed class TooNewTweak : ITweak { public void Initialize(IFeatureHost host) { } }
+
+        private sealed class NoManifestTweak : ITweak { public void Initialize(IFeatureHost host) { } }
+
+        private static void TestFeatureManifest() {
+            // 属性默认值：Rank 默认 120，MinContract 默认 = 当前契约版本
+            SrFeatureAttribute attr = new SrFeatureAttribute("ut.x", "X", "1.0");
+            Eq("SrFeature 默认 Rank", 120, attr.Rank);
+            Eq("SrFeature 默认 MinContract", SRContract.Version, attr.MinContract);
+
+            FeatureInfo bi = Features.FromType(typeof(BasicTweak));
+            Check("FromType 有清单", bi != null && !bi.ManifestMissing);
+            Eq("FromType 复制 Id", "ut.basic", bi.Id);
+            Eq("FromType 复制 Name", "Basic", bi.Name);
+            Eq("FromType 复制 Version", "1.5", bi.Version);
+            Eq("FromType 复制 Rank", 7, bi.Rank);
+            Check("MinContract 未过期 -> ContractTooNew=false", !bi.ContractTooNew);
+
+            FeatureInfo di = Features.FromType(typeof(DepTweak));
+            Eq("DependsOn 长度", 1, di.DependsOn != null ? di.DependsOn.Length : -1);
+            Eq("Provides 长度", 1, di.Provides != null ? di.Provides.Length : -1);
+            Eq("DependsOn 内容", "ut.missing.dep", di.DependsOn[0]);
+
+            FeatureInfo tn = Features.FromType(typeof(TooNewTweak));
+            Check("MinContract 过期 -> ContractTooNew=true", tn.ContractTooNew);
+            Check("ContractTooNew 出现在 ToString", tn.ToString() != null && tn.ToString().Contains("要求契约"));
+
+            FeatureInfo nm = Features.FromType(typeof(NoManifestTweak));
+            Check("无 [SrFeature] -> ManifestMissing=true", nm.ManifestMissing);
+            Eq("无清单回退 Id=类型全名", typeof(NoManifestTweak).FullName, nm.Id);
+            Eq("无清单回退 Version=0", "0", nm.Version);
+            Check("ManifestMissing 出现在 ToString", nm.ToString().Contains("未声明清单"));
+
+            // Register / Find / 去重：同一 id 第二次注册改成 id#类型名，不互相覆盖
+            int n0 = Features.Count;
+            FeatureInfo r1 = new FeatureInfo { Id = "ut.reg", Name = "R1", Version = "1", Impl = typeof(string) };
+            Features.Register(r1);
+            FeatureInfo r2 = new FeatureInfo { Id = "ut.reg", Name = "R2", Version = "1", Impl = typeof(object) };
+            Features.Register(r2);
+            Eq("Register 两条同 id 都保留", n0 + 2, Features.Count);
+            Check("Find 原 id 返回第一条", Features.Find("ut.reg") == r1);
+            Check("Find 去重 id 返回第二条", Features.Find("ut.reg#Object") == r2);
+            Eq("Find null 返回 null", (object)null, Features.Find(null));
+            Eq("Find 空串返回 null", (object)null, Features.Find(""));
+            int n1 = Features.Count;
+            Features.Register(null);
+            Features.Register(new FeatureInfo { Id = "", Name = "empty" });
+            Eq("Register 非法输入 no-op", n1, Features.Count);
+            Features.Register(new FeatureInfo { Id = "ut.problem", Name = "Problem", Version = "1", Impl = typeof(string), ContractTooNew = true });
+            Features.Register(new FeatureInfo { Id = "ut.problem", Name = "Problem", Version = "1", Impl = typeof(string), ContractTooNew = true });
+            Check("ProblemCount 计数包含过期契约", Features.ProblemCount >= 1);
+
+            // 依赖缺失/槽位冲突的检测逻辑在 Rebuild() 里（需要扫 AppDomain），这里只验证数据结构可用。
+            di.MissingDeps.Add("ut.missing.dep");
+            di.ConflictSlots.Add("ut.slot.provided");
+            Eq("MissingDeps 记录", 1, di.MissingDeps.Count);
+            Eq("ConflictSlots 记录", 1, di.ConflictSlots.Count);
+            string ds = Features.Describe();
+            Check("Describe 返回非空且含契约版本", !string.IsNullOrEmpty(ds) && ds.Contains("契约 v"));
+        }
+
+        // 通道/回退：未注入 sink 时 T() 回退中文、Sink 记账单调、时间常量合理。
+        private static void TestSinksAndFallbacks() {
+            Eq("T 未注入时回退中文", "中文原文", SRApi.T("中文原文", "English text"));
+            Check("SinkCount <= SinkTotal", SRApi.SinkCount() <= SRApi.SinkTotal(), SRApi.SinkCount() + "/" + SRApi.SinkTotal());
+            Check("MissingSinks 非 null", SRApi.MissingSinks() != null);
+            Check("SinkTotal >= 0", SRApi.SinkTotal() >= 0);
+            Check("重载锁自愈阈值 > 0", SrTimeouts.ReloadLockStaleSeconds > 0f);
+            Check("预设消费超时 > 0", SrTimeouts.PresetConsumeTimeoutSeconds > 0f);
+            Check("重载锁阈值 > 预设消费超时", SrTimeouts.ReloadLockStaleSeconds > SrTimeouts.PresetConsumeTimeoutSeconds);
+            Check("TableRowH > 0", SRApi.Ctl.TableRowH() > 0f);
+            Check("ThemeRadius >= 0", SRApi.Ctl.ThemeRadius >= 0f);
+            Check("ThemeHoverFade 在 0..1", SRApi.Ctl.ThemeHoverFade >= 0f && SRApi.Ctl.ThemeHoverFade <= 1f);
+            Eq("TableColumnWidths(null) 返回 null", (object)null, SRApi.Ctl.TableColumnWidths(null));
+            // 线程检查：主线程上断言不得抛异常（跨线程行为需真游戏环境，这里只保证接口安全）
+            MainThread.Enable(true);
+            MainThread.Assert("ut.mainthread");
+            MainThread.Enable(false);
+            Check("主线程 Assert 不抛异常", true);
         }
 
         // 契约版本单调递增：外部模块按它握手，倒退会让 DLL 静默失效。

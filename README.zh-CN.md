@@ -224,7 +224,7 @@
 新克隆的仓库与 CI 都能跑：
 
 ```powershell
-.\build\run-tests.ps1 -NoGame    # 契约层必须编译通过 + 13 条断言（dotnet, net8.0）
+.\build\run-tests.ps1 -NoGame    # 契约层必须编译通过 + 73 条断言（dotnet, net8.0）：ColorHex、表格滚动几何、Slots 槽位总线、功能清单/版本/依赖、时间常量与通道记账
 .\build\run-tests.ps1            # 有游戏时同样的测试走 csc + 真实 BepInEx
 .\build\guards-text.ps1          # 文本守卫（API 白名单、层边界、rsp 覆盖与生成一致性、
                                  # 编码、悬浮条目形状、静默 catch 与文件行数棘轮）

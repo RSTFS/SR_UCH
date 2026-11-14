@@ -281,7 +281,7 @@ Everything below runs **without the game installed** (contract layer is compiled
 `tests/UnityStubs.cs` + `tests/BepInExStubs.cs`), so it works on a fresh clone and in CI:
 
 ```powershell
-./build/run-tests.ps1 -NoGame    # contract layer must compile + 13 assertions (dotnet, net8.0)
+./build/run-tests.ps1 -NoGame    # contract layer must compile + 73 assertions (dotnet, net8.0): ColorHex, table scroll math, Slots bus, feature manifest/version/deps, timeouts and sink accounting
 ./build/run-tests.ps1            # same tests through csc against the real BepInEx when a game is present
 ./build/guards-text.ps1          # text guards (API allow-list, layer boundaries, rsp coverage +
                                  # generated-list consistency, encoding, tooltips, ratchets)
