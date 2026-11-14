@@ -181,9 +181,9 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterTick("通知中心-绑定与过期", Tick);
 
             // 核心 NotifyImpl 会惰性查这个名字；Provide 之后所有来源的提示都会进 OnNotify。
-            Slots.Provide(HookSlot, (Func<string, string, bool>)((t, g) => OnNotify(t, g)));
+            Func<string, string, bool> __hook = (t, g) => OnNotify(t, g); _provided[HookSlot] = __hook; Slots.Provide(HookSlot, __hook);
             // 对局播报复用同一套优先级口径（0 低 / 1 中 / 2 高），不再自己维护关键词表。
-            Slots.Provide("sr.notify.priority", (Func<string, string, int>)((t, g) => Classify(t, g)));
+            Func<string, string, int> __prio = (t, g) => Classify(t, g); _provided["sr.notify.priority"] = __prio; Slots.Provide("sr.notify.priority", __prio);
 
             _bindTries = 0;
             _nextBind = Time.unscaledTime + 0.5f;
@@ -194,10 +194,16 @@ namespace SR_UCH.Tweaks {
             }
         }
 
+        // 槽位注销：必须传“自己的委托”，否则契约层在 expected==null 时会无条件删除，
+        // 可能把之后注册的实现一起删掉。
+        private static readonly System.Collections.Generic.Dictionary<string, object> _provided =
+            new System.Collections.Generic.Dictionary<string, object>();
+
         // ITweak 没有 Shutdown 契约；留一个对称入口，将来契约补齐时可直接调用。
         public void Shutdown() {
-            Slots.Retract(HookSlot, null);
-            Slots.Retract("sr.notify.priority", null);
+            object impl;
+            if (_provided.TryGetValue(HookSlot, out impl) && impl is Func<string, string, bool>) Slots.Retract(HookSlot, impl);
+            if (_provided.TryGetValue("sr.notify.priority", out impl) && impl is Func<string, string, int>) Slots.Retract("sr.notify.priority", impl);
             if (_ui != null) { try { UnityEngine.Object.Destroy(_ui.gameObject); } catch (Exception ex) { SRApi.Guard.Log("通知中心/销毁对象", ex); } _ui = null; }
             if (_white != null) { try { UnityEngine.Object.Destroy(_white); } catch (Exception ex) { SRApi.Guard.Log("通知中心/销毁贴图", ex); } _white = null; }
         }
