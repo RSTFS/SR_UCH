@@ -52,7 +52,9 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<string>[] _tierColors;   // 六档自定义颜色（十六进制）
         private static ConfigEntry<int> _strength, _size;
         private static Sprite _glowSprite;          // 柔光（六档共用一张）
-        private static Material _addMat;            // 加色混合材质：让"光"叠到画面上而不是盖一层灰
+        private static Material[] _addMats;         // 六档各一份加色材质（共享同一份时颜色会被最后一件覆盖）
+        private static bool _addShaderTried;
+        private static Shader _addShader;
         private static Sprite[] _glowShapes;        // 6 档形状贴图（可读性页开启时）
         private static float _nextScan;
         // 可读性适配（软依赖）：只查槽位名，缺 DLL 时零 miss、零副作用。
@@ -171,17 +173,24 @@ namespace SR_UCH.Tweaks {
 
                 PickableBlock[] all = SRApi.FrameObjects<PickableBlock>();
                 if (all == null) return;
+                // 第一遍：先把全盒权重范围统计完。边扫边分级会让"第一件只有它自己"落回绝对阈值、
+                // 第二件起才走相对分档 —— 同一盒用两套相反标准，六档分布会乱。
                 for (int i = 0; i < all.Length; i++) {
-                    PickableBlock pb = all[i];
-                    if (pb == null || !pb.InPartybox) continue;      // 只处理派对盒里的，场上已放置的不碰
-                    _totalSeen++;
+                    PickableBlock pb0 = all[i];
+                    if (pb0 == null || !pb0.InPartybox) continue;
                     try {
-                        Placeable __pl = pb.placeablePrefab;
+                        Placeable __pl = pb0.placeablePrefab;
                         if (__pl != null) {
                             int __w = BlockGroup.GetItemFilterWeight(__pl, (int)__pl.BaseRarity);
                             if (__w > 0) { if (__w < _wMin) _wMin = __w; if (__w > _wMax) _wMax = __w; }
                         }
                     } catch (Exception __ww) { SRApi.Guard.Log("品质光芒/权重范围", __ww); }
+                }
+                // 第二遍：按完整范围分级并上光。
+                for (int i = 0; i < all.Length; i++) {
+                    PickableBlock pb = all[i];
+                    if (pb == null || !pb.InPartybox) continue;      // 只处理派对盒里的，场上已放置的不碰
+                    _totalSeen++;
                     int tier = TierOf(pb);
                     if (tier < 0) { _tierCount[6]++; HideGlow(pb); continue; }
                     _tierCount[tier]++;
@@ -208,8 +217,9 @@ namespace SR_UCH.Tweaks {
             // 权重记录在扫描阶段（见 RenderTick：_wMin/_wMax）。
             if (_wMax > _wMin && _wMin > 0) {
                 float lo = Mathf.Log(_wMin), hi = Mathf.Log(_wMax);
+                // 权重 = "每多少件出一件"：越小越稀有 → 高档位。pos 按稀有度取反。
                 float pos = hi > lo ? (Mathf.Log(w) - lo) / (hi - lo) : 1f;
-                return Mathf.Clamp(Mathf.RoundToInt(pos * 5f), 0, 5);
+                return Mathf.Clamp(Mathf.RoundToInt((1f - pos) * 5f), 0, 5);
             }
             for (int t = 5; t >= 0; t--) if (w <= TierMaxWeight[t]) return t;
             return 0;
@@ -250,13 +260,8 @@ namespace SR_UCH.Tweaks {
             }
             sr.enabled = true;
             sr.sprite = EnsureSprite(tier);
-            if (_addMat == null) {
-                try {
-                    Shader sh = Shader.Find("Particles/Additive");
-                    if (sh != null) { _addMat = new Material(sh); _addMat.hideFlags = HideFlags.HideAndDontSave; }
-                } catch (Exception __am) { SRApi.Guard.Log("品质光芒/加色材质", __am); }
-            }
-            if (_addMat != null) sr.sharedMaterial = _addMat;
+            Material __mat = AddMat(tier);
+            if (__mat != null) sr.sharedMaterial = __mat;
 
             // 包围盒：合并所有 ArtSprites 的世界包围；空则退化成固定尺寸
             Vector3 worldCenter = pb.transform.position;
@@ -282,10 +287,28 @@ namespace SR_UCH.Tweaks {
             if (_breathe.Value) a *= 0.86f + 0.14f * Mathf.Sin(Time.time * 2.2f + pb.GetInstanceID() * 0.37f);
             Color c = TierColor[tier];
             sr.color = new Color(c.r, c.g, c.b, Mathf.Clamp01(a));
-            if (_addMat != null) {
-                try { _addMat.SetColor("_TintColor", new Color(c.r, c.g, c.b, Mathf.Clamp01(a))); }
+            Material __tm = AddMat(tier);
+            if (__tm != null) {
+                try { __tm.SetColor("_TintColor", new Color(c.r, c.g, c.b, Mathf.Clamp01(a))); }
                 catch (Exception __tc) { SRApi.Guard.Log("品质光芒/tint", __tc); }
             }
+        }
+
+        // 每档一份材质：六档共用一份时，同一帧里每件道具都会改写它，
+        // 最终所有光晕都变成最后一件的颜色（"只有一个颜色"的另一个来源）。
+        private static Material AddMat(int tier) {
+            int t = Mathf.Clamp(tier, 0, 5);
+            if (_addMats == null) _addMats = new Material[6];
+            if (_addMats[t] != null) return _addMats[t];
+            if (!_addShaderTried) {
+                _addShaderTried = true;
+                try { _addShader = Shader.Find("Particles/Additive"); } catch (Exception __sh) { SRApi.Guard.Log("品质光芒/着色器", __sh); }
+            }
+            if (_addShader == null) return null;                 // 构建裁剪时退回默认 Sprite 材质
+            Material m = new Material(_addShader);
+            m.hideFlags = HideFlags.HideAndDontSave;
+            _addMats[t] = m;
+            return m;
         }
 
         private static Color ParseColor(string hex, Color fallback) {

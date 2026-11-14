@@ -247,7 +247,10 @@ namespace SR_UCH.Tweaks {
             // 上一版漏了栏目登记：侧栏会显示英文 id 且排序靠后。补上中英名与顺序。
             SRApi.LocSec("Chaos", "混乱牌组", "Chaos Deck");
             RegUi();
-            SRApi.Nav("Chaos", 130);   // 联机(90)/时间控制(91) 之后、实验(100) 之前
+            SRApi.Nav("Chaos", 130);
+            // 每帧钩子：重抽键、握手、提案过期、软依赖绑定、对局播报推送都在 Tick 里。
+            // 此前这里漏了注册，整个每帧调度线是死的（重抽键完全无效）。
+            SRApi.RegisterTick("混乱牌组-每帧", Tick);
             SRApi.RegisterPage("Chaos", "Deck", "牌组", "Deck", 118, RenderPage);
             SRApi.RegisterPage("Chaos", "Pool", "牌池", "Card pool", 130, RenderPoolPage);
 
@@ -277,9 +280,9 @@ namespace SR_UCH.Tweaks {
 
         public void Tick() {
             if (!_ready) return;
-            if (_drawKey.Value != KeyCode.None && Input.GetKeyDown(_drawKey.Value) && IsAuthority) DrawAndBroadcast();
-            // 房客/非权威端按提案键；房主自己直接用重抽键，不发提案。
-                SendProposal(RandomCardId());
+            if (_enabled.Value == false) return;                       // 总开关关掉后不跑任何每帧逻辑
+            // 用项目的组合键框架：Shift/Ctrl 组合能用，且聊天框打字时让路（裸 Input.GetKeyDown 会误触发）。
+            if (IsAuthority && SRApi.ComboKeyDown(_drawKey)) DrawAndBroadcast();
             BindA11y();
             if (_pendingActive && Time.unscaledTime - _pendingAt > ProposalSeconds()) {
                 _lastExpiredCard = _pendingCard;

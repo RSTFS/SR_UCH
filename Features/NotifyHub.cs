@@ -266,9 +266,12 @@ namespace SR_UCH.Tweaks {
                 float stay = Mathf.Clamp(_toastSeconds.Value, 2f, 15f) + AExtra();
 
                 // 同类合并：3 秒窗口内同 key 只累加计数并续期，不再插入新行。
+                // 必须全表扫：命中后会把该条的 At 刷新为 now，但它仍留在 List 的旧位置；
+                // 一旦"时间已旧"的条目先被遇到就 break，后面刚续期的新条目反而扫不到（合并偶发失效）。
                 Notice merged = null;
-                for (int i = _history.Count - 1; i >= 0 && now - _history[i].At < 3f; i--) {
+                for (int i = _history.Count - 1; i >= 0; i--) {
                     if (_history[i].Key != key) continue;
+                    if (now - _history[i].At >= 3f) continue;
                     merged = _history[i]; break;
                 }
                 if (merged != null) {

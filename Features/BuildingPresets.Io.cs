@@ -165,9 +165,25 @@ namespace SR_UCH.Tweaks {
                         return null;
                     }
                 } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                // 相对路径快速通道同样必须做根校验：`..\..\x.xml` 能跳出预设根（受限的任意文件读）。
+                string root0 = Path.GetFullPath(PresetsRoot());
                 string p = null;
-                try { p = Path.Combine(Paths.BepInExRootPath, input); if (File.Exists(p)) return p; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-                try { p = Path.Combine(Paths.ConfigPath, input); if (File.Exists(p)) return p; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                try {
+                    p = Path.Combine(Paths.BepInExRootPath, input);
+                    string f1 = File.Exists(p) ? Path.GetFullPath(p) : null;
+                    if (f1 != null) {
+                        if (IsUnderRoot(f1, root0)) return f1;
+                        SRApi.LogWarn("[布局预设] 拒绝导入预设根目录之外的文件: " + f1);
+                    }
+                } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                try {
+                    p = Path.Combine(Paths.ConfigPath, input);
+                    string f2 = File.Exists(p) ? Path.GetFullPath(p) : null;
+                    if (f2 != null) {
+                        if (IsUnderRoot(f2, root0)) return f2;
+                        SRApi.LogWarn("[布局预设] 拒绝导入预设根目录之外的文件: " + f2);
+                    }
+                } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 try {
                 // 先净化文件名，再取全路径并确认仍在预设根目录内（防目录穿越）。
                 string safe = SafeFileName(input);
