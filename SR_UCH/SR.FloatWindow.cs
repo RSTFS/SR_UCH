@@ -58,6 +58,7 @@ public partial class SR {
         internal static bool CloseOnOutsideClick = true;
 
         private static bool _placed, _dragging;
+        private static float _measuredContentH;   // 内容实测高度（Layout 事件量得）
         private static Vector2 _dragOff;
         private static Action _onClose;
         private static Action _onDraw;
@@ -90,7 +91,9 @@ public partial class SR {
                 // 自适应：设计尺寸是"建议值"，同时夹到屏幕内并保留最小可用尺寸。
                 float minW = SR.Ctl.Sc(220f), minH = SR.Ctl.Sc(120f);
                 float w = Mathf.Clamp(SR.Ctl.Sc(_size.x), minW, Mathf.Max(minW, Screen.width - SR.Ctl.Sc(16f)));
-                float h = Mathf.Clamp(SR.Ctl.Sc(_size.y), minH, Mathf.Max(minH, Screen.height - SR.Ctl.Sc(16f)));
+                // 高度优先用内容实测值（上一帧 Layout 量到），没有实测时退回设计值。
+                float designH = _measuredContentH > 0f ? _measuredContentH + SR.Ctl.Sc(42f) : SR.Ctl.Sc(_size.y);
+                float h = Mathf.Clamp(designH, minH, Mathf.Max(minH, Screen.height - SR.Ctl.Sc(16f)));
                 if (!_placed) {
                     _placed = true;
                     // 左上角 = 鼠标点击处（输入坐标是左下原点，GUI 用左上原点）。
@@ -128,8 +131,15 @@ public partial class SR {
                     GUI.Label(new Rect(title.x + SR.Ctl.Sc(10f), title.y + SR.Ctl.Sc(5f), w - SR.Ctl.Sc(50f), SR.Ctl.Sc(22f)),
                         Title, SR.Ctl.SecHeader);
                     if (GUI.Button(close, "×", SR.Ctl.Btn)) { Close(); return; }
-                    GUI.BeginGroup(new Rect(Rect.x + SR.Ctl.Sc(10f), Rect.y + SR.Ctl.Sc(34f), w - SR.Ctl.Sc(20f), h - SR.Ctl.Sc(42f)));
+                    Rect content = new Rect(Rect.x + SR.Ctl.Sc(10f), Rect.y + SR.Ctl.Sc(34f), w - SR.Ctl.Sc(20f), h - SR.Ctl.Sc(42f));
+                    GUI.BeginGroup(content);
                     try { _onDraw(); } finally { GUI.EndGroup(); }
+                    // 自适应高度：量内容真实高度（Layout 事件），下一帧把窗口高度贴上去。
+                    // 估算法必然留白或截断，这里以实测为准，最多留 8px 内边距。
+                    if (e != null && e.type == EventType.Layout) {
+                        float used = GUILayoutUtility.GetLastRect().height;
+                        if (used > 0f) _measuredContentH = Mathf.Min(used, Screen.height * 0.8f);
+                    }
                     // 自绘光标：浮窗在最上层，光标必须更靠上才看得见。
                     if (e != null) {
                         Texture2D cur = SRApi.Ctl.CursorTexture;

@@ -49,13 +49,13 @@ namespace SR_UCH {
 
         private static void RenderSpawnPage() {
             try {
-                SRApi.Ctl.SectionTitle(SRApi.T("重生点", "Spawn points"),
-                    SRApi.T("自定义出生位置，配合地图页右键使用\n重生会传送到最近的重生点\n没有自定义点时回到游戏默认出生点",
-                            "custom spawn positions, used from the map page's right-click menu\nrespawn teleports to the nearest point\nfalls back to the game's default spawn"));
-                SpawnPointTools.RenderRows();
+                SRApi.Ctl.SectionTitle(SRApi.T("重生点", "Spawn points"));
+                // 顺序：开关 -> 动作行（可右键绑键）-> 列表。提示标签已删除（说明在各行 tooltip 里）。
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) {
                     return e.Definition.Key == "Spawn Points";
                 });
+                GUILayout.Space(SRApi.Ctl.Sc(4f));
+                SpawnPointTools.RenderRows();
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式重生点页/渲染", __ex); }
         }
 

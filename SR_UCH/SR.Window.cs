@@ -386,7 +386,8 @@ public partial class SR {
             // 松手即清 BlockWindowDrag，页面没机会清时也不卡住窗口拖动。
             if (e.type == EventType.MouseUp) BlockWindowDrag = false;
             if (!_resizing) {
-                if (e.type == EventType.MouseDown && over && e.button == 0) {
+                if (e.type == EventType.MouseDown && over && e.button == 0
+                    && !(SR.FloatWindow.IsOpen && SR.FloatWindow.Rect.Contains(mouse))) {
                     _downPos = mouse;
                     // 记下本次按下是否落在控件上：BlockWindowDrag 只在 MouseDown 帧为真，后续拖拽帧会变 false。
                     _downOnControl = BlockWindowDrag;
@@ -404,7 +405,10 @@ public partial class SR {
                     }
                 }
                 // 只判左键（侧栏排序用右键）；不用 hotControl==0：滚动视图按下即拿走它，空白处就拖不动窗口。
-                if (e.type == EventType.MouseDrag && e.button == 0 && over && !_dragActive && !BlockWindowDrag && !_downOnControl) {
+                // 独立窗口（一类浮窗 / 二类地图）上方的拖动归它们自己：否则拖浮窗会连 SR 一起拖。
+                bool overStandalone = SR.FloatWindow.IsOpen && SR.FloatWindow.Rect.Contains(mouse);
+                if (e.type == EventType.MouseDrag && e.button == 0 && over && !_dragActive && !BlockWindowDrag
+                    && !_downOnControl && !overStandalone) {
                     _dragActive = true;
                     _dragMoved = false;
                     _dragOffset = mouse - new Vector2(_winX, _winY);

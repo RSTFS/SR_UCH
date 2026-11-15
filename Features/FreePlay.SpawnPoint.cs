@@ -128,6 +128,7 @@ namespace SR_UCH.Tweaks {
                 if (_points.Count >= MaxPoints) _points.RemoveAt(0);
                 if (_curScene.Length == 0) _curScene = CurrentScene();
                 _points.Add(new Vector3(world.x, world.y, 0f));
+                _activeIndex = _points.Count - 1;   // 新建即生效：下次复活就在新位置
                 SavePoints();
             } catch (Exception __ex) { SRApi.Guard.Log("重生点/添加", __ex); }
         }
@@ -192,21 +193,45 @@ namespace SR_UCH.Tweaks {
         }
 
         // 重生：传送到最近的自定义重生点；没有自定义点时回到游戏默认出生点。
+        // 当前生效的重生点：最后新建或手动选中的那一个（下标）。
+        // 语义是"我在这里重生"，而不是"离我最近的" —— 后者会导致刚建的点被旧点抢先。
+        private static int _activeIndex = -1;
+        internal static int ActiveIndex { get { return _activeIndex; } }
+
+        // 把某个点设为当前重生位置（新建点时自动调用）。
+        internal static void SetActive(int index) {
+            try {
+                _activeIndex = (index >= 0 && index < _points.Count) ? index : (_points.Count > 0 ? _points.Count - 1 : -1);
+                SavePoints();
+            } catch (Exception __sa) { SRApi.Guard.Log("重生点/设为当前", __sa); }
+        }
+
         internal static void Respawn() {
             try {
-                if (_points.Count == 0) {
-                    ReadDefault();
-                    if (_defaultPoint.HasValue) TeleportLocal(_defaultPoint.Value);
+                // 优先用"当前生效点"；没有就回游戏默认出生点。
+                if (_points.Count > 0) {
+                    int idx = (_activeIndex >= 0 && _activeIndex < _points.Count) ? _activeIndex : _points.Count - 1;
+                    TeleportLocal(_points[idx]);
                     return;
                 }
-                Vector2 me = LocalPosition();
-                int best = 0; float bestD = float.MaxValue;
-                for (int i = 0; i < _points.Count; i++) {
-                    float d = Vector2.Distance(me, _points[i]);
-                    if (d < bestD) { bestD = d; best = i; }
-                }
-                TeleportLocal(_points[best]);
+                ReadDefault();
+                if (_defaultPoint.HasValue) TeleportLocal(_defaultPoint.Value);
             } catch (Exception __ex) { SRApi.Guard.Log("重生点/重生", __ex); }
+        }
+
+        // 地图标记用：当前生效点的下标（不再按"最近"高亮）。
+        internal static int ActiveMarkerIndex() { return (_activeIndex >= 0 && _activeIndex < _points.Count) ? _activeIndex : -1; }
+
+        // 供地图显示游戏原生出生点：读一次成功后缓存。
+        internal static bool TryGetDefault(out Vector2 pos) {
+            pos = Vector2.zero;
+            try {
+                ReadDefault();
+                if (!_defaultPoint.HasValue) return false;
+                Vector3 p = _defaultPoint.Value;
+                pos = new Vector2(p.x, p.y);
+                return true;
+            } catch (Exception) { return false; }
         }
 
         // 读游戏自己的默认出生点（Level.GetSpawnPosition）。
@@ -229,9 +254,9 @@ namespace SR_UCH.Tweaks {
             try {
                 // 内容标签 + 按钮（右键绑键）+ 快捷键框。
                 if (SRApi.Ctl.ActionRow(SRApi.T("重生", "Respawn"),
-                        SRApi.T("传送到最近的自定义重生点\n没有自定义点时回游戏默认出生点",
-                                "teleport to the nearest custom point\nfalls back to the game default"),
-                        SRApi.T("重生（最近点）", "Respawn (nearest)"), _respawnKey, 130f))
+                        SRApi.T("传送到当前生效的重生点\n没有自定义点时回游戏默认出生点",
+                                "teleport to the active spawn point\nfalls back to the game default"),
+                        SRApi.T("重生", "Respawn"), _respawnKey, 130f))
                     Respawn();
                 if (SRApi.Ctl.ActionRow(SRApi.T("添加重生点", "Add spawn point"),
                         SRApi.T("在当前位置添加一个自定义重生点\n最多 20 个", "add a custom point at your position\nup to 20"),
@@ -252,14 +277,15 @@ namespace SR_UCH.Tweaks {
                     int __del = -1;
                     for (int i = 0; i < Count; i++) {
                         Vector3 pt = At(i);
+                        bool __isActive = (i == ActiveIndex);
                         int __hit = SRApi.Ctl.ButtonRow(
                             new string[] {
-                                "#" + (i + 1) + "  (" + pt.x.ToString("0.0") + ", " + pt.y.ToString("0.0") + ")",
-                                SRApi.T("传送", "Teleport"),
+                                (__isActive ? "★ " : "") + "#" + (i + 1) + "  (" + pt.x.ToString("0.0") + ", " + pt.y.ToString("0.0") + ")",
+                                SRApi.T("设为重生点", "Set as spawn"),
                                 SRApi.T("删除", "Delete")
                             },
                             new float[] { 160f, 64f, 64f }, 22f);
-                        if (__hit == 0 || __hit == 1) TeleportLocal(pt);
+                        if (__hit == 0 || __hit == 1) { SetActive(i); TeleportLocal(pt); }
                         else if (__hit == 2) __del = i;
                     }
                     if (__del >= 0) { _points.RemoveAt(__del); SavePoints(); }

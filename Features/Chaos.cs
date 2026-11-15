@@ -65,7 +65,6 @@ namespace SR_UCH.Tweaks {
             new CardDef("高跳跃",   "High jump",        "跳跃高度提升",             "Higher jumps",                         TabletRule.ModifierJumpSpeed,          FJump,          false, 2, 3),
             new CardDef("快冲刺",   "Fast sprint",      "冲刺速度提升",             "Faster sprinting",                     TabletRule.ModifierSprintSpeed,        FSprint,        false, 2, 4),
             new CardDef("快平台",   "Fast platforms",   "平台移动变快",             "Platforms move faster",                TabletRule.ModifierPlatformSpeed,      FPlatform,      false, 2, 4),
-            new CardDef("超重",     "Crushing gravity", "重力极重，跳跃困难",       "Very heavy gravity, hard to jump",     TabletRule.ModifierGravity,            FGravity,       false, 3, 3),
             new CardDef("龟速冲刺", "Crawl sprint",     "冲刺慢到接近走路",         "Sprint barely faster than walking",    TabletRule.ModifierSprintSpeed,        FSprint,        false, 1, 1),
             new CardDef("停滞平台", "Frozen platforms", "平台几乎不动",             "Platforms barely move",                TabletRule.ModifierPlatformSpeed,      FPlatform,      false, 1, 1),
         };
@@ -80,6 +79,7 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<int> _everyRounds, _maxActive;
         private static ConfigEntry<KeyCode> _drawKey;
         private static ConfigEntry<bool>[] _pool;
+        private static ConfigEntry<int>[] _paramMin, _paramMax;   // 每张数值牌的取值区间（可圈定）
 
         private static ChaosListener _listener;
         private static readonly List<ActiveCard> _active = new List<ActiveCard>();
@@ -189,9 +189,18 @@ namespace SR_UCH.Tweaks {
             _drawKey = plugin.Config.Bind(Sec, "RerollKey", KeyCode.None, "房主按此键立刻重抽一张。");
 
             _pool = new ConfigEntry<bool>[Cards.Length];
+            _paramMin = new ConfigEntry<int>[Cards.Length];
+            _paramMax = new ConfigEntry<int>[Cards.Length];
             for (int i = 0; i < Cards.Length; i++) {
                 var c = Cards[i];
                 _pool[i] = plugin.Config.Bind(Sec, c.En, true, "是否进入随机池：" + c.Zh);
+                if (!c.IsBool) {
+                    // 数值牌的取值区间：默认沿用卡牌定义，可在这里圈定（例如只要 1-2 档）。
+                    _paramMin[i] = plugin.Config.Bind(Sec, c.En + " Min", c.Min,
+                        new ConfigDescription("数值下限：" + c.Zh, new AcceptableValueRange<int>(0, 8)));
+                    _paramMax[i] = plugin.Config.Bind(Sec, c.En + " Max", c.Max,
+                        new ConfigDescription("数值上限：" + c.Zh, new AcceptableValueRange<int>(0, 8)));
+                }
                 
                 SRApi.LocPair(Sec, c.En, c.Zh, c.En,
                               c.Zh + "\n勾选后才可能被抽到。", c.En + "\ncheck to include it in the draw pool.");
@@ -204,10 +213,16 @@ namespace SR_UCH.Tweaks {
                 _maxActive.Value = 1;
                 _announce.Value = true;
                 _drawKey.Value = KeyCode.None;
-                for (int __i = 0; __i < _pool.Length; __i++) if (_pool[__i] != null) _pool[__i].Value = true;
+                for (int __i = 0; __i < _pool.Length; __i++) {
+                    if (_pool[__i] != null) _pool[__i].Value = true;
+                    if (_paramMin != null && __i < _paramMin.Length && _paramMin[__i] != null) _paramMin[__i].Value = Cards[__i].Min;
+                    if (_paramMax != null && __i < _paramMax.Length && _paramMax[__i] != null) _paramMax[__i].Value = Cards[__i].Max;
+                }
             } catch (Exception __rs) { SRApi.Guard.Log("混乱牌组/会话重置", __rs); }
 
-            _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) RestoreAll(); };
+            // 关闭开关必须把修改器内容清干净：先按快照还原，再把残留的规则值复位到游戏默认，
+            // 否则之前抽到的牌会以"快照值"的形式留在 Modifiers 里，下次开局仍是改过的状态。
+            _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) { RestoreAll(); ClearModifiers(); } };
 
             SRApi.NetMagic.Register("chaos.signal", Magic);
             SRApi.NetMagic.Register("chaos.card", CardMagic);
@@ -351,8 +366,16 @@ namespace SR_UCH.Tweaks {
             var rng = new System.Random(Environment.TickCount ^ (_roundSeen * 7919) ^ (_drawSeq * 104729));
             int want = Mathf.Clamp(_maxActive.Value, 1, 4);
             _active.Clear();
-            for (int i = 0; i < want; i++) {
-                int id = chosen[rng.Next(chosen.Count)];
+            // 洗牌后按顺序取：同一张牌不会重复抽到；同一规则只保留第一次出现的那张，
+            // 否则规则覆盖会让实际生效数量少于设置值（例如要 4 张、牌池 2 张却只剩 2 条生效）。
+            List<int> bag = new List<int>(chosen);
+            for (int i = bag.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); int tmp = bag[i]; bag[i] = bag[j]; bag[j] = tmp; }
+            var usedRules = new List<TabletRule>();
+            for (int i = 0; i < bag.Count && _active.Count < want; i++) {
+                int id = bag[i];
+                TabletRule rule = Cards[id].Rule;
+                if (usedRules.Contains(rule)) continue;      // 同规则已被其它牌占用，跳过
+                usedRules.Add(rule);
                 int param = ParamFor(id, rng);
                 _active.Add(new ActiveCard(id, param));
                 BroadcastOne(id, param);
@@ -365,7 +388,14 @@ namespace SR_UCH.Tweaks {
         private int ParamFor(int id, System.Random rng) {
             var c = Cards[id];
             if (c.IsBool) return 1;
-            int lo = Mathf.Max(1, c.Min), hi = c.Max;
+            // 区间来自用户配置（可圈定），下限不低于 1、上限不超过该规则的取值数组长度。
+            int lo = c.Min, hi = c.Max;
+            try {
+                if (_paramMin != null && id < _paramMin.Length && _paramMin[id] != null) lo = _paramMin[id].Value;
+                if (_paramMax != null && id < _paramMax.Length && _paramMax[id] != null) hi = _paramMax[id].Value;
+            } catch (Exception __pc) { SRApi.Guard.Log("混乱牌组/读取数值区间", __pc); }
+            lo = Mathf.Max(1, lo);
+            if (hi < lo) hi = lo;
             var m = SafeMods();
             if (m != null) {
                 int arrLen = ArrayLengthFor(c.Field, m);
@@ -479,6 +509,30 @@ namespace SR_UCH.Tweaks {
             m.mirrorControls = _snap.Mirror;
             m.playerPlayerCollisions = _snap.PlayerCol;
             m.frictionless = _snap.Friction;
+        }
+
+        // 牌组关闭时的兜底：把牌可能改过的字段全部复位到游戏默认值。
+        // 不依赖快照（快照可能是在已被改过的状态下抓的），因此这是"干净"的终态。
+        private void ClearModifiers() {
+            try {
+                var m = SafeMods();
+                if (m == null) return;
+                // Modifiers 的模式字段默认就是 0（游戏序列化默认），不猜测"1 = 正常"。
+                m.GravityMode = 0;
+                m.JumpSpeedMode = 0;
+                m.SprintSpeedMode = 0;
+                m.PlatformSpeedMode = 0;
+                m.RateOfFireMode = 0;
+                m.wallJumpsDisabled = false;
+                m.danceInvincibility = false;
+                m.mirrorControls = false;
+                m.playerPlayerCollisions = false;
+                m.frictionless = false;
+                _active.Clear();
+                _hasSnapshot = false;
+                _applied = false;
+                SRApi.LogInfo("[混乱牌组] 已清空牌面与修改器内容");
+            } catch (Exception __cm) { SRApi.Guard.Log("混乱牌组/清空修改器", __cm); }
         }
 
         private static void ApplyLocal(Modifiers m, CardDef c, int param) {

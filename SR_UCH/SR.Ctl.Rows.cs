@@ -135,6 +135,8 @@ public partial class SR {
                         Event ev = Event.current;
                         if (ev == null || ev.button == 0) clicked = true;
                     }
+                    // 动作按钮也要支持右键绑键（原实现漏了这一步，所以右键没反应）。
+                    if (key != null && Event.current != null) TryBindByRightClick(key, GUILayoutUtility.GetLastRect());
                     GUILayout.Space(Sc(4));
                     if (key != null) {
                         bool cap = _capturing == key;
