@@ -1,8 +1,10 @@
 name: guards
 
-# 两道门禁（都不需要游戏安装）：
-#  1) text-guards：文本层守卫（API 棘轮 / 契约边界 / 功能层边界 / rsp 覆盖 / 编码 / 悬浮文案 / 单文件行数 …）
-#  2) unit-tests  ：编译契约层 + 跑单元测试（tests/SR_UCH.Tests.csproj，BepInEx 与 UnityEngine 都用桩）
+# 四道门禁（都不需要游戏安装）：
+#  1) text-guards  ：文本层守卫（API 棘轮 / 契约边界 / 功能层边界 / 编码 / 悬浮文案 / 单文件行数 …）
+#  2) schema-guards：槽位图 / 配置与本地化一致性（guards-schema.ps1）
+#  3) rsp-verify   ：构建源码清单覆盖（gen-rsp.ps1 -Verify）
+#  4) unit-tests   ：编译契约层 + 跑单元测试（tests/SR_UCH.Tests.csproj，BepInEx 与 UnityEngine 都用桩）
 #     这一步同时充当"契约层必须能编译"的最小编译门禁 —— 编译不过的 PR 在 CI 里就会红。
 # 需要游戏 Managed DLL 的守卫（csproj 构建 / 拆分构建 / 运行时自检）仍只在本地 build\build.ps1 -Check 里跑。
 

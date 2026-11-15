@@ -563,6 +563,9 @@ namespace SR_UCH {
                         }
                         var tweak = (ITweak)Activator.CreateInstance(t);
                         tweak.Initialize(this);
+                        // 必须登记：否则 late pass（PickUchAssemblies 扫 SR_UCH*）会把这个类型再初始化一次，
+                        // 造成 SettingChanged 重复订阅、启动开销翻倍。
+                        _initedTweaks.Add(t);
                         ModLogger.LogInfo("[SR] 已加载外部功能: " + t.Name + " (" + name + ".dll)");
                     } catch (Exception e) {
                         ModLogger.LogError("[SR] 外部 DLL 初始化失败 " + name + "/" + t.Name + ": " + e.Message);

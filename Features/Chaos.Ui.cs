@@ -2,7 +2,7 @@
 // 网络方案：发真实的 TabletRule + Value，由游戏自己的代码写进 Modifiers，房主安装即可带全场。
 // 房主被 !IsHost 挡住不执行那段，故房主须本地双写一次；Value2 高位放牌组魔数供 UI 解析。
 // 高位标记不干扰原生规则：游戏的规则分支只读 Value / Valueb。
-// 不进池的规则：GameSpeed（归时间控制）、CharacterSize / CameraFlip / Doomsday（碰相机或要重建绘制）。
+// 不进池的规则：GameSpeed（改全局速度）、CharacterSize / CameraFlip / Doomsday（碰相机或要重建绘制）。
 // 房内 mod 清单复用 MsgGameRuleSet 以 TabletRule.None 承载；Value 放本机 networkNumber（conn 无法区分发件人）。
 // 不新增 Harmony 补丁 / msgType / 反射登记；状态只在主线程回调里读写。
 
@@ -161,8 +161,9 @@ namespace SR_UCH.Tweaks {
             GUILayout.EndHorizontal();
             int __on = 0;
             for (int i = 0; i < Cards.Length; i++) if (_pool[i] != null && _pool[i].Value) __on++;
-            Line(SRApi.T("已启用 " + __on + " / " + Cards.Length + " 张；勾选后才会进入随机池。", __on + " / " + Cards.Length + " cards enabled; only checked cards can be drawn."),
-                 SRApi.T("已启用 " + __on + " / " + Cards.Length + " 张；勾选后才会进入随机池。", __on + " / " + Cards.Length + " cards enabled; only checked cards can be drawn."));
+            // Line 的两个参数分别是中文与英文：之前两处都传了同一句中英混合串，英文界面会显示中文。
+            Line("已启用 " + __on + " / " + Cards.Length + " 张；勾选后才会进入随机池。",
+                 __on + " / " + Cards.Length + " cards enabled; only checked cards can be drawn.");
             GUILayout.Space(SRApi.Ctl.Sc(6f));
 
             RenderPoolGroup(true);    // 数值规则
@@ -170,12 +171,8 @@ namespace SR_UCH.Tweaks {
         }
 
         // 分组渲染：按数值/布尔规则分两块（顺序固定，结构不随勾选变化）。
-        // 配置条目显示名缓存：仅游戏名/语言变化时重注册 LocKey（每帧重注册会让本地化缓存抖动）。
-        private static string[] _poolLabelCache;
-
         private void RenderPoolGroup(bool numeric) {
             SRApi.Ctl.SectionTitle(SRApi.T(numeric ? "数值规则" : "布尔规则", numeric ? "Numeric rules" : "Boolean rules"));
-            if (_poolLabelCache == null) _poolLabelCache = new string[Cards.Length];
             for (int i = 0; i < Cards.Length; i++) {
                 if (Cards[i].IsBool == numeric || _pool[i] == null) continue;   // numeric=true 显示数值牌（IsBool=false）
                 CardDef c = Cards[i];

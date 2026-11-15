@@ -108,6 +108,9 @@ public partial class SR {
         if ((m.Value2 >> 8) != CompatMagic) return;                     // 其它功能/游戏的规则消息
         int remoteHash = m.Value;
         int remoteCount = m.Value2 & 0xFF;
+        // 房主的 SendToAll 会把消息也发给本机 local connection：不滤掉会自己收到自己的签名，
+        // 每 20 秒刷一条"握手一致"。只处理"来自房主"且不是自身回环的消息。
+        if (m.Valueb && m.Value == LocalCompatHash()) return;            // 自身回环（房主收到自己发的）
         if (remoteHash == 0 || remoteHash == _compatRemoteHash) return; // 同一签名只处理一次
         _compatRemoteHash = remoteHash;
         int mine = LocalCompatHash();

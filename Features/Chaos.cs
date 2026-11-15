@@ -5,8 +5,8 @@
 //
 // 约束：
 // 1) Value2 高位放牌组魔数；游戏只读 Value / Valueb，手动改规则的 Value2 = 0 不会误判。
-// 2) 射速牌会写 Time.timeScale，与时间控制抢同一全局状态。
-// 3) GameSpeed / CharacterSize / CameraFlip / Doomsday 不进池（归时间控制或需重建绘制对象）。
+// 2) 射速牌会写 Time.timeScale：房客端会被游戏重置、房主端不会，两端不对称。
+// 3) GameSpeed / CharacterSize / CameraFlip / Doomsday 不进池（会改全局速度或需重建绘制对象）。
 // 4) 还原必须双写：重发树屋原值（未装 mod 的房客）+ 带外 Restore（清牌面标记）。
 // 5) 房内清单复用 MsgGameRuleSet 以 None 承载，Value 放本机 networkNumber。
 // 不新增 Harmony 补丁 / msgType / 反射登记；状态只在主线程读写。
@@ -49,7 +49,7 @@ namespace SR_UCH.Tweaks {
         private static int _drawSeq;   // 抽牌序号：保证每次重抽的随机种子都不同（否则 TickCount 同毫秒会抽出同一张）
         private const int FBoolWallJumps = 8, FBoolDance = 9, FBoolMirror = 10, FBoolPlayerCol = 12, FBoolFriction = 13;
 
-        // 17 张牌：5 个数值规则的多档取值 + 5 个布尔规则；每张带一句效果说明。
+        // 16 张牌：5 个数值规则的多档取值 + 5 个布尔规则；每张带一句效果说明。
         private static readonly CardDef[] Cards = new CardDef[] {
             new CardDef("低重力",   "Low gravity",      "重力变轻，跳得更高",       "Lighter gravity, floatier jumps",      TabletRule.ModifierGravity,            FGravity,       false, 1, 2),
             new CardDef("高重力",   "High gravity",     "重力加重，下落更快",       "Heavier gravity, faster falls",        TabletRule.ModifierGravity,            FGravity,       false, 2, 2),
@@ -200,6 +200,14 @@ namespace SR_UCH.Tweaks {
                         new ConfigDescription("数值下限：" + c.Zh, new AcceptableValueRange<int>(0, 8)));
                     _paramMax[i] = plugin.Config.Bind(Sec, c.En + " Max", c.Max,
                         new ConfigDescription("数值上限：" + c.Zh, new AcceptableValueRange<int>(0, 8)));
+                    SRApi.LocKey(Sec, c.En + " Min", c.Zh + "下限", c.En + " min");
+                    SRApi.LocDesc(Sec, c.En + " Min",
+                        c.Zh + "的下限\n抽取时不会低于这个档位\n与上限一起圈定取值范围",
+                        "lowest tier for " + c.En + "\nthe roll never goes below this\nwith max it defines the range");
+                    SRApi.LocKey(Sec, c.En + " Max", c.Zh + "上限", c.En + " max");
+                    SRApi.LocDesc(Sec, c.En + " Max",
+                        c.Zh + "的上限\n抽取时不会高于这个档位\n低于下限时按一下限处理",
+                        "highest tier for " + c.En + "\nthe roll never goes above this\nfalls back to min when lower");
                 }
                 
                 SRApi.LocPair(Sec, c.En, c.Zh, c.En,

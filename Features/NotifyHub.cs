@@ -88,8 +88,8 @@ namespace SR_UCH.Tweaks {
         private static void RegUi() {
             SRApi.LocKey(Sec, "Enabled", "启用通知中心", "Enable notification hub");
             SRApi.LocDesc(Sec, "Enabled",
-                "启用通知中心\n统一接管所有屏幕提示：分级、合并、静默。",
-                "Enable notification hub\nTake over all screen toasts: priority, merging, quiet mode and history.");
+                "启用通知中心\n统一接管所有屏幕提示：分级、合并、排队。",
+                "Enable notification hub\nTake over all screen toasts: priority, merging and queueing.");
             SRApi.LocKey(Sec, "Max Visible", "同时显示条数", "Max visible");
             SRApi.LocDesc(Sec, "Max Visible",
                 "同时显示条数\n浮层最多同时显示几条（1-6）。",
@@ -144,7 +144,7 @@ namespace SR_UCH.Tweaks {
         }
 
         public void Initialize(IFeatureHost plugin) {
-            _enabled = plugin.Config.Bind(Sec, "Enabled", true, "统一接管所有屏幕提示：分级、合并、静默。");
+            _enabled = plugin.Config.Bind(Sec, "Enabled", true, "统一接管所有屏幕提示：分级、合并、排队。");
             // 旧配置项已删除：启动时从 cfg 清理。
             try { SRApi.Migration.Remove(Sec, "Use Native Toast"); } catch (Exception __mr) { SRApi.Guard.Log("通知中心/清理旧键1", __mr); }
             try { SRApi.Migration.Remove(Sec, "Show On Screen"); } catch (Exception __mr2) { SRApi.Guard.Log("通知中心/清理旧键2", __mr2); }
@@ -293,10 +293,14 @@ namespace SR_UCH.Tweaks {
                     if (action != null) merged.Action = action;
                     merged.At = now;
                     merged.Stay = stay;
+                    // 合并可能把条目升级到更高优先级：必须重排，否则它仍排在队尾、不会立刻上屏。
+                    int __prevLevel = merged.Level;
                     merged.Level = Mathf.Max(merged.Level, level);
+                    bool __levelRaised = merged.Level != __prevLevel;
                     // 已不在队列：重新排队，避免再次出现时被合并掉。
                     bool queued = false;
                     for (int vi = 0; vi < _visible.Count; vi++) if (_visible[vi].Key == key) { queued = true; break; }
+                    if (__levelRaised) SortTrim();   // 优先级变了就立刻重排
                     if (queued) {
                         bool wasDying = merged.DyingAt > 0f;
                         merged.DyingAt = 0f;

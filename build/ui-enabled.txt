@@ -2,5 +2,5 @@
 Features/BuildingTools.cs=2
 Features/CharacterAuto.cs=2
 Features/Online.cs=2
-SR_UCH/SR.Contracts.cs=3
+SR_UCH/Contracts/Contracts.cs=3
 SR_UCH/SR.Settings.cs=2

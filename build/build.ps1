@@ -422,17 +422,53 @@ function Get-PluginsDir {
     return ''
 }
 if ($Deploy) {
+    # 拆分模式下收尾会把 SR_UCH.dll 改名成 SR_Manager.dll，且功能各自是 SR_UCH_<功能>.dll，
+    # 旧逻辑只找 SR_UCH.dll 必然失败、也只搬一个文件。这里按形态分开处理。
     $dll = Join-Path $outDir 'SR_UCH.dll'
-    if (-not (Test-Path $dll)) { Write-Host "找不到产物: $dll（先去掉 -Deploy 跑一次构建）"; exit 1 }
+    $managerDll = Join-Path $outDir 'SR_Manager.dll'
+    $isSplitShape = (-not (Test-Path $dll)) -and (Test-Path $managerDll)
+    if (-not (Test-Path $dll) -and -not $isSplitShape) { Write-Host "找不到产物: $dll（先去掉 -Deploy 跑一次构建）"; exit 1 }
     $plugins = Get-PluginsDir
     if (-not $plugins -or -not (Test-Path $plugins)) {
         Write-Host "找不到 plugins 目录；请用 -PluginsDir '<游戏>\BepInEx\plugins' 指定"
         exit 1
     }
+    if ($isSplitShape) {
+        # 拆分形态：搬 SR_Manager.dll + 全部 SR_UCH_*.dll，并清掉合并形态的残留 SR_UCH.dll。
+        $splitTarget = Join-Path $plugins 'SR_Manager.dll'
+        try {
+            Copy-Item $managerDll $splitTarget -Force -ErrorAction Stop
+            Write-Host ("已部署: " + $splitTarget)
+            $featDlls = @(Get-ChildItem -LiteralPath $outDir -Filter 'SR_UCH_*.dll' -File)
+            foreach ($fd in $featDlls) {
+                Copy-Item $fd.FullName (Join-Path $plugins $fd.Name) -Force -ErrorAction Stop
+                Write-Host ("已部署: " + (Join-Path $plugins $fd.Name))
+            }
+            # 合并形态的 SR_UCH.dll 与拆分形态冲突（会被当成"未带 BepInPlugin 的外部 DLL"再扫一遍）。
+            $stale = Join-Path $plugins 'SR_UCH.dll'
+            if (Test-Path $stale) { Remove-Item $stale -Force -ErrorAction SilentlyContinue; Write-Host ("已清理合并形态残留: " + $stale) }
+        } catch {
+            Write-Host "部署失败（拆分形态）：插件 DLL 正被占用 —— 请**先完全退出游戏**再重跑 -Deploy"
+            Write-Host ("  原因: " + $_.Exception.Message)
+            exit 2
+        }
+        return
+    }
     $target = Join-Path $plugins 'SR_UCH.dll'
     try {
         Copy-Item $dll $target -Force -ErrorAction Stop
         Write-Host ("已部署: " + $target)
+        # 合并形态部署时清理拆分形态残留：SR_Manager.dll 与 SR_UCH_*.dll（EX 除外）
+        # 留着它们会被当成"未带 BepInPlugin 的外部 DLL"再加载一遍，功能初始化两次。
+        $splitLeft = @()
+        $mgr = Join-Path $plugins 'SR_Manager.dll'
+        if (Test-Path $mgr) { $splitLeft += $mgr }
+        $splitLeft += @(Get-ChildItem -LiteralPath $plugins -Filter 'SR_UCH_*.dll' -File |
+                        Where-Object { $_.Name -ne 'SR_UCH.dll' -and $_.Name -ne 'SR_UCH_EX.dll' } |
+                        ForEach-Object { $_.FullName })
+        foreach ($sl in $splitLeft) {
+            try { Remove-Item $sl -Force -ErrorAction SilentlyContinue; Write-Host ("已清理拆分残留: " + $sl) } catch { }
+        }
     } catch {
         Write-Host "部署失败：插件 DLL 正被占用 —— 请**先完全退出游戏**再重跑 -Deploy"
         Write-Host ("  目标: " + $target)
