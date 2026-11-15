@@ -139,6 +139,8 @@ namespace SR_UCH.Tweaks {
             try {
                 if (e != null) {
                     SRApi.Ctl.SetValue(e, value);
+                    // 显式落盘：筛选是用户设置，不该依赖 1 秒节流或关面板时机（直接关游戏时 CloseMenu 不走，会丢）。
+                    try { if (e.ConfigFile != null) e.ConfigFile.Save(); } catch (Exception __sv) { SRApi.Guard.Log("房间筛选/保存配置", __sv); }
                     // 筛选条件变化需立即标脏，否则房间数要等 1 秒兜底才更新。
                     _lobbiesDirty = true;
                 }

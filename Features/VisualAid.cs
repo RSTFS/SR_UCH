@@ -19,6 +19,8 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<int> _opacityPercent;
         private static ConfigEntry<bool> _useDistance;
         private static ConfigEntry<int> _distance;
+        private static ConfigEntry<bool> _skipTreehouse;   // 树屋/大厅里不淡化
+        private static ConfigEntry<bool> _skipWhenDead;    // 本体死亡后不淡化
         private static ConfigEntry<float> _fadeSeconds;
         // 每个角色的当前显示 alpha（渐变用）；不透明度切换到目标值而不是瞬跳。
         private static readonly System.Collections.Generic.Dictionary<int, float> _curAlpha =
@@ -49,6 +51,14 @@ namespace SR_UCH.Tweaks {
             SRApi.LocDesc(Sec, "Enabled",
                 "启用视觉辅助\n淡化其他玩家，方便看清自己、录屏或截图\n只影响本机画面，不改变游戏状态",
                 "Enable visual aid\nFades other players for a clearer view while recording\nlocal picture only; gameplay is unchanged");
+            SRApi.LocKey(Sec, "Skip In Treehouse", "树屋无效", "Disabled in treehouse");
+            SRApi.LocDesc(Sec, "Skip In Treehouse",
+                "树屋无效\n在树屋/大厅等非对局场景完全不淡化\n避免在树屋里误把角色淡化",
+                "disabled in treehouse\nno fading outside a match (treehouse, lobby)\navoids fading characters in the treehouse");
+            SRApi.LocKey(Sec, "Skip When Dead", "死后无效", "Disabled while dead");
+            SRApi.LocDesc(Sec, "Skip When Dead",
+                "死后无效\n本机角色死亡期间停止淡化其他玩家\n复活后自动恢复",
+                "disabled while dead\nstops fading while your character is dead\nresumes after respawn");
             SRApi.LocKey(Sec, "Fade Seconds", "淡化时长", "Fade duration");
             SRApi.LocDesc(Sec, "Fade Seconds",
                 "淡化/恢复的过渡时长\n0 = 立即切换，数值越大越柔和\n范围 0-2 秒",
@@ -121,6 +131,10 @@ namespace SR_UCH.Tweaks {
                 _fadeSeconds = plugin.Config.Bind(Sec, "Fade Seconds", 0.35f,
                     new ConfigDescription("淡化/恢复的过渡时长（秒）；0 = 立即切换。",
                         new AcceptableValueRange<float>(0f, 2f)));
+                _skipTreehouse = plugin.Config.Bind(Sec, "Skip In Treehouse", true,
+                    "树屋/大厅无效：在树屋、大厅等非对局场景里完全不淡化其他角色。");
+                _skipWhenDead = plugin.Config.Bind(Sec, "Skip When Dead", true,
+                    "死后无效：本机角色死亡（含濒死/等待重生）期间停止淡化其他玩家。");
                 _useDistance = plugin.Config.Bind(Sec, "Use Distance", true, "只在距离内淡化其他玩家（关闭 = 全部淡化）。");
                 _distance = plugin.Config.Bind(Sec, "Distance", 5,
                     new ConfigDescription("淡化距离（1-30）：离本机玩家不超过该距离的其他玩家才淡化。", new AcceptableValueRange<int>(1, 30)));
@@ -130,6 +144,8 @@ namespace SR_UCH.Tweaks {
                 _enabled.SettingChanged += (s, e) => Refresh();
                 _opacityPercent.SettingChanged += (s, e) => { FixOpacityStep(); Refresh(); };
                 _useDistance.SettingChanged += (s, e) => Refresh();
+                _skipTreehouse.SettingChanged += (s, e) => Refresh();
+                _skipWhenDead.SettingChanged += (s, e) => Refresh();
                 _distance.SettingChanged += (s, e) => Refresh();
 
                 SRApi.RegisterKey("视觉辅助-开关", _toggleKey, "press", delegate {
@@ -160,12 +176,16 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/整十步进", __ex); }
         }
 
+        private static bool _skipTree, _skipDead;
+
         private static void Refresh() {
             try {
                 _shutdown = false;   // 热重载后静态字段保留，须复位否则永久失效
                 if (!_conflict && Time.frameCount % 300 == 0) _conflict = DetectCamHog();   // CamHog 可能后加载
                 _on = _enabled != null && _enabled.Value;
                 if (!_on) RestoreAll();   // 关开关时还原已淡化角色，别让游戏沿用我们的值
+                _skipTree = _skipTreehouse != null && _skipTreehouse.Value;
+                _skipDead = _skipWhenDead != null && _skipWhenDead.Value;
                 _useDist = _useDistance == null || _useDistance.Value;
                 _dist = _distance != null ? _distance.Value : 5;
                 _alpha = Mathf.Clamp01((_opacityPercent != null ? _opacityPercent.Value : 30) / 100f);
@@ -191,8 +211,24 @@ namespace SR_UCH.Tweaks {
             return false;
         }
 
+        // 本机角色是否已死亡（死亡/濒死/本地判定死亡任一为真）。
+        private static bool LocalIsDead() {
+            try {
+                System.Collections.Generic.List<Character> all = Character.AllCharacters;
+                if (all == null) return false;
+                for (int i = 0; i < all.Count; i++) {
+                    Character c = all[i];
+                    if (c == null || !IsLocal(c)) continue;
+                    return c.Dead || c.Dying || c.LocallyDead;
+                }
+            } catch (Exception __ld) { SRApi.Guard.Log("视觉辅助/本机死亡判定", __ld); }
+            return false;
+        }
+
         private static bool ShouldFade(Character c) {
             if (!_on || _conflict || _shutdown) return false;
+            if (_skipTree && SRApi.Env.InTreehouse) return false;   // 树屋/大厅不淡化
+            if (_skipDead && LocalIsDead()) return false;            // 本体死亡期间不淡化
             if (c == null || !c.picked) return false;      // 未入座/已离场
             if (IsLocal(c)) return false;                  // 自己不动
             if (!_useDist || _dist <= 0) return true;      // 不看距离 -> 全部淡化
@@ -309,6 +345,8 @@ namespace SR_UCH.Tweaks {
             }
             CfgRow(_enabled);
             CfgRow(_opacityPercent);
+            CfgRow(_skipTreehouse);
+            CfgRow(_skipWhenDead);
             CfgRow(_useDistance);
             CfgRow(_distance);
         }
