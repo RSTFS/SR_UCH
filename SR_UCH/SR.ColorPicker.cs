@@ -14,7 +14,7 @@ public partial class SR {
     // ================= 颜色选择器（统一调色板）================
     // 版式：预览行 -> SV 方块 + 色相条 -> 常用色网格 -> HSV -> RGB -> Hex。
     // 拖动只改预览色，松开或回车才写盘；切条目 / 收起 / 关窗由 Close / Tick 兜底提交。
-    internal static class ColorPicker {
+    internal static partial class ColorPicker {
         // 常用色：8 档灰阶 + 16 常见色（12 列 × 2 行，对应 ImGui 的 palette 区）。
         private static readonly string[] Palette = new string[] {
             "#000000", "#1A1A1A", "#333333", "#4D4D4D", "#666666", "#808080", "#B3B3B3", "#FFFFFF",
@@ -48,11 +48,10 @@ public partial class SR {
 
         private static readonly Dictionary<ConfigEntryBase, State> _states = new Dictionary<ConfigEntryBase, State>();
         // 独立浮层窗口：点色块打开，画在 SR 窗口之上（覆盖层），不占页面布局、不影响滚动。
+        // 浮层自己的矩形/初始化标记放在 SR.ColorPicker.Float.cs；这里只保留共享的开关与条目。
         internal static bool FloatOpen;
-        private static Rect _floatRect;
-        private static bool _floatInit;
         private const string FloatTitle = "SR_ColorFloat";
-        private static ConfigEntryBase _open;   // 当前展开的条目（同一时间只展开一个）
+        internal static ConfigEntryBase _open;   // 当前展开的条目（同一时间只展开一个）
         private static bool _tickHooked;
         private const string HexField = "SR_ColorHex";
         private static readonly string[] RgbFields = new string[] { "SR_ColorR", "SR_ColorG", "SR_ColorB" };
@@ -136,7 +135,7 @@ public partial class SR {
                 string tip = T("点击打开/收起调色板", "click to open/close the color picker");
                 if (!GUI.Button(r, new GUIContent("", tip), GUIStyle.none)) return false;
                 // 独立浮层：点色块打开窗口（不再在页面内展开面板，避免挤动布局与滚动）。
-                if (FloatOpen && ReferenceEquals(_open, e)) { CloseFloat(e, s); return true; }
+                if (FloatOpen && ReferenceEquals(OpenEntry, e)) { CloseFloat(e, s); return true; }
                 OpenFloat(e, s);
                 return true;
             } catch (Exception __ex) { Guard.Log("颜色色块", __ex); return false; }
@@ -147,6 +146,9 @@ public partial class SR {
         }
 
         // 打开/关闭独立浮层窗口。
+        // 当前展开的条目（供浮层分部读取，避免跨文件直接访问私有字段）。
+        internal static ConfigEntryBase OpenEntry { get { return _open; } }
+
         private static void OpenFloat(ConfigEntryBase e, State s) {
             try {
                 if (_open != null && !ReferenceEquals(_open, e)) {
@@ -156,7 +158,7 @@ public partial class SR {
                 _open = e;
                 s.Open = true;
                 FloatOpen = true;
-                _floatInit = false;
+                ResetFloatPosition();
                 Load(s, ReadColor(e));
             } catch (Exception __ex) { Guard.Log("调色板浮层/打开", __ex); }
         }
@@ -168,48 +170,6 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("调色板浮层/关闭", __ex); }
         }
 
-        // 浮层绘制（由 SR 的覆盖层每帧调用，画在主窗口之上）。
-        internal static void DrawFloat() {
-            if (!FloatOpen || _open == null) return;
-            State s;
-            if (!_states.TryGetValue(_open, out s) || !s.Open) { FloatOpen = false; return; }
-            try {
-                float w = Mathf.Min(Sc(480f), Screen.width - Sc(40f));
-                float h = Sc(338f);
-                if (!_floatInit) {
-                    _floatInit = true;
-                    // 默认停在鼠标附近，但夹进屏幕内。
-                    Vector2 m = Input.mousePosition;
-                    float x = Mathf.Clamp(m.x + Sc(16f), Sc(8f), Mathf.Max(Sc(8f), Screen.width - w - Sc(8f)));
-                    float y = Mathf.Clamp(Screen.height - m.y + Sc(16f), Sc(8f), Mathf.Max(Sc(8f), Screen.height - h - Sc(8f)));
-                    _floatRect = new Rect(x, y, w, h);
-                }
-                _floatRect.width = w; _floatRect.height = h;
-                // 拖动标题栏移动窗口
-                Event ev = Event.current;
-                Rect title = new Rect(_floatRect.x, _floatRect.y, _floatRect.width, Sc(24f));
-                if (ev != null) {
-                    if (ev.type == EventType.MouseDown && ev.button == 0 && title.Contains(ev.mousePosition)) { _floatDrag = true; _floatDragOff = ev.mousePosition - new Vector2(_floatRect.x, _floatRect.y); ev.Use(); }
-                    else if (ev.type == EventType.MouseDrag && _floatDrag) { _floatRect.x = ev.mousePosition.x - _floatDragOff.x; _floatRect.y = ev.mousePosition.y - _floatDragOff.y; ev.Use(); }
-                    else if (ev.type == EventType.MouseUp && _floatDrag) { _floatDrag = false; ev.Use(); }
-                }
-                _floatRect.x = Mathf.Clamp(_floatRect.x, 0f, Mathf.Max(0f, Screen.width - _floatRect.width));
-                _floatRect.y = Mathf.Clamp(_floatRect.y, 0f, Mathf.Max(0f, Screen.height - _floatRect.height));
-                // 圆角面板 + 标题栏
-                GUI.Box(_floatRect, GUIContent.none, Ctl.Footer);
-                GUI.Label(new Rect(title.x + Sc(10f), title.y + Sc(3f), title.width - Sc(46f), Sc(20f)), T("调色板", "Palette"), Ctl.SecHeader);
-                if (GUI.Button(new Rect(title.xMax - Sc(30f), title.y + Sc(3f), Sc(24f), Sc(20f)), "×", Ctl.Btn)) {
-                    CloseFloat(_open, s);
-                    return;
-                }
-                // 内容：复用现有 DrawPanel 布局，但画在浮层矩形内。
-                GUI.BeginGroup(new Rect(_floatRect.x + Sc(8f), _floatRect.y + Sc(26f), _floatRect.width - Sc(16f), _floatRect.height - Sc(34f)));
-                try { DrawPanel(_open, s); } finally { GUI.EndGroup(); }
-            } catch (Exception __ex) { Guard.Log("调色板浮层/绘制", __ex); }
-        }
-
-        private static bool _floatDrag;
-        private static Vector2 _floatDragOff;
 
         public static Color? Preview(ConfigEntryBase e) {
             try {
@@ -405,11 +365,14 @@ public partial class SR {
             bool enter = ev != null && ev.type == EventType.KeyDown
                 && (ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter);
             bool enterText = enter && (IsFocused(HexField) || IsRgbFocused());
-            float pw = FloatOpen ? Mathf.Max(Sc(200f), _floatRect.width - Sc(20f)) : PanelWidth();
+            float pw = FloatOpen ? FloatContentWidth() : PanelWidth();
 
             GUILayout.BeginVertical(GUILayout.Width(pw));
             try {
-                try { GUILayout.Label(T("调色板", "Palette"), Ctl.SecHeader); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                // 浮层已有标题栏时不重复画标题。
+                if (!FloatOpen) {
+                    try { GUILayout.Label(T("调色板", "Palette"), Ctl.SecHeader); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                }
                 DrawHeader(e, s, pw);
                 GUILayout.Space(Sc(6f));
 

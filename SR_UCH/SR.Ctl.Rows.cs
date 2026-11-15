@@ -85,7 +85,9 @@ public partial class SR {
                     GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
                     ResetOnLabelClick(GUILayoutUtility.GetLastRect(), e);
                     GUILayout.Space(Sc(6));
-                    string cur = e.BoxedValue as string ?? "";
+                    // 当前值可能是 int/float/bool/enum（不只是 string）：统一按字符串比较，
+                    // 否则 BoxedValue as string 恒为 null → 下标永远 0、下拉点不动。
+                    string cur = EntryValueText(e);
                     int idx = 0;
                     for (int i = 0; i < vals.Length; i++) if (vals[i] == cur) { idx = i; break; }
                     idx = Mathf.Clamp(idx, 0, labels.Length - 1);
@@ -95,7 +97,7 @@ public partial class SR {
                     int sel = ComboBox(e, labels[idx], vals, labels, ref open, Sc(width));
                     if (SRApi.Ctl.EditOpen != null) SRApi.Ctl.EditOpen[e] = open;
                     if (sel >= 0 && sel < vals.Length) {
-                        SetValue(e, vals[sel]);
+                        SetValue(e, EntryValueOf(e, vals[sel]));
                         picked = sel;
                         if (SRApi.Ctl.EditOpen != null) SRApi.Ctl.EditOpen[e] = false;   // 选中后明确收起
                     }
@@ -104,6 +106,31 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("统一下拉行", __ex); }
             GUILayout.Space(Sc(2));
             return picked;
+        }
+
+        // 条目当前值的文本形式（下拉框比较用）。
+        private static string EntryValueText(ConfigEntryBase e) {
+            try {
+                object v = e.BoxedValue;
+                if (v == null) return "";
+                if (v is bool) return ((bool)v) ? "true" : "false";
+                return Convert.ToString(v, CultureInfo.InvariantCulture) ?? "";
+            } catch (Exception __ev) { Guard.Log("下拉行/读取当前值", __ev); return ""; }
+        }
+
+        // 下拉选项字符串 → 条目实际类型（int/float/bool/enum/string）。
+        private static object EntryValueOf(ConfigEntryBase e, string s) {
+            try {
+                Type st = e.SettingType;
+                s = s ?? "";
+                if (st == typeof(string)) return s;
+                if (st == typeof(int)) { int i; return int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out i) ? i : 0; }
+                if (st == typeof(float)) { float f; return float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out f) ? f : 0f; }
+                if (st == typeof(bool)) return string.Equals(s, "true", StringComparison.OrdinalIgnoreCase) || s == "1";
+                if (st.IsEnum) { try { return Enum.Parse(st, s, true); } catch (Exception) { return e.DefaultValue; } }
+                if (st == typeof(double)) { double d; return double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out d) ? d : 0d; }
+                return s;
+            } catch (Exception __eo) { Guard.Log("下拉行/转换选项", __eo); return s; }
         }
 
         // 统一滑块行：0.1 步进 + 数值右对齐；返回本帧是否写入。

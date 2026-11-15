@@ -22,7 +22,7 @@ namespace SR_UCH.Tweaks {
 
         internal static void Initialize(IFeatureHost plugin) {
             try {
-                _enabled = plugin.Config.Bind(Sec, "Spawn Points", true,
+                _enabled = plugin.Config.Bind(Sec, "Spawn Points", false,
                     "自定义重生点：在地图页右键添加/传送/删除，仅自由模式可用。");
                 SRApi.LocKey(Sec, "Spawn Points", "自定义重生点", "Custom spawn points");
                 SRApi.LocDesc(Sec, "Spawn Points",

@@ -241,6 +241,8 @@ public partial class SR : ITweak {
         private static Font _prevFont;
         private static Texture2D _gripTex;
         private static Texture2D _cursorTex;
+        // 自绘光标贴图（独立浮层绘制在最上层时需要自己再画一遍光标）。
+        internal static Texture2D CursorTexture { get { return _cursorTex; } }
         private static Texture2D _cursorResizeTex; // 悬停分隔线时的左右调整光标
         private static Texture2D _cursorMoveTex;   // 悬停可拖动单元格时的四向移动光标
         public static bool CursorResize;          // 本帧是否显示调整光标（Tick 复位）

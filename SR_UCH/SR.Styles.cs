@@ -11,6 +11,8 @@ public partial class SR {
 // 分区：Styles（深色主题 GUIStyle / 字体 / 纹理 / 滑块素材）
 
         internal static Font OrigSkinFontValue { get { return _origSkinFont; } }
+        // 主题字体（SR 界面统一用这个；独立浮层也要一致）。
+        internal static Font UiFont { get { return _font; } }
         private static Font _origSkinFont;                 // 全局皮肤的原始字体（恢复用）
         private static bool _origSelColorSaved;
         private static Color _origSelColor;               // 全局皮肤的原始选择色

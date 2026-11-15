@@ -17,7 +17,7 @@ namespace SR_UCH {
                 // 侧栏栏目必须显式 Nav 注册：_navOrder 只由 SR.Nav 填充，只调 RegisterPage 不显示。
                 SRApi.Nav(Sec, 100);
                 // 自由模式页拆成三个分页：相机与自身 / 地图 / 重生点。
-                SRApi.RegisterPage(Sec, "main", "相机状态", "Camera", 10, RenderAll);
+                SRApi.RegisterPage(Sec, "main", "一般", "General", 10, RenderAll);
                 SRApi.RegisterPage(Sec, "map", "地图", "Map", 20, RenderMapPage);
                 SRApi.RegisterPage(Sec, "spawn", "重生点", "Spawn points", 30, RenderSpawnPage);
                 FreePlayMap.Initialize(plugin);

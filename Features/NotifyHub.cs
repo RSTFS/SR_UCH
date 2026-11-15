@@ -527,6 +527,7 @@ namespace SR_UCH.Tweaks {
 
         private void RenderOptionsPage() {
             CfgRow(_enabled);
+            // 功能关闭时下面的设置仍然可调（下列控件不依赖运行期状态）。
             CfgRow(_maxVisible);
             CfgRow(_toastSeconds);
             CfgRow(_cardScale);
