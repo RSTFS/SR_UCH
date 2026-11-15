@@ -20,6 +20,66 @@ namespace SR_UCH.Tweaks {
         internal static IList<Vector3> All { get { return _points; } }
         internal static Vector3 At(int i) { return (i >= 0 && i < _points.Count) ? _points[i] : Vector3.zero; }
 
+        // 离本机玩家最近的重生点下标（无点返回 -1）。
+        internal static int NearestIndex() {
+            try {
+                if (_points.Count == 0) return -1;
+                Vector2 me = LocalPosition();
+                int best = 0; float bestD = float.MaxValue;
+                for (int i = 0; i < _points.Count; i++) {
+                    float d = Vector2.Distance(me, _points[i]);
+                    if (d < bestD) { bestD = d; best = i; }
+                }
+                return best;
+            } catch (Exception __ni) { SRApi.Guard.Log("重生点/最近下标", __ni); return -1; }
+        }
+
+        // ---------- 持久化：按"场景名"存每组重生点（换关卡各自保留，重进同一关卡恢复） ----------
+        private static ConfigEntry<string> _store;
+        private static string _curScene = "";
+
+        private static void SavePoints() {
+            try {
+                if (_store == null) return;
+                System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                for (int i = 0; i < _points.Count; i++) {
+                    if (sb.Length > 0) sb.Append(';');
+                    sb.Append(_points[i].x.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)).Append(',')
+                      .Append(_points[i].y.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+                }
+                _store.Value = _curScene + "|" + sb;
+                SRApi.Ctl.MarkConfigDirty(_store.ConfigFile);
+            } catch (Exception __sp) { SRApi.Guard.Log("重生点/保存", __sp); }
+        }
+
+        private static void LoadPoints() {
+            try {
+                _points.Clear();
+                _curScene = CurrentScene();
+                if (_store == null || string.IsNullOrEmpty(_store.Value)) return;
+                string raw = _store.Value;
+                int bar = raw.IndexOf('|');
+                if (bar < 0) return;
+                if (raw.Substring(0, bar) != _curScene) return;   // 不同关卡：不恢复
+                string body = raw.Substring(bar + 1);
+                if (body.Length == 0) return;
+                string[] parts = body.Split(';');
+                for (int i = 0; i < parts.Length && _points.Count < MaxPoints; i++) {
+                    string[] xy = parts[i].Split(',');
+                    if (xy.Length != 2) continue;
+                    float x, y;
+                    if (!float.TryParse(xy[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out x)) continue;
+                    if (!float.TryParse(xy[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out y)) continue;
+                    _points.Add(new Vector3(x, y, 0f));
+                }
+            } catch (Exception __lp) { SRApi.Guard.Log("重生点/读取", __lp); }
+        }
+
+        private static string CurrentScene() {
+            try { return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name ?? ""; }
+            catch (Exception) { return ""; }
+        }
+
         internal static void Initialize(IFeatureHost plugin) {
             try {
                 _enabled = plugin.Config.Bind(Sec, "Spawn Points", false,
@@ -28,7 +88,14 @@ namespace SR_UCH.Tweaks {
                 SRApi.LocDesc(Sec, "Spawn Points",
                     "自定义重生点\n地图页右键可添加、传送、删除重生点\n最多 20 个；仅自由模式可用",
                     "custom spawn points\nright-click on the map to add, teleport or remove\nup to 20; freeplay only");
-                SRApi.RegisterSceneHook(delegate { _points.Clear(); _defaultPoint = null; });
+                _store = plugin.Config.Bind(Sec, "Spawn Points Store", "",
+                    "内部状态：自定义重生点（按关卡保存，格式 场景名|x,y;x,y）。");
+                SRApi.LocKey(Sec, "Spawn Points Store", "重生点数据", "Spawn point data");
+                SRApi.LocDesc(Sec, "Spawn Points Store",
+                    "内部状态：自定义重生点数据\n按关卡分别保存\n由地图页右键菜单自动维护",
+                    "internal: custom spawn point data\nstored per level\nmaintained by the map right-click menu");
+                SRApi.RegisterSceneHook(delegate { _defaultPoint = null; LoadPoints(); });
+                LoadPoints();
             } catch (Exception __ex) { SRApi.Guard.Log("重生点/初始化", __ex); }
         }
 
@@ -36,12 +103,14 @@ namespace SR_UCH.Tweaks {
             try {
                 if (_enabled != null && !_enabled.Value) return;
                 if (_points.Count >= MaxPoints) _points.RemoveAt(0);
+                if (_curScene.Length == 0) _curScene = CurrentScene();
                 _points.Add(new Vector3(world.x, world.y, 0f));
+                SavePoints();
             } catch (Exception __ex) { SRApi.Guard.Log("重生点/添加", __ex); }
         }
 
         internal static void Clear() {
-            try { _points.Clear(); } catch (Exception __ex) { SRApi.Guard.Log("重生点/清空", __ex); }
+            try { _points.Clear(); SavePoints(); } catch (Exception __ex) { SRApi.Guard.Log("重生点/清空", __ex); }
         }
 
         // 删除离本机玩家最近的重生点。
@@ -54,7 +123,7 @@ namespace SR_UCH.Tweaks {
                     float d = Vector2.Distance(me, _points[i]);
                     if (d < bestD) { bestD = d; best = i; }
                 }
-                if (best >= 0) _points.RemoveAt(best);
+                if (best >= 0) { _points.RemoveAt(best); SavePoints(); }
             } catch (Exception __ex) { SRApi.Guard.Log("重生点/删除最近", __ex); }
         }
 
@@ -154,6 +223,22 @@ namespace SR_UCH.Tweaks {
                 GUILayout.Label(Count + " / " + MaxPoints, SRApi.Ctl.Label);
                 if (Count == 0) {
                     GUILayout.Label(SRApi.T("还没有自定义重生点：在地图页右键添加。", "No custom spawn points yet: add them from the map page's right-click menu."), SRApi.Ctl.Label);
+                } else {
+                    // 逐点一行：序号+坐标 / 传送 / 删除（走核心 ButtonRow，避免手写水平布局）
+                    int __del = -1;
+                    for (int i = 0; i < Count; i++) {
+                        Vector3 pt = At(i);
+                        int __hit = SRApi.Ctl.ButtonRow(
+                            new string[] {
+                                "#" + (i + 1) + "  (" + pt.x.ToString("0.0") + ", " + pt.y.ToString("0.0") + ")",
+                                SRApi.T("传送", "Teleport"),
+                                SRApi.T("删除", "Delete")
+                            },
+                            new float[] { 160f, 64f, 64f }, 22f);
+                        if (__hit == 0 || __hit == 1) TeleportLocal(pt);
+                        else if (__hit == 2) __del = i;
+                    }
+                    if (__del >= 0) { _points.RemoveAt(__del); SavePoints(); }
                 }
                 GUILayout.Space(Sc(4f));
                 GUILayout.Label(SRApi.T("提示：地图页右键菜单可传送、添加、删除重生点；仅自由模式可用。",

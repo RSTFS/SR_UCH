@@ -80,6 +80,7 @@ namespace SR_UCH.Tweaks {
         internal static void Close() {
             try {
                 if (!_open) { return; }
+                _boundsValid = false;
                 _open = false;
                 _menuOpen = false;
                 _dragging = false;
@@ -188,13 +189,16 @@ namespace SR_UCH.Tweaks {
             _min -= pad; _max += pad;
         }
 
-        // 俯视取景：固定 z 轴正向、按基准 FOV 反推距离（改 FOV 才会真正缩放）。
         private static void ApplyCamera(Camera cam) {
+            ApplyCameraTo(cam, _fov != null ? Mathf.Clamp(_fov.Value, 1f, 20f) : 10f);
+        }
+
+        // 俯视取景：固定 z 轴正向、按基准 FOV 反推距离（改 FOV 才会真正缩放）。
+        private static void ApplyCameraTo(Camera cam, float fov) {
             float w = _max.x - _min.x, h = _max.y - _min.y;
             if (w <= 0.01f || h <= 0.01f) return;
             Vector3 center = new Vector3((_min.x + _max.x) * 0.5f, (_min.y + _max.y) * 0.5f, 0f);
             float aspect = cam.pixelRect.width / Mathf.Max(1f, cam.pixelRect.height);
-            float fov = _fov != null ? Mathf.Clamp(_fov.Value, 1f, 20f) : 10f;
             cam.orthographic = false;
             cam.fieldOfView = fov;
             float tanBase = Mathf.Tan(10f * 0.5f * Mathf.Deg2Rad);
@@ -240,7 +244,15 @@ namespace SR_UCH.Tweaks {
                     GUI.Label(new Rect(Sc(10f), Sc(3f), Sc(80f), Sc(20f)), SRApi.T("地图", "Map"), SRApi.Ctl.SecHeader);
                     GUI.Label(new Rect(Sc(60f), Sc(4f), Screen.width - Sc(160f), Sc(20f)),
                         SRApi.T("左键拖动平移 · 滚轮缩放 · 右键操作", "drag to pan · wheel to zoom · right-click for actions"), SRApi.Ctl.Label);
-                    if (GUI.Button(new Rect(Screen.width - Sc(30f), Sc(3f), Sc(24f), Sc(20f)), "×", SRApi.Ctl.Btn)) { Close(); return; }
+                    // 右侧：视野读数 + 重置视图 + 关闭
+                    float __fovNow = _fov != null ? _fov.Value : 10f;
+                    GUI.Label(new Rect(Screen.width - Sc(196f), Sc(4f), Sc(74f), Sc(20f)), "FOV " + __fovNow.ToString("0.0"), SRApi.Ctl.Label);
+                    if (GUI.Button(new Rect(Screen.width - Sc(118f), Sc(3f), Sc(80f), Sc(20f)), SRApi.T("重置视图", "Reset view"), SRApi.Ctl.Btn)) {
+                        _dragOffset = Vector3.zero;
+                        if (_fov != null) _fov.Value = 10f;
+                        Toast(SRApi.T("视图已重置", "View reset"));
+                    }
+                    if (GUI.Button(new Rect(Screen.width - Sc(32f), Sc(3f), Sc(24f), Sc(20f)), "×", SRApi.Ctl.Btn)) { Close(); return; }
                     if (!string.IsNullOrEmpty(_toast) && Time.unscaledTime < _toastUntil)
                         GUI.Label(new Rect(Sc(10f), Sc(30f), Screen.width - Sc(20f), Sc(20f)), _toast, SRApi.Ctl.Label);
 
@@ -251,10 +263,13 @@ namespace SR_UCH.Tweaks {
                         GUI.color = c.hasAuthority ? Color.white : new Color(0.4f, 0.65f, 1f, 1f);
                         GUI.DrawTexture(new Rect(sp.x - Sc(3f), sp.y - Sc(3f), Sc(6f), Sc(6f)), Texture2D.whiteTexture);
                     }
+                    // 重生点：绿色方块 + 序号（最近的点高亮为黄色）
+                    int __near = SpawnPointTools.NearestIndex();
                     for (int i = 0; i < SpawnPointTools.Count; i++) {
                         Vector2 sp = WorldToScreen(cam, SpawnPointTools.At(i));
-                        GUI.color = new Color(0.2f, 0.9f, 0.3f, 1f);
+                        GUI.color = (i == __near) ? new Color(1f, 0.85f, 0.2f, 1f) : new Color(0.2f, 0.9f, 0.3f, 1f);
                         GUI.DrawTexture(new Rect(sp.x - Sc(4f), sp.y - Sc(4f), Sc(8f), Sc(8f)), Texture2D.whiteTexture);
+                        GUI.Label(new Rect(sp.x + Sc(6f), sp.y - Sc(7f), Sc(30f), Sc(16f)), (i + 1).ToString(), SRApi.Ctl.Label);
                     }
                     GUI.color = prevColor;
 
@@ -275,7 +290,21 @@ namespace SR_UCH.Tweaks {
                         } else if (e.type == EventType.MouseUp && e.button == 0) { _dragging = false; }
                         if (e.type == EventType.ScrollWheel) {
                             float amt = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
-                            if (_fov != null) _fov.Value = Mathf.Clamp(_fov.Value + amt * 0.6f, 1f, 20f);
+                            if (_fov != null) {
+                                float oldFov = _fov.Value;
+                                float newFov = Mathf.Clamp(oldFov + amt * 0.6f, 1f, 20f);
+                                if (Mathf.Abs(newFov - oldFov) > 0.001f) {
+                                    // 以光标位置为缩放锚点：先取世界点，改 FOV 后把它拉回光标下。
+                                    Vector2 beforeWorld = ScreenToWorld(cam, e.mousePosition);
+                                    _fov.Value = newFov;
+                                    ApplyCameraTo(cam, newFov);
+                                    Vector2 afterScreen = WorldToScreen(cam, new Vector3(beforeWorld.x, beforeWorld.y, 0f));
+                                    Vector2 d = e.mousePosition - afterScreen;
+                                    float halfH = Mathf.Abs(cam.transform.position.z) * Mathf.Tan(newFov * 0.5f * Mathf.Deg2Rad);
+                                    float worldPerPx = 2f * halfH / Mathf.Max(1f, Screen.height);
+                                    _dragOffset += new Vector3(d.x * worldPerPx, -d.y * worldPerPx, 0f);
+                                }
+                            }
                             e.Use();
                         }
                         if (e.type == EventType.MouseDown && e.button == 1) {
