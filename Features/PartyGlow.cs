@@ -206,6 +206,9 @@ namespace SR_UCH.Tweaks {
             return found;
         }
 
+        // 本轮"仍在派对盒里"的道具实例 ID（每次扫描重建，仅用于差集比较）。
+        private static readonly HashSet<int> _aliveIds = new HashSet<int>();
+
         // 光晕 → 道具 反查表（道具实例 ID），用于发现"道具已被拿走/销毁但光晕还在"。
         private static readonly System.Collections.Generic.Dictionary<int, int> _glowOwner =
             new System.Collections.Generic.Dictionary<int, int>();
@@ -214,23 +217,21 @@ namespace SR_UCH.Tweaks {
         private static void SyncRemovedGlows(PickableBlock[] alive) {
             try {
                 if (_glowById.Count == 0) return;
+                // 先用一次遍历把"仍在派对盒里的道具实例 ID"建成集合，避免 光晕数 × 道具数 的嵌套扫描。
+                _aliveIds.Clear();
+                for (int i = 0; i < alive.Length; i++) {
+                    PickableBlock pb = alive[i];
+                    if (pb == null || !pb.InPartybox || !pb.gameObject.activeInHierarchy) continue;
+                    _aliveIds.Add(pb.GetInstanceID());
+                }
                 System.Collections.Generic.List<int> dead = null;
                 foreach (System.Collections.Generic.KeyValuePair<int, Transform> kv in _glowById) {
                     bool still = false;
                     if (kv.Value == null) still = false;
                     else {
-                        // 光晕仍有效 = 父链完好 且 该道具还在场景里且仍属于派对盒。
+                        // 光晕仍有效 = 父链完好 且 该道具还在派对盒里。
                         Transform __parent = kv.Value.parent;
-                        if (__parent == null || !__parent.gameObject.activeInHierarchy) still = false;
-                        else {
-                            for (int i = 0; i < alive.Length; i++) {
-                                PickableBlock pb = alive[i];
-                                if (pb == null) continue;
-                                if (pb.GetInstanceID() != kv.Key) continue;
-                                if (pb.InPartybox && pb.gameObject.activeInHierarchy) still = true;
-                                break;
-                            }
-                        }
+                        still = __parent != null && __parent.gameObject.activeInHierarchy && _aliveIds.Contains(kv.Key);
                     }
                     if (still) continue;
                     try {

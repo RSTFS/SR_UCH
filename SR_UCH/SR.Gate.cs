@@ -146,8 +146,15 @@ public partial class SR {
         private static readonly Dictionary<Type, int> _featureModes = new Dictionary<Type, int>();   // -1 = 不限
         private static readonly Dictionary<Type, bool> _allowedCache = new Dictionary<Type, bool>();
         private static int _allowedFrame = -1;
+        private static int _featureModesVersion = -1;   // 功能表变化后模式缓存必须重建
 
         private static int ModesOf(Type impl) {
+            // 功能表（晚注册 / 热重载后重建）版本变了就整体作废，否则会一直用旧的"-1 = 不限"。
+            if (_featureModesVersion != Features.Version) {
+                _featureModesVersion = Features.Version;
+                _featureModes.Clear();
+                _allowedCache.Clear();
+            }
             int modes;
             if (_featureModes.TryGetValue(impl, out modes)) return modes;
             modes = -1;
@@ -176,15 +183,16 @@ public partial class SR {
         }
 
         // 供按键派发用：受限功能在错误模式下按下键，给一次节流提示（否则"按了没反应"）。
-        private static float _modeHintAt = -9f;
-        private static readonly HashSet<Type> _modeHinted = new HashSet<Type>();
+        // 节流按"功能 → 上次提示时刻"记录，用时间戳而非布尔集合，避免集合随功能数无限增长。
+        private static readonly Dictionary<Type, float> _modeHintAt = new Dictionary<Type, float>();
+        private const float ModeHintInterval = 2f;
 
         internal static bool GateFeatureForAction(Type impl, string actionName) {
-            if (FeatureAllowed(impl)) { _modeHinted.Remove(impl); return true; }
-            // 同一功能 2 秒内只提示一次，避免 hold 类键每秒刷屏。
-            if (!_modeHinted.Contains(impl) || Time.unscaledTime - _modeHintAt > 2f) {
-                _modeHinted.Add(impl);
-                _modeHintAt = Time.unscaledTime;
+            if (FeatureAllowed(impl)) return true;
+            float last;
+            if (!_modeHintAt.TryGetValue(impl, out last) || Time.unscaledTime - last > ModeHintInterval) {
+                if (_modeHintAt.Count > 64) _modeHintAt.Clear();   // 只做节流，条目数不需要精确
+                _modeHintAt[impl] = Time.unscaledTime;
                 try {
                     LogWarn("[模式限制] " + (actionName ?? "?") + " 在当前模式下不可用");
                     Notify(T(actionName ?? "?", actionName ?? "?") + " " + T("在当前模式下不可用", "is unavailable in this mode"));

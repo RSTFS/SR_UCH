@@ -113,7 +113,7 @@ namespace SR_UCH {
         // Version：功能清单契约的破坏性基线，与 SR.ApiVersion 独立演进。
         public const int Version = 2;
         // ApiLevel：SRApi 门面 API 的 additive 等级，每新增一个 public 成员 +1；删除/改签名必须抬 Version。
-        public const int ApiLevel = 11;  // 11 起有 RegisterKey(impl) 门控重载；10 起有 Ctl.FloatOpen 一族；9 起有 Ctl.RegisterRowGate
+        public const int ApiLevel = 12;  // 12 起有 Features.Version；11 起有 RegisterKey(impl) 门控重载；10 起有 Ctl.FloatOpen
     }
 
         // 跨功能共享的时间常量：Level.* 与 BuildingPresets 共用同一份值，改一处即同步。
@@ -174,8 +174,13 @@ namespace SR_UCH {
             FeatureInfo fi; return _byId.TryGetValue(id, out fi) ? fi : null;
         }
         // 登记一条（id 冲突时用 "id#类型名" 去重，避免同一 id 被两个类占用而覆盖）。
+        // 功能表版本：表内容每变一次就自增，外部缓存（如模式门控）据此失效。
+        private static int _version;
+        public static int Version { get { return _version; } }
+
         public static void Register(FeatureInfo fi) {
             if (fi == null || string.IsNullOrEmpty(fi.Id)) return;
+            _version++;
             if (_byId.ContainsKey(fi.Id)) fi.Id = fi.Id + "#" + (fi.Impl != null ? fi.Impl.Name : "?");
             _all.Add(fi); _byId[fi.Id] = fi;
         }
@@ -198,7 +203,7 @@ namespace SR_UCH {
         }
         // 扫描所有已加载程序集里的 ITweak 实现，重建功能表并解析依赖。
         public static void Rebuild() {
-            _all.Clear(); _byId.Clear();
+            _all.Clear(); _byId.Clear(); _version++;
             Assembly[] asms = AppDomain.CurrentDomain.GetAssemblies();
             for (int i = 0; i < asms.Length; i++) {
                 Type[] types;
