@@ -68,7 +68,7 @@ namespace SR_UCH {
 
         internal static void RenderOtherPage() {
             try {
-                SRApi.Ctl.SectionTitle(SRApi.T("- 地图网格 -", "- Map grid -"));
+                SRApi.Ctl.SectionTitle(SRApi.T("地图网格", "Map grid"));
                 SRApi.Ctl.LabeledRow(SRApi.T("常显网格", "Always show grid"),
                     SRApi.T("行动状态下也显示建造网格\n随开随关：开启立即淡入，关闭立即淡出",
                         "keeps the build grid visible during the play phase\ntakes effect immediately when toggled"),

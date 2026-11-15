@@ -31,7 +31,7 @@ namespace SR_UCH.Tweaks {
                 }
                 LobbyManager lm = LobbyManager.instance;
                 if (lm == null) {
-                    SRApi.Notify(SRApi.T("当前不在对局中", "Not in a match"));
+                    SRApi.NotifyT("当前不在对局中", "Not in a match");
                     return;
                 }
                 GameControl gc = lm.CurrentGameController as GameControl;
@@ -41,23 +41,23 @@ namespace SR_UCH.Tweaks {
                         TryLoadPresetInTreehouse(p);
                         return;
                     }
-                    SRApi.Notify(SRApi.T("未进入有效对局或树屋", "Not in an active match or treehouse"));
+                    SRApi.NotifyT("未进入有效对局或树屋", "Not in an active match or treehouse");
                     return;
                 }
                 if (gc.GetComponent<QuickSaver>() == null) {
-                    SRApi.Notify(SRApi.T("当前对局不支持加载预设", "Loading presets is not supported in this match"));
+                    SRApi.NotifyT("当前对局不支持加载预设", "Loading presets is not supported in this match");
                     return;
                 }
                 GameState gs = GameState.GetInstance();
                 GameSettings st = GameSettings.GetInstance();
                 if (gs == null || st == null) {
-                    SRApi.Notify(SRApi.T("游戏状态尚未就绪，请稍后再试", "Game state not ready; try again later"));
+                    SRApi.NotifyT("游戏状态尚未就绪，请稍后再试", "Game state not ready; try again later");
                     return;
                 }
                 if (ReloadBlocked()) return;
                 string xml = ReadPresetXml(p);
                 if (string.IsNullOrEmpty(xml)) {
-                    SRApi.Notify(SRApi.T("读取预设文件失败", "Failed to read the preset file"));
+                    SRApi.NotifyT("读取预设文件失败", "Failed to read the preset file");
                     return;
                 }
                 XmlDocument doc = null;
@@ -67,7 +67,7 @@ namespace SR_UCH.Tweaks {
                     SRApi.Guard.Log("布局预设/解析预设文件", __ex);
                 }
                 if (doc == null || doc.DocumentElement == null || doc.DocumentElement.Name != "scene") {
-                    SRApi.Notify(SRApi.T("预设文件已损坏（根节点不是 scene）", "The preset file is damaged (root node is not scene)"));
+                    SRApi.NotifyT("预设文件已损坏（根节点不是 scene）", "The preset file is damaged (root node is not scene)");
                     return;
                 }
                 string presetScene = "";
@@ -87,7 +87,7 @@ namespace SR_UCH.Tweaks {
                     if (customPreset) {
                         targetLevel = GameState.LevelName.BLANKLEVEL;
                     } else if (!TrySceneToLevel(presetScene, out targetLevel) || targetLevel == GameState.LevelName.BLANKLEVEL) {
-                        SRApi.Notify(SRApi.T("无法识别预设所属关卡，暂不支持自动替换关卡", "The preset's level could not be recognized; automatic level replacement is not supported"));
+                        SRApi.NotifyT("无法识别预设所属关卡，暂不支持自动替换关卡", "The preset's level could not be recognized; automatic level replacement is not supported");
                         return;
                     }
                     GameState.GameMode targetMode = ResolveLoadMode(p, st.GameMode);
@@ -124,7 +124,7 @@ namespace SR_UCH.Tweaks {
                                 + (skipTreehouse && hasRemoteClients ? SRApi.T("（已跳过树屋流程，房客关卡状态可能不同步）", " (treehouse flow skipped; clients' level state may be out of sync)") : ""));
                         } else if (customPreset) {
                             // 失败：不动 guard（finally 会清 XML + 放锁）。
-                            SRApi.Notify(SRApi.T("替换自定义关卡失败（详见日志）", "Failed to replace into the custom level (see the log)"));
+                            SRApi.NotifyT("替换自定义关卡失败（详见日志）", "Failed to replace into the custom level (see the log)");
                         } else {
                             lm.StartCoroutine(ReplaceLevelRoutine(p.Name, xml, presetScene, targetLevel, targetMode));
                             guard.Handoff();
@@ -133,7 +133,7 @@ namespace SR_UCH.Tweaks {
                         }
                     } catch (Exception __rx) {
                         SRApi.Guard.Log("布局预设/开始替换关卡", __rx);
-                        SRApi.Notify(SRApi.T("加载预设失败：无法开始替换关卡", "Failed to load the preset: could not start the level replacement"));
+                        SRApi.NotifyT("加载预设失败：无法开始替换关卡", "Failed to load the preset: could not start the level replacement");
                     } finally {
                         guard.Settle();   // 没交给协程 -> 清 XML + 放锁；已交给协程 -> 什么都不做
                     }
@@ -164,7 +164,7 @@ namespace SR_UCH.Tweaks {
                         + SRApi.T("，全员重载中（分数会重置）", "; everyone is reloading (scores will reset)"));
                 } catch (Exception __ex) {
                     SRApi.Guard.Log("布局预设/开始加载", __ex);
-                    SRApi.Notify(SRApi.T("加载预设失败", "Failed to load the preset"));
+                    SRApi.NotifyT("加载预设失败", "Failed to load the preset");
                 } finally {
                     reloadGuard.Settle();
                 }
@@ -183,17 +183,17 @@ namespace SR_UCH.Tweaks {
                 }
                 LobbyManager lm = LobbyManager.instance;
                 GameControl gc = lm != null ? lm.CurrentGameController as GameControl : null;
-                if (gc == null) { SRApi.Notify(SRApi.T("当前不在对局中，无需返回树屋", "Not in a match; nothing to return from")); return; }
+                if (gc == null) { SRApi.NotifyT("当前不在对局中，无需返回树屋", "Not in a match; nothing to return from"); return; }
                 SetReloadBusy(true, "返回树屋");
                 gc.EndGame();
                 // 锁必须由 watchdog 释放，否则后续加载全被"重载进行中"拦住。
                 try { lm.StartCoroutine(TreehouseReturnWatchdog()); }
                 catch (Exception __wx) { SRApi.Guard.Log("布局预设/返回树屋watchdog", __wx); SetReloadBusy(false); }
-                SRApi.Notify(SRApi.T("正在返回树屋…", "Returning to the treehouse…"));
+                SRApi.NotifyT("正在返回树屋…", "Returning to the treehouse…");
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/返回树屋", __ex);
                 SetReloadBusy(false);
-                SRApi.Notify(SRApi.T("返回树屋失败", "Failed to return to the treehouse"));
+                SRApi.NotifyT("返回树屋失败", "Failed to return to the treehouse");
             }
         }
 
@@ -327,7 +327,7 @@ namespace SR_UCH.Tweaks {
                     yield return null;
                 }
                 if (lsc == null) {
-                    SRApi.Notify(SRApi.T("替换关卡失败：等待回到树屋超时", "Level replacement failed: timed out waiting to return to the treehouse"));
+                    SRApi.NotifyT("替换关卡失败：等待回到树屋超时", "Level replacement failed: timed out waiting to return to the treehouse");
                 } else {
                     // 等大厅就绪（刚加载完的一两帧门可能还没激活）。
                     yield return new WaitForSeconds(0.8f);
@@ -346,7 +346,7 @@ namespace SR_UCH.Tweaks {
                 LobbyManager lm = LobbyManager.instance;
                 GameControl gc = lm != null ? lm.CurrentGameController as GameControl : null;
                 if (lm == null || gc == null || !NetworkServer.active) {
-                    SRApi.Notify(SRApi.T("无法替换关卡：当前没有可结束的对局", "Cannot replace the level: there is no active match"));
+                    SRApi.NotifyT("无法替换关卡：当前没有可结束的对局", "Cannot replace the level: there is no active match");
                     return false;
                 }
                 // 模式先在本机设好，LaunchLevel 会同步给房客。
@@ -356,7 +356,7 @@ namespace SR_UCH.Tweaks {
                 return true;
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/结束对局回树屋", __ex);
-                SRApi.Notify(SRApi.T("替换关卡失败：无法结束当前对局", "Level replacement failed: could not end the current match"));
+                SRApi.NotifyT("替换关卡失败：无法结束当前对局", "Level replacement failed: could not end the current match");
                 return false;
             }
         }
@@ -367,13 +367,13 @@ namespace SR_UCH.Tweaks {
             try {
                 LevelPortal portal = FindTreehousePortal(lsc, targetLevel);
                 if (portal == null) {
-                    SRApi.Notify(SRApi.T("替换关卡失败：树屋里找不到「", "Level replacement failed: no treehouse portal for \"")
-                        + LevelDisplayNameForScene(presetScene) + SRApi.T("」的入口（可能未解锁）", "\" (possibly locked)"));
+                    SRApi.NotifyT("替换关卡失败：树屋里找不到「{0}」的入口（可能未解锁）",
+                        "Level replacement failed: no treehouse portal for \"{0}\" (possibly locked)",
+                        LevelDisplayNameForScene(presetScene));
                     return false;
                 }
                 if (!AllLobbyPlayersPickedCharacter(LobbyManager.instance)) {
-                    SRApi.Notify(SRApi.T("已回到树屋：有玩家还没选角色，先选好角色后再点一次「加载」即可进入预设关卡",
-                        "Returned to the treehouse: some players have not picked a character; pick one and click Load again to enter the preset level"));
+                    SRApi.NotifyT("已回到树屋：有玩家还没选角色，先选好角色后再点一次「加载」即可进入预设关卡", "Returned to the treehouse: some players have not picked a character; pick one and click Load again to enter the preset level");
                     return false;
                 }
                 try {
@@ -399,7 +399,7 @@ namespace SR_UCH.Tweaks {
                 return true;
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/替换关卡进入", __ex);
-                SRApi.Notify(SRApi.T("替换关卡加载失败（详见日志）", "Level replacement failed (see the log)"));
+                SRApi.NotifyT("替换关卡加载失败（详见日志）", "Level replacement failed (see the log)");
                 return false;
             }
         }
@@ -411,12 +411,12 @@ namespace SR_UCH.Tweaks {
             try {
                 LobbyManager lm = LobbyManager.instance;
                 if (lm == null) {
-                    SRApi.Notify(SRApi.T("当前不在树屋或对局中", "Not in a treehouse or match"));
+                    SRApi.NotifyT("当前不在树屋或对局中", "Not in a treehouse or match");
                     return;
                 }
                 LevelSelectController lsc = lm.CurrentLevelSelectController;
                 if (lsc == null) {
-                    SRApi.Notify(SRApi.T("当前不在树屋/大厅中，无法切换到预设关卡", "Not in the treehouse/lobby; cannot switch to the preset level"));
+                    SRApi.NotifyT("当前不在树屋/大厅中，无法切换到预设关卡", "Not in the treehouse/lobby; cannot switch to the preset level");
                     return;
                 }
                 if (!SRApi.GateHost || !NetworkServer.active) {
@@ -426,7 +426,7 @@ namespace SR_UCH.Tweaks {
                 if (ReloadBlocked()) return;
                 string xml = ReadPresetXml(p);
                 if (string.IsNullOrEmpty(xml)) {
-                    SRApi.Notify(SRApi.T("读取预设文件失败", "Failed to read the preset file"));
+                    SRApi.NotifyT("读取预设文件失败", "Failed to read the preset file");
                     return;
                 }
                 XmlDocument doc = null;
@@ -436,7 +436,7 @@ namespace SR_UCH.Tweaks {
                     SRApi.Guard.Log("布局预设/树屋解析预设文件", __ex);
                 }
                 if (doc == null || doc.DocumentElement == null || doc.DocumentElement.Name != "scene") {
-                    SRApi.Notify(SRApi.T("预设文件已损坏（根节点不是 scene）", "The preset file is damaged (root node is not scene)"));
+                    SRApi.NotifyT("预设文件已损坏（根节点不是 scene）", "The preset file is damaged (root node is not scene)");
                     return;
                 }
                 string presetScene = "";
@@ -444,18 +444,18 @@ namespace SR_UCH.Tweaks {
                 if (string.IsNullOrEmpty(presetScene)) presetScene = p.Level ?? "";
                 GameState.LevelName target;
                 if (!TrySceneToLevel(presetScene, out target)) {
-                    SRApi.Notify(SRApi.T("树屋加载仅支持游戏内置关卡；自定义关卡请先进入该关卡再加载预设", "Treehouse loading only supports built-in levels; enter custom levels first and load there"));
+                    SRApi.NotifyT("树屋加载仅支持游戏内置关卡；自定义关卡请先进入该关卡再加载预设", "Treehouse loading only supports built-in levels; enter custom levels first and load there");
                     return;
                 }
                 if (target == GameState.LevelName.BLANKLEVEL) {
                     // 自定义关卡：树屋没有可用关卡门，直接替换进 BlankLevel；联机须勾选「跳过树屋流程」。
                     bool skipTH = _skipTreehouse != null && _skipTreehouse.Value;
                     if (HasRemoteClients() && !skipTH) {
-                        SRApi.Notify(SRApi.T("联机替换自定义关卡需要先勾选『跳过树屋流程』", "Replacing a custom level online requires enabling 'Skip treehouse' first"));
+                        SRApi.NotifyT("联机替换自定义关卡需要先勾选『跳过树屋流程』", "Replacing a custom level online requires enabling 'Skip treehouse' first");
                         return;
                     }
                     if (!AllLobbyPlayersPickedCharacter(lm)) {
-                        SRApi.Notify(SRApi.T("有玩家还没选角色：请等所有人选好角色后再加载（否则可能开局异常）", "Some players have not picked a character yet; wait until everyone has one"));
+                        SRApi.NotifyT("有玩家还没选角色：请等所有人选好角色后再加载（否则可能开局异常）", "Some players have not picked a character yet; wait until everyone has one");
                         return;
                     }
                     GameState.GameMode __cm = ResolveLoadMode(p, GameSettings.GetInstance().GameMode);
@@ -464,18 +464,18 @@ namespace SR_UCH.Tweaks {
                         started = true;
                         SRApi.LogInfo("[布局预设] 正直接从树屋进入自定义关卡并加载预设：" + p.Name);
                     } else {
-                        SRApi.Notify(SRApi.T("进入自定义关卡失败（详见日志）", "Failed to enter the custom level (see the log)"));
+                        SRApi.NotifyT("进入自定义关卡失败（详见日志）", "Failed to enter the custom level (see the log)");
                     }
                     return;
                 }
                 LevelPortal portal = FindTreehousePortal(lsc, target);
                 if (portal == null) {
-                    SRApi.Notify(SRApi.T("树屋里找不到「", "No treehouse portal found for \"") + LocalizedLevelName(presetScene)
+                    SRApi.NotifyT("树屋里找不到「{0}」", "No treehouse portal found for \"{0}\"", LocalizedLevelName(presetScene)
                         + SRApi.T("」的入口（可能未解锁或不可用）", "\" (possibly locked or unavailable)"));
                     return;
                 }
                 if (!AllLobbyPlayersPickedCharacter(lm)) {
-                    SRApi.Notify(SRApi.T("有玩家还没选角色：现在加载会把未选角色的玩家移出房间，请等所有人选好角色后再试", "Some players have not picked a character yet; loading now would remove them from the lobby. Wait until everyone has picked a character"));
+                    SRApi.NotifyT("有玩家还没选角色：现在加载会把未选角色的玩家移出房间，请等所有人选好角色后再试", "Some players have not picked a character yet; loading now would remove them from the lobby. Wait until everyone has picked a character");
                     return;
                 }
                 // 普通关卡：LaunchLevel 用 GameSettings.GameMode，进入前先按加载模式设置。
@@ -510,7 +510,7 @@ namespace SR_UCH.Tweaks {
                     + SRApi.T(" → ", " -> ") + LocalizedLevelName(presetScene));
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/树屋加载", __ex);
-                SRApi.Notify(SRApi.T("从树屋加载预设失败（详见日志）", "Failed to load the preset from the treehouse (see the log)"));
+                SRApi.NotifyT("从树屋加载预设失败（详见日志）", "Failed to load the preset from the treehouse (see the log)");
             }
             if (!started) {
                 try { QuickSaver.levelPortalXml = null; } catch (Exception __ex) { SRApi.Guard.Log("布局预设/清理树屋预设XML", __ex); }
@@ -599,7 +599,7 @@ namespace SR_UCH.Tweaks {
                 SRApi.Guard.Log("布局预设/重载场景", __ex);
             }
             if (!ok) {
-                SRApi.Notify(SRApi.T("加载预设失败：重载场景失败", "Failed to load the preset: scene reload failed"));
+                SRApi.NotifyT("加载预设失败：重载场景失败", "Failed to load the preset: scene reload failed");
                 try { QuickSaver.levelPortalXml = null; } catch (Exception __ex) { SRApi.Guard.Log("布局预设/清理预设XML", __ex); }
                 SetReloadBusy(false);
                 yield break;
@@ -621,7 +621,7 @@ namespace SR_UCH.Tweaks {
                     if (QuickSaver.levelPortalXml == expectedXml) QuickSaver.levelPortalXml = null;
                 } catch (Exception __ex) { SRApi.Guard.Log("布局预设/清理超时预设XML", __ex); }
                 SRApi.LogWarn("[布局预设] 预设 XML 未被游戏消费（可能重载未完成），已清掉，避免影响下一次原生重载: " + name);
-                SRApi.Notify(SRApi.T("预设加载可能未生效：等待场景重载超时", "The preset may not have been applied: timed out waiting for the scene reload"));
+                SRApi.NotifyT("预设加载可能未生效：等待场景重载超时", "The preset may not have been applied: timed out waiting for the scene reload");
             }
             SetReloadBusy(false);
         }
@@ -639,7 +639,7 @@ namespace SR_UCH.Tweaks {
                                 + " 秒未释放（level.reloadBusy=true），预设加载被拦住");
                             _otherBusySince = Time.unscaledTime;   // 每 60 秒提醒一次
                         }
-                        SRApi.Notify(SRApi.T("关卡正在重载，请稍候", "Level reload in progress; please wait"));
+                        SRApi.NotifyT("关卡正在重载，请稍候", "Level reload in progress; please wait");
                         return true;
                     }
                     _otherBusySince = -1f;
@@ -650,7 +650,7 @@ namespace SR_UCH.Tweaks {
                     SRApi.LogWarn("[布局预设] 检测到残留的忙碌锁（超过 45 秒未复位），已自动放锁");
                     return false;
                 }
-                SRApi.Notify(SRApi.T("重载进行中，请稍候", "Reload in progress"));
+                SRApi.NotifyT("重载进行中，请稍候", "Reload in progress");
                 return true;
             } catch { return false; }
         }

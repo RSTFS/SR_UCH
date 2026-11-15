@@ -27,7 +27,7 @@ namespace SR_UCH.Tweaks {
                 string xml = null;
                 try { xml = GUIUtility.systemCopyBuffer; } catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取剪贴板", __ex); }
                 if (string.IsNullOrEmpty(xml) || xml.Trim().Length == 0) {
-                    SRApi.Notify(SRApi.T("剪贴板是空的", "The clipboard is empty"));
+                    SRApi.NotifyT("剪贴板是空的", "The clipboard is empty");
                     return;
                 }
                 ImportXmlText(xml, null, SRApi.T("剪贴板", "clipboard"));
@@ -42,7 +42,7 @@ namespace SR_UCH.Tweaks {
                 string input = (_importPath ?? "").Trim();
                 if (input.Length >= 2 && input[0] == '"' && input[input.Length - 1] == '"') input = input.Substring(1, input.Length - 2).Trim();
                 if (input.Length == 0) {
-                    SRApi.Notify(SRApi.T("请先填写 XML 文件路径", "Enter the XML file path first"));
+                    SRApi.NotifyT("请先填写 XML 文件路径", "Enter the XML file path first");
                     return;
                 }
                 string path = ResolveImportPath(input);
@@ -50,26 +50,26 @@ namespace SR_UCH.Tweaks {
                     string ext = Path.GetExtension(path) ?? "";
                     if (!ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)
                         && !ext.Equals(".snapshot", StringComparison.OrdinalIgnoreCase)) {
-                        SRApi.Notify(SRApi.T("只能导入 .xml 或 .snapshot 文件", "Only .xml or .snapshot files can be imported"));
+                        SRApi.NotifyT("只能导入 .xml 或 .snapshot 文件", "Only .xml or .snapshot files can be imported");
                         return;
                     }
                 }
                 if (string.IsNullOrEmpty(path)) {
-                    SRApi.Notify(SRApi.T("找不到 XML 文件：", "XML file not found: ") + input);
+                    SRApi.NotifyT("找不到 XML 文件：{0}", "XML file not found: {0}", input);
                     return;
                 }
                 long length = 0;
                 try { length = new FileInfo(path).Length; }
                 catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取文件大小", __ex); }
                 if (length > MaxImportChars) {
-                    SRApi.Notify(SRApi.T("XML 文件过大，已拒绝导入", "The XML file is too large; import rejected"));
+                    SRApi.NotifyT("XML 文件过大，已拒绝导入", "The XML file is too large; import rejected");
                     return;
                 }
                 string xml = null;
                 try { xml = File.ReadAllText(path, Encoding.UTF8); }
                 catch (Exception __ex) { SRApi.Guard.Log("布局预设/读取路径文件", __ex); }
                 if (string.IsNullOrEmpty(xml)) {
-                    SRApi.Notify(SRApi.T("读取 XML 文件失败", "Failed to read the XML file"));
+                    SRApi.NotifyT("读取 XML 文件失败", "Failed to read the XML file");
                     return;
                 }
                 string defaultName = null;
@@ -83,13 +83,13 @@ namespace SR_UCH.Tweaks {
         private static void ImportXmlText(string xml, string defaultBaseName, string sourceLabel) {
             try {
                 if (string.IsNullOrEmpty(xml) || xml.Trim().Length == 0) {
-                    SRApi.Notify(SRApi.T("导入内容为空", "The import content is empty"));
+                    SRApi.NotifyT("导入内容为空", "The import content is empty");
                     return;
                 }
                 xml = xml.Trim();
                 if (xml.Length > MaxImportChars) {
-                    SRApi.Notify(SRApi.T("导入内容过大，已拒绝（上限 ", "Import content is too large; rejected (limit ")
-                        + (MaxImportChars / 1000) + SRApi.T(" 千字符）", "k characters)"));
+                    SRApi.NotifyT("导入内容过大，已拒绝（上限 {0} 千字符）",
+                        "Import content is too large; rejected (limit {0}k characters)", MaxImportChars / 1000);
                     return;
                 }
                 XmlDocument doc = null;
@@ -99,22 +99,22 @@ namespace SR_UCH.Tweaks {
                     SRApi.Guard.Log("布局预设/解析导入 XML", __ex);
                 }
                 if (doc == null || doc.DocumentElement == null || doc.DocumentElement.Name != "scene") {
-                    SRApi.Notify(SRApi.T("导入内容不是关卡布局 XML（根节点必须是 scene）", "The import content is not level layout XML (root node must be scene)"));
+                    SRApi.NotifyT("导入内容不是关卡布局 XML（根节点必须是 scene）", "The import content is not level layout XML (root node must be scene)");
                     return;
                 }
                 int blocks = CountBlocks(doc);
                 if (blocks <= 0) {
-                    SRApi.Notify(SRApi.T("导入 XML 里没有方块", "The imported XML contains no blocks"));
+                    SRApi.NotifyT("导入 XML 里没有方块", "The imported XML contains no blocks");
                     return;
                 }
                 if (blocks > MaxImportBlocks) {
-                    SRApi.Notify(SRApi.T("方块数超过导入上限 ", "Block count exceeds the import limit ") + MaxImportBlocks
+                    SRApi.NotifyT("方块数超过导入上限 {0}", "Block count exceeds the import limit {0}", MaxImportBlocks
                         + SRApi.T("，已拒绝导入", "; import rejected"));
                     return;
                 }
                 string level = LevelFromDoc(doc);
                 if (string.IsNullOrEmpty(level)) {
-                    SRApi.Notify(SRApi.T("XML 缺少 levelSceneName，无法确定属于哪个关卡", "The XML has no levelSceneName, so its level cannot be determined"));
+                    SRApi.NotifyT("XML 缺少 levelSceneName，无法确定属于哪个关卡", "The XML has no levelSceneName, so its level cannot be determined");
                     return;
                 }
                 StripDestroyed(doc);
@@ -218,7 +218,7 @@ namespace SR_UCH.Tweaks {
                     try { File.Delete(p.FilePath); }
                     catch (Exception __df) {
                         SRApi.Guard.Log("布局预设/删除文件", __df);
-                        SRApi.Notify(SRApi.T("删除失败：文件被占用？", "Delete failed: file in use?"));
+                        SRApi.NotifyT("删除失败：文件被占用？", "Delete failed: file in use?");
                         return;   // 文件没删掉就不要动索引
                     }
                     // 顺手清理同名残留（原子写临时文件 / 覆盖前备份）。
@@ -247,7 +247,7 @@ namespace SR_UCH.Tweaks {
                 if (!ActionAllowed()) return;
                 string name = (_renameText ?? "").Trim();
                 if (name.Length == 0) {
-                    SRApi.Notify(SRApi.T("名称不能为空", "The name cannot be empty"));
+                    SRApi.NotifyT("名称不能为空", "The name cannot be empty");
                     return;
                 }
                 if (name.Length > 40) name = name.Substring(0, 40);
@@ -276,8 +276,7 @@ namespace SR_UCH.Tweaks {
                     p.Name = oldName;
                     _renameKey = null;
                     _renameText = null;
-                    SRApi.Notify(SRApi.T("重命名失败：预设文件写不进去（只读或被占用）",
-                        "Rename failed: the preset file could not be written"));
+                    SRApi.NotifyT("重命名失败：预设文件写不进去（只读或被占用）", "Rename failed: the preset file could not be written");
                     return;
                 }
                 _renameKey = null;
@@ -304,22 +303,22 @@ namespace SR_UCH.Tweaks {
             }
             LobbyManager lm = LobbyManager.instance;
             if (lm == null) {
-                SRApi.Notify(SRApi.T("当前不在对局中", "Not in a match"));
+                SRApi.NotifyT("当前不在对局中", "Not in a match");
                 return false;
             }
             GameControl gc = lm.CurrentGameController as GameControl;
             if (gc == null) {
-                SRApi.Notify(SRApi.T("未进入有效对局", "No active match"));
+                SRApi.NotifyT("未进入有效对局", "No active match");
                 return false;
             }
             QuickSaver qs = gc.GetComponent<QuickSaver>();
             if (qs == null) {
-                SRApi.Notify(SRApi.T("当前对局不支持保存布局", "Saving layouts is not supported in this match"));
+                SRApi.NotifyT("当前对局不支持保存布局", "Saving layouts is not supported in this match");
                 return false;
             }
             doc = qs.GetCurrentXmlSnapshot(false);
             if (doc == null || doc.DocumentElement == null) {
-                SRApi.Notify(SRApi.T("布局快照生成失败", "Failed to generate the layout snapshot"));
+                SRApi.NotifyT("布局快照生成失败", "Failed to generate the layout snapshot");
                 doc = null;
                 return false;
             }
@@ -646,7 +645,7 @@ namespace SR_UCH.Tweaks {
                 if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
                 long len = new FileInfo(path).Length;
                 if (len > MaxImportChars) {
-                    SRApi.Notify(SRApi.T("预设文件过大，已拒绝加载（上限约 2MB）", "Preset file is too large and was not loaded (limit about 2MB)"));
+                    SRApi.NotifyT("预设文件过大，已拒绝加载（上限约 2MB）", "Preset file is too large and was not loaded (limit about 2MB)");
                     SRApi.LogWarn("[布局预设] 预设文件过大，已拒绝加载: " + path + " (" + len + " bytes)");
                     return null;
                 }
@@ -665,7 +664,7 @@ namespace SR_UCH.Tweaks {
                 }
                 if (string.IsNullOrEmpty(xml)) return null;
                 if (!string.IsNullOrEmpty(xml) && xml.Length > MaxImportChars) {
-                    SRApi.Notify(SRApi.T("预设文件过大，已拒绝加载（上限约 2MB）", "Preset file is too large and was not loaded (limit about 2MB)"));
+                    SRApi.NotifyT("预设文件过大，已拒绝加载（上限约 2MB）", "Preset file is too large and was not loaded (limit about 2MB)");
                     return null;
                 }
                 // 方块数上限：与导入路径的 MaxImportBlocks 一致。
@@ -681,7 +680,7 @@ namespace SR_UCH.Tweaks {
                         if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == '>' || ch == '/') blocks++;
                     }
                     if (blocks > MaxImportBlocks) {
-                        SRApi.Notify(SRApi.T("预设方块数量超限，已拒绝加载", "The preset has too many blocks and was not loaded"));
+                        SRApi.NotifyT("预设方块数量超限，已拒绝加载", "The preset has too many blocks and was not loaded");
                         SRApi.LogWarn("[布局预设] 预设方块数超限，已拒绝加载: " + path);
                         return null;
                     }

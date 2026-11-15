@@ -211,7 +211,7 @@ public partial class QuickAdjust : ITweak {
     public static void Render() {
         try {
         // 每对 BeginHorizontal/EndHorizontal 之间都有会抛异常的控件，任一处抛异常会使 IMGUI 布局栈失衡，故整段包 try/catch。
-        SRApi.Ctl.SectionTitle(SRApi.T("- 评分百分比 -", "- Score percentage -"));
+        SRApi.Ctl.SectionTitle(SRApi.T("评分百分比", "Score percentage"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase disc = SRApi.Ctl.FindEntry("Quick Adjust", "Handicap");
         int discVal = QuickAdjust.HandicapValue;
@@ -264,7 +264,7 @@ public partial class QuickAdjust : ITweak {
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
 
-        SRApi.Ctl.SectionTitle(SRApi.T("- 快速切换 -", "- Quick switch -"));
+        SRApi.Ctl.SectionTitle(SRApi.T("快速切换", "Quick switch"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase qs = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Switch");
         SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("快速切换", "Quick switch"), SRApi.T("仅自由模式：长按 B 到设定等待秒数切换 行动<->建造 模式。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n长按时间在下方设置，对局中开关立即生效。", "Freeplay only: hold B for the set seconds to switch Action<->Build.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately.")), qs, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
@@ -329,7 +329,7 @@ public partial class QuickAdjust : ITweak {
 
     public static void RenderChallengePage() {
         try {
-            SRApi.Ctl.SectionTitle("- " + SRApi.T("挑战", "Challenge") + " -",
+            SRApi.Ctl.SectionTitle(SRApi.T("挑战", "Challenge"),
                 SRApi.T("挑战模式的自动重试与长按重试；两套都只影响挑战模式。",
                         "Auto retry and hold-to-retry for challenge mode; both only affect challenge runs."));
             GUILayout.Space(SRApi.Ctl.Sc(2));
@@ -391,9 +391,9 @@ public partial class QuickAdjust : ITweak {
                 _draftText = null;
                 if (string.IsNullOrEmpty(txt)) return;
                 int v;
-                if (!int.TryParse(txt.Trim(), out v)) { SRApi.Notify(SRApi.T("评分百分比必须是数字", "Score percentage must be a number")); return; }
+                if (!int.TryParse(txt.Trim(), out v)) { SRApi.NotifyT("评分百分比必须是数字", "Score percentage must be a number"); return; }
                 int clamped = Mathf.Clamp(v, 10, 100);
-                if (clamped != v) SRApi.Notify(SRApi.T("评分百分比已钳制到 ", "Score percentage clamped to ") + clamped + "%");
+                if (clamped != v) SRApi.NotifyT("评分百分比已钳制到 {0}%", "Score percentage clamped to {0}%", clamped);
                 if (entry != null) SRApi.Ctl.SetValue(entry, clamped);
             } catch (Exception __ex) { SRApi.Guard.Log("QuickAdjust.CommitDraft", __ex); }
         }

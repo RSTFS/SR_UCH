@@ -15,7 +15,7 @@ public partial class Experiments : ITweak
         public static void RenderPage3() {
             try {
             GUILayout.Space(SRApi.Ctl.Sc(6));
-            SRApi.Ctl.SectionTitle("- " + SRApi.T("树屋", "Treehouse") + " -", SRApi.T("在树屋大厅里直接开始关卡.",
+            SRApi.Ctl.SectionTitle(SRApi.T("树屋", "Treehouse"), SRApi.T("在树屋大厅里直接开始关卡.",
                        "Start the level immediately from the treehouse."));
             SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
                 return e.Definition.Key.StartsWith("Lobby ");
@@ -26,7 +26,7 @@ public partial class Experiments : ITweak
                 }
 
                 GUILayout.Space(SRApi.Ctl.Sc(6));
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("加载与切场景", "Loading and scene switch") + " -", SRApi.T("跳过加载动画. 温柔加载在切换场景时先卸载再回收.",
+                SRApi.Ctl.SectionTitle(SRApi.T("加载与切场景", "Loading and scene switch"), SRApi.T("跳过加载动画. 温柔加载在切换场景时先卸载再回收.",
                          "Skip the loading animation. Gentle load unloads and collects before switching."));
                 SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
                     return e.Definition.Key.StartsWith("Splash ") || e.Definition.Key == "Gentle Load";
@@ -157,7 +157,7 @@ public partial class Experiments : ITweak
                 EnsureSplashActive(sp);
                 if (sp == null) {
                     Note = SRApi.T("当前没有遮罩", "No mask on screen");
-                    SRApi.Notify(SRApi.T("当前没有遮罩", "No mask on screen"));
+                    SRApi.NotifyT("当前没有遮罩", "No mask on screen");
                     return;
                 }
                 bool closed = false;
@@ -315,9 +315,9 @@ public partial class Experiments : ITweak
         }
 
         private static void DoLaunch(LevelSelectController lsc) {
-            if (!SRApi.CanControlLocally) { SRApi.Notify(SRApi.T("仅房主可开始关卡", "Host only")); return; }
+            if (!SRApi.CanControlLocally) { SRApi.NotifyT("仅房主可开始关卡", "Host only"); return; }
             LevelPortal[] portals = lsc.portals;
-            if (portals == null || portals.Length == 0) { SRApi.Notify(SRApi.T("未找到可用关卡门", "No level portal available")); return; }
+            if (portals == null || portals.Length == 0) { SRApi.NotifyT("未找到可用关卡门", "No level portal available"); return; }
             Character hostChar = null;
             try {
                 LobbyManager lm = LobbyManager.instance;
@@ -356,11 +356,11 @@ public partial class Experiments : ITweak
                 if (pick != null) SRApi.LogInfo("[立即开始] 没找到本机角色的投票，改用票数最高的门（" + best + " 票）");
             }
             if (pick == null) {
-                SRApi.Notify(SRApi.T("未选择关卡", "No level selected"));
+                SRApi.NotifyT("未选择关卡", "No level selected");
                 return;
             }
             lsc.LaunchLevel(pick);
-            SRApi.Notify(SRApi.T("关卡已开始", "Level started"));
+            SRApi.NotifyT("关卡已开始", "Level started");
         }
 
 

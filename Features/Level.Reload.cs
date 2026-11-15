@@ -36,7 +36,7 @@ namespace SR_UCH.Tweaks {
             try {
                 Func<bool> other = Slots.Require<Func<bool>>("presets.reloadBusy");
                 if (other != null && other()) {
-                    SRApi.Notify(SRApi.T("布局预设正在加载，请稍候", "A layout preset is loading; please wait"));
+                    SRApi.NotifyT("布局预设正在加载，请稍候", "A layout preset is loading; please wait");
                     return true;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("重载互斥检查", __ex); }
@@ -46,7 +46,7 @@ namespace SR_UCH.Tweaks {
                 SRApi.LogWarn("[重载] 检测到残留的忙碌锁（超过 45 秒未复位），已自动放锁");
                 return false;
             }
-            SRApi.Notify(SRApi.T("重载进行中，请稍候", "Reload in progress"));
+            SRApi.NotifyT("重载进行中，请稍候", "Reload in progress");
             return true;
         }
 
@@ -100,31 +100,31 @@ namespace SR_UCH.Tweaks {
                 LobbyManager lm = LobbyManager.instance;
                 if ((UnityEngine.Object)(object)lm == (UnityEngine.Object)null)
                 {
-                    SRApi.Notify(SRApi.T("当前不在对局中", "Not in a match"));
+                    SRApi.NotifyT("当前不在对局中", "Not in a match");
                     return;
                 }
                 GameControl gc = lm.CurrentGameController as GameControl;
                 if ((UnityEngine.Object)(object)gc == (UnityEngine.Object)null)
                 {
-                    SRApi.Notify(SRApi.T("未进入有效对局", "No active match"));
+                    SRApi.NotifyT("未进入有效对局", "No active match");
                     return;
                 }
                 QuickSaver qs = gc.GetComponent<QuickSaver>();
                 if ((UnityEngine.Object)(object)qs == (UnityEngine.Object)null)
                 {
-                    SRApi.Notify(SRApi.T("当前对局不支持该操作", "Unsupported in the current match"));
+                    SRApi.NotifyT("当前对局不支持该操作", "Unsupported in the current match");
                     return;
                 }
                 GameState gs = GameState.GetInstance();
                 if (gs == null)
                 {
-                    SRApi.Notify(SRApi.T("游戏状态尚未就绪", "Game state not ready"));
+                    SRApi.NotifyT("游戏状态尚未就绪", "Game state not ready");
                     return;
                 }
                 if (ReloadBlocked()) return; // 锁残留自愈
                 // 快照刚广播（3 秒内）先别重载，等方块重建落定。
                 if (Time.unscaledTime - _lastSnapshotAt < 3f) {
-                    SRApi.Notify(SRApi.T("快照刚广播，请稍后重载", "Snapshot just broadcast; retry later"));
+                    SRApi.NotifyT("快照刚广播，请稍后重载", "Snapshot just broadcast; retry later");
                     return;
                 }
                 SetReloadBusy(true);
@@ -133,7 +133,7 @@ namespace SR_UCH.Tweaks {
                 if (doc == null || string.IsNullOrEmpty(doc.OuterXml))
                 {
                     SetReloadBusy(false); // 失败路径复位锁
-                    SRApi.Notify(SRApi.T("当前场景没有可同步的方块", "No blocks to sync in the current scene"));
+                    SRApi.NotifyT("当前场景没有可同步的方块", "No blocks to sync in the current scene");
                     return;
                 }
                 try
@@ -143,7 +143,7 @@ namespace SR_UCH.Tweaks {
                 catch
                 {
                     SetReloadBusy(false); // 失败路径复位锁
-                    SRApi.Notify(SRApi.T("快照写入失败", "Failed to write the snapshot"));
+                    SRApi.NotifyT("快照写入失败", "Failed to write the snapshot");
                     return;
                 }
                 // 补分标志须在真正 ReloadScene 前置位；提前置位会被提前返回留下残留，致下次结算错补分。
@@ -151,8 +151,7 @@ namespace SR_UCH.Tweaks {
                 GameSettings gsForMode = GameSettings.GetInstance();
                 if (gsForMode == null)
                 {
-                    SRApi.Notify(SRApi.T("游戏加载中，请稍后再试",
-                        "Still loading; try again later"));
+                    SRApi.NotifyT("游戏加载中，请稍后再试", "Still loading; try again later");
                     SetReloadBusy(false);
                     return;
                 }

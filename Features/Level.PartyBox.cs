@@ -13,7 +13,7 @@ public partial class Level {
 
         public static void RenderPartyBox() {
         // 分区：道具（自动道具 → 延迟 → 跳过炸弹 → 放弃道具）
-        SRApi.Ctl.SectionTitle("- " + SRApi.T("道具", "Items") + " -",
+        SRApi.Ctl.SectionTitle(SRApi.T("道具", "Items"),
             SRApi.T("道具：开箱自动选择，以及放弃道具。",
                     "Items: auto-pick one when the box opens, plus the game's native drop-piece key."));
         float __itemCol = Mathf.Max(SRApi.Ctl.Sc(180), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(240));
@@ -38,27 +38,27 @@ public partial class Level {
             SRApi.T("派对阶段丢弃手上的道具\n请勿删除边界墙和出生方块，一经删除无法复原\n仅派对阶段、走游戏原生通道", "Discards the held piece during the pick phase\nDo not delete boundary walls or spawn blocks; they cannot be restored\nPick phase only, uses the game channel"), __drop, 120f);
 
         // 派对盒炸弹：对局内所有成员都发过炸弹！快捷短语才生成。
-        SRApi.Ctl.SectionTitle(SRApi.T("- 派对盒子炸弹 -", "- Party-box bomb -"));
+        SRApi.Ctl.SectionTitle(SRApi.T("派对盒子炸弹", "Party-box bomb"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase pbe = SRApi.Ctl.FindEntry("Level", "Party Bomb"); // Bind 在 Level 段
         SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("派对盒子炸弹", "Party-box bomb"), SRApi.T("房主开启后，对局内所有成员都发过炸弹！快捷短语时，往当前派对盒子塞入炸弹。", "Host on: when every member sends the Bomb quick-phrase, spawn a bomb in the current party box.")), pbe, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(40));
         if (pbe != null) SRApi.Ctl.RenderControl(pbe);
         GUILayout.Space(SRApi.Ctl.Sc(10));
-        GUILayout.Label(SRApi.T("炸弹种类", "Bomb type"), SRApi.Ctl.Label, GUILayout.Height(SRApi.Ctl.Sc(26)));
+        // RowCombo 自带标签列，无需另画标签（否则会重复）。
         ConfigEntryBase pbtype = SRApi.Ctl.FindEntry("Level", "Party Bomb Type");
         if (pbtype != null) {
             string[] opts = new[] { SRApi.T("小炸弹", "Small"), SRApi.T("大炸弹", "Big"), SRApi.T("超级炸弹", "Mega") };
-            int curIdx = Mathf.Clamp((int)pbtype.BoxedValue, 0, 2);
-            bool open; if (!SRApi.Ctl.EditOpen.TryGetValue(pbtype, out open)) open = false;
-            int pbSel = SRApi.Ctl.ComboBox(pbtype, opts[curIdx], BombTypeVals, opts, ref open, SRApi.Ctl.Sc(150));
-            if (pbSel >= 0) { SRApi.Ctl.SetValue(pbtype, BombTypeVals[pbSel]); SRApi.Ctl.EditOpen[pbtype] = false; }
-            else SRApi.Ctl.EditOpen[pbtype] = open;
+            string[] vals = new[] { "0", "1", "2" };
+            SRApi.Ctl.RowCombo(SRApi.T("炸弹种类", "Bomb type"),
+                SRApi.T("塞进派对盒的是哪种炸弹\n小 / 大 / 超级，对应不同的爆炸范围",
+                        "which bomb goes into the party box\nsmall / big / mega, each with a different blast"),
+                pbtype, vals, opts, SRApi.Ctl.Sc(150));
         }
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(2));
 
-        SRApi.Ctl.SectionTitle(SRApi.T("- 派对盒（重抽 / 开箱 / 关闭）-", "- Party box -"));
+        SRApi.Ctl.SectionTitle(SRApi.T("派对盒（重抽 / 开箱 / 关闭）", "Party box"));
         GUILayout.BeginHorizontal();
         if (SRApi.Ctl.HotkeyActionButton(SRApi.T("刷新派对盒", "Reroll + reopen box"), SRApi.T("完整重走一遍游戏自己的派对盒流程：按本轮权重重抽道具 + 重新开箱（全员可再选一次）", "Run the game own party-box flow again: reroll with this round weights and reopen the box so everyone can pick again"), LevelPartyBox.RefreshPartyBoxKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBox();
         GUILayout.Space(SRApi.Ctl.Sc(8));
@@ -143,7 +143,7 @@ public class LevelPartyBox : ITweak {
                 VersusControl vc = UnityEngine.Object.FindObjectOfType<VersusControl>();
                 if (vc == null) return;   // 非派对模式静默跳过
                 PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
-                if (pb == null) { SRApi.Notify(SRApi.T("未找到派对盒", "Party box not found")); return; }
+                if (pb == null) { SRApi.NotifyT("未找到派对盒", "Party box not found"); return; }
                 // 道具由房主生成并需服务器广播，提示文案由 SR 统一给出。
                 if (!SRApi.CanDoHost()) return;
                 int oldPieces = DestroyPartyBoxPieces(pb); // 旧道具必须广播销毁：内部 ClearPieces 只用 Object.Destroy
@@ -151,7 +151,7 @@ public class LevelPartyBox : ITweak {
                 if (show != null) {
                     show.Invoke(vc, null);
                     try { vc.CallRpcShowPartyBox(); } catch (System.Exception __ex) { SRApi.LogWarn("重新开箱(通知客户端)失败: " + __ex.Message); }
-                    SRApi.Notify(SRApi.T("已重抽道具并重新开箱", "Rerolled the items and reopened the box"));
+                    SRApi.NotifyT("已重抽道具并重新开箱", "Rerolled the items and reopened the box");
                 } else {
                     FallbackRefresh(pb, oldPieces); // 兜底：手工走同样两步
                 }
@@ -196,7 +196,7 @@ public class LevelPartyBox : ITweak {
                 System.Reflection.FieldInfo pw = SRApi.Ref.Field(typeof(VersusControl), "showingPlacementWarning",
                     "关卡派对盒：关闭（进入原生的放置结束提示窗口）");
                 if (pt == null || pw == null) {
-                    SRApi.Notify(SRApi.T("关闭派对盒失败（游戏成员不可用）", "Failed to close the party box (member unavailable)"));
+                    SRApi.NotifyT("关闭派对盒失败（游戏成员不可用）", "Failed to close the party box (member unavailable)");
                     return;
                 }
                 // 计时归零并进入警告窗口；卡在 0 时重复写同值是空操作，故先复位警告位、下一帧再置位。
@@ -212,7 +212,7 @@ public class LevelPartyBox : ITweak {
                 } else {
                     pw.SetValue(vc, true);
                 }
-                SRApi.Notify(SRApi.T("已关闭派对盒", "Party box closed"));
+                SRApi.NotifyT("已关闭派对盒", "Party box closed");
             } catch (Exception __ex) { SRApi.LogWarn("关闭派对盒失败: " + __ex.Message); }
         }
 
@@ -244,7 +244,7 @@ public class LevelPartyBox : ITweak {
                 if (amount <= 0) amount = 1; // 件数由调用方在销毁前传入
                 pb.ChoosePieces(amount, null);
                 ReopenPartyBox(pb);
-                SRApi.Notify(SRApi.T("已重抽派对盒道具", "Rerolled the party box items"));
+                SRApi.NotifyT("已重抽派对盒道具", "Rerolled the party box items");
             } catch (System.Exception e) { SRApi.LogWarn("刷新派对盒(兜底)失败: " + e.Message); }
         }
 

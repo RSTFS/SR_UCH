@@ -28,7 +28,7 @@ namespace SR_UCH {
         // 地图页：开关 + 视野 + 打开按钮 + 说明（地图本身是覆盖在主窗口之上的全屏视图）。
         private static void RenderMapPage() {
             try {
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("地图", "Map") + " -",
+                SRApi.Ctl.SectionTitle(SRApi.T("地图", "Map"),
                     SRApi.T("俯视查看整张关卡平面图\n打开后可拖动平移、滚轮缩放、右键操作\n仅自由模式可用",
                             "overhead view of the whole level\ndrag to pan, wheel to zoom, right-click for actions\nfreeplay only"));
                 // 开关地图：内容标签 + 按钮（右键绑键）+ 快捷键框（不再单列一行快捷键配置）。
@@ -49,7 +49,7 @@ namespace SR_UCH {
 
         private static void RenderSpawnPage() {
             try {
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("重生点", "Spawn points") + " -",
+                SRApi.Ctl.SectionTitle(SRApi.T("重生点", "Spawn points"),
                     SRApi.T("自定义出生位置，配合地图页右键使用\n重生会传送到最近的重生点\n没有自定义点时回到游戏默认出生点",
                             "custom spawn positions, used from the map page's right-click menu\nrespawn teleports to the nearest point\nfalls back to the game's default spawn"));
                 SpawnPointTools.RenderRows();
@@ -61,7 +61,7 @@ namespace SR_UCH {
 
         private static void RenderAll() {
             try {
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("自由相机", "Free camera") + " -",
+                SRApi.Ctl.SectionTitle(SRApi.T("自由相机", "Free camera"),
                     SRApi.T("开启后可以用滚轮自由缩放视野\n关闭后完全恢复游戏默认相机\n只在自由模式有效",
                             "wheel zooms the view freely while on\noff restores the default camera\nfreeplay only"));
                 SRApi.RenderSectionEntries("自由模式", delegate (ConfigEntryBase e) {
@@ -71,7 +71,7 @@ namespace SR_UCH {
                 // 视野快捷键与自由相机开关同一行：由核心的「行 companion」机制画在复选框右边。
                 GUILayout.Space(SRApi.Ctl.Sc(4));
 
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("自身状态", "Self state") + "-");
+                SRApi.Ctl.SectionTitle(SRApi.T("自身状态", "Self state"));
                 SelfState.RenderRows();
                 GUILayout.Space(SRApi.Ctl.Sc(4));
 

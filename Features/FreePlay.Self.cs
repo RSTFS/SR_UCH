@@ -93,7 +93,7 @@ namespace SR_UCH {
             bool inMode = true;
             try { inMode = SRApi.FeatureAllowed(typeof(SelfState)); } catch { inMode = true; }
             if (!inMode) return;
-            SRApi.Notify(SRApi.T(zh, en) + (e.Value ? SRApi.T("：开", ": on") : SRApi.T("：关", ": off")));
+            SRApi.NotifyT(zh + (e.Value ? "：开" : "：关"), en + (e.Value ? ": on" : ": off"));
         }
 
         // 分区：死亡拦截

@@ -174,14 +174,14 @@ namespace SR_UCH.Tweaks {
             try {
                 if (!SRApi.GateMaster) return;
                 PiecePlacementCursor c = FindCursor();
-                if (c == null) { SRApi.Notify(SRApi.T("未找到放置光标", "Placement cursor not found")); return; }
-                if (c.Piece == null) { SRApi.Notify(SRApi.T("手上没有方块", "No piece in hand")); return; }
+                if (c == null) { SRApi.NotifyT("未找到放置光标", "Placement cursor not found"); return; }
+                if (c.Piece == null) { SRApi.NotifyT("手上没有方块", "No piece in hand"); return; }
                 if (!CallNativeRemoveUnplaced()) {
-                    SRApi.Notify(SRApi.T("放弃失败", "Failed to drop the piece"));
+                    SRApi.NotifyT("放弃失败", "Failed to drop the piece");
                     SRApi.LogWarn("[放弃道具] 原生放弃接口不可用");
                     return;
                 }
-                SRApi.Notify(SRApi.T("已放弃当前方块", "Piece dropped"));
+                SRApi.NotifyT("已放弃当前方块", "Piece dropped");
             } catch (Exception __ex) { SRApi.Guard.Log("放弃道具", __ex); }
         }
 

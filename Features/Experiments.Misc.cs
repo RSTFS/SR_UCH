@@ -16,7 +16,7 @@ public partial class Experiments : ITweak
 
                 // 跨平台联机：反射改游戏自己的 CrossPlatformToggle，不绑版本。
                 GUILayout.Space(SRApi.Ctl.Sc(6));
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("跨平台联机", "Cross-play") + " -",
+                SRApi.Ctl.SectionTitle(SRApi.T("跨平台联机", "Cross-play"),
                     SRApi.T("开：匹配池包含其它平台（走 Unity 大厅/中继，延迟通常更高）；关：只和同平台玩家联机. "
                         + "新建存档的默认值是关.",
                         "ON: the matchmaking pool includes other platforms (Unity lobby + relay, usually higher ping); "

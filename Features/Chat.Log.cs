@@ -77,7 +77,7 @@ public partial class Chat : ITweak {
                 int num = LocalNetworkNumber();
                 // 取不到玩家号就别发：按 -1 发出会被服务端与所有客户端静默丢弃，改成明确提示。
                 if (num < 0) {
-                    SRApi.Notify(SRApi.T("聊天：还没分配到玩家号，稍后再试", "Chat: no player number yet, try again later"));
+                    SRApi.NotifyT("聊天：还没分配到玩家号，稍后再试", "Chat: no player number yet, try again later");
                     return;
                 }
                 if (GameState.ChatSystem != null) {

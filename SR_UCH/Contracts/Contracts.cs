@@ -113,7 +113,7 @@ namespace SR_UCH {
         // Version：功能清单契约的破坏性基线，与 SR.ApiVersion 独立演进。
         public const int Version = 2;
         // ApiLevel：SRApi 门面 API 的 additive 等级，每新增一个 public 成员 +1；删除/改签名必须抬 Version。
-        public const int ApiLevel = 12;  // 12 起有 Features.Version；11 起有 RegisterKey(impl) 门控重载；10 起有 Ctl.FloatOpen
+        public const int ApiLevel = 13;  // 13 起有 Ctl.Row 行作用域；12 起有 Features.Version；11 起有 RegisterKey(impl)
     }
 
         // 跨功能共享的时间常量：Level.* 与 BuildingPresets 共用同一份值，改一处即同步。

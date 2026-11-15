@@ -335,7 +335,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void RenderPage() {
-            SRApi.Ctl.SectionTitle("- " + SRApi.T("其他玩家显示", "Other players") + " -",
+            SRApi.Ctl.SectionTitle(SRApi.T("其他玩家显示", "Other players"),
                 SRApi.T("淡化其他玩家，方便看不清自己 / 录屏 / 截图；只改变本机画面，不影响任何玩法和联机。",
                         "Fades other players for a clearer view; local picture only, no gameplay or network effect."));
             if (_conflict) {

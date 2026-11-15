@@ -154,7 +154,7 @@ namespace SR_UCH.Tweaks {
 
         private static void RenderPick() {
             try {
-                SRApi.Ctl.SectionTitle(SRApi.T("- 自动选择 -", "- Auto pick -"));
+                SRApi.Ctl.SectionTitle(SRApi.T("自动选择", "Auto pick"));
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) { return e.Definition.Key == "Enabled"; });
                 EnsureAnimalList();
                 // 核心 RowCombo 用配置条目当稳定 ID 管理展开态，选中即写值并收起；须传原始枚举值（传本地化名会永远显示第一项）。
@@ -217,7 +217,7 @@ namespace SR_UCH.Tweaks {
 
         private static void RenderOutfit() {
             try {
-                SRApi.Ctl.SectionTitle(SRApi.T("- 自动时装 -", "- Auto outfit -"));
+                SRApi.Ctl.SectionTitle(SRApi.T("自动时装", "Auto outfit"));
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) { return e.Definition.Key == "Outfit Enabled"; });
                 GUILayout.Space(SRApi.Ctl.Sc(4f));
                 GUILayout.BeginHorizontal();
@@ -447,9 +447,9 @@ namespace SR_UCH.Tweaks {
                 LobbyManager lm = LobbyManager.instance;
                 if (lm == null) return;
                 LobbyPlayer lp = LocalLobbyPlayer(lm);
-                if (lp == null || lp.CharacterInstance == null) { SRApi.Notify(SRApi.T("先选一个角色", "Pick an animal first")); return; }
+                if (lp == null || lp.CharacterInstance == null) { SRApi.NotifyT("先选一个角色", "Pick an animal first"); return; }
                 OutfitChangeProp prop = UnityEngine.Object.FindObjectOfType<OutfitChangeProp>();
-                if (prop == null || prop.OutfitManager == null) { SRApi.Notify(SRApi.T("当前场景没有换装对象", "No dresser in this scene")); return; }
+                if (prop == null || prop.OutfitManager == null) { SRApi.NotifyT("当前场景没有换装对象", "No dresser in this scene"); return; }
                 // 原生 Show 依赖解锁表；表没建好会 KeyNotFound（原生 UI 打不开的常见原因）
                 try {
                     if (prop.OutfitManager.characterOutfitsUnlocked == null || prop.OutfitManager.characterOutfitsUnlocked.Count == 0)
@@ -457,7 +457,7 @@ namespace SR_UCH.Tweaks {
                 } catch (Exception __rd) { SRApi.Guard.Log("角色/换装解锁表", __rd); }
                 Character ch = lp.CharacterInstance;
                 Vector3 keep = ch.transform.position;
-                if (!prop.Use(lp, InputEvent.InputKey.Accept)) { SRApi.Notify(SRApi.T("游戏当前不允许换装", "The game does not allow dressing right now")); return; }
+                if (!prop.Use(lp, InputEvent.InputKey.Accept)) { SRApi.NotifyT("游戏当前不允许换装", "The game does not allow dressing right now"); return; }
                 OutfitController ctrl;
                 if (OutfitChangeProp.OutfitControllers.TryGetValue(ch, out ctrl) && ctrl != null) {
                     ctrl.transform.position = keep;    // 界面留在原地
@@ -466,7 +466,7 @@ namespace SR_UCH.Tweaks {
                     _dressChar = ch;
                     _dressShowAt = Time.unscaledTime + 0.05f;   // 下一帧补 Show（让 Awake/Start 先跑）
                 }
-                SRApi.Notify(SRApi.T("已打开换装界面（Accept/Back 关闭）", "Dresser opened (Accept/Back closes)"));
+                SRApi.NotifyT("已打开换装界面（Accept/Back 关闭）", "Dresser opened (Accept/Back closes)");
             } catch (Exception __ex) { SRApi.Guard.Log("角色/原地换装", __ex); }
         }
 
@@ -478,7 +478,7 @@ namespace SR_UCH.Tweaks {
                 LobbyManager lm = LobbyManager.instance;
                 if (lm == null) return;
                 LobbyPlayer lp = LocalLobbyPlayer(lm);
-                if (lp == null || lp.CharacterInstance == null) { SRApi.Notify(SRApi.T("还没选角色", "Pick an animal first")); return; }
+                if (lp == null || lp.CharacterInstance == null) { SRApi.NotifyT("还没选角色", "Pick an animal first"); return; }
                 Character ch = lp.CharacterInstance;
                 Outfit[] all = ch.GetComponentsInChildren<Outfit>(true);
                 if (all != null) {
@@ -491,7 +491,7 @@ namespace SR_UCH.Tweaks {
                 }
                 SetOutfitRecord(ch.CharacterSprite.ToString(), "none");
                 _dressedFor = ch;
-                SRApi.Notify(SRApi.T("已清空该角色的时装", "Cleared this animal's outfit"));
+                SRApi.NotifyT("已清空该角色的时装", "Cleared this animal's outfit");
             } catch (Exception __ex) { SRApi.Guard.Log("角色/清空时装", __ex); }
         }
 
@@ -596,12 +596,12 @@ namespace SR_UCH.Tweaks {
                 LobbyManager lm = LobbyManager.instance;
                 if (lm == null) return;
                 LobbyPlayer lp = LocalLobbyPlayer(lm);
-                if (lp == null || lp.CharacterInstance == null) { SRApi.Notify(SRApi.T("还没选角色", "Pick an animal first")); return; }
+                if (lp == null || lp.CharacterInstance == null) { SRApi.NotifyT("还没选角色", "Pick an animal first"); return; }
                 Character ch = lp.CharacterInstance;
                 ApplyOutfitFor(ch, true);                       // reroll：重新随机并写记录
                 lp.CallCmdSetOutfitsFromArray(ch.GetOutfitsAsArray());
                 _dressedFor = ch;
-                SRApi.Notify(SRApi.T("已重抽该角色的外观", "Rerolled this animal's look"));
+                SRApi.NotifyT("已重抽该角色的外观", "Rerolled this animal's look");
             } catch (Exception __ex) { SRApi.Guard.Log("角色/随机整套", __ex); }
         }
 

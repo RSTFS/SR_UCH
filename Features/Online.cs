@@ -207,7 +207,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void Notes(string zh, string en) {
-            SRApi.Notify(SRApi.T(zh, en));
+            SRApi.NotifyT(zh, en);
         }
 
         // 软看门狗（房主解散专用）：只做"始终没回主界面就切场景"兜底，不动 LobbyManager。

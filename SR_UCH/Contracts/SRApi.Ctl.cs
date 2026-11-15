@@ -215,6 +215,17 @@ namespace SR_UCH {
             public static void SetCursorTextureSink(Func<Texture2D> f) { _cursorTex = f; }
             public static Texture2D CursorTexture { get { Func<Texture2D> f = _cursorTex; return f != null ? f() : null; } }
 
+            // 行作用域：替代手写 BeginHorizontal/EndHorizontal。任一处抛异常也会正确收栈，
+            // 否则 IMGUI 布局栈失衡会让整个页面错位。用法：using (Ctl.Row()) { ... }
+            private static Func<System.IDisposable> _row;
+            public static void SetRowSink(Func<System.IDisposable> f) { _row = f; }
+            public static System.IDisposable Row(float width = 0f) {
+                Func<System.IDisposable> f = _row;
+                if (f == null) return new NoopScope();
+                return f();
+            }
+            private sealed class NoopScope : System.IDisposable { public void Dispose() { } }
+
             // 附随浮窗（一类：随主面板，面板关闭即收起）。功能层只通过这里开窗。
             public delegate void FloatDrawFn();
             private static Func<bool> _floatIsOpen;
@@ -414,9 +425,17 @@ namespace SR_UCH {
         public static System.IDisposable Tint(Color color) { return new GuiScope(true, true, color); }
         public static System.IDisposable Tint(Color color, bool useIt) { return new GuiScope(true, useIt, color); }
 
+        // 分区标题装饰：非空且尚未带 "- " 前缀时自动包裹。
+        private static string Decorate(string title) {
+            if (string.IsNullOrEmpty(title)) return "";
+            string s = title.Trim();
+            if (s.Length >= 4 && s.StartsWith("- ", StringComparison.Ordinal) && s.EndsWith(" -", StringComparison.Ordinal)) return s;
+            return "- " + s + " -";
+        }
+
         public static void SectionTitle(string title, string tip = null) {
-            // 控件创建不能放在 try 里：Layout 与 Repaint 建的数量不一致会抛 group 位置异常，故只在 try 里算尺寸。
-            GUIContent c = new GUIContent(title ?? "", tip);
+            // 统一加 "- 标题 -" 装饰：调用方只传标题本身，样式集中在一处。
+            GUIContent c = new GUIContent(Decorate(title), tip);
             GUIStyle st = SecHeader;
             Vector2 sz;
             try { sz = st.CalcSize(c); } catch { sz = new Vector2(Sc(120f), Sc(20f)); }

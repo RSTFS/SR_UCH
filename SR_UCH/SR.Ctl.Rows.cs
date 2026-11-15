@@ -108,6 +108,18 @@ public partial class SR {
             return picked;
         }
 
+        // 行作用域：Dispose 时一定 EndHorizontal，控件抛异常也不会让布局栈失衡。
+        internal sealed class RowScope : System.IDisposable {
+            private bool _ended;
+            internal RowScope() { GUILayout.BeginHorizontal(); }
+            public void Dispose() {
+                if (_ended) return;
+                _ended = true;
+                try { GUILayout.EndHorizontal(); } catch (Exception __er) { Guard.Log("行作用域/收尾", __er); }
+            }
+        }
+        internal static System.IDisposable NewRow() { return new RowScope(); }
+
         // 动作行：标签 + 动作按钮（左键执行 / 右键绑键）+ 只读快捷键框。
         // 快捷键框显示当前键，点它进入录制（与按钮右键同一套录制逻辑）。
         internal static bool RowsActionRow(string label, string tip, string button, ConfigEntry<KeyCode> key, float buttonW, float labelW) {

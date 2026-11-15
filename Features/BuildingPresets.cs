@@ -547,7 +547,7 @@ namespace SR_UCH.Tweaks {
         private static void SubmitRename(PresetInfo p) {
             try {
                 if ((_renameText ?? "").Trim().Length == 0) {
-                    SRApi.Notify(SRApi.T("名称不能为空", "The name cannot be empty"));
+                    SRApi.NotifyT("名称不能为空", "The name cannot be empty");
                     return;
                 }
                 CommitRename(p);

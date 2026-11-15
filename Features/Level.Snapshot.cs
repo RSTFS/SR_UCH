@@ -66,19 +66,19 @@ namespace SR_UCH.Tweaks {
             LobbyManager lm = LobbyManager.instance;
             if ((UnityEngine.Object)(object)lm == (UnityEngine.Object)null)
             {
-                SRApi.Notify(SRApi.T("当前不在对局中", "Not in a match"));
+                SRApi.NotifyT("当前不在对局中", "Not in a match");
                 return false;
             }
             GameControl g = lm.CurrentGameController as GameControl;
             if ((UnityEngine.Object)(object)g == (UnityEngine.Object)null)
             {
-                SRApi.Notify(SRApi.T("未进入有效对局", "No active match"));
+                SRApi.NotifyT("未进入有效对局", "No active match");
                 return false;
             }
             QuickSaver q = g.GetComponent<QuickSaver>();
             if ((UnityEngine.Object)(object)q == (UnityEngine.Object)null)
             {
-                SRApi.Notify(SRApi.T("当前对局不支持该操作", "Unsupported in the current match"));
+                SRApi.NotifyT("当前对局不支持该操作", "Unsupported in the current match");
                 return false;
             }
             if (ReloadBlocked()) return false; // 锁残留自愈
@@ -108,7 +108,7 @@ namespace SR_UCH.Tweaks {
         // 清除玩家放置的方块（全员可见）：逐块网络销毁，不走 <destroyed> 快照路径。
         public static void ClearPlacedBlocks(List<Placeable> targets, string feature) {
             try {
-                if (targets == null || targets.Count == 0) { SRApi.Notify(SRApi.T("地图上没有玩家放置的道具", "No player-placed props on the map")); return; }
+                if (targets == null || targets.Count == 0) { SRApi.NotifyT("地图上没有玩家放置的道具", "No player-placed props on the map"); return; }
                 GameControl gc; QuickSaver qs;
                 if (!TryGetSnapshotContext(feature, out gc, out qs)) return;
                 FallbackClearPlacedBlocks(targets); // 逐块网络销毁

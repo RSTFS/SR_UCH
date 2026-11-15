@@ -11,7 +11,7 @@ namespace SR_UCH.Tweaks {
 
         internal static void RenderRespawnSection() {
             try {
-                SRApi.Ctl.SectionTitle("- " + SRApi.T("重生", "Respawn") + " -",
+                SRApi.Ctl.SectionTitle(SRApi.T("重生", "Respawn"),
                     SRApi.T("重生延迟、出生无敌、炮弹卡死自动重生（挑战/自由通用）。",
                             "Respawn delay, spawn invincibility and cannon-stuck respawn (challenge and freeplay)."));
                 if (_delay != null) {

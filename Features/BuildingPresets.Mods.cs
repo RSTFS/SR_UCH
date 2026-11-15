@@ -157,7 +157,7 @@ namespace SR_UCH.Tweaks {
                 p.ModsMode = next;
                 if (string.Equals(next, ModsInherit, StringComparison.Ordinal)) p.ModsVals = null;
                 SaveIndex();
-                SRApi.Notify(SRApi.T("数据：", "Data: ") + ModsLabel(p) + " · " + (p.Name ?? ""));
+                SRApi.NotifyT("数据：{0} · {1}", "Data: {0} · {1}", ModsLabel(p), p.Name ?? "");
                 SRApi.LogInfo("[布局预设] 数据模式切换: " + (p.Name ?? "") + " -> " + ModsLabel(p));
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/切换数据模式", __ex); }
         }

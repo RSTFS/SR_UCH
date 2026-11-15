@@ -17,14 +17,14 @@ namespace SR_UCH.Tweaks {
                 if (!ActionAllowed()) return;
                 string xml = ReadAllText(p.FilePath);
                 if (string.IsNullOrEmpty(xml)) {
-                    SRApi.Notify(SRApi.T("读取预设文件失败", "Failed to read the preset file"));
+                    SRApi.NotifyT("读取预设文件失败", "Failed to read the preset file");
                     return;
                 }
                 try {
                     GUIUtility.systemCopyBuffer = xml;
                 } catch (Exception __ex) {
                     SRApi.Guard.Log("布局预设/写剪贴板", __ex);
-                    SRApi.Notify(SRApi.T("写入剪贴板失败", "Failed to write to the clipboard"));
+                    SRApi.NotifyT("写入剪贴板失败", "Failed to write to the clipboard");
                     return;
                 }
                 _status = SRApi.T("已导出到剪贴板：", "Exported to clipboard: ") + p.Name;
@@ -70,7 +70,7 @@ namespace SR_UCH.Tweaks {
                     SRApi.Guard.Log("布局预设/导出全部索引", __ex);
                 }
                 if (copied == 0) {
-                    SRApi.Notify(SRApi.T("全部导出失败（详见日志）", "Exporting all presets failed (see the log)"));
+                    SRApi.NotifyT("全部导出失败（详见日志）", "Exporting all presets failed (see the log)");
                     return;
                 }
                 _status = SRApi.T("已导出 ", "Exported ") + copied + SRApi.T(" 个预设到：", " presets to: ") + baseDir
@@ -91,7 +91,7 @@ namespace SR_UCH.Tweaks {
                 StripDestroyed(doc);
                 int blocks = CountBlocks(doc);
                 if (blocks <= 0) {
-                    SRApi.Notify(SRApi.T("当前场景没有可保存的方块", "No blocks to save in the current scene"));
+                    SRApi.NotifyT("当前场景没有可保存的方块", "No blocks to save in the current scene");
                     return;
                 }
                 string level = LevelFromDoc(doc);
@@ -115,7 +115,7 @@ namespace SR_UCH.Tweaks {
             try {
                 if (string.IsNullOrEmpty(xml)) return;
                 if (xml.Length > MaxImportChars || blocks > MaxImportBlocks) {
-                    SRApi.Notify(SRApi.T("布局太大，无法保存为预设（超出读取上限）", "The layout is too large to save as a preset (exceeds the load limit)"));
+                    SRApi.NotifyT("布局太大，无法保存为预设（超出读取上限）", "The layout is too large to save as a preset (exceeds the load limit)");
                     SRApi.LogWarn("[布局预设] 保存被拒：xml 长度=" + xml.Length + " 方块数=" + blocks);
                     return;
                 }
@@ -136,7 +136,7 @@ namespace SR_UCH.Tweaks {
                 } else {
                     ClearPending();
                     if (CountPresetEntries() >= MaxPresets) {
-                        SRApi.Notify(SRApi.T("预设数量已达上限 ", "Preset limit reached: ") + MaxPresets
+                        SRApi.NotifyT("预设数量已达上限 {0}", "Preset limit reached: {0}", MaxPresets
                             + SRApi.T("，请先删除旧预设", "; delete an old preset first"));
                         return;
                     }
@@ -172,7 +172,7 @@ namespace SR_UCH.Tweaks {
                 SRApi.LogInfo("[布局预设] 保存 " + key + "（" + blocks + " 块）");
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/写文件", __ex);
-                SRApi.Notify(SRApi.T("保存预设失败", "Failed to save the preset"));
+                SRApi.NotifyT("保存预设失败", "Failed to save the preset");
             }
         }
 

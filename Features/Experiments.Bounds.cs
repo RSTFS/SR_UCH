@@ -30,7 +30,7 @@ public partial class Experiments : ITweak
 
         public static void Render() {
             try {
-                SRApi.Ctl.SectionTitle(SRApi.T("- 解除关卡边界 -", "- Unlock level bounds -"));
+                SRApi.Ctl.SectionTitle(SRApi.T("解除关卡边界", "Unlock level bounds"));
                 Row("解除关卡边界", "Unlock level bounds",
                     "解除关卡边界：放开关卡四周的空间限制.\n"
                     + "开启后实体墙、放置光标、相机取景、界外黑幕与方块越界放置同时解除; 关闭即逐项还原.",
@@ -38,7 +38,7 @@ public partial class Experiments : ITweak
                     + "removes the solid walls, placement-cursor bounds, camera framing, the out-of-bounds overlay and out-of-bounds placement at once; turning it off restores each one.",
                     "Level Bounds");
                 GUILayout.Space(SRApi.Ctl.Sc(6));
-                SRApi.Ctl.SectionTitle(SRApi.T("- 进阶（一般不用改）-", "- Advanced (rarely needed) -"));
+                SRApi.Ctl.SectionTitle(SRApi.T("进阶（一般不用改）", "Advanced (rarely needed)"));
                 AdvRow("Level Bounds Radius", "越界范围", "Unlock radius",
                     "硬解除半径：光标与相机可到关卡外的距离, 不限范围.\n"
                     + "值越大可走得越远; 相机取景与放置光标的边界都按这个值换掉.",

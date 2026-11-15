@@ -80,11 +80,11 @@ namespace SR_UCH.Tweaks {
                     } catch (Exception __v) { SRApi.Guard.Log("QuickAdjust/核实 handicap", __v); }
                     // 100% 也要记住：它是当前生效值，归零等于放弃保持。
                     _keepHandicap = target;
-                    SRApi.Notify(SRApi.T("评分百分比：", "Score percentage: ") + target + "%");
+                    SRApi.NotifyT("评分百分比：{0}%", "Score percentage: {0}%", target);
                 }
                 else
                 {
-                    SRApi.Notify(SRApi.T("评分百分比应用失败", "Failed to apply score percentage"));
+                    SRApi.NotifyT("评分百分比应用失败", "Failed to apply score percentage");
                 }
             }
             catch (Exception ex)
@@ -202,11 +202,11 @@ namespace SR_UCH.Tweaks {
                 if (ApplyOwnHandicap(100))
                 {
                     _keepHandicap = 0;
-                    SRApi.Notify(SRApi.T("评分百分比：100%", "Score percentage: 100%"));
+                    SRApi.NotifyT("评分百分比：100%", "Score percentage: 100%");
                 }
                 else
                 {
-                    SRApi.Notify(SRApi.T("评分百分比还原失败", "Failed to restore score percentage"));
+                    SRApi.NotifyT("评分百分比还原失败", "Failed to restore score percentage");
                 }
             }
             catch (Exception ex)

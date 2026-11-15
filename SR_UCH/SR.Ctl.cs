@@ -228,6 +228,7 @@ public partial class SR {
                 SRApi.Ctl.SetClearKeySink(ClearKeyEntry);
                 SRApi.Ctl.SetCursorTextureSink(delegate { return SR.CursorTexture; });
                 SRApi.Ctl.SetRowGateSink(SR.Ctl.RegisterRowGateImpl);
+                SRApi.Ctl.SetRowSink(delegate { return SR.Ctl.NewRow(); });
             } catch (Exception __ia) { Guard.Log("注入动作行", __ia); }
         }
         public static string RecTextPublic() { return SR.RecText(); }

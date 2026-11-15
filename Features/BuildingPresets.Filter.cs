@@ -228,19 +228,13 @@ namespace SR_UCH.Tweaks {
 
         private static void RenderSortCombo() {
             try {
+                // 统一走核心下拉行：展开态、类型转换、写回与收起都由 RowCombo 处理。
                 ConfigEntryBase e = SRApi.Ctl.FindEntry(Section, "Sort Mode");
                 string[] opts = new[] { SRApi.T("时间", "Time"), SRApi.T("名称", "Name") };
-                int[] vals = new int[] { 0, 1 };
-                int cur = Mathf.Clamp(SortMode, 0, opts.Length - 1);
-                bool open;
-                if (e == null || !SRApi.Ctl.EditOpen.TryGetValue(e, out open)) open = false;
-                int sel = SRApi.Ctl.ComboBox(e, opts[cur], vals, opts, ref open, W(110));
-                if (sel >= 0) {
-                    if (e != null) SRApi.Ctl.SetValue(e, vals[sel]);
-                    if (e != null) SRApi.Ctl.EditOpen[e] = false;
-                } else if (e != null) {
-                    SRApi.Ctl.EditOpen[e] = open;
-                }
+                string[] vals = new[] { "0", "1" };
+                SRApi.Ctl.RowCombo(SRApi.T("排序", "Sort by"),
+                    SRApi.T("预设列表的排序方式\n按时间或按名称", "how the preset list is sorted\nby time or by name"),
+                    e, vals, opts, W(110));
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/渲染排序下拉", __ex);
             }

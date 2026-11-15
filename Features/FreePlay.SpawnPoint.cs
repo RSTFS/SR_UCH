@@ -115,8 +115,8 @@ namespace SR_UCH.Tweaks {
                     "清空重生点快捷键\n删除全部自定义重生点\n游戏默认出生点不受影响",
                     "clear spawn points hotkey\nremoves every custom point\nthe game default is untouched");
                 SRApi.RegisterKey("重生点-重生", _respawnKey, "press", delegate { if (SRApi.GateMaster && Enabled) Respawn(); }, typeof(FreePlayPage));
-                SRApi.RegisterKey("重生点-添加", _addKey, "press", delegate { if (SRApi.GateMaster && Enabled) { Add(LocalPosition()); SRApi.Notify(SRApi.T("已添加重生点（", "Spawn point added (") + Count + ")"); } }, typeof(FreePlayPage));
-                SRApi.RegisterKey("重生点-清空", _clearKey, "press", delegate { if (SRApi.GateMaster && Enabled) { Clear(); SRApi.Notify(SRApi.T("已清空重生点", "Spawn points cleared")); } }, typeof(FreePlayPage));
+                SRApi.RegisterKey("重生点-添加", _addKey, "press", delegate { if (SRApi.GateMaster && Enabled) { Add(LocalPosition()); SRApi.NotifyT("已添加重生点（{0}）", "Spawn point added ({0})", Count); } }, typeof(FreePlayPage));
+                SRApi.RegisterKey("重生点-清空", _clearKey, "press", delegate { if (SRApi.GateMaster && Enabled) { Clear(); SRApi.NotifyT("已清空重生点", "Spawn points cleared"); } }, typeof(FreePlayPage));
                 SRApi.RegisterSceneHook(delegate { _defaultPoint = null; LoadPoints(); });
                 LoadPoints();
             } catch (Exception __ex) { SRApi.Guard.Log("重生点/初始化", __ex); }
@@ -237,7 +237,7 @@ namespace SR_UCH.Tweaks {
                         SRApi.T("在当前位置添加一个自定义重生点\n最多 20 个", "add a custom point at your position\nup to 20"),
                         SRApi.T("在当前位置添加", "Add here"), _addKey, 130f)) {
                     Add(LocalPosition());
-                    SRApi.Notify(SRApi.T("已添加重生点（", "Spawn point added (") + Count + ")");
+                    SRApi.NotifyT("已添加重生点（{0}）", "Spawn point added ({0})", Count);
                 }
                 if (SRApi.Ctl.ActionRow(SRApi.T("清空重生点", "Clear spawn points"),
                         SRApi.T("删除全部自定义重生点\n游戏默认出生点不受影响", "remove every custom point\nthe game default is untouched"),

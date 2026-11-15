@@ -133,7 +133,7 @@ namespace SR_UCH.Tweaks {
             if (_enabled != null && !_enabled.Value)
                 Line("本机开关已关：这里只显示收到的牌面，房主规则仍会生效。",
                      "Switch is off on this machine: cards are display-only; host rules still apply.");
-            SRApi.Ctl.SectionTitle("- " + SRApi.T("当前牌面", "Active cards") + " -",
+            SRApi.Ctl.SectionTitle(SRApi.T("当前牌面", "Active cards"),
                 SRApi.T("本回合生效的规则牌：绿边 = 增益，红边 = 减益，蓝边 = 中性。",
                         "Rules in effect this round: green = buff, red = debuff, blue = neutral."));
             RenderActiveCards();
@@ -174,7 +174,7 @@ namespace SR_UCH.Tweaks {
         private static string[] _poolLabelCache;
 
         private void RenderPoolGroup(bool numeric) {
-            SRApi.Ctl.SectionTitle("- " + SRApi.T(numeric ? "数值规则" : "布尔规则", numeric ? "Numeric rules" : "Boolean rules") + " -");
+            SRApi.Ctl.SectionTitle(SRApi.T(numeric ? "数值规则" : "布尔规则", numeric ? "Numeric rules" : "Boolean rules"));
             if (_poolLabelCache == null) _poolLabelCache = new string[Cards.Length];
             for (int i = 0; i < Cards.Length; i++) {
                 if (Cards[i].IsBool == numeric || _pool[i] == null) continue;   // numeric=true 显示数值牌（IsBool=false）
