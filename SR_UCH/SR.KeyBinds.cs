@@ -608,6 +608,7 @@ public partial class SR {
 
         public static void CheckHotkeys() {
             // 每个条目的回调单独隔离：一个功能抛异常不影响其余快捷键。
+            // 注意：本方法由 ManagerUI.Update 每帧调用，与主面板是否打开无关 —— 独立窗口的快捷键靠这条链路。
             try { HkInitAll(); } catch (Exception __ex) { Guard.Log("初始化自动快捷键", __ex); }
             CheckRegisteredKeyActions();   // 功能登记的键位动作（核心统一轮询；hold 类需每帧）
             if (_capturing != null) return; // 正在录制按键：不触发

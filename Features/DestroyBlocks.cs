@@ -17,9 +17,9 @@ namespace SR_UCH.Tweaks {
         private static IFeatureHost _mp; // 仅用于读 Config（契约类型）
         private static int _index;
         private static int _wheelFrame = -1;   // 上一帧吃掉滚轮的帧号（防同帧多次加）
-        // 本次"按住切换键"会话里是否已经用滚轮选过：选过之后选中项完全由滚轮决定，
-        // 不再按"上一帧选中项"重定位（那正是"切一下就弹回"的原因）。松开切换键即清除。
-        private static bool _wheelPickedThisHold;
+        // 滚轮选中项按**引用**保存（不按下标）：列表每次重建/按距离重排后下标含义会变，
+        // 只有引用才能保证"切到那个就一直选它"，直到下一次触发才重新开始。
+        private static Placeable _wheelPicked;
         private static List<Placeable> Blocks = new List<Placeable>();
         private static bool _altDown;
         private static Placeable _selected;
@@ -418,7 +418,7 @@ namespace SR_UCH.Tweaks {
             bool canDestroy = SRApi.CanControlLocally || AllowClientsOn;
             if (SRApi.ComboKeyDown(_toggleKey)) {
                 _altDown = true;
-                _wheelPickedThisHold = false;   // 新的一次触发：从默认选中开始，滚轮重新接管
+                _wheelPicked = null;   // 新的一次触发：清掉滚轮选中项，回到默认选中
                 RebuildList();
                 _lastListRebuildAt = Time.unscaledTime;
                 _listDirty = false;
@@ -436,17 +436,14 @@ namespace SR_UCH.Tweaks {
                 if (RealtimeListOn) TickRealtimeList();
 
                 if (Blocks.Count <= 0) return;
-                // 刚用滚轮换过目标：不要再用"上一帧选中项"把它拉回去（否则表现为切一下就弹回）。
-                // 滚轮一旦选过，本次按住期间不再跟随旧选中项（否则滚轮结果会被立刻拉回）。
-                if (!_wheelPickedThisHold) {
-                    Placeable prev = _selected;
-                    if (prev != null) {
-                        for (int i = 0; i < Blocks.Count; i++) {
-                            if (Blocks[i] == prev) { _index = i; break; }
-                        }
-                    }
+                // 选中项统一以**引用**为准：滚轮选过就用滚轮那个，否则用上一帧的选中项；
+                // 每帧都按引用重新定位下标，列表重排（距离模式）也不会让选中项漂移。
+                Placeable __keep = _wheelPicked != null ? _wheelPicked : _selected;
+                if (__keep != null) {
+                    int __at = -1;
+                    for (int i = 0; i < Blocks.Count; i++) { if (Blocks[i] == __keep) { __at = i; break; } }
+                    if (__at >= 0) _index = __at;
                 }
-                if (_index < 0 || _index >= Blocks.Count) _index = Blocks.Count - 1;
                 // 删除键只对房主生效；ComboKeyDown 是边沿触发，必须只调一次。
                 if (SRApi.ComboKeyDown(_deleteKey)) {
                     if (!canDestroy) {
@@ -477,13 +474,14 @@ namespace SR_UCH.Tweaks {
                     if (wheel != 0f) {
                         _wheelFrame = Time.frameCount;
                         _index += wheel > 0f ? 1 : -1;
-                        _wheelPickedThisHold = true;
                         SRApi.MarkWheelUsed(); // 滚轮已被选块器吃掉，地图/自由相机让路
                     }
                 }
                 if (_index >= Blocks.Count) _index = 0;
                 if (_index < 0) _index = Blocks.Count - 1;
                 _selected = Blocks[_index];
+                // 本帧结束后把"当前选中"固化成引用：之后列表怎么重排都跟着这个方块。
+                _wheelPicked = _selected;
                 if (_selected != _tintedBlock) {
                     ClearTintGroup();
                     TintGroup(_selected);
@@ -495,7 +493,7 @@ namespace SR_UCH.Tweaks {
             else if(_altDown)
             {
                 _altDown = false;
-                _wheelPickedThisHold = false;
+                _wheelPicked = null;
                 if (_tintedBlock != null) {
                     ClearTintGroup();   // 整组清除（含子件）
                 }
@@ -586,8 +584,8 @@ namespace SR_UCH.Tweaks {
         // 重建候选表并按引用找回选中项：否则高亮会乱跳；异常须兜住。
         private static void RefreshListKeepSelection() {
           try {
-            // 滚轮选过的方块就是当前选中项（_selected 已由按下标维护），列表重建时按它重新定位。
-            Placeable prev = (_selected != null ? _selected : _tintedBlock);
+            // 优先跟随滚轮选中项（按引用），其次上一帧选中项；列表重建后按引用重新定位下标。
+            Placeable prev = _wheelPicked != null ? _wheelPicked : (_selected != null ? _selected : _tintedBlock);
             // 选中项已被标记销毁时不可再高亮（AddBombTint 对已销毁对象会抛异常）
             if (prev != null && prev.MarkedForDestruction) prev = null;
             RebuildList();

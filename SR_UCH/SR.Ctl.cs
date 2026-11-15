@@ -48,11 +48,6 @@ public partial class SR {
 
 
 
-
-
-
-
-
         // 表格自适应高度：usedAbove + 表格高 = 底栏之上可用高度；配合 TableAfterDraw 自校准。
     public static float TableAutoFit(float contentBottomY, float currentY, float minH, ref float bias) {
         if (contentBottomY <= 1f) return minH;
@@ -120,15 +115,9 @@ public partial class SR {
 
 
 
-
-
-
-
         // 条目标签（可点击恢复默认值）。
         public static void RestoreLabel(GUIContent content, ConfigEntryBase entry, float w, float h, ConfigEntry<KeyCode> hotkey = null) { SR.RestoreLabel(content, entry, w, h, hotkey); }
         public static void RenderControl(ConfigEntryBase entry) { SR.RenderControl(entry); }
-
-
 
 
 

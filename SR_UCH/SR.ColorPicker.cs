@@ -148,9 +148,11 @@ public partial class SR {
         // 打开/关闭独立浮层窗口。
         // 当前展开的条目（供浮层分部读取，避免跨文件直接访问私有字段）。
         internal static ConfigEntryBase OpenEntry { get { return _open; } }
+        internal static void ClearOpenEntry() { _open = null; }
 
         private static void OpenFloat(ConfigEntryBase e, State s) {
             try {
+                if (!SR.Visible) return;   // 一类窗口只能由 SR 界面触发
                 if (_open != null && !ReferenceEquals(_open, e)) {
                     State prev;
                     if (_states.TryGetValue(_open, out prev)) Close(_open, prev);

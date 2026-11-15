@@ -10,7 +10,9 @@ namespace SR_UCH.Tweaks {
         private const string Sec = "自由模式";
 
         private static ConfigEntry<bool> _enabled;
-        private static ConfigEntry<float> _fov;
+        private static ConfigEntry<KeyCode> _openKey;   // 地图开关快捷键
+        private const float BaseFov = 10f;              // 基准取景视野
+        private static float _fov = BaseFov;            // 当前视野（仅运行期，滚轮调，重开归位）
         private static bool _open;
 
         // 相机快照
@@ -37,23 +39,28 @@ namespace SR_UCH.Tweaks {
         private static string _toast = "";
 
         internal static bool IsOpen { get { return _open; } }
+        internal static ConfigEntry<KeyCode> OpenKeyEntry { get { return _openKey; } }
 
         internal static void Initialize(IFeatureHost plugin) {
             try {
                 _enabled = plugin.Config.Bind(Sec, "Map Enabled", false,
                 "自由模式地图：启用后可在自由模式页打开俯视地图。");
-                _fov = plugin.Config.Bind(Sec, "Map FOV", 10f,
-                    new ConfigDescription("地图视野（1-20）：越小越放大。", new AcceptableValueRange<float>(1f, 20f)));
+                _openKey = plugin.Config.Bind(Sec, "Map Key", KeyCode.M,
+                    "地图开关快捷键（默认 M）：在地图外的任何地方按一下打开/关闭俯视地图。");
                 SRApi.LocKey(Sec, "Map Enabled", "启用地图", "Enable map");
                 SRApi.LocDesc(Sec, "Map Enabled",
                     "启用自由模式地图\n打开后俯视查看整张关卡\n仅自由模式可用",
                     "enable the freeplay map\noverhead view of the whole level\nfreeplay only");
-                SRApi.LocKey(Sec, "Map FOV", "地图视野", "Map FOV");
-                SRApi.LocDesc(Sec, "Map FOV",
-                    "地图视野\n1-20，越小越放大\n滚轮也能缩放",
-                    "map field of view\n1-20, smaller zooms in\nthe wheel also zooms");
+                SRApi.LocKey(Sec, "Map Key", "地图快捷键", "Map hotkey");
+                SRApi.LocDesc(Sec, "Map Key",
+                    "地图开关快捷键\n按一下打开/关闭俯视地图\n默认 M；右键按钮可改绑",
+                    "map open/close hotkey\nopens or closes the overhead map\ndefault M; right-click the button to rebind");
                 SRApi.RegisterTick("自由模式-地图", Tick);
-                SRApi.RegisterOverlay(Draw);
+                // 快捷键：地图外任意位置按一下开关（不需要打开 SR 面板）。
+                // 仅地图使用 M：按一下开/关俯视地图；不影响其它界面。
+                SRApi.RegisterKey("自由模式-地图开关", _openKey, "press", delegate {
+                    try { if (SRApi.GateMaster) Toggle(); } catch (Exception __mk) { SRApi.Guard.Log("地图快捷键", __mk); }
+                });
                 SRApi.RegisterSceneHook(Close);
                 try { Harmony.CreateAndPatchAll(typeof(FreePlayMap)); }
                 catch (Exception __h) { SRApi.Guard.Log("自由模式地图/补丁", __h); }
@@ -71,6 +78,7 @@ namespace SR_UCH.Tweaks {
                 SaveCam(cam);
                 _boundsValid = false;
                 _dragOffset = Vector3.zero;
+                _fov = BaseFov;
                 _open = true;
                 _menuOpen = false;
                 Toast(SRApi.T("地图已打开：拖动平移 · 滚轮缩放 · 右键菜单", "Map open: drag to pan · wheel to zoom · right-click for actions"));
@@ -190,7 +198,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void ApplyCamera(Camera cam) {
-            ApplyCameraTo(cam, _fov != null ? Mathf.Clamp(_fov.Value, 1f, 20f) : 10f);
+            ApplyCameraTo(cam, _fov);
         }
 
         // 俯视取景：固定 z 轴正向、按基准 FOV 反推距离（改 FOV 才会真正缩放）。
@@ -236,6 +244,8 @@ namespace SR_UCH.Tweaks {
                 Event e = Event.current;
                 int prevDepth = GUI.depth;
                 Color prevColor = GUI.color;
+                Font prevFont = GUI.skin.font;
+                try { if (SRApi.Ctl.UiFont != null) GUI.skin.font = SRApi.Ctl.UiFont; } catch (Exception) { /* 字体不可用时用默认 */ }
                 try {
                     GUI.depth = -900;   // 压在主窗口之上
                     // 顶栏
@@ -245,11 +255,11 @@ namespace SR_UCH.Tweaks {
                     GUI.Label(new Rect(Sc(60f), Sc(4f), Screen.width - Sc(160f), Sc(20f)),
                         SRApi.T("左键拖动平移 · 滚轮缩放 · 右键操作", "drag to pan · wheel to zoom · right-click for actions"), SRApi.Ctl.Label);
                     // 右侧：视野读数 + 重置视图 + 关闭
-                    float __fovNow = _fov != null ? _fov.Value : 10f;
+                    float __fovNow = _fov;
                     GUI.Label(new Rect(Screen.width - Sc(196f), Sc(4f), Sc(74f), Sc(20f)), "FOV " + __fovNow.ToString("0.0"), SRApi.Ctl.Label);
                     if (GUI.Button(new Rect(Screen.width - Sc(118f), Sc(3f), Sc(80f), Sc(20f)), SRApi.T("重置视图", "Reset view"), SRApi.Ctl.Btn)) {
                         _dragOffset = Vector3.zero;
-                        if (_fov != null) _fov.Value = 10f;
+                        _fov = BaseFov;
                         Toast(SRApi.T("视图已重置", "View reset"));
                     }
                     if (GUI.Button(new Rect(Screen.width - Sc(32f), Sc(3f), Sc(24f), Sc(20f)), "×", SRApi.Ctl.Btn)) { Close(); return; }
@@ -290,13 +300,14 @@ namespace SR_UCH.Tweaks {
                         } else if (e.type == EventType.MouseUp && e.button == 0) { _dragging = false; }
                         if (e.type == EventType.ScrollWheel) {
                             float amt = Mathf.Abs(e.delta.y) > 0.001f ? e.delta.y : e.delta.x;
-                            if (_fov != null) {
-                                float oldFov = _fov.Value;
+                            {
+                                float oldFov = _fov;
                                 float newFov = Mathf.Clamp(oldFov + amt * 0.6f, 1f, 20f);
                                 if (Mathf.Abs(newFov - oldFov) > 0.001f) {
                                     // 以光标位置为缩放锚点：先取世界点，改 FOV 后把它拉回光标下。
                                     Vector2 beforeWorld = ScreenToWorld(cam, e.mousePosition);
-                                    _fov.Value = newFov;
+                                    _fov = newFov;
+
                                     ApplyCameraTo(cam, newFov);
                                     Vector2 afterScreen = WorldToScreen(cam, new Vector3(beforeWorld.x, beforeWorld.y, 0f));
                                     Vector2 d = e.mousePosition - afterScreen;
@@ -313,7 +324,7 @@ namespace SR_UCH.Tweaks {
                         }
                     }
                     if (_menuOpen) DrawMenu(cam, e);
-                } finally { GUI.color = prevColor; GUI.depth = prevDepth; }
+                } finally { GUI.color = prevColor; GUI.depth = prevDepth; GUI.skin.font = prevFont; }
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式地图/绘制", __ex); }
         }
 

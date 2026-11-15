@@ -743,8 +743,9 @@ public partial class SR {
             SR.Ctl.EndLabelColumnFrame();   // 标签列宽本帧收敛（下一帧生效）
             }
             DrawOverlays();
-            // 调色板独立浮层：画在所有功能覆盖层之后（最上层），不占页面布局。
-            try { ColorPicker.SetFloatFont(SR.UiFont); ColorPicker.DrawFloat(); } catch (Exception __cf) { Guard.Log("调色板浮层", __cf); }
+            // 一类浮窗（调色板 / 重命名）：只在主面板打开时画，随面板一起收起。
+            try { SR.DrawAttachedWindows(); } catch (Exception __aw) { Guard.Log("绘制随面板浮窗", __aw); }
+
         }
 
 // 分区：MonoBehaviour（ManagerUI：Update/LateUpdate/OnGUI 驱动入口）
@@ -796,6 +797,7 @@ public partial class SR {
             private static readonly Action _actOpenKey = SR.CheckOpenKey;
             private static readonly Action _actHotkeys = SR.CheckHotkeys;
             private static readonly Action _actDrawGui = DoDrawGui;
+            private static readonly Action _actDrawStandalone = delegate { SR.DrawStandaloneWindows(); };
             private static readonly Action _actPostWheel = SR.PostGuiWheel;
 
             private void Update() {
@@ -819,6 +821,8 @@ public partial class SR {
                 try { SR.RecordGuiKeyEvent(Event.current); } catch (Exception __gk) { SR.Guard.Log("OnGUI 记录按键", __gk); }
                 // 分开包：DrawGUI 抛异常时滚轮收口仍要执行。
                 Guard.Try("绘制面板", _actDrawGui);
+                // 二类独立窗口（地图）：主面板关闭时也要能用。
+                Guard.Try("绘制独立窗口", _actDrawStandalone);
                 // 滚轮收口必须在 DrawGUI 之后，否则 Input 读轴缩放会抢滚轮。
                 Guard.Try("滚轮收口", _actPostWheel);
                 // 点在下拉框外即收起：判据是 MouseDown 帧无下拉框认领，不靠坐标；放在 DrawGUI 之后。

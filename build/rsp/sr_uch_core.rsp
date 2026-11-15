@@ -47,6 +47,7 @@ SR_UCH\SR.Ctl.Styles.cs
 SR_UCH\SR.Ctl.Table.cs
 SR_UCH\SR.Ctl.Tooltip.cs
 SR_UCH\SR.Ext.cs
+SR_UCH\SR.FloatWindow.cs
 SR_UCH\SR.Gate.cs
 SR_UCH\SR.Hooks.cs
 SR_UCH\SR.Input.cs

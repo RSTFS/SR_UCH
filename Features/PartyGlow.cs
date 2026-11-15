@@ -134,7 +134,7 @@ namespace SR_UCH.Tweaks {
                 _wMin = int.MaxValue; _wMax = 0;
 
                 PickableBlock[] all = SRApi.FrameObjects<PickableBlock>();
-                if (all == null) return;
+                if (all == null) all = new PickableBlock[0];   // 拿不到也要走清理，避免光晕残留
                 if (_wCache.Length < all.Length) _wCache = new int[all.Length];
                 // 第一遍：先统计全盒权重范围并缓存每件权重，第二遍不再重算。
                 for (int i = 0; i < all.Length; i++) {
@@ -219,10 +219,17 @@ namespace SR_UCH.Tweaks {
                     bool still = false;
                     if (kv.Value == null) still = false;
                     else {
-                        for (int i = 0; i < alive.Length; i++) {
-                            PickableBlock pb = alive[i];
-                            if (pb == null || !pb.InPartybox) continue;
-                            if (pb.GetInstanceID() == kv.Key) { still = true; break; }
+                        // 光晕仍有效 = 父链完好 且 该道具还在场景里且仍属于派对盒。
+                        Transform __parent = kv.Value.parent;
+                        if (__parent == null || !__parent.gameObject.activeInHierarchy) still = false;
+                        else {
+                            for (int i = 0; i < alive.Length; i++) {
+                                PickableBlock pb = alive[i];
+                                if (pb == null) continue;
+                                if (pb.GetInstanceID() != kv.Key) continue;
+                                if (pb.InPartybox && pb.gameObject.activeInHierarchy) still = true;
+                                break;
+                            }
                         }
                     }
                     if (still) continue;
@@ -374,7 +381,7 @@ namespace SR_UCH.Tweaks {
             // 兜底：帧缓存里还有但未登记的光晕（防旧版本/手工残留）。
             try {
                 PickableBlock[] all = SRApi.FrameObjects<PickableBlock>();
-                if (all == null) return;
+                if (all == null) all = new PickableBlock[0];   // 拿不到也要走清理，避免光晕残留
                 for (int i = 0; i < all.Length; i++) {
                     if (all[i] == null) continue;
                     Transform g = Holder(all[i]).Find(GlowName);

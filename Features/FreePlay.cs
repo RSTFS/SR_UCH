@@ -32,11 +32,13 @@ namespace SR_UCH {
                     SRApi.T("俯视查看整张关卡平面图\n打开后可拖动平移、滚轮缩放、右键操作\n仅自由模式可用",
                             "overhead view of the whole level\ndrag to pan, wheel to zoom, right-click for actions\nfreeplay only"));
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) {
-                    return e.Definition.Key == "Map Enabled" || e.Definition.Key == "Map FOV";
+                    return e.Definition.Key == "Map Enabled" || e.Definition.Key == "Map Key";
                 });
                 GUILayout.Space(SRApi.Ctl.Sc(6));
                 string label = FreePlayMap.IsOpen ? SRApi.T("关闭地图", "Close map") : SRApi.T("打开地图", "Open map");
-                if (SRApi.Ctl.ButtonRow(new string[] { label }, new float[] { 120f }, 24f) == 0) FreePlayMap.Toggle();
+                // 与地图快捷键同一个配置项：右键按钮可改绑。
+                if (SRApi.Ctl.HotkeyActionButton(label, SRApi.T("打开/关闭俯视地图（也可用下面的快捷键）", "open or close the overhead map"), FreePlayMap.OpenKeyEntry, SRApi.Ctl.Sc(120f), true))
+                    FreePlayMap.Toggle();
                 GUILayout.Space(SRApi.Ctl.Sc(4));
                 GUILayout.Label(SRApi.T("右键菜单：传送到此处 / 添加重生点 / 删除最近的重生点 / 清空重生点 / 关闭地图",
                     "Right-click menu: teleport here / add spawn point / remove nearest / clear / close map"), SRApi.Ctl.Label);
@@ -49,7 +51,8 @@ namespace SR_UCH {
                     SRApi.T("自定义出生位置，配合地图页右键使用\n重生会传送到最近的重生点\n没有自定义点时回到游戏默认出生点",
                             "custom spawn positions, used from the map page's right-click menu\nrespawn teleports to the nearest point\nfalls back to the game's default spawn"));
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) {
-                    return e.Definition.Key == "Spawn Points";
+                    return e.Definition.Key == "Spawn Points" || e.Definition.Key == "Spawn Respawn Key"
+                        || e.Definition.Key == "Spawn Add Key" || e.Definition.Key == "Spawn Clear Key";
                 });
                 GUILayout.Space(SRApi.Ctl.Sc(6));
                 SpawnPointTools.RenderRows();

@@ -60,35 +60,11 @@ public partial class SR : ITweak {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         private static bool _refAudited;
 
 
         // 补丁自检：合并类级/方法级 [HarmonyPatch]，逐个验证按名绑定的目标是否仍存在。
         private static bool _patchAudited;
-
-
-
-
-
-
 
 
         public sealed class AuditIssue {
@@ -157,6 +133,8 @@ public partial class SR : ITweak {
         private static readonly Dictionary<ConfigEntryBase, ComboMod> _keyMods = new Dictionary<ConfigEntryBase, ComboMod>();
         private static readonly Dictionary<ConfigEntryBase, ConfigEntry<string>> _keyModEntries = new Dictionary<ConfigEntryBase, ConfigEntry<string>>();
         private static bool _visible;
+        // 主面板是否可见（一类独立窗口只在面板打开时可用）。
+        internal static bool Visible { get { return _visible; } }
         private static float _uiAlpha; // 开合淡入淡出
         private static bool _scanned;
         private enum Mode { Internal, Settings, External }
