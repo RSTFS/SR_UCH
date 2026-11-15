@@ -114,9 +114,9 @@ namespace SR_UCH.Tweaks {
                 SRApi.LocDesc(Sec, "Spawn Clear Key",
                     "清空重生点快捷键\n删除全部自定义重生点\n游戏默认出生点不受影响",
                     "clear spawn points hotkey\nremoves every custom point\nthe game default is untouched");
-                SRApi.RegisterKey("重生点-重生", _respawnKey, "press", delegate { if (SRApi.GateMaster && Enabled) Respawn(); });
-                SRApi.RegisterKey("重生点-添加", _addKey, "press", delegate { if (SRApi.GateMaster && Enabled) { Add(LocalPosition()); SRApi.Notify(SRApi.T("已添加重生点（", "Spawn point added (") + Count + ")"); } });
-                SRApi.RegisterKey("重生点-清空", _clearKey, "press", delegate { if (SRApi.GateMaster && Enabled) { Clear(); SRApi.Notify(SRApi.T("已清空重生点", "Spawn points cleared")); } });
+                SRApi.RegisterKey("重生点-重生", _respawnKey, "press", delegate { if (SRApi.GateMaster && Enabled) Respawn(); }, typeof(FreePlayPage));
+                SRApi.RegisterKey("重生点-添加", _addKey, "press", delegate { if (SRApi.GateMaster && Enabled) { Add(LocalPosition()); SRApi.Notify(SRApi.T("已添加重生点（", "Spawn point added (") + Count + ")"); } }, typeof(FreePlayPage));
+                SRApi.RegisterKey("重生点-清空", _clearKey, "press", delegate { if (SRApi.GateMaster && Enabled) { Clear(); SRApi.Notify(SRApi.T("已清空重生点", "Spawn points cleared")); } }, typeof(FreePlayPage));
                 SRApi.RegisterSceneHook(delegate { _defaultPoint = null; LoadPoints(); });
                 LoadPoints();
             } catch (Exception __ex) { SRApi.Guard.Log("重生点/初始化", __ex); }

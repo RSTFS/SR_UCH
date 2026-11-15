@@ -103,7 +103,7 @@ public partial class Experiments : ITweak
                 _followSpeed = plugin.Config.Bind("自由模式", "Free Camera Speed", 1f,
                     new ConfigDescription("相机跟随角色的速度倍数（0-10，每次 0.5，1 = 游戏原值；与自由相机开关无关）",
                         new AcceptableValueRange<float>(0f, 10f)));
-                SRApi.RegisterKey("实验-自由相机", _key, "press", CheckKey);
+                SRApi.RegisterKey("实验-自由相机", _key, "press", CheckKey, typeof(FreeCam));
                 SRApi.RegisterWheelHook(WheelZoom);
                 // 不强制重置写盘（会覆盖用户设置）；只把非法 FOV 回落到 10。
                 try { if (_fov.Value <= 0f || _fov.Value > 64f) _fov.Value = 10f; } catch (Exception __fv) { SRApi.Guard.Log("自由相机/修正FOV", __fv); }

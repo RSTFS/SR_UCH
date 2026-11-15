@@ -142,19 +142,55 @@ public partial class SR {
         public static bool CanControlLocally { get { return Env.IsHost; } }
 
         // 功能级模式门控：查 [SrFeature].Modes（无记录或未声明 = 不限）。
-        internal static bool FeatureAllowed(Type impl) {
+        // 结果按帧缓存：hold 类键位每帧、每功能都要问一次，不缓存就是每帧多次全表遍历。
+        private static readonly Dictionary<Type, int> _featureModes = new Dictionary<Type, int>();   // -1 = 不限
+        private static readonly Dictionary<Type, bool> _allowedCache = new Dictionary<Type, bool>();
+        private static int _allowedFrame = -1;
+
+        private static int ModesOf(Type impl) {
+            int modes;
+            if (_featureModes.TryGetValue(impl, out modes)) return modes;
+            modes = -1;
             try {
-                if (impl == null) return true;
                 IList<FeatureInfo> all = Features.All;
                 for (int i = 0; i < all.Count; i++) {
                     FeatureInfo fi = all[i];
-                    if (fi != null && fi.Impl == impl) {
-                        if (fi.Modes == 0) return true;
-                        return GateModeAllows((ModeMask)fi.Modes);
-                    }
+                    if (fi != null && fi.Impl == impl) { modes = fi.Modes; break; }
                 }
-            } catch (Exception __fa) { Guard.Log("功能模式门控", __fa); }
-            return true;
+            } catch (Exception __fm) { Guard.Log("功能模式查询", __fm); }
+            _featureModes[impl] = modes;
+            return modes;
+        }
+
+        internal static bool FeatureAllowed(Type impl) {
+            if (impl == null) return true;
+            try {
+                if (_allowedFrame != Time.frameCount) { _allowedFrame = Time.frameCount; _allowedCache.Clear(); }
+                bool cached;
+                if (_allowedCache.TryGetValue(impl, out cached)) return cached;
+                int modes = ModesOf(impl);
+                bool ok = modes == 0 || (modes < 0) || GateModeAllows((ModeMask)modes);
+                _allowedCache[impl] = ok;
+                return ok;
+            } catch (Exception __fa) { Guard.Log("功能模式门控", __fa); return true; }
+        }
+
+        // 供按键派发用：受限功能在错误模式下按下键，给一次节流提示（否则"按了没反应"）。
+        private static float _modeHintAt = -9f;
+        private static readonly HashSet<Type> _modeHinted = new HashSet<Type>();
+
+        internal static bool GateFeatureForAction(Type impl, string actionName) {
+            if (FeatureAllowed(impl)) { _modeHinted.Remove(impl); return true; }
+            // 同一功能 2 秒内只提示一次，避免 hold 类键每秒刷屏。
+            if (!_modeHinted.Contains(impl) || Time.unscaledTime - _modeHintAt > 2f) {
+                _modeHinted.Add(impl);
+                _modeHintAt = Time.unscaledTime;
+                try {
+                    LogWarn("[模式限制] " + (actionName ?? "?") + " 在当前模式下不可用");
+                    Notify(T(actionName ?? "?", actionName ?? "?") + " " + T("在当前模式下不可用", "is unavailable in this mode"));
+                } catch (Exception __mh) { Guard.Log("模式限制提示", __mh); }
+            }
+            return false;
         }
 
         public static bool GateModeAllows(ModeMask allowed) {

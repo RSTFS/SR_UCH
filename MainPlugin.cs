@@ -294,6 +294,11 @@ namespace SR_UCH {
             SinkStep("ActionRow", delegate () {
                 SR.Ctl.InstallActionRowSinks();
             });
+            SinkStep("KeyActionGated", delegate () {
+                SRApi.SetKeyActionGatedSink(delegate (string __kn, ConfigEntry<KeyCode> __ke, string __km, Action __ka, Type __ki) {
+                    SR.RegisterKeyAction(__kn, __ke, __km, __ka, __ki);
+                });
+            });
             SinkStep("FloatWindow", delegate () {
                 SRApi.SetUiVisibleSink(delegate { return SR.Visible; });
                 SRApi.Ctl.SetFloatWindowSinks(

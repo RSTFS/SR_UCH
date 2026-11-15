@@ -82,7 +82,7 @@ namespace SR_UCH.Tweaks {
                 // 仅地图使用 M：按一下开/关俯视地图；不影响其它界面。
                 SRApi.RegisterKey("自由模式-地图开关", _openKey, "press", delegate {
                     try { if (SRApi.GateMaster) Toggle(); } catch (Exception __mk) { SRApi.Guard.Log("地图快捷键", __mk); }
-                });
+                }, typeof(FreePlayPage));
                 SRApi.RegisterSceneHook(Close);
                 try { Harmony.CreateAndPatchAll(typeof(FreePlayMap)); }
                 catch (Exception __h) { SRApi.Guard.Log("自由模式地图/补丁", __h); }
@@ -94,7 +94,6 @@ namespace SR_UCH.Tweaks {
         internal static void OpenMap() {
             try {
                 if (_enabled != null && !_enabled.Value) { Toast(SRApi.T("地图未启用（先在上面勾选）", "Map is disabled (enable it above)")); return; }
-                if (!SRApi.FeatureAllowed(typeof(FreePlayPage))) return;
                 Camera cam = GameCamera();
                 if (cam == null) return;
                 SaveCam(cam);

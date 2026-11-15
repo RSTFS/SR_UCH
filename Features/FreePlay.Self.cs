@@ -40,10 +40,10 @@ namespace SR_UCH {
                 _flyKey = plugin.Config.Bind(Sec, "Fly Key", KeyCode.None, "飞天的快捷键。");
                 _ignoreCollisionKey = plugin.Config.Bind(Sec, "Ignore Collision Key", KeyCode.None, "无视碰撞的快捷键。");
 
-                SRApi.RegisterKey("自身状态-无敌", _invincibleKey, "press", delegate { SelfKey(_invincible, "无敌", "Invincible"); });
-                SRApi.RegisterKey("自身状态-完美无敌", _godModeKey, "press", delegate { SelfKey(_godMode, "完美无敌", "God mode"); });
-                SRApi.RegisterKey("自身状态-飞天", _flyKey, "press", delegate { SelfKey(_fly, "飞天", "Fly"); });
-                SRApi.RegisterKey("自身状态-无视碰撞", _ignoreCollisionKey, "press", delegate { SelfKey(_ignoreCollision, "无视碰撞", "Ignore collision"); });
+                SRApi.RegisterKey("自身状态-无敌", _invincibleKey, "press", delegate { SelfKey(_invincible, "无敌", "Invincible"); }, typeof(SelfState));
+                SRApi.RegisterKey("自身状态-完美无敌", _godModeKey, "press", delegate { SelfKey(_godMode, "完美无敌", "God mode"); }, typeof(SelfState));
+                SRApi.RegisterKey("自身状态-飞天", _flyKey, "press", delegate { SelfKey(_fly, "飞天", "Fly"); }, typeof(SelfState));
+                SRApi.RegisterKey("自身状态-无视碰撞", _ignoreCollisionKey, "press", delegate { SelfKey(_ignoreCollision, "无视碰撞", "Ignore collision"); }, typeof(SelfState));
 
                 SRApi.RegisterTick("自身状态-穿模", TickIgnore);
                 SRApi.RegisterSceneHook(OnSceneChanged);

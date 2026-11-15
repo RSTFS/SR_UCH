@@ -304,8 +304,8 @@ namespace SR_UCH.Tweaks {
                 "Delete Key",
                 KeyCode.Backspace,
                 "Keybind for deleting the currently selected block");
-            SRApi.RegisterKey("方块破坏-切换", _toggleKey, "hold");
-            SRApi.RegisterKey("方块破坏-删除", _deleteKey, "press");
+            SRApi.RegisterKey("方块破坏-切换", _toggleKey, "hold", null, typeof(DestroyBlocks));
+            SRApi.RegisterKey("方块破坏-删除", _deleteKey, "press", null, typeof(DestroyBlocks));
             SRApi.RegisterPage("Destroy Blocks", "Normal", "普通", "Normal", 10, RenderNormalPage);
             _selectMode = _mp.Config.Bind(
                 "Destroy Blocks",

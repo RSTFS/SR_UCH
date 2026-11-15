@@ -307,7 +307,14 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
             Action<string, ConfigEntry<KeyCode>, string, Action> f = _registerKeyAction;
             if (f != null) f(name, entry, mode, action);
         }
+        // 带 impl 的重载：受模式限制的键位交给核心统一判定（不通过则不执行 + 节流提示）。
+        public static void RegisterKey(string name, ConfigEntry<KeyCode> entry, string mode, Action action, Type impl) {
+            Action<string, ConfigEntry<KeyCode>, string, Action, Type> f = _registerKeyActionGated;
+            if (f != null) f(name, entry, mode, action, impl);
+        }
         public static void SetKeyActionSink(Action<string, ConfigEntry<KeyCode>, string, Action> f) { _registerKeyAction = f; }
+        private static Action<string, ConfigEntry<KeyCode>, string, Action, Type> _registerKeyActionGated;
+        public static void SetKeyActionGatedSink(Action<string, ConfigEntry<KeyCode>, string, Action, Type> f) { _registerKeyActionGated = f; }
         public static bool ComboKeyDown(ConfigEntry<KeyCode> entry) { Func<ConfigEntry<KeyCode>, bool> f = _comboKeyDown; return f != null && f(entry); }
         public static bool ComboKeyHeld(ConfigEntry<KeyCode> entry) { Func<ConfigEntry<KeyCode>, bool> f = _comboKeyHeld; return f != null && f(entry); }
         public static void RenderSectionEntries(string section, Func<ConfigEntryBase, bool> filter) { Action<string, Func<ConfigEntryBase, bool>> f = _renderSectionEntries; if (f != null) f(section, filter); }

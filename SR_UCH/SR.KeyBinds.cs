@@ -587,14 +587,22 @@ public partial class SR {
             public string Name, Mode;
             public ConfigEntry<KeyCode> Entry;
             public Action Run;
+            public Type Impl;        // 受限功能的实现类型（null = 不受模式限制）
         }
         private static readonly List<KeyAct> _keyActs = new List<KeyAct>();
 
         public static void RegisterKeyAction(string name, ConfigEntry<KeyCode> entry, string mode, Action action) {
+            RegisterKeyAction(name, entry, mode, action, null);
+        }
+
+        // impl 非空 = 受模式限制：核心在派发前统一判定，不通过则不执行并给节流提示。
+        public static void RegisterKeyAction(string name, ConfigEntry<KeyCode> entry, string mode, Action action, Type impl) {
             if (entry == null || action == null) return;
             for (int i = 0; i < _keyActs.Count; i++)
-                if (ReferenceEquals(_keyActs[i].Entry, entry)) { _keyActs[i].Mode = mode ?? "press"; _keyActs[i].Run = action; _keyActs[i].Name = name; return; }
-            KeyAct a = new KeyAct(); a.Name = name; a.Mode = mode ?? "press"; a.Entry = entry; a.Run = action;
+                if (ReferenceEquals(_keyActs[i].Entry, entry)) {
+                    _keyActs[i].Mode = mode ?? "press"; _keyActs[i].Run = action; _keyActs[i].Name = name; _keyActs[i].Impl = impl; return;
+                }
+            KeyAct a = new KeyAct(); a.Name = name; a.Mode = mode ?? "press"; a.Entry = entry; a.Run = action; a.Impl = impl;
             _keyActs.Add(a);
         }
 
@@ -604,7 +612,10 @@ public partial class SR {
                 try {
                     if (a.Entry == null) continue;
                     bool fire = (a.Mode == "hold") ? ComboKeyHeld(a.Entry) : ComboKeyDown(a.Entry);
-                    if (fire && a.Run != null) a.Run();
+                    if (!fire || a.Run == null) continue;
+                    // 模式限制统一在这里判：受限功能在错误模式下不执行，并给一次提示。
+                    if (a.Impl != null && !GateFeatureForAction(a.Impl, a.Name)) continue;
+                    a.Run();
                 } catch (Exception __ex) { Guard.Log("键位动作 " + (a.Name ?? "?"), __ex); }
             }
         }

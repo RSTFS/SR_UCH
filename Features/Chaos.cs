@@ -211,10 +211,11 @@ namespace SR_UCH.Tweaks {
 
             SRApi.NetMagic.Register("chaos.signal", Magic);
             SRApi.NetMagic.Register("chaos.card", CardMagic);
+            // 模式限制由核心统一判定（见 SR.RegisterKey 的 impl 重载），这里只判房主与开关。
             SRApi.RegisterKey("混乱牌组-重抽", _drawKey, "press", delegate {
-                if (!IsAuthority || !ModeAllowed()) return;
+                if (!IsAuthority) return;
                 if (_enabled != null && _enabled.Value) DrawAndBroadcast();
-            });
+            }, typeof(Chaos));
 
             // 播报读本局启用的牌池（牌逐回合随机抽）。
             SRApi.LocSec(Sec, "混乱牌组", "Chaos Deck");
