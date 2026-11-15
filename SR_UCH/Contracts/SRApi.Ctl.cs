@@ -292,6 +292,10 @@ namespace SR_UCH {
             public static GUIStyle ChatLabel { get { return Style("ChatLabel"); } }
             public static GUIStyle ChatArea { get { return Style("ChatArea"); } }
             public static GUIStyle SecHeader { get { return Style("SecHeader"); } }
+            // 界面主题字体（独立浮层需要与主界面一致）。未注入时返回 null，调用方保持默认。
+            public static void SetUiFontSink(Func<Font> f) { _uiFont = f; }
+            private static Func<Font> _uiFont;
+            public static Font UiFont { get { Func<Font> f = _uiFont; return f != null ? f() : null; } }
         // 分区标题：宽度收缩到文字实际宽度，悬浮提示只在标题文字上生效。
         private static Func<string, string, float, float, bool> _button;
         public static void SetButtonSink(Func<string, string, float, float, bool> f) { _button = f; }

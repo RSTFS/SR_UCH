@@ -98,7 +98,7 @@ public partial class SR {
                 } catch (Exception) { return Sc(300f); }
             }
 
-            private static Font _floatFont = SR.UiFont;
+            private static Font _floatFont;
             internal static void SetFloatFont(Font f) { _floatFont = f; }
             private static bool _floatDrag;
             private static Vector2 _floatDragOff;

@@ -152,6 +152,8 @@ namespace SR_UCH.Tweaks {
             _joinGuardUntil = Time.unscaledTime + JoinGuardSeconds;
             DisarmWatchdog();
             if (InSession() || Matchmaker.CurrentMatchmakingLobby != null) {
+                // 已在房间里再点另一个房间：只发 LeaveLobby 会让 NetManager 处于"已初始化但未连接"的
+                // 半断开状态，之后的 JoinLobby 必定失败且原有会话彻底断掉。统一先回主界面再加入。
                 _pendingJoin = id;
                 _pendingIsJoin = true;   // 看门狗强制回主界面时保留这个目标
                 _pendingUseCode = useCode;
@@ -159,8 +161,7 @@ namespace SR_UCH.Tweaks {
                 _pendingNudged = false;
                 _pendingGiveUpAt = Time.unscaledTime + 15f;   // 等待离开旧房：留出"回主界面"兜底的时间
                 Notes("正在退出当前房间并在退出后加入", "Leaving the current session, then joining");
-            // 只做“离开当前房间”，不等主界面，省一趟场景加载。
-                LeaveCurrentForJoin();
+                EscalateToMainMenu("已在房间中切换");
                 return;
             }
             DoJoin(id, useCode);

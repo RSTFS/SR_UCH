@@ -104,6 +104,9 @@ namespace UnityEngine {
         public static T FindObjectOfType<T>() where T : Object { return null; }
     }
 
+    // 契约门面暴露 Font（浮层用主题字体），测试桩只需要类型存在。
+    public class Font : Object { }
+
     public class Camera : Object { }
 
     public static class Time {

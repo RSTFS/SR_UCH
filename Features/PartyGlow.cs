@@ -164,6 +164,8 @@ namespace SR_UCH.Tweaks {
                     if (tier < 0) { HideGlow(pb); continue; }
                     ApplyGlow(pb, tier);
                 }
+                // 被拿走的道具已不在 FrameObjects 结果里：按缓存反查，把残留光晕关掉。
+                SyncRemovedGlows(all);
                 if (_made.Count > 64) PruneMade();   // 跨局累积的已销毁条目
             } catch (Exception ex) { SRApi.Guard.Log("品质光芒/扫描", ex); }
         }
@@ -202,6 +204,41 @@ namespace SR_UCH.Tweaks {
             try { found = Holder(pb).Find(GlowName); } catch (Exception __gl) { SRApi.Guard.Log("品质光芒/光晕缓存", __gl); }
             if (found != null) { try { _glowById[pb.GetInstanceID()] = found; } catch (Exception __gl) { SRApi.Guard.Log("品质光芒/光晕缓存", __gl); } }
             return found;
+        }
+
+        // 光晕 → 道具 反查表（道具实例 ID），用于发现"道具已被拿走/销毁但光晕还在"。
+        private static readonly System.Collections.Generic.Dictionary<int, int> _glowOwner =
+            new System.Collections.Generic.Dictionary<int, int>();
+
+        // 遍历本帧所有仍在派对盒里的道具，其余缓存条目一律隐藏光晕并清缓存。
+        private static void SyncRemovedGlows(PickableBlock[] alive) {
+            try {
+                if (_glowById.Count == 0) return;
+                System.Collections.Generic.List<int> dead = null;
+                foreach (System.Collections.Generic.KeyValuePair<int, Transform> kv in _glowById) {
+                    bool still = false;
+                    if (kv.Value == null) still = false;
+                    else {
+                        for (int i = 0; i < alive.Length; i++) {
+                            PickableBlock pb = alive[i];
+                            if (pb == null || !pb.InPartybox) continue;
+                            if (pb.GetInstanceID() == kv.Key) { still = true; break; }
+                        }
+                    }
+                    if (still) continue;
+                    try {
+                        if (kv.Value != null) {
+                            SpriteRenderer sr = kv.Value.GetComponent<SpriteRenderer>();
+                            if (sr != null) sr.enabled = false;
+                            _made.Remove(kv.Value);
+                            UnityEngine.Object.Destroy(kv.Value.gameObject);
+                        }
+                    } catch (Exception __gd) { SRApi.Guard.Log("品质光芒/清理已拿走", __gd); }
+                    if (dead == null) dead = new System.Collections.Generic.List<int>();
+                    dead.Add(kv.Key);
+                }
+                if (dead != null) for (int i = 0; i < dead.Count; i++) _glowById.Remove(dead[i]);
+            } catch (Exception __ex) { SRApi.Guard.Log("品质光芒/同步已拿走", __ex); }
         }
 
         private static Transform Holder(PickableBlock pb) {
@@ -325,6 +362,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void RemoveAll() {
+            try { _glowById.Clear(); _glowOwner.Clear(); } catch (Exception __rc) { SRApi.Guard.Log("品质光芒/清缓存", __rc); }
             // 首选弱登记：帧对象缓存为空（关功能瞬间/道具重建前）时也能清干净。
             try {
                 for (int i = _made.Count - 1; i >= 0; i--) {

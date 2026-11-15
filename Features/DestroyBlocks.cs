@@ -435,7 +435,7 @@ namespace SR_UCH.Tweaks {
 
                 if (Blocks.Count <= 0) return;
                 // 刚用滚轮换过目标：不要再用"上一帧选中项"把它拉回去（否则表现为切一下就弹回）。
-                Placeable prev = (Time.unscaledTime - _wheelPickAt < 0.5f) ? _wheelPicked : _selected;
+                Placeable prev = (Time.unscaledTime - _wheelPickAt < 1.5f) ? _wheelPicked : _selected;
                 if (prev != null) {
                     for (int i = 0; i < Blocks.Count; i++) {
                         if (Blocks[i] == prev) { _index = i; break; }
@@ -479,7 +479,7 @@ namespace SR_UCH.Tweaks {
                 if (_index >= Blocks.Count) _index = 0;
                 if (_index < 0) _index = Blocks.Count - 1;
                 _selected = Blocks[_index];
-                if (Time.unscaledTime - _wheelPickAt < 0.5f) _wheelPicked = _selected;
+                if (Time.unscaledTime - _wheelPickAt < 1.5f) _wheelPicked = _selected;
                 if (_selected != _tintedBlock) {
                     ClearTintGroup();
                     TintGroup(_selected);
@@ -581,7 +581,10 @@ namespace SR_UCH.Tweaks {
         // 重建候选表并按引用找回选中项：否则高亮会乱跳；异常须兜住。
         private static void RefreshListKeepSelection() {
           try {
-            Placeable prev = (_selected != null ? _selected : _tintedBlock);
+            // 滚轮刚换过目标：以滚轮选中的方块为准恢复下标（否则列表重建会把选中项拉回旧目标）。
+            Placeable prev = (Time.unscaledTime - _wheelPickAt < 1.5f && _wheelPicked != null)
+                ? _wheelPicked
+                : (_selected != null ? _selected : _tintedBlock);
             // 选中项已被标记销毁时不可再高亮（AddBombTint 对已销毁对象会抛异常）
             if (prev != null && prev.MarkedForDestruction) prev = null;
             RebuildList();
@@ -597,7 +600,7 @@ namespace SR_UCH.Tweaks {
             }
             if (prev != null) {
                 for (int i = 0; i < Blocks.Count; i++) {
-                    if (Blocks[i] == prev) { _index = i; _selected = Blocks[i]; return; }
+                    if (Blocks[i] == prev) { _index = i; _selected = Blocks[i]; if (prev == _wheelPicked) _wheelPicked = Blocks[i]; return; }
                 }
             }
             // 选中项已不在列表：就地钳制同一下标，跳到头/尾会让选中项乱飞。

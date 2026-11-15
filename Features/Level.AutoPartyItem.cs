@@ -51,7 +51,7 @@ public class AutoPartyItem : ITweak {
 
     private static void Tick() {
         try {
-            TickHoverPick();   // 挑选流程每帧推进（它自己有节流），不能被下面的 0.15s 轮询挡住
+            // 挑选已改为一次性下发，不需要逐帧推进悬停状态。
             // 先判总开关：关闭时不做每帧全场景查找。
             if (_enabled == null || !_enabled.Value) { _armedAt = -1f; return; }
             if (!SRApi.GateMaster) return;
@@ -64,14 +64,10 @@ public class AutoPartyItem : ITweak {
             if (Time.unscaledTime < LevelPartyBox.BoxBusyUntil) { _armedAt = -1f; return; }
             _nextAt = Time.unscaledTime + 0.15f;   // 轮询节流：不抢游戏自己的逻辑，也不每帧全场景找
 
-            PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
-            if (pb == null) { _armedAt = -1f; return; }
-            bool active = false;
-            try { active = pb.IsStillActive; } catch (Exception __ac) { SRApi.Guard.Log("自动道具/盒状态", __ac); }
-            if (!active) { _armedAt = -1f; return; }
-
             PartyPickCursor cur = seen;
             if (cur == null) { _armedAt = -1f; return; }
+            // 光标处于挑选态就说明盒子开着：不强依赖 PartyBox 实例（跨房/重建时可能取不到或状态过期）。
+            PartyBox pb = UnityEngine.Object.FindObjectOfType<PartyBox>();
             if (_pickedSeq == _openSeq) return;      // 本次开箱已经自动挑过
             if (_armedAt < 0f) { _armedAt = Time.unscaledTime; return; }
             float delay = _delay != null ? Mathf.Clamp(_delay.Value, 0f, 3f) : 0.5f;
@@ -100,12 +96,23 @@ public class AutoPartyItem : ITweak {
         return null;
     }
 
+    // 候选道具：优先读 PartyBox.pieces；反射失败时退回"场景里在派对盒内的道具"。
     private static List<PickableBlock> ReadPieces(PartyBox pb) {
         try {
             if (_fPieces == null) _fPieces = SRApi.Ref.Field(typeof(PartyBox), "pieces", "派对盒自动道具（候选列表）");
-            if (_fPieces == null) return null;
-            return _fPieces.GetValue(pb) as List<PickableBlock>;
-        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/读取候选", __ex); return null; }
+            List<PickableBlock> list = _fPieces != null ? _fPieces.GetValue(pb) as List<PickableBlock> : null;
+            if (list != null && list.Count > 0) return list;
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/读取候选", __ex); }
+        try {
+            PickableBlock[] all = SRApi.FrameObjects<PickableBlock>();
+            if (all == null) return null;
+            List<PickableBlock> scan = new List<PickableBlock>();
+            for (int i = 0; i < all.Length; i++) {
+                PickableBlock b = all[i];
+                if (b != null && b.InPartybox) scan.Add(b);
+            }
+            return scan;
+        } catch (Exception __sc) { SRApi.Guard.Log("自动道具/扫描候选", __sc); return null; }
     }
 
     private static PickableBlock Choose(PartyBox pb, List<PickableBlock> pieces) {
@@ -140,12 +147,29 @@ public class AutoPartyItem : ITweak {
     // 走游戏 tryPickPiece 链路：Picking=false → 记 NetworkpickedPiece →（有权威才）发
     // PiecePicked → Freeze → Disable()。顺序不可变，否则房主端判为无效挑选。
     // 故光标须先悬停在道具上：游戏靠碰撞体算 hoveredPick，并从中取 netIdValue。
+    // 直接走游戏自己的挑选结果链路：写 NetworkpickedPiece + 发 MsgPiecePicked + 冻结/关闭光标。
+    // 这与手动点选后 tryPickPiece 的做法一致，不依赖 hoveredPick（物理触发）或反射写悬停字段，
+    // 房主与房客都能用。
     private static bool DoPick(PartyPickCursor cur, PickableBlock target) {
         try {
             if (cur == null || target == null) return false;
-            _hpCur = cur; _hpTarget = target; _hpStage = 1; _hpAt = Time.unscaledTime + 0.06f;
+            var nm = UnityEngine.Networking.NetworkManager.singleton;
+            if (nm == null || nm.client == null) return false;
+            cur.Picking = false;
+            try {
+                cur.NetworkpickedPiece = UnityEngine.Networking.ClientScene.FindLocalObject(
+                    new UnityEngine.Networking.NetworkInstanceId(target.netIdValue));
+            } catch (Exception __np) { SRApi.Guard.Log("自动道具/写选中项", __np); }
+            if (cur.hasAuthority) {
+                MsgPiecePicked msg = new MsgPiecePicked();
+                msg.PickableNetID = target.netIdValue;
+                msg.PlayerNumber = cur.networkNumber;
+                nm.client.Send(NetMsgTypes.PiecePicked, msg);
+            }
+            try { cur.Freeze(); cur.Disable(); } catch (Exception __fd) { SRApi.Guard.Log("自动道具/关闭光标", __fd); }
+            SRApi.LogInfo("[自动道具] 已挑选：" + target.name);
             return true;
-        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/启动悬停挑选", __ex); return false; }
+        } catch (Exception __ex) { SRApi.Guard.Log("自动道具/挑选", __ex); return false; }
     }
 
     // 每帧推进：优先直接写 hoveredPick 并同栈启动协程，失败才复刻手动挑选。
