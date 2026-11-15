@@ -133,6 +133,14 @@ public partial class Experiments : ITweak
             } catch (Exception __ex) { SRApi.Guard.Log("清 SkipBool", __ex); }
         }
 
+        // 游戏用 while (State != SHOW) 等遮罩：若对象被停用过（含旧版本遗留），加载会永久卡住。
+        // 这里在拿到遮罩时确保它是 active 的。
+        internal static void EnsureSplashActive(UISplashScreen sp) {
+            try {
+                if (sp != null && sp.gameObject != null && !sp.gameObject.activeSelf) sp.gameObject.SetActive(true);
+            } catch (Exception __es) { SRApi.Guard.Log("关闭遮罩/恢复激活", __es); }
+        }
+
         // Instance 为空时才回退全场景扫描，回退路径 15 帧节流。
         private static int _splashScanAt = -9999;
         private static LoadingInterstitialSplash FindSplash() {
@@ -146,6 +154,7 @@ public partial class Experiments : ITweak
         internal static void CloseMaskNow() {
             try {
                 LoadingInterstitialSplash sp = FindSplash();
+                EnsureSplashActive(sp);
                 if (sp == null) {
                     Note = SRApi.T("当前没有遮罩", "No mask on screen");
                     SRApi.Notify(SRApi.T("当前没有遮罩", "No mask on screen"));
@@ -161,14 +170,26 @@ public partial class Experiments : ITweak
                 try { ClearSkip(sp); } catch (Exception __cs) { SRApi.Guard.Log("关闭遮罩/清SkipBool", __cs); }
                 if (_closeLoadUi != null && _closeLoadUi.Value) {
                     CloseLoadingUi();
-                    // 连 splash 根对象一起停用，动画音效不再推进。
-                    try { if (sp != null && sp.gameObject != null) sp.gameObject.SetActive(false); }
-                    catch (Exception __sa) { SRApi.Guard.Log("关闭遮罩/关闭加载动画", __sa); }
+                    HideSplashVisuals(sp);
                 }
                 Note = closed ? SRApi.T("已关闭一次遮罩", "Mask closed once")
                               : SRApi.T("遮罩不在可关闭状态", "Mask is not in a closable state");
                 SRApi.LogInfo("[实验.场景] " + Note);
             } catch (Exception __ex) { SRApi.Guard.Log("关闭遮罩", __ex); }
+        }
+
+        // 隐藏加载动画的"画面"但**保留对象与状态机**：
+        // 游戏用 `while (State != SHOW) yield return null` 等遮罩；一旦 SetActive(false)，
+        // 该对象的 Update 不再执行、State 永远到不了 SHOW → 返回主界面/加载协程永久卡住。
+        // 所以只把可见元素透明化（CanvasGroup/Images/Texts 均为 public 字段）。
+        internal static void HideSplashVisuals(UISplashScreen sp) {
+            CanvasSplash cs = sp as CanvasSplash;
+            if (cs == null) return;
+            try {
+                if (cs.CanvasGroup != null) cs.CanvasGroup.alpha = 0f;
+                if (cs.Images != null) for (int i = 0; i < cs.Images.Count; i++) if (cs.Images[i] != null) { Color c = cs.Images[i].color; c.a = 0f; cs.Images[i].color = c; }
+                if (cs.Texts != null) for (int i = 0; i < cs.Texts.Count; i++) if (cs.Texts[i] != null) { Color c = cs.Texts[i].color; c.a = 0f; cs.Texts[i].color = c; }
+            } catch (Exception __hv) { SRApi.Guard.Log("关闭遮罩/隐藏动画画面", __hv); }
         }
 
         // 顺带隐藏平板加载界面；不会加快加载，可能看起来像卡住。

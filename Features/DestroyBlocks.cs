@@ -17,8 +17,9 @@ namespace SR_UCH.Tweaks {
         private static IFeatureHost _mp; // 仅用于读 Config（契约类型）
         private static int _index;
         private static int _wheelFrame = -1;   // 上一帧吃掉滚轮的帧号（防同帧多次加）
-        private static float _wheelPickAt = -1f;   // 最近一次滚轮换目标的时刻（这段时间内不让"跟随旧选中项"覆盖）
-        private static Placeable _wheelPicked;     // 滚轮选中的方块（用于刷新后重新定位）
+        // 本次"按住切换键"会话里是否已经用滚轮选过：选过之后选中项完全由滚轮决定，
+        // 不再按"上一帧选中项"重定位（那正是"切一下就弹回"的原因）。松开切换键即清除。
+        private static bool _wheelPickedThisHold;
         private static List<Placeable> Blocks = new List<Placeable>();
         private static bool _altDown;
         private static Placeable _selected;
@@ -417,6 +418,7 @@ namespace SR_UCH.Tweaks {
             bool canDestroy = SRApi.CanControlLocally || AllowClientsOn;
             if (SRApi.ComboKeyDown(_toggleKey)) {
                 _altDown = true;
+                _wheelPickedThisHold = false;   // 新的一次触发：从默认选中开始，滚轮重新接管
                 RebuildList();
                 _lastListRebuildAt = Time.unscaledTime;
                 _listDirty = false;
@@ -435,10 +437,13 @@ namespace SR_UCH.Tweaks {
 
                 if (Blocks.Count <= 0) return;
                 // 刚用滚轮换过目标：不要再用"上一帧选中项"把它拉回去（否则表现为切一下就弹回）。
-                Placeable prev = (Time.unscaledTime - _wheelPickAt < 1.5f) ? _wheelPicked : _selected;
-                if (prev != null) {
-                    for (int i = 0; i < Blocks.Count; i++) {
-                        if (Blocks[i] == prev) { _index = i; break; }
+                // 滚轮一旦选过，本次按住期间不再跟随旧选中项（否则滚轮结果会被立刻拉回）。
+                if (!_wheelPickedThisHold) {
+                    Placeable prev = _selected;
+                    if (prev != null) {
+                        for (int i = 0; i < Blocks.Count; i++) {
+                            if (Blocks[i] == prev) { _index = i; break; }
+                        }
                     }
                 }
                 if (_index < 0 || _index >= Blocks.Count) _index = Blocks.Count - 1;
@@ -472,14 +477,13 @@ namespace SR_UCH.Tweaks {
                     if (wheel != 0f) {
                         _wheelFrame = Time.frameCount;
                         _index += wheel > 0f ? 1 : -1;
-                        _wheelPickAt = Time.unscaledTime;
+                        _wheelPickedThisHold = true;
                         SRApi.MarkWheelUsed(); // 滚轮已被选块器吃掉，地图/自由相机让路
                     }
                 }
                 if (_index >= Blocks.Count) _index = 0;
                 if (_index < 0) _index = Blocks.Count - 1;
                 _selected = Blocks[_index];
-                if (Time.unscaledTime - _wheelPickAt < 1.5f) _wheelPicked = _selected;
                 if (_selected != _tintedBlock) {
                     ClearTintGroup();
                     TintGroup(_selected);
@@ -491,6 +495,7 @@ namespace SR_UCH.Tweaks {
             else if(_altDown)
             {
                 _altDown = false;
+                _wheelPickedThisHold = false;
                 if (_tintedBlock != null) {
                     ClearTintGroup();   // 整组清除（含子件）
                 }
@@ -581,10 +586,8 @@ namespace SR_UCH.Tweaks {
         // 重建候选表并按引用找回选中项：否则高亮会乱跳；异常须兜住。
         private static void RefreshListKeepSelection() {
           try {
-            // 滚轮刚换过目标：以滚轮选中的方块为准恢复下标（否则列表重建会把选中项拉回旧目标）。
-            Placeable prev = (Time.unscaledTime - _wheelPickAt < 1.5f && _wheelPicked != null)
-                ? _wheelPicked
-                : (_selected != null ? _selected : _tintedBlock);
+            // 滚轮选过的方块就是当前选中项（_selected 已由按下标维护），列表重建时按它重新定位。
+            Placeable prev = (_selected != null ? _selected : _tintedBlock);
             // 选中项已被标记销毁时不可再高亮（AddBombTint 对已销毁对象会抛异常）
             if (prev != null && prev.MarkedForDestruction) prev = null;
             RebuildList();
@@ -600,7 +603,7 @@ namespace SR_UCH.Tweaks {
             }
             if (prev != null) {
                 for (int i = 0; i < Blocks.Count; i++) {
-                    if (Blocks[i] == prev) { _index = i; _selected = Blocks[i]; if (prev == _wheelPicked) _wheelPicked = Blocks[i]; return; }
+                    if (Blocks[i] == prev) { _index = i; _selected = Blocks[i]; return; }
                 }
             }
             // 选中项已不在列表：就地钳制同一下标，跳到头/尾会让选中项乱飞。
