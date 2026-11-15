@@ -15,7 +15,7 @@ public partial class SR {
         }
             // 浮层绘制：统一走核心 FloatWindow（拖动 / 关闭 / 点外部关闭 / 字体 / 鼠标位置定位）。
         internal static void DrawFloat() {
-            if (!FloatOpen) { FloatWindow.Close(); return; }
+            if (!FloatOpen) { SRApi.Ctl.FloatClose(); return; }
             if (!FloatWindow.IsOpen) {
                 FloatWindow.Open(SRApi.T("调色板", "Palette"), new Vector2(440f, FloatHeight(440f) / Mathf.Max(0.0001f, Sc(1f))), DrawFloatContent, OnFloatClosed);
             }
@@ -38,7 +38,7 @@ public partial class SR {
 
         private static void DrawFloatContent() {
             State s;
-            if (OpenEntry == null || !_states.TryGetValue(OpenEntry, out s) || !s.Open) { FloatWindow.Close(); return; }
+            if (OpenEntry == null || !_states.TryGetValue(OpenEntry, out s) || !s.Open) { SRApi.Ctl.FloatClose(); return; }
             try { DrawPanel(OpenEntry, s); } catch (Exception __ex) { Guard.Log("调色板浮层/内容", __ex); }
         }
 

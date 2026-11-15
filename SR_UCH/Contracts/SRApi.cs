@@ -202,6 +202,21 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         private static Func<Type, bool> _featureAllowed;
         private static Func<string> _envSceneName;
         private static Func<bool> _envInTreehouse;
+        // 主面板是否打开（一类浮窗只能由面板内触发）。
+        private static Func<bool> _uiVisible;
+        public static void SetUiVisibleSink(Func<bool> f) { _uiVisible = f; }
+        public static bool Visible { get { Func<bool> f = _uiVisible; return f != null && f(); } }
+        // 二类独立窗口（主面板关闭也要画）的绘制注入：核心不认识具体功能。
+        private static readonly List<Action> _standaloneDrawers = new List<Action>();
+        public static void RegisterStandaloneDrawer(Action draw) {
+            if (draw == null) return;
+            if (!_standaloneDrawers.Contains(draw)) _standaloneDrawers.Add(draw);
+        }
+        public static void RunStandaloneDrawers() {
+            for (int i = 0; i < _standaloneDrawers.Count; i++) {
+                try { _standaloneDrawers[i](); } catch (Exception) { /* 单个窗口失败不影响其它 */ }
+            }
+        }
         public static void SetGateSinks(Func<int, bool> gateModeAllows, Func<string> envSceneName, Func<bool> envInTreehouse) {
             _gateModeAllows = gateModeAllows; _envSceneName = envSceneName; _envInTreehouse = envInTreehouse;
         }

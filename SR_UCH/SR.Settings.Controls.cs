@@ -108,10 +108,15 @@ namespace SR_UCH.Tweaks {
             object val = entry.BoxedValue;
             if (val is bool) {
                 bool b = (bool)val;
+                // 当前模式不支持时置灰且不可勾选（例：自由相机只在自由模式可用）。
+                bool allowed = Ctl.RowAllowed(entry);
+                bool prevEnabled = GUI.enabled;
+                if (!allowed) GUI.enabled = false;
                 // 复选框只负责开关（左键切换），快捷键绑定走其左侧标签。
                 if (GUILayout.Button(b && CheckTex == null ? "✓" : "", b ? _checkOn : _checkOff, GUILayout.Width(CtlH()), GUILayout.Height(Sc(26)))) {
                     SetValue(entry, !b);
                 }
+                if (!allowed) GUI.enabled = prevEnabled;
                 // 勾贴图叠画在复选框上，贴图缺失时回退字形。
                 if (b && CheckTex != null) {
                     Rect __ckr = GUILayoutUtility.GetLastRect();

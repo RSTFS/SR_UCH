@@ -45,7 +45,7 @@ public partial class SR {
             try {
                 GUI.matrix = Matrix4x4.identity;
                 if (SRApi.Ctl.UiFont != null) GUI.skin.font = SRApi.Ctl.UiFont;
-                FreePlayMap.Draw();
+                SRApi.RunStandaloneDrawers();
             } finally {
                 GUI.matrix = prevM; GUI.color = prev; GUI.skin.font = prevF; GUI.depth = prevD;
             }
@@ -87,8 +87,10 @@ public partial class SR {
         internal static void Draw() {
             if (!IsOpen || _onDraw == null) return;
             try {
-                float w = Mathf.Min(SR.Ctl.Sc(_size.x), Screen.width - SR.Ctl.Sc(16f));
-                float h = Mathf.Min(SR.Ctl.Sc(_size.y), Screen.height - SR.Ctl.Sc(16f));
+                // 自适应：设计尺寸是"建议值"，同时夹到屏幕内并保留最小可用尺寸。
+                float minW = SR.Ctl.Sc(220f), minH = SR.Ctl.Sc(120f);
+                float w = Mathf.Clamp(SR.Ctl.Sc(_size.x), minW, Mathf.Max(minW, Screen.width - SR.Ctl.Sc(16f)));
+                float h = Mathf.Clamp(SR.Ctl.Sc(_size.y), minH, Mathf.Max(minH, Screen.height - SR.Ctl.Sc(16f)));
                 if (!_placed) {
                     _placed = true;
                     // 左上角 = 鼠标点击处（输入坐标是左下原点，GUI 用左上原点）。
@@ -98,14 +100,16 @@ public partial class SR {
                 Rect.width = w; Rect.height = h;
 
                 Event e = Event.current;
-                Rect title = new Rect(Rect.x, Rect.y, w, SR.Ctl.Sc(26f));
-                Rect close = new Rect(title.xMax - SR.Ctl.Sc(30f), title.y + SR.Ctl.Sc(3f), SR.Ctl.Sc(24f), SR.Ctl.Sc(20f));
+                Rect title = new Rect(Rect.x, Rect.y, w, SR.Ctl.Sc(30f));
+                Rect close = new Rect(title.xMax - SR.Ctl.Sc(32f), title.y + SR.Ctl.Sc(4f), SR.Ctl.Sc(26f), SR.Ctl.Sc(22f));
                 if (e != null) {
                     Vector2 mp = e.mousePosition;
                     if (e.type == EventType.MouseDown && e.button == 0) {
                         if (close.Contains(mp)) { Close(); e.Use(); return; }
-                        if (title.Contains(mp)) { _dragging = true; _dragOff = mp - new Vector2(Rect.x, Rect.y); e.Use(); }
-                        else if (!Rect.Contains(mp) && CloseOnOutsideClick) { Close(); e.Use(); return; }
+                        if (Rect.Contains(mp)) {
+                            // 窗口内按下即视为拖动（内容区控件会自己消费 MouseDown，不会走到这里）。
+                            _dragging = true; _dragOff = mp - new Vector2(Rect.x, Rect.y); e.Use();
+                        } else if (CloseOnOutsideClick) { Close(); e.Use(); return; }
                     } else if (e.type == EventType.MouseDrag && _dragging) {
                         Rect.x = mp.x - _dragOff.x; Rect.y = mp.y - _dragOff.y; e.Use();
                     } else if (e.type == EventType.MouseUp && _dragging) { _dragging = false; e.Use(); }
@@ -117,18 +121,18 @@ public partial class SR {
                 Font prevFont = GUI.skin.font;
                 int prevDepth = GUI.depth;
                 try {
-                    GUI.depth = -1000;                    // 压在主窗口与其他覆盖层之上
+                    GUI.depth = -1000;                    // 高于 SR 主窗口一层（主窗口为默认 0）
                     Font f = SRApi.Ctl.UiFont;
                     if (f != null) GUI.skin.font = f;
                     GUI.Box(Rect, GUIContent.none, SR.Ctl.Footer);
-                    GUI.Label(new Rect(title.x + SR.Ctl.Sc(10f), title.y + SR.Ctl.Sc(4f), w - SR.Ctl.Sc(48f), SR.Ctl.Sc(20f)),
+                    GUI.Label(new Rect(title.x + SR.Ctl.Sc(10f), title.y + SR.Ctl.Sc(5f), w - SR.Ctl.Sc(50f), SR.Ctl.Sc(22f)),
                         Title, SR.Ctl.SecHeader);
                     if (GUI.Button(close, "×", SR.Ctl.Btn)) { Close(); return; }
-                    GUI.BeginGroup(new Rect(Rect.x + SR.Ctl.Sc(10f), Rect.y + SR.Ctl.Sc(30f), w - SR.Ctl.Sc(20f), h - SR.Ctl.Sc(38f)));
+                    GUI.BeginGroup(new Rect(Rect.x + SR.Ctl.Sc(10f), Rect.y + SR.Ctl.Sc(34f), w - SR.Ctl.Sc(20f), h - SR.Ctl.Sc(42f)));
                     try { _onDraw(); } finally { GUI.EndGroup(); }
                     // 自绘光标：浮窗在最上层，光标必须更靠上才看得见。
                     if (e != null) {
-                        Texture2D cur = SR.CursorTexture;
+                        Texture2D cur = SRApi.Ctl.CursorTexture;
                         if (cur != null) {
                             GUI.depth = -2000;
                             Color c = GUI.color;

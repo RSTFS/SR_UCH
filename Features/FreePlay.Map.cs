@@ -10,7 +10,10 @@ namespace SR_UCH.Tweaks {
         private const string Sec = "自由模式";
 
         private static ConfigEntry<bool> _enabled;
-        private static ConfigEntry<KeyCode> _openKey;   // 地图开关快捷键
+        private static ConfigEntry<KeyCode> _openKey;          // 地图开关快捷键
+        private static ConfigEntry<bool> _freezeChar;          // 地图打开时冻结角色
+        private static ConfigEntry<bool> _teleportWithKey;     // 允许用快捷键传送
+        private static ConfigEntry<KeyCode> _teleportKey;      // 传送快捷键
         private const float BaseFov = 10f;              // 基准取景视野
         private static float _fov = BaseFov;            // 当前视野（仅运行期，滚轮调，重开归位）
         private static bool _open;
@@ -45,17 +48,36 @@ namespace SR_UCH.Tweaks {
             try {
                 _enabled = plugin.Config.Bind(Sec, "Map Enabled", false,
                 "自由模式地图：启用后可在自由模式页打开俯视地图。");
+                _freezeChar = plugin.Config.Bind(Sec, "Map Freeze Character", true,
+                    "冻结角色：地图打开期间角色不移动（仅打开地图时生效）。");
+                _teleportWithKey = plugin.Config.Bind(Sec, "Map Teleport Key Enabled", true,
+                    "传送快捷键：允许用快捷键把角色传送到光标处（仅地图打开时）。");
+                _teleportKey = plugin.Config.Bind(Sec, "Map Teleport Key", KeyCode.T,
+                    "地图内传送快捷键（默认 T）：地图打开时把角色传送到光标处。");
                 _openKey = plugin.Config.Bind(Sec, "Map Key", KeyCode.M,
                     "地图开关快捷键（默认 M）：在地图外的任何地方按一下打开/关闭俯视地图。");
                 SRApi.LocKey(Sec, "Map Enabled", "启用地图", "Enable map");
                 SRApi.LocDesc(Sec, "Map Enabled",
                     "启用自由模式地图\n打开后俯视查看整张关卡\n仅自由模式可用",
                     "enable the freeplay map\noverhead view of the whole level\nfreeplay only");
+                SRApi.LocKey(Sec, "Map Freeze Character", "冻结角色", "Freeze character");
+                SRApi.LocDesc(Sec, "Map Freeze Character",
+                    "冻结角色\n地图打开期间角色不能移动\n仅打开地图时生效",
+                    "freeze character\nstops your character while the map is open\nonly while the map is open");
+                SRApi.LocKey(Sec, "Map Teleport Key Enabled", "传送快捷键", "Teleport hotkey");
+                SRApi.LocDesc(Sec, "Map Teleport Key Enabled",
+                    "传送快捷键\n地图打开时按快捷键把角色传送到光标处\n关闭后只能用右键菜单传送",
+                    "teleport hotkey\nwhile the map is open, press the key to teleport to the cursor\nwhen off, use the right-click menu");
+                SRApi.LocKey(Sec, "Map Teleport Key", "传送快捷键", "Teleport key");
+                SRApi.LocDesc(Sec, "Map Teleport Key",
+                    "地图内传送快捷键\n地图打开时把角色传送到光标处\n默认 T，可改绑",
+                    "in-map teleport key\nteleports to the cursor while the map is open\ndefault T, rebindable");
                 SRApi.LocKey(Sec, "Map Key", "地图快捷键", "Map hotkey");
                 SRApi.LocDesc(Sec, "Map Key",
                     "地图开关快捷键\n按一下打开/关闭俯视地图\n默认 M；右键按钮可改绑",
                     "map open/close hotkey\nopens or closes the overhead map\ndefault M; right-click the button to rebind");
                 SRApi.RegisterTick("自由模式-地图", Tick);
+                SRApi.RegisterStandaloneDrawer(Draw);   // 二类独立窗口：主面板关闭也画
                 // 快捷键：地图外任意位置按一下开关（不需要打开 SR 面板）。
                 // 仅地图使用 M：按一下开/关俯视地图；不影响其它界面。
                 SRApi.RegisterKey("自由模式-地图开关", _openKey, "press", delegate {
@@ -81,7 +103,6 @@ namespace SR_UCH.Tweaks {
                 _fov = BaseFov;
                 _open = true;
                 _menuOpen = false;
-                Toast(SRApi.T("地图已打开：拖动平移 · 滚轮缩放 · 右键菜单", "Map open: drag to pan · wheel to zoom · right-click for actions"));
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式地图/打开", __ex); }
         }
 
@@ -145,9 +166,40 @@ namespace SR_UCH.Tweaks {
             _camSaved = false;
         }
 
+        // 冻结角色：地图打开期间把本地角色的输入/速度压住（不改游戏全局，只在本机生效）。
+        private static void ApplyFreeze() {
+            try {
+                if (!_open || _freezeChar == null || !_freezeChar.Value) return;
+                foreach (Character c in Character.AllCharacters) {
+                    if (c == null || !c.hasAuthority) continue;
+                    Rigidbody2D rb = c.GetComponent<Rigidbody2D>();
+                    if (rb != null) rb.velocity = Vector2.zero;
+                    break;
+                }
+            } catch (Exception __fr) { SRApi.Guard.Log("地图/冻结角色", __fr); }
+        }
+
+        // 传送快捷键：地图打开时把角色放到光标处。
+        private static void TickTeleportKey() {
+            try {
+                if (!_open || _teleportWithKey == null || !_teleportWithKey.Value) return;
+                if (_teleportKey == null || _teleportKey.Value == KeyCode.None) return;
+                if (!Input.GetKeyDown(_teleportKey.Value)) return;
+                Camera cam = GameCamera();
+                if (cam == null) return;
+                Vector2 world = ScreenToWorld(cam, Event.current != null ? Event.current.mousePosition : (Vector2)Input.mousePosition);
+                SpawnPointTools.TeleportLocal(world);
+                Toast(SRApi.T("已传送到光标处", "Teleported to the cursor"));
+            } catch (Exception __tk) { SRApi.Guard.Log("地图/传送快捷键", __tk); }
+        }
+
+        internal static ConfigEntry<KeyCode> TeleportKeyEntry { get { return _teleportKey; } }
+
         private static void Tick() {
             try {
                 if (!_open) return;
+                ApplyFreeze();
+                TickTeleportKey();
                 if (!SRApi.FeatureAllowed(typeof(FreePlayPage))) { Close(); return; }
                 UpdateBounds();
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式地图/每帧", __ex); }
@@ -233,6 +285,40 @@ namespace SR_UCH.Tweaks {
             return new Vector2(sp.x, Screen.height - sp.y);
         }
 
+        private const float CharacterBoxSize = 1.0f;   // 角色大致占 1 个单位
+
+        // 世界尺寸换算成屏幕像素（透视相机按距离与 FOV）。
+        private static float WorldSizeToPx(Camera cam, Vector3 world, float worldSize) {
+            try {
+                if (cam.orthographic) return worldSize / (2f * Mathf.Max(0.1f, cam.orthographicSize)) * Screen.height;
+                float dist = Vector3.Distance(cam.transform.position, world);
+                float halfH = dist * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+                return worldSize / (2f * Mathf.Max(0.01f, halfH)) * Screen.height;
+            } catch (Exception) { return Sc(8f); }
+        }
+
+        // 方框描边（四条细线，比方块更轻、不遮挡）。
+        private static void DrawBox(Rect r, float t) {
+            if (r.width <= 1f || r.height <= 1f) return;
+            GUI.DrawTexture(new Rect(r.x, r.y, r.width, t), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(r.x, r.yMax - t, r.width, t), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(r.x, r.y, t, r.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(r.xMax - t, r.y, t, r.height), Texture2D.whiteTexture);
+        }
+
+        // 自绘光标（游戏隐藏系统光标；地图可能在 SR 面板之上/之下，需自己画）。
+        private static void DrawCursor(Event e) {
+            try {
+                if (e == null) return;
+                Texture2D cur = SRApi.Ctl.CursorTexture;
+                if (cur == null) return;
+                Color c = GUI.color;
+                GUI.color = Color.white;
+                GUI.DrawTexture(new Rect(e.mousePosition.x - Sc(7f), e.mousePosition.y - Sc(7f), Sc(15f), Sc(15f)), cur);
+                GUI.color = c;
+            } catch (Exception) { /* 光标绘制失败不影响地图 */ }
+        }
+
         private static void Toast(string s) { _toast = s ?? ""; _toastUntil = Time.unscaledTime + 2f; }
 
         // 覆盖层：顶栏 + 标记 + 交互 + 右键菜单。画在主窗口之上。
@@ -247,24 +333,25 @@ namespace SR_UCH.Tweaks {
                 Font prevFont = GUI.skin.font;
                 try { if (SRApi.Ctl.UiFont != null) GUI.skin.font = SRApi.Ctl.UiFont; } catch (Exception) { /* 字体不可用时用默认 */ }
                 try {
-                    GUI.depth = -900;   // 压在主窗口之上
+                    GUI.depth = 100;   // 画在 SR 主窗口之下（SR 用默认 0）：两者可同时存在、互不遮挡操作
                     // 顶栏
-                    Rect bar = new Rect(0f, 0f, Screen.width, Sc(26f));
+                    float barH = Sc(34f);
+                    Rect bar = new Rect(0f, 0f, Screen.width, barH);
                     GUI.Box(bar, GUIContent.none, SRApi.Ctl.Footer);
-                    GUI.Label(new Rect(Sc(10f), Sc(3f), Sc(80f), Sc(20f)), SRApi.T("地图", "Map"), SRApi.Ctl.SecHeader);
-                    GUI.Label(new Rect(Sc(60f), Sc(4f), Screen.width - Sc(160f), Sc(20f)),
+                    GUI.Label(new Rect(Sc(10f), Sc(6f), Sc(80f), Sc(22f)), SRApi.T("地图", "Map"), SRApi.Ctl.SecHeader);
+                    GUI.Label(new Rect(Sc(64f), Sc(9f), Mathf.Max(Sc(120f), Screen.width - Sc(340f)), Sc(20f)),
                         SRApi.T("左键拖动平移 · 滚轮缩放 · 右键操作", "drag to pan · wheel to zoom · right-click for actions"), SRApi.Ctl.Label);
                     // 右侧：视野读数 + 重置视图 + 关闭
                     float __fovNow = _fov;
-                    GUI.Label(new Rect(Screen.width - Sc(196f), Sc(4f), Sc(74f), Sc(20f)), "FOV " + __fovNow.ToString("0.0"), SRApi.Ctl.Label);
-                    if (GUI.Button(new Rect(Screen.width - Sc(118f), Sc(3f), Sc(80f), Sc(20f)), SRApi.T("重置视图", "Reset view"), SRApi.Ctl.Btn)) {
+                    GUI.Label(new Rect(Screen.width - Sc(200f), Sc(7f), Sc(78f), Sc(20f)), "FOV " + __fovNow.ToString("0.0"), SRApi.Ctl.Label);
+                    if (GUI.Button(new Rect(Screen.width - Sc(122f), Sc(5f), Sc(84f), Sc(24f)), SRApi.T("重置视图", "Reset view"), SRApi.Ctl.Btn)) {
                         _dragOffset = Vector3.zero;
                         _fov = BaseFov;
                         Toast(SRApi.T("视图已重置", "View reset"));
                     }
-                    if (GUI.Button(new Rect(Screen.width - Sc(32f), Sc(3f), Sc(24f), Sc(20f)), "×", SRApi.Ctl.Btn)) { Close(); return; }
+                    if (GUI.Button(new Rect(Screen.width - Sc(34f), Sc(5f), Sc(28f), Sc(24f)), "×", SRApi.Ctl.Btn)) { Close(); return; }
                     if (!string.IsNullOrEmpty(_toast) && Time.unscaledTime < _toastUntil)
-                        GUI.Label(new Rect(Sc(10f), Sc(30f), Screen.width - Sc(20f), Sc(20f)), _toast, SRApi.Ctl.Label);
+                        GUI.Label(new Rect(Sc(10f), Sc(38f), Screen.width - Sc(20f), Sc(20f)), _toast, SRApi.Ctl.Label);
 
                     // 玩家与重生点标记
                     foreach (Character c in Character.AllCharacters) {
@@ -273,19 +360,21 @@ namespace SR_UCH.Tweaks {
                         GUI.color = c.hasAuthority ? Color.white : new Color(0.4f, 0.65f, 1f, 1f);
                         GUI.DrawTexture(new Rect(sp.x - Sc(3f), sp.y - Sc(3f), Sc(6f), Sc(6f)), Texture2D.whiteTexture);
                     }
-                    // 重生点：绿色方块 + 序号（最近的点高亮为黄色）
+                    // 重生点：角色大小的方框（最近的高亮为黄色）
                     int __near = SpawnPointTools.NearestIndex();
                     for (int i = 0; i < SpawnPointTools.Count; i++) {
-                        Vector2 sp = WorldToScreen(cam, SpawnPointTools.At(i));
+                        Vector3 wp = SpawnPointTools.At(i);
+                        Vector2 sp = WorldToScreen(cam, wp);
+                        float px = WorldSizeToPx(cam, wp, CharacterBoxSize);
                         GUI.color = (i == __near) ? new Color(1f, 0.85f, 0.2f, 1f) : new Color(0.2f, 0.9f, 0.3f, 1f);
-                        GUI.DrawTexture(new Rect(sp.x - Sc(4f), sp.y - Sc(4f), Sc(8f), Sc(8f)), Texture2D.whiteTexture);
-                        GUI.Label(new Rect(sp.x + Sc(6f), sp.y - Sc(7f), Sc(30f), Sc(16f)), (i + 1).ToString(), SRApi.Ctl.Label);
+                        DrawBox(new Rect(sp.x - px * 0.5f, sp.y - px * 0.5f, px, px), Sc(2f));
+                        GUI.Label(new Rect(sp.x + px * 0.5f + Sc(4f), sp.y - Sc(8f), Sc(30f), Sc(16f)), (i + 1).ToString(), SRApi.Ctl.Label);
                     }
                     GUI.color = prevColor;
 
                     if (e == null) return;
                     // 顶栏区域不参与地图交互
-                    bool inBar = e.mousePosition.y < Sc(26f);
+                    bool inBar = e.mousePosition.y < Sc(34f);
                     if (!_menuOpen && !inBar) {
                         if (e.type == EventType.MouseDown && e.button == 0) { _dragging = true; _dragMoved = false; _dragLast = e.mousePosition; }
                         else if (e.type == EventType.MouseDrag && _dragging) {
@@ -304,7 +393,7 @@ namespace SR_UCH.Tweaks {
                                 float oldFov = _fov;
                                 float newFov = Mathf.Clamp(oldFov + amt * 0.6f, 1f, 20f);
                                 if (Mathf.Abs(newFov - oldFov) > 0.001f) {
-                                    // 以光标位置为缩放锚点：先取世界点，改 FOV 后把它拉回光标下。
+                                    // 以光标为缩放中心：记录光标下的世界点，改完视野后调整拖动偏移把它拉回同一屏幕位置。
                                     Vector2 beforeWorld = ScreenToWorld(cam, e.mousePosition);
                                     _fov = newFov;
 
@@ -324,6 +413,8 @@ namespace SR_UCH.Tweaks {
                         }
                     }
                     if (_menuOpen) DrawMenu(cam, e);
+                    // 自绘光标：地图是最底层窗口时也要能看到鼠标（SR 面板里画的光标会被地图盖住）。
+                    DrawCursor(e);
                 } finally { GUI.color = prevColor; GUI.depth = prevDepth; GUI.skin.font = prevFont; }
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式地图/绘制", __ex); }
         }
@@ -362,6 +453,19 @@ namespace SR_UCH.Tweaks {
                     default: Close(); break;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式地图/菜单动作", __ex); }
+        }
+
+        // 地图页附加功能（都是复选框）：冻结角色 / 传送快捷键。
+        internal static void RenderExtraRows() {
+            try {
+                SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) {
+                    return e.Definition.Key == "Map Freeze Character" || e.Definition.Key == "Map Teleport Key Enabled";
+                });
+                if (SRApi.Ctl.ActionRow(SRApi.T("传送到光标", "Teleport to cursor"),
+                        SRApi.T("地图打开时把角色传送到光标位置", "teleport to the cursor while the map is open"),
+                        SRApi.T("传送", "Teleport"), _teleportKey, 110f))
+                    TickTeleportKey();
+            } catch (Exception __re) { SRApi.Guard.Log("地图页附加行", __re); }
         }
 
         private static float Sc(float v) { return SRApi.Ctl.Sc(v); }

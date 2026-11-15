@@ -106,6 +106,8 @@ namespace UnityEngine {
 
     // 契约门面暴露 Font（浮层用主题字体），测试桩只需要类型存在。
     public class Font : Object { }
+    // 契约门面暴露 Texture2D（自绘光标），测试桩只需要类型存在。
+    public class Texture2D : Object { }
 
     public class Camera : Object { }
 

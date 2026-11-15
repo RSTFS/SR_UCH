@@ -495,21 +495,26 @@ namespace SR_UCH.Tweaks {
 
 
         // 重命名弹窗：右键行弹出输入框 + 确定/取消；用绝对矩形绘制，不依赖行内输入框与焦点。
-        // 重命名浮窗：统一走核心 FloatWindow（拖动 / 关闭 / 点外部关闭 / 字体 / 鼠标位置定位）。
+        // 打开重命名浮窗（右键行时直接调用；不依赖列表页是否正在渲染）。
+        private static void EnsureRenameFloat() {
+            try {
+                if (string.IsNullOrEmpty(_renameKey)) return;
+                if (!SRApi.Visible) return;          // 一类窗口只能由 SR 界面触发
+                if (SRApi.Ctl.FloatIsOpen) return;
+                _renameOwnsFloat = true;
+                SRApi.Ctl.FloatOpen(SRApi.T("重命名预设", "Rename preset"),
+                    new Vector2(420f, 130f), DrawRenameContent, CancelRename);
+            } catch (Exception __ex) { SRApi.Guard.Log("布局预设/重命名浮窗", __ex); }
+        }
+
+        // 每帧维护：有目标就保证窗口存在；目标消失则收窗。
         private static void DrawInlineRename() {
             try {
-                if (string.IsNullOrEmpty(_renameKey)) { if (SR_UCH.Tweaks.SR.FloatWindow.IsOpen && _renameOwnsFloat) CancelRename(); return; }
-                if (_args == null) return;
-                List<PresetInfo> vis = _visibleCache;
-                PresetInfo p = null;
-                if (vis != null) for (int i = 0; i < vis.Count; i++) if (vis[i] != null && vis[i].Key == _renameKey) { p = vis[i]; break; }
-                if (p == null) { CancelRename(); return; }
-                _renameTarget = p;
-                if (!SR_UCH.Tweaks.SR.Visible) return;   // 一类窗口只能由 SR 界面触发
-                if (!SR_UCH.Tweaks.SR.FloatWindow.IsOpen) {
-                    _renameOwnsFloat = true;
-                    SR_UCH.Tweaks.SR.FloatWindow.Open(SRApi.T("重命名预设", "Rename preset"), new Vector2(340f, 108f), DrawRenameContent, CancelRename);
+                if (string.IsNullOrEmpty(_renameKey)) {
+                    if (SRApi.Ctl.FloatIsOpen && _renameOwnsFloat) CancelRename();
+                    return;
                 }
+                EnsureRenameFloat();
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/重命名浮窗", __ex); }
         }
 
@@ -519,8 +524,8 @@ namespace SR_UCH.Tweaks {
         private static void DrawRenameContent() {
             try {
                 PresetInfo p = _renameTarget;
-                if (p == null) { SR_UCH.Tweaks.SR.FloatWindow.Close(); return; }
-                float w = Mathf.Max(SRApi.Ctl.Sc(200f), SR_UCH.Tweaks.SR.FloatWindow.Rect.width - SRApi.Ctl.Sc(20f));
+                if (p == null) { SRApi.Ctl.FloatClose(); return; }
+                float w = Mathf.Max(SRApi.Ctl.Sc(200f), SRApi.Ctl.FloatRect.width - SRApi.Ctl.Sc(20f));
                 GUI.SetNextControlName("srPresetRenameField");
                 string typed = GUI.TextField(new Rect(0f, 0f, w, SRApi.Ctl.Sc(26f)), _renameText ?? p.Name ?? "", 40);
                 if (typed != _renameText) _renameText = typed;
@@ -552,7 +557,7 @@ namespace SR_UCH.Tweaks {
 
         private static void CancelRename() {
             _renameKey = null; _renameText = null; _renameTarget = null;
-            if (_renameOwnsFloat) { _renameOwnsFloat = false; SR_UCH.Tweaks.SR.FloatWindow.Close(); }
+            if (_renameOwnsFloat) { _renameOwnsFloat = false; SRApi.Ctl.FloatClose(); }
         }
 
         // Shift+右键表头：核心还原列宽与隐藏列后回调这里，再补一次整表还原并落盘。

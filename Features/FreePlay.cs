@@ -31,17 +31,19 @@ namespace SR_UCH {
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("地图", "Map") + " -",
                     SRApi.T("俯视查看整张关卡平面图\n打开后可拖动平移、滚轮缩放、右键操作\n仅自由模式可用",
                             "overhead view of the whole level\ndrag to pan, wheel to zoom, right-click for actions\nfreeplay only"));
-                SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) {
-                    return e.Definition.Key == "Map Enabled" || e.Definition.Key == "Map Key";
-                });
-                GUILayout.Space(SRApi.Ctl.Sc(6));
-                string label = FreePlayMap.IsOpen ? SRApi.T("关闭地图", "Close map") : SRApi.T("打开地图", "Open map");
-                // 与地图快捷键同一个配置项：右键按钮可改绑。
-                if (SRApi.Ctl.HotkeyActionButton(label, SRApi.T("打开/关闭俯视地图（也可用下面的快捷键）", "open or close the overhead map"), FreePlayMap.OpenKeyEntry, SRApi.Ctl.Sc(120f), true))
+                // 开关地图：内容标签 + 按钮（右键绑键）+ 快捷键框（不再单列一行快捷键配置）。
+                if (SRApi.Ctl.ActionRow(SRApi.T("开关地图", "Toggle map"),
+                        SRApi.T("打开或关闭俯视地图\n按钮左键开关，右键可绑定快捷键",
+                                "open or close the overhead map\nleft-click to toggle, right-click to bind a key"),
+                        FreePlayMap.IsOpen ? SRApi.T("关闭地图", "Close map") : SRApi.T("打开地图", "Open map"),
+                        FreePlayMap.OpenKeyEntry, 110f))
                     FreePlayMap.Toggle();
+                SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) {
+                    return e.Definition.Key == "Map Enabled";
+                });
                 GUILayout.Space(SRApi.Ctl.Sc(4));
-                GUILayout.Label(SRApi.T("右键菜单：传送到此处 / 添加重生点 / 删除最近的重生点 / 清空重生点 / 关闭地图",
-                    "Right-click menu: teleport here / add spawn point / remove nearest / clear / close map"), SRApi.Ctl.Label);
+                // 仅地图打开时生效的功能。
+                FreePlayMap.RenderExtraRows();
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式地图页/渲染", __ex); }
         }
 
@@ -50,12 +52,10 @@ namespace SR_UCH {
                 SRApi.Ctl.SectionTitle("- " + SRApi.T("重生点", "Spawn points") + " -",
                     SRApi.T("自定义出生位置，配合地图页右键使用\n重生会传送到最近的重生点\n没有自定义点时回到游戏默认出生点",
                             "custom spawn positions, used from the map page's right-click menu\nrespawn teleports to the nearest point\nfalls back to the game's default spawn"));
-                SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) {
-                    return e.Definition.Key == "Spawn Points" || e.Definition.Key == "Spawn Respawn Key"
-                        || e.Definition.Key == "Spawn Add Key" || e.Definition.Key == "Spawn Clear Key";
-                });
-                GUILayout.Space(SRApi.Ctl.Sc(6));
                 SpawnPointTools.RenderRows();
+                SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) {
+                    return e.Definition.Key == "Spawn Points";
+                });
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式重生点页/渲染", __ex); }
         }
 

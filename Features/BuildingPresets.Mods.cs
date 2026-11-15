@@ -275,7 +275,7 @@ namespace SR_UCH.Tweaks {
                 }
                 if (col == ColName && e.type == EventType.MouseDown && e.button == 1) {
                     // IsLocal = 游戏本地关卡存档（只读，改名会破坏映射），只有自己的预设可改名。
-                    if (!p.IsLocal) { ClearPending(); _renameKey = p.Key; _renameText = p.Name; _renameFocusPending = true; e.Use(); }
+                    if (!p.IsLocal) { ClearPending(); _renameKey = p.Key; _renameText = p.Name; _renameFocusPending = true; _renameTarget = p; EnsureRenameFloat(); e.Use(); }
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/行内单元格", __ex); }
         }

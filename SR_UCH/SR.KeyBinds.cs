@@ -550,6 +550,9 @@ public partial class SR {
             return KeySuffix(k);
         }
 
+        // 供核心控件调用的公开入口（进入录制）。
+        internal static void EnterCapturePublic(ConfigEntry<KeyCode> k) { SR.EnterCaptureInternal(k); }
+
         public static string KeyText(ConfigEntry<KeyCode> k) {
             if (k == null) return T("未绑定", "Unbound");
             if (_capturing == k) return _recSeq.Count == 0 ? "..." : RecText();

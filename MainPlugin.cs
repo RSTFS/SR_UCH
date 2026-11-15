@@ -291,6 +291,19 @@ namespace SR_UCH {
                     delegate { return SR.Env.SceneName; },
                     delegate { return SR.Env.InTreehouse; });
             });
+            SinkStep("ActionRow", delegate () {
+                SR.Ctl.InstallActionRowSinks();
+            });
+            SinkStep("FloatWindow", delegate () {
+                SRApi.SetUiVisibleSink(delegate { return SR.Visible; });
+                SRApi.Ctl.SetFloatWindowSinks(
+                    delegate { return SR.FloatWindow.IsOpen; },
+                    delegate (string __ft, Vector2 __fs, SRApi.Ctl.FloatDrawFn __fd, Action __fc) {
+                        SR.FloatWindow.Open(__ft, __fs, delegate { __fd(); }, __fc);
+                    },
+                    delegate { SR.FloatWindow.Close(); },
+                    delegate { return SR.FloatWindow.Rect; });
+            });
             SinkStep("UiFont", delegate () {
                 SRApi.Ctl.SetUiFontSink(delegate { return SR.UiFont; });
             });

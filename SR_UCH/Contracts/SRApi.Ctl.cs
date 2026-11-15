@@ -196,6 +196,56 @@ namespace SR_UCH {
             } catch { /* 静默：下拉渲染失败不影响本帧其它控件 */ }
         }
 
+            public static string RecTextOrEmpty() { Func<string> f = _recText; return f != null ? (f() ?? "") : ""; }
+            private static Func<string> _recText;
+            public static void SetRecTextSink(Func<string> f) { _recText = f; }
+            public static string KeyText(ConfigEntry<KeyCode> e) { return KeyTextOf(e); }
+            private static Func<ConfigEntry<KeyCode>, string> _keyTextOf;
+            public static void SetKeyTextSink(Func<ConfigEntry<KeyCode>, string> f) { _keyTextOf = f; }
+            public static string KeyTextOf(ConfigEntry<KeyCode> e) { Func<ConfigEntry<KeyCode>, string> f = _keyTextOf; return f != null ? f(e) : null; }
+            public static void BeginCapture(ConfigEntry<KeyCode> e) { Action<ConfigEntry<KeyCode>> f = _beginCapture; if (f != null) f(e); }
+            private static Action<ConfigEntry<KeyCode>> _beginCapture;
+            public static void SetBeginCaptureSink(Action<ConfigEntry<KeyCode>> f) { _beginCapture = f; }
+            public static void ClearKey(ConfigEntry<KeyCode> e) { Action<ConfigEntry<KeyCode>> f = _clearKey; if (f != null) f(e); }
+            private static Action<ConfigEntry<KeyCode>> _clearKey;
+            public static void SetClearKeySink(Action<ConfigEntry<KeyCode>> f) { _clearKey = f; }
+            public static GUIStyle KeyBox { get { return Style("SearchBox"); } }
+            // 自绘光标贴图（独立窗口/覆盖层上要自己画一次光标）。
+            private static Func<Texture2D> _cursorTex;
+            public static void SetCursorTextureSink(Func<Texture2D> f) { _cursorTex = f; }
+            public static Texture2D CursorTexture { get { Func<Texture2D> f = _cursorTex; return f != null ? f() : null; } }
+
+            // 附随浮窗（一类：随主面板，面板关闭即收起）。功能层只通过这里开窗。
+            public delegate void FloatDrawFn();
+            private static Func<bool> _floatIsOpen;
+            private static Action<string, Vector2, FloatDrawFn, Action> _floatOpen;
+            private static Action _floatClose;
+            private static Func<Rect> _floatRect;
+            public static void SetFloatWindowSinks(Func<bool> isOpen, Action<string, Vector2, FloatDrawFn, Action> open, Action close, Func<Rect> rect) {
+                _floatIsOpen = isOpen; _floatOpen = open; _floatClose = close; _floatRect = rect;
+            }
+            public static bool FloatIsOpen { get { Func<bool> f = _floatIsOpen; return f != null && f(); } }
+            public static void FloatOpen(string title, Vector2 size, FloatDrawFn draw, Action onClose = null) {
+                Action<string, Vector2, FloatDrawFn, Action> f = _floatOpen;
+                if (f == null || draw == null) return;
+                f(title, size, delegate { draw(); }, onClose);
+            }
+            public static void FloatClose() { Action f = _floatClose; if (f != null) f(); }
+            public static Rect FloatRect { get { Func<Rect> f = _floatRect; return f != null ? f() : default(Rect); } }
+
+            // 条目可用性门：返回 false 时该行控件置灰且不可操作（用于"当前模式不支持"）。
+            private static Action<ConfigEntryBase, Func<bool>> _rowGate;
+            public static void SetRowGateSink(Action<ConfigEntryBase, Func<bool>> f) { _rowGate = f; }
+            public static void RegisterRowGate(ConfigEntryBase entry, Func<bool> allowed) { Action<ConfigEntryBase, Func<bool>> f = _rowGate; if (f != null) f(entry, allowed); }
+
+            // 动作行：标签 + 动作按钮（左键执行 / 右键绑键）+ 快捷键框。返回是否点击了按钮。
+            private static Func<string, string, string, ConfigEntry<KeyCode>, float, float, bool> _actionRow;
+            public static void SetActionRowSink(Func<string, string, string, ConfigEntry<KeyCode>, float, float, bool> f) { _actionRow = f; }
+            public static bool ActionRow(string label, string tip, string button, ConfigEntry<KeyCode> key, float buttonW = 0f, float labelW = 0f) {
+                Func<string, string, string, ConfigEntry<KeyCode>, float, float, bool> f = _actionRow;
+                return f != null && f(label, tip, button, key, buttonW, labelW);
+            }
+
             public static float SidebarWidth() { Func<float> f = _sidebarWidth; return f != null ? f() : 0f; }
             public static float WinWidth { get { Func<float> f = _winWidth; return f != null ? f() : 0f; } }
             public static void SetValue(ConfigEntryBase entry, object value) { Action<ConfigEntryBase, object> f = _setValue; if (f != null) f(entry, value); }

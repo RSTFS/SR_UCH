@@ -216,6 +216,37 @@ public partial class SR {
         public static Font OrigSkinFont() { return SR.OrigSkinFontValue; }
         public static string KeySuffix(ConfigEntry<KeyCode> e) { return SR.KeySuffix(e); }
         public static string KeyText(ConfigEntry<KeyCode> e) { return SR.KeyText(e); }
+        // 动作行用的注入：录制开始/清空/键名。
+        public static void BeginCaptureEntry(ConfigEntry<KeyCode> e) { SR.EnterCapturePublic(e); }
+        // 供契约注入（在核心初始化时调用一次）。
+        internal static void InstallActionRowSinks() {
+            try {
+                SRApi.Ctl.SetActionRowSink(SR.Ctl.RowsActionRowSink);
+                SRApi.Ctl.SetRecTextSink(RecTextPublic);
+                SRApi.Ctl.SetKeyTextSink(SR.KeyText);
+                SRApi.Ctl.SetBeginCaptureSink(BeginCaptureEntry);
+                SRApi.Ctl.SetClearKeySink(ClearKeyEntry);
+                SRApi.Ctl.SetCursorTextureSink(delegate { return SR.CursorTexture; });
+                SRApi.Ctl.SetRowGateSink(SR.Ctl.RegisterRowGateImpl);
+            } catch (Exception __ia) { Guard.Log("注入动作行", __ia); }
+        }
+        public static string RecTextPublic() { return SR.RecText(); }
+        // 条目可用性门（不可用 -> 置灰、不可点）。
+        private static readonly Dictionary<ConfigEntryBase, Func<bool>> _rowGates = new Dictionary<ConfigEntryBase, Func<bool>>();
+        public static void RegisterRowGateImpl(ConfigEntryBase entry, Func<bool> allowed) {
+            if (entry == null) return;
+            _rowGates[entry] = allowed;
+        }
+        internal static bool RowAllowed(ConfigEntryBase entry) {
+            Func<bool> f;
+            if (entry == null || !_rowGates.TryGetValue(entry, out f) || f == null) return true;
+            try { return f(); } catch (Exception __ra) { Guard.Log("条目可用性门", __ra); return true; }
+        }
+
+        public static bool RowsActionRowSink(string label, string tip, string button, ConfigEntry<KeyCode> key, float bw, float lw) {
+            return SR.Ctl.RowsActionRow(label, tip, button, key, bw, lw);
+        }
+        public static void ClearKeyEntry(ConfigEntry<KeyCode> e) { try { if (e != null) e.Value = KeyCode.None; } catch (Exception __ce) { Guard.Log("清空快捷键", __ce); } }
         public static void RegisterRowHotkey(ConfigEntry<KeyCode> entry) { SR.RegisterRowHotkey(entry); }
         public static void TryBindByRightClick(ConfigEntry<KeyCode> entry, Rect rect) { SR.TryBindByRightClick(entry, rect); }
         public static bool SelfToggleButton(string label, string tooltip, bool on, ConfigEntry<KeyCode> keyEntry, float width = 0f, bool bindable = false) {
@@ -423,6 +454,8 @@ public partial class SR {
         }
 
         // 进入录制（左键未绑定与右键都走它）。
+        internal static void EnterCaptureInternal(ConfigEntry<KeyCode> key) { EnterCapture(key); }
+
         private static void EnterCapture(ConfigEntry<KeyCode> key) {
             if (key == null) return;
             _prevBoxed = key.BoxedValue;

@@ -108,6 +108,39 @@ public partial class SR {
             return picked;
         }
 
+        // 动作行：标签 + 动作按钮（左键执行 / 右键绑键）+ 只读快捷键框。
+        // 快捷键框显示当前键，点它进入录制（与按钮右键同一套录制逻辑）。
+        internal static bool RowsActionRow(string label, string tip, string button, ConfigEntry<KeyCode> key, float buttonW, float labelW) {
+            bool clicked = false;
+            try {
+                GUILayout.BeginHorizontal();
+                try {
+                    float lw = labelW > 0f ? Sc(labelW) : LabelColumnWidth(label);
+                    GUILayout.Label(SRApi.Ctl.Content(label, tip), SR.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(Sc(26)));
+                    GUILayout.Space(Sc(6));
+                    float bw = buttonW > 0f ? Sc(buttonW) : Sc(120f);
+                    if (GUILayout.Button(SRApi.Ctl.Content(button ?? label, tip), _btn, GUILayout.Width(bw), GUILayout.Height(Sc(26)))) {
+                        Event ev = Event.current;
+                        if (ev == null || ev.button == 0) clicked = true;
+                    }
+                    GUILayout.Space(Sc(4));
+                    if (key != null) {
+                        bool cap = _capturing == key;
+                        string txt = cap ? (SRApi.Ctl.RecTextOrEmpty() ?? "[...]") : (SRApi.Ctl.KeyText(key) ?? "—");
+                        if (GUILayout.Button(new GUIContent(txt, T("点击后按任意键绑定；右键清空", "Click then press a key to bind; right-click to clear")),
+                                cap ? _capture : SRApi.Ctl.KeyBox, GUILayout.Width(Sc(96f)), GUILayout.Height(Sc(26)))) {
+                            Event ev2 = Event.current;
+                            if (ev2 != null && ev2.button == 1) SRApi.Ctl.ClearKey(key);
+                            else SRApi.Ctl.BeginCapture(key);
+                        }
+                    }
+                    GUILayout.FlexibleSpace();
+                } finally { GUILayout.EndHorizontal(); }
+            } catch (Exception __ex) { Guard.Log("动作行", __ex); }
+            GUILayout.Space(Sc(2));
+            return clicked;
+        }
+
         // 条目当前值的文本形式（下拉框比较用）。
         private static string EntryValueText(ConfigEntryBase e) {
             try {
