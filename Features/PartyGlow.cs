@@ -101,6 +101,9 @@ namespace SR_UCH.Tweaks {
                 TierColor[i] = ParseColor(_tierColors[i].Value, TierColorDefault[i]);
                 _tierColors[i].SettingChanged += (s2, e2) => { TierColor[ti] = ParseColor(_tierColors[ti].Value, TierColorDefault[ti]); };
                 SRApi.LocKey(Sec, "Tier Color " + i, TierZh[i] + "颜色", TierEn[i] + " color");
+                SRApi.LocDesc(Sec, "Tier Color " + i,
+                    TierZh[i] + "的颜色\n品质光芒按档位取这里的前景色\n十六进制格式（#RRGGBB）",
+                    TierEn[i] + " color\nthe glow uses this colour for that tier\nhex format (#RRGGBB)");
             }
             _size = plugin.Config.Bind(Sec, "Size", 180, new ConfigDescription("光晕相对道具包围盒的尺寸百分比（100-300）。", new AcceptableValueRange<int>(100, 300)));
             _breathe = plugin.Config.Bind(Sec, "Breathe", false, "轻微呼吸脉动。用缩放时间驱动：梦境定格时它会跟着静止。");

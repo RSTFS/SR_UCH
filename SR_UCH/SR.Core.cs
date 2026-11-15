@@ -478,9 +478,9 @@ public partial class SR : ITweak {
                 try { ResetWheelState(); } catch (Exception __ex) { Guard.Log("SR.Core", __ex); }   // 清掉滑块 / 滚轮盾的跨帧残留
             };
             // 扫描不在此调用：其它 tweak 可能晚于本插件初始化，改在首帧 Update 跑。
-            try { Harmony.CreateAndPatchAll(typeof(SR)); } catch (Exception ex) { SR.LogError("SR 补丁注册失败: " + ex.Message); }
+            try { SRApi.RegisterPatch(typeof(SR)); } catch (Exception ex) { SR.LogError("SR 补丁注册失败: " + ex.Message); }
             // 录键屏蔽表情系统的嵌套类不被 CreateAndPatchAll 递归发现，需单独注册。
-            try { Harmony.CreateAndPatchAll(typeof(EmoteBlockPatch)); } catch (Exception ex) { SR.LogWarn("录键屏蔽表情系统 补丁注册失败: " + ex.Message); }
+            try { SRApi.RegisterPatch(typeof(EmoteBlockPatch)); } catch (Exception ex) { SR.LogWarn("录键屏蔽表情系统 补丁注册失败: " + ex.Message); }
         }
 
         // 侧栏栏目自注册（Nav 顺序值越小越靠前，NavHide 不成栏目）；晚注册也立即生效。

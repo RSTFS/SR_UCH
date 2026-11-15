@@ -334,6 +334,9 @@ public partial class Chat : ITweak {
             _chatLogSystemEntry = plugin.Config.Bind("Chat", "Log System Msgs", true, "会话内容页：记录系统消息（加入/离开/踢人/回合提示等）。关掉只记录玩家发言。");
             SRApi.LocKey("Chat", "Log System Msgs", "记录系统消息", "Log system messages");
             SRApi.LocKey("Chat", "Log Limit", "日志上限", "Log limit");
+            SRApi.LocDesc("Chat", "Log Limit",
+                "日志上限\n聊天历史最多保留多少条\n超出后丢弃最旧的记录",
+                "log limit\nhow many chat history lines are kept\nthe oldest are dropped beyond this");
             SRApi.LocDesc("Chat", "Log System Msgs", "记录系统消息\n把加入/离开/踢人/回合提示这类系统事件也记进会话内容\n关掉则只记玩家发言", "Log system messages\nalso record system events such as joins, leaves, kicks and round notices\noff records player chat only");
             _chatFilterQuick = _chatFilterQuickEntry.Value;
             _chatFilterQuickEntry.SettingChanged += (s, e) => _chatFilterQuick = _chatFilterQuickEntry.Value;

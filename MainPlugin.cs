@@ -75,7 +75,7 @@ namespace SR_UCH {
 
         // 需显式注册补丁（CreateAndPatchAll 不递归发现独立类型），失败只记日志。
         private void PatchOwnConfigFile() {
-            try { HarmonyLib.Harmony.CreateAndPatchAll(typeof(PatchOwnConfigFile)); }
+            try { SRApi.RegisterPatch(typeof(PatchOwnConfigFile)); }
             catch (Exception __pf) { try { ModLogger.LogWarning("配置外置补丁(PatchOwnConfigFile)注册失败: " + __pf.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
 
         }
@@ -298,6 +298,15 @@ namespace SR_UCH {
                 SRApi.SetKeyActionGatedSink(delegate (string __kn, ConfigEntry<KeyCode> __ke, string __km, Action __ka, Type __ki) {
                     SR.RegisterKeyAction(__kn, __ke, __km, __ka, __ki);
                 });
+            });
+            SinkStep("Active", delegate () {
+                SRApi.SetActiveSink(delegate (Type __ai, BepInEx.Configuration.ConfigEntryBase __ao) {
+                    return SR.FeatureActive(__ai, __ao);
+                });
+            });
+            SinkStep("Patch", delegate () {
+                SRApi.SetPatchSink(delegate (Type __pt) { SR.RegisterPatchType(__pt); });
+                SRApi.SetPatchCountSink(delegate { return SR.PatchedCount; });
             });
             SinkStep("FloatWindow", delegate () {
                 SRApi.SetUiVisibleSink(delegate { return SR.Visible; });

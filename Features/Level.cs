@@ -43,7 +43,7 @@ public partial class Level : ITweak {
         catch (Exception __tr) { SRApi.Guard.Log("关卡重载/注册锁自愈", __tr); }
         _reloadMode = plugin.Config.Bind<ReloadMode>("Level", "Reload Mode", ReloadMode.KeepScore, "重载关卡模式：\n保留方块和分数（允许补分）= 重载后当前方块保留；房主按重载前的分类型分块（获胜/金币/陷阱等原样）给全员广播补分，下一回合结算时全员得分板显示与重载前一致的分数和类型（含未装 mod 的房客；补分不立即结算，图标随正常结算显示）。\n仅保留方块（跳过补分）= 重载后当前方块保留，分数重置（重新对局，不补分）。");
             // CreateAndPatchAll 不自动发现带 [HarmonyPatch] 的独立类，必须显式注册。
-        try { Harmony.CreateAndPatchAll(typeof(Level), (string)null); }
+        try { SRApi.RegisterPatch(typeof(Level)); }
         catch (Exception e) { SRApi.LogError("Level 补丁注册失败: " + e.Message); }
     }
 }

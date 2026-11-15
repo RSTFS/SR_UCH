@@ -84,7 +84,7 @@ namespace SR_UCH.Tweaks {
                     try { if (SRApi.GateMaster) Toggle(); } catch (Exception __mk) { SRApi.Guard.Log("地图快捷键", __mk); }
                 }, typeof(FreePlayPage));
                 SRApi.RegisterSceneHook(Close);
-                try { Harmony.CreateAndPatchAll(typeof(FreePlayMap)); }
+                try { SRApi.RegisterPatch(typeof(FreePlayMap)); }
                 catch (Exception __h) { SRApi.Guard.Log("自由模式地图/补丁", __h); }
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式地图/初始化", __ex); }
         }

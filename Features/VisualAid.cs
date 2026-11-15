@@ -160,7 +160,7 @@ namespace SR_UCH.Tweaks {
                 if (_conflict) SRApi.LogWarn("视觉辅助：检测到 CamHog，已让位（避免两边同时改透明度）。");
 
                 SRApi.OnShutdown(Sec, Shutdown);
-                try { Harmony.CreateAndPatchAll(typeof(VisualAid)); }
+                try { SRApi.RegisterPatch(typeof(VisualAid)); }
                 catch (Exception e) { SRApi.LogError("视觉辅助 补丁注册失败: " + e.Message); }
             } catch (Exception __ex) { SRApi.Guard.Log("视觉辅助/初始化", __ex); }
         }

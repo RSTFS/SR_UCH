@@ -44,10 +44,10 @@ namespace SR_UCH.Tweaks {
                 _invincible = plugin.Config.Bind(Sec, "Spawn Invincible", 1f, new ConfigDescription("出生无敌（0-10 秒）", new AcceptableValueRange<float>(0f, 10f)));
                 _cannonRespawn = plugin.Config.Bind(Sec, "Cannon Auto Respawn", false, "炮弹卡死：死亡且卡在炮弹里超过 1.5 秒自动重生。");
                 SRApi.RegisterTick("重生-轮询", Tick);
-                try { Harmony.CreateAndPatchAll(typeof(RespawnTools)); }
+                try { SRApi.RegisterPatch(typeof(RespawnTools)); }
                 catch (Exception __h) { SRApi.Guard.Log("重生/补丁注册", __h); }
                 // 重生延迟计时阈值补丁单独注册，失败只丢那一条并留警告。
-                try { Harmony.CreateAndPatchAll(typeof(RespawnDelayTimingPatch)); }
+                try { SRApi.RegisterPatch(typeof(RespawnDelayTimingPatch)); }
                 catch (Exception __h2) { SRApi.LogWarn("重生延迟/计时阈值补丁跳过: " + __h2.Message); }
             } catch (Exception __ex) { SRApi.Guard.Log("重生/初始化", __ex); }
         }
@@ -368,7 +368,7 @@ public partial class QuickAdjust : ITweak {
         // 本类自带 [HarmonyPatch] 但 ITweak 为反射发现，须手动 CreateAndPatchAll；单个目标失效只丢本类功能。
             try { RespawnTools.Initialize(plugin); } catch (Exception __rs) { SRApi.Guard.Log("快速调整/重生初始化", __rs); }
             try { SRApi.RegisterTick("评分百分比-保持", TickKeepHandicap); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-            try { Harmony.CreateAndPatchAll(typeof(QuickAdjust), (string)null); }
+            try { SRApi.RegisterPatch(typeof(QuickAdjust)); }
             catch (Exception e) { SRApi.LogError("快速调整 补丁注册失败: " + e.Message); }
             // 不注册 GamePlayer.OnStartClient / OnStartServer 补丁（这些成员在本版本不存在）；
             // 评分百分比改由 TickKeepHandicap 每帧按“本地值 != 目标值”重下发。

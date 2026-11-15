@@ -29,7 +29,7 @@ namespace SR_UCH.Tweaks {
             Enabled = _enabled.Value;
             _enabled.SettingChanged += (s, e) => Enabled = _enabled.Value;
             // 带 try/catch：单个补丁目标失效只丢本类功能。
-            try { Harmony.CreateAndPatchAll(typeof(PartyBomb)); }
+            try { SRApi.RegisterPatch(typeof(PartyBomb)); }
             catch (Exception e) { SRApi.LogError("派对盒炸弹 补丁注册失败: " + e.Message); }
             // networkNumber 会跨对局复用：换场景与对局开始两处都要清理，否则同号玩家被误判。
             SRApi.RegisterSceneHook(delegate { _bombSent.Clear(); });
@@ -162,7 +162,13 @@ namespace SR_UCH.Tweaks {
             try {
                 SRApi.LocKey("Level", "Drop Held Piece", "放弃道具", "Drop held piece");
                 SRApi.LocKey("Level", "Party Bomb", "派对盒子炸弹", "Party bomb");
+                SRApi.LocDesc("Level", "Party Bomb",
+                    "派对盒子炸弹\n对局内所有成员都发过炸弹！短语后才生成\n只有房主设置有效",
+                    "party-box bomb\nspawns only after every member sends the Bomb phrase\nhost setting only");
                 SRApi.LocKey("Level", "Party Bomb Type", "炸弹类型", "Party bomb type");
+                SRApi.LocDesc("Level", "Party Bomb Type",
+                    "炸弹种类\n塞进派对盒的是哪种炸弹\n小 / 大 / 超级对应不同爆炸范围",
+                    "bomb type\nwhich bomb goes into the party box\nsmall / big / mega have different blast radii");
                 SRApi.LocDesc("Level", "Drop Held Piece", "放弃道具按键\n派对阶段丢弃手上的道具（游戏原生通道）\n请勿删除边界墙和出生方块，删了无法复原", "Drop held piece\ndiscards the held piece during the pick phase via the game channel\nnever delete boundary walls or spawn blocks - it cannot be undone");
                 _key = plugin.Config.Bind("Level", "Drop Held Piece", KeyCode.None,
                     "按这个键就把手上拿着的那块丢掉（走游戏原生通道, 全员可见）, 填 None 就是不绑键.");

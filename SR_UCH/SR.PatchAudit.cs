@@ -43,5 +43,49 @@ namespace SR_UCH.Tweaks {
             missing = miss.ToArray();
             return total;
         }
+
+        // 分区：补丁注册（统一入口 + 漏注册检测）
+
+        private static readonly List<Type> _patched = new List<Type>();
+        internal static int PatchedCount { get { return _patched.Count; } }
+
+        // 统一注册：CreateAndPatchAll 按类型扫描，失败只记日志（与各功能原行为一致）。
+        internal static void RegisterPatchType(Type patchType) {
+            if (patchType == null) return;
+            if (_patched.Contains(patchType)) return;   // 重复注册会重复打补丁
+            try {
+                Harmony.CreateAndPatchAll(patchType);
+                _patched.Add(patchType);
+            } catch (Exception __rp) {
+                LogWarn("[补丁] 注册失败 " + patchType.Name + "：" + (__rp != null ? __rp.Message : "?"));
+            }
+        }
+
+        // 自检：声明了 [HarmonyPatch] 却从未 RegisterPatch 的类型 —— 这类补丁会静默失效。
+        internal static string[] FindUnregisteredPatchTypes() {
+            List<string> bad = new List<string>();
+            try {
+                Assembly asm = typeof(SR).Assembly;
+                Type[] types = asm.GetTypes();
+                for (int i = 0; i < types.Length; i++) {
+                    Type ty = types[i];
+                    if (ty == null || _patched.Contains(ty)) continue;
+                    // 只看"自己声明了补丁方法"的类型（类级 [HarmonyPatch] 也在其中）。
+                    bool declares = false;
+                    try { declares = ty.GetCustomAttributes(typeof(HarmonyPatch), true).Length > 0; } catch (Exception) { declares = false; }
+                    if (!declares) {
+                        MethodInfo[] ms;
+                        try { ms = ty.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly); }
+                        catch (Exception) { continue; }
+                        for (int k = 0; k < ms.Length; k++) {
+                            try { if (ms[k].GetCustomAttributes(typeof(HarmonyPatch), true).Length > 0) { declares = true; break; } }
+                            catch (Exception) { /* 单个方法读不到就跳过 */ }
+                        }
+                    }
+                    if (declares) bad.Add(ty.Name);
+                }
+            } catch (Exception) { /* 扫描失败不阻断自检 */ }
+            return bad.ToArray();
+        }
     }
 }

@@ -76,6 +76,33 @@ namespace SR_UCH {
         public static void RegisterPauseProvider(Func<bool> f2) { Action<Func<bool>> f = _pauseProvider; if (f != null) f(f2); }
         public static void RegisterTabPrefix(string section, Action draw) { Action<string, Action> f = _tabPrefix; if (f != null) f(section, draw); }
 
+        // 门控组合器：补丁/热路径统一用一处判断 —— 总开关 + 功能开关 + 模式限制。
+        private static Func<Type, ConfigEntryBase, bool> _active;
+        public static void SetActiveSink(Func<Type, ConfigEntryBase, bool> f) { _active = f; }
+        public static bool Active(Type impl, ConfigEntryBase on = null) {
+            Func<Type, ConfigEntryBase, bool> f = _active;
+            return f != null ? f(impl, on) : true;
+        }
+
+        // 补丁注册门面：功能只声明类型，由核心统一 CreateAndPatchAll 并记录，
+        // 未注册的补丁类在自检页报出来（否则 [HarmonyPatch] 类漏注册会静默失效）。
+        private static readonly List<Type> _patchTypes = new List<Type>();
+        private static Action<Type> _registerPatch;
+        public static void SetPatchSink(Action<Type> f) { _registerPatch = f; }
+        public static void RegisterPatch(Type patchType) {
+            if (patchType == null) return;
+            Action<Type> f = _registerPatch;
+            if (f != null) f(patchType);
+        }
+        public static void RegisterPatches(params Type[] patchTypes) {
+            if (patchTypes == null) return;
+            for (int i = 0; i < patchTypes.Length; i++) RegisterPatch(patchTypes[i]);
+        }
+        // 自检用：已通过 RegisterPatch 登记的类型数。
+        public static void SetPatchCountSink(Func<int> f) { _registeredPatchCount = f; }
+        private static Func<int> _registeredPatchCount;
+        public static int RegisteredPatchCount { get { Func<int> f = _registeredPatchCount; return f != null ? f() : 0; } }
+
         // 迁移规则门面：注册表与 cfg 改写都在核心，只转发。
         // 表格控件门面：TableArgs 是纯数据参数对象，交互函数委托注入；操作列按钮只给描述，布局与命中由核心处理。
         public delegate void TableDragWatchdogFn(Event e, ref float watchdog, ref bool sbDragging, ref int moveCol,

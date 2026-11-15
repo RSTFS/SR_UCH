@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using System.Collections.Generic;
 using System.Reflection;
+using BepInEx.Configuration;
 using HarmonyLib;
 
 // 分区：Gate（门控 / 房主判定 / 模式豁免 / 补丁自检）
@@ -180,6 +181,15 @@ public partial class SR {
                 _allowedCache[impl] = ok;
                 return ok;
             } catch (Exception __fa) { Guard.Log("功能模式门控", __fa); return true; }
+        }
+
+        // 统一门控：总开关 -> 功能开关 -> 模式限制。补丁与热路径都读这一处，避免各写各的。
+        internal static bool FeatureActive(Type impl, ConfigEntryBase on) {
+            if (!GateMaster) return false;
+            if (on != null) {
+                try { if (!Equals(on.BoxedValue, true)) return false; } catch (Exception) { return false; }
+            }
+            return FeatureAllowed(impl);
         }
 
         // 供按键派发用：受限功能在错误模式下按下键，给一次节流提示（否则"按了没反应"）。

@@ -86,7 +86,7 @@ public partial class Experiments : ITweak
                     "切场景时走游戏自己的 DoGentleSceneLoad（卸载+GC，能减轻卡顿）。");
                 SRApi.RegisterTick("加载遮罩", Tick);
                 SRApi.RegisterSceneHook(Reset);
-                try { Harmony.CreateAndPatchAll(typeof(SplashPatch)); }
+                try { SRApi.RegisterPatch(typeof(SplashPatch)); }
                 catch (Exception __ex) { SRApi.LogWarn("加载遮罩 补丁注册失败: " + __ex.Message); }
             } catch (Exception __ex) { SRApi.Guard.Log("加载遮罩 初始化", __ex); }
         }

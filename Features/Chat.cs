@@ -13,7 +13,7 @@ public partial class Chat : ITweak {
             InitWindow(plugin);
             InitLog(plugin);
             // CreateAndPatchAll 按类型扫描，一次调用覆盖两个 partial 文件，不可重复注册。
-            try { HarmonyLib.Harmony.CreateAndPatchAll(typeof(Chat), (string)null); }
+            try { SRApi.RegisterPatch(typeof(Chat)); }
             catch (Exception e) { SRApi.LogError("会话(聊天窗口/聊天记录) 补丁注册失败: " + e.Message); }
         }
 }

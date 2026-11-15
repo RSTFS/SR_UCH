@@ -41,7 +41,7 @@ public partial class Experiments : ITweak
         }
         // 本页补丁统一注册点（CreateAndPatchAll 不会自动发现带 [HarmonyPatch] 的类型）。
         internal static void InitCleanup(IFeatureHost plugin) {
-            try { Harmony.CreateAndPatchAll(typeof(Experiments), (string)null); }
+            try { SRApi.RegisterPatch(typeof(Experiments)); }
             catch (Exception e) { SRApi.LogError("实验页 补丁注册失败: " + e.Message); }
         }
 

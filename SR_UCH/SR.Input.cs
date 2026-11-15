@@ -118,7 +118,7 @@ public partial class SR {
 public class SRInputGate : ITweak {
 
     public void Initialize(IFeatureHost plugin) {
-        try { Harmony.CreateAndPatchAll(typeof(SRInputGate)); }
+        try { SRApi.RegisterPatch(typeof(SRInputGate)); }
         catch (Exception e) { SR.LogError("输入门控 补丁注册失败: " + e.Message); }
     }
 

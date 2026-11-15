@@ -410,7 +410,7 @@ namespace SR_UCH.Tweaks {
                 go.AddComponent<HudComponent>();
 
                 // 本类自带 [HarmonyPatch] 但 ITweak 为反射发现，须手动 CreateAndPatchAll；失败只丢本类功能。
-                try { Harmony.CreateAndPatchAll(typeof(HUD), (string)null); }
+                try { SRApi.RegisterPatch(typeof(HUD)); }
                 catch (Exception e) { SRApi.LogError("HUD 补丁注册失败: " + e.Message); }
             } catch (Exception __ex) { SRApi.Guard.Log("HUD 初始化", __ex); }
         }

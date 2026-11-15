@@ -30,6 +30,11 @@ public partial class SR {
             string[] patchMiss; int patchTotal = SR.AuditPatches(out patchMiss);
             StCheck(T("补丁目标存在", "Patch targets exist"), patchMiss == null || patchMiss.Length == 0,
                 patchMiss != null && patchMiss.Length > 0 ? string.Join(", ", patchMiss) : T("已校验 ", "checked ") + patchTotal);
+            string[] unreg = SR.FindUnregisteredPatchTypes();
+            StCheck(T("补丁已注册", "Patches registered"), unreg == null || unreg.Length == 0,
+                unreg != null && unreg.Length > 0
+                    ? T("未注册（会静默失效）: ", "declared but never registered: ") + string.Join(", ", unreg)
+                    : T("已注册 ", "registered ") + SR.PatchedCount);
             string[] magicConf = SRApi.NetMagic.Conflicts();
             StCheck(T("网络魔数唯一", "Network magics unique"), magicConf == null || magicConf.Length == 0,
                 magicConf != null && magicConf.Length > 0 ? string.Join("; ", magicConf) : T("已登记 ", "registered ") + SRApi.NetMagic.Registered);

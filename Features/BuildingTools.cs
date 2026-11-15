@@ -157,9 +157,9 @@ namespace SR_UCH.Tweaks {
             });
 
             // 补丁分两次独立注册：FreePlacementPatch 是顶层类不会被连带注册，且能独立失败互不连累。
-            try { Harmony.CreateAndPatchAll(typeof(BuildingTools)); }
+            try { SRApi.RegisterPatch(typeof(BuildingTools)); }
             catch (Exception e) { SRApi.LogWarn("BuildingTools 补丁失败: " + e.Message); }
-            try { Harmony.CreateAndPatchAll(typeof(FreePlacementPatch)); }
+            try { SRApi.RegisterPatch(typeof(FreePlacementPatch)); }
             catch (Exception __fp) { SRApi.LogError("自由放置 补丁注册失败: " + __fp.Message); }
         }
 

@@ -34,7 +34,7 @@ namespace SR_UCH {
                 _alwaysOn = plugin.Config.Bind(Sec, "Grid Always On", false, "常显网格：行动状态下也显示建造网格。");
                 _lastOn = _alwaysOn.Value;
                 // 补丁单独注册（CreateAndPatchAll 不递归发现独立类型）；目标失效只丢本功能。
-                try { Harmony.CreateAndPatchAll(typeof(GridKeepOnPatch), (string)null); }
+                try { SRApi.RegisterPatch(typeof(GridKeepOnPatch)); }
                 catch (Exception __p) { SRApi.LogWarn("地图网格/补丁跳过（Graphpaper.disableGrid 不存在）: " + __p.Message); }
                 SRApi.RegisterTick("自由模式-地图网格", Tick);
             } catch (Exception __ex) { SRApi.Guard.Log("地图网格/初始化", __ex); }

@@ -48,11 +48,11 @@ namespace SR_UCH {
                 SRApi.RegisterTick("自身状态-穿模", TickIgnore);
                 SRApi.RegisterSceneHook(OnSceneChanged);
                 // 三个补丁类独立注册：一个目标不存在只丢那一条。
-                try { Harmony.CreateAndPatchAll(typeof(KillPatch), (string)null); }
+                try { SRApi.RegisterPatch(typeof(KillPatch)); }
                 catch (Exception __h1) { SRApi.LogWarn("自身状态/死亡拦截补丁跳过: " + __h1.Message); }
-                try { Harmony.CreateAndPatchAll(typeof(SetupDeathPatch), (string)null); }
+                try { SRApi.RegisterPatch(typeof(SetupDeathPatch)); }
                 catch (Exception __h2) { SRApi.LogWarn("自身状态/广播死亡补丁跳过: " + __h2.Message); }
-                try { Harmony.CreateAndPatchAll(typeof(FixedPatch), (string)null); }
+                try { SRApi.RegisterPatch(typeof(FixedPatch)); }
                 catch (Exception __h3) { SRApi.LogWarn("自身状态/物理帧补丁跳过: " + __h3.Message); }
             } catch (Exception __ex) { SRApi.Guard.Log("自身状态/初始化", __ex); }
         }
