@@ -89,6 +89,10 @@ public partial class HUD {
                 _hasGame = true;
 
                 GameSettings gs = ReadSettings();
+                // 新回合进入布置/开始相位 = 结算板已收起，退出结算展示期。
+                if (_phase == GameControl.GamePhase.PLACE || _phase == GameControl.GamePhase.START) {
+                    SR_UCH.Pure.RoundTruth.EndTally(ref _rs);
+                }
                 UpdateTimer(gc, gs);
                 UpdateRound(gc, gs);
                 UpdateLevel(gs);
@@ -253,7 +257,10 @@ public partial class HUD {
                 if (challenge) { _roundText = RoundWord() + trueRound; return; }
                 int max = 0;
                 try { if (gs != null) max = gs.MaxRounds; } catch { max = 0; }
-                int shown = max > 0 ? Mathf.Min(trueRound, max) : trueRound;
+                // 结算展示期显示"刚打完的那一轮"：RoundNumber 此时已提前指向下一轮，
+                // 直接用 TrueRound 会显示成"第 2/N"，而第 1 轮结算板还挂在屏幕上。
+                int disp = SR_UCH.Pure.RoundTruth.DisplayRound(_rs, max);
+                int shown = max > 0 ? Mathf.Min(disp, max) : disp;
                 _roundText = max > 0
                     ? RoundWord() + shown + "/" + max
                     : RoundWord() + shown;

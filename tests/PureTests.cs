@@ -167,9 +167,28 @@ namespace SR_UCH.Tests {
             Ok("挑战模式重试计数", RoundTruth.Step(ref rc, 5, true) && rc.TrueRound == 5);
             Ok("挑战模式抖动不回退", !RoundTruth.Step(ref rc, 3, true) && rc.TrueRound == 5);
             Ok("挑战模式回到 1", RoundTruth.Step(ref rc, 1, true) && rc.TrueRound == 1);
+
+            // 结算展示期：RoundNumber 已提前指向下一轮，HUD 要显示刚打完的那一轮。
+            RoundTruthState rd = new RoundTruthState();
+            RoundTruth.Step(ref rd, 1, false);
+            RoundTruth.NoteTally(ref rd);
+            Eq("非结算期显示当前轮", 1, RoundTruth.DisplayRound(rd, 5));
+            RoundTruth.Step(ref rd, 2, false);   // 结算后 +1 被接受，但结算板还挂着
+            Ok("接受 +1 后仍在展示期", rd.TrueRound == 2 && rd.InTally);
+            Eq("展示期回退一轮", 1, RoundTruth.DisplayRound(rd, 5));
+            RoundTruth.EndTally(ref rd);
+            Ok("EndTally 退出展示期", !rd.InTally);
+            Eq("展示期结束后显示当前轮", 2, RoundTruth.DisplayRound(rd, 5));
+            // 末轮：回退会显示成 max-1，看起来像少一轮，故不回退。
+            RoundTruthState rl = new RoundTruthState();
+            RoundTruth.Step(ref rl, 3, false);
+            RoundTruth.NoteTally(ref rl);
+            RoundTruth.Step(ref rl, 4, false);
+            Eq("末轮不回退（不显示 max-1）", 4, RoundTruth.DisplayRound(rl, 4));
+
             RoundTruth.NoteTally(ref rt);
             RoundTruth.Reset(ref rt);
-            Ok("Reset 全清", rt.TrueRound == 0 && rt.Pending == 0 && !rt.TallySeen);
+            Ok("Reset 全清", rt.TrueRound == 0 && rt.Pending == 0 && !rt.TallySeen && !rt.InTally);
             RoundTruthState rp = new RoundTruthState();
             RoundTruth.Step(ref rp, 1, false);
             Ok("多次虚增只记最大", !RoundTruth.Step(ref rp, 4, false) && !RoundTruth.Step(ref rp, 5, false) && rp.Pending == 5);
