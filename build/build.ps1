@@ -185,7 +185,7 @@ function Invoke-Build([string]$rsp, [string]$name) {
     else { & $csc "@$rsp" 2>&1 | Out-Null }
     if ($LASTEXITCODE -ne 0) { Write-Host "  [FAIL] $name"; exit 1 }
     Write-Host "  [ OK ] $name"
-    $summary.Add("SR   build  OK   $name")
+    $summary.Add("SR  build   $name")
 }
 
 # ---- -Check：守卫只有一份实现，交给统一入口 ----
@@ -212,7 +212,7 @@ if ($useDotnetBuild) {
         Copy-Item -LiteralPath $builtDll -Destination (Join-Path $outDir 'SR_UCH.dll') -Force
     }
     Write-Host '  [ OK ] SR_UCH.dll (dotnet)'
-    $summary.Add('SR   build  OK   bin\MSBuild\SR_UCH.dll')
+    $summary.Add('SR  build   bin\MSBuild\SR_UCH.dll')
 } else {
     Invoke-Build $work 'SR_UCH.dll'
 }
@@ -242,7 +242,7 @@ if ($Deploy) {
     Write-Host ("已部署: " + (Join-Path $plugins $dll))
     $srHash = ''
     try { $srHash = (Get-FileHash -LiteralPath (Join-Path $plugins $dll) -Algorithm SHA256).Hash.Substring(0, 12) } catch { }
-    $summary.Add("SR   deploy OK   $dll  $srHash")
+    $summary.Add("SR  deploy  $dll  " + $srHash)
     try {
         $hash = (Get-FileHash $src -Algorithm SHA256).Hash.Substring(0, 16)
         $verLine = 'SR_UCH ' + $hash + '  built ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
@@ -282,7 +282,7 @@ if (-not $NoEx) {
             Write-Host '  [WARN] EX 构建失败（SR 已成功，可单独跑 SR_UCH_EX\build\check-ex.ps1 排查）'
         } else {
             Write-Host '  [ OK ] SR_UCH_EX.dll'
-            $summary.Add('EX   build  OK   bin\MSBuild\SR_UCH_EX.dll')
+            $summary.Add('EX  build   bin\MSBuild\SR_UCH_EX.dll')
             if ($Deploy) {
                 $exBuilt = Join-Path $exRoot 'bin\MSBuild\SR_UCH_EX.dll'
                 if (Test-Path -LiteralPath $exBuilt) {
@@ -291,7 +291,7 @@ if (-not $NoEx) {
                         Write-Host ("已部署: " + (Join-Path $plugins 'SR_UCH_EX.dll'))
                         $exHash = ''
                         try { $exHash = (Get-FileHash -LiteralPath (Join-Path $plugins 'SR_UCH_EX.dll') -Algorithm SHA256).Hash.Substring(0, 12) } catch { }
-                        $summary.Add("EX   deploy OK   SR_UCH_EX.dll  $exHash")
+                        $summary.Add("EX  deploy  SR_UCH_EX.dll  " + $exHash)
                     } catch { Write-Host ('EX 部署失败（游戏是否正在运行？）: ' + $_.Exception.Message) }
                 } else {
                     Write-Host ("找不到 EX 产物: $exBuilt")
@@ -302,32 +302,19 @@ if (-not $NoEx) {
     }
 }
 
-# ---- 构建总结：每次运行都打印，避免出现"看起来成功了但没有产物" ----
+# ---- 构建总结：一行状态 + 一行产物，避免"看起来成功了但没有产物" ----
 Write-Host ''
-Write-Host '================= 构建总结 ================='
-Write-Host ('  游戏目录 : ' + $GameDir)
-Write-Host ('  编译路线 : ' + $(if ($useDotnetBuild) { 'dotnet build (MSBuild)' } else { 'csc' }))
-if ($Check) { Write-Host '  目标     : -Check（统一回归，不构建）' }
-elseif ($Ex -and $NoEx) { Write-Host '  目标     : 参数冲突（-Ex 与 -NoEx 同时给出）' }
-elseif ($Ex) { Write-Host '  目标     : 只构建 EX' }
-elseif ($NoEx) { Write-Host '  目标     : 只构建 SR' }
-else { Write-Host '  目标     : SR + EX' }
-Write-Host ('  部署     : ' + $(if ($Deploy) { '是' } else { '否（未加 -Deploy）' }))
-Write-Host ''
-if ($summary.Count -gt 0) {
-    Write-Host '  组件  阶段    结果  详情'
-    Write-Host '  ----  ------  ----  ------------------------------------------'
-    foreach ($s in $summary) { Write-Host ('  ' + $s) }
+if ($summary.Count -eq 0) {
+    Write-Host '[构建] 无产物'
 } else {
-    Write-Host '  （本次没有产出任何构建结果）'
+    $stage = 'build'
+    if ($Deploy) { $stage = 'deploy' }
+    $route = 'csc'
+    if ($useDotnetBuild) { $route = 'msbuild' }
+    Write-Host ('[构建] ' + $summary.Count + ' 项完成  (' + $route + ')')
+    foreach ($s in $summary) { Write-Host ('       ' + $s) }
+    if ($Deploy) { Write-Host ('[部署] ' + (Join-Path $GameDir 'BepInEx\plugins')) }
 }
-if ($Deploy) {
-    Write-Host ''
-    Write-Host ('  部署目录 : ' + (Join-Path $GameDir 'BepInEx\plugins'))
-    Write-Host '  提示     : 游戏运行时部署可能失败，请先完全退出游戏'
-}
-Write-Host '============================================='
-Write-Host ''
 
 if ($ExportAudit) {
     $log = Join-Path $GameDir 'BepInEx\LogOutput.log'
