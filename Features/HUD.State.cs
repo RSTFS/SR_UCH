@@ -20,12 +20,7 @@ public partial class HUD {
                 if (start != null) { OnPhaseStarted(__instance, start.Phase); return; }
                 EndPhaseEvent end = e as EndPhaseEvent;
                 if (end != null) { OnPhaseEnded(end.Phase); return; }
-                ScoreboardEvent sb = e as ScoreboardEvent;
-                if (sb != null) {
-                    // 记分板出现或结算完成 = 本回合确实推进过，作为回合增量证据。
-                    try { if (sb.Showing || sb.AfterTally) SR_UCH.Pure.RoundTruth.NoteTally(ref _rs); }
-                    catch { /* 静默：非关键路径，失败可直接忽略 */ }
-                }
+                // 记分板事件不再作为回合证据：RoundNumber 本身就是当前回合（见 Pure/RoundTruth.cs）。
             } catch (Exception __ex) { SRApi.Guard.Log("HUD 阶段事件", __ex); }
         }
         private static void OnPhaseStarted(GameControl gc, GameControl.GamePhase phase) {
@@ -89,10 +84,6 @@ public partial class HUD {
                 _hasGame = true;
 
                 GameSettings gs = ReadSettings();
-                // 新回合进入布置/开始相位 = 结算板已收起，退出结算展示期。
-                if (_phase == GameControl.GamePhase.PLACE || _phase == GameControl.GamePhase.START) {
-                    SR_UCH.Pure.RoundTruth.EndTally(ref _rs);
-                }
                 UpdateTimer(gc, gs);
                 UpdateRound(gc, gs);
                 UpdateLevel(gs);

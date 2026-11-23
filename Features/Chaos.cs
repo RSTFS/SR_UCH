@@ -242,7 +242,6 @@ namespace SR_UCH.Tweaks {
             public ChaosListener(Chaos o) { _o = o; }
             public void handleEvent(GameEvent.GameEvent e) {
                 if (e is GameEvent.StartPhaseEvent) { _o.OnStartPhase((GameEvent.StartPhaseEvent)e); return; }
-                if (e is GameEvent.ScoreboardEvent) { _o.OnScoreboard((GameEvent.ScoreboardEvent)e); return; }
                 if (e is GameEvent.GameEndEvent) { _o.OnGameEnd(); return; }
                 if (e is GameEvent.NewMatchEvent) { _o.OnNewMatch(); return; }
                 if (e is GameEvent.NetworkMessageReceivedEvent) { _o.OnNet((GameEvent.NetworkMessageReceivedEvent)e); return; }
@@ -290,13 +289,6 @@ namespace SR_UCH.Tweaks {
         }
 
         // ============ 阶段边界 / 真回合 ============
-
-        // 记分板出现或结算完成 = 本回合确实推进过；与 HUD 同一判据。
-        private void OnScoreboard(GameEvent.ScoreboardEvent e) {
-            if (e == null) return;
-            try { if (e.Showing || e.AfterTally) SR_UCH.Pure.RoundTruth.NoteTally(ref _rs); }
-            catch (Exception __sb) { SRApi.Guard.Log("混乱牌组/结算证据", __sb); }
-        }
 
         // 每帧读游戏回合数，交给共享状态机判定「真回合」是否推进。
         private static void PumpRoundTruth() {

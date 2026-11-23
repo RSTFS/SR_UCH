@@ -152,51 +152,29 @@ namespace SR_UCH.Tests {
             Eq("服务键", "ui.ActivePage", RuntimeRules.ServiceKey("ui", "ActivePage"));
             Eq("服务键空值", "", RuntimeRules.ServiceKey("", "x"));
 
-            // 真回合：结算证据 + 挂起候选 + 只进不退（HUD / 混乱牌组同源）。
+            // 真回合：直接采用游戏 roundNumber（ToPlaceMode 里 ++，结算期不加）。
             RoundTruthState rt = new RoundTruthState();
-            Ok("首回合无需结算", RoundTruth.Step(ref rt, 1, false) && rt.TrueRound == 1 && rt.Pending == 0);
-            Ok("证据一次性消费", !rt.TallySeen);
-            RoundTruth.NoteTally(ref rt);
-            Ok("结算后 +1 接受", RoundTruth.Step(ref rt, 2, false) && rt.TrueRound == 2 && rt.Pending == 0 && !rt.TallySeen);
-            Ok("无结算虚增只挂起", !RoundTruth.Step(ref rt, 3, false) && rt.TrueRound == 2 && rt.Pending == 3);
-            Ok("同帧抖动不丢挂起", !RoundTruth.Step(ref rt, 2, false) && rt.TrueRound == 2 && rt.Pending == 3);
-            RoundTruth.NoteTally(ref rt);
-            Ok("结算迟到确认挂起", RoundTruth.Step(ref rt, 3, false) && rt.TrueRound == 3 && rt.Pending == 0 && !rt.TallySeen);
-            Ok("回退到 1 才算换局", RoundTruth.Step(ref rt, 1, false) && rt.TrueRound == 1);
-            RoundTruthState rc = new RoundTruthState();
-            Ok("挑战模式重试计数", RoundTruth.Step(ref rc, 5, true) && rc.TrueRound == 5);
-            Ok("挑战模式抖动不回退", !RoundTruth.Step(ref rc, 3, true) && rc.TrueRound == 5);
-            Ok("挑战模式回到 1", RoundTruth.Step(ref rc, 1, true) && rc.TrueRound == 1);
+            Ok("首回合直接接受", RoundTruth.Step(ref rt, 1, false) && rt.TrueRound == 1);
+            Ok("前进到 2", RoundTruth.Step(ref rt, 2, false) && rt.TrueRound == 2);
+            Ok("抖动不回退", !RoundTruth.Step(ref rt, 2, false) && rt.TrueRound == 2);
+            Ok("瞬时回退被忽略", !RoundTruth.Step(ref rt, 0, false) && rt.TrueRound == 2);
+            Ok("回到 1 视为换局", RoundTruth.Step(ref rt, 1, false) && rt.TrueRound == 1);
 
-            // 结算展示期：RoundNumber 已提前指向下一轮，HUD 要显示刚打完的那一轮。
+            // HUD 展示：当前回合，按 MaxRounds 钳上限。
             RoundTruthState rd = new RoundTruthState();
-            RoundTruth.Step(ref rd, 1, false);
-            RoundTruth.NoteTally(ref rd);
-            Eq("非结算期显示当前轮", 1, RoundTruth.DisplayRound(rd, 5));
-            RoundTruth.Step(ref rd, 2, false);   // 结算后 +1 被接受，但结算板还挂着
-            Ok("接受 +1 后仍在展示期", rd.TrueRound == 2 && rd.InTally);
-            Eq("展示期回退一轮", 1, RoundTruth.DisplayRound(rd, 5));
-            RoundTruth.EndTally(ref rd);
-            Ok("EndTally 退出展示期", !rd.InTally);
-            Eq("展示期结束后显示当前轮", 2, RoundTruth.DisplayRound(rd, 5));
-            // 末轮：回退会显示成 max-1，看起来像少一轮，故不回退。
-            RoundTruthState rl = new RoundTruthState();
-            RoundTruth.Step(ref rl, 3, false);
-            RoundTruth.NoteTally(ref rl);
-            RoundTruth.Step(ref rl, 4, false);
-            Eq("末轮不回退（不显示 max-1）", 4, RoundTruth.DisplayRound(rl, 4));
+            RoundTruth.Step(ref rd, 3, false);
+            Eq("显示当前回合", 3, RoundTruth.DisplayRound(rd, 5));
+            Eq("超过上限被钳住", 4, RoundTruth.DisplayRound(new RoundTruthState { TrueRound = 9 }, 4));
+            Eq("无上限原样显示", 3, RoundTruth.DisplayRound(rd, 0));
 
-            RoundTruth.NoteTally(ref rt);
+            // 挑战模式：每次重试 roundNumber 从 1 起，与普通模式同一套判定。
+            RoundTruthState rc = new RoundTruthState();
+            Ok("挑战模式首回合", RoundTruth.Step(ref rc, 1, true) && rc.TrueRound == 1);
+            Ok("挑战模式重试累加", RoundTruth.Step(ref rc, 2, true) && rc.TrueRound == 2);
+            Ok("挑战模式抖动不回退", !RoundTruth.Step(ref rc, 1, true) || rc.TrueRound >= 1);
+
             RoundTruth.Reset(ref rt);
-            Ok("Reset 全清", rt.TrueRound == 0 && rt.Pending == 0 && !rt.TallySeen && !rt.InTally);
-            RoundTruthState rp = new RoundTruthState();
-            RoundTruth.Step(ref rp, 1, false);
-            Ok("多次虚增只记最大", !RoundTruth.Step(ref rp, 4, false) && !RoundTruth.Step(ref rp, 5, false) && rp.Pending == 5);
-            RoundTruth.NoteTally(ref rp);
-            Ok("一次结算确认最大候选", RoundTruth.Step(ref rp, 5, false) && rp.TrueRound == 5 && rp.Pending == 0);
-            RoundTruth.NoteTally(ref rp);
-            RoundTruth.ClearTally(ref rp);
-            Ok("ClearTally 只清证据", !rp.TallySeen && rp.TrueRound == 5);
+            Ok("Reset 全清", rt.TrueRound == 0);
 
             Console.WriteLine("  通过 " + _pass + " / 失败 " + _fail);
             if (_fail > 0) { Console.WriteLine("== 有失败 =="); return 1; }

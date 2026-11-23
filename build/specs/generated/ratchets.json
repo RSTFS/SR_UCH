@@ -36,7 +36,7 @@
     "Features/Experiments.RemoveUi3.cs": 3,
     "Features/Experiments.Scene.cs": 3,
     "Features/FreePlay.Self.cs": 13,
-    "Features/HUD.State.cs": 2,
+    "Features/HUD.State.cs": 1,
     "Features/Level.AutoPartyItem.cs": 1,
     "Features/Level.PartyBox.cs": 1,
     "Features/Level.Snapshot.cs": 2,
@@ -51,7 +51,7 @@
     "Features/QuickAdjust.cs": 1,
     "MainPlugin.cs": 20
   },
-  "silent_catch_total": 174,
+  "silent_catch_total": 173,
   "api_level": {
     "ApiLevel": 16,
     "members": 649
