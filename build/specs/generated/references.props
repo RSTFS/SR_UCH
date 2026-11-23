@@ -1,23 +1,23 @@
 <Project>
   <!-- 由 tools/spec_engine.py 从 spec.build 派生；勿手改。 -->
   <ItemGroup>
-    <Reference Include="Assembly-CSharp"><HintPath>$(UchManagedDir)/Assembly-CSharp.dll</HintPath></Reference>
-    <Reference Include="UnityEngine"><HintPath>$(UchManagedDir)/UnityEngine.dll</HintPath></Reference>
-    <Reference Include="UnityEngine.CoreModule"><HintPath>$(UchManagedDir)/UnityEngine.CoreModule.dll</HintPath></Reference>
-    <Reference Include="UnityEngine.UNETModule"><HintPath>$(UchManagedDir)/UnityEngine.UNETModule.dll</HintPath></Reference>
-    <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(UchManagedDir)/UnityEngine.IMGUIModule.dll</HintPath></Reference>
-    <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(UchManagedDir)/UnityEngine.InputLegacyModule.dll</HintPath></Reference>
-    <Reference Include="UnityEngine.Physics2DModule"><HintPath>$(UchManagedDir)/UnityEngine.Physics2DModule.dll</HintPath></Reference>
-    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(UchManagedDir)/UnityEngine.TextRenderingModule.dll</HintPath></Reference>
-    <Reference Include="UnityEngine.UI"><HintPath>$(UchManagedDir)/UnityEngine.UI.dll</HintPath></Reference>
-    <Reference Include="UnityEngine.UIModule"><HintPath>$(UchManagedDir)/UnityEngine.UIModule.dll</HintPath></Reference>
-    <Reference Include="UnityEngine.AudioModule"><HintPath>$(UchManagedDir)/UnityEngine.AudioModule.dll</HintPath></Reference>
-    <Reference Include="UnityEngine.AnimationModule"><HintPath>$(UchManagedDir)/UnityEngine.AnimationModule.dll</HintPath></Reference>
-    <Reference Include="InControl"><HintPath>$(UchManagedDir)/InControl.dll</HintPath></Reference>
-    <Reference Include="com.unity.multiplayer-hlapi.Runtime"><HintPath>$(UchManagedDir)/com.unity.multiplayer-hlapi.Runtime.dll</HintPath></Reference>
-    <Reference Include="AK.Wwise.Unity.API"><HintPath>$(UchManagedDir)/AK.Wwise.Unity.API.dll</HintPath></Reference>
-    <Reference Include="BepInEx"><HintPath>$(BepInExCoreDir)/BepInEx.dll</HintPath></Reference>
-    <Reference Include="0Harmony"><HintPath>$(BepInExCoreDir)/0Harmony.dll</HintPath></Reference>
+    <Reference Include="Assembly-CSharp"><HintPath>$(UchManagedDir)/Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(UchManagedDir)/UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(UchManagedDir)/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UNETModule"><HintPath>$(UchManagedDir)/UnityEngine.UNETModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(UchManagedDir)/UnityEngine.IMGUIModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(UchManagedDir)/UnityEngine.InputLegacyModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.Physics2DModule"><HintPath>$(UchManagedDir)/UnityEngine.Physics2DModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(UchManagedDir)/UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(UchManagedDir)/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UIModule"><HintPath>$(UchManagedDir)/UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.AudioModule"><HintPath>$(UchManagedDir)/UnityEngine.AudioModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.AnimationModule"><HintPath>$(UchManagedDir)/UnityEngine.AnimationModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="InControl"><HintPath>$(UchManagedDir)/InControl.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="com.unity.multiplayer-hlapi.Runtime"><HintPath>$(UchManagedDir)/com.unity.multiplayer-hlapi.Runtime.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="AK.Wwise.Unity.API"><HintPath>$(UchManagedDir)/AK.Wwise.Unity.API.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="BepInEx"><HintPath>$(BepInExCoreDir)/BepInEx.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(BepInExCoreDir)/0Harmony.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="mscorlib" />
     <Reference Include="netstandard" />
     <Reference Include="System" />

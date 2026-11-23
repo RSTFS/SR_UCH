@@ -348,7 +348,9 @@ def derive():
         # dir 决定根目录：bepinex 项在 $(BepInExCoreDir)，其余在 $(UchManagedDir)。
         # 之前无论 dir 是什么都写 UchManagedDir，导致 BepInEx/0Harmony 引用解析不到。
         root = '$(BepInExCoreDir)' if x.get('dir') == 'bepinex' else '$(UchManagedDir)'
-        rp.append('    <Reference Include="%s"><HintPath>%s/%s.dll</HintPath></Reference>' % (x['name'], root, x['name']))
+        # Private=false：游戏/BepInEx 的 DLL 是运行时依赖，不能拷进输出目录。
+        # 不加会把 90+ 个游戏 DLL 全量复制到 bin/，产物目录被塞满。
+        rp.append('    <Reference Include="%s"><HintPath>%s/%s.dll</HintPath><Private>false</Private></Reference>' % (x['name'], root, x['name']))
     for x in s['build']['bcl']:
         rp.append('    <Reference Include="%s" />' % x)
     rp += ['  </ItemGroup>', '</Project>', '']
