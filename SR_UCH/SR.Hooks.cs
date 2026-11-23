@@ -25,6 +25,8 @@ public partial class SR {
             public float Hz;
             public long Overruns;
             public float WarnedAt = -999f;
+            // 组合根：登记本钩子所属功能 Id，用于门控与按功能撤销。
+            public string Owner;
         }
         private static readonly List<TickHook> _tickHooks = new List<TickHook>();
         // 分区：帧钩子预算（固定预算 + 压力平滑 + 防抖换档）
@@ -40,12 +42,37 @@ public partial class SR {
 
         // 按名去重：同名视为同一钩子的重新注册（覆盖 Run）；匿名委托是新实例，重复注册拦不住。
         private static void AddOrReplaceHook(List<TickHook> list, string name, Action hook) {
+            AddOrReplaceHook(list, name, hook, null);
+        }
+        private static void AddOrReplaceHook(List<TickHook> list, string name, Action hook, string owner) {
             string n = string.IsNullOrEmpty(name) ? "未命名" : name;
             for (int i = 0; i < list.Count; i++) {
                 TickHook h = list[i];
-                if (h != null && string.Equals(h.Name, n, StringComparison.Ordinal)) { h.Run = hook; return; }
+                if (h != null && string.Equals(h.Name, n, StringComparison.Ordinal)) { h.Run = hook; h.Owner = owner; return; }
             }
-            list.Add(new TickHook { Name = n, Run = hook });
+            list.Add(new TickHook { Name = n, Run = hook, Owner = owner });
+        }
+
+        // 组合根：按 owner 标记 / 撤销 tick，按名字撤销关机回调。
+        internal static void SetTickOwner(string name, string owner) {
+            for (int i = 0; i < _tickHooks.Count; i++)
+                if (_tickHooks[i] != null && string.Equals(_tickHooks[i].Name, name, StringComparison.Ordinal)) {
+                    _tickHooks[i].Owner = owner; return;
+                }
+        }
+        internal static void UnregisterTicksByOwner(string owner) {
+            if (string.IsNullOrEmpty(owner)) return;
+            for (int i = _tickHooks.Count - 1; i >= 0; i--)
+                if (_tickHooks[i] != null && string.Equals(_tickHooks[i].Owner, owner, StringComparison.Ordinal)) _tickHooks.RemoveAt(i);
+        }
+        internal static void UnregisterShutdownsByNames(IList<string> names) {
+            if (names == null || names.Count == 0) return;
+            for (int i = _shutdownHooks.Count - 1; i >= 0; i--) {
+                TickHook h = _shutdownHooks[i];
+                if (h == null) continue;
+                for (int k = 0; k < names.Count; k++)
+                    if (string.Equals(h.Name, names[k], StringComparison.Ordinal)) { _shutdownHooks.RemoveAt(i); break; }
+            }
         }
 
         private static readonly List<TickHook> _shutdownHooks = new List<TickHook>();
@@ -65,6 +92,10 @@ public partial class SR {
                 }
                 if (_shutdownHooks.Count > 0) LogInfo("[SR] 已执行 " + _shutdownHooks.Count + " 个关机回调");
                 _shutdownHooks.Clear();
+                int __globals = Sub.GlobalCount;
+                int __leases = SrRuntime.Shutdown();
+                if (__globals > 0) LogInfo("[SR] 已撤销 " + __globals + " 个全局委托订阅");
+                if (__leases > 0) LogInfo("[SR] 已撤销 " + __leases + " 个功能作用域");
             } catch (Exception __ex) { Guard.Log("关机回调批处理", __ex); }
         }
 
@@ -117,6 +148,7 @@ public partial class SR {
             for (int i = 0; i < hooks.Count; i++) {
                 TickHook h = hooks[i];
                 if (h == null || h.Run == null) continue;
+                if (!FeatureRuntime.GateAllows(h.Owner)) continue;
                 bool input = IsInputHookName(h.Name);
                 // 按键类永不降频；其余按 Interval 限流（由 UpdateTickBudget 写入）。
                 if (!input) {

@@ -1,4 +1,4 @@
-// 契约层：ITweak / IFeatureHost / ILanguagePack / Slots，第三方功能只依赖本文件。
+// 契约层：ITweak / IFeatureHost / ILanguagePack / SrCaps，第三方功能只依赖本文件。
 // 硬约定：不得引用 SR 的其它文件，须能单独编译；槽位只传 BCL / 引擎 / 游戏类型。
 using System;
 using System.Collections.Generic;
@@ -61,11 +61,10 @@ namespace SR_UCH {
             public static float TableAutoHeight(float usedAbove, float minH) { return SRApi.TableAutoHeight(usedAbove, minH); }
             // 表格尺寸令牌（随 UI 缩放）；滚动几何为纯函数，单测直接覆盖。
         public static float TableRowsH(float tableH, float headerH) {
-            return Mathf.Max(0f, tableH - headerH);
+            return SR_UCH.Pure.ScrollMath.TableRowsH(tableH, headerH);
         }
         public static float TableMaxScrollY(int rows, float rowH, float rowsH) {
-            float content = Mathf.Max(0, rows) * Mathf.Max(0f, rowH);
-            return Mathf.Max(0f, content - Mathf.Max(0f, rowsH));
+            return SR_UCH.Pure.ScrollMath.TableMaxScrollY(rows, rowH, rowsH);
         }
 
         // 自绘列表的唯一滚动几何：把表格框收敛成屏幕真实可见的行区。
@@ -73,8 +72,7 @@ namespace SR_UCH {
         public static float ScrollRowsH(Rect box, float headerH, float visibleBottom, float rowH) {
             float rowsTop = box.y + headerH;
             float raw = Mathf.Max(rowH, box.height - headerH);
-            float avail = Mathf.Max(rowsTop + rowH, visibleBottom) - rowsTop;
-            return Mathf.Max(rowH, Mathf.Min(raw, avail));
+            return SR_UCH.Pure.ScrollMath.RowsHVisible(rowsTop, raw, visibleBottom, rowH);
         }
         // 收敛后行区的滚动上限（与 TableMaxScrollY 同公式，收敛逻辑收在一处）。
         public static float ScrollMaxY(int rows, float rowH, float rowsH) {
@@ -82,6 +80,21 @@ namespace SR_UCH {
         }
 
         public static float TableRowH() { return Sc(26f); }
+        // 滚动条便捷门面：功能层只需 Ctl.Scroll.Wheel/Changed/Clamp，
+        // 具体算术仍只有 Pure/ScrollMath 一份实现（单测直接覆盖）。
+        public static class Scroll {
+            public static float Wheel(float y, float notches, float maxY, float step) {
+                return SR_UCH.Pure.ScrollMath.Wheel(y, notches, maxY, step);
+            }
+            public static float Clamp(float y, float maxY) {
+                return SR_UCH.Pure.ScrollMath.Clamp(y, maxY);
+            }
+            public static bool Changed(float before, float after) {
+                return SR_UCH.Pure.ScrollMath.Changed(before, after);
+            }
+        }
+
+
             public static float ThemeRadius { get { return Sc(6f); } }
             public static float ThemeHoverFade { get { return 0.12f; } }
             public static Color ThemeFooterBg { get { return new Color(0.10f, 0.11f, 0.13f, 0.96f); } }
@@ -410,20 +423,63 @@ namespace SR_UCH {
 
         // ================= 作用域化 GUI 状态（用法：using (SRApi.Ctl.Disabled(cond)) { ... }） =================
         // 手写 try/finally 还原 GUI.enabled 漏一次就会让整页变灰。
+        // 覆盖全部 IMGUI 全局态；嵌套按栈校验，帧末 CheckLeak 能发现漏释放。
+        // 注意：必须用 using，禁止手写 prev/还原跨方法配对。
         public sealed class GuiScope : System.IDisposable {
             private readonly bool _enabled;
-            private readonly bool _hasColor;
-            private readonly Color _color;
-            internal GuiScope(bool enabled, bool hasColor, Color color) {
-                _enabled = GUI.enabled; _hasColor = hasColor; _color = GUI.color;
+            private bool _hasColor, _hasBg, _hasContent, _hasMatrix, _hasDepth, _hasFont;
+            private readonly Color _color, _bg, _content;
+            private readonly Matrix4x4 _matrix;
+            private readonly int _depth;
+            private readonly Font _font;
+            private bool _done;
+            private static readonly System.Collections.Generic.Stack<GuiScope> _stack
+                = new System.Collections.Generic.Stack<GuiScope>();
+            private static int _leaks;
+
+            private GuiScope() {
+                _enabled = GUI.enabled; _color = GUI.color; _bg = GUI.backgroundColor;
+                _content = GUI.contentColor; _matrix = GUI.matrix; _depth = GUI.depth;
+                _font = GUI.skin != null ? GUI.skin.font : null;
+            }
+            internal GuiScope(bool enabled, bool hasColor, Color color) : this() {
+                _hasColor = hasColor;
                 if (!enabled) GUI.enabled = false;
                 if (hasColor) GUI.color = color;
+                _stack.Push(this);
             }
-            public void Dispose() { GUI.enabled = _enabled; if (_hasColor) GUI.color = _color; }
+            public static GuiScope Capture() { GuiScope s = new GuiScope(); _stack.Push(s); return s; }
+            public GuiScope WithMatrix(Matrix4x4 m) { _hasMatrix = true; GUI.matrix = m; return this; }
+            public GuiScope WithDepth(UiLayer layer) { _hasDepth = true; GUI.depth = (int)layer; return this; }
+            public GuiScope WithFont(Font f) { _hasFont = true; if (GUI.skin != null) GUI.skin.font = f; return this; }
+            public GuiScope WithBg(Color c) { _hasBg = true; GUI.backgroundColor = c; return this; }
+            public GuiScope WithContent(Color c) { _hasContent = true; GUI.contentColor = c; return this; }
+
+            public void Dispose() {
+                if (_done) return; _done = true;
+                if (_stack.Count > 0 && ReferenceEquals(_stack.Peek(), this)) _stack.Pop();
+                else if (_stack.Contains(this)) _leaks++;   // 嵌套顺序错乱
+                GUI.enabled = _enabled;
+                if (_hasColor) GUI.color = _color;
+                if (_hasBg) GUI.backgroundColor = _bg;
+                if (_hasContent) GUI.contentColor = _content;
+                if (_hasMatrix) GUI.matrix = _matrix;
+                if (_hasDepth) GUI.depth = _depth;
+                if (_hasFont && GUI.skin != null) GUI.skin.font = _font;
+            }
+            // 帧末调用：仍有未释放作用域即记一次，避免污染后续功能绘制。
+            public static int CheckLeak() {
+                if (_stack.Count > 0) { _leaks++; _stack.Clear(); }
+                return _leaks;
+            }
+            public static int Active { get { return _stack.Count; } }
         }
         public static System.IDisposable Disabled(bool disabled) { return new GuiScope(!disabled, false, default(Color)); }
         public static System.IDisposable Tint(Color color) { return new GuiScope(true, true, color); }
         public static System.IDisposable Tint(Color color, bool useIt) { return new GuiScope(true, useIt, color); }
+        public static GuiScope CaptureGui() { return GuiScope.Capture(); }
+        public static GuiScope Layer(UiLayer layer) { return GuiScope.Capture().WithDepth(layer); }
+        public static GuiScope Transform(Matrix4x4 m) { return GuiScope.Capture().WithMatrix(m); }
 
         // 分区标题装饰：非空且尚未带 "- " 前缀时自动包裹。
         private static string Decorate(string title) {
@@ -525,6 +581,14 @@ namespace SR_UCH {
                 ColorResetFn f = _colorReset as ColorResetFn;
                 if (f != null) f(entry);
             }
+        }
+
+        // 列表滚动统一约定：上滚为正 → 偏移减小；每帧把偏移夹回当前上限。
+        // 纯算术、无 sink；预设列表与联机列表共用，避免两页各写一套符号与夹紧逻辑。
+        public static class Scroll {
+            public static float Clamp(float y, float maxY) { return SR_UCH.Pure.ScrollMath.Clamp(y, maxY); }
+            public static float Wheel(float y, float notches, float maxY, float step) { return SR_UCH.Pure.ScrollMath.Wheel(y, notches, maxY, step); }
+            public static bool Changed(float before, float after) { return SR_UCH.Pure.ScrollMath.Changed(before, after); }
         }
     }
 }

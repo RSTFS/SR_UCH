@@ -1,0 +1,14 @@
+{
+  "schema": 2,
+  "features_declared": 28,
+  "groups_declared": 16,
+  "reflection_unique_keys": 33,
+  "reflection_calls": 34,
+  "harmony_patch_attributes": 50,
+  "contract": 2,
+  "features_semantics": "exact",
+  "require_all_hit": true,
+  "game_compare": false,
+  "note": "由 tools/spec_engine.py -Generate 派生；运行时值写 health.actual.json，不覆盖本文件。",
+  "reflection_key_digest": "cccc02a65fc4bf805e0af654a24361e03a3b6bc9f152f8e9ade22fd96238a802"
+}

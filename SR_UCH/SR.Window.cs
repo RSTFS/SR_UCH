@@ -161,8 +161,21 @@ public partial class SR {
         private static float _pageUsedTop;   // 上一帧量到的页头/页签底部 Y（Layout 帧兜底用）   // 各栏目页面外框按钮高度（切换栏目不跳）
         private static int _footerClickFrame = -1;   // 底栏按钮同帧去重
 
-        // 页面滚动位置；自绘页用它抵消滚动区跳动。
-        public static Vector2 PageScroll { get { return _scroll; } set { _scroll = value; } }
+        // 页面滚动位置：按 "模式|页签" 分桶，换页不再继承旧偏移、回到旧页可续看。
+        // 注意：_scroll 仍是本帧镜像；帧末由 BeginScrollView 结果写回字典。
+        private static readonly Dictionary<string, Vector2> _pageScroll = new Dictionary<string, Vector2>();
+        private static string PageScrollKey() {
+            string id = "";
+            try { id = SR.SelectedPageId(_selectedInternalSection) ?? ""; } catch { /* 静默：页签键读取失败不影响绘制 */ }
+            return _mode + "|" + id;
+        }
+        private static Vector2 RestorePageScroll() {
+            Vector2 v;
+            string policy = SrPageModel.PolicyFor(PageScrollKey());
+            if (policy != "per-page") return Vector2.zero;
+            return _pageScroll.TryGetValue(PageScrollKey(), out v) ? v : Vector2.zero;
+        }
+        public static Vector2 PageScroll { get { return _scroll; } set { _scroll = value; _pageScroll[PageScrollKey()] = value; } }
 
         // 自绘页声明不要页面级滚动条（内容自己适配窗口）；每帧末置 true，切栏目清掉。
         public static bool NoPageScrollBars;
@@ -224,8 +237,8 @@ public partial class SR {
             GUI.Label(new Rect(Sc(124), tY, Mathf.Max(Sc(40), mx - Sc(124) - Sc(6)), Sc(26)),
                 TitleHint(), _titleMid);
             if (GUI.Button(new Rect(mx, tY, mw, Sc(26)),
-                new GUIContent(AllEnabled ? T("总开关：开", "Master ON") : T("总开关：关", "Master OFF"),
-                    T("本 Mod 总开关：关闭时所有内部功能运行时失效，各功能开关值保持不变", "Mod master switch: off disables all internal features at runtime")),
+                new GUIContent(AllEnabled ? Tid("b706fd8bbd", "总开关：开", "Master ON") : Tid("69d5a06dd2", "总开关：关", "Master OFF"),
+                    Tid("2751907555", "本 Mod 总开关：关闭时所有内部功能运行时失效，各功能开关值保持不变", "Mod master switch: off disables all internal features at runtime")),
                 AllEnabled ? _selItem : _btn)) {
                 AllEnabled = !AllEnabled;
                 if (_allEnabledEntry != null) {
@@ -244,7 +257,7 @@ public partial class SR {
                 if (string.IsNullOrEmpty(key)) key = "INS";
                 if (UseEn) return key + ": manager - hover entries for tooltips";
                 return key + ": 开关界面 / 悬停条目看说明";
-            } catch { return T("INS: 开关界面 / 悬停条目看说明", "INS: manager - hover entries for tooltips"); }
+            } catch { return Tid("67816c9a18", "INS: 开关界面 / 悬停条目看说明", "INS: manager - hover entries for tooltips"); }
         }
 
         private static void DrawGUI() {
@@ -259,6 +272,7 @@ public partial class SR {
             _scaled = Mathf.Clamp(_uiScaleEntry.Value, Ui.ScaleMin, Ui.ScaleMax);
             if (_visible || _uiAlpha > 0.01f) {
             // 全局 GUI 状态（matrix / color / 字体 / 选择色）须在任何副作用前快照，否则异常会污染全局绘制。
+            SRApi.Ctl.GuiScope __gui = SRApi.Ctl.GuiScope.Capture();
             Color prevColor = GUI.color;
             Matrix4x4 prevMatrix = GUI.matrix;
             try {
@@ -448,7 +462,7 @@ public partial class SR {
                 if (GUILayout.Button(ZhSection(s), sbSel ? _selItem : _item, GUILayout.Height(Sc(26)), GUILayout.ExpandWidth(true))) {
                     _mode = Mode.Internal;
                     _selectedInternalSection = s;
-                    _scroll = Vector2.zero;
+                    _scroll = RestorePageScroll();
                     NoPageScrollBars = false;   // 换栏目：页面级滚动条要求复位（由自绘页每帧重新声明）
                     _editText.Clear();
                     _editOpen.Clear();
@@ -461,10 +475,10 @@ public partial class SR {
             foreach (PluginEntry p in _externalPlugins) {
                 // 被禁用的插件在侧栏标 *。
                 string label = (IsExternalDisabled(p.guid) ? "* " : "") + p.name;
-                if (GUILayout.Button(new GUIContent(label, p.guid + (IsExternalDisabled(p.guid) ? "\n" + T("已禁用（设置页可重新启用）", "disabled (re-enable in Settings)") : "")),
+                if (GUILayout.Button(new GUIContent(label, p.guid + (IsExternalDisabled(p.guid) ? "\n" + Tid("a0060a9c0c", "已禁用（设置页可重新启用）", "disabled (re-enable in Settings)") : "")),
                         _mode == Mode.External && p.guid == _pluginKey ? _selItem : _item, GUILayout.Height(Sc(26)), GUILayout.ExpandWidth(true))) {
                     _mode = Mode.External;
-                    _scroll = Vector2.zero;
+                    _scroll = RestorePageScroll();
                 // 右键该行可绑定插件启用 / 禁用热键。
                     _pluginKey = p.guid;
                     NoPageScrollBars = false;
@@ -489,7 +503,6 @@ public partial class SR {
             GUILayout.Space(Sc(2));
             GUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.Height(__bodyH));
             float colWidth = EntryNameWidth();
-            // 功能页外框部件：滚动区之外，功能自注册，仅选中栏目时调用；页签须画在顶栏之前。
             if (_mode == Mode.Internal) SR.RenderPageTabs(_selectedInternalSection);
             if (_mode == Mode.Internal) SR.RenderPageHeader(_selectedInternalSection);
             // ================= 滚轮：唯一入口（仲裁器） =================
@@ -506,7 +519,7 @@ public partial class SR {
                     SR.Ctl.ResetLabelColumn();   // 换页：标签列宽重新按本页标签收敛
                     _noScrollDeclared = false;   // 旧页的"禁止页面滚动"声明不能带到新页（会吞掉换页后的第一格滚轮）
                     SR.HighlightQuery = "";      // 换页清掉表格搜索高亮（否则旧查询串会染到别的列表）
-                    _scroll = Vector2.zero;     // 换页回到顶部：新页内容更短时不会停在空白处，看起来像"滚不动"
+                    _scroll = RestorePageScroll();     // 按本页分桶恢复滚动位置；新页无记录时为零（见 PageScrollKey / SrPageModel）。
                 }
             } catch (Exception __cs) { Guard.Log("换页收起下拉框", __cs); }
 
@@ -546,8 +559,9 @@ public partial class SR {
             Vector2 __scrollBeforeWheel = _scroll;
             if (__useScrollView) {
                 _scroll = GUILayout.BeginScrollView(_scroll, GUIStyle.none, GUIStyle.none, GUILayout.ExpandHeight(true));
+                _pageScroll[PageScrollKey()] = _scroll;   // 帧末写回本页，隔离其它页
             } else {
-                _scroll = Vector2.zero;   // 填充页没有页面滚动
+                _scroll = RestorePageScroll();   // 填充页没有页面滚动
             }
             if (_scroll != pageBefore) WheelFrame = Time.frameCount; // 页面滚动区吃掉了滚轮
             // 下拉框展开时滚轮只给下拉列表，撤销页面滚动量，否则整页跟着滑。
@@ -571,7 +585,7 @@ public partial class SR {
                         try { RenderEntryRow(entry, true, colWidth); }
                         catch (Exception __er) { Guard.Log("条目行渲染", __er); }
                     }
-                    if (!any) GUILayout.Label(T("（无匹配条目）", "(no matching entries)"), _label);
+                    if (!any) GUILayout.Label(Tid("2be7d7a6da", "（无匹配条目）", "(no matching entries)"), _label);
                 }
             } else if (_mode == Mode.Settings) {
                 try { RenderSettingsPage(colWidth); }   // 通用 / 自检 两页（自检页含诊断浮层开关）
@@ -581,9 +595,9 @@ public partial class SR {
                 if (curExt != null) {
                     bool dis = IsExternalDisabled(curExt.guid);
                     GUILayout.BeginHorizontal();
-                    if (GUILayout.Button(dis ? T("启用", "Enable") : T("禁用", "Disable"), _btn, GUILayout.Width(Sc(84)), GUILayout.Height(Sc(25)))) ToggleExternalPlugin(curExt);
+                    if (GUILayout.Button(dis ? Tid("14891bd418", "启用", "Enable") : Tid("6eb7d96b00", "禁用", "Disable"), _btn, GUILayout.Width(Sc(84)), GUILayout.Height(Sc(25)))) ToggleExternalPlugin(curExt);
                     GUILayout.Space(Sc(8));
-                    GUILayout.Label(dis ? T("（已禁用，重启后仍禁用）", "(disabled, stays disabled after restart)") : T("（已启用，重启后保持启用）", "(enabled, stays enabled after restart)"), _label, GUILayout.Height(Sc(26)));
+                    GUILayout.Label(dis ? Tid("9239da6cbf", "（已禁用，重启后仍禁用）", "(disabled, stays disabled after restart)") : Tid("1ee4cf186f", "（已启用，重启后保持启用）", "(enabled, stays enabled after restart)"), _label, GUILayout.Height(Sc(26)));
                     GUILayout.FlexibleSpace();
                     GUILayout.EndHorizontal();
                     GUILayout.Space(Sc(4));
@@ -600,7 +614,7 @@ public partial class SR {
                     }
                     RenderEntryRow(entry, false, colWidth);
                 }
-                if (!any) GUILayout.Label(T("（这个插件没有可显示的配置项）", "(this plugin has no visible settings)"), _label);
+                if (!any) GUILayout.Label(Tid("5b29bf2ba0", "（这个插件没有可显示的配置项）", "(this plugin has no visible settings)"), _label);
             }
             if (__useScrollView) {
                 GUILayout.EndScrollView();
@@ -675,7 +689,7 @@ public partial class SR {
             SR.DrawRounded(__footRect, SRApi.Ctl.ThemeFooterBg, SRApi.Ctl.ThemeRadius);
             Rect __footIn = new Rect(__footRect.x + Sc(4f), __footRect.y + Sc(3f), Mathf.Max(Sc(40f), __footRect.width - Sc(8f)), Sc(22f));
             float __bx = __footIn.x;
-            string __setLbl = T("设置", "Settings");
+            string __setLbl = Tid("36b502ac91", "设置", "Settings");
             float __setW = _btn.CalcSize(new GUIContent(__setLbl)).x + Sc(18f);
             Rect __setRect = new Rect(__bx, __footIn.y, __setW, Sc(22f));
             bool __setHover = __setRect.Contains(Event.current != null ? Event.current.mousePosition : Vector2.zero);
@@ -685,7 +699,7 @@ public partial class SR {
             GUI.backgroundColor = __setBg;
             if (__setClicked) {
                 _mode = Mode.Settings;
-                _scroll = Vector2.zero;   // 换页必须复位滚动位置，否则新页继承旧偏移
+                _scroll = RestorePageScroll();   // 按本页分桶恢复滚动位置；换页不继承其它页的偏移。
                 NoPageScrollBars = false;
                 _editText.Clear();
                 _editOpen.Clear();
@@ -702,7 +716,7 @@ public partial class SR {
                 if (fb == null || string.IsNullOrEmpty(fb.Id)) continue;
                 string fbLabel = T(fb.LabelZh, fb.LabelEn);
                 if (string.IsNullOrEmpty(fbLabel)) continue;
-                GUIContent fbContent = new GUIContent(fbLabel, T("打开", "Open ") + fbLabel);
+                GUIContent fbContent = new GUIContent(fbLabel, Tid("bebd5077be", "打开", "Open ") + fbLabel);
                 float fbW = _btn.CalcSize(new GUIContent(fbLabel)).x + Sc(16f);
                 if (__bx + fbW > __bxMax) break;
                 bool fbSel = _mode == Mode.Internal && _selectedInternalSection == fb.Id;
@@ -713,7 +727,7 @@ public partial class SR {
                         try { if (fb.OnClick != null) fb.OnClick(); } catch (Exception __ex) { Guard.Log("底栏按钮", __ex); }
                         _mode = Mode.Internal;
                         _selectedInternalSection = fb.Id;
-                        _scroll = Vector2.zero;
+                        _scroll = RestorePageScroll();
                         NoPageScrollBars = false;
                         _editText.Clear();
                         _editOpen.Clear();
@@ -735,7 +749,9 @@ public partial class SR {
                 if (e.type == EventType.MouseDown && e.button == 0 && over) _downOnControl = BlockWindowDrag;
             } catch (Exception __dg) { Guard.Log("窗口拖拽/按下标记", __dg); }
             } finally {
+                __gui.Dispose();   // 统一还原全局 GUI 状态；手工还原保留作双保险
                 GUI.matrix = prevMatrix; GUI.color = prevColor; GUI.skin.font = SR.Ctl.OrigSkinFont() ?? _prevFont;
+            SRApi.Ctl.GuiScope.CheckLeak();
                 // 还原全局选择色：GUI.skin 是共享皮肤，只在 SR 绘制期间改色。
                 RestoreSkinSelectionColor();
                 // 收走本帧页面声明并清零，下帧只认仍在声明的页面。

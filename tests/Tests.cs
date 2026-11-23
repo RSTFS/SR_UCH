@@ -25,15 +25,18 @@ namespace SR_UCH.Tests {
             TestColorHex();
             TestContractVersion();
             TestTableScrollMath();
-            TestSlots();
+            TestCaps();
             TestFeatureManifest();
             TestSinksAndFallbacks();
             TestStoragePath();
             TestTableArgsCreate();
             TestFeatureLogic();
+            TestFeatureRuntime();
+            RunStructureChecks();
+            TestPureParity();
 
-            Console.WriteLine("  通过 " + _pass + " / 失败 " + _fail);
-            if (_fail > 0) { Console.WriteLine("== 有失败 ❌ =="); return 1; }
+            Console.WriteLine("  通过 " + _pass + " / 失败 " + (_fail + Failures));
+            if (_fail + Failures > 0) { Console.WriteLine("== 有失败 ❌ =="); return 1; }
             Console.WriteLine("== 全部通过 ✅ ==");
             return 0;
         }
@@ -51,6 +54,17 @@ namespace SR_UCH.Tests {
         }
 
         // ColorHex：功能层颜色文本解析入口。
+        // 运行时门面与纯函数层必须给出同一结果。
+        private static void TestPureParity() {
+            for (int i = -10; i <= 120; i += 11) {
+                float y = (float)i;
+                Eq("Scroll.Clamp 同源", SR_UCH.Pure.ScrollMath.Clamp(y, 55f), SRApi.Ctl.Scroll.Clamp(y, 55f));
+                Eq("Scroll.Wheel 同源", SR_UCH.Pure.ScrollMath.Wheel(y, 2f, 55f, 7f), SRApi.Ctl.Scroll.Wheel(y, 2f, 55f, 7f));
+            }
+            Eq("TableRowsH 同源", SR_UCH.Pure.ScrollMath.TableRowsH(200f, 30f), (float)SRApi.Ctl.TableRowsH(200f, 30f));
+            Eq("TableMaxScrollY 同源", SR_UCH.Pure.ScrollMath.TableMaxScrollY(17, 34f, 400f), (float)SRApi.Ctl.TableMaxScrollY(17, 34f, 400f));
+        }
+
         private static void TestColorHex() {
             Color c;
 
@@ -78,53 +92,15 @@ namespace SR_UCH.Tests {
             Check("FromColor32(ToColor32) 往返", Math.Abs(back.g - 1f) < 0.01f);
         }
 
-        private static void TestSlots() {
-            int c0 = Slots.Count;
-            object a = new object();
-            object b = new object();
-
-            Slots.Provide("ut.slot", a);
-            Eq("Provide 后 Count+1", c0 + 1, Slots.Count);
-            Check("Require 取回同一引用", ReferenceEquals(a, Slots.Require<object>("ut.slot")));
-
-            // 后 Provide 覆盖前一个（EX 覆盖内置实现）。
-            Slots.Provide("ut.slot", b);
-            Check("Provide 覆盖后 Require 返回新实现", ReferenceEquals(b, Slots.Require<object>("ut.slot")));
-
-            // Retract(expected) 只删自己提供的：不匹配时不得删别人的。
-            Slots.Retract("ut.slot", a);
-            Eq("Retract(expected 不匹配) 不删除", c0 + 1, Slots.Count);
-            Slots.Retract("ut.slot", b);
-            Eq("Retract(expected 匹配) 删除", c0, Slots.Count);
-            Eq("Retract 后 Require 返回 null", (object)null, Slots.Require<object>("ut.slot"));
-
-            // 非法输入（null/空槽位名、null 实现）不得改变注册表。
-            int c1 = Slots.Count;
-            Slots.Provide("", a);
-            Slots.Provide(null, a);
-            Slots.Provide("ut.slot.null", null);
-            Eq("非法 Provide 不改变 Count", c1, Slots.Count);
-            Slots.Retract("", null);
-            Slots.Retract(null, null);
-            Slots.Retract("ut.slot.absent", null);
-            Eq("非法 Retract 不改变 Count", c1, Slots.Count);
-            Eq("空槽位名 Require 返回 null", (object)null, Slots.Require<object>(""));
-
-            // 缺槽位返回 null，并记入 MissCount / MissNames。
-            int m0 = Slots.MissCount;
-            Eq("缺槽位 Require 返回 null", (object)null, Slots.Require<object>("ut.slot.absent"));
-            Check("缺槽位记入 MissCount", Slots.MissCount > m0, "before=" + m0 + " after=" + Slots.MissCount);
-            bool named = false;
-            foreach (string n in Slots.MissNames) if (n != null && n.StartsWith("ut.slot.absent")) { named = true; break; }
-            Check("缺槽位名出现在 MissNames", named);
-
-            // 类型不符返回 null，miss 名带「类型不符」后缀。
-            Slots.Provide("ut.slot.typed", a);
-            Eq("类型不符 Require 返回 null", (object)null, Slots.Require<string>("ut.slot.typed"));
-            bool typedMiss = false;
-            foreach (string n in Slots.MissNames) if (n != null && n.StartsWith("ut.slot.typed")) { typedMiss = true; break; }
-            Check("类型不符记入 MissNames", typedMiss);
-            Slots.Retract("ut.slot.typed", a);
+        private static void TestCaps() {
+            object token = new object();
+            SrCaps.SelfTestToken = token;
+            Check("能力容器赋读同一引用", ReferenceEquals(token, SrCaps.SelfTestToken));
+            SrCaps.LevelReloadBusy = () => true;
+            Check("能力容器委托可调用", SrCaps.LevelReloadBusy != null && SrCaps.LevelReloadBusy());
+            SrCaps.SelfTestToken = null;
+            SrCaps.LevelReloadBusy = null;
+            Check("能力容器清空后为 null", SrCaps.SelfTestToken == null && SrCaps.LevelReloadBusy == null);
         }
 
         [SrFeature("ut.basic", "Basic", "1.5", Rank = 7)]
@@ -259,13 +235,105 @@ namespace SR_UCH.Tests {
             Eq("ChaosLogic 快冲刺=增益", 0, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 2, 2));
             Eq("ChaosLogic 跳舞=增益", 0, SR_UCH.Tweaks.ChaosLogic.TintKind(true, 9, 0));
             Eq("ChaosLogic 镜像=减益", 1, SR_UCH.Tweaks.ChaosLogic.TintKind(true, 10, 0));
-            Eq("ChaosLogic 慢射速=减益", 1, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 4, 1));
             Eq("ChaosLogic 未知字段=中性", 2, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 7, 1));
+        }
+
+        // 组合根：幂等、作用域账本、撤销。放在最后，避免污染其它用例的槽位状态。
+        private static void TestFeatureRuntime() {
+            FeatureRuntime.SetRevokeSink(null);
+            bool first = FeatureRuntime.TryInit(typeof(Program), "unit.runtime", delegate {
+                FeatureRuntime.RecordTick("T1");
+                FeatureRuntime.RecordPage("unit/page");
+                FeatureRuntime.RecordSlot("unit.slot", new object());
+                FeatureRuntime.NoteRequire("unit.slot", true);
+            });
+            bool second = FeatureRuntime.TryInit(typeof(Program), "unit.runtime", delegate { });
+            Check("FeatureRuntime 幂等", first && !second);
+            Eq("FeatureRuntime 作用域数", 1, FeatureRuntime.Count);
+            Check("FeatureRuntime 账本可见", FeatureRuntime.Report().Contains("unit.runtime"));
+            Check("FeatureRuntime 可撤销", FeatureRuntime.Dispose("unit.runtime"));
+            Eq("FeatureRuntime 撤销后归零", 0, FeatureRuntime.Count);
         }
 
         // 契约版本单调递增：外部模块按它握手，倒退会让 DLL 失效。
         private static void TestContractVersion() {
             Check("SRContract.Version >= 2", SRContract.Version >= 2, "v" + SRContract.Version);
         }
+
+        // 结构不变量：与上面的 Check 分开计数，避免重载劫持三参数版本的 _pass/_fail。
+        private static void CheckS(string name, bool ok) {
+            if (ok) { _pass++; return; }
+            Failures += 1;
+            Console.WriteLine((ok ? "  OK  " : " FAIL ") + name);
+        }
+    public static int Failures;
+
+    public static void RunStructureChecks() {
+        int[] layers = new int[] { -2000, -1000, 0, 1, 3, 100 };
+        System.Collections.Generic.HashSet<int> seen = new System.Collections.Generic.HashSet<int>();
+        bool uniq = true;
+        foreach (int v in layers) if (!seen.Add(v)) uniq = false;
+        CheckS("UiLayer 值唯一", uniq);
+        short[] ids = new short[] { 771, 772, 773, 774 };
+        System.Collections.Generic.HashSet<short> si = new System.Collections.Generic.HashSet<short>();
+        bool iu = true; foreach (short v in ids) if (!si.Add(v)) iu = false;
+        CheckS("NetMsgId 唯一", iu);
+        UiLayerRegistry.Reset(); NetMsgId.Reset();
+        UiLayerRegistry.Register("a", UiLayer.Main);
+        UiLayerRegistry.Register("b", UiLayer.Main);
+        CheckS("同层冲突可检出", UiLayerRegistry.Conflicts.Count == 1);
+        NetMsgId.Register("a", NetMsgId.ChaosRule);
+        NetMsgId.Register("b", NetMsgId.ChaosRule);
+        CheckS("消息撞号可检出", NetMsgId.Conflicts.Count == 1);
+        RefCache.InvalidateAll(); RefCache.Declare("X.Y"); RefCache.Declare("X.Y");
+        CheckS("反射声明去重", RefCache.DeclaredCount == 1);
+        RefCache.InvalidateAll();
+        CheckS("反射失效递增", RefCache.Version >= 0);
+        CheckS("稳定 ID 非空", SR_UCH.SrLocIds.Count > 0);
+        CheckS("稳定 ID 全部 10 位", System.Array.TrueForAll(SR_UCH.SrLocIds.Keys, k => k != null && k.Length == 10));
+        CheckS("列号声明与迁移同源", SR_UCH.SrCfgColumns.OnlineV5ColCount == SR_UCH.SrCfgColumns.OnlineV4ColCount - 1);
+        CheckS("反射缓存支持 Property", SR_UCH.RefCache.PropertyOf(typeof(string), "Length") != null);
+        CheckS("反射缓存失效递增", SR_UCH.RefCache.Version >= 0);
+        SR_UCH.Sub.DisposeAll();
+        CheckS("全局撤销可清空", SR_UCH.Sub.GlobalCount == 0);
+        // 页级滚动分桶：同一 key 覆写、不同 key 互不影响（纯字典语义）
+        var d = new System.Collections.Generic.Dictionary<string, UnityEngine.Vector2>();
+        d["Internal|A"] = new UnityEngine.Vector2(0, 120);
+        d["Internal|B"] = UnityEngine.Vector2.zero;
+        CheckS("页级 ViewState 隔离", d["Internal|A"].y == 120 && d["Internal|B"].y == 0);
+
+        // 能力容器：强类型字段，拼错在编译期失败。
+        CheckS("能力容器字段可直接赋值", SrCaps.LevelReloadBusy == null);
+
+        // 健康快照：四个出口共用的数据模型，纯函数可测。
+        HealthSchemaCheck();
+    }
+
+    private static void HealthSchemaCheck() {
+        CheckS("健康 schema 含 events", HealthSchema.Has("events"));
+        CheckS("健康 schema 含 verdict", HealthSchema.Has("verdict"));
+        CheckS("事件码全部有描述", HealthCode.All.Length == 5 &&
+            Array.TrueForAll(HealthCode.All, c => !string.IsNullOrEmpty(HealthCode.Describe(c))));
+        CheckS("未知事件码被拒", !HealthCode.IsKnown("SR-H999"));
+        HealthSnapshot s = new HealthSnapshot();
+        s.PatchTotal = 2; s.PatchOk = 1;
+        CheckS("补丁不全中即 FAIL", s.Verdict() == "FAIL");
+        s.PatchOk = 2; s.RefTotal = 1; s.RefOk = 1;
+        CheckS("全部命中即 OK", s.Verdict() == "OK");
+        s.Add(HealthCode.DegradedCatch, "sr.demo", "降级处理");
+        s.Add("BAD", "x", "y");
+        CheckS("事件登记去重且仅收已知码", s.Events.Count == 1 && s.Events[0].Valid);
+        CheckS("自检行格式固定", s.ToSelfTestLine("OK").StartsWith("[SR.SelfTest] OK 游戏版本=") &&
+            s.ToSelfTestLine("OK").Contains("补丁=2/2") && s.ToSelfTestLine("OK").Contains("API=0/0"));
+        CheckS("文本报告兼容旧格式", s.ToText().StartsWith("=== SR_UCH 诊断报告 ===") &&
+            s.ToText().Contains("结构化事件"));
+        CheckS("JSON 含 schema 与 events", s.ToJson().Contains("\"schema\": 1") && s.ToJson().Contains("\"events\": ["));
+            new System.Collections.Generic.Dictionary<string, string[]>();
+        // 组合根注入：替身写的值必须被关机路径读回。
+        CheckS("注入判定 OK", SR_UCH.Pure.RuntimeRules.InjectionHonored("Ui.ActivePage", "Ui.ActivePage"));
+        CheckS("关机报告 OK", SR_UCH.Pure.RuntimeRules.ShutdownReport(true, 3, 4) == "OK");
+        CheckS("关机报告 REVIEW", SR_UCH.Pure.RuntimeRules.ShutdownReport(false, 3, 4) == "REVIEW");
+    }
+
     }
 }

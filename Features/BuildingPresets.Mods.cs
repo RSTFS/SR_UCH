@@ -140,9 +140,9 @@ namespace SR_UCH.Tweaks {
             try {
                 if (p == null || p.IsLocal) return "-";
                 string m = p.ModsMode ?? ModsInherit;
-                if (string.Equals(m, ModsCurrent, StringComparison.Ordinal)) return SRApi.T("当前", "Current");
-                if (string.Equals(m, ModsOff, StringComparison.Ordinal)) return SRApi.T("关闭", "Off");
-                return SRApi.T("预设", "Preset");
+                if (string.Equals(m, ModsCurrent, StringComparison.Ordinal)) return SRApi.Tid("0bcb8dacb7", "当前", "Current");
+                if (string.Equals(m, ModsOff, StringComparison.Ordinal)) return SRApi.Tid("ba73348af5", "关闭", "Off");
+                return SRApi.Tid("c2622072c2", "预设", "Preset");
             } catch { return "-"; }
         }
 
@@ -203,7 +203,7 @@ namespace SR_UCH.Tweaks {
                     string s = r as string;
                     if (!string.IsNullOrEmpty(s)) return s;
                 }
-                return bv ? SRApi.T("开", "on") : SRApi.T("关", "off");
+                return bv ? SRApi.Tid("8bd94919cc", "开", "on") : SRApi.Tid("136de6ba80", "关", "off");
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/修改器预览取值文本", __ex);
                 return raw;
@@ -227,7 +227,7 @@ namespace SR_UCH.Tweaks {
                     string v = mods.GetAttribute(d.Attr);
                     if (string.IsNullOrEmpty(v)) continue;
                     if (string.Equals(v, ModDefault(d), StringComparison.OrdinalIgnoreCase)) continue;   // 只列非默认
-                    if (shown > 0) sb.Append(SRApi.T(" · ", " · "));
+                    if (shown > 0) sb.Append(SRApi.Tid("45e12b705f", " · ", " · "));
                     sb.Append(SRApi.T(d.Zh, d.En)).Append('=').Append(ModValueText(d, v));
                     shown++;
                 }
@@ -310,21 +310,19 @@ namespace SR_UCH.Tweaks {
                 if (p == null) return null;
                 string __mm = p.ModsMode ?? ModsInherit;
                 if (string.Equals(__mm, ModsCurrent, StringComparison.Ordinal)) {
-                    return SRApi.T("当前：加载时用游戏此刻的修改器（不覆盖预设自带）\n左键切到「关闭」",
-                                     "Current: the level loads with the game's present modifiers (preset's own mods ignored)\nleft-click for Off");
+                    return SRApi.Tid("b0b7461fe0", "当前：加载时用游戏此刻的修改器（不覆盖预设自带）\n左键切到「关闭」", "Current: the level loads with the game's present modifiers (preset's own mods ignored)\nleft-click for Off");
                 }
                 if (string.Equals(__mm, ModsOff, StringComparison.Ordinal)) {
-                    return SRApi.T("关闭：加载时把修改器写成默认值\n左键切回「预设」",
-                                     "Off: modifiers are reset to defaults at load time\nleft-click for Preset");
+                    return SRApi.Tid("6bce7b1de0", "关闭：加载时把修改器写成默认值\n左键切回「预设」", "Off: modifiers are reset to defaults at load time\nleft-click for Preset");
                 }
                 string summary = ModsSummaryFromXml(p, 12);
                 if (string.IsNullOrEmpty(summary)) {
                     int n = ModsCountInXml(p);
                     return n <= 0
-                        ? SRApi.T("预设：该 XML 没有修改器，加载时用游戏当前值\n左键切到「关闭」", "Preset: this XML stores no modifiers; the game's current values are used\nleft-click for Off")
-                        : SRApi.T("预设：修改器全部为默认值\n左键切到「关闭」", "Preset: all stored modifiers are default\nleft-click for Off");
+                        ? SRApi.Tid("37f2b6e1bc", "预设：该 XML 没有修改器，加载时用游戏当前值\n左键切到「关闭」", "Preset: this XML stores no modifiers; the game's current values are used\nleft-click for Off")
+                        : SRApi.Tid("382e9d420d", "预设：修改器全部为默认值\n左键切到「关闭」", "Preset: all stored modifiers are default\nleft-click for Off");
                 }
-                return SRApi.T("预设：", "Preset: ") + summary;
+                return SRApi.Tid("37cb71eb0b", "预设：", "Preset: ") + summary;
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/数据格提示", __ex); return null; }
         }
 

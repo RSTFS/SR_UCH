@@ -13,7 +13,6 @@ namespace SR_UCH.Tweaks {
                 case 1: return min >= 2 ? 0 : 1;    // 高跳跃 buff，弱跳跃 debuff
                 case 2:                             // 冲刺：快 buff，慢/龟速 debuff
                 case 3: return min >= 2 ? 0 : 1;    // 平台：快 buff，慢/停滞 debuff
-                case 4: return 1;                   // 慢射速 debuff
                 default: return 2;
             }
         }

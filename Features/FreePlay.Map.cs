@@ -56,26 +56,17 @@ namespace SR_UCH.Tweaks {
                     "地图内传送快捷键（默认 T）：地图打开时把角色传送到光标处。");
                 _openKey = plugin.Config.Bind(Sec, "Map Key", KeyCode.M,
                     "地图开关快捷键（默认 M）：在地图外的任何地方按一下打开/关闭俯视地图。");
-                SRApi.LocKey(Sec, "Map Enabled", "启用地图", "Enable map");
-                SRApi.LocDesc(Sec, "Map Enabled",
-                    "启用自由模式地图\n打开后俯视查看整张关卡\n仅自由模式可用",
-                    "enable the freeplay map\noverhead view of the whole level\nfreeplay only");
-                SRApi.LocKey(Sec, "Map Freeze Character", "冻结角色", "Freeze character");
-                SRApi.LocDesc(Sec, "Map Freeze Character",
-                    "冻结角色\n地图打开期间角色不能移动\n仅打开地图时生效",
-                    "freeze character\nstops your character while the map is open\nonly while the map is open");
-                SRApi.LocKey(Sec, "Map Teleport Key Enabled", "传送快捷键", "Teleport hotkey");
-                SRApi.LocDesc(Sec, "Map Teleport Key Enabled",
+                TweakCfg.Entry(Sec, "Map Enabled", "启用地图", "Enable map",
+                    "启用自由模式地图\n打开后俯视查看整张关卡\n仅自由模式可用", "enable the freeplay map\noverhead view of the whole level\nfreeplay only");
+                TweakCfg.Entry(Sec, "Map Freeze Character", "冻结角色", "Freeze character",
+                    "冻结角色\n地图打开期间角色不能移动\n仅打开地图时生效", "freeze character\nstops your character while the map is open\nonly while the map is open");
+                TweakCfg.Entry(Sec, "Map Teleport Key Enabled", "传送快捷键", "Teleport hotkey",
                     "传送快捷键\n地图打开时按快捷键把角色传送到光标处\n关闭后只能用右键菜单传送",
                     "teleport hotkey\nwhile the map is open, press the key to teleport to the cursor\nwhen off, use the right-click menu");
-                SRApi.LocKey(Sec, "Map Teleport Key", "传送快捷键", "Teleport key");
-                SRApi.LocDesc(Sec, "Map Teleport Key",
-                    "地图内传送快捷键\n地图打开时把角色传送到光标处\n默认 T，可改绑",
-                    "in-map teleport key\nteleports to the cursor while the map is open\ndefault T, rebindable");
-                SRApi.LocKey(Sec, "Map Key", "地图快捷键", "Map hotkey");
-                SRApi.LocDesc(Sec, "Map Key",
-                    "地图开关快捷键\n按一下打开/关闭俯视地图\n默认 M；右键按钮可改绑",
-                    "map open/close hotkey\nopens or closes the overhead map\ndefault M; right-click the button to rebind");
+                TweakCfg.Entry(Sec, "Map Teleport Key", "传送快捷键", "Teleport key",
+                    "地图内传送快捷键\n地图打开时把角色传送到光标处\n默认 T，可改绑", "in-map teleport key\nteleports to the cursor while the map is open\ndefault T, rebindable");
+                TweakCfg.Entry(Sec, "Map Key", "地图快捷键", "Map hotkey",
+                    "地图开关快捷键\n按一下打开/关闭俯视地图\n默认 M；右键按钮可改绑", "map open/close hotkey\nopens or closes the overhead map\ndefault M; right-click the button to rebind");
                 SRApi.RegisterTick("自由模式-地图", Tick);
                 SRApi.RegisterPauseProvider(ShouldPause);   // 冻结角色：与 EX 同原理
                 SRApi.RegisterStandaloneDrawer(Draw);   // 二类独立窗口：主面板关闭也画
@@ -94,7 +85,7 @@ namespace SR_UCH.Tweaks {
 
         internal static void OpenMap() {
             try {
-                if (_enabled != null && !_enabled.Value) { Toast(SRApi.T("地图未启用（先在上面勾选）", "Map is disabled (enable it above)")); return; }
+                if (_enabled != null && !_enabled.Value) { Toast(SRApi.Tid("d43c86f2f2", "地图未启用（先在上面勾选）", "Map is disabled (enable it above)")); return; }
                 Camera cam = GameCamera();
                 if (cam == null) return;
                 SaveCam(cam);
@@ -185,7 +176,7 @@ namespace SR_UCH.Tweaks {
                 if (cam == null) return;
                 Vector2 world = ScreenToWorld(cam, Event.current != null ? Event.current.mousePosition : (Vector2)Input.mousePosition);
                 SpawnPointTools.TeleportLocal(world);
-                Toast(SRApi.T("已传送到光标处", "Teleported to the cursor"));
+                Toast(SRApi.Tid("66e88ba0c0", "已传送到光标处", "Teleported to the cursor"));
             } catch (Exception __tk) { SRApi.Guard.Log("地图/传送快捷键", __tk); }
         }
 
@@ -328,22 +319,22 @@ namespace SR_UCH.Tweaks {
                 Font prevFont = GUI.skin.font;
                 try { if (SRApi.Ctl.UiFont != null) GUI.skin.font = SRApi.Ctl.UiFont; } catch (Exception) { /* 字体不可用时用默认 */ }
                 try {
-                    GUI.depth = 100;   // 画在 SR 主窗口之下（SR 用默认 0）：两者可同时存在、互不遮挡操作
+                    GUI.depth = (int)UiLayer.WorldOverlay;   // 画在 SR 主窗口之下（SR 用默认 0）：两者可同时存在、互不遮挡操作
                     // 顶栏
                     float barH = Sc(44f);
                     Rect bar = new Rect(0f, 0f, Screen.width, barH);
                     GUI.Box(bar, GUIContent.none, SRApi.Ctl.Footer);
-                    GUI.Label(new Rect(Sc(10f), Sc(10f), Sc(80f), Sc(24f)), SRApi.T("地图", "Map"), SRApi.Ctl.SecHeader);
+                    GUI.Label(new Rect(Sc(10f), Sc(10f), Sc(80f), Sc(24f)), SRApi.Tid("41f8e215e9", "地图", "Map"), SRApi.Ctl.SecHeader);
                     // 提示标签给足高度（原来 20px 会截断中文字形下半部分）。
                     GUI.Label(new Rect(Sc(64f), Sc(12f), Mathf.Max(Sc(120f), Screen.width - Sc(360f)), Sc(24f)),
-                        SRApi.T("右键拖动平移 · 滚轮缩放 · 右键操作", "right-drag to pan · wheel to zoom · right-click for actions"), SRApi.Ctl.Label);
+                        SRApi.Tid("ac090f7506", "右键拖动平移 · 滚轮缩放 · 右键操作", "right-drag to pan · wheel to zoom · right-click for actions"), SRApi.Ctl.Label);
                     // 右侧：视野读数 + 重置视图 + 关闭
                     float __fovNow = _fov;
                     GUI.Label(new Rect(Screen.width - Sc(206f), Sc(12f), Sc(84f), Sc(24f)), "FOV " + __fovNow.ToString("0.1"), SRApi.Ctl.Label);
-                    if (GUI.Button(new Rect(Screen.width - Sc(126f), Sc(8f), Sc(88f), Sc(28f)), SRApi.T("重置视图", "Reset view"), SRApi.Ctl.Btn)) {
+                    if (GUI.Button(new Rect(Screen.width - Sc(126f), Sc(8f), Sc(88f), Sc(28f)), SRApi.Tid("59e9908af0", "重置视图", "Reset view"), SRApi.Ctl.Btn)) {
                         _dragOffset = Vector3.zero;
                         _fov = BaseFov;
-                        Toast(SRApi.T("视图已重置", "View reset"));
+                        Toast(SRApi.Tid("8531effcc3", "视图已重置", "View reset"));
                     }
                     if (GUI.Button(new Rect(Screen.width - Sc(36f), Sc(8f), Sc(30f), Sc(28f)), "×", SRApi.Ctl.Btn)) { Close(); return; }
                     if (!string.IsNullOrEmpty(_toast) && Time.unscaledTime < _toastUntil)
@@ -425,11 +416,11 @@ namespace SR_UCH.Tweaks {
 
         private static void DrawMenu(Camera cam, Event e) {
             string[] items = new string[] {
-                SRApi.T("传送到此处", "Teleport here"),
-                SRApi.T("在此添加重生点", "Add spawn point here"),
-                SRApi.T("删除最近的重生点", "Remove nearest spawn point"),
-                SRApi.T("清空重生点", "Clear spawn points"),
-                SRApi.T("关闭地图", "Close map")
+                SRApi.Tid("65590c01a0", "传送到此处", "Teleport here"),
+                SRApi.Tid("936ed6f0cf", "在此添加重生点", "Add spawn point here"),
+                SRApi.Tid("2adbd1ff92", "删除最近的重生点", "Remove nearest spawn point"),
+                SRApi.Tid("aaaef597ba", "清空重生点", "Clear spawn points"),
+                SRApi.Tid("233cd1c1f3", "关闭地图", "Close map")
             };
             float w = Sc(172f), ih = Sc(24f);
             Rect box = new Rect(_menuPos.x, _menuPos.y, w, ih * items.Length + Sc(6f));
@@ -450,10 +441,10 @@ namespace SR_UCH.Tweaks {
         private static void DoMenu(int i) {
             try {
                 switch (i) {
-                    case 0: SpawnPointTools.TeleportLocal(_menuWorld); Toast(SRApi.T("已传送到该位置", "Teleported")); break;
-                    case 1: SpawnPointTools.Add(_menuWorld); Toast(SRApi.T("已添加重生点（", "Spawn point added (") + SpawnPointTools.Count + ")"); break;
-                    case 2: SpawnPointTools.RemoveNearest(); Toast(SRApi.T("已删除最近的重生点", "Nearest spawn point removed")); break;
-                    case 3: SpawnPointTools.Clear(); Toast(SRApi.T("已清空重生点", "Spawn points cleared")); break;
+                    case 0: SpawnPointTools.TeleportLocal(_menuWorld); Toast(SRApi.Tid("b57f18f24e", "已传送到该位置", "Teleported")); break;
+                    case 1: SpawnPointTools.Add(_menuWorld); Toast(SRApi.Tid("8ec6044a48", "已添加重生点（", "Spawn point added (") + SpawnPointTools.Count + ")"); break;
+                    case 2: SpawnPointTools.RemoveNearest(); Toast(SRApi.Tid("5db45efee9", "已删除最近的重生点", "Nearest spawn point removed")); break;
+                    case 3: SpawnPointTools.Clear(); Toast(SRApi.Tid("aacc234341", "已清空重生点", "Spawn points cleared")); break;
                     default: Close(); break;
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式地图/菜单动作", __ex); }
@@ -466,10 +457,9 @@ namespace SR_UCH.Tweaks {
                     return e.Definition.Key == "Map Freeze Character" || e.Definition.Key == "Map Teleport Key Enabled";
                 });
                 // 只要一个快捷键：标签 + 复选框 + 快捷键框（不再要按钮，地图内按 T 即可）。
-                if (SRApi.Ctl.ActionRow(SRApi.T("传送到光标", "Teleport to cursor"),
-                        SRApi.T("地图打开时按这个快捷键把角色传送到光标位置",
-                                "press this key while the map is open to teleport to the cursor"),
-                        SRApi.T("传送", "Teleport"), _teleportKey, 0f)) { }
+                if (SRApi.Ctl.ActionRow(SRApi.Tid("425131255f", "传送到光标", "Teleport to cursor"),
+                        SRApi.Tid("60a5097541", "地图打开时按这个快捷键把角色传送到光标位置", "press this key while the map is open to teleport to the cursor"),
+                        SRApi.Tid("ec0c1c05f9", "传送", "Teleport"), _teleportKey, 0f)) { }
             } catch (Exception __re) { SRApi.Guard.Log("地图页附加行", __re); }
         }
 

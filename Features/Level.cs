@@ -6,7 +6,7 @@ using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 namespace SR_UCH.Tweaks {
-[SrFeature("sr.level", "Level", "1.0", Provides = new string[] { SRApi.SlotKeys.LevelReloadBusy, "Level.ClearPlacedBlocks" })]
+[SrFeature("sr.level", "Level", "1.0")]
 public partial class Level : ITweak {
 
     // 重载锁自愈：协程被场景切换掐断时无人复位，超时即视为残留并放锁。
@@ -27,17 +27,18 @@ public partial class Level : ITweak {
         SRApi.Nav("Level", 50); //侧栏栏目顺序 40
         SRApi.RegisterPage("Level", "partybox", "派对盒", "Party Box", 10, RenderPartyBox);
         SRApi.RegisterPage("Level", "tools", "关卡工具", "Level Tools", 20, RenderTools);
-        SRApi.LocKey("Level", "Reload Mode", "重载模式", null);
-        SRApi.LocDesc("Level", "Reload Mode", "关卡重载模式\n保留方块和分数＝保方块并给全员补分；只保留方块＝分数清零\n补分在下次结算显示，未装本模组的房客同样生效", "Reload mode\nblocks+score = refill scores too; blocks only = scores reset\nrefill shows at the next settlement and also covers vanilla clients");
+        TweakCfg.Entry("Level", "Reload Mode", "重载模式", null,
+            "关卡重载模式\n保留方块和分数＝保方块并给全员补分；只保留方块＝分数清零\n补分在下次结算显示，未装本模组的房客同样生效",
+            "Reload mode\nblocks+score = refill scores too; blocks only = scores reset\nrefill shows at the next settlement and also covers vanilla clients");
         // 预登记自动快捷键：不预登记则重启后首次打开本页前按键无效；渲染时会幂等再登记。
         SRApi.HotkeyAction("level.reload", "重载关卡", () => Level.ReloadLevel());
     }
 
     public void Initialize(IFeatureHost plugin) {
         SelfReg();
-        // 对外槽位：清场能力、重载忙碌状态（预设据此避免并发重载）。
-        Slots.Provide(SlotClearPlacedBlocks, (Action<List<Placeable>, string>)ClearPlacedBlocks);
-        Slots.Provide(SRApi.SlotKeys.LevelReloadBusy, (Func<bool>)(() => _reloadBusy));
+        // 对外能力：重载忙碌状态（预设据此避免并发重载）。清场能力无消费者，不再登记。
+        SrCaps.LevelReloadBusy = () => _reloadBusy;
+        FeatureRuntime.RecordRevoke(() => SrCaps.LevelReloadBusy = null);
         // 锁自愈 tick：预设加载会被残留的 level.reloadBusy 永久拦住，需定时放锁。
         try { SRApi.RegisterTick("关卡重载-锁自愈", TickReloadLock); }
         catch (Exception __tr) { SRApi.Guard.Log("关卡重载/注册锁自愈", __tr); }

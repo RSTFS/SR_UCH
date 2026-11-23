@@ -1,5 +1,5 @@
 // 布局预设 · 第二页（预设列表）：固定表头 + 占满剩余高度的列表，只有列表自己滚。
-// 注意事项：行区高与滚动上限须同源；滚轮不做命中测试，窗口帧尾的 page hook 仅兜底；
+// 注意事项：行区高与滚动上限须同源；滚轮按表格矩形命中，帧尾 page hook 仅兜底；
 // 先应用滚轮再绘制，同帧即可见位移。
 using System;
 using System.Collections.Generic;
@@ -87,10 +87,8 @@ namespace SR_UCH.Tweaks {
 
         private static string EmptyHintText() {
             return _presets.Count == 0
-                ? SRApi.T("ℹ\n还没有预设\n到「预设保存」页保存当前布局，或从剪贴板 / 文件导入。",
-                          "ℹ\nNo presets yet\nSave the current layout on the Save page, or import from clipboard / file.")
-                : SRApi.T("ℹ\n没有匹配的预设\n清空搜索或切换筛选条件试试。",
-                          "ℹ\nNo matching presets\nClear the search or change the filters.");
+                ? SRApi.Tid("a1e587159b", "ℹ\n还没有预设\n到「预设保存」页保存当前布局，或从剪贴板 / 文件导入。", "ℹ\nNo presets yet\nSave the current layout on the Save page, or import from clipboard / file.")
+                : SRApi.Tid("de0f5669d0", "ℹ\n没有匹配的预设\n清空搜索或切换筛选条件试试。", "ℹ\nNo matching presets\nClear the search or change the filters.");
         }
 
         // 分区：页面二（预设列表）
@@ -123,8 +121,8 @@ namespace SR_UCH.Tweaks {
         private static void ApplyListWheel(float notches) {
             if (Mathf.Abs(notches) < 0.01f) return;
             float before = _scrollRows.y;
-            _scrollRows.y = Mathf.Clamp(_scrollRows.y - notches * SRApi.Ctl.Sc(56f), 0f, _listMaxY);
-            if (Mathf.Abs(_scrollRows.y - before) > 0.01f) {
+            _scrollRows.y = SRApi.Ctl.Scroll.Wheel(before, notches, _listMaxY, SRApi.Ctl.Sc(56f));
+            if (SRApi.Ctl.Scroll.Changed(before, _scrollRows.y)) {
                 try { SRApi.MarkWheelUsed(); } catch { /* 静默：非关键路径 */ }
             }
         }
@@ -145,7 +143,7 @@ namespace SR_UCH.Tweaks {
                 float before = _scrollRows.y;
                 ApplyListWheel(PageWheelSign * Mathf.Sign(wheel) * Mathf.Max(1f, notches));
                 // 只有真的滚动了才吃掉事件，否则交回窗口。
-                return Mathf.Abs(_scrollRows.y - before) > 0.01f;
+                return SRApi.Ctl.Scroll.Changed(before, _scrollRows.y);
             } catch (Exception __ex) { SRApi.Guard.Log("预设列表/页面滚轮", __ex); return false; }
         }
 
@@ -168,7 +166,7 @@ namespace SR_UCH.Tweaks {
             _listMaxY = SRApi.Ctl.TableMaxScrollY(visible.Count, rowH, rowsH);
             _maxScrollY = _listMaxY;
             // 每帧把 scrollY 夹回当前 maxY：窗口缩放/切页/页头变高后不会停在旧上限。
-            _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _listMaxY);
+            _scrollRows.y = SRApi.Ctl.Scroll.Clamp(_scrollRows.y, _listMaxY);
             _rowsHCache = rowsH;
             _listPageFrame = Time.frameCount;
 
@@ -194,7 +192,7 @@ namespace SR_UCH.Tweaks {
                     totalW += SRApi.Ctl.Sc(_drawW[ci]);
                 }
                 _maxScrollX = Mathf.Max(0f, totalW - stripW);
-                _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _maxScrollX);
+                _scrollCols.x = SRApi.Ctl.Scroll.Clamp(_scrollCols.x, _maxScrollX);
 
                 Event e = Event.current;
                 Vector2 mp = e != null ? e.mousePosition : Vector2.zero;
@@ -215,7 +213,7 @@ namespace SR_UCH.Tweaks {
                 _args.mp = mp;
                 _args.pinW = pinW;
                 _args.pinX = box.x + stripW;
-                _args.pinTitle = SRApi.T("操作", "Actions");
+                _args.pinTitle = SRApi.Tid("d4eb333d8f", "操作", "Actions");
                 _args.drawHeader = true;
                 _args.headerLeft = false;
                 _args.title = _titleFn;

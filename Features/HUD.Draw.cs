@@ -156,7 +156,7 @@ namespace SR_UCH.Tweaks {
 
             Event ev = Event.current;
             if (ev == null || ev.type != EventType.Repaint) return;
-            GUI.depth = 1;
+            GUI.depth = (int)UiLayer.Hud;
 
             GUI.color = new Color(0f, 0f, 0f, bgA);
             GUI.DrawTexture(panel, _white);

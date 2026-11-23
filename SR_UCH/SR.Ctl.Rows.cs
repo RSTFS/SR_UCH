@@ -51,7 +51,7 @@ public partial class SR {
                 object dv = e.SettingType == typeof(string) ? (object)"" : e.DefaultValue;
                 if (!object.Equals(e.BoxedValue, dv)) {
                     SetValue(e, dv);
-                    SRApi.Notify(T("已恢复默认值", "Reset to default"));
+                    SRApi.Notify(Tid("0a037734f5", "已恢复默认值", "Reset to default"));
                 }
                 ev.Use();
             } catch (Exception __ex) { Guard.Log("统一行/恢复默认", __ex); }
@@ -141,7 +141,7 @@ public partial class SR {
                     if (key != null) {
                         bool cap = _capturing == key;
                         string txt = cap ? (SRApi.Ctl.RecTextOrEmpty() ?? "[...]") : (SRApi.Ctl.KeyText(key) ?? "—");
-                        if (GUILayout.Button(new GUIContent(txt, T("点击后按任意键绑定；右键清空", "Click then press a key to bind; right-click to clear")),
+                        if (GUILayout.Button(new GUIContent(txt, Tid("90f73d1550", "点击后按任意键绑定；右键清空", "Click then press a key to bind; right-click to clear")),
                                 cap ? _capture : SRApi.Ctl.KeyBox, GUILayout.Width(Sc(96f)), GUILayout.Height(Sc(26)))) {
                             Event ev2 = Event.current;
                             if (ev2 != null && ev2.button == 1) SRApi.Ctl.ClearKey(key);

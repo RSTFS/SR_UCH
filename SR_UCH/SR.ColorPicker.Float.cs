@@ -17,7 +17,7 @@ public partial class SR {
         internal static void DrawFloat() {
             if (!FloatOpen) { SRApi.Ctl.FloatClose(); return; }
             if (!FloatWindow.IsOpen) {
-                FloatWindow.Open(SRApi.T("调色板", "Palette"), new Vector2(440f, FloatHeight(440f) / Mathf.Max(0.0001f, Sc(1f))), DrawFloatContent, OnFloatClosed);
+                FloatWindow.Open(SRApi.Tid("29676954ea", "调色板", "Palette"), new Vector2(440f, FloatHeight(440f) / Mathf.Max(0.0001f, Sc(1f))), DrawFloatContent, OnFloatClosed);
             }
         }
 

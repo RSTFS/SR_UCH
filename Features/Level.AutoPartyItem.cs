@@ -28,12 +28,12 @@ public class AutoPartyItem : ITweak {
     private static int _hpAttempts;
 
     private static void SelfReg() {
-        SRApi.LocKey("Level", "Auto Party Item", "自动道具", null);
-        SRApi.LocDesc("Level", "Auto Party Item", "自动道具\n派对盒开启后自动随机挑一个道具\n与手动挑选同一条链路，服务端发放", "Auto party item\npicks a random piece for you once the box opens\nsame path as picking by hand; the server hands it over");
-        SRApi.LocKey("Level", "Auto Party Item Delay", "自动道具延迟", null);
-        SRApi.LocDesc("Level", "Auto Party Item Delay", "自动道具延迟\n开箱后等多少秒再挑\n范围 0-3，步进 0.1", "Auto item delay\nseconds to wait after the box opens\nrange 0-3 in steps of 0.1");
-        SRApi.LocKey("Level", "Auto Party Item Skip Bomb", "跳过炸弹", null);
-        SRApi.LocDesc("Level", "Auto Party Item Skip Bomb", "跳过炸弹\n自动挑道具时排除派对盒里的炸弹\n关闭后炸弹也可能被自动挑中", "Skip bombs\nexcludes party-box bombs from the random pick\nwhen off a bomb may be picked");
+        TweakCfg.Entry("Level", "Auto Party Item", "自动道具", null,
+            "自动道具\n派对盒开启后自动随机挑一个道具\n与手动挑选同一条链路，服务端发放", "Auto party item\npicks a random piece for you once the box opens\nsame path as picking by hand; the server hands it over");
+        TweakCfg.Entry("Level", "Auto Party Item Delay", "自动道具延迟", null,
+            "自动道具延迟\n开箱后等多少秒再挑\n范围 0-3，步进 0.1", "Auto item delay\nseconds to wait after the box opens\nrange 0-3 in steps of 0.1");
+        TweakCfg.Entry("Level", "Auto Party Item Skip Bomb", "跳过炸弹", null,
+            "跳过炸弹\n自动挑道具时排除派对盒里的炸弹\n关闭后炸弹也可能被自动挑中", "Skip bombs\nexcludes party-box bombs from the random pick\nwhen off a bomb may be picked");
     }
 
     public void Initialize(IFeatureHost plugin) {

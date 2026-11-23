@@ -1,5 +1,5 @@
-// 入口（BepInEx 插件）：配置外置到 SR_UCH_data.cfg；反射发现并初始化全部 ITweak；
-// 扫描外部功能 / 语言包 DLL；注册程序集解析；定义统一契约 ITweak。
+// 入口：配置外置、API sink 注入、功能装载、外部 DLL 扫描、程序集解析。
+// 注意：功能装载统一走 FeatureRuntime.TryInit（按 Type 幂等），不要在别处再建已初始化表。
 using System;
 using UnityEngine;
 using BepInEx.Configuration;
@@ -62,7 +62,7 @@ namespace SR_UCH {
                 // 装配完成后补扫一轮 ITweak；EX 自身幂等。
                 __run("InitializeTweaks(late)", delegate { InitializeTweaks(true); });
                 __run("RebuildFeatureManifest", RebuildFeatureManifest);   // 含功能清单登记 + 启动自检 + 自检日志
-                __run("NetHandshake", SR.NetInit);   // 联机版本/功能握手（纯提示，不改游戏状态）
+                    __run("NetHandshake", SR.NetInit);   // 联机版本/功能握手（纯提示，不改游戏状态）
                 try { SR.BootTimings = __boot.ToString().TrimEnd(); } catch (Exception __bt) { SRApi.Guard.Log("启动耗时/记录", __bt); }
                 try { ModLogger.LogInfo("[SR.Boot] 启动耗时: " + (SR.BootTimings ?? "?")); } catch (Exception __bl) { SRApi.Guard.Log("启动耗时/日志", __bl); }
             } catch (Exception __aw) {
@@ -104,7 +104,6 @@ namespace SR_UCH {
 
         }
 
-        // 在任何 Bind 之前把旧 GUID 的 cfg 复制成新名字。
         private void MigrateLegacyConfigNames() {
             try {
                 string __cfgDir = BepInEx.Paths.ConfigPath;
@@ -119,6 +118,19 @@ namespace SR_UCH {
 
         // 契约层 API 门面的全部 sink：漏注入会让功能静默失效。
         private void InjectApiSinks() {
+        // 结构登记：UI 层级与自定义消息号在启动期一次性声明，重复即进诊断报告。
+        UiLayerRegistry.Reset(); NetMsgId.Reset();
+        UiLayerRegistry.Register("SR.MainWindow", UiLayer.Main);
+        UiLayerRegistry.Register("SR.FloatWindow", UiLayer.Modal);
+        UiLayerRegistry.Register("SR.FloatWindow", UiLayer.Backdrop);
+        UiLayerRegistry.Register("HUD", UiLayer.Hud);
+        UiLayerRegistry.Register("NotifyHub", UiLayer.Toast);
+        UiLayerRegistry.Register("FreePlay.Map", UiLayer.WorldOverlay);
+        NetMsgId.Register("Chaos", NetMsgId.ChaosRule);
+        NetMsgId.Register("Chaos", NetMsgId.ChaosCard);
+        NetMsgId.Register("Chaos", NetMsgId.ChaosHello);
+        NetMsgId.Register("Chaos", NetMsgId.ChaosKill);
+
             
             SinkStep("Log", delegate () {
                 SRApi.SetLogSinks(
@@ -184,16 +196,19 @@ namespace SR_UCH {
                 SRApi.WireSection(SR.SectionBegin, SR.SectionEnd);
                 SRApi.Ctl.WireSection(SR.SectionBegin, SR.SectionEnd);
             });
+            SinkStep("FeatureRuntime", delegate () {
+                SR.InstallFeatureRuntime();
+            });
             SinkStep("Ext", delegate () {
                 SRApi.SetExtSinks(
-                    delegate (string __s, int __r) { SR.Nav(__s, __r); },
-                    delegate (string __s) { SR.NavHide(__s); },
-                    delegate (string __n, Action __a) { SR.RegisterTick(__n, __a); },
-                    delegate (Action __a) { SR.RegisterSceneHook(__a); },
-                    delegate (Action __a) { SR.RegisterDismissHook(__a); },
-                    delegate (Func<float, bool> __w) { SR.RegisterWheelHook(__w); },
-                    delegate (string __i, string __l, Action __a) { SR.HotkeyAction(__i, __l, __a); },
-                    delegate (string __n, Action __a) { SR.RegisterShutdown(__n, __a); });
+                    delegate (string __s, int __r) { SR.FeatureNav(__s, __r); },
+                    delegate (string __s) { SR.FeatureNavHide(__s); },
+                    delegate (string __n, Action __a) { SR.FeatureTick(__n, __a); },
+                    delegate (Action __a) { SR.FeatureScene(__a); },
+                    delegate (Action __a) { SR.FeatureDismiss(__a); },
+                    delegate (Func<float, bool> __w) { SR.FeatureWheel(__w); },
+                    delegate (string __i, string __l, Action __a) { SR.FeatureHotkey(__i, __l, __a); },
+                    delegate (string __n, Action __a) { SR.FeatureShutdown(__n, __a); });
             });
             SinkStep("State", delegate () {
                 SRApi.SetStateSinks(
@@ -216,6 +231,7 @@ namespace SR_UCH {
             });
             SinkStep("Lang", delegate () {
                 SRApi.SetLangSinks(
+                    delegate (string __id, string __z, string __e) { return SR.Tid(__id, __z, __e); },
                     delegate (string __z, string __e) { return SR.T(__z, __e); },
                     delegate (string __s, string __z) { SR.LocSec(__s, __z); },
                     delegate (string __s, string __z, string __e) { SR.LocSec(__s, __z, __e); },
@@ -331,8 +347,8 @@ namespace SR_UCH {
                     delegate (string __t, int __mx, GUIStyle __st, GUILayoutOption[] __o) {
                         return __mx < 0 ? SR.ClearableTextField(__t, __st, __o) : SR.ClearableTextField(__t, __mx, __st, __o);
                     },
-                    delegate (string __s, Action __a) { SR.RegisterPage(__s, __a.Invoke); },
-                    delegate (string __s, string __p, string __zh, string __en, int __o, Action __a) { SR.RegisterPage(__s, __p, __zh, __en, __o, __a.Invoke); });
+                    delegate (string __s, Action __a) { SR.FeaturePageSimple(__s, __a.Invoke); },
+                    delegate (string __s, string __p, string __zh, string __en, int __o, Action __a) { SR.FeaturePageFull(__s, __p, __zh, __en, __o, __a.Invoke); });
             });
             SinkStep("Table", delegate () {
                 SRApi.SetTableSinks(
@@ -364,7 +380,6 @@ namespace SR_UCH {
             });
                 // API 通道自检：漏注入会让功能静默失效，必须报错。
                 string[] __miss = SRApi.MissingSinks();
-                // 有一批通道由 UI 初始化时注入，本自检跑在它之前必然为空。
                 List<string> __lateInjected = new List<string> {
                     "SRApi._wheelLayer", "SRApi._wheelTake", "SRApi._overlay", "SRApi._rounded", "SRApi._typing",
                     "Ctl._labeledRow", "Ctl._rowCombo", "Ctl._rowSlider", "Ctl._button", "Ctl._labelCol",
@@ -390,8 +405,11 @@ namespace SR_UCH {
         }
 
 
-        // 已初始化过的 ITweak 类型：补扫只处理新出现的。
-        private static readonly HashSet<Type> _initedTweaks = new HashSet<Type>();
+        // 功能 Id：优先 [SrFeature].Id，否则用类型全名。
+        private static string FeatureIdOf(Type t) {
+            FeatureInfo fi = Features.FromType(t);
+            return fi != null && !fi.ManifestMissing ? fi.Id : t.FullName;
+        }
 
         // 补扫用：只取名字以 SR_UCH 开头的程序集。
         private static Assembly[] PickUchAssemblies() {
@@ -408,31 +426,37 @@ namespace SR_UCH {
             } catch (Exception __ex) { SR.LogWarn("枚举程序集失败: " + __ex.Message); return new Assembly[0]; }
         }
 
-        // latePass = true 表示装配完成后补扫。
+        // latePass = true 表示装配完成后补扫。幂等由 FeatureRuntime 保证，三条装载路径共用。
+        // 注意：SR 必须最先 Initialize（旧 cfg 迁移要早于任何功能 Bind）。
         private void InitializeTweaks(bool latePass = false) {
-            // 顺序：SR 必须最先 Initialize（旧 cfg 迁移要早于任何功能 Bind）。
+            // 核心本体显式自举：旧 cfg 迁移必须早于任何功能 Bind。
+            // 本体不实现 ITweak / 不挂 [SrFeature]，故不进功能表、不参与 latePass 补扫。
+            if (!latePass) {
+                try { new SR_UCH.Tweaks.SR().Initialize(this); }
+                catch (Exception e) { ModLogger.LogError("Failed to initialize SR core: " + e); }
+            }
             List<Type> __tweaks = new List<Type>();
             // 补扫只覆盖 SR_UCH* 程序集：扫全部 AppDomain 会白花上百毫秒。
             Assembly[] __asms = latePass ? PickUchAssemblies() : new Assembly[] { Assembly.GetExecutingAssembly() };
             for (int __ai = 0; __ai < __asms.Length; __ai++) {
                 foreach (Type __t in GetTypesSafe(__asms[__ai])) {
                     if (!typeof(ITweak).IsAssignableFrom(__t) || __t.IsInterface || __t.IsAbstract) continue;
-                    if (_initedTweaks.Contains(__t)) continue;
                     __tweaks.Add(__t);
                 }
             }
+            // 核心已显式初始化，不在功能列表里；这里只按类型名稳定排序。
             __tweaks.Sort(delegate(Type a, Type b) {
-                int ra = a == typeof(SR_UCH.Tweaks.SR) ? 0 : 1;
-                int rb = b == typeof(SR_UCH.Tweaks.SR) ? 0 : 1;
-                if (ra != rb) return ra - rb;
                 return string.Compare(a.FullName, b.FullName, StringComparison.Ordinal);
             });
             foreach (Type type in __tweaks) {
-                
-                _initedTweaks.Add(type);
                 try {
-                    var tweak = (ITweak)Activator.CreateInstance(type);
-                    tweak.Initialize(this);
+                    string id = FeatureIdOf(type);
+                    bool ran = FeatureRuntime.TryInit(type, id, delegate {
+                        var tweak = (ITweak)Activator.CreateInstance(type);
+                        FeatureRuntime.SetInstance(tweak);
+                        tweak.Initialize(this);
+                    });
+                    if (!ran) continue;
                 } catch (Exception e) {
                     ModLogger.LogError("Failed to initialize " + type.Name + ": " + e);
                 }
@@ -454,18 +478,20 @@ namespace SR_UCH {
                 int __bad = ApiSinkFailures.Count;
                 string __gv = "?";
                 try { __gv = UnityEngine.Application.version; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                // 自检行由健康快照生成：与诊断报告 / 支持包 / CI 基线共用同一份数据。
+                HealthSnapshot __snap = Health.Capture(__gv);
                 if (__miss.Length == 0 && __bad == 0 && Features.ProblemCount == 0)
-                    ModLogger.LogInfo("[SR.SelfTest] OK 游戏版本=" + __gv + " 契约=v" + SRContract.Version + " 补丁=" + SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " 反射=" + SR.AuditRefOk + "/" + SR.AuditRefTotal + " 功能=" + Features.Count + " API=" + SRApi.SinkCount() + "/" + SRApi.SinkTotal());
+                    ModLogger.LogInfo(__snap.ToSelfTestLine("OK"));
                 else
-                    ModLogger.LogError("[SR.SelfTest] FAIL 游戏版本=" + __gv + " API通道缺失=" + __miss.Length + " 注入失败=" + __bad + " 功能表问题=" + Features.ProblemCount + " 缺失=" + string.Join(",", __miss) + (__bad > 0 ? " 失败分组=" + string.Join(",", ApiSinkFailures.ToArray()) : ""));
+                    ModLogger.LogError(__snap.ToSelfTestLine("FAIL") + " API通道缺失=" + __miss.Length + " 注入失败=" + __bad + " 功能表问题=" + Features.ProblemCount + " 缺失=" + string.Join(",", __miss) + (__bad > 0 ? " 失败分组=" + string.Join(",", ApiSinkFailures.ToArray()) : ""));
             } catch (Exception __st) { try { ModLogger.LogError("[SR.SelfTest] FAIL 自检异常: " + __st.Message); } catch { /* 静默：非关键路径，失败可直接忽略 */ } }
         }
 
-        // 只认 SR_UCH 这几个程序集名。
+
+        // 只认 SR_UCH 这几个程序集名（拆分式核心文件名不同，也要能解析回本程序集）。
         private static Assembly OnAssemblyResolve(object sender, ResolveEventArgs args) {
             try {
                 AssemblyName want = new AssemblyName(args.Name);
-                // 拆分模式下核心文件名是 SR_Manager.dll / SR_UCH_Manager.dll。
                 if (want.Name == "SR_UCH" || want.Name == "SR_Manager" || want.Name == "SR_UCH_Manager")
                     return typeof(MainPlugin).Assembly;
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -474,7 +500,7 @@ namespace SR_UCH {
 
         // 外部 DLL 实现 ITweak 或 ILanguagePack，只需引用 SR_UCH.dll。
         private void LoadExternal() {
-            // 第三方 dll 进受信任目录即会被执行，故把加载来源与大小写进日志。
+            // 加载来源、文件名与登记状态全部写进日志；策略由 spec.external_plugins 生成。
             string[] dirs = null;
             try {
                 dirs = new[] { Paths.PluginPath, Path.Combine(Paths.BepInExRootPath, "modules") };
@@ -505,7 +531,16 @@ namespace SR_UCH {
             try {
                 string name = Path.GetFileNameWithoutExtension(dll);
                 
-                if (name == "SR_UCH" || name == "SR_Manager" || name == "SR_UCH_Manager") return;
+                if (name == "SR_UCH") return;
+                // 外部 DLL 不再「进受信任目录即静默执行」：按生成式策略给出可见性。
+                if (SR_UCH.SrExternalPolicy.IsStrict() && !SR_UCH.SrExternalPolicy.IsAllowed(name)) {
+                    ModLogger.LogWarning("[SR.Mod] 未登记外部 DLL，strict 策略跳过：" + dll);
+                    return;
+                }
+                if (!SR_UCH.SrExternalPolicy.IsAllowed(name)) {
+                    ModLogger.LogWarning("[SR.Mod] 未登记外部 DLL（policy=log，仍加载）：" + name
+                        + " | 可回填 spec.external_plugins.allowlist");
+                }
                 // 已加载过则复用同一份程序集：LoadFile 会复制副本，Type 不再相同。
                 Assembly asm = null;
                 foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies()) {
@@ -562,10 +597,12 @@ namespace SR_UCH {
                             continue;
                         }
                         var tweak = (ITweak)Activator.CreateInstance(t);
-                        tweak.Initialize(this);
-                        // 必须登记：否则 late pass（PickUchAssemblies 扫 SR_UCH*）会把这个类型再初始化一次，
-                        // 造成 SettingChanged 重复订阅、启动开销翻倍。
-                        _initedTweaks.Add(t);
+                        string fid = __fi != null ? __fi.Id : t.FullName;
+                        bool ran = FeatureRuntime.TryInit(t, fid, delegate {
+                            FeatureRuntime.SetInstance(tweak);
+                            tweak.Initialize(this);
+                        });
+                        if (!ran) continue;
                         ModLogger.LogInfo("[SR] 已加载外部功能: " + t.Name + " (" + name + ".dll)");
                     } catch (Exception e) {
                         ModLogger.LogError("[SR] 外部 DLL 初始化失败 " + name + "/" + t.Name + ": " + e.Message);

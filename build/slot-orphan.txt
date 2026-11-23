@@ -1,4 +1,0 @@
-﻿# 孤儿槽位基线：Provide 了但本仓库没有 Require 的槽位名；只减不增。
-# 注意：本守卫只扫 SR_UCH 仓库；被独立 EX 模块消费的槽位会出现在这里（属正常，不要删空）。
-DestroyBlocks.PlayerPlacedBlocks
-Level.ClearPlacedBlocks

@@ -74,7 +74,7 @@ namespace SR_UCH.Tweaks {
                 _pendingSteamId = 0;   // 无论下面是否走通都必须清零，否则会污染下一次刷新
                 try {
                     // 保持反射：源码里写 SteamMatchmaker 会因同族重载的 CSteamID 形参被迫引入 Steamworks 程序集依赖。
-                    System.Reflection.MethodInfo jsu = mm.GetType().GetMethod("JoinSteamLobby", new System.Type[] { typeof(ulong) });
+                    System.Reflection.MethodInfo jsu = RefCache.MethodOf(mm.GetType(), "JoinSteamLobby", typeof(ulong));
                     if (jsu != null) {
                         SRApi.LogInfo("[联机] 走 JoinSteamLobby(ulong) " + sid);
                         jsu.Invoke(mm, new object[] { sid });

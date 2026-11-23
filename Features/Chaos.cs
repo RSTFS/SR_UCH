@@ -1,15 +1,15 @@
-// 混乱牌组（树屋选举版）+ 房内 mod 清单。
+// 混乱牌组：树屋里选牌组，每回合抽牌改规则；仅房主安装即可带全场。
 //
 // 发「真实 TabletRule + 真实 Value」而非 None 带外信号：游戏只对「非房主 + 非 None」的规则消息写
-// Modifiers，故仅房主装 mod 即可带全场；房主自己被 !IsHost 挡住，需本地双写。
+// Modifiers；房主被 !IsHost 挡住，需本地双写一次。
 //
-// 约束：
+// 注意事项：
 // 1) Value2 高位放牌组魔数；游戏只读 Value / Valueb，手动改规则的 Value2 = 0 不会误判。
-// 2) 射速牌会写 Time.timeScale：房客端会被游戏重置、房主端不会，两端不对称。
-// 3) GameSpeed / CharacterSize / CameraFlip / Doomsday 不进池（会改全局速度或需重建绘制对象）。
-// 4) 还原必须双写：重发树屋原值（未装 mod 的房客）+ 带外 Restore（清牌面标记）。
-// 5) 房内清单复用 MsgGameRuleSet 以 None 承载，Value 放本机 networkNumber。
-// 不新增 Harmony 补丁 / msgType / 反射登记；状态只在主线程读写。
+// 2) GameSpeed / RateOfFire / CharacterSize / CameraFlip / Doomsday 不进池：碰全局时间尺度、
+//    相机或需要重建绘制对象。
+// 3) 关闭开关向全场广播清零：真实规则消息覆盖未装 mod 的房客，带外信号让装 mod 的端全字段归零。
+// 4) 房内清单复用 MsgGameRuleSet 以 None 承载，Value 放本机 networkNumber。
+// 5) 不新增 Harmony 补丁 / msgType / 反射登记；状态只在主线程读写。
 
 using System;
 using System.Collections.Generic;
@@ -26,7 +26,7 @@ namespace SR_UCH.Tweaks {
         // 带外消息：Value2 = (Magic << 8) | op
         private const int Magic = 771;
         private const int OpHello = 1;
-        private const int OpRestore = 2;
+        private const int OpClearAll = 2;
         // 真实规则消息：Value2 = (CardMagic << 16) | (op << 8) | cardId
         private const int CardMagic = 772;
         private const int OpCardDraw = 4;
@@ -45,11 +45,11 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        private const int FGravity = 0, FJump = 1, FSprint = 2, FPlatform = 3, FRate = 4;
+        private const int FGravity = 0, FJump = 1, FSprint = 2, FPlatform = 3;
         private static int _drawSeq;   // 抽牌序号：保证每次重抽的随机种子都不同（否则 TickCount 同毫秒会抽出同一张）
         private const int FBoolWallJumps = 8, FBoolDance = 9, FBoolMirror = 10, FBoolPlayerCol = 12, FBoolFriction = 13;
 
-        // 16 张牌：5 个数值规则的多档取值 + 5 个布尔规则；每张带一句效果说明。
+        // 15 张牌：4 个数值规则的多档取值 + 5 个布尔规则；每张带一句效果说明。
         private static readonly CardDef[] Cards = new CardDef[] {
             new CardDef("低重力",   "Low gravity",      "重力变轻，跳得更高",       "Lighter gravity, floatier jumps",      TabletRule.ModifierGravity,            FGravity,       false, 1, 2),
             new CardDef("高重力",   "High gravity",     "重力加重，下落更快",       "Heavier gravity, faster falls",        TabletRule.ModifierGravity,            FGravity,       false, 2, 2),
@@ -61,7 +61,6 @@ namespace SR_UCH.Tweaks {
             new CardDef("跳舞无敌", "Dance invincible", "跳舞时无敌",               "Invincible while dancing",             TabletRule.ModifierDanceInvincibility, FBoolDance,     true,  0, 0),
             new CardDef("玩家互撞", "Player colliding", "玩家之间会碰撞",           "Players collide with each other",      TabletRule.ModifierPlayerPlayerCollisions, FBoolPlayerCol, true, 0, 0),
             new CardDef("无摩擦",   "Frictionless",     "地面打滑，难以减速",       "Slippery, hard to stop",               TabletRule.ModifierFrictionless,       FBoolFriction,  true,  0, 0),
-            new CardDef("慢射速",   "Slow fire rate",   "射箭速度变慢",             "Slower rate of fire",                  TabletRule.ModifierRateOfFire,         FRate,          false, 1, 3),
             new CardDef("高跳跃",   "High jump",        "跳跃高度提升",             "Higher jumps",                         TabletRule.ModifierJumpSpeed,          FJump,          false, 2, 3),
             new CardDef("快冲刺",   "Fast sprint",      "冲刺速度提升",             "Faster sprinting",                     TabletRule.ModifierSprintSpeed,        FSprint,        false, 2, 4),
             new CardDef("快平台",   "Fast platforms",   "平台移动变快",             "Platforms move faster",                TabletRule.ModifierPlatformSpeed,      FPlatform,      false, 2, 4),
@@ -70,11 +69,6 @@ namespace SR_UCH.Tweaks {
         };
 
         private struct ActiveCard { public int Id, Param; public ActiveCard(int id, int param) { Id = id; Param = param; } }
-        private struct Snapshot {
-            public int Gravity, Jump, Sprint, Platform, Rate;
-            public bool WallJumps, Dance, Mirror, PlayerCol, Friction;
-        }
-
         private static ConfigEntry<bool> _enabled, _announce;
         private static ConfigEntry<int> _everyRounds, _maxActive;
         private static ConfigEntry<KeyCode> _drawKey;
@@ -83,9 +77,12 @@ namespace SR_UCH.Tweaks {
 
         private static ChaosListener _listener;
         private static readonly List<ActiveCard> _active = new List<ActiveCard>();
-        private static Snapshot _snap;
-        private static bool _hasSnapshot, _applied, _ready;
+        private static bool _applied, _ready;
         private static int _roundSeen;
+        // 真回合：与 HUD 共用 Pure/RoundTruth.cs。重载关卡 / 刷新派对盒会额外 +1 且没有结算，
+        // 那种 StartPhaseEvent(PLACE) 不算新回合，不抽牌、也不重建规则。
+        private static SR_UCH.Pure.RoundTruthState _rs;
+        private static int _roundAdvancePending;
         private struct RosterEntry {
             public float At;
             public RosterEntry(float a) { At = a; }
@@ -99,72 +96,50 @@ namespace SR_UCH.Tweaks {
         private static bool _uiReg;
 
         // 配置行走"标签 + 控件"，否则 LocKey / LocDesc 不会被消费；列宽固定 180 设计像素。
-        private static void CfgRow(ConfigEntryBase e) {
-            SRApi.Ctl.DrawEntryRow(e);
-        }
 
         // 显示名与悬浮说明必须登记。
         private static void RegUi() {
-            SRApi.LocKey(Sec, "Enabled", "启用混乱牌组", "Enable chaos deck");
-            SRApi.LocDesc(Sec, "Enabled",
-                "启用混乱牌组\n树屋里选牌组，每回合抽牌改变规则；关闭即还原。",
-                "Enable chaos deck\nPick cards in the treehouse; each round changes a rule. Off restores everything.");
-            SRApi.LocKey(Sec, "EveryNRounds", "抽牌间隔（回合）", "Draw every N rounds");
-            SRApi.LocDesc(Sec, "EveryNRounds",
-                "抽牌间隔（回合）\n几回合抽一次：1 = 每个摆放阶段都抽。",
-                "Draw every N rounds\n1 = draw at every build phase. Range 1-5.");
-            SRApi.LocKey(Sec, "MaxActive", "同时生效牌数", "Max active cards");
-            SRApi.LocDesc(Sec, "MaxActive",
-                "同时生效牌数\n最多同时生效几张牌。",
-                "Max active cards\nHow many cards may apply at once. Range 1-4.");
-            SRApi.LocKey(Sec, "Announce", "抽牌提示", "Announce draws");
-            SRApi.LocDesc(Sec, "Announce",
-                "抽牌提示\n抽牌时在屏幕上提示本回合牌面。",
-                "Announce draws\nShow the drawn card on screen when a round starts.");
-            SRApi.LocKey(Sec, "RerollKey", "重抽快捷键", "Reroll key");
-            SRApi.LocDesc(Sec, "RerollKey",
-                "重抽快捷键\n房主按此键立刻重抽一张。",
-                "Reroll key\nHost: press to draw a new card immediately.");
-            SRApi.LocKey(Sec, "Low gravity", "低重力", "Low gravity");
-            SRApi.LocDesc(Sec, "Low gravity",
-                "低重力\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
-                "Low gravity\nInclude the low gravity card in the draw pool.");
-            SRApi.LocKey(Sec, "High gravity", "高重力", "High gravity");
-            SRApi.LocDesc(Sec, "High gravity",
-                "高重力\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
-                "High gravity\nInclude the high gravity card in the draw pool.");
-            SRApi.LocKey(Sec, "Weak jump", "弱跳跃", "Weak jump");
-            SRApi.LocDesc(Sec, "Weak jump",
-                "弱跳跃\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
-                "Weak jump\nInclude the weak jump card in the draw pool.");
-            SRApi.LocKey(Sec, "Slow sprint", "慢冲刺", "Slow sprint");
-            SRApi.LocDesc(Sec, "Slow sprint",
-                "慢冲刺\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
-                "Slow sprint\nInclude the slow sprint card in the draw pool.");
-            SRApi.LocKey(Sec, "Slow platforms", "慢平台", "Slow platforms");
-            SRApi.LocDesc(Sec, "Slow platforms",
-                "慢平台\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
-                "Slow platforms\nInclude the slow platforms card in the draw pool.");
-            SRApi.LocKey(Sec, "No wall jumps", "禁墙跳", "No wall jumps");
-            SRApi.LocDesc(Sec, "No wall jumps",
-                "禁墙跳\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
-                "No wall jumps\nInclude the no-wall-jumps card in the draw pool.");
-            SRApi.LocKey(Sec, "Mirror controls", "镜像操作", "Mirror controls");
-            SRApi.LocDesc(Sec, "Mirror controls",
-                "镜像操作\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
-                "Mirror controls\nInclude the mirror controls card in the draw pool.");
-            SRApi.LocKey(Sec, "Dance invincible", "跳舞无敌", "Dance invincible");
-            SRApi.LocDesc(Sec, "Dance invincible",
-                "跳舞无敌\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
-                "Dance invincible\nInclude the dance invincibility card in the draw pool.");
-            SRApi.LocKey(Sec, "Player colliding", "玩家互撞", "Player colliding");
-            SRApi.LocDesc(Sec, "Player colliding",
-                "玩家互撞\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
-                "Player colliding\nInclude the player collisions card in the draw pool.");
-            SRApi.LocKey(Sec, "Frictionless", "无摩擦", "Frictionless");
-            SRApi.LocDesc(Sec, "Frictionless",
-                "无摩擦\n是否把这张牌放进随机池\n关闭后本局不会抽到它",
-                "Frictionless\nInclude the frictionless card in the draw pool.");
+            TweakCfg.Entry(Sec, "Enabled", "启用混乱牌组", "Enable chaos deck",
+                "启用混乱牌组\n树屋里选牌组，每回合抽牌改变规则；关闭即还原。", "Enable chaos deck\nPick cards in the treehouse; each round changes a rule. Off restores everything.");
+            TweakCfg.Entry(Sec, "EveryNRounds", "抽牌间隔（回合）", "Draw every N rounds",
+                "抽牌间隔（回合）\n几回合抽一次：1 = 每个真回合都抽\n只有结算推进才计数，重载 / 刷新派对盒不抽",
+                "Draw every N rounds\n1 = draw every real round\nonly tally-confirmed advances count; reload / party-box refresh does not");
+            TweakCfg.Entry(Sec, "MaxActive", "同时生效牌数", "Max active cards",
+                "同时生效牌数\n最多同时生效几张牌。", "Max active cards\nHow many cards may apply at once. Range 1-4.");
+            TweakCfg.Entry(Sec, "Announce", "抽牌提示", "Announce draws",
+                "抽牌提示\n抽牌时在屏幕上提示本回合牌面。", "Announce draws\nShow the drawn card on screen when a round starts.");
+            TweakCfg.Entry(Sec, "RerollKey", "重抽快捷键", "Reroll key",
+                "重抽快捷键\n房主按此键立刻重抽一张。", "Reroll key\nHost: press to draw a new card immediately.");
+            TweakCfg.Entry(Sec, "Low gravity", "低重力", "Low gravity",
+                "低重力\n勾选后本局才可能抽到这张牌", "Low gravity\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "High gravity", "高重力", "High gravity",
+                "高重力\n勾选后本局才可能抽到这张牌", "High gravity\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "Weak jump", "弱跳跃", "Weak jump",
+                "弱跳跃\n勾选后本局才可能抽到这张牌", "Weak jump\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "Slow sprint", "慢冲刺", "Slow sprint",
+                "慢冲刺\n勾选后本局才可能抽到这张牌", "Slow sprint\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "Slow platforms", "慢平台", "Slow platforms",
+                "慢平台\n勾选后本局才可能抽到这张牌", "Slow platforms\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "No wall jumps", "禁墙跳", "No wall jumps",
+                "禁墙跳\n勾选后本局才可能抽到这张牌", "No wall jumps\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "Mirror controls", "镜像操作", "Mirror controls",
+                "镜像操作\n勾选后本局才可能抽到这张牌", "Mirror controls\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "Dance invincible", "跳舞无敌", "Dance invincible",
+                "跳舞无敌\n勾选后本局才可能抽到这张牌", "Dance invincible\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "Player colliding", "玩家互撞", "Player colliding",
+                "玩家互撞\n勾选后本局才可能抽到这张牌", "Player colliding\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "Frictionless", "无摩擦", "Frictionless",
+                "无摩擦\n勾选后本局才可能抽到这张牌", "Frictionless\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "High jump", "高跳跃", "High jump",
+                "高跳跃\n勾选后本局才可能抽到这张牌", "High jump\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "Fast sprint", "快冲刺", "Fast sprint",
+                "快冲刺\n勾选后本局才可能抽到这张牌", "Fast sprint\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "Fast platforms", "快平台", "Fast platforms",
+                "快平台\n勾选后本局才可能抽到这张牌", "Fast platforms\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "Crawl sprint", "龟速冲刺", "Crawl sprint",
+                "龟速冲刺\n勾选后本局才可能抽到这张牌", "Crawl sprint\nChecked cards can be drawn this match");
+            TweakCfg.Entry(Sec, "Frozen platforms", "停滞平台", "Frozen platforms",
+                "停滞平台\n勾选后本局才可能抽到这张牌", "Frozen platforms\nChecked cards can be drawn this match");
             if (!_uiReg) { _uiReg = true; SRApi.RowSliders.Add(UiSlider); }
         }
 
@@ -183,7 +158,7 @@ namespace SR_UCH.Tweaks {
 
         public void Initialize(IFeatureHost plugin) {
             _enabled = plugin.Config.Bind(Sec, "Enabled", false, "树屋里选牌组，每回合抽牌改变规则；关闭即还原。");
-            _everyRounds = plugin.Config.Bind(Sec, "EveryNRounds", 1, new ConfigDescription("几回合抽一次：1 = 每个摆放阶段都抽。", new AcceptableValueRange<int>(1, 5)));
+            _everyRounds = plugin.Config.Bind(Sec, "EveryNRounds", 1, new ConfigDescription("几回合抽一次：1 = 每个真回合都抽（只有结算推进才计数）。", new AcceptableValueRange<int>(1, 5)));
             _maxActive = plugin.Config.Bind(Sec, "MaxActive", 1, new ConfigDescription("最多同时生效几张牌。", new AcceptableValueRange<int>(1, 4)));
             _announce = plugin.Config.Bind(Sec, "Announce", true, "抽牌时在屏幕上提示本回合牌面。");
             _drawKey = plugin.Config.Bind(Sec, "RerollKey", KeyCode.None, "房主按此键立刻重抽一张。");
@@ -200,18 +175,8 @@ namespace SR_UCH.Tweaks {
                         new ConfigDescription("数值下限：" + c.Zh, new AcceptableValueRange<int>(0, 8)));
                     _paramMax[i] = plugin.Config.Bind(Sec, c.En + " Max", c.Max,
                         new ConfigDescription("数值上限：" + c.Zh, new AcceptableValueRange<int>(0, 8)));
-                    SRApi.LocKey(Sec, c.En + " Min", c.Zh + "下限", c.En + " min");
-                    SRApi.LocDesc(Sec, c.En + " Min",
-                        c.Zh + "的下限\n抽取时不会低于这个档位\n与上限一起圈定取值范围",
-                        "lowest tier for " + c.En + "\nthe roll never goes below this\nwith max it defines the range");
-                    SRApi.LocKey(Sec, c.En + " Max", c.Zh + "上限", c.En + " max");
-                    SRApi.LocDesc(Sec, c.En + " Max",
-                        c.Zh + "的上限\n抽取时不会高于这个档位\n低于下限时按一下限处理",
-                        "highest tier for " + c.En + "\nthe roll never goes above this\nfalls back to min when lower");
                 }
                 
-                SRApi.LocPair(Sec, c.En, c.Zh, c.En,
-                              c.Zh + "\n勾选后才可能被抽到。", c.En + "\ncheck to include it in the draw pool.");
             }
 
             // 本功能配置不存盘：启动时强制回到默认值。
@@ -228,9 +193,10 @@ namespace SR_UCH.Tweaks {
                 }
             } catch (Exception __rs) { SRApi.Guard.Log("混乱牌组/会话重置", __rs); }
 
-            // 关闭开关必须把修改器内容清干净：先按快照还原，再把残留的规则值复位到游戏默认，
-            // 否则之前抽到的牌会以"快照值"的形式留在 Modifiers 里，下次开局仍是改过的状态。
-            _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) { RestoreAll(); ClearModifiers(); } };
+            // 总开关关闭：广播全场清零，本机与所有房客落到同一终态。
+            System.EventHandler __h__enabled_1 = (s2, e2) => { if (!_enabled.Value) { ClearAll(true); } };
+            _enabled.SettingChanged += __h__enabled_1;
+            Sub.Revoke(() => _enabled.SettingChanged -= __h__enabled_1);
 
             SRApi.NetMagic.Register("chaos.signal", Magic);
             SRApi.NetMagic.Register("chaos.card", CardMagic);
@@ -254,6 +220,7 @@ namespace SR_UCH.Tweaks {
             if (_listener == null) {
                 _listener = new ChaosListener(this);
                 GameEventManager.ChangeListener<GameEvent.StartPhaseEvent>(_listener, true);
+                GameEventManager.ChangeListener<GameEvent.ScoreboardEvent>(_listener, true);
                 GameEventManager.ChangeListener<GameEvent.GameEndEvent>(_listener, true);
                 GameEventManager.ChangeListener<GameEvent.NewMatchEvent>(_listener, true);
                 GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(_listener, true);
@@ -265,12 +232,13 @@ namespace SR_UCH.Tweaks {
         public void Shutdown() {
             if (_listener != null) {
                 GameEventManager.ChangeListener<GameEvent.StartPhaseEvent>(_listener, false);
+                GameEventManager.ChangeListener<GameEvent.ScoreboardEvent>(_listener, false);
                 GameEventManager.ChangeListener<GameEvent.GameEndEvent>(_listener, false);
                 GameEventManager.ChangeListener<GameEvent.NewMatchEvent>(_listener, false);
                 GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(_listener, false);
                 _listener = null;
             }
-            RestoreAll();
+            ClearLocal();
             _ready = false;
         }
 
@@ -278,6 +246,7 @@ namespace SR_UCH.Tweaks {
             if (!_ready) return;
             if (_enabled.Value == false) return;                       // 总开关关掉后不跑任何每帧逻辑
             if (!ModeAllowed()) return;                                 // 限制模式：静默跳过
+            PumpRoundTruth();
             SendHelloOnce();
         }
 
@@ -286,6 +255,7 @@ namespace SR_UCH.Tweaks {
             public ChaosListener(Chaos o) { _o = o; }
             public void handleEvent(GameEvent.GameEvent e) {
                 if (e is GameEvent.StartPhaseEvent) { _o.OnStartPhase((GameEvent.StartPhaseEvent)e); return; }
+                if (e is GameEvent.ScoreboardEvent) { _o.OnScoreboard((GameEvent.ScoreboardEvent)e); return; }
                 if (e is GameEvent.GameEndEvent) { _o.OnGameEnd(); return; }
                 if (e is GameEvent.NewMatchEvent) { _o.OnNewMatch(); return; }
                 if (e is GameEvent.NetworkMessageReceivedEvent) { _o.OnNet((GameEvent.NetworkMessageReceivedEvent)e); return; }
@@ -332,27 +302,51 @@ namespace SR_UCH.Tweaks {
             return -1;
         }
 
-        // ============ 阶段边界 ============
+        // ============ 阶段边界 / 真回合 ============
+
+        // 记分板出现或结算完成 = 本回合确实推进过；与 HUD 同一判据。
+        private void OnScoreboard(GameEvent.ScoreboardEvent e) {
+            if (e == null) return;
+            try { if (e.Showing || e.AfterTally) SR_UCH.Pure.RoundTruth.NoteTally(ref _rs); }
+            catch (Exception __sb) { SRApi.Guard.Log("混乱牌组/结算证据", __sb); }
+        }
+
+        // 每帧读游戏回合数，交给共享状态机判定「真回合」是否推进。
+        private static void PumpRoundTruth() {
+            try {
+                LobbyManager lm = SafeLobby();
+                GameControl gc = (lm != null) ? lm.CurrentGameController : null;
+                if (gc == null) return;
+                if (SR_UCH.Pure.RoundTruth.Step(ref _rs, gc.RoundNumber, false)) _roundAdvancePending++;
+            } catch (Exception __rt) { SRApi.Guard.Log("混乱牌组/真回合判定", __rt); }
+        }
 
         private void OnStartPhase(GameEvent.StartPhaseEvent e) {
             if (!_ready || !_enabled.Value) return;
             if (e == null || e.Phase != GameControl.GamePhase.PLACE) return;
 
-            // 房客端绝不本地重建：会用已被房主改过的值做快照、再用空 _active 还原，把房主的牌冲掉。
+            // 抽牌时机仍是建造阶段开始，但只有真回合推进才计数：
+            // 重载关卡 / 刷新派对盒会直接调 ToPlaceMode() 发 PLACE 且把 RoundNumber +1，
+            // 却没有结算记分板，那种 PLACE 一律不抽牌、不重建。
+            // 房客端同步消费计数（不抽牌），避免两端状态分叉。
+            if (_roundAdvancePending <= 0) return;
+            _roundAdvancePending--;
+            // 房客端绝不本地重建：只跟踪房主广播的牌面，避免用本机脏值覆盖权威状态。
             if (!IsAuthority) return;
             _roundSeen++;
             if (_roundSeen % Mathf.Max(1, _everyRounds.Value) == 0) DrawAndBroadcast();
             else if (_applied) RebuildLocal();
         }
 
-        private void OnGameEnd() { RestoreAll(); }
+        private void OnGameEnd() { ClearLocal(); }
 
         /// <summary>换局：只清本机状态，不广播（游戏自己会重置规则）。</summary>
         private void OnNewMatch() {
             _active.Clear();
             _applied = false;
-            _hasSnapshot = false;
             _roundSeen = 0;
+            SR_UCH.Pure.RoundTruth.Reset(ref _rs);
+            _roundAdvancePending = 0;
             _roster.Clear();
         }
 
@@ -367,8 +361,8 @@ namespace SR_UCH.Tweaks {
             for (int i = 0; i < Cards.Length; i++) if (_pool[i] != null && _pool[i].Value) chosen.Add(i);
             if (chosen.Count == 0) return;
 
-            // 先重发上一回合规则的树屋原值，否则未装 mod 的房客会逐回合累积。
-            BroadcastRestoreRules();
+            // 先按 0 复位上一回合生效的规则，否则未装 mod 的房客会逐回合累积。
+            BroadcastResetPrevious();
 
             _drawSeq++;
             var rng = new System.Random(Environment.TickCount ^ (_roundSeen * 7919) ^ (_drawSeq * 104729));
@@ -416,7 +410,6 @@ namespace SR_UCH.Tweaks {
         private static int ArrayLengthFor(int field, Modifiers m) {
             switch (field) {
                 case FGravity:  return m.GravityValues != null ? m.GravityValues.Length : 0;
-                case FRate:     return m.RateOfFireValues != null ? m.RateOfFireValues.Length : 0;
                 case FJump:     return m.JumpSpeedValues != null ? m.JumpSpeedValues.Length : 0;
                 case FSprint:   return m.SprintModifiers != null ? m.SprintModifiers.Length : 0;
                 case FPlatform: return m.PlatformMoveSpeedValues != null ? m.PlatformMoveSpeedValues.Length : 0;
@@ -435,118 +428,72 @@ namespace SR_UCH.Tweaks {
             } catch (Exception ex) { SRApi.Guard.Log("混乱牌组/广播", ex); }
         }
 
-        // ============ 本地落位（幂等：先还原再按序重建） ============
+        // ============ 本地落位（幂等：先清零再按序重建） ============
 
         private void RebuildLocal() {
-            
             if (!IsAuthority) return;
             var m = SafeMods();
             if (m == null) return;
-            if (!_hasSnapshot) { Capture(m); _hasSnapshot = true; }
-            RestoreLocal(m);
+            ClearFields(m);
             for (int i = 0; i < _active.Count; i++) ApplyLocal(m, Cards[_active[i].Id], _active[i].Param);
             _applied = true;
         }
 
-        /// <summary>把生效牌对应的规则按树屋原值重发。</summary>
-        private static void BroadcastRestoreRules() {
-            if (!IsAuthority || !NetClientActive() || !_hasSnapshot) return;
-            for (int i = 0; i < _active.Count; i++) {
-                int id = _active[i].Id;
-                int orig = SnapshotValue(Cards[id].Field);
-                BroadcastOne(id, Cards[id].IsBool ? (orig != 0 ? 1 : 0) : orig, true);
-            }
+        // 全部修改器字段复位到游戏默认值；不猜"1 = 正常"，0/false 即序列化默认。
+        private static void ClearFields(Modifiers m) {
+            m.GravityMode = 0;
+            m.JumpSpeedMode = 0;
+            m.SprintSpeedMode = 0;
+            m.PlatformSpeedMode = 0;
+            m.RateOfFireMode = 0;
+            m.wallJumpsDisabled = false;
+            m.danceInvincibility = false;
+            m.mirrorControls = false;
+            m.playerPlayerCollisions = false;
+            m.frictionless = false;
         }
 
-        private void RestoreAll() {
-            // 未装 mod 的房客：重发每条曾生效规则的树屋原值。
-            if (_hasSnapshot && _active.Count > 0 && IsAuthority) {
-                BroadcastRestoreRules();
-                // 装了 mod 的房客：清牌面标记，避免下一局显示过期牌。
-                SendSignal(OpRestore);
-            }
-            // 房主自己本地还原；房客端不碰 Modifiers。
-            if (_hasSnapshot && IsAuthority) { var m = SafeMods(); if (m != null) RestoreLocal(m); }
-            if (IsAuthority) {
-                _active.Clear();
-                _hasSnapshot = false;
-                _roundSeen = 0;
-            } else {
-                // 房客：关本机开关只清"已应用"标记，牌面继续跟踪。
-            }
+        // 本机终态：字段归零 + 清牌面与状态；不广播。
+        private void ClearLocal() {
+            try { var m = SafeMods(); if (m != null) ClearFields(m); }
+            catch (Exception __cl) { SRApi.Guard.Log("混乱牌组/本地清零", __cl); }
+            _active.Clear();
             _applied = false;
+            _roundSeen = 0;
+            SR_UCH.Pure.RoundTruth.Reset(ref _rs);
+            _roundAdvancePending = 0;
         }
 
-        private static int SnapshotValue(int field) {
-            switch (field) {
-                case FGravity:  return _snap.Gravity;
-                case FRate:     return _snap.Rate;
-                case FJump:     return _snap.Jump;
-                case FSprint:   return _snap.Sprint;
-                case FPlatform: return _snap.Platform;
-                case FBoolWallJumps: return _snap.WallJumps ? 1 : 0;
-                case FBoolDance:     return _snap.Dance ? 1 : 0;
-                case FBoolMirror:    return _snap.Mirror ? 1 : 0;
-                case FBoolPlayerCol: return _snap.PlayerCol ? 1 : 0;
-                case FBoolFriction:  return _snap.Friction ? 1 : 0;
+        // 关闭开关：房主广播全场清零，随后本机落到同一终态。
+        private void ClearAll(bool broadcast) {
+            if (broadcast && IsAuthority) BroadcastClearAll();
+            ClearLocal();
+            SRApi.LogInfo("[混乱牌组] 已清空牌面与修改器内容（全场一致）");
+        }
+
+        // 抽牌前把上一回合生效的规则广播为 0；OpCardRestore 同时清掉房客的旧牌面。
+        private static void BroadcastResetPrevious() {
+            if (!NetClientActive() || _active.Count == 0) return;
+            for (int i = 0; i < _active.Count; i++) BroadcastOne(_active[i].Id, 0, true);
+        }
+
+        // 真实规则消息给未装 mod 的房客（游戏原生写 0），带外信号让装 mod 的端全字段归零。
+        private static void BroadcastClearAll() {
+            if (!NetClientActive()) return;
+            var seen = new List<TabletRule>();
+            for (int i = 0; i < Cards.Length; i++) {
+                bool dup = false;
+                for (int k = 0; k < seen.Count; k++) if (seen[k] == Cards[i].Rule) { dup = true; break; }
+                if (dup) continue;
+                seen.Add(Cards[i].Rule);
+                BroadcastOne(i, 0, true);
             }
-            return 0;
-        }
-
-        private void Capture(Modifiers m) {
-            _snap.Gravity = m.GravityMode;
-            _snap.Jump = m.JumpSpeedMode;
-            _snap.Sprint = m.SprintSpeedMode;
-            _snap.Platform = m.PlatformSpeedMode;
-            _snap.Rate = m.RateOfFireMode;
-            _snap.WallJumps = m.wallJumpsDisabled;
-            _snap.Dance = m.danceInvincibility;
-            _snap.Mirror = m.mirrorControls;
-            _snap.PlayerCol = m.playerPlayerCollisions;
-            _snap.Friction = m.frictionless;
-        }
-
-        private void RestoreLocal(Modifiers m) {
-            m.GravityMode = _snap.Gravity;
-            m.JumpSpeedMode = _snap.Jump;
-            m.SprintSpeedMode = _snap.Sprint;
-            m.PlatformSpeedMode = _snap.Platform;
-            m.RateOfFireMode = _snap.Rate;
-            m.wallJumpsDisabled = _snap.WallJumps;
-            m.danceInvincibility = _snap.Dance;
-            m.mirrorControls = _snap.Mirror;
-            m.playerPlayerCollisions = _snap.PlayerCol;
-            m.frictionless = _snap.Friction;
-        }
-
-        // 牌组关闭时的兜底：把牌可能改过的字段全部复位到游戏默认值。
-        // 不依赖快照（快照可能是在已被改过的状态下抓的），因此这是"干净"的终态。
-        private void ClearModifiers() {
-            try {
-                var m = SafeMods();
-                if (m == null) return;
-                // Modifiers 的模式字段默认就是 0（游戏序列化默认），不猜测"1 = 正常"。
-                m.GravityMode = 0;
-                m.JumpSpeedMode = 0;
-                m.SprintSpeedMode = 0;
-                m.PlatformSpeedMode = 0;
-                m.RateOfFireMode = 0;
-                m.wallJumpsDisabled = false;
-                m.danceInvincibility = false;
-                m.mirrorControls = false;
-                m.playerPlayerCollisions = false;
-                m.frictionless = false;
-                _active.Clear();
-                _hasSnapshot = false;
-                _applied = false;
-                SRApi.LogInfo("[混乱牌组] 已清空牌面与修改器内容");
-            } catch (Exception __cm) { SRApi.Guard.Log("混乱牌组/清空修改器", __cm); }
+            SendSignal(OpClearAll);
         }
 
         private static void ApplyLocal(Modifiers m, CardDef c, int param) {
             switch (c.Field) {
                 case FGravity:  m.GravityMode = param; break;
-                case FRate:     m.RateOfFireMode = param; break;
                 case FJump:     m.JumpSpeedMode = param; break;
                 case FSprint:   m.SprintSpeedMode = param; break;
                 case FPlatform: m.PlatformSpeedMode = param; break;
@@ -597,7 +544,7 @@ namespace SR_UCH.Tweaks {
                 int op = m.Value2 & 0xFF;
                 if (op == OpHello && m.Value >= 0 && m.Value < 8 && m.Value != LocalNetworkNumber())
                     _roster[m.Value] = new RosterEntry(Time.unscaledTime);
-                else if (op == OpRestore) { _active.Clear(); _applied = false; }
+                else if (op == OpClearAll) { ClearLocal(); }
                 return;
             }
 
@@ -667,9 +614,9 @@ namespace SR_UCH.Tweaks {
                 parts.Add("#" + kv.Key);
             }
             string tail = parts.Count > 0
-                ? string.Join(SRApi.T("、", ", "), parts.ToArray())
-                : SRApi.T("尚未收到其他端回应", "no other clients replied yet");
-            return SRApi.T("房内：本机已装 / 其他端 ", "Room: this machine installed / others ") + tail;
+                ? string.Join(SRApi.Tid("6486d4e8b0", "、", ", "), parts.ToArray())
+                : SRApi.Tid("4957c49e50", "尚未收到其他端回应", "no other clients replied yet");
+            return SRApi.Tid("9e4c887019", "房内：本机已装 / 其他端 ", "Room: this machine installed / others ") + tail;
         }
 
     }

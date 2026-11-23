@@ -34,7 +34,7 @@ namespace SR_UCH.Tweaks {
         {
             // 先查对方：布局预设正在加载时必须拦下。
             try {
-                Func<bool> other = Slots.Require<Func<bool>>("presets.reloadBusy");
+                Func<bool> other = SrCaps.PresetsReloadBusy;
                 if (other != null && other()) {
                     SRApi.NotifyT("布局预设正在加载，请稍候", "A layout preset is loading; please wait");
                     return true;
@@ -67,7 +67,7 @@ namespace SR_UCH.Tweaks {
         // 重载当前关卡：先把房主快照写入 QuickSaver.levelPortalXml，重载后由 OnSetupStartLevel 读取广播。
         public static void ReloadLevel()
         {
-            ReloadLevelImpl(SRApi.T("重载关卡", "Reload Level"));
+            ReloadLevelImpl(SRApi.Tid("7e8acf1db1", "重载关卡", "Reload Level"));
         }
 
         private static void ReloadLevelImpl(string feature)
@@ -83,7 +83,7 @@ namespace SR_UCH.Tweaks {
                 }
                 if (!IsPartyCreativeOrFreeplay())
                 {
-                    SRApi.Notify(feature + SRApi.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
+                    SRApi.Notify(feature + SRApi.Tid("25f0182810", "：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
                     return;
                 }
                 if (!SRApi.GateHost)
@@ -128,7 +128,6 @@ namespace SR_UCH.Tweaks {
                     return;
                 }
                 SetReloadBusy(true);
-                // 协程只在末尾复位锁；本方法所有提前 return 都在 StartCoroutine 之前，须逐条手动复位。
                 System.Xml.XmlDocument doc = qs.GetCurrentXmlSnapshot(false);
                 if (doc == null || string.IsNullOrEmpty(doc.OuterXml))
                 {
@@ -207,12 +206,12 @@ namespace SR_UCH.Tweaks {
             {
                 if (ok)
                 {
-                    SRApi.Notify(feature + SRApi.T("：重载中，方块保留，", ": reloading, blocks kept, ") +
-                        (ReloadKeepsScore ? SRApi.T("分数保留", "scores kept") : SRApi.T("分数重置", "scores reset")));
+                    SRApi.Notify(feature + SRApi.Tid("e156aaba37", "：重载中，方块保留，", ": reloading, blocks kept, ") +
+                        (ReloadKeepsScore ? SRApi.Tid("3bf6d8857d", "分数保留", "scores kept") : SRApi.Tid("a84b19122d", "分数重置", "scores reset")));
                 }
                 else
                 {
-                    SRApi.Notify(feature + SRApi.T("：重载失败", ": reload failed"));
+                    SRApi.Notify(feature + SRApi.Tid("06a4adc61b", "：重载失败", ": reload failed"));
                 }
                 _reloadStartedAt = Time.unscaledTime;
                 _reloadLoadedAt = -1f; // 等 FadeOut 置位

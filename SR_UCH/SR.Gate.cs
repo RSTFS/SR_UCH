@@ -205,7 +205,7 @@ public partial class SR {
                 _modeHintAt[impl] = Time.unscaledTime;
                 try {
                     LogWarn("[模式限制] " + (actionName ?? "?") + " 在当前模式下不可用");
-                    Notify(T(actionName ?? "?", actionName ?? "?") + " " + T("在当前模式下不可用", "is unavailable in this mode"));
+                    Notify(T(actionName ?? "?", actionName ?? "?") + " " + Tid("b7ca9751b9", "在当前模式下不可用", "is unavailable in this mode"));
                 } catch (Exception __mh) { Guard.Log("模式限制提示", __mh); }
             }
             return false;
@@ -238,9 +238,8 @@ public partial class SR {
         public static bool CanDo(Cap cap, out string why) {
             why = null;
             try {
-                // 总开关不可豁免，须在所有能力判定之前。
                 if (!GateMaster) {
-                    why = T("总开关已关闭（设置页 → All Enabled）", "Master switch is off (Settings -> All Enabled)");
+                    why = Tid("53493fc4d6", "总开关已关闭（设置页 → All Enabled）", "Master switch is off (Settings -> All Enabled)");
                     return false;
                 }
                 switch (cap) {
@@ -249,17 +248,15 @@ public partial class SR {
                     case Cap.HostOnly:
                         // 仅房主按“本机是否权威”而非“是否在跑服务器”：离线单机/本地派对同样成立。
                         if (Env.IsHost) return true;
-                        why = T("仅房主可执行此操作",
-                                "Host only");
+                        why = Tid("1e63df8bda", "仅房主可执行此操作", "Host only");
                         return false;
                     case Cap.AnyViaMessage:
                         if (Env.HasServer || Env.Online) return true;
-                        why = T("此操作需要联机对局",
-                                "This action requires an online session");
+                        why = Tid("47731377cb", "此操作需要联机对局", "This action requires an online session");
                         return false;
                 }
             } catch (Exception __ex) { Guard.Log("能力判定", __ex); }
-            why = T("当前状态不满足执行条件", "Preconditions not met");
+            why = Tid("72978523f7", "当前状态不满足执行条件", "Preconditions not met");
             return false;
         }
 

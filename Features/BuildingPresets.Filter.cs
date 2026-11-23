@@ -99,19 +99,13 @@ namespace SR_UCH.Tweaks {
             } catch { return false; }
         }
 
-        private static bool ContainsText(string text, string query) {
-            try { return text != null && query != null && text.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0; }
-            catch { return false; }
-        }
-
-
         private static void RenderLevelFilterCombo() {
             try {
                 List<string> vals = LevelFilterValues();
                 if (_levelOptVals == null || _levelOptVals.Length != vals.Count) { _levelOptVals = vals.ToArray(); _levelOptLabels = null; }
                 if (_levelOptLabels == null || _levelOptLabels.Length != vals.Count) {
                     string[] labels = new string[vals.Count];
-                    for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
+                    for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.Tid("bafb97cd53", "全部", "All") : LevelDisplayNameForScene(vals[i]);
                     _levelOptLabels = labels;
                 }
                 SRApi.Ctl.FilterCombo("关卡", _levelOptVals, _levelOptLabels,
@@ -138,7 +132,7 @@ namespace SR_UCH.Tweaks {
                 vals.Insert(0, "");
                 _levelOptVals = vals.ToArray();
                 string[] labels = new string[vals.Count];
-                for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : LevelDisplayNameForScene(vals[i]);
+                for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.Tid("bafb97cd53", "全部", "All") : LevelDisplayNameForScene(vals[i]);
                 _levelOptLabels = labels;
                 _levelOptSig = sig;
                 _levelOpts = vals;
@@ -154,7 +148,7 @@ namespace SR_UCH.Tweaks {
                 if (_modeOptVals == null || _modeOptVals.Length != vals.Count) { _modeOptVals = vals.ToArray(); _modeOptLabels = null; }
                 if (_modeOptLabels == null || _modeOptLabels.Length != vals.Count) {
                     string[] labels = new string[vals.Count];
-                    for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
+                    for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.Tid("bafb97cd53", "全部", "All") : ModeText(vals[i]);
                     _modeOptLabels = labels;
                 }
                 SRApi.Ctl.FilterCombo("模式", _modeOptVals, _modeOptLabels,
@@ -181,7 +175,7 @@ namespace SR_UCH.Tweaks {
                 vals.Insert(0, "");
                 _modeOptVals = vals.ToArray();
                 string[] labels = new string[vals.Count];
-                for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.T("全部", "All") : ModeText(vals[i]);
+                for (int i = 0; i < vals.Count; i++) labels[i] = vals[i].Length == 0 ? SRApi.Tid("bafb97cd53", "全部", "All") : ModeText(vals[i]);
                 _modeOptLabels = labels;
                 _modeOptSig = sig;
                 _modeOpts = vals;
@@ -195,9 +189,9 @@ namespace SR_UCH.Tweaks {
             try {
                 string[] vals = new string[] { "", "preset", "local" };
                 string[] labels = new string[] {
-                    SRApi.T("全部", "All"),
-                    SRApi.T("预设", "Presets"),
-                    SRApi.T("本地", "Local")
+                    SRApi.Tid("bafb97cd53", "全部", "All"),
+                    SRApi.Tid("e01d0468f0", "预设", "Presets"),
+                    SRApi.Tid("c94b4b3e96", "本地", "Local")
                 };
                 SRApi.Ctl.FilterCombo("类型", vals, labels,
                     delegate { return _typeFilter; }, delegate(string v) { SetFilterValue(_filterTypeEntry, v); _typeFilter = v; },
@@ -215,7 +209,7 @@ namespace SR_UCH.Tweaks {
                 }
                 if (cur == 0 && !string.IsNullOrEmpty(_loadMode)) _loadMode = "";
                 string[] labels = new string[vals.Length];
-                labels[0] = SRApi.T("默认", "Default");
+                labels[0] = SRApi.Tid("58cd596ffa", "默认", "Default");
                 for (int i = 1; i < vals.Length; i++) labels[i] = ModeText(vals[i]);
                 bool open = _loadModeOpen;
                 int sel = SRApi.Ctl.ComboBox(null, labels[cur], vals, labels, ref open, W(110));
@@ -230,10 +224,10 @@ namespace SR_UCH.Tweaks {
             try {
                 // 统一走核心下拉行：展开态、类型转换、写回与收起都由 RowCombo 处理。
                 ConfigEntryBase e = SRApi.Ctl.FindEntry(Section, "Sort Mode");
-                string[] opts = new[] { SRApi.T("时间", "Time"), SRApi.T("名称", "Name") };
+                string[] opts = new[] { SRApi.Tid("772ed3aeed", "时间", "Time"), SRApi.Tid("84f28b852b", "名称", "Name") };
                 string[] vals = new[] { "0", "1" };
-                SRApi.Ctl.RowCombo(SRApi.T("排序", "Sort by"),
-                    SRApi.T("预设列表的排序方式\n按时间或按名称", "how the preset list is sorted\nby time or by name"),
+                SRApi.Ctl.RowCombo(SRApi.Tid("22125ddcd4", "排序", "Sort by"),
+                    SRApi.Tid("5358bddf58", "预设列表的排序方式\n按时间或按名称", "how the preset list is sorted\nby time or by name"),
                     e, vals, opts, W(110));
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/渲染排序下拉", __ex);

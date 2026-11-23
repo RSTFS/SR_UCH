@@ -17,7 +17,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\SR_UCH\Contracts\*.cs" />
+    <Compile Include="..\SR_UCH\Contracts\**\*.cs" />
+    <Compile Include="..\Pure\*.cs" />
     <!-- 功能层纯逻辑（无 Unity/BepInEx 依赖）：直接编进测试程序集覆盖 -->
     <Compile Include="..\Features\Chaos.Logic.cs" />
     <Compile Include="..\Features\NotifyHub.Logic.cs" />

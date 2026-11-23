@@ -7,13 +7,13 @@ using UnityEngine;
 namespace SR_UCH.Tweaks {
     public partial class Online {
         private static string DispName(string key, string v) {
-            if (string.IsNullOrEmpty(v)) return SRApi.T("全部", "All");
+            if (string.IsNullOrEmpty(v)) return SRApi.Tid("bafb97cd53", "全部", "All");
             if (key == "Filter Region") return DispRegion(v);
             if (key == "Filter Mode") return SRApi.T(v == "OTHER" ? "其它" : v == "FREEPLAY" ? "自由" : v == "CREATIVE" ? "创意" : v == "PARTY" ? "派对" : "挑战",
                                                   v == "FREEPLAY" ? "Freeplay" : v == "CREATIVE" ? "Creative" : v == "PARTY" ? "Party" : "Challenge");
             if (key == "Filter Tag") return SRApi.T(v == "Fun" ? "好玩" : v == "Competitive" ? "竞技" : v == "Beginner" ? "新手" : "自定义关卡",
                                                  v == "Fun" ? "Fun" : v == "Competitive" ? "Competitive" : v == "Beginner" ? "Beginner" : "Custom levels");
-            if (key == "Filter State") return v == "join" ? SRApi.T("可加入", "joinable") : v == "full" ? SRApi.T("人满", "full") : v == "playing" ? SRApi.T("对局中", "in match") : SRApi.T("全部", "all");
+            if (key == "Filter State") return v == "join" ? SRApi.Tid("25c459ee1d", "可加入", "joinable") : v == "full" ? SRApi.Tid("a8b0ea7444", "人满", "full") : v == "playing" ? SRApi.Tid("e4029a1120", "对局中", "in match") : SRApi.Tid("46adda6114", "全部", "all");
             return v; // 区域等：值本身就是显示名
         }
 
@@ -61,7 +61,7 @@ namespace SR_UCH.Tweaks {
             string old;
             if (_optCache.TryGetValue(key, out cached) && _optStamp.TryGetValue(key, out old) && old == stamp) return cached;
             List<string> opts = new List<string>(1 + (values != null ? values.Length : 0));
-            opts.Add(SRApi.T("全部", "All"));
+            opts.Add(SRApi.Tid("bafb97cd53", "全部", "All"));
             if (values != null) {
                 for (int i = 0; i < values.Length; i++) opts.Add(DispName(key, values[i]));
             }
@@ -89,7 +89,7 @@ namespace SR_UCH.Tweaks {
             string lk = SRApi.CurrentLanguageId + "|" + SRApi.LangVer;
             if (_filterLabelW >= 0f && _filterLabelLKey == lk) return _filterLabelW;
             float w = 0f;
-            string[] ls = { SRApi.T("区域", "Region"), SRApi.T("模式", "Mode"), SRApi.T("标签", "Tag"), SRApi.T("人数", "Players"), SRApi.T("AFK", "AFK") };
+            string[] ls = { SRApi.Tid("901419cf41", "区域", "Region"), SRApi.Tid("47384f58db", "模式", "Mode"), SRApi.Tid("4a740cf5ed", "标签", "Tag"), SRApi.Tid("e03763b9b3", "人数", "Players"), SRApi.Tid("8f62cfb5b2", "AFK", "AFK") };
             for (int i = 0; i < ls.Length; i++) w = Mathf.Max(w, SRApi.Ctl.Label.CalcSize(new GUIContent(ls[i])).x);
             _filterLabelW = Mathf.Max(SRApi.Ctl.Sc(FilterLabelW), w + SRApi.Ctl.Sc(8));
             _filterLabelLKey = lk;

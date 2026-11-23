@@ -15,8 +15,7 @@ public partial class Experiments : ITweak
         public static void RenderPage3() {
             try {
             GUILayout.Space(SRApi.Ctl.Sc(6));
-            SRApi.Ctl.SectionTitle(SRApi.T("树屋", "Treehouse"), SRApi.T("在树屋大厅里直接开始关卡.",
-                       "Start the level immediately from the treehouse."));
+            SRApi.Ctl.SectionTitle(SRApi.Tid("3f7114bae0", "树屋", "Treehouse"), SRApi.Tid("93b077da51", "在树屋大厅里直接开始关卡.", "Start the level immediately from the treehouse."));
             SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
                 return e.Definition.Key.StartsWith("Lobby ");
             });
@@ -26,18 +25,16 @@ public partial class Experiments : ITweak
                 }
 
                 GUILayout.Space(SRApi.Ctl.Sc(6));
-                SRApi.Ctl.SectionTitle(SRApi.T("加载与切场景", "Loading and scene switch"), SRApi.T("跳过加载动画. 温柔加载在切换场景时先卸载再回收.",
-                         "Skip the loading animation. Gentle load unloads and collects before switching."));
+                SRApi.Ctl.SectionTitle(SRApi.Tid("24d466b81b", "加载与切场景", "Loading and scene switch"), SRApi.Tid("8ec812d34d", "跳过加载动画. 温柔加载在切换场景时先卸载再回收.", "Skip the loading animation. Gentle load unloads and collects before switching."));
                 SRApi.RenderSectionEntries("Scene", delegate (ConfigEntryBase e) {
                     return e.Definition.Key.StartsWith("Splash ") || e.Definition.Key == "Gentle Load";
                 });
                 Action doCloseMask = delegate {
                     SplashTools.CloseMaskNow();
-                    SRApi.Notify(SplashTools.Note ?? SRApi.T("关闭遮罩：已执行一次", "Close the mask: executed once"));
+                    SRApi.Notify(SplashTools.Note ?? SRApi.Tid("87fbe805fc", "关闭遮罩：已执行一次", "Close the mask: executed once"));
                 };
-                if (SRApi.Ctl.HotkeyButton("exp.close_mask", SRApi.T("关闭遮罩", "Close the mask"),
-                        SRApi.T("立刻关掉当前加载遮罩\n只关这一次，不改变「跳过加载动画」设置",
-                            "dismiss the current loading mask\none shot; does not change the skip-load-animation setting"),
+                if (SRApi.Ctl.HotkeyButton("exp.close_mask", SRApi.Tid("44573fc96f", "关闭遮罩", "Close the mask"),
+                        SRApi.Tid("a53c3d579b", "立刻关掉当前加载遮罩\n只关这一次，不改变「跳过加载动画」设置", "dismiss the current loading mask\none shot; does not change the skip-load-animation setting"),
                         doCloseMask)) doCloseMask();
 
                 GUILayout.Space(SRApi.Ctl.Sc(6));
@@ -66,14 +63,13 @@ public partial class Experiments : ITweak
             SRApi.NavHide("Scene");
             // SkipBool 为 protected，登记后游戏改名时自检能报出来。
             SRApi.Ref.Override("UISplashScreen.SkipBool", "关闭跳过加载动画需清此标志");
-            SRApi.LocKey("Scene", "Splash Skip Load", "跳过加载动画", "Skip load animation");
-            SRApi.LocDesc("Scene", "Splash Skip Load", "跳过加载动画\n加载画面一出现就跳过\n无副作用，只省等待", "Skip loading animation\nskips the splash as soon as it appears\nno side effects, only saves the wait");
-            SRApi.LocKey("Scene", "Close Load UI", "同时关闭加载界面", "Also close loading screen");
-            SRApi.LocDesc("Scene", "Close Load UI",
+            TweakCfg.Entry("Scene", "Splash Skip Load", "跳过加载动画", "Skip load animation",
+                "跳过加载动画\n加载画面一出现就跳过\n无副作用，只省等待", "Skip loading animation\nskips the splash as soon as it appears\nno side effects, only saves the wait");
+            TweakCfg.Entry("Scene", "Close Load UI", "同时关闭加载界面", "Also close loading screen",
                 "同时关闭加载界面\n点「关闭遮罩」时把平板加载界面一起隐藏\n注意：加载并不会更快，界面消失后可能看起来像卡住",
                 "Also close loading screen\nhides the tablet loading screen when the mask is closed\nnote: loading is not faster, the game may look frozen without it");
-            SRApi.LocKey("Scene", "Gentle Load", "温柔加载", "Gentle load");
-            SRApi.LocDesc("Scene", "Gentle Load", "温和加载\n切换场景时走卸载加 GC 流程，减轻卡顿\n切到主菜单时交给游戏自身流程", "Gentle load\nunload plus GC when switching scenes to reduce stutter\nmain-menu transitions use the game's own path");
+            TweakCfg.Entry("Scene", "Gentle Load", "温柔加载", "Gentle load",
+                "温和加载\n切换场景时走卸载加 GC 流程，减轻卡顿\n切到主菜单时交给游戏自身流程", "Gentle load\nunload plus GC when switching scenes to reduce stutter\nmain-menu transitions use the game's own path");
         }
 
         public void Initialize(IFeatureHost plugin) {
@@ -133,7 +129,6 @@ public partial class Experiments : ITweak
             } catch (Exception __ex) { SRApi.Guard.Log("清 SkipBool", __ex); }
         }
 
-        // 游戏用 while (State != SHOW) 等遮罩：若对象被停用过（含旧版本遗留），加载会永久卡住。
         // 这里在拿到遮罩时确保它是 active 的。
         internal static void EnsureSplashActive(UISplashScreen sp) {
             try {
@@ -156,7 +151,7 @@ public partial class Experiments : ITweak
                 LoadingInterstitialSplash sp = FindSplash();
                 EnsureSplashActive(sp);
                 if (sp == null) {
-                    Note = SRApi.T("当前没有遮罩", "No mask on screen");
+                    Note = SRApi.Tid("8046519eba", "当前没有遮罩", "No mask on screen");
                     SRApi.NotifyT("当前没有遮罩", "No mask on screen");
                     return;
                 }
@@ -172,8 +167,8 @@ public partial class Experiments : ITweak
                     CloseLoadingUi();
                     HideSplashVisuals(sp);
                 }
-                Note = closed ? SRApi.T("已关闭一次遮罩", "Mask closed once")
-                              : SRApi.T("遮罩不在可关闭状态", "Mask is not in a closable state");
+                Note = closed ? SRApi.Tid("9bafa64d9d", "已关闭一次遮罩", "Mask closed once")
+                              : SRApi.Tid("ac32fe8f0a", "遮罩不在可关闭状态", "Mask is not in a closable state");
                 SRApi.LogInfo("[实验.场景] " + Note);
             } catch (Exception __ex) { SRApi.Guard.Log("关闭遮罩", __ex); }
         }
@@ -287,8 +282,9 @@ public partial class Experiments : ITweak
         internal static string Note = "";
 
         private static void SelfReg() {
-            SRApi.LocKey("Scene", "Lobby Launch Key", "立即开始键", "Launch now key");
-            SRApi.LocDesc("Scene", "Lobby Launch Key", "立即开始关卡\n优先开始你投过票的那扇门，没投票时选票数最高的门\n仅房主或离线有效；没绑按键时不生效", "Launch the level now\nprefers the portal you voted for, otherwise the most-voted portal\nhost or offline only; does nothing while unbound");
+            TweakCfg.Entry("Scene", "Lobby Launch Key", "立即开始键", "Launch now key",
+                "立即开始关卡\n优先开始你投过票的那扇门，没投票时选票数最高的门\n仅房主或离线有效；没绑按键时不生效",
+                "Launch the level now\nprefers the portal you voted for, otherwise the most-voted portal\nhost or offline only; does nothing while unbound");
 
         }
 

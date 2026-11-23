@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "note": "UCH 版本 ↔ mod 版本 ↔ 补丁状态。游戏 DLL 哈希变化后由 tools/uch.py doctor 提醒重比，并把状态改为 needs-reverify。",
+  "rows": [
+    {
+      "uch": "1.13.13.779.4563fd9.REL",
+      "mod": "main (当前源码)",
+      "contract": 2,
+      "status": "verified",
+      "note": "反编译 dump 已离线比对；自检基线 39/39 补丁、33/33 反射。"
+    }
+  ]
+}

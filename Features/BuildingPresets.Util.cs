@@ -36,6 +36,10 @@ namespace SR_UCH.Tweaks {
         private static XmlDocument ParseXmlSafe(string xml) {
             // 上限与导入一致：超大输入直接拒绝，避免主线程卡在 DOM 构建。
             if (string.IsNullOrEmpty(xml) || xml.Length > MaxImportChars) return null;
+            // 四层防护的唯一策略源：禁 DTD / ENTITY，且根节点必须是 <scene>。
+            // XmlReaderSettings 禁 DTD 属解析层；根名与 DTD/ENTITY 策略统一由 Pure 层判定。
+            if (!SR_UCH.Pure.PresetXmlPolicy.ForbidsDtd(xml)) return null;
+            if (!SR_UCH.Pure.PresetXmlPolicy.RootOk(xml)) return null;
             XmlDocument doc = new XmlDocument();
             XmlReaderSettings s = new XmlReaderSettings();
             s.DtdProcessing = DtdProcessing.Prohibit;
@@ -159,10 +163,10 @@ namespace SR_UCH.Tweaks {
                         if (!string.IsNullOrEmpty(localized) && localized.IndexOf('/') < 0) return localized;
                     }
                     switch (gm) {
-                        case GameState.GameMode.PARTY: return SRApi.T("派对", "Party");
-                        case GameState.GameMode.CREATIVE: return SRApi.T("创意", "Creative");
-                        case GameState.GameMode.FREEPLAY: return SRApi.T("自由", "Freeplay");
-                        case GameState.GameMode.CHALLENGE: return SRApi.T("挑战", "Challenge");
+                        case GameState.GameMode.PARTY: return SRApi.Tid("97c0e6938b", "派对", "Party");
+                        case GameState.GameMode.CREATIVE: return SRApi.Tid("44d9d5345b", "创意", "Creative");
+                        case GameState.GameMode.FREEPLAY: return SRApi.Tid("ebb2dba278", "自由", "Freeplay");
+                        case GameState.GameMode.CHALLENGE: return SRApi.Tid("0cce1e0303", "挑战", "Challenge");
                     }
                 }
                 return mode;
@@ -185,18 +189,18 @@ namespace SR_UCH.Tweaks {
         // 关卡显示名：优先保存时的展示名，否则按场景名解析（BlankLevel 为「自定义关卡」），兜底非空占位。
         private static string LevelText(PresetInfo p) {
             try {
-                if (p == null) return SRApi.T("未知关卡", "Unknown level");
+                if (p == null) return SRApi.Tid("fa9b6bf383", "未知关卡", "Unknown level");
                 if (!string.IsNullOrEmpty(p.LevelName)) return p.LevelName;
                 return LevelDisplayNameForScene(p.Level);
-            } catch { return SRApi.T("未知关卡", "Unknown level"); }
+            } catch { return SRApi.Tid("fa9b6bf383", "未知关卡", "Unknown level"); }
         }
 
         private static string LevelDisplayNameForScene(string scene) {
             try {
-                if (string.IsNullOrEmpty(scene)) return SRApi.T("未知关卡", "Unknown level");
-                if (string.Equals(scene, "BlankLevel", StringComparison.OrdinalIgnoreCase)) return SRApi.T("自定义关卡", "Custom level");
+                if (string.IsNullOrEmpty(scene)) return SRApi.Tid("fa9b6bf383", "未知关卡", "Unknown level");
+                if (string.Equals(scene, "BlankLevel", StringComparison.OrdinalIgnoreCase)) return SRApi.Tid("756f1de77d", "自定义关卡", "Custom level");
                 return LocalizedLevelName(scene);
-            } catch { return string.IsNullOrEmpty(scene) ? SRApi.T("未知关卡", "Unknown level") : scene; }
+            } catch { return string.IsNullOrEmpty(scene) ? SRApi.Tid("fa9b6bf383", "未知关卡", "Unknown level") : scene; }
         }
 
         // 当前对局若是自定义关卡，返回其名字；否则 null。
@@ -218,7 +222,7 @@ namespace SR_UCH.Tweaks {
                 if (string.Equals(active, "BlankLevel", StringComparison.OrdinalIgnoreCase)) {
                     string custom = CurrentCustomLevelName();
                     if (!string.IsNullOrEmpty(custom)) return custom;
-                    return SRApi.T("自定义关卡", "Custom level");
+                    return SRApi.Tid("756f1de77d", "自定义关卡", "Custom level");
                 }
                 return LevelDisplayNameForScene(string.IsNullOrEmpty(active) ? scene : active);
             } catch { return LevelDisplayNameForScene(scene); }

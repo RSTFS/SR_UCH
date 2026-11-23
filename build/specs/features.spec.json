@@ -1,0 +1,825 @@
+{
+  "schema": 3,
+  "purpose": "注册与产物的唯一声明；源文件清单、注册点计数、槽位解析一律由生成器扫描派生，不写入本文件",
+  "policy": {
+    "phase": 5,
+    "verify_mode": "strict",
+    "features_baseline_semantics": "exact",
+    "reflection_expectation": "Ref.Override 字面量 key 去重数（运行时 _refFeature.Count）",
+    "readonly_in_phase1": false,
+    "readme_generated_blocks": true,
+    "region_access": [
+      "_allEnabledEntry",
+      "_allSections",
+      "_appliedDisabled",
+      "_blockInputEntry",
+      "_captureStartFrame",
+      "_capturing",
+      "_cursorMoveTex",
+      "_cursorResizeTex",
+      "_cursorTex",
+      "_dirty",
+      "_disabledPluginsEntry",
+      "_externalPlugins",
+      "_font",
+      "_forceZh",
+      "_gatedEventSystem",
+      "_gripTex",
+      "_internalConfig",
+      "_internalSections",
+      "_langEn",
+      "_langEntry",
+      "_langVer",
+      "_leftScroll",
+      "_mode",
+      "_nameWCached",
+      "_nameWKey",
+      "_openKey",
+      "_pluginKey",
+      "_prevBoxed",
+      "_prevFont",
+      "_recHeld",
+      "_recSeq",
+      "_rmbConsumedFrame",
+      "_scaled",
+      "_scroll",
+      "_selectedInternalSection",
+      "_styleList",
+      "_stylesReady",
+      "_uiAlpha",
+      "_uiScaleEntry",
+      "_userHiddenSections",
+      "_visible",
+      "_winHeight",
+      "_winWidth",
+      "_winX",
+      "_winY",
+      "_auditIssues",
+      "_navHidden",
+      "_patchAudited",
+      "_refAudited",
+      "_refWarned",
+      "_startupAudited",
+      "_removedKeysLog",
+      "_appliedRemovals",
+      "_appliedOldKeys",
+      "_appliedOldSections",
+      "_appliedMoves"
+    ]
+  },
+  "artifacts": {
+    "dll": "SR_UCH.dll",
+    "deploy_target": "BepInEx\\plugins"
+  },
+  "deployment": {
+    "schema": 1,
+    "mode": "single",
+    "dll": "SR_UCH.dll",
+    "contract_version": 2,
+    "api_level": 16,
+    "core_provides": [
+      "sr.selftest.token"
+    ],
+    "note": "单一产物 SR_UCH.dll；功能同程序集，跨组协作直接走编译期常量，不再有缺件影响面。"
+  },
+  "ci": {
+    "workflow": ".github/workflows/guards.yml",
+    "job": "guards",
+    "command": "python3 tools/uch.py verify --strict",
+    "strict_from_phase": 3
+  },
+  "architecture": {
+    "note": "目录即层；依赖方向由 tools/check_architecture.py 检查，派生产物由 tools/spec_engine.py 重写。新增 .cs 必须落在某层，生成物统一放 Generated/；契约层枚举一律递归，独立编译清单与完整构建同源。",
+    "layers": [
+      {
+        "id": "pure",
+        "dirs": [
+          "Pure"
+        ],
+        "may_reference": [
+          "bcl"
+        ],
+        "forbid": [
+          "UnityEngine",
+          "BepInEx",
+          "HarmonyLib",
+          "SR_UCH.Tweaks"
+        ],
+        "desc": "纯函数；不得引用引擎、插件宿主或任何上层类型"
+      },
+      {
+        "id": "contracts",
+        "dirs": [
+          "SR_UCH/Contracts",
+          "SR_UCH/Contracts/Generated"
+        ],
+        "may_reference": [
+          "pure",
+          "bcl",
+          "engine"
+        ],
+        "forbid": [
+          "SR_UCH.Tweaks",
+          "Features/ 声明的类型"
+        ],
+        "desc": "契约与运行时基础设施；不得依赖核心实现或功能层"
+      },
+      {
+        "id": "core",
+        "dirs": [
+          "SR_UCH"
+        ],
+        "may_reference": [
+          "pure",
+          "contracts",
+          "engine"
+        ],
+        "forbid": [
+          "Features/ 声明的类型"
+        ],
+        "desc": "框架本体（partial class SR）：窗口 / 控件 / 钩子 / 诊断，不含任何功能；功能一律在 Features/"
+      },
+      {
+        "id": "features",
+        "dirs": [
+          "Features"
+        ],
+        "may_reference": [
+          "pure",
+          "contracts",
+          "core",
+          "engine"
+        ],
+        "forbid": [],
+        "desc": "功能层；跨功能协作走契约层强类型能力容器，不直接改核心私有状态"
+      },
+      {
+        "id": "bootstrap",
+        "dirs": [
+          ".",
+          "tests"
+        ],
+        "may_reference": [
+          "pure",
+          "contracts",
+          "core",
+          "features",
+          "engine"
+        ],
+        "forbid": [],
+        "desc": "装配根与测试；允许引用全部层"
+      }
+    ],
+    "rules": [
+      {
+        "id": "pure-no-engine",
+        "layer": "pure",
+        "severity": "error"
+      },
+      {
+        "id": "contracts-no-core",
+        "layer": "contracts",
+        "severity": "error"
+      },
+      {
+        "id": "contracts-no-features",
+        "layer": "contracts",
+        "severity": "error"
+      },
+      {
+        "id": "core-no-features",
+        "layer": "core",
+        "severity": "error"
+      },
+      {
+        "id": "generated-separated",
+        "severity": "error"
+      },
+      {
+        "id": "no-unlayered",
+        "severity": "error"
+      }
+    ]
+  },
+  "layers": {
+    "group": "功能分组（文档 / 归属粒度）",
+    "feature": "逻辑功能（SrFeature 粒度）",
+    "lease": "运行时作用域（FeatureRuntime：幂等装载 / 注册归属 / 自动撤销）"
+  },
+  "groups": [
+    {
+      "id": "BuildingPresets",
+      "feature_ids": [
+        "sr.buildingpresets"
+      ]
+    },
+    {
+      "id": "BuildingTools",
+      "feature_ids": [
+        "sr.buildingtools",
+        "sr.buildunlimiter"
+      ]
+    },
+    {
+      "id": "Chaos",
+      "feature_ids": [
+        "sr.chaos"
+      ]
+    },
+    {
+      "id": "CharacterAuto",
+      "feature_ids": [
+        "sr.character"
+      ]
+    },
+    {
+      "id": "Chat",
+      "feature_ids": [
+        "sr.chat"
+      ]
+    },
+    {
+      "id": "DestroyBlocks",
+      "feature_ids": [
+        "sr.destroyblocks"
+      ]
+    },
+    {
+      "id": "Experiments",
+      "feature_ids": [
+        "sr.experiments",
+        "sr.levelboundsunlock",
+        "sr.freecam",
+        "sr.removeui3",
+        "sr.splashtools",
+        "sr.lobbytools"
+      ]
+    },
+    {
+      "id": "FreePlay",
+      "feature_ids": [
+        "sr.freeplay.grid",
+        "sr.freeplay.self",
+        "sr.freeplay"
+      ]
+    },
+    {
+      "id": "HUD",
+      "feature_ids": [
+        "sr.roundhud"
+      ]
+    },
+    {
+      "id": "Level",
+      "feature_ids": [
+        "sr.autopartyitem",
+        "sr.partybomb",
+        "sr.dropheldpiece",
+        "sr.levelpartybox",
+        "sr.level"
+      ]
+    },
+    {
+      "id": "NotifyHub",
+      "feature_ids": [
+        "sr.notifyhub"
+      ]
+    },
+    {
+      "id": "Online",
+      "feature_ids": [
+        "sr.online"
+      ]
+    },
+    {
+      "id": "PartyGlow",
+      "feature_ids": [
+        "sr.partyglow"
+      ]
+    },
+    {
+      "id": "PlayerTracker",
+      "feature_ids": [
+        "sr.playertracker"
+      ]
+    },
+    {
+      "id": "QuickAdjust",
+      "feature_ids": [
+        "sr.quickadjust"
+      ]
+    },
+    {
+      "id": "VisualAid",
+      "feature_ids": [
+        "sr.visualaid"
+      ]
+    }
+  ],
+  "core_features": [],
+  "features": [
+    {
+      "id": "sr.buildingpresets",
+      "name": "BuildingPresets",
+      "version": "1.0",
+      "modes": "all",
+      "provides": [
+        "presets.reloadBusy"
+      ]
+    },
+    {
+      "id": "sr.buildingtools",
+      "name": "BuildingTools",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.buildunlimiter",
+      "name": "BuildUnlimiter",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.chaos",
+      "name": "Chaos",
+      "version": "2.2",
+      "modes": "SRApi.ModeMask.Party | SRApi.ModeMask.Creative",
+      "provides": []
+    },
+    {
+      "id": "sr.character",
+      "name": "Character",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.chat",
+      "name": "Chat",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.destroyblocks",
+      "name": "DestroyBlocks",
+      "version": "1.0",
+      "modes": "SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay",
+      "provides": [
+        "DestroyBlocks.PlayerPlacedBlocks",
+        "DestroyBlocks.AttributeToHost"
+      ]
+    },
+    {
+      "id": "sr.experiments",
+      "name": "Experiments",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.levelboundsunlock",
+      "name": "LevelBoundsUnlock",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.freecam",
+      "name": "FreeCam",
+      "version": "1.0",
+      "modes": "SRApi.ModeMask.Freeplay",
+      "provides": []
+    },
+    {
+      "id": "sr.removeui3",
+      "name": "RemoveUI3",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.splashtools",
+      "name": "SplashTools",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.lobbytools",
+      "name": "LobbyTools",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.freeplay.grid",
+      "name": "FreePlayGrid",
+      "version": "2.0",
+      "modes": "SRApi.ModeMask.Freeplay",
+      "provides": []
+    },
+    {
+      "id": "sr.freeplay.self",
+      "name": "SelfState",
+      "version": "1.0",
+      "modes": "SRApi.ModeMask.Freeplay",
+      "provides": []
+    },
+    {
+      "id": "sr.freeplay",
+      "name": "FreePlay",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.roundhud",
+      "name": "HUD",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.autopartyitem",
+      "name": "AutoPartyItem",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.partybomb",
+      "name": "PartyBomb",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.dropheldpiece",
+      "name": "DropHeldPiece",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.levelpartybox",
+      "name": "LevelPartyBox",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.level",
+      "name": "Level",
+      "version": "1.0",
+      "modes": "all",
+      "provides": [
+        "Level.ClearPlacedBlocks",
+        "level.reloadBusy"
+      ]
+    },
+    {
+      "id": "sr.notifyhub",
+      "name": "通知中心",
+      "version": "1.0",
+      "modes": "all",
+      "provides": [
+        "sr.notify.hook",
+        "sr.notify.hub2"
+      ]
+    },
+    {
+      "id": "sr.online",
+      "name": "Online",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.partyglow",
+      "name": "品质光芒",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.playertracker",
+      "name": "PlayerTracker",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.quickadjust",
+      "name": "QuickAdjust",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    },
+    {
+      "id": "sr.visualaid",
+      "name": "视觉辅助",
+      "version": "1.0",
+      "modes": "all",
+      "provides": []
+    }
+  ],
+  "cfgColumns": {
+    "onlineV4ColCount": 12,
+    "onlineV5ColCount": 11,
+    "onlineV4SkillCol": 3
+  },
+  "fingerprint": {
+    "external": [
+      "AcceptableValueRange`1.Min",
+      "AcceptableValueRange`1.Max"
+    ],
+    "member_aliases": {
+      "GamePlayer.set_NetworkHandicap": "NetworkHandicap"
+    },
+    "note": "外部组件条目跳过离线比对；属性 getter/setter 按属性名匹配。"
+  },
+  "ui": {
+    "scroll_restore": "per-page",
+    "wheel_positive": "up",
+    "layers": "UiLayer",
+    "note": "页级 ViewState 由 SrPageModel 的编译期常量驱动；29 页节点树由 ui.pages.json 声明，绘制仍由各功能自己负责（双轨，未切换）。",
+    "page_model": "build/specs/ui.pages.json"
+  },
+  "cfg": {
+    "schema": 3,
+    "stamp_suffix": ".schema",
+    "note": "schema 不匹配时归档旧 cfg 并重建；不做旧键搬运。"
+  },
+  "build": {
+    "sdk": "8.0.100",
+    "roll_forward": "latestFeature",
+    "target_framework": "net472",
+    "lang_version": "7.3",
+    "bcl": [
+      "mscorlib",
+      "netstandard",
+      "System",
+      "System.Core",
+      "System.Xml"
+    ],
+    "game": [
+      {
+        "name": "Assembly-CSharp",
+        "dir": "managed"
+      },
+      {
+        "name": "UnityEngine",
+        "dir": "managed"
+      },
+      {
+        "name": "UnityEngine.CoreModule",
+        "dir": "managed"
+      },
+      {
+        "name": "UnityEngine.UNETModule",
+        "dir": "managed"
+      },
+      {
+        "name": "UnityEngine.IMGUIModule",
+        "dir": "managed"
+      },
+      {
+        "name": "UnityEngine.InputLegacyModule",
+        "dir": "managed"
+      },
+      {
+        "name": "UnityEngine.Physics2DModule",
+        "dir": "managed"
+      },
+      {
+        "name": "UnityEngine.TextRenderingModule",
+        "dir": "managed"
+      },
+      {
+        "name": "UnityEngine.UI",
+        "dir": "managed"
+      },
+      {
+        "name": "UnityEngine.UIModule",
+        "dir": "managed"
+      },
+      {
+        "name": "UnityEngine.AudioModule",
+        "dir": "managed"
+      },
+      {
+        "name": "UnityEngine.AnimationModule",
+        "dir": "managed"
+      },
+      {
+        "name": "InControl",
+        "dir": "managed"
+      },
+      {
+        "name": "com.unity.multiplayer-hlapi.Runtime",
+        "dir": "managed"
+      },
+      {
+        "name": "AK.Wwise.Unity.API",
+        "dir": "managed"
+      },
+      {
+        "name": "BepInEx",
+        "dir": "bepinex"
+      },
+      {
+        "name": "0Harmony",
+        "dir": "bepinex"
+      }
+    ],
+    "stub_mode": "requires-game-managed",
+    "note": "引用清单唯一真值：references.props 与 sr_uch.rsp 的 /r: 行均由本段派生。"
+  },
+  "net": {
+    "messages": [
+      {
+        "name": "ChaosRule",
+        "const": "ChaosRule",
+        "authority": "host",
+        "payload": "rule"
+      },
+      {
+        "name": "ChaosCard",
+        "const": "ChaosCard",
+        "authority": "host",
+        "payload": "card"
+      },
+      {
+        "name": "ChaosHello",
+        "const": "ChaosHello",
+        "authority": "any",
+        "payload": "hello"
+      },
+      {
+        "name": "ChaosKill",
+        "const": "ChaosKill",
+        "authority": "host",
+        "payload": "clear"
+      }
+    ],
+    "note": "消息号只引用 NetMsgId 常量；权威要求由收发层读取。"
+  },
+  "toolchain": {
+    "entry": "python3 tools/uch.py <verify|gen|impact|codemod|smoke|ship|seal|doctor|trace-gate|docs|add|remove>",
+    "ci_entry_command": "python3 tools/uch.py verify --strict",
+    "rsp_scope": {
+      "checked": [
+        "sr_uch.rsp"
+      ],
+      "external_exempt": [],
+      "source_of_truth": "build/specs/generated/sources.manifest.json:compile",
+      "note": "单链构建：只有 sr_uch.rsp；EX 与独立插件的源码和清单都在各自项目。"
+    },
+    "note": "唯一维护入口。CI 与本地只调 uch.py；各 check_*.py 保留为可独立运行的权威实现。不再设文件数 / 行数 / 工具模块集合上限：判定逻辑只有一份，靠对账发现漂移。",
+    "required_spec_schema": 3,
+    "api_level_scope": {
+      "root": "SR_UCH/Contracts",
+      "exclude_dirs": [
+        "SR_UCH/Contracts/Generated"
+      ],
+      "note": "API 棘轮只数手写契约的 public 行；生成物里的 public 常量不计入。生成器与 uch.py 共享本声明。"
+    },
+    "required_generated": [
+      "architecture.generated.json",
+      "artifacts.manifest.json",
+      "compile.targets",
+      "contract-fingerprint.json",
+      "facts.generated.json",
+      "health.schema.json",
+      "ratchets.json",
+      "references.props",
+      "removal-plan.json",
+      "selftest.expected.json",
+      "sources.manifest.json",
+      "spec.report.json",
+      "ui-model.generated.json",
+      "README_features.generated.md",
+      "feature_index.generated.md",
+      "checks.generated.json",
+      "error-sites.generated.json",
+      "ui-shadow.generated.json",
+      "health.golden.json",
+      "smoke.generated.json",
+      "ship.checklist.json"
+    ],
+    "legacy_scripts": [
+      "build/build.ps1",
+      "build/run-tests.ps1",
+      "tools/uch.py",
+      "tools/spec_engine.py",
+      "tools/uch_rules.py",
+      "tools/maint_ops.py",
+      "tools/materialize.py",
+      "tools/check_architecture.py",
+      "tools/check_uimodel.py"
+    ],
+    "retired_baselines": [
+      "selftest-baseline.txt",
+      "api_level.txt",
+      "loc-coverage.txt",
+      "ui-enabled.txt",
+      "ui-raw-layout.txt",
+      "file-size.txt",
+      "silent-catch.txt",
+      "slot-orphan.txt",
+      "slot-optional.txt",
+      "region-access.txt"
+    ],
+    "migrations": [
+      {
+        "id": "M01",
+        "title": "声明单源化（spec → rsp / README / 基线）",
+        "chk": "SPEC-002"
+      },
+      {
+        "id": "M02",
+        "title": "生命周期账本与生成物归位",
+        "chk": "ARCH-001"
+      },
+      {
+        "id": "M04",
+        "title": "声明式页面模型（29 页 / 双轨）",
+        "chk": "UI-001"
+      },
+      {
+        "id": "M05",
+        "title": "稳定本地化 ID 与 cfg schema 门",
+        "chk": "CFG-001"
+      },
+      {
+        "id": "M06",
+        "title": "契约指纹 + 健康合流",
+        "chk": "CONTRACT-002"
+      },
+      {
+        "id": "M07",
+        "title": "构建图三链同源（references.props）",
+        "chk": "GEN-005"
+      },
+      {
+        "id": "M08",
+        "title": "统一维护入口与 manifest 单一基线",
+        "chk": "MANIFEST-001"
+      },
+      {
+        "id": "M09",
+        "title": "单一声明引擎（pwsh 退薄壳）",
+        "chk": "ENGINE-001"
+      },
+      {
+        "id": "M10",
+        "title": "结构化错误站点覆盖全部静默 catch",
+        "chk": "ERROR-001"
+      }
+    ],
+    "trace_gate": {
+      "target_batch": 1,
+      "mode": "enforce",
+      "cutover_requested": false,
+      "require_runtime_ab": true,
+      "evidence": "build/specs/generated/ui-ab-evidence.json",
+      "note": "声明层 READY 不等于可删旧 IMGUI；cutover_requested=true 且实机 A/B 证据 verdict=PASS 才允许，否则 CI 红。"
+    },
+    "engine": "tools/spec_engine.py",
+    "engine_note": "唯一解析器：pwsh 薄壳只转发；生成器/守卫/CI 不再各写一套判定。",
+    "generated_policy": {
+      "review_fold": ".gitattributes linguist-generated",
+      "committed": "baselines-only",
+      "committed_files": [
+        "build/api_surface.txt",
+        "build/specs/generated/contract-fingerprint.json",
+        "build/specs/generated/ratchets.json",
+        "build/specs/generated/health.schema.json",
+        "build/specs/generated/selftest.expected.json",
+        "build/specs/generated/removal-plan.json",
+        "SR_UCH/Contracts/Generated/NetMessages.g.cs",
+        "SR_UCH/Contracts/Generated/SrBuildGraph.g.cs",
+        "SR_UCH/Contracts/Generated/SrStateMap.g.cs"
+      ],
+      "materialize_command": "python3 tools/uch.py materialize",
+      "reason": "纯派生物（rsp / 派生 json / 可生成 .g.cs）不入库；历史基线、唯一绑定表与手写编译输入必须入库，否则守卫失去比较基准。"
+    }
+  },
+  "external_plugins": {
+    "policy": "log",
+    "note": "log=未登记仍加载但告警；strict=只加载 allowlist。清单为空时全部按未登记处理。",
+    "allowlist": []
+  },
+  "pure": {
+    "runtime": [
+      "ScrollMath",
+      "RuntimeRules",
+      "PresetXmlPolicy",
+      "RoundTruth"
+    ],
+    "note": "其余 Pure 文件仅由 tests/PureTests.cs 与 Python 守卫复用，不参与运行时；清单由 PUR-002 双向核对。"
+  }
+}

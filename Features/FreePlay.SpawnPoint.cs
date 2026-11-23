@@ -22,20 +22,6 @@ namespace SR_UCH.Tweaks {
         internal static IList<Vector3> All { get { return _points; } }
         internal static Vector3 At(int i) { return (i >= 0 && i < _points.Count) ? _points[i] : Vector3.zero; }
 
-        // 离本机玩家最近的重生点下标（无点返回 -1）。
-        internal static int NearestIndex() {
-            try {
-                if (_points.Count == 0) return -1;
-                Vector2 me = LocalPosition();
-                int best = 0; float bestD = float.MaxValue;
-                for (int i = 0; i < _points.Count; i++) {
-                    float d = Vector2.Distance(me, _points[i]);
-                    if (d < bestD) { bestD = d; best = i; }
-                }
-                return best;
-            } catch (Exception __ni) { SRApi.Guard.Log("重生点/最近下标", __ni); return -1; }
-        }
-
         // ---------- 持久化：按"场景名"存每组重生点（换关卡各自保留，重进同一关卡恢复） ----------
         private static ConfigEntry<string> _store;
         private static string _curScene = "";
@@ -86,34 +72,24 @@ namespace SR_UCH.Tweaks {
             try {
                 _enabled = plugin.Config.Bind(Sec, "Spawn Points", false,
                     "自定义重生点：在地图页右键添加/传送/删除，仅自由模式可用。");
-                SRApi.LocKey(Sec, "Spawn Points", "自定义重生点", "Custom spawn points");
-                SRApi.LocDesc(Sec, "Spawn Points",
-                    "自定义重生点\n地图页右键可添加、传送、删除重生点\n最多 20 个；仅自由模式可用",
-                    "custom spawn points\nright-click on the map to add, teleport or remove\nup to 20; freeplay only");
+                TweakCfg.Entry(Sec, "Spawn Points", "自定义重生点", "Custom spawn points",
+                    "自定义重生点\n地图页右键可添加、传送、删除重生点\n最多 20 个；仅自由模式可用", "custom spawn points\nright-click on the map to add, teleport or remove\nup to 20; freeplay only");
                 _store = plugin.Config.Bind(Sec, "Spawn Points Store", "",
                     "内部状态：自定义重生点（按关卡保存，格式 场景名|x,y;x,y）。");
-                SRApi.LocKey(Sec, "Spawn Points Store", "重生点数据", "Spawn point data");
-                SRApi.LocDesc(Sec, "Spawn Points Store",
-                    "内部状态：自定义重生点数据\n按关卡分别保存\n由地图页右键菜单自动维护",
-                    "internal: custom spawn point data\nstored per level\nmaintained by the map right-click menu");
+                TweakCfg.Entry(Sec, "Spawn Points Store", "重生点数据", "Spawn point data",
+                    "内部状态：自定义重生点数据\n按关卡分别保存\n由地图页右键菜单自动维护", "internal: custom spawn point data\nstored per level\nmaintained by the map right-click menu");
                 _respawnKey = plugin.Config.Bind(Sec, "Spawn Respawn Key", KeyCode.P,
                     "重生快捷键（默认 P）：传送到最近的自定义重生点，没有则回游戏默认出生点。");
                 _addKey = plugin.Config.Bind(Sec, "Spawn Add Key", KeyCode.O,
                     "添加重生点快捷键（默认 O）：在当前位置添加一个自定义重生点。");
                 _clearKey = plugin.Config.Bind(Sec, "Spawn Clear Key", KeyCode.K,
                     "清空重生点快捷键（默认 K）：删除全部自定义重生点（保留游戏默认）。");
-                SRApi.LocKey(Sec, "Spawn Respawn Key", "重生快捷键", "Respawn hotkey");
-                SRApi.LocDesc(Sec, "Spawn Respawn Key",
-                    "重生快捷键\n传送到最近的自定义重生点\n没有自定义点时回游戏默认出生点",
-                    "respawn hotkey\nteleports to the nearest custom spawn point\nfalls back to the game default");
-                SRApi.LocKey(Sec, "Spawn Add Key", "添加重生点快捷键", "Add spawn hotkey");
-                SRApi.LocDesc(Sec, "Spawn Add Key",
-                    "添加重生点快捷键\n在当前位置添加一个自定义重生点\n最多 20 个",
-                    "add spawn point hotkey\nadds a custom point at your position\nup to 20");
-                SRApi.LocKey(Sec, "Spawn Clear Key", "清空重生点快捷键", "Clear spawns hotkey");
-                SRApi.LocDesc(Sec, "Spawn Clear Key",
-                    "清空重生点快捷键\n删除全部自定义重生点\n游戏默认出生点不受影响",
-                    "clear spawn points hotkey\nremoves every custom point\nthe game default is untouched");
+                TweakCfg.Entry(Sec, "Spawn Respawn Key", "重生快捷键", "Respawn hotkey",
+                    "重生快捷键\n传送到最近的自定义重生点\n没有自定义点时回游戏默认出生点", "respawn hotkey\nteleports to the nearest custom spawn point\nfalls back to the game default");
+                TweakCfg.Entry(Sec, "Spawn Add Key", "添加重生点快捷键", "Add spawn hotkey",
+                    "添加重生点快捷键\n在当前位置添加一个自定义重生点\n最多 20 个", "add spawn point hotkey\nadds a custom point at your position\nup to 20");
+                TweakCfg.Entry(Sec, "Spawn Clear Key", "清空重生点快捷键", "Clear spawns hotkey",
+                    "清空重生点快捷键\n删除全部自定义重生点\n游戏默认出生点不受影响", "clear spawn points hotkey\nremoves every custom point\nthe game default is untouched");
                 SRApi.RegisterKey("重生点-重生", _respawnKey, "press", delegate { if (SRApi.GateMaster && Enabled) Respawn(); }, typeof(FreePlayPage));
                 SRApi.RegisterKey("重生点-添加", _addKey, "press", delegate { if (SRApi.GateMaster && Enabled) { Add(LocalPosition()); SRApi.NotifyT("已添加重生点（{0}）", "Spawn point added ({0})", Count); } }, typeof(FreePlayPage));
                 SRApi.RegisterKey("重生点-清空", _clearKey, "press", delegate { if (SRApi.GateMaster && Enabled) { Clear(); SRApi.NotifyT("已清空重生点", "Spawn points cleared"); } }, typeof(FreePlayPage));
@@ -253,25 +229,24 @@ namespace SR_UCH.Tweaks {
         internal static void RenderRows() {
             try {
                 // 内容标签 + 按钮（右键绑键）+ 快捷键框。
-                if (SRApi.Ctl.ActionRow(SRApi.T("重生", "Respawn"),
-                        SRApi.T("传送到当前生效的重生点\n没有自定义点时回游戏默认出生点",
-                                "teleport to the active spawn point\nfalls back to the game default"),
-                        SRApi.T("重生", "Respawn"), _respawnKey, 130f))
+                if (SRApi.Ctl.ActionRow(SRApi.Tid("7dcb0ae306", "重生", "Respawn"),
+                        SRApi.Tid("8b136004e6", "传送到当前生效的重生点\n没有自定义点时回游戏默认出生点", "teleport to the active spawn point\nfalls back to the game default"),
+                        SRApi.Tid("7dcb0ae306", "重生", "Respawn"), _respawnKey, 130f))
                     Respawn();
-                if (SRApi.Ctl.ActionRow(SRApi.T("添加重生点", "Add spawn point"),
-                        SRApi.T("在当前位置添加一个自定义重生点\n最多 20 个", "add a custom point at your position\nup to 20"),
-                        SRApi.T("在当前位置添加", "Add here"), _addKey, 130f)) {
+                if (SRApi.Ctl.ActionRow(SRApi.Tid("b56dfaf10d", "添加重生点", "Add spawn point"),
+                        SRApi.Tid("c119b89531", "在当前位置添加一个自定义重生点\n最多 20 个", "add a custom point at your position\nup to 20"),
+                        SRApi.Tid("66954d7c0d", "在当前位置添加", "Add here"), _addKey, 130f)) {
                     Add(LocalPosition());
                     SRApi.NotifyT("已添加重生点（{0}）", "Spawn point added ({0})", Count);
                 }
-                if (SRApi.Ctl.ActionRow(SRApi.T("清空重生点", "Clear spawn points"),
-                        SRApi.T("删除全部自定义重生点\n游戏默认出生点不受影响", "remove every custom point\nthe game default is untouched"),
-                        SRApi.T("清空", "Clear"), _clearKey, 130f))
+                if (SRApi.Ctl.ActionRow(SRApi.Tid("aaaef597ba", "清空重生点", "Clear spawn points"),
+                        SRApi.Tid("90ad945945", "删除全部自定义重生点\n游戏默认出生点不受影响", "remove every custom point\nthe game default is untouched"),
+                        SRApi.Tid("c69ad09e1c", "清空", "Clear"), _clearKey, 130f))
                     Clear();
                 GUILayout.Space(Sc(4f));
-                GUILayout.Label(SRApi.T("已有 ", "Stored: ") + Count + " / " + MaxPoints, SRApi.Ctl.Label);
+                GUILayout.Label(SRApi.Tid("350feb8696", "已有 ", "Stored: ") + Count + " / " + MaxPoints, SRApi.Ctl.Label);
                 if (Count == 0) {
-                    GUILayout.Label(SRApi.T("还没有自定义重生点：在地图页右键添加。", "No custom spawn points yet: add them from the map page's right-click menu."), SRApi.Ctl.Label);
+                    GUILayout.Label(SRApi.Tid("1e44eea5f5", "还没有自定义重生点：在地图页右键添加。", "No custom spawn points yet: add them from the map page's right-click menu."), SRApi.Ctl.Label);
                 } else {
                     // 逐点一行：序号+坐标 / 传送 / 删除（走核心 ButtonRow，避免手写水平布局）
                     int __del = -1;
@@ -281,8 +256,8 @@ namespace SR_UCH.Tweaks {
                         int __hit = SRApi.Ctl.ButtonRow(
                             new string[] {
                                 (__isActive ? "★ " : "") + "#" + (i + 1) + "  (" + pt.x.ToString("0.0") + ", " + pt.y.ToString("0.0") + ")",
-                                SRApi.T("设为重生点", "Set as spawn"),
-                                SRApi.T("删除", "Delete")
+                                SRApi.Tid("043d7ba796", "设为重生点", "Set as spawn"),
+                                SRApi.Tid("6cba6a2c08", "删除", "Delete")
                             },
                             new float[] { 160f, 64f, 64f }, 22f);
                         if (__hit == 0 || __hit == 1) { SetActive(i); TeleportLocal(pt); }

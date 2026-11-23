@@ -27,7 +27,7 @@ namespace SR_UCH.Tweaks {
                     SRApi.NotifyT("写入剪贴板失败", "Failed to write to the clipboard");
                     return;
                 }
-                _status = SRApi.T("已导出到剪贴板：", "Exported to clipboard: ") + p.Name;
+                _status = SRApi.Tid("8af462b03e", "已导出到剪贴板：", "Exported to clipboard: ") + p.Name;
                 SRApi.LogInfo("[布局预设] " + _status);
                 SRApi.Notify(_status);   // 显式操作，给屏幕提示
             } catch (Exception __ex) {
@@ -39,7 +39,7 @@ namespace SR_UCH.Tweaks {
             try {
                 if (!ActionAllowed()) return;
                 if (CountPresetEntries() == 0) {
-                    SRApi.LogInfo("[布局预设] " + SRApi.T("当前没有可导出的预设", "There are no presets to export"));
+                    SRApi.LogInfo("[布局预设] " + SRApi.Tid("c419f9cd87", "当前没有可导出的预设", "There are no presets to export"));
                     return;
                 }
                 string baseDir = Path.Combine(PresetsRoot(), "exports", DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture));
@@ -73,8 +73,8 @@ namespace SR_UCH.Tweaks {
                     SRApi.NotifyT("全部导出失败（详见日志）", "Exporting all presets failed (see the log)");
                     return;
                 }
-                _status = SRApi.T("已导出 ", "Exported ") + copied + SRApi.T(" 个预设到：", " presets to: ") + baseDir
-                    + (failed > 0 ? SRApi.T("（失败 ", " (failed ") + failed + SRApi.T(" 个）", ")") : "");
+                _status = SRApi.Tid("d01baee1c8", "已导出 ", "Exported ") + copied + SRApi.Tid("8e8cab1ff3", " 个预设到：", " presets to: ") + baseDir
+                    + (failed > 0 ? SRApi.Tid("11bf5c4c55", "（失败 ", " (failed ") + failed + SRApi.Tid("ca53b80b1a", " 个）", ")") : "");
                 SRApi.LogInfo("[布局预设] " + _status);
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/全部导出", __ex);
@@ -100,7 +100,7 @@ namespace SR_UCH.Tweaks {
                 string name = (_newName ?? "").Trim();
                 // 名称留空则默认「关卡名 + 时间」。
                 if (name.Length == 0) {
-                    string baseName = string.IsNullOrEmpty(level) ? SRApi.T("布局", "Layout") : level;
+                    string baseName = string.IsNullOrEmpty(level) ? SRApi.Tid("627f6c6451", "布局", "Layout") : level;
                     name = baseName + " " + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture);
                 }
                 if (name.Length > 40) name = name.Substring(0, 40);
@@ -129,7 +129,7 @@ namespace SR_UCH.Tweaks {
                 try { exists = File.Exists(path) || FindPreset(key) != null; } catch (Exception __ex) { SRApi.Guard.Log("布局预设/检查同名", __ex); }
                 if (exists) {
                     if (!ConfirmOrArm("overwrite:" + key)) {
-                        _status = SRApi.T("同名预设已存在，再点一次「确认覆盖」：", "A preset with this name exists; click Confirm overwrite again: ") + name;
+                        _status = SRApi.Tid("bb49188415", "同名预设已存在，再点一次「确认覆盖」：", "A preset with this name exists; click Confirm overwrite again: ") + name;
                         SRApi.Notify(_status);
                         return;
                     }
@@ -137,7 +137,7 @@ namespace SR_UCH.Tweaks {
                     ClearPending();
                     if (CountPresetEntries() >= MaxPresets) {
                         SRApi.NotifyT("预设数量已达上限 {0}", "Preset limit reached: {0}", MaxPresets
-                            + SRApi.T("，请先删除旧预设", "; delete an old preset first"));
+                            + SRApi.Tid("c07dd6c745", "，请先删除旧预设", "; delete an old preset first"));
                         return;
                     }
                 }
@@ -167,7 +167,7 @@ namespace SR_UCH.Tweaks {
                 p.Ok = true;
                 SortPresets();
                 SaveIndex();
-                _status = SRApi.T("已保存预设：", "Saved preset: ") + name;
+                _status = SRApi.Tid("0e6f137228", "已保存预设：", "Saved preset: ") + name;
                 SRApi.LogInfo("[布局预设] " + _status);
                 SRApi.LogInfo("[布局预设] 保存 " + key + "（" + blocks + " 块）");
             } catch (Exception __ex) {

@@ -1,4 +1,4 @@
-# SR 功能层 API 白名单（微内核棘轮 / SMAPI 式 API 表面）
+﻿# SR 功能层 API 白名单（微内核棘轮 / SMAPI 式 API 表面）
 # 规则：SR_UCH\Features\*.cs 只允许使用本文件列出的 SRApi 第一段成员名；新增 API 必须同时改代码与本清单（-Check / CI 会拦）。
 # 粒度：只约束第一段（SRApi.X）。SRApi.Ctl / SRApi.Ref / SRApi.Cache 等子命名空间的二级成员整体放行，不逐条登记，
 #       因此本清单不出现 Ctl.ColorEdit 这类条目（写了也永远不会被守卫匹配到）。
@@ -103,7 +103,6 @@ TableWheelInput
 TakeWheelEvent
 Typing
 UiOpen
-WheelArea
 WheelFrame
 WheelLayer
 SelfToggleButton
@@ -114,4 +113,3 @@ NotifyExFn
 FeatureAllowed
 LocDynamic
 Storage
-SlotKeys

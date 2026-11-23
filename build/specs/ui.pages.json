@@ -1,0 +1,1142 @@
+{
+  "schema": 1,
+  "note": "页面声明由源码 RegisterPage 派生；节点树仅供逐批轨迹断言，不参与当前运行时绘制，也不是路由表（运行时路由以源码 RegisterPage / DrawGUI 为准）。",
+  "rules": {
+    "scroll_policies": [
+      "per-page",
+      "reset-on-switch"
+    ],
+    "layers": [
+      "content",
+      "overlay",
+      "hud"
+    ],
+    "forbid_nested_scroll_view": true,
+    "root_scroll_file": "SR_UCH/SR.Window.cs",
+    "batches": {
+      "1": "规整配置页",
+      "2": "列表与重 Rect",
+      "3": "纯自绘卡片"
+    },
+    "batch2_rect_threshold": 12,
+    "page_dispatch": "registry",
+    "note": "页面级滚动区只由主窗口建立；功能页不得再套 ScrollView。策略按 section 聚合，同 section 必须一致。"
+  },
+  "pages": [
+    {
+      "id": "Building Presets/save",
+      "section": "Building Presets",
+      "tab": "save",
+      "name_zh": "预设保存",
+      "name_en": "Save",
+      "order": 10,
+      "renderer": "Render",
+      "file": "Features/BuildingPresets.cs",
+      "batch": 2,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Building Presets/save.page"
+        },
+        {
+          "kind": "header",
+          "id": "Building Presets/save.header"
+        },
+        {
+          "kind": "toolbar",
+          "id": "Building Presets/save.toolbar"
+        },
+        {
+          "kind": "table",
+          "id": "Building Presets/save.table"
+        },
+        {
+          "kind": "viewport",
+          "id": "Building Presets/save.viewport"
+        },
+        {
+          "kind": "footer",
+          "id": "Building Presets/save.footer"
+        }
+      ]
+    },
+    {
+      "id": "Building Presets/list",
+      "section": "Building Presets",
+      "tab": "list",
+      "name_zh": "预设列表",
+      "name_en": "List",
+      "order": 20,
+      "renderer": "RenderListPage",
+      "file": "Features/BuildingPresets.cs",
+      "batch": 2,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Building Presets/list.page"
+        },
+        {
+          "kind": "header",
+          "id": "Building Presets/list.header"
+        },
+        {
+          "kind": "toolbar",
+          "id": "Building Presets/list.toolbar"
+        },
+        {
+          "kind": "table",
+          "id": "Building Presets/list.table"
+        },
+        {
+          "kind": "viewport",
+          "id": "Building Presets/list.viewport"
+        },
+        {
+          "kind": "footer",
+          "id": "Building Presets/list.footer"
+        }
+      ]
+    },
+    {
+      "id": "Character/auto",
+      "section": "Character",
+      "tab": "auto",
+      "name_zh": "自动选择",
+      "name_en": "Auto pick",
+      "order": 10,
+      "renderer": "RenderPick",
+      "file": "Features/CharacterAuto.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Character/auto.page"
+        },
+        {
+          "kind": "header",
+          "id": "Character/auto.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "Character/auto.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "Character/auto.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "Character/auto.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "Character/auto.footer"
+        }
+      ]
+    },
+    {
+      "id": "Character/outfit",
+      "section": "Character",
+      "tab": "outfit",
+      "name_zh": "自动时装",
+      "name_en": "Auto outfit",
+      "order": 20,
+      "renderer": "RenderOutfit",
+      "file": "Features/CharacterAuto.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Character/outfit.page"
+        },
+        {
+          "kind": "header",
+          "id": "Character/outfit.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "Character/outfit.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "Character/outfit.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "Character/outfit.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "Character/outfit.footer"
+        }
+      ]
+    },
+    {
+      "id": "Chat/ChatWindow",
+      "section": "Chat",
+      "tab": "ChatWindow",
+      "name_zh": "对话窗口",
+      "name_en": "ChatWindows",
+      "order": 10,
+      "renderer": "RenderPage",
+      "file": "Features/Chat.Window.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Chat/ChatWindow.page"
+        },
+        {
+          "kind": "header",
+          "id": "Chat/ChatWindow.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "Chat/ChatWindow.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "Chat/ChatWindow.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "Chat/ChatWindow.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "Chat/ChatWindow.footer"
+        }
+      ]
+    },
+    {
+      "id": "Chat/ChatLog",
+      "section": "Chat",
+      "tab": "ChatLog",
+      "name_zh": "对话内容",
+      "name_en": "ChatLog",
+      "order": 20,
+      "renderer": "Render",
+      "file": "Features/Chat.Log.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Chat/ChatLog.page"
+        },
+        {
+          "kind": "header",
+          "id": "Chat/ChatLog.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "Chat/ChatLog.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "Chat/ChatLog.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "Chat/ChatLog.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "Chat/ChatLog.footer"
+        }
+      ]
+    },
+    {
+      "id": "Destroy Blocks/Normal",
+      "section": "Destroy Blocks",
+      "tab": "Normal",
+      "name_zh": "普通",
+      "name_en": "Normal",
+      "order": 10,
+      "renderer": "RenderNormalPage",
+      "file": "Features/DestroyBlocks.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Destroy Blocks/Normal.page"
+        },
+        {
+          "kind": "header",
+          "id": "Destroy Blocks/Normal.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "Destroy Blocks/Normal.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "Destroy Blocks/Normal.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "Destroy Blocks/Normal.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "Destroy Blocks/Normal.footer"
+        }
+      ]
+    },
+    {
+      "id": "Experiments/p3",
+      "section": "Experiments",
+      "tab": "p3",
+      "name_zh": "场景",
+      "name_en": "Scene",
+      "order": 10,
+      "renderer": "RenderPage3",
+      "file": "Features/Experiments.Misc.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Experiments/p3.page"
+        },
+        {
+          "kind": "header",
+          "id": "Experiments/p3.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "Experiments/p3.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "Experiments/p3.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "Experiments/p3.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "Experiments/p3.footer"
+        }
+      ]
+    },
+    {
+      "id": "Experiments/p1",
+      "section": "Experiments",
+      "tab": "p1",
+      "name_zh": "关卡边界",
+      "name_en": "Bounds",
+      "order": 20,
+      "renderer": "Render",
+      "file": "Features/Experiments.Misc.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Experiments/p1.page"
+        },
+        {
+          "kind": "header",
+          "id": "Experiments/p1.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "Experiments/p1.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "Experiments/p1.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "Experiments/p1.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "Experiments/p1.footer"
+        }
+      ]
+    },
+    {
+      "id": "Experiments/p2",
+      "section": "Experiments",
+      "tab": "p2",
+      "name_zh": "其它",
+      "name_en": "Misc",
+      "order": 30,
+      "renderer": "RenderPage2",
+      "file": "Features/Experiments.Misc.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Experiments/p2.page"
+        },
+        {
+          "kind": "header",
+          "id": "Experiments/p2.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "Experiments/p2.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "Experiments/p2.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "Experiments/p2.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "Experiments/p2.footer"
+        }
+      ]
+    },
+    {
+      "id": "HUD/hud",
+      "section": "HUD",
+      "tab": "hud",
+      "name_zh": "HUD",
+      "name_en": "HUD",
+      "order": 10,
+      "renderer": "RenderPage1",
+      "file": "Features/HUD.cs",
+      "batch": 2,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "HUD/hud.page"
+        },
+        {
+          "kind": "header",
+          "id": "HUD/hud.header"
+        },
+        {
+          "kind": "toolbar",
+          "id": "HUD/hud.toolbar"
+        },
+        {
+          "kind": "table",
+          "id": "HUD/hud.table"
+        },
+        {
+          "kind": "viewport",
+          "id": "HUD/hud.viewport"
+        },
+        {
+          "kind": "footer",
+          "id": "HUD/hud.footer"
+        }
+      ]
+    },
+    {
+      "id": "HUD/content",
+      "section": "HUD",
+      "tab": "content",
+      "name_zh": "显示内容",
+      "name_en": "Content",
+      "order": 20,
+      "renderer": "RenderPage2",
+      "file": "Features/HUD.cs",
+      "batch": 2,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "HUD/content.page"
+        },
+        {
+          "kind": "header",
+          "id": "HUD/content.header"
+        },
+        {
+          "kind": "toolbar",
+          "id": "HUD/content.toolbar"
+        },
+        {
+          "kind": "table",
+          "id": "HUD/content.table"
+        },
+        {
+          "kind": "viewport",
+          "id": "HUD/content.viewport"
+        },
+        {
+          "kind": "footer",
+          "id": "HUD/content.footer"
+        }
+      ]
+    },
+    {
+      "id": "Home/main",
+      "section": "Home",
+      "tab": "main",
+      "name_zh": "",
+      "name_en": "",
+      "order": 0,
+      "renderer": "RenderHomePage",
+      "file": "SR_UCH/SR.Core.cs",
+      "batch": 3,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Home/main.page"
+        },
+        {
+          "kind": "cards",
+          "id": "Home/main.cards"
+        },
+        {
+          "kind": "verdict",
+          "id": "Home/main.verdict"
+        },
+        {
+          "kind": "footer",
+          "id": "Home/main.footer"
+        }
+      ]
+    },
+    {
+      "id": "Level/partybox",
+      "section": "Level",
+      "tab": "partybox",
+      "name_zh": "派对盒",
+      "name_en": "Party Box",
+      "order": 10,
+      "renderer": "RenderPartyBox",
+      "file": "Features/Level.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Level/partybox.page"
+        },
+        {
+          "kind": "header",
+          "id": "Level/partybox.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "Level/partybox.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "Level/partybox.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "Level/partybox.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "Level/partybox.footer"
+        }
+      ]
+    },
+    {
+      "id": "Level/tools",
+      "section": "Level",
+      "tab": "tools",
+      "name_zh": "关卡工具",
+      "name_en": "Level Tools",
+      "order": 20,
+      "renderer": "RenderTools",
+      "file": "Features/Level.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Level/tools.page"
+        },
+        {
+          "kind": "header",
+          "id": "Level/tools.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "Level/tools.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "Level/tools.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "Level/tools.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "Level/tools.footer"
+        }
+      ]
+    },
+    {
+      "id": "Online/main",
+      "section": "Online",
+      "tab": "main",
+      "name_zh": "",
+      "name_en": "",
+      "order": 0,
+      "renderer": "RenderOnlinePage",
+      "file": "Features/Online.cs",
+      "batch": 2,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Online/main.page"
+        },
+        {
+          "kind": "header",
+          "id": "Online/main.header"
+        },
+        {
+          "kind": "toolbar",
+          "id": "Online/main.toolbar"
+        },
+        {
+          "kind": "table",
+          "id": "Online/main.table"
+        },
+        {
+          "kind": "viewport",
+          "id": "Online/main.viewport"
+        },
+        {
+          "kind": "footer",
+          "id": "Online/main.footer"
+        }
+      ]
+    },
+    {
+      "id": "Player Tracker/main",
+      "section": "Player Tracker",
+      "tab": "main",
+      "name_zh": "",
+      "name_en": "",
+      "order": 0,
+      "renderer": "Render",
+      "file": "Features/PlayerTracker.cs",
+      "batch": 2,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Player Tracker/main.page"
+        },
+        {
+          "kind": "header",
+          "id": "Player Tracker/main.header"
+        },
+        {
+          "kind": "toolbar",
+          "id": "Player Tracker/main.toolbar"
+        },
+        {
+          "kind": "table",
+          "id": "Player Tracker/main.table"
+        },
+        {
+          "kind": "viewport",
+          "id": "Player Tracker/main.viewport"
+        },
+        {
+          "kind": "footer",
+          "id": "Player Tracker/main.footer"
+        }
+      ]
+    },
+    {
+      "id": "Quick Adjust/qa",
+      "section": "Quick Adjust",
+      "tab": "qa",
+      "name_zh": "快速调整",
+      "name_en": "Quick adjust",
+      "order": 10,
+      "renderer": "Render",
+      "file": "Features/QuickAdjust.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Quick Adjust/qa.page"
+        },
+        {
+          "kind": "header",
+          "id": "Quick Adjust/qa.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "Quick Adjust/qa.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "Quick Adjust/qa.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "Quick Adjust/qa.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "Quick Adjust/qa.footer"
+        }
+      ]
+    },
+    {
+      "id": "Quick Adjust/challenge",
+      "section": "Quick Adjust",
+      "tab": "challenge",
+      "name_zh": "重生",
+      "name_en": "Respawn",
+      "order": 20,
+      "renderer": "RenderChallengePage",
+      "file": "Features/QuickAdjust.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Quick Adjust/challenge.page"
+        },
+        {
+          "kind": "header",
+          "id": "Quick Adjust/challenge.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "Quick Adjust/challenge.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "Quick Adjust/challenge.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "Quick Adjust/challenge.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "Quick Adjust/challenge.footer"
+        }
+      ]
+    },
+    {
+      "id": "Self-check/Audit",
+      "section": "Self-check",
+      "tab": "Audit",
+      "name_zh": "自检",
+      "name_en": "Self-check",
+      "order": 10,
+      "renderer": "SR.RenderAuditBlock",
+      "file": "SR_UCH/SR.Core.cs",
+      "batch": 3,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "Self-check/Audit.page"
+        },
+        {
+          "kind": "cards",
+          "id": "Self-check/Audit.cards"
+        },
+        {
+          "kind": "verdict",
+          "id": "Self-check/Audit.verdict"
+        },
+        {
+          "kind": "footer",
+          "id": "Self-check/Audit.footer"
+        }
+      ]
+    },
+    {
+      "id": "build/main",
+      "section": "build",
+      "tab": "main",
+      "name_zh": "",
+      "name_en": "",
+      "order": 0,
+      "renderer": "RenderPage",
+      "file": "Features/BuildingTools.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "build/main.page"
+        },
+        {
+          "kind": "header",
+          "id": "build/main.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "build/main.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "build/main.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "build/main.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "build/main.footer"
+        }
+      ]
+    },
+    {
+      "id": "品质光芒/Glow",
+      "section": "品质光芒",
+      "tab": "Glow",
+      "name_zh": "品质光芒",
+      "name_en": "Rarity Glow",
+      "order": 10,
+      "renderer": "RenderPage",
+      "file": "Features/PartyGlow.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "品质光芒/Glow.page"
+        },
+        {
+          "kind": "header",
+          "id": "品质光芒/Glow.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "品质光芒/Glow.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "品质光芒/Glow.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "品质光芒/Glow.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "品质光芒/Glow.footer"
+        }
+      ]
+    },
+    {
+      "id": "混乱牌组/Deck",
+      "section": "混乱牌组",
+      "tab": "Deck",
+      "name_zh": "牌组",
+      "name_en": "Deck",
+      "order": 118,
+      "renderer": "RenderPage",
+      "file": "Features/Chaos.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "混乱牌组/Deck.page"
+        },
+        {
+          "kind": "header",
+          "id": "混乱牌组/Deck.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "混乱牌组/Deck.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "混乱牌组/Deck.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "混乱牌组/Deck.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "混乱牌组/Deck.footer"
+        }
+      ]
+    },
+    {
+      "id": "混乱牌组/Pool",
+      "section": "混乱牌组",
+      "tab": "Pool",
+      "name_zh": "牌池",
+      "name_en": "Card pool",
+      "order": 130,
+      "renderer": "RenderPoolPage",
+      "file": "Features/Chaos.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "混乱牌组/Pool.page"
+        },
+        {
+          "kind": "header",
+          "id": "混乱牌组/Pool.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "混乱牌组/Pool.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "混乱牌组/Pool.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "混乱牌组/Pool.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "混乱牌组/Pool.footer"
+        }
+      ]
+    },
+    {
+      "id": "自由模式/main",
+      "section": "自由模式",
+      "tab": "main",
+      "name_zh": "一般",
+      "name_en": "General",
+      "order": 10,
+      "renderer": "RenderAll",
+      "file": "Features/FreePlay.cs",
+      "batch": 2,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "自由模式/main.page"
+        },
+        {
+          "kind": "header",
+          "id": "自由模式/main.header"
+        },
+        {
+          "kind": "toolbar",
+          "id": "自由模式/main.toolbar"
+        },
+        {
+          "kind": "table",
+          "id": "自由模式/main.table"
+        },
+        {
+          "kind": "viewport",
+          "id": "自由模式/main.viewport"
+        },
+        {
+          "kind": "footer",
+          "id": "自由模式/main.footer"
+        }
+      ]
+    },
+    {
+      "id": "自由模式/map",
+      "section": "自由模式",
+      "tab": "map",
+      "name_zh": "地图",
+      "name_en": "Map",
+      "order": 20,
+      "renderer": "RenderMapPage",
+      "file": "Features/FreePlay.cs",
+      "batch": 2,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "自由模式/map.page"
+        },
+        {
+          "kind": "header",
+          "id": "自由模式/map.header"
+        },
+        {
+          "kind": "toolbar",
+          "id": "自由模式/map.toolbar"
+        },
+        {
+          "kind": "table",
+          "id": "自由模式/map.table"
+        },
+        {
+          "kind": "viewport",
+          "id": "自由模式/map.viewport"
+        },
+        {
+          "kind": "footer",
+          "id": "自由模式/map.footer"
+        }
+      ]
+    },
+    {
+      "id": "自由模式/spawn",
+      "section": "自由模式",
+      "tab": "spawn",
+      "name_zh": "重生点",
+      "name_en": "Spawn points",
+      "order": 30,
+      "renderer": "RenderSpawnPage",
+      "file": "Features/FreePlay.cs",
+      "batch": 2,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "自由模式/spawn.page"
+        },
+        {
+          "kind": "header",
+          "id": "自由模式/spawn.header"
+        },
+        {
+          "kind": "toolbar",
+          "id": "自由模式/spawn.toolbar"
+        },
+        {
+          "kind": "table",
+          "id": "自由模式/spawn.table"
+        },
+        {
+          "kind": "viewport",
+          "id": "自由模式/spawn.viewport"
+        },
+        {
+          "kind": "footer",
+          "id": "自由模式/spawn.footer"
+        }
+      ]
+    },
+    {
+      "id": "视觉辅助/Main",
+      "section": "视觉辅助",
+      "tab": "Main",
+      "name_zh": "画面",
+      "name_en": "View",
+      "order": 10,
+      "renderer": "RenderPage",
+      "file": "Features/VisualAid.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "视觉辅助/Main.page"
+        },
+        {
+          "kind": "header",
+          "id": "视觉辅助/Main.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "视觉辅助/Main.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "视觉辅助/Main.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "视觉辅助/Main.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "视觉辅助/Main.footer"
+        }
+      ]
+    },
+    {
+      "id": "通知中心/HubOptions",
+      "section": "通知中心",
+      "tab": "HubOptions",
+      "name_zh": "通知设置",
+      "name_en": "Settings",
+      "order": 20,
+      "renderer": "RenderOptionsPage",
+      "file": "Features/NotifyHub.cs",
+      "batch": 1,
+      "policy": "per-page",
+      "layer": "content",
+      "nodes": [
+        {
+          "kind": "page",
+          "id": "通知中心/HubOptions.page"
+        },
+        {
+          "kind": "header",
+          "id": "通知中心/HubOptions.header"
+        },
+        {
+          "kind": "tabs",
+          "id": "通知中心/HubOptions.tabs"
+        },
+        {
+          "kind": "sections",
+          "id": "通知中心/HubOptions.sections"
+        },
+        {
+          "kind": "rows",
+          "id": "通知中心/HubOptions.rows"
+        },
+        {
+          "kind": "footer",
+          "id": "通知中心/HubOptions.footer"
+        }
+      ]
+    }
+  ]
+}

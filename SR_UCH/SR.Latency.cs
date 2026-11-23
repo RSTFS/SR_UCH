@@ -1,5 +1,5 @@
 // 延迟探测回显：回显逻辑放核心，对方只装基础模组也能被房主测到 RTT。
-// 协议同 ExModule.Ping.cs：MsgGameRuleSet + Magic=774，NewRule=None 的带外信号。
+// 延迟探测协议：MsgGameRuleSet + Magic=774，NewRule=None 的带外信号。
 using System;
 using GameEvent;
 using UnityEngine.Networking;
@@ -17,7 +17,7 @@ namespace SR_UCH.Tweaks {
 
         internal static void LatencyInit() {
             try {
-                SRApi.NetMagic.Register("core.ping", LatencyMagic);   // 与 EX 的登记同名同值，重复登记不冲突
+                SRApi.NetMagic.Register("core.ping", LatencyMagic);   // 重复登记不冲突
                 _latencyListener = new LatencyListener();
                 GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(_latencyListener, true);
             } catch (Exception __ex) { Guard.Log("延迟回显/初始化", __ex); }

@@ -1,4 +1,4 @@
-// 契约层：ITweak / IFeatureHost / ILanguagePack / Slots；第三方功能只依赖本文件。
+// 契约层：ITweak / IFeatureHost / ILanguagePack / SrCaps；第三方功能只依赖本文件。
 // 本文件不得引用 SR 其它文件，须能单独编译；槽位只传 BCL / 引擎 / 游戏类型。
 using System;
 using System.Collections.Generic;
@@ -70,9 +70,6 @@ namespace SR_UCH {
         private static Func<Rect, float> _wheelTake;
         public static void SetWheelTakeSink(Func<Rect, float> f) { _wheelTake = f; }
         public static float WheelTake(Rect layoutRect) { Func<Rect, float> f = _wheelTake; return f != null ? f(layoutRect) : 0f; }
-        // 兼容旧调用：空实现，仅保留签名。
-        public static void WheelArea(string id, Rect layoutRect, Func<float, bool> handler) { }
-
         // 覆盖层：画在窗口最上层、不受页面裁剪，供功能弹出列表使用。
         private static Action<Action> _overlay;
         public static void SetOverlaySink(Action<Action> f) { _overlay = f; }

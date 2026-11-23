@@ -127,24 +127,25 @@ namespace SR_UCH.Tweaks {
             SRApi.Nav("Player Tracker", 10); // 侧栏顺序
             // 每个栏目自声明页面：缺了会靠核心兜底分支成页，外部模块无法替换。
             SRApi.RegisterPage("Player Tracker", Render);
-            SRApi.LocKey("Player Tracker", "Tracking Length", "轨迹长度", null);
-            SRApi.LocDesc("Player Tracker", "Tracking Length", "轨迹长度\n记录多少帧的历史位置\n范围 10-3000，60 帧约 1 秒", "Trail length\nhow many frames of history are kept\nrange 10-3000; 60 frames is about 1 second");
-            SRApi.LocKey("Player Tracker", "Skip Frames", "跳帧数", null);
-            SRApi.LocDesc("Player Tracker", "Skip Frames", "采样间隔\n每跳过 N 帧记一个点\n范围 0-60，越大越稀疏", "Sampling interval\nrecords one point every N frames\nrange 0-60; higher is sparser");
-            SRApi.LocKey("Player Tracker", "Line Start Width", "起点宽度", null);
-            SRApi.LocDesc("Player Tracker", "Line Start Width", "起点线宽\n靠近当前位置一端的粗细\n范围 0.01-2", "Start width\nthickness at the end nearest the current position\nrange 0.01-2");
-            SRApi.LocKey("Player Tracker", "Line End Width", "终点宽度", null);
-            SRApi.LocDesc("Player Tracker", "Line End Width", "终点线宽\n最旧位置一端的粗细\n范围 0.01-2", "End width\nthickness at the oldest point\nrange 0.01-2");
-            SRApi.LocKey("Player Tracker", "Teleport Threshold", "瞬移清除距离", null);
-            SRApi.LocDesc("Player Tracker", "Teleport Threshold", "瞬移判定距离\n单帧移动超过该值就清空重画\n避免拖出贯穿全图的长线；范围 1-500", "Teleport threshold\nclears the trail when a jump exceeds this in one frame\navoids a line across the map; range 1-500");
-            SRApi.LocKey("Player Tracker", "Enabled", "移动轨迹总开关", null);
-            SRApi.LocDesc("Player Tracker", "Enabled", "玩家轨迹\n在画面上绘制其他玩家的移动轨迹\n仅显示，不影响游戏判定", "Player trails\ndraws other players' movement trails\ndisplay only; gameplay unaffected");
+            TweakCfg.Entry("Player Tracker", "Tracking Length", "轨迹长度", null,
+                "轨迹长度\n记录多少帧的历史位置\n范围 10-3000，60 帧约 1 秒", "Trail length\nhow many frames of history are kept\nrange 10-3000; 60 frames is about 1 second");
+            TweakCfg.Entry("Player Tracker", "Skip Frames", "跳帧数", null,
+                "采样间隔\n每跳过 N 帧记一个点\n范围 0-60，越大越稀疏", "Sampling interval\nrecords one point every N frames\nrange 0-60; higher is sparser");
+            TweakCfg.Entry("Player Tracker", "Line Start Width", "起点宽度", null,
+                "起点线宽\n靠近当前位置一端的粗细\n范围 0.01-2", "Start width\nthickness at the end nearest the current position\nrange 0.01-2");
+            TweakCfg.Entry("Player Tracker", "Line End Width", "终点宽度", null,
+                "终点线宽\n最旧位置一端的粗细\n范围 0.01-2", "End width\nthickness at the oldest point\nrange 0.01-2");
+            TweakCfg.Entry("Player Tracker", "Teleport Threshold", "瞬移清除距离", null,
+                "瞬移判定距离\n单帧移动超过该值就清空重画\n避免拖出贯穿全图的长线；范围 1-500",
+                "Teleport threshold\nclears the trail when a jump exceeds this in one frame\navoids a line across the map; range 1-500");
+            TweakCfg.Entry("Player Tracker", "Enabled", "移动轨迹总开关", null,
+                "玩家轨迹\n在画面上绘制其他玩家的移动轨迹\n仅显示，不影响游戏判定", "Player trails\ndraws other players' movement trails\ndisplay only; gameplay unaffected");
         }
 
         private static void Render() {
             try {
                 List<ConfigEntryBase> list = SRApi.SectionEntries("Player Tracker");
-                if (list == null || list.Count == 0) { GUILayout.Label(SRApi.T("（无匹配条目）", "(no matching entries)"), SRApi.Ctl.Label); return; }
+                if (list == null || list.Count == 0) { GUILayout.Label(SRApi.Tid("2be7d7a6da", "（无匹配条目）", "(no matching entries)"), SRApi.Ctl.Label); return; }
                 SRApi.RenderSectionEntries("Player Tracker");
             } catch (Exception __ex) { SRApi.Guard.Log("渲染移动轨迹页", __ex); }
         }
@@ -156,7 +157,9 @@ namespace SR_UCH.Tweaks {
             _mp = plugin;
             ConfigEntry<bool> enabled = _mp.Config.Bind("Player Tracker", "Enabled", false, "总开关");
             Enabled = enabled.Value;
-            enabled.SettingChanged += (s, e) => Enabled = enabled.Value;
+            System.EventHandler __h_enabled_1 = (s, e) => Enabled = enabled.Value;
+            enabled.SettingChanged += __h_enabled_1;
+            Sub.Revoke(() => enabled.SettingChanged -= __h_enabled_1);
             _trackingLength = _mp.Config.Bind(
                 "Player Tracker",
                 "Tracking Length",
@@ -191,11 +194,15 @@ namespace SR_UCH.Tweaks {
                 1f,
                 new ConfigDescription("轨迹透明度（0.05-1，默认 1 = 完全不透明）。调低可让轨迹不遮挡画面。",
                     new AcceptableValueRange<float>(0.05f, 1f)));
-            SRApi.LocKey("Player Tracker", "Trail Alpha", "轨迹透明度", "Trail opacity");
-            SRApi.LocDesc("Player Tracker", "Trail Alpha", "轨迹透明度\n越低越不遮挡画面\n范围 0.05-1", "Trail opacity\nlower values obstruct less\nrange 0.05-1");
+            TweakCfg.Entry("Player Tracker", "Trail Alpha", "轨迹透明度", "Trail opacity",
+                "轨迹透明度\n越低越不遮挡画面\n范围 0.05-1", "Trail opacity\nlower values obstruct less\nrange 0.05-1");
             // 宽度只在 CreateLine 里读一次，配置变更时需刷新已存在的线。
-            _lineWidthStart.SettingChanged += (s, e) => ApplyWidths();
-            _lineWidthEnd.SettingChanged += (s, e) => ApplyWidths();
+            System.EventHandler __h__lineWidthStart_2 = (s, e) => ApplyWidths();
+            _lineWidthStart.SettingChanged += __h__lineWidthStart_2;
+            Sub.Revoke(() => _lineWidthStart.SettingChanged -= __h__lineWidthStart_2);
+            System.EventHandler __h__lineWidthEnd_3 = (s, e) => ApplyWidths();
+            _lineWidthEnd.SettingChanged += __h__lineWidthEnd_3;
+            Sub.Revoke(() => _lineWidthEnd.SettingChanged -= __h__lineWidthEnd_3);
 
             GameObject go = new GameObject("SR_UCHPlayerTracker");
             UnityEngine.Object.DontDestroyOnLoad(go);

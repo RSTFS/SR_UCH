@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 纯函数层：不引用 Unity / BepInEx，CI 里真实编译并跑表驱动断言。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <StartupObject>SR_UCH.Tests.PureProgram</StartupObject>
+    <AssemblyName>SR_UCH_PureTests</AssemblyName>
+    <NoWarn>CS0414;CS0169;CS0649;CS0162;CS0219</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Pure\*.cs" />
+    <Compile Include="PureTests.cs" />
+  </ItemGroup>
+</Project>

@@ -1,529 +1,143 @@
 ﻿# ============================================================
-# SR_UCH 一键构建脚本
-# 用法：
-#   .\build\build.ps1                          合并模式（默认，部署用）：核心 + 全部功能 → 单个 SR_UCH.dll
-#   .\build\build.ps1 -Split                   拆分模式：核心 SR_Manager.dll + 每个功能一个 SR_UCH_<功能>.dll
-#   .\build\build.ps1 -All                     合并模式 + 再编译 EX 与 Others 下的独立插件
-#   .\build\build.ps1 -Separate                先编契约程序集 SR.Contracts.dll，再按上面的模式构建
-#   .\build\build.ps1 -Features "HUD,Chat"   # 裁剪构建：只把指定功能编进 DLL（Lite 版）
-#   （-Split / -All / -Separate 可组合；全部参数与 _tools 构建链一致）
-# 架构说明：核心 SR_UCH.dll 只提供 UI/控件/注册表/门控，不认识任何功能；
-#   功能源码在 SR_UCH\Features\<功能>.cs，靠 SR_UCH.ITweak + SR 的注册 API 自挂。
-#   → 合并模式把功能一起编进 SR_UCH.dll（当前发布形态，配置与部署都最简单）；
-#   → 拆分模式把功能各自编成 DLL（架构支持：它们只引用核心，互相 0 引用）。
-#   两种模式的产物互斥：切换时会自动清掉另一种模式的残留 DLL，避免"功能被初始化两次"。
-#   ★拆分模式的核心**编译时仍叫 SR_UCH.dll**（功能与 EX 的 rsp 都引用它），
-#     全部编完之后才改名成 $splitCoreName.dll —— 只动文件名，程序集标识仍是 SR_UCH。
-# 注：新增功能源码后，在 build\rsp\ 下建 feat_<功能>.rsp，
-#     并把文件名加进下面的 $rspFeatures；合并模式的 sr_uch.rsp 也要补上该 .cs。
-# 注：本机无 dotnet SDK 时会自动回退到 tasks\net472\csc.exe。
+# SR_UCH 一键构建：单一产物 SR_UCH.dll
+#   .\build\build.ps1                      构建（默认）
+#   .\build\build.ps1 -Deploy             构建并复制进 BepInEx\plugins
+#   .\build\build.ps1 -Check              统一回归（uch.py verify --strict）
+#   .\build\build.ps1 -Features "HUD,Chat"  裁剪构建（Lite）
+#   .\build\build.ps1 -ExportAudit        从运行日志导出启动审计报告
+# 源码清单、引用清单、部署产物都由 build/specs/features.spec.json 派生。
+# 构建链只有 build/rsp/sr_uch.rsp 一条；EX 与独立插件在各自项目构建，本仓库不放其清单。
 # ============================================================
-param([switch]$All, [switch]$Ex, [switch]$Others, [switch]$Split, [switch]$Check, [switch]$Deploy, [switch]$Separate, [string]$Features = '', [string]$GameDir = '', [switch]$ExportAudit, [string]$PluginsDir = '', [string]$Root = (Split-Path -Parent $PSScriptRoot))
-# 拆分模式核心的**文件名**（程序集标识仍是 SR_UCH，改名只动文件名）。
-# 目的：与合并模式的 SR_UCH.dll 区分开 —— 否则同一个 bin\Release 里会有两份同名不同内容的核心。
-$splitCoreName = 'SR_Manager'
+param([switch]$Check, [switch]$Deploy,
+      [string]$Features = '', [string]$GameDir = '', [switch]$ExportAudit,
+      [string]$PluginsDir = '', [string]$Root = (Split-Path -Parent $PSScriptRoot))
 $ErrorActionPreference = 'Stop'
-# 仓库根 = build\ 的上一级（本脚本位于 <repo>\build\build.ps1）
-$Root = Split-Path -Parent $PSScriptRoot
-# 工作区根：公共仓库里只有 SR_UCH 自己；本地工作区还带 ../SR_UCH_EX 与 ../Others。
 $workspaceRoot = Split-Path -Parent $Root
 
-
-# ---- 游戏目录探测：-GameDir > 环境变量 UCH_DIR > 常见 Steam 路径 ----
+# ---- 游戏目录探测：-GameDir > UCH_DIR > 常见 Steam 路径 ----
 if (-not $GameDir) { $GameDir = $env:UCH_DIR }
 if (-not $GameDir) {
     $cands = @(
         'C:\Program Files (x86)\Steam\steamapps\common\Ultimate Chicken Horse',
         'D:\Steam\steamapps\common\Ultimate Chicken Horse',
-        'D:\EF\Steam\steamapps\common\Ultimate Chicken Horse',
         'E:\Steam\steamapps\common\Ultimate Chicken Horse'
     )
-    foreach ($c in $cands) { if (Test-Path -LiteralPath (Join-Path $c 'UltimateChickenHorse_Data\Managed')) { $GameDir = $c; break } }
+    foreach ($c in $cands) { if (Test-Path -LiteralPath $c) { $GameDir = $c; break } }
 }
-if (-not $GameDir -or -not (Test-Path -LiteralPath (Join-Path $GameDir 'UltimateChickenHorse_Data\Managed'))) {
-    Write-Host '找不到游戏目录：请用 -GameDir "…\Ultimate Chicken Horse" 或设置环境变量 UCH_DIR'
-    exit 1
-}
-Write-Host ("游戏目录: " + $GameDir)
-Set-Location $Root   # csc 的相对路径以仓库根为基准
-New-Item -ItemType Directory -Force -Path (Join-Path $Root 'bin\Release') | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $PSScriptRoot '.cache') | Out-Null
+if (-not $GameDir) { Write-Host '找不到游戏目录：设 UCH_DIR 或用 -GameDir'; exit 1 }
 
-# ---- 生成构建清单（单一真源 = 磁盘上的源码；生成器 build\gen-rsp.ps1）----
-# 正常构建直接重新生成，避免"新增 .cs 漏改清单"；-Check 不改文件，由守卫校验一致性。
-if (-not $Check) { & (Join-Path $PSScriptRoot 'gen-rsp.ps1') }
-
-# ---- 准备 rsp：把 %GAME% 替换成实际游戏路径，写入 build\.cache ----
-$cache = Join-Path $PSScriptRoot '.cache'
-if (-not (Test-Path -LiteralPath $cache)) { New-Item -ItemType Directory -Force -Path $cache | Out-Null }
-$tplDir = Join-Path $PSScriptRoot 'rsp'
-Get-ChildItem -LiteralPath $tplDir -Recurse -Filter '*.rsp' -File | ForEach-Object {
-    $rel = $_.FullName.Substring($tplDir.Length).TrimStart('\')
-    $dst = Join-Path $cache $rel
-    $dstDir = Split-Path $dst -Parent
-    if (-not (Test-Path -LiteralPath $dstDir)) { New-Item -ItemType Directory -Force -Path $dstDir | Out-Null }
-    $txt = [System.IO.File]::ReadAllText($_.FullName).Replace('%GAME%', $GameDir)
-    [System.IO.File]::WriteAllText($dst, $txt, (New-Object System.Text.UTF8Encoding($true)))
-}
-
-# **Opt-24（审计 B1）**：这里原来把工程根写死成 'D:\RS_TFS\D\...'，而该目录在本机**根本不存在**
-#  （工程实际在 D:\RS_TFS\CC）-> README 承诺的"一键构建"直接失败，且没有任何提示指向路径问题。
-# 现在统一从脚本位置推导（$PSScriptRoot 的上一级 = 工程根），也可以用 -Root 显式指定：
-#   .\build\build.ps1 -GameDir 'E:\...\Ultimate Chicken Horse'
-# 工程整体挪目录 / 换机器都不用再改脚本。
-if (-not (Test-Path -LiteralPath $Root)) { Write-Host "工程根不存在: $Root（可用 -Root 指定）"; exit 1 }
-# csc 解析：优先用系统 dotnet SDK 自带的 Roslyn 编译器，其次工程内 vendored 工具链，最后 net472 csc.exe。
-# 说明：_tools\roslyn_toolset 已删除，这里不再依赖它（只作为"哪天又放回来"的兜底路径）。
+# ---- csc：优先 dotnet 自带 Roslyn，回退 net472 csc.exe ----
 $csc = ''
-try {
-    foreach ($line in (& dotnet --list-sdks 2>$null)) {
-        if ($line -match '^\s*(\S+)\s+\[(.+)\]\s*$') {
-            $p = Join-Path (Join-Path $Matches[2] $Matches[1]) 'Roslyn\bincore\csc.dll'
-            if (Test-Path -LiteralPath $p) { $csc = $p; break }
-        }
-    }
-} catch { }
+$roslyn = Join-Path $Root '_tools\roslyn_toolset\csc.dll'
+if (Test-Path -LiteralPath $roslyn) { $csc = $roslyn }
 if (-not $csc) {
-    $vendor = Join-Path $Root '_tools\roslyn_toolset\tasks\netcore\bincore\csc.dll'
-    if (Test-Path -LiteralPath $vendor) { $csc = $vendor }
-}
-if (-not $csc) {
-    $net472 = Join-Path $Root '_tools\roslyn_toolset\tasks\net472\csc.exe'
+    $net472 = Join-Path $Root '_tools\net472\csc.exe'
     if (Test-Path -LiteralPath $net472) { $csc = $net472 }
 }
-if (-not $csc) { Write-Host '找不到 csc：需要 dotnet SDK（含 Roslyn），或把 roslyn_toolset 放回 _tools\'; exit 1 }
+$useDotnetBuild = $false
+if (-not $csc) {
+    # fresh clone 没有 _tools 工具集时，直接回退 MSBuild（编译输入已入库）。
+    $dn = Get-Command dotnet -ErrorAction SilentlyContinue
+    if ($dn) { $useDotnetBuild = $true; Write-Host 'csc 缺失 -> 回退 dotnet build SR_UCH.csproj' }
+    else { Write-Host '找不到 csc / dotnet：需要 .NET SDK 或 _tools\net472\csc.exe'; exit 1 }
+}
 Write-Host "csc: $csc"
-$rspDir = Join-Path $PSScriptRoot '.cache'
-# -Separate：契约层（SR_UCH\Contracts\*.cs）单独编成一个程序集（SR.Contracts.dll），功能与 EX 只依赖它。
-# 仓库内不存在 _tools 构建链，这里直接用同一份 sr_uch_contracts.rsp（守卫 1 用的也是它）。
-if ($Separate) { Write-Host '== 分离模式：先编译契约程序集（SR.Contracts.dll）==' }
-$rspMain = Join-Path $rspDir 'sr_uch.rsp'          # 合并模式：核心 + 全部功能
-$rspCore = Join-Path $rspDir 'sr_uch_core.rsp'     # 拆分模式：仅核心
-$rspEx = Join-Path $rspDir 'sr_uch_ex.rsp'          # EX 独立仓库（工作区布局：../SR_UCH_EX）
-$rspOthersDir = Join-Path $rspDir 'plugins'          # 独立插件（工作区布局：../Others）
 
-# 功能 DLL（拆分模式用；都引用核心 SR_UCH.dll，必须排在核心之后编译）
-# 功能清单 = build\rsp 下的 feat_*.rsp（按文件名排序，无需手工维护列表）
-$rspFeatures = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'rsp') -Filter 'feat_*.rsp' -File |
-    Sort-Object Name | ForEach-Object { $_.Name })
+$cache = Join-Path $PSScriptRoot '.cache'
+$rspDir = Join-Path $PSScriptRoot 'rsp'
+$outDir = Join-Path $Root 'bin\Release'
+if (-not (Test-Path -LiteralPath $cache)) { New-Item -ItemType Directory -Force -Path $cache | Out-Null }
+if (-not (Test-Path -LiteralPath $outDir)) { New-Item -ItemType Directory -Force -Path $outDir | Out-Null }
 
-# -Features：裁剪构建（Lite 版）。只过滤 build\.cache 里的清单，不动仓库里的 rsp 模板；
-# 下次不带 -Features 构建时 gen-rsp 会重新生成完整清单。
-#   .\build\build.ps1 -Features "HUD,Chat"        → 合并模式只含这两个功能
-#   .\build\build.ps1 -Split -Features "HUD,Chat" → 只编这两个功能 DLL
+# ---- 清单副本：仓库 rsp 是模板，本次构建的裁剪只改 .cache ----
+$main = Join-Path $rspDir 'sr_uch.rsp'
+$work = Join-Path $cache 'sr_uch.rsp'
+if (-not (Test-Path -LiteralPath $main)) {
+    Write-Host "缺 $main，自动恢复派生物…"
+    $py = Get-Command python3 -ErrorAction SilentlyContinue
+    if (-not $py) { $py = Get-Command python -ErrorAction SilentlyContinue }
+    if (-not $py) { Write-Host 'python3 未找到，无法自举'; exit 1 }
+    & $py.Source (Join-Path $Root 'tools\uch.py') materialize
+    if (-not (Test-Path -LiteralPath $main)) { Write-Host "自举后仍缺 $main"; exit 1 }
+}
+Copy-Item -LiteralPath $main -Destination $work -Force
+
 if ($Features) {
     $wantSet = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
     foreach ($w in ($Features.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })) { [void]$wantSet.Add($w) }
     if ($wantSet.Count -eq 0) { Write-Host '裁剪构建：-Features 为空'; exit 1 }
     Write-Host ('裁剪构建：只编功能 ' + (($wantSet | Sort-Object) -join ', '))
-    foreach ($rspName in @('sr_uch.rsp', 'sr_uch_core.rsp')) {
-        $rp = Join-Path $cache $rspName
-        if (-not (Test-Path -LiteralPath $rp)) { continue }
-        $kept = New-Object System.Collections.Generic.List[string]
-        foreach ($ln in [System.IO.File]::ReadAllLines($rp)) {
-            $m = [regex]::Match($ln, '^Features\\([^.]+)')
-            if ($m.Success -and -not $wantSet.Contains($m.Groups[1].Value)) { continue }
-            $kept.Add($ln)
-        }
-        [System.IO.File]::WriteAllLines($rp, $kept.ToArray(), (New-Object System.Text.UTF8Encoding($true)))
+    $kept = New-Object System.Collections.Generic.List[string]
+    foreach ($ln in [System.IO.File]::ReadAllLines($work)) {
+        $m = [regex]::Match($ln, '^Features\\([^.]+)')
+        if ($m.Success -and -not $wantSet.Contains($m.Groups[1].Value)) { continue }
+        $kept.Add($ln)
     }
-    $rspFeatures = @($rspFeatures | Where-Object {
-        $g = $_ -replace '^feat_', '' -replace '\.rsp$', ''
-        $wantSet.Contains($g)
-    })
-    if ($rspFeatures.Count -eq 0) { Write-Host '裁剪后没有功能可编（检查 -Features 里的功能名）'; exit 1 }
+    [System.IO.File]::WriteAllLines($work, $kept.ToArray(), (New-Object System.Text.UTF8Encoding($true)))
 }
-$outDir = Join-Path $Root 'bin\Release'
-
-# dotnet 不可用时的回退已在上面解析 csc 时处理（net472 csc.exe）
 
 function Invoke-Build([string]$rsp, [string]$name) {
-    # 源码缺失（插件已移除/改名）时跳过，避免 -All 因历史 rsp 残留而整体失败
     $missing = @()
     if (Test-Path $rsp) {
-        $srcs = Get-Content $rsp | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '\.cs$' }
-        foreach ($s in $srcs) { if (-not (Test-Path $s)) { $missing += $s } }
-    } else {
-        $missing += $rsp
-    }
-    if ($missing.Count -gt 0) {
-        Write-Host "==> 跳过 $name（源码缺失: $($missing -join '; ')）"
-        return
-    }
-    Write-Host "==> 编译 $name ..."
-    # 死代码守卫：未使用的私有字段 / 只写不读 / 从未赋值（CS0169 / CS0414 / CS0649）直接算编译失败
-    $deadCodeWarn = '/warnaserror:CS0168,CS0169,CS0414,CS0649'   # CS0168 未使用变量也纳入死代码门禁
-    if ($csc.EndsWith('.dll')) { & dotnet $csc "@$rsp" $deadCodeWarn } else { & $csc "@$rsp" $deadCodeWarn }
-    if ($LASTEXITCODE -ne 0) { Write-Host "$name 编译失败"; exit 1 }
-    Write-Host "    $name OK"
-}
-
-# 是否需要重编：输出 DLL 缺失，或 rsp 里任一 .cs 源文件比 DLL 新
-function Test-NeedRebuild([string]$rsp, [string]$outDll) {
-    if (-not (Test-Path $outDll)) { return $true }
-    $dllTime = (Get-Item $outDll).LastWriteTime
-    $srcs = Get-Content $rsp | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '\.cs$' }
-    foreach ($s in $srcs) {
-        if (Test-Path $s) {
-            if ((Get-Item $s).LastWriteTime -gt $dllTime) { return $true }
-        }
-    }
-    return $false
-}
-
-# 从 rsp 里取 /out: 路径
-function Get-OutPath([string]$rsp) {
-    $line = Get-Content $rsp | Where-Object { $_ -match '^/out:' } | Select-Object -First 1
-    if (-not $line) { return $null }
-    return $line.Substring(5).Trim()
-}
-
-# ============================================================
-# **Opt-41（可维护性）**：-Check —— 把"想起来才手工做一次"的核对变成机械守卫
-#   & '.\_tools\build_sr_uch.ps1' -Check
-# 三条守卫（都来自分析报告 §4 / §8 / §9 里手工做过一次的核对）：
-#   1) 契约层 sr_uch_contracts.rsp 必须能**独立编译**
-#      —— 这是"契约不依赖实现"这条架构约定的**唯一**机械证明；
-#   2) sr_uch.rsp 必须**恰好**覆盖 SR_UCH 下所有 .cs（漏一个 = 该功能静默不进部署产物）；
-#      核心 rsp 不得含 Features；每个 feat_<X>.rsp 必须与 X 的文件精确匹配；
-#   3) IDE 工程（csproj）必须能编 —— 它和部署构建各有一份引用清单，最容易漂移。
-# ============================================================
-function Invoke-ContractCheck {
-    $rsp = Join-Path $rspDir 'sr_uch_contracts.rsp'
-    if (-not (Test-Path $rsp)) { Write-Host '  [FAIL] 缺少 sr_uch_contracts.rsp'; return $false }
-    if ($csc.EndsWith('.dll')) { & dotnet $csc "@$rsp" '/warnaserror:CS0169,CS0414,CS0649' 2>&1 | Out-Null } else { & $csc "@$rsp" '/warnaserror:CS0169,CS0414,CS0649' 2>&1 | Out-Null }
-    if ($LASTEXITCODE -ne 0) { Write-Host '  [FAIL] 契约层不能独立编译 -> 契约文件里引用了实现'; return $false }
-    Write-Host '  [ OK ] 契约层（Contracts\*.cs）可独立编译'
-    return $true
-}
-function Get-RspSources([string]$rsp) {
-    if (-not (Test-Path $rsp)) { return @() }
-    Get-Content $rsp | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '\.cs$' } | ForEach-Object {
-        $_.Replace('/', '\').Replace($Root, '').TrimStart('\')
-    }
-}
-function Invoke-CsprojCheck {
-    $csproj = Join-Path $Root 'SR_UCH.csproj'
-    if (-not (Test-Path $csproj)) { Write-Host '  [FAIL] 缺少 SR_UCH.csproj'; return $false }
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { Write-Host '  [SKIP] 本机没有 dotnet，跳过 IDE 工程检查'; return $true }
-    $o = & dotnet build $csproj -v:q --nologo 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host '  [FAIL] IDE 工程（csproj）编译失败：'
-        $o | Select-Object -Last 8 | ForEach-Object { Write-Host ('        ' + $_) }
-        return $false
-    }
-    Write-Host '  [ OK ] IDE 工程（csproj）编译通过（两条构建链的引用清单一致）'
-    return $true
-}
-function Invoke-MigrationRuleCheck {
-    # **Opt-43（可维护性）**：迁移的"清理/搬移"名单是手工维护的。一旦名单里的键**后来又被打回来**
-    #  （R432 就把 Level Bounds Cursor / Camera 加回来了），迁移就会每次启动把用户的设置删掉，
-    #  而且没有任何报错。这里在**构建期**做静态交叉核对：名单里的 (段,键) 不得同时出现在 Config.Bind 里。
-    $sep = [string][char]1
-    $binds = @{}
-      foreach ($d in @('.')) {
-          $r2 = $Root
-        if (-not (Test-Path $r2)) { continue }
-        Get-ChildItem $r2 -Recurse -Include *.cs -File |
-            Where-Object { $_.FullName -notmatch '\\obj\\|\\bin\\' } | ForEach-Object {
-                $txt = Get-Content $_.FullName -Raw
-                foreach ($m in [regex]::Matches($txt, '\.Bind(?:<[^<>()]*>)?\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"')) {
-                    $binds[$m.Groups[1].Value + $sep + $m.Groups[2].Value] = $true
-                }
-            }
-    }
-    $migPath = Join-Path $Root 'SR_UCH\SR.ConfigMigration.cs'
-    if (-not (Test-Path $migPath)) { Write-Host '  [FAIL] 找不到 SR.ConfigMigration.cs'; return $false }
-    $mig = Get-Content $migPath -Raw
-    $ok = $true
-    foreach ($m in [regex]::Matches($mig, 'RemoveKeys\s*\(\s*text\s*,\s*"([^"]+)"\s*,\s*new\[\]\s*\{([^}]*)\}')) {
-        $sec = $m.Groups[1].Value
-        foreach ($k in [regex]::Matches($m.Groups[2].Value, '"([^"]+)"')) {
-            $key = $k.Groups[1].Value
-            if ($binds.ContainsKey($sec + $sep + $key)) {
-                Write-Host ('  [FAIL] 迁移清理名单撞上活键: [' + $sec + '] ' + $key + '（当前仍有 Config.Bind -> 该设置每次启动会被删掉）')
-                $ok = $false
+        foreach ($ln in [System.IO.File]::ReadAllLines($rsp)) {
+            $t = $ln.Trim()
+            if ($t.EndsWith('.cs') -and -not $t.StartsWith('/')) {
+                $p = Join-Path $Root ($t -replace '"', '')
+                if (-not (Test-Path -LiteralPath $p)) { $missing += $t }
             }
         }
-    }
-    foreach ($m in [regex]::Matches($mig, 'MoveKeyBetweenSections\s*\(\s*text\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"')) {
-        $from = $m.Groups[1].Value; $key = $m.Groups[3].Value
-        if ($binds.ContainsKey($from + $sep + $key)) {
-            Write-Host ('  [FAIL] 迁移搬移的源段仍是活段: [' + $from + '] ' + $key + '（该键在被搬的同时仍被绑定）')
-            $ok = $false
-        }
-    }
-    if ($ok) { Write-Host ('  [ OK ] 迁移规则与 ' + $binds.Count + ' 条 Config.Bind 无冲突（清理名单未撞上活键）') }
-    return $ok
-}
-function Invoke-SinkCoverageCheck {
-    # P0-1：契约层每个 Set*Sinks 注入点都必须在 MainPlugin 里被调用（静态可验证，不需要跑游戏）。
-    $contractDir = Join-Path $Root 'SR_UCH\Contracts'
-    $main = Join-Path $Root 'MainPlugin.cs'
-    if (-not (Test-Path -LiteralPath $contractDir) -or -not (Test-Path -LiteralPath $main)) { Write-Host '  [FAIL] 缺少契约层目录或 MainPlugin'; return $false }
-    $ctext = (@(Get-ChildItem -LiteralPath $contractDir -Filter '*.cs' -File | ForEach-Object { [System.IO.File]::ReadAllText($_.FullName) }) -join "`n")
-    $mtext = [System.IO.File]::ReadAllText($main)
-    $bad = @(); $total = 0
-    foreach ($m in [regex]::Matches($ctext, 'public static void (Set\w+Sinks)\s*\(')) {
-        $total++
-        $name = $m.Groups[1].Value
-        if ($mtext -notmatch [regex]::Escape($name + '(')) { $bad += $name }
-    }
-    if ($bad.Count -gt 0) {
-        Write-Host ('  [FAIL] MainPlugin 未调用注入点: ' + ($bad -join ', '))
-        return $false
-    }
-    Write-Host ('  [ OK ] 注入点全部已调用（' + $total + ' 组）')
-    return $true
-}
-function Invoke-RepoTextGuards {
-    # 文本类守卫只有一份实现：build/guards-text.ps1。
-    # 这里 dot-source 它（-NoExit：只跑检查、不 exit），避免 API 棘轮 / 契约边界 /
-    # 功能层泄漏 / rsp 覆盖这些逻辑维护两套（之前两套已漂移过一次）。
-    $g = Join-Path $PSScriptRoot 'guards-text.ps1'
-    if (-not (Test-Path -LiteralPath $g)) { Write-Host '  [FAIL] 缺少 build/guards-text.ps1'; return $false }
-    $oldLoc = Get-Location
-    try {
-        $script:fail = 0
-        . $g -NoExit
-        if ($script:fail -gt 0) { Write-Host '  [FAIL] 文本类守卫（guards-text.ps1）未通过'; return $false }
-    } catch {
-        Write-Host ('  [FAIL] 文本类守卫执行异常: ' + $_.Exception.Message)
-        return $false
-    } finally {
-        Set-Location -LiteralPath $oldLoc
-    }
-    Write-Host '  [ OK ] 文本类守卫全部通过（实现见 build/guards-text.ps1）'
-    return $true
-}
-function Show-ExRepoStatus {
-    # EX 是独立仓库（工作区 ../SR_UCH_EX）：只提示不失败，避免日常开发总被脏目录打断。
-    $exRoot = Join-Path $workspaceRoot 'SR_UCH_EX'
-    if (-not (Test-Path -LiteralPath $exRoot)) { return }
-    try {
-        $out = & git -C $exRoot status --porcelain 2>$null
-        if ($LASTEXITCODE -ne 0) { Write-Host '  [INFO] SR_UCH_EX 仓库状态读取失败'; return }
-        $n = @($out | Where-Object { $_ -and $_.Trim().Length -gt 0 }).Count
-        if ($n -gt 0) { Write-Host ("  [INFO] SR_UCH_EX 有未提交的改动：{0} 个文件（记得在 EX 仓库单独提交）" -f $n) }
-        else { Write-Host '  [ OK ] SR_UCH_EX 仓库干净（EX 改动已提交）' }
-    } catch { Write-Host '  [INFO] SR_UCH_EX 仓库状态检查异常（忽略）' }
+    } else { Write-Host "  跳过 $name（缺 $rsp）"; return }
+    if ($missing.Count) { Write-Host ("  跳过 {0}：源码缺失 {1}" -f $name, ($missing -join ', ')); return }
+    Write-Host "== 构建 $name =="
+    if ($csc.EndsWith('.dll')) { & dotnet $csc "@$rsp" 2>&1 | Out-Null }
+    else { & $csc "@$rsp" 2>&1 | Out-Null }
+    if ($LASTEXITCODE -ne 0) { Write-Host "  [FAIL] $name"; exit 1 }
+    Write-Host "  [ OK ] $name"
 }
 
+# ---- -Check：守卫只有一份实现，交给统一入口 ----
 if ($Check) {
-    Write-Host '== SR_UCH 机械守卫（-Check）=='
-    $allOk = $true
-    # 0) 构建清单必须与磁盘源码一致（清单由 build/gen-rsp.ps1 生成，不允许手改）
-    & (Join-Path $PSScriptRoot 'gen-rsp.ps1') -Verify
-    if ($LASTEXITCODE -ne 0) { $allOk = $false }
-    if (-not (Invoke-ContractCheck))      { $allOk = $false }
-    if (-not (Invoke-MigrationRuleCheck)) { $allOk = $false }
-    if (-not (Invoke-CsprojCheck))        { $allOk = $false }
-    if (-not (Invoke-SinkCoverageCheck))  { $allOk = $false }
-    # 文本类守卫（与 CI 同一份实现）：API 棘轮 / 契约边界 / 功能层边界 / rsp 覆盖 / 编码 / 行数…
-    if (-not (Invoke-RepoTextGuards))     { $allOk = $false }
-    # 结构守卫（槽位图 + 本地化覆盖 + 孤儿槽位）
-    $schemaGuard = Join-Path $PSScriptRoot 'guards-schema.ps1'
-    if (Test-Path -LiteralPath $schemaGuard) { & $schemaGuard; if ($LASTEXITCODE -ne 0) { $allOk = $false } }
-    Show-ExRepoStatus
-    if (-not $allOk) { Write-Host '== 有守卫未通过 ❌ =='; exit 1 }
-    Write-Host '== 全部守卫通过 ✅ =='
-    exit 0
+    $py = Get-Command python3 -ErrorAction SilentlyContinue
+    if (-not $py) { $py = Get-Command python -ErrorAction SilentlyContinue }
+    if (-not $py) { Write-Host 'python3 未找到'; exit 1 }
+    & $py.Source (Join-Path $Root 'tools\uch.py') verify --strict
+    exit $LASTEXITCODE
 }
 
-if ($Separate) {
-    $rspContracts = Join-Path $rspDir 'sr_uch_contracts.rsp'
-    Invoke-Build $rspContracts 'SR.Contracts.dll'
-}
-if (-not $Split) {
-    # ---- 合并模式（默认，发布形态）----
-    Invoke-Build $rspMain 'SR_UCH.dll'
-    # 清掉拆分模式的残留：否则 plugins 里会同时有"合并版功能 + 独立功能 DLL"，功能会被初始化两次
-    $stale = Get-ChildItem $outDir -Filter 'SR_UCH_*.dll' -ErrorAction SilentlyContinue
-    if ($stale) {
-        $stale | ForEach-Object { Remove-Item $_.FullName -Force; Write-Host "    已清理拆分模式残留: $($_.Name)" }
-    }
-    # 拆分模式的核心（改名后的那份）同样要清，否则同一个 bin\Release 里躺着两份核心
-    foreach ($n in @($splitCoreName, 'SR_UCH_Manager')) {
-        $sp = Join-Path $outDir ($n + '.dll')
-        if (Test-Path $sp) { Remove-Item $sp -Force; Write-Host "    已清理拆分模式残留: $($n).dll" }
-    }
-    Write-Host "合并模式产物: SR_UCH.dll（核心 + 8 个功能）"
+if ($useDotnetBuild) {
+    if ($Features) { Write-Host '注意：-Features 裁剪只作用于 rsp 链；本次 dotnet 回退为全量编译' }
+    & dotnet build (Join-Path $Root 'SR_UCH.csproj') -c Release --nologo -warnaserror
+    if ($LASTEXITCODE -ne 0) { Write-Host '  [FAIL] SR_UCH.dll (dotnet)'; exit 1 }
+    Write-Host '  [ OK ] SR_UCH.dll (dotnet)'
 } else {
-    # ---- 拆分模式：核心 + 每个功能各自一个 DLL ----
-    Invoke-Build $rspCore 'SR_UCH.dll (核心)'
-    $coreDll = Get-OutPath $rspCore
-    $coreTime = (Get-Item $coreDll).LastWriteTime
-    $featBuilt = 0
-    foreach ($r in $rspFeatures) {
-        $rsp = Join-Path $rspDir $r
-        if (-not (Test-Path $rsp)) { Write-Host "跳过（缺少 $r）"; continue }
-        $out = Get-OutPath $rsp
-        $need = (Test-NeedRebuild $rsp $out) -or ((Get-Item $out).LastWriteTime -lt $coreTime)
-        if ($need) {
-            Invoke-Build $rsp ([System.IO.Path]::GetFileName($out))
-            $featBuilt++
-        }
-    }
-    Write-Host "拆分模式产物: $splitCoreName.dll(核心) + $featBuilt 个功能 DLL（核心在收尾时改名）"
+    Invoke-Build $work 'SR_UCH.dll'
 }
 
-
-
-
-# ---- EX（独立仓库）与独立插件（Others）：按需编译 ----
-# 公共仓库没有这两个目录 -> 自动跳过；本地工作区有 -> 与主模块同一次构建。
-$wantEx = $All -or $Ex
-if ($wantEx) {
-    if (Test-Path -LiteralPath (Join-Path $workspaceRoot 'SR_UCH_EX')) {
-        Invoke-Build $rspEx 'SR_UCH_EX.dll'
-    } else {
-        Write-Host '（未找到 ../SR_UCH_EX，跳过 EX 编译；-All 只构建主模块）'
-    }
-}
-if ($Others) {
-    if (Test-Path -LiteralPath (Join-Path $workspaceRoot 'Others')) {
-        foreach ($r in (Get-ChildItem -LiteralPath $rspOthersDir -Filter '*.rsp' -File -ErrorAction SilentlyContinue | Sort-Object Name)) {
-            Invoke-Build (Join-Path $rspOthersDir $r.Name) ('独立插件 ' + $r.Name)
-        }
-    } else {
-        Write-Host '（未找到 ../Others，跳过独立插件编译）'
-    }
-}
-
-# ---- 拆分模式收尾：核心改名 ----
-# 必须放在最末尾：功能与 EX 的 rsp 都引用 SR_UCH.dll，改名早了它们就找不到引用程序集。
-if ($Split) {
-    $built  = Join-Path $outDir 'SR_UCH.dll'
-    $target = Join-Path $outDir ($splitCoreName + '.dll')
-    if (Test-Path $built) {
-        Move-Item $built $target -Force
-        Write-Host "拆分模式：核心已改名 -> $($splitCoreName).dll（程序集标识仍是 SR_UCH）"
-    } else {
-        Write-Host "拆分模式：未找到 $built，跳过改名"
-    }
-}
-
-# ---- **Opt-47（方便维护）**：-Deploy = 构建完直接复制进游戏的 BepInEx\plugins ----
-# plugins 目录从 csproj 的 UchManagedDir 推导（单一真值），也可用 -PluginsDir 显式指定。
-# 游戏运行时插件 DLL 被映射进进程 -> 复制必然失败；这里把它翻译成一句人话，而不是抛 IOException。
+# ---- -Deploy：只搬一个 DLL ----
 function Get-PluginsDir {
     if ($PluginsDir) { return $PluginsDir }
-    # 主路径：脚本开头已探测并校验过的游戏目录（单一真值）。
-    if ($GameDir) { return (Join-Path $GameDir 'BepInEx\plugins') }
-    $csproj = Join-Path $Root 'SR_UCH.csproj'
-    if (Test-Path $csproj) {
-        $m = [regex]::Match((Get-Content $csproj -Raw), '<UchManagedDir[^>]*>([^<]+)</UchManagedDir>')
-        if ($m.Success) {
-            $managed = $m.Groups[1].Value.Trim()
-            $game = Split-Path (Split-Path $managed -Parent) -Parent   # ...\<游戏>\<游戏>_Data\Managed -> ...\<游戏>
-            return (Join-Path $game 'BepInEx\plugins')
-        }
-    }
-    return ''
+    return (Join-Path $GameDir 'BepInEx\plugins')
 }
 if ($Deploy) {
-    # 拆分模式下收尾会把 SR_UCH.dll 改名成 SR_Manager.dll，且功能各自是 SR_UCH_<功能>.dll，
-    # 旧逻辑只找 SR_UCH.dll 必然失败、也只搬一个文件。这里按形态分开处理。
-    $dll = Join-Path $outDir 'SR_UCH.dll'
-    $managerDll = Join-Path $outDir 'SR_Manager.dll'
-    $isSplitShape = (-not (Test-Path $dll)) -and (Test-Path $managerDll)
-    if (-not (Test-Path $dll) -and -not $isSplitShape) { Write-Host "找不到产物: $dll（先去掉 -Deploy 跑一次构建）"; exit 1 }
     $plugins = Get-PluginsDir
-    if (-not $plugins -or -not (Test-Path $plugins)) {
-        Write-Host "找不到 plugins 目录；请用 -PluginsDir '<游戏>\BepInEx\plugins' 指定"
-        exit 1
-    }
-    if ($isSplitShape) {
-        # 拆分形态：搬 SR_Manager.dll + 全部 SR_UCH_*.dll，并清掉合并形态的残留 SR_UCH.dll。
-        $splitTarget = Join-Path $plugins 'SR_Manager.dll'
-        try {
-            Copy-Item $managerDll $splitTarget -Force -ErrorAction Stop
-            Write-Host ("已部署: " + $splitTarget)
-            $featDlls = @(Get-ChildItem -LiteralPath $outDir -Filter 'SR_UCH_*.dll' -File)
-            foreach ($fd in $featDlls) {
-                Copy-Item $fd.FullName (Join-Path $plugins $fd.Name) -Force -ErrorAction Stop
-                Write-Host ("已部署: " + (Join-Path $plugins $fd.Name))
-            }
-            # 合并形态的 SR_UCH.dll 与拆分形态冲突（会被当成"未带 BepInPlugin 的外部 DLL"再扫一遍）。
-            $stale = Join-Path $plugins 'SR_UCH.dll'
-            if (Test-Path $stale) { Remove-Item $stale -Force -ErrorAction SilentlyContinue; Write-Host ("已清理合并形态残留: " + $stale) }
-        } catch {
-            Write-Host "部署失败（拆分形态）：插件 DLL 正被占用 —— 请**先完全退出游戏**再重跑 -Deploy"
-            Write-Host ("  原因: " + $_.Exception.Message)
-            exit 2
-        }
-        return
-    }
-    $target = Join-Path $plugins 'SR_UCH.dll'
+    if (-not (Test-Path $plugins)) { Write-Host "找不到 plugins 目录；用 -PluginsDir 指定"; exit 1 }
+    $specFile = Join-Path $PSScriptRoot 'specs\features.spec.json'
+    $dll = ((Get-Content -LiteralPath $specFile -Raw -Encoding UTF8) | ConvertFrom-Json).artifacts.dll
+    $src = Join-Path $outDir $dll
+    if (-not (Test-Path -LiteralPath $src)) { Write-Host "找不到产物 $dll（先不带 -Deploy 构建）"; exit 1 }
+    try { Copy-Item -LiteralPath $src -Destination (Join-Path $plugins $dll) -Force }
+    catch { Write-Host ('复制失败（游戏是否正在运行？）: ' + $_.Exception.Message); exit 1 }
+    Write-Host ("已部署: " + (Join-Path $plugins $dll))
     try {
-        Copy-Item $dll $target -Force -ErrorAction Stop
-        Write-Host ("已部署: " + $target)
-        # 合并形态部署时清理拆分形态残留：SR_Manager.dll 与 SR_UCH_*.dll（EX 除外）
-        # 留着它们会被当成"未带 BepInPlugin 的外部 DLL"再加载一遍，功能初始化两次。
-        $splitLeft = @()
-        $mgr = Join-Path $plugins 'SR_Manager.dll'
-        if (Test-Path $mgr) { $splitLeft += $mgr }
-        $splitLeft += @(Get-ChildItem -LiteralPath $plugins -Filter 'SR_UCH_*.dll' -File |
-                        Where-Object { $_.Name -ne 'SR_UCH.dll' -and $_.Name -ne 'SR_UCH_EX.dll' } |
-                        ForEach-Object { $_.FullName })
-        foreach ($sl in $splitLeft) {
-            try { Remove-Item $sl -Force -ErrorAction SilentlyContinue; Write-Host ("已清理拆分残留: " + $sl) } catch { }
-        }
-    } catch {
-        Write-Host "部署失败：插件 DLL 正被占用 —— 请**先完全退出游戏**再重跑 -Deploy"
-        Write-Host ("  目标: " + $target)
-        Write-Host ("  原因: " + $_.Exception.Message)
-        exit 2
-    }
-    # **Opt-53（方便维护）**：EX 也是同一套部署目标（它由 SR_UCH 从 plugins 目录加载）。
-    #  以前 -Deploy 只搬 SR_UCH.dll -> 只改 EX 源码时很容易忘记搬，plugins 里会留着旧 EX
-    #  （真发生过：plugins 里是 10/6 的旧 EX 配新 SR）。这里一并搬。
-    #  注意：Others\ 下的独立插件**不在** SR 这套里（用户已说明不用管），不在这里处理。
-    $exDll = Join-Path $workspaceRoot 'SR_UCH_EX\bin\Release\SR_UCH_EX.dll'
-    $exTarget = Join-Path $plugins 'SR_UCH_EX.dll'
-    if ((Test-Path $exDll) -and (Test-Path $exTarget)) {
-        $h1 = (Get-FileHash $exDll -Algorithm SHA256).Hash
-        $h2 = (Get-FileHash $exTarget -Algorithm SHA256).Hash
-        if ($h1 -eq $h2) {
-            Write-Host ("EX 已是最新: " + $exTarget)
-        } else {
-            try {
-                Copy-Item $exDll $exTarget -Force -ErrorAction Stop
-                Write-Host ("已部署: " + $exTarget)
-            } catch {
-                Write-Host ("EX 部署失败（被占用？）：" + $_.Exception.Message)
-            }
-        }
-    }
-    # 发布可追溯：在插件目录写版本文件（git 短 hash + 构建时间 + 契约 ApiLevel）。
-    try {
-        $hash = (& git -C $Root rev-parse --short HEAD 2>$null)
-        if (-not $hash) { $hash = 'unknown' }
-        $apiLv = '?'
-        $contracts = Join-Path $Root 'SR_UCH\Contracts\Contracts.cs'
-        if (Test-Path -LiteralPath $contracts) {
-            $mm = [regex]::Match([IO.File]::ReadAllText($contracts), 'public\s+const\s+int\s+ApiLevel\s*=\s*(\d+)')
-            if ($mm.Success) { $apiLv = $mm.Groups[1].Value }
-        }
-        $verLine = 'SR_UCH ' + $hash + '  built ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '  ApiLevel ' + $apiLv
+        $hash = (Get-FileHash $src -Algorithm SHA256).Hash.Substring(0, 16)
+        $verLine = 'SR_UCH ' + $hash + '  built ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
         [IO.File]::WriteAllText((Join-Path $plugins 'SR_UCH.version.txt'), $verLine, (New-Object System.Text.UTF8Encoding($false)))
-        Write-Host ('已写入版本文件: ' + $verLine)
     } catch { Write-Host ('版本文件写入失败（忽略）: ' + $_.Exception.Message) }
 }
-if ($Separate -and $Deploy) {
-    # 阶段B1：分离模式下契约程序集作为依赖放进 BepInEx\core（BepInEx 会先加载 core 里的程序集）
-    $coreDir = Join-Path (Join-Path $GameDir 'BepInEx') 'core'
-    $srcC = Join-Path $Root 'bin\Release\SR.Contracts.dll'
-    if (Test-Path -LiteralPath $srcC) {
-        if (-not (Test-Path -LiteralPath $coreDir)) { New-Item -ItemType Directory -Force -Path $coreDir | Out-Null }
-        Copy-Item -LiteralPath $srcC -Destination (Join-Path $coreDir 'SR.Contracts.dll') -Force
-        Write-Host ('已部署契约程序集: ' + (Join-Path $coreDir 'SR.Contracts.dll'))
-    }
-}
-# P1-2：从运行日志导出启动审计报告（补丁/反射/功能表/API通道/自检结论）
+
 if ($ExportAudit) {
     $log = Join-Path $GameDir 'BepInEx\LogOutput.log'
-    if (-not (Test-Path -LiteralPath $log)) { Write-Host ('找不到日志: ' + $log); exit 1 }
+    if (-not (Test-Path -LiteralPath $log)) { Write-Host "找不到日志 $log"; exit 1 }
     $lines = [System.IO.File]::ReadAllLines($log)
     $ver = 'unknown'
     foreach ($l in $lines) { if ($l -match '游戏版本=([^\s]+)') { $ver = $Matches[1]; break } }
@@ -534,9 +148,6 @@ if ($ExportAudit) {
     [void]$sb.AppendLine('# SR_UCH 启动审计报告')
     [void]$sb.AppendLine('')
     [void]$sb.AppendLine('- 游戏版本: ' + $ver)
-    [void]$sb.AppendLine('- 导出时间: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
-    $dll = Join-Path $GameDir 'BepInEx\plugins\SR_UCH.dll'
-    if (Test-Path -LiteralPath $dll) { [void]$sb.AppendLine('- SR_UCH.dll SHA256(前16位): ' + (Get-FileHash $dll -Algorithm SHA256).Hash.Substring(0,16)) }
     [void]$sb.AppendLine('')
     [void]$sb.AppendLine('## 审计行')
     [void]$sb.AppendLine('')
@@ -545,5 +156,4 @@ if ($ExportAudit) {
     [void]$sb.AppendLine('```')
     [IO.File]::WriteAllText($out, $sb.ToString(), (New-Object System.Text.UTF8Encoding($true)))
     Write-Host ('已导出: ' + $out)
-    exit 0
 }

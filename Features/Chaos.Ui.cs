@@ -2,7 +2,7 @@
 // 网络方案：发真实的 TabletRule + Value，由游戏自己的代码写进 Modifiers，房主安装即可带全场。
 // 房主被 !IsHost 挡住不执行那段，故房主须本地双写一次；Value2 高位放牌组魔数供 UI 解析。
 // 高位标记不干扰原生规则：游戏的规则分支只读 Value / Valueb。
-// 不进池的规则：GameSpeed（改全局速度）、CharacterSize / CameraFlip / Doomsday（碰相机或要重建绘制）。
+// 不进池的规则：GameSpeed / RateOfFire（写全局时间尺度）、CharacterSize / CameraFlip / Doomsday（碰相机或要重建绘制）。
 // 房内 mod 清单复用 MsgGameRuleSet 以 TabletRule.None 承载；Value 放本机 networkNumber（conn 无法区分发件人）。
 // 不新增 Harmony 补丁 / msgType / 反射登记；状态只在主线程回调里读写。
 
@@ -113,7 +113,7 @@ namespace SR_UCH.Tweaks {
             _cardEffect.fontSize = Mathf.RoundToInt(SRApi.Ctl.Sc(10f));
             GUI.Label(new Rect(inner.x, inner.y, inner.width, titleH), SRApi.T(c.Zh, c.En), _cardTitle);
             string effect = SRApi.T(c.TipZh, c.TipEn);
-            if (!c.IsBool) effect += " · " + SRApi.T("值 ", "value ") + param;
+            if (!c.IsBool) effect += " · " + SRApi.Tid("d280869c6e", "值 ", "value ") + param;
             GUI.Label(new Rect(inner.x, inner.y + titleH, inner.width, inner.height - titleH), effect, _cardEffect);
         }
 
@@ -121,10 +121,10 @@ namespace SR_UCH.Tweaks {
             // 配置项一律走核心统一渲染；核心层没有裸 Toggle/Slider/Label 控件。
             // 限制模式（非派对/创意）下整页配置置灰：触发即跳过，不弹提示。
             using (SRApi.Ctl.Disabled(!ModeAllowed())) {
-                CfgRow(_enabled);
-                CfgRow(_everyRounds);
-                CfgRow(_maxActive);
-                CfgRow(_announce);
+                TweakCfg.Row(_enabled);
+                TweakCfg.Row(_everyRounds);
+                TweakCfg.Row(_maxActive);
+                TweakCfg.Row(_announce);
             }
             if (!ModeAllowed())
                 Line("仅派对 / 创意模式可用。", "Party / Creative only.");
@@ -133,13 +133,12 @@ namespace SR_UCH.Tweaks {
             if (_enabled != null && !_enabled.Value)
                 Line("本机开关已关：这里只显示收到的牌面，房主规则仍会生效。",
                      "Switch is off on this machine: cards are display-only; host rules still apply.");
-            SRApi.Ctl.SectionTitle(SRApi.T("当前牌面", "Active cards"),
-                SRApi.T("本回合生效的规则牌：绿边 = 增益，红边 = 减益，蓝边 = 中性。",
-                        "Rules in effect this round: green = buff, red = debuff, blue = neutral."));
+            SRApi.Ctl.SectionTitle(SRApi.Tid("1776951d46", "当前牌面", "Active cards"),
+                SRApi.Tid("09beafdacf", "本回合生效的规则牌：绿边 = 增益，红边 = 减益，蓝边 = 中性。", "Rules in effect this round: green = buff, red = debuff, blue = neutral."));
             RenderActiveCards();
             using (SRApi.Ctl.Disabled(!IsAuthority || _enabled == null || !_enabled.Value)) {
-                SRApi.Ctl.HotkeyButton("chaos.reroll", SRApi.T("重抽", "Draw"),
-                                       SRApi.T("仅房主 / 离线有效", "Host or offline only"), DrawAndBroadcast);
+                SRApi.Ctl.HotkeyButton("chaos.reroll", SRApi.Tid("7339f5954f", "重抽", "Draw"),
+                                       SRApi.Tid("233a9f783a", "仅房主 / 离线有效", "Host or offline only"), DrawAndBroadcast);
             }
         }
 
@@ -149,19 +148,19 @@ namespace SR_UCH.Tweaks {
             // 四个批量操作同排一行（紧凑按钮，避免占掉过多列表空间）。
             GUILayout.BeginHorizontal();
             float bh = SRApi.Ctl.Sc(24f), bw = SRApi.Ctl.Sc(64f);
-            if (SRApi.Ctl.Button(SRApi.T("全选", "All"), SRApi.T("勾选全部牌", "Enable every card"), bw, bh)) SetAllPools(true);
+            if (SRApi.Ctl.Button(SRApi.Tid("dcda6abd9e", "全选", "All"), SRApi.Tid("a8de93c052", "勾选全部牌", "Enable every card"), bw, bh)) SetAllPools(true);
             GUILayout.Space(SRApi.Ctl.Sc(4f));
-            if (SRApi.Ctl.Button(SRApi.T("全不选", "None"), SRApi.T("全部取消（会再自动勾回第一张）", "Disable all (the first card is re-enabled)"), bw, bh)) SetAllPools(false);
+            if (SRApi.Ctl.Button(SRApi.Tid("881021dfc8", "全不选", "None"), SRApi.Tid("9f20c219c0", "全部取消（会再自动勾回第一张）", "Disable all (the first card is re-enabled)"), bw, bh)) SetAllPools(false);
             GUILayout.Space(SRApi.Ctl.Sc(4f));
-            if (SRApi.Ctl.Button(SRApi.T("仅增益", "Buffs"), SRApi.T("只保留对自己有利的牌（高跳/快跑/跳舞无敌等）", "Keep only beneficial cards"), bw, bh)) KeepBeneficial();
+            if (SRApi.Ctl.Button(SRApi.Tid("b824cfd002", "仅增益", "Buffs"), SRApi.Tid("106e5ad1eb", "只保留对自己有利的牌（高跳/快跑/跳舞无敌等）", "Keep only beneficial cards"), bw, bh)) KeepBeneficial();
             GUILayout.Space(SRApi.Ctl.Sc(4f));
-            if (SRApi.Ctl.Button(SRApi.T("仅减益", "Debuffs"), SRApi.T("只保留让人受限/变弱的牌（低重力/慢速/禁墙跳等）", "Keep only weakening cards"), bw, bh)) KeepHarmful();
+            if (SRApi.Ctl.Button(SRApi.Tid("92ab16bb0d", "仅减益", "Debuffs"), SRApi.Tid("38937e841a", "只保留让人受限/变弱的牌（低重力/慢速/禁墙跳等）", "Keep only weakening cards"), bw, bh)) KeepHarmful();
             GUILayout.Space(SRApi.Ctl.Sc(4f));
-            if (SRApi.Ctl.Button(SRApi.T("反选", "Invert"), SRApi.T("勾选状态全部反转（至少留一张）", "Invert every checkbox (keep at least one)"), bw, bh)) InvertPools();
+            if (SRApi.Ctl.Button(SRApi.Tid("4b9e822548", "反选", "Invert"), SRApi.Tid("87bc828d83", "勾选状态全部反转（至少留一张）", "Invert every checkbox (keep at least one)"), bw, bh)) InvertPools();
             GUILayout.EndHorizontal();
             int __on = 0;
             for (int i = 0; i < Cards.Length; i++) if (_pool[i] != null && _pool[i].Value) __on++;
-            // Line 的两个参数分别是中文与英文：之前两处都传了同一句中英混合串，英文界面会显示中文。
+            // Line(中文, 英文)：两参各是一门语言的完整句子，不要预先 T() 再拼。
             Line("已启用 " + __on + " / " + Cards.Length + " 张；勾选后才会进入随机池。",
                  __on + " / " + Cards.Length + " cards enabled; only checked cards can be drawn.");
             GUILayout.Space(SRApi.Ctl.Sc(6f));
@@ -171,8 +170,12 @@ namespace SR_UCH.Tweaks {
         }
 
         // 分组渲染：按数值/布尔规则分两块（顺序固定，结构不随勾选变化）。
+        // 配置条目显示名缓存：仅游戏名/语言变化时重注册 LocKey（每帧重注册会让本地化缓存抖动）。
+        private static string[] _poolLabelCache;
+
         private void RenderPoolGroup(bool numeric) {
             SRApi.Ctl.SectionTitle(SRApi.T(numeric ? "数值规则" : "布尔规则", numeric ? "Numeric rules" : "Boolean rules"));
+            if (_poolLabelCache == null) _poolLabelCache = new string[Cards.Length];
             for (int i = 0; i < Cards.Length; i++) {
                 if (Cards[i].IsBool == numeric || _pool[i] == null) continue;   // numeric=true 显示数值牌（IsBool=false）
                 CardDef c = Cards[i];
@@ -181,7 +184,7 @@ namespace SR_UCH.Tweaks {
                 // 同一规则有多张牌（如低/高重力）时游戏名相同，追加本功能的档位名区分。
                 string label = string.IsNullOrEmpty(gm) ? ours : (gm == ours ? gm : gm + " · " + ours);
                 SRApi.LocDynamic(_pool[i], label, label);   // 行名跟随游戏语言（核心节流重注册）
-                CfgRow(_pool[i]);   // 标准复选框行（不是按钮）
+                TweakCfg.Row(_pool[i]);   // 标准复选框行（不是按钮）
                 // 数值牌：直接在行下方给出取值区间（可圈定），勾选状态与区间一起决定抽到什么。
                 if (!Cards[i].IsBool) RenderParamRange(i, c);
             }
@@ -193,18 +196,18 @@ namespace SR_UCH.Tweaks {
                 if (_paramMin == null || _paramMax == null) return;
                 if (i >= _paramMin.Length || i >= _paramMax.Length) return;
                 if (_paramMin[i] == null || _paramMax[i] == null) return;
-                SRApi.Ctl.RowSlider(SRApi.T("数值下限", "Min value"),
-                    SRApi.T("这张牌抽到的最小档位\n与该牌的上限一起圈定取值范围",
-                            "lowest tier this card can roll\nwith the max, defines the allowed range"),
+                // 外部配置窗口也显示中文名（本页 RowSlider 自带标签，不读 LocKey）。
+                SRApi.LocDynamic(_paramMin[i], c.Zh + " 下限", c.En + " min");
+                SRApi.LocDynamic(_paramMax[i], c.Zh + " 上限", c.En + " max");
+                SRApi.Ctl.RowSlider(SRApi.Tid("321c0930e1", "数值下限", "Min value"),
+                    SRApi.Tid("479852f111", "这张牌抽到的最小档位\n与该牌的上限一起圈定取值范围", "lowest tier this card can roll\nwith the max, defines the allowed range"),
                     _paramMin[i], 0f, 8f, "0");
-                SRApi.Ctl.RowSlider(SRApi.T("数值上限", "Max value"),
-                    SRApi.T("这张牌抽到的最大档位\n低于下限时会自动按一下限处理",
-                            "highest tier this card can roll\nfalls back to the min when lower"),
+                SRApi.Ctl.RowSlider(SRApi.Tid("04a69c96e5", "数值上限", "Max value"),
+                    SRApi.Tid("cdc1e9617c", "这张牌抽到的最大档位\n低于下限时会自动按一下限处理", "highest tier this card can roll\nfalls back to the min when lower"),
                     _paramMax[i], 0f, 8f, "0");
                 // 防止用户把上限调到下限以下：读取时已夹紧，这里给一行说明。
                 if (_paramMax[i].Value < _paramMin[i].Value) {
-                    GUILayout.Label(SRApi.T("上限低于下限，抽取时按上限=下限处理。",
-                        "Max is below min; the roll uses max = min."), SRApi.Ctl.Label);
+                    GUILayout.Label(SRApi.Tid("2d8d0e9bdb", "上限低于下限，抽取时按上限=下限处理。", "Max is below min; the roll uses max = min."), SRApi.Ctl.Label);
                 }
             } catch (Exception __rp) { SRApi.Guard.Log("混乱牌组/数值区间行", __rp); }
         }
@@ -239,9 +242,10 @@ namespace SR_UCH.Tweaks {
         }
 
         // 牌池批量筛选用的倾向分类（与 Cards 顺序一一对应）：+1 增益 / 0 中性 / -1 减益。
+        // 增删卡牌必须同步改本数组，否则「仅增益 / 仅减益」会错位。
         private static readonly sbyte[] CardMood = new sbyte[] {
-            1, -1, -1, -1, -1, -1, -1,    // 低重力(有益) / 高重力 / 弱跳跃 / 慢冲刺 / 慢平台 / 禁墙跳 / 镜像
-             1, -1, -1, -1,               // 跳舞无敌 / 玩家互撞 / 无摩擦 / 慢射速
+            1, -1, -1, -1, -1, -1, -1,    // 低重力(增益) / 高重力 / 弱跳跃 / 慢冲刺 / 慢平台 / 禁墙跳 / 镜像
+             1, -1, -1,                   // 跳舞无敌 / 玩家互撞 / 无摩擦
              1,  1,  1,                   // 高跳跃 / 快冲刺 / 快平台
             -1, -1                       // 龟速冲刺 / 停滞平台
         };

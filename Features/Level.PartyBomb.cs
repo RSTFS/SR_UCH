@@ -27,7 +27,9 @@ namespace SR_UCH.Tweaks {
             _bombSize = plugin.Config.Bind("Level", "Party Bomb Type", 0,
                 "塞进去的是哪种炸弹, 填 PartyBox.BombPrefab 里的第几个, 从 0 开始. 不同下标对应盒子里不同大小的炸弹. 第一次生成的时候日志里会列出有哪些可选.");
             Enabled = _enabled.Value;
-            _enabled.SettingChanged += (s, e) => Enabled = _enabled.Value;
+            System.EventHandler __h__enabled_1 = (s, e) => Enabled = _enabled.Value;
+            _enabled.SettingChanged += __h__enabled_1;
+            Sub.Revoke(() => _enabled.SettingChanged -= __h__enabled_1);
             // 带 try/catch：单个补丁目标失效只丢本类功能。
             try { SRApi.RegisterPatch(typeof(PartyBomb)); }
             catch (Exception e) { SRApi.LogError("派对盒炸弹 补丁注册失败: " + e.Message); }
@@ -160,16 +162,13 @@ namespace SR_UCH.Tweaks {
 
         public void Initialize(IFeatureHost plugin) {
             try {
-                SRApi.LocKey("Level", "Drop Held Piece", "放弃道具", "Drop held piece");
-                SRApi.LocKey("Level", "Party Bomb", "派对盒子炸弹", "Party bomb");
-                SRApi.LocDesc("Level", "Party Bomb",
-                    "派对盒子炸弹\n对局内所有成员都发过炸弹！短语后才生成\n只有房主设置有效",
-                    "party-box bomb\nspawns only after every member sends the Bomb phrase\nhost setting only");
-                SRApi.LocKey("Level", "Party Bomb Type", "炸弹类型", "Party bomb type");
-                SRApi.LocDesc("Level", "Party Bomb Type",
-                    "炸弹种类\n塞进派对盒的是哪种炸弹\n小 / 大 / 超级对应不同爆炸范围",
-                    "bomb type\nwhich bomb goes into the party box\nsmall / big / mega have different blast radii");
-                SRApi.LocDesc("Level", "Drop Held Piece", "放弃道具按键\n派对阶段丢弃手上的道具（游戏原生通道）\n请勿删除边界墙和出生方块，删了无法复原", "Drop held piece\ndiscards the held piece during the pick phase via the game channel\nnever delete boundary walls or spawn blocks - it cannot be undone");
+                TweakCfg.Entry("Level", "Drop Held Piece", "放弃道具", "Drop held piece",
+                    "放弃道具按键\n派对阶段丢弃手上的道具（游戏原生通道）\n请勿删除边界墙和出生方块，删了无法复原",
+                    "Drop held piece\ndiscards the held piece during the pick phase via the game channel\nnever delete boundary walls or spawn blocks - it cannot be undone");
+                TweakCfg.Entry("Level", "Party Bomb", "派对盒子炸弹", "Party bomb",
+                    "派对盒子炸弹\n对局内所有成员都发过炸弹！短语后才生成\n只有房主设置有效", "party-box bomb\nspawns only after every member sends the Bomb phrase\nhost setting only");
+                TweakCfg.Entry("Level", "Party Bomb Type", "炸弹类型", "Party bomb type",
+                    "炸弹种类\n塞进派对盒的是哪种炸弹\n小 / 大 / 超级对应不同爆炸范围", "bomb type\nwhich bomb goes into the party box\nsmall / big / mega have different blast radii");
                 _key = plugin.Config.Bind("Level", "Drop Held Piece", KeyCode.None,
                     "按这个键就把手上拿着的那块丢掉（走游戏原生通道, 全员可见）, 填 None 就是不绑键.");
                 SRApi.RegisterKey("关卡-放弃道具", _key, "press", Perform);

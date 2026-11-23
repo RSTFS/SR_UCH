@@ -1,4 +1,4 @@
-// 契约层：ITweak / IFeatureHost / ILanguagePack / Slots，第三方功能只依赖本文件。
+// 契约层：ITweak / IFeatureHost / ILanguagePack / SrCaps，第三方功能只依赖本文件。
 // 硬约定：不得引用 SR 的其它文件，须能单独编译；槽位只传 BCL / 引擎 / 游戏类型。
 using System;
 using System.Collections.Generic;
@@ -17,8 +17,8 @@ namespace SR_UCH {
         private static Func<string, int, GUIStyle, GUILayoutOption[], string> _clearableTextField;
         private static Action<string, Action> _registerPageSimple;
         private static Action<string, string, string, string, int, Action> _registerPageFull;
-        public static string MsgMasterOff { get { return T("本 Mod 总开关已关闭", "The mod's master switch is off"); } }
-        public static string MsgNotLobby { get { return T("不在大厅或找不到本地玩家", "Not in a lobby or cannot find the local player"); } }
+        public static string MsgMasterOff { get { return Tid("d42678f5d4", "本 Mod 总开关已关闭", "The mod's master switch is off"); } }
+        public static string MsgNotLobby { get { return Tid("c300287139", "不在大厅或找不到本地玩家", "Not in a lobby or cannot find the local player"); } }
         public static void SetMiscSinks(Func<ConfigEntryBase, int> keyComboMod, Action<ConfigEntryBase, int> setDefaultCombo,
                                         Func<string, int, GUIStyle, GUILayoutOption[], string> clearableTextField,
                                         Action<string, Action> registerPageSimple,
@@ -366,6 +366,7 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
 
 
         private static Func<string, string, string> _t;
+        private static Func<string, string, string, string> _tid;
         private static Action<string, string> _locSec2;
         private static Action<string, string, string> _locSec3;
         private static Action<string, string, string, string> _locKey, _locDesc;
@@ -373,17 +374,19 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         private static Func<string> _currentLanguageId;
         private static Func<int> _langVer;
         private static Action<string, string, object[]> _notifyT;
-        public static void SetLangSinks(Func<string, string, string> t,
+        public static void SetLangSinks(Func<string, string, string, string> tid, Func<string, string, string> t,
                                         Action<string, string> locSec2, Action<string, string, string> locSec3,
                                         Action<string, string, string, string> locKey,
                                         Action<string, string, string, string> locDesc,
                                         Action<string, string> locEnum,
                                         Func<string> currentLanguageId, Func<int> langVer,
                                         Action<string, string, object[]> notifyT) {
-            _t = t; _locSec2 = locSec2; _locSec3 = locSec3; _locKey = locKey; _locDesc = locDesc;
+            _tid = tid; _t = t; _locSec2 = locSec2; _locSec3 = locSec3; _locKey = locKey; _locDesc = locDesc;
             _locEnum = locEnum; _currentLanguageId = currentLanguageId; _langVer = langVer; _notifyT = notifyT;
         }
         public static string T(string zh, string en) { Func<string, string, string> f = _t; return f != null ? f(zh, en) : zh; }
+        // 稳定 ID 入口：语言包按 @id 索引；未注入时用内置文案。
+        public static string Tid(string id, string zh, string en) { Func<string, string, string, string> f = _tid; return f != null ? f(id, zh, en) : T(zh, en); }
         // 本地化注册：栏目 / 键名 / 描述 / 枚举值
         public static void LocSec(string sec, string zh) { Action<string, string> f = _locSec2; if (f != null) f(sec, zh); }
         public static void LocSec(string sec, string zh, string en) { Action<string, string, string> f = _locSec3; if (f != null) f(sec, zh, en); }
@@ -471,6 +474,15 @@ public static readonly List<RowFilterFn> RowFilters = new List<RowFilterFn>();
         }
         // 关机 / 卸载回调：ITweak 没有 Shutdown，功能可把撤销注册挂在这里；回调应幂等。
         public static void OnShutdown(string name, Action cleanup) { Action<string, Action> f = _shutdown; if (f != null) f(name, cleanup); }
+        // 反射取值统一走缓存门面；Override 登记同时进失效表。
+        public static void DeclareRef(string key) { RefCache.Declare(key); }
+        public static void InvalidateRefs() { RefCache.InvalidateAll(); }
+        public static FieldInfo Field(string typeName, string member) {
+            return RefCache.Field(typeName, member);
+        }
+        public static MethodInfo Method(string typeName, string member) {
+            return RefCache.Method(typeName, member);
+        }
         public static void Nav(string sec, int rank) { Action<string, int> f = _nav; if (f != null) f(sec, rank); }
         public static void NavHide(string sec) { Action<string> f = _navHide; if (f != null) f(sec); }
         public static void RegisterTick(string name, Action hook) { Action<string, Action> f = _tick; if (f != null) f(name, hook); }

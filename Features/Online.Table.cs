@@ -161,17 +161,17 @@ namespace SR_UCH.Tweaks {
             bool __shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             if (__shift && _tableMaxX > 0f) {
                 float beforeX = _scrollCols.x;
-                _scrollCols.x = Mathf.Clamp(_scrollCols.x - wheel * SRApi.Ctl.Sc(60), 0f, _tableMaxX);
-                return Mathf.Abs(_scrollCols.x - beforeX) > 0.01f;
+                _scrollCols.x = SRApi.Ctl.Scroll.Wheel(beforeX, wheel, _tableMaxX, SRApi.Ctl.Sc(60));
+                return SRApi.Ctl.Scroll.Changed(beforeX, _scrollCols.x);
             }
             float __maxY = _tableMaxY;
             if (__maxY <= 0f && _rowsHCache > 0f)
                 __maxY = _shownLobbies != null ? SRApi.Ctl.TableMaxScrollY(_shownLobbies.Count, SRApi.Ctl.TableRowH(), _rowsHCache) : 0f;
             if (__maxY <= 0f) return false;
             float before = _scrollRows.y;
-            _scrollRows.y = Mathf.Clamp(_scrollRows.y - wheel * SRApi.Ctl.Sc(56), 0f, __maxY);
+            _scrollRows.y = SRApi.Ctl.Scroll.Wheel(before, wheel, __maxY, SRApi.Ctl.Sc(56));
             _tableMaxY = __maxY;
-            return Mathf.Abs(_scrollRows.y - before) > 0.01f;
+            return SRApi.Ctl.Scroll.Changed(before, _scrollRows.y);
         } catch (Exception __ex) { SRApi.Guard.Log("联机列表/表格滚动", __ex); return false; }
     }
 
@@ -219,8 +219,8 @@ namespace SR_UCH.Tweaks {
             // maxY = 内容高 − 行区（不能 +rowH，多给一行会滚过表尾）。
             _tableMaxY = SRApi.Ctl.TableMaxScrollY(_shownLobbies.Count, rowH, rowsH);
             _rowsHCache = rowsH;
-            _scrollCols.x = Mathf.Clamp(_scrollCols.x, 0f, _tableMaxX);
-            _scrollRows.y = Mathf.Clamp(_scrollRows.y, 0f, _tableMaxY);
+            _scrollCols.x = SRApi.Ctl.Scroll.Clamp(_scrollCols.x, _tableMaxX);
+            _scrollRows.y = SRApi.Ctl.Scroll.Clamp(_scrollRows.y, _tableMaxY);
             if (e == null) return;
             if (e.type == EventType.Repaint) GUI.Box(box, GUIContent.none, SRApi.Ctl.Footer);
             DrawTableRows(box, headerH, rowH, stripW, rowsH, viewW, mp);
@@ -235,7 +235,7 @@ namespace SR_UCH.Tweaks {
         private static readonly Func<int, string[]> _rowCellsFn = delegate(int r) { return CellTexts(_shownLobbies[r]); };
 
         private static readonly Func<int, float> _rowAlphaFn = delegate(int r) { return IsJoinable(_shownLobbies[r]) ? 1f : 0.55f; };
-        private static readonly Func<string> _emptyHintFn = delegate { return SRApi.T("（没有符合筛选的房间）", "(no lobbies match the filters)"); };
+        private static readonly Func<string> _emptyHintFn = delegate { return SRApi.Tid("497a78f421", "（没有符合筛选的房间）", "(no lobbies match the filters)"); };
         private static readonly Action _joinDownReset = delegate { _joinDownRow = -1; };
         private static readonly Func<int, string> _tipFn = delegate (int ci) { return TipText(ci); };
         private static readonly Action<int> _clickFn = delegate (int ci) { HeaderClickOnce(ci); };
@@ -274,7 +274,6 @@ namespace SR_UCH.Tweaks {
             SRApi.TableDraw(_tableArgs);
             _joinHeaderPage = _tableArgs.pinHeader;
             if (_joinW > 0f) SRApi.DrawLine(new Rect(_joinXPage - 1f, box.y + headerH, 1f, rowsH), SRApi.TableLineStrong);   // 钉住列分隔线
-            // 竖向滚动条：几何/绘制/输入全部由核心按 TableArgs 计算（数据区右侧、钉住列之前）。
             _sbHandled = SRApi.Ctl.TableScrollbarFor(_tableArgs, Event.current, ref _sbDragging, ref _sbGrabY, ref _scrollRows.y);
         }
 
@@ -329,7 +328,7 @@ namespace SR_UCH.Tweaks {
             // 拖拽兜底复位：不用 Input.GetMouseButton（与 IMGUI 事件流不同步），改为超时无事件才复位。
             try {
                 SRApi.TableDragWatchdog(e, ref _dragWatchdog, ref _sbDragging, ref _tableArgs.moveCol, ref _tableArgs.moveDx, ref _tableArgs.dragCol, ref _dragH,
-                    SaveWidths, SaveTableH, delegate { _joinDownRow = -1; });
+                    SaveWidths, SaveTableH, _joinDownReset);
             } catch (Exception __ex) { SRApi.Guard.Log("联机表格输入处理", __ex); } // 兜底：表头拖拽 / 列宽 / 加入点击都在这里
             if (_sbHandled) return;   // 核心滚动条已处理本帧事件
             SRApi.TableWheelInput(e, box, mp, _tableMaxX, _tableMaxY, ref _scrollCols, ref _scrollRows);
@@ -366,7 +365,7 @@ namespace SR_UCH.Tweaks {
                     if (_hiddenCols.Contains(hitCol) && _hiddenCols.Count > _hiddenColsBeforeTable) {
                         SaveCols();
                         string nm = SRApi.T(Titles[hitCol], TitlesEn[hitCol]);
-                        string hiddenColMsg = SRApi.T("已隐藏列：", "Hidden column: ") + nm;
+                        string hiddenColMsg = SRApi.Tid("0a6818c24c", "已隐藏列：", "Hidden column: ") + nm;
                         Notes(hiddenColMsg, hiddenColMsg);
                     }
                     e.Use();   // 表头右键隐藏列由核心完成，这里只负责落盘/提示

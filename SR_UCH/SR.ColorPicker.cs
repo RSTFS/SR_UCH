@@ -132,7 +132,7 @@ public partial class SR {
                 Color c = s.Dirty ? Quant(PickerColor(s)) : ReadColor(e);
                 DrawFill(r, c);
                 Ring(r, new Color(1f, 1f, 1f, 0.35f));
-                string tip = T("点击打开/收起调色板", "click to open/close the color picker");
+                string tip = Tid("a3c05ff6c5", "点击打开/收起调色板", "click to open/close the color picker");
                 if (!GUI.Button(r, new GUIContent("", tip), GUIStyle.none)) return false;
                 // 独立浮层：点色块打开窗口（不再在页面内展开面板，避免挤动布局与滚动）。
                 if (FloatOpen && ReferenceEquals(OpenEntry, e)) { CloseFloat(e, s); return true; }
@@ -141,14 +141,13 @@ public partial class SR {
             } catch (Exception __ex) { Guard.Log("颜色色块", __ex); return false; }
         }
 
-        public static void Panel(ConfigEntryBase e) {
-            // 页面内不再内联展开：调色板改为独立浮层（DrawFloat），这里保持空实现以兼容旧调用。
-        }
-
         // 打开/关闭独立浮层窗口。
         // 当前展开的条目（供浮层分部读取，避免跨文件直接访问私有字段）。
         internal static ConfigEntryBase OpenEntry { get { return _open; } }
         internal static void ClearOpenEntry() { _open = null; }
+        // 页面内不再内联展开：调色板改为独立浮层（DrawFloat），这里保持空实现以兼容旧调用。
+        public static void Panel(ConfigEntryBase e) { }
+
 
         private static void OpenFloat(ConfigEntryBase e, State s) {
             try {
@@ -276,7 +275,6 @@ public partial class SR {
                 State s;
                 if (_open == null || !_states.TryGetValue(_open, out s)) return;
                 // 拖动中丢失 MouseUp（指针移出窗口或事件被吃掉）会让 Dirty 永久留着、预览永不落盘。
-                // 只要鼠标已完全松开就补一次提交，这条必须在"8 帧内跳过"之前。
                 try {
                     if (s.Dirty && !Input.GetMouseButton(0) && !Input.GetMouseButton(1)) Commit(_open, s);
                 } catch (Exception __dm) { Guard.Log("颜色兜底提交", __dm); }
@@ -373,7 +371,7 @@ public partial class SR {
             try {
                 // 浮层已有标题栏时不重复画标题。
                 if (!FloatOpen) {
-                    try { GUILayout.Label(T("调色板", "Palette"), Ctl.SecHeader); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                    try { GUILayout.Label(Tid("29676954ea", "调色板", "Palette"), Ctl.SecHeader); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 }
                 DrawHeader(e, s, pw);
                 GUILayout.Space(Sc(6f));
@@ -399,10 +397,10 @@ public partial class SR {
                     try {
                         DrawPaletteGrid(e, s, rightW);
                         GUILayout.Space(Sc(4f));
-                        float labelW = LabelCol(T("色相", "Hue"), T("饱和", "Sat"), T("明度", "Val"), "Hex");
-                        DrawHsvRow(e, s, T("色相", "Hue"), 0, 0f, 360f, rightW, labelW);
-                        DrawHsvRow(e, s, T("饱和", "Sat"), 1, 0f, 100f, rightW, labelW);
-                        DrawHsvRow(e, s, T("明度", "Val"), 2, 0f, 100f, rightW, labelW);
+                        float labelW = LabelCol(Tid("83899acc46", "色相", "Hue"), Tid("9f5db32aa2", "饱和", "Sat"), Tid("a4eead9edf", "明度", "Val"), "Hex");
+                        DrawHsvRow(e, s, Tid("83899acc46", "色相", "Hue"), 0, 0f, 360f, rightW, labelW);
+                        DrawHsvRow(e, s, Tid("9f5db32aa2", "饱和", "Sat"), 1, 0f, 100f, rightW, labelW);
+                        DrawHsvRow(e, s, Tid("a4eead9edf", "明度", "Val"), 2, 0f, 100f, rightW, labelW);
                         GUILayout.Space(Sc(4f));
                         DrawRgbRow(e, s, rightW);
                         DrawHexRow(e, s, rightW, labelW);
@@ -473,7 +471,7 @@ public partial class SR {
             DrawFill(m, Color.white);
             Ring(m, Color.black);
             HandleSvInput(e, s, r);
-            HoverTip(r, T("拖动选择饱和度与明度；松开写入配置", "drag to pick saturation/value; release to apply"));
+            HoverTip(r, Tid("77ad1fc58d", "拖动选择饱和度与明度；松开写入配置", "drag to pick saturation/value; release to apply"));
         }
 
         // 竖向色相条：顶部 0°、底部 360°，点击 / 拖动立刻更新预览。
@@ -491,7 +489,7 @@ public partial class SR {
             DrawFill(new Rect(r.x, markerY, r.width, Sc(2f)), Color.white);
             DrawFill(new Rect(r.x, markerY, r.width, Sc(1f)), new Color(0f, 0f, 0f, 0.85f));
             HandleHueInput(e, s, r);
-            HoverTip(r, T("拖动选择色相；松开写入配置", "drag to pick hue; release to apply"));
+            HoverTip(r, Tid("10f9db7e32", "拖动选择色相；松开写入配置", "drag to pick hue; release to apply"));
         }
 
         private static void HandleSvInput(ConfigEntryBase e, State s, Rect r) {
@@ -652,7 +650,7 @@ public partial class SR {
         // Hex 输入：#RRGGBB；非法时实时红框，回车 / 失焦回退为当前色。
         private static void DrawHexRow(ConfigEntryBase e, State s, float pw, float labelW) {
             float rowH = Ctl.ControlH();
-            float hintW = Mathf.Max(Sc(56f), TextW(T("回车应用", "Enter to apply"), Ctl.Label) + Sc(8f));
+            float hintW = Mathf.Max(Sc(56f), TextW(Tid("4a9710c486", "回车应用", "Enter to apply"), Ctl.Label) + Sc(8f));
             float fieldW = Mathf.Max(Sc(48f), pw - labelW - hintW - Sc(12f));
             GUILayout.BeginHorizontal();
             try {
@@ -663,7 +661,7 @@ public partial class SR {
                 Rect fr = GUILayoutUtility.GetLastRect();
                 Color probe;
                 if (!SRApi.ColorHex.ParseHex(s.HexEdit, out probe)) Ring(fr, new Color(0.9f, 0.25f, 0.2f, 0.9f));
-                GUILayout.Label(T("回车应用", "Enter to apply"), Ctl.Label, GUILayout.Width(hintW), GUILayout.Height(rowH));
+                GUILayout.Label(Tid("4a9710c486", "回车应用", "Enter to apply"), Ctl.Label, GUILayout.Width(hintW), GUILayout.Height(rowH));
             } catch (Exception __ex) { Guard.Log("调色板 Hex", __ex); }
             GUILayout.EndHorizontal();
             if (!string.Equals(s.HexEdit, SRApi.ColorHex.ToHex(PickerColor(s)))) s.TextPending = true;

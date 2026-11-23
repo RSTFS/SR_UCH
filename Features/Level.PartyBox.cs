@@ -13,56 +13,53 @@ public partial class Level {
 
         public static void RenderPartyBox() {
         // 分区：道具（自动道具 → 延迟 → 跳过炸弹 → 放弃道具）
-        SRApi.Ctl.SectionTitle(SRApi.T("道具", "Items"),
-            SRApi.T("道具：开箱自动选择，以及放弃道具。",
-                    "Items: auto-pick one when the box opens, plus the game's native drop-piece key."));
+        SRApi.Ctl.SectionTitle(SRApi.Tid("6fbf85dd33", "道具", "Items"),
+            SRApi.Tid("dfac712ee7", "道具：开箱自动选择，以及放弃道具。", "Items: auto-pick one when the box opens, plus the game's native drop-piece key."));
         float __itemCol = Mathf.Max(SRApi.Ctl.Sc(180), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(240));
         ConfigEntryBase __autoEntry = SRApi.Ctl.FindEntry("Level", "Auto Party Item");
         GUILayout.Space(SRApi.Ctl.Sc(4));
-        if (__autoEntry != null) SRApi.Ctl.LabeledRow(SRApi.T("自动道具", "Auto party item"),
-            SRApi.T("开箱后自动随机挑一个\n与手动挑选同一条链路，服务端发放\n关闭则不自动挑", "Picks a random piece when the box opens\nSame path as picking by hand; the server hands it over\nOff = no auto pick"), __autoEntry, 120f);
+        if (__autoEntry != null) SRApi.Ctl.LabeledRow(SRApi.Tid("e60484bbc2", "自动道具", "Auto party item"),
+            SRApi.Tid("c93dcb2b6f", "开箱后自动随机挑一个\n与手动挑选同一条链路，服务端发放\n关闭则不自动挑", "Picks a random piece when the box opens\nSame path as picking by hand; the server hands it over\nOff = no auto pick"), __autoEntry, 120f);
 
         ConfigEntryBase __dl = SRApi.Ctl.FindEntry("Level", "Auto Party Item Delay");
         if (__dl != null)
-            SRApi.Ctl.RowSlider(SRApi.T("自动道具延迟", "Auto item delay"),
-                SRApi.T("开箱后等多久再自动挑\n范围 0-3 秒，步进 0.1",
-                        "how long to wait before picking\n0-3 seconds in 0.1 steps"),
+            SRApi.Ctl.RowSlider(SRApi.Tid("ae84f6ae12", "自动道具延迟", "Auto item delay"),
+                SRApi.Tid("7d6c889e5f", "开箱后等多久再自动挑\n范围 0-3 秒，步进 0.1", "how long to wait before picking\n0-3 seconds in 0.1 steps"),
                 __dl, 0f, 3f, "0.0");
         ConfigEntryBase __skip = SRApi.Ctl.FindEntry("Level", "Auto Party Item Skip Bomb");
         GUILayout.Space(SRApi.Ctl.Sc(4));
-        if (__skip != null) SRApi.Ctl.LabeledRow(SRApi.T("跳过炸弹", "Skip bombs"),
-            SRApi.T("自动挑道具时排除派对盒里的炸弹\n关闭后炸弹也可能被自动挑中\n只影响自动挑选", "Exclude party-box bombs when auto picking\nWhen off a bomb may be picked\nAuto pick only"), __skip, 120f);
+        if (__skip != null) SRApi.Ctl.LabeledRow(SRApi.Tid("67dc3f299f", "跳过炸弹", "Skip bombs"),
+            SRApi.Tid("4a0dc6301a", "自动挑道具时排除派对盒里的炸弹\n关闭后炸弹也可能被自动挑中\n只影响自动挑选", "Exclude party-box bombs when auto picking\nWhen off a bomb may be picked\nAuto pick only"), __skip, 120f);
         ConfigEntryBase __drop = SRApi.Ctl.FindEntry("Level", "Drop Held Piece");
         GUILayout.Space(SRApi.Ctl.Sc(4));
-        if (__drop != null) SRApi.Ctl.LabeledRow(SRApi.T("放弃道具", "Drop held piece"),
-            SRApi.T("派对阶段丢弃手上的道具\n请勿删除边界墙和出生方块，一经删除无法复原\n仅派对阶段、走游戏原生通道", "Discards the held piece during the pick phase\nDo not delete boundary walls or spawn blocks; they cannot be restored\nPick phase only, uses the game channel"), __drop, 120f);
+        if (__drop != null) SRApi.Ctl.LabeledRow(SRApi.Tid("7ada60f959", "放弃道具", "Drop held piece"),
+            SRApi.Tid("223cdfd7d1", "派对阶段丢弃手上的道具\n请勿删除边界墙和出生方块，一经删除无法复原\n仅派对阶段、走游戏原生通道", "Discards the held piece during the pick phase\nDo not delete boundary walls or spawn blocks; they cannot be restored\nPick phase only, uses the game channel"), __drop, 120f);
 
         // 派对盒炸弹：对局内所有成员都发过炸弹！快捷短语才生成。
-        SRApi.Ctl.SectionTitle(SRApi.T("派对盒子炸弹", "Party-box bomb"));
+        SRApi.Ctl.SectionTitle(SRApi.Tid("e2dd43a39f", "派对盒子炸弹", "Party-box bomb"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase pbe = SRApi.Ctl.FindEntry("Level", "Party Bomb"); // Bind 在 Level 段
-        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("派对盒子炸弹", "Party-box bomb"), SRApi.T("房主开启后，对局内所有成员都发过炸弹！快捷短语时，往当前派对盒子塞入炸弹。", "Host on: when every member sends the Bomb quick-phrase, spawn a bomb in the current party box.")), pbe, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(40));
+        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.Tid("e2dd43a39f", "派对盒子炸弹", "Party-box bomb"), SRApi.Tid("9f3d60de4b", "房主开启后，对局内所有成员都发过炸弹！快捷短语时，往当前派对盒子塞入炸弹。", "Host on: when every member sends the Bomb quick-phrase, spawn a bomb in the current party box.")), pbe, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(40));
         if (pbe != null) SRApi.Ctl.RenderControl(pbe);
         GUILayout.Space(SRApi.Ctl.Sc(10));
         // RowCombo 自带标签列，无需另画标签（否则会重复）。
         ConfigEntryBase pbtype = SRApi.Ctl.FindEntry("Level", "Party Bomb Type");
         if (pbtype != null) {
-            string[] opts = new[] { SRApi.T("小炸弹", "Small"), SRApi.T("大炸弹", "Big"), SRApi.T("超级炸弹", "Mega") };
+            string[] opts = new[] { SRApi.Tid("1ca0cd63ca", "小炸弹", "Small"), SRApi.Tid("77b64e4ac0", "大炸弹", "Big"), SRApi.Tid("4ba40007f7", "超级炸弹", "Mega") };
             string[] vals = new[] { "0", "1", "2" };
-            SRApi.Ctl.RowCombo(SRApi.T("炸弹种类", "Bomb type"),
-                SRApi.T("塞进派对盒的是哪种炸弹\n小 / 大 / 超级，对应不同的爆炸范围",
-                        "which bomb goes into the party box\nsmall / big / mega, each with a different blast"),
+            SRApi.Ctl.RowCombo(SRApi.Tid("d902fac458", "炸弹种类", "Bomb type"),
+                SRApi.Tid("174677a16e", "塞进派对盒的是哪种炸弹\n小 / 大 / 超级，对应不同的爆炸范围", "which bomb goes into the party box\nsmall / big / mega, each with a different blast"),
                 pbtype, vals, opts, SRApi.Ctl.Sc(150));
         }
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(2));
 
-        SRApi.Ctl.SectionTitle(SRApi.T("派对盒（重抽 / 开箱 / 关闭）", "Party box"));
+        SRApi.Ctl.SectionTitle(SRApi.Tid("5912bde55a", "派对盒（重抽 / 开箱 / 关闭）", "Party box"));
         GUILayout.BeginHorizontal();
-        if (SRApi.Ctl.HotkeyActionButton(SRApi.T("刷新派对盒", "Reroll + reopen box"), SRApi.T("完整重走一遍游戏自己的派对盒流程：按本轮权重重抽道具 + 重新开箱（全员可再选一次）", "Run the game own party-box flow again: reroll with this round weights and reopen the box so everyone can pick again"), LevelPartyBox.RefreshPartyBoxKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBox();
+        if (SRApi.Ctl.HotkeyActionButton(SRApi.Tid("7e84b60137", "刷新派对盒", "Reroll + reopen box"), SRApi.Tid("3bb6f53c55", "完整重走一遍游戏自己的派对盒流程：按本轮权重重抽道具 + 重新开箱（全员可再选一次）", "Run the game own party-box flow again: reroll with this round weights and reopen the box so everyone can pick again"), LevelPartyBox.RefreshPartyBoxKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.RefreshPartyBox();
         GUILayout.Space(SRApi.Ctl.Sc(8));
-        if (SRApi.Ctl.HotkeyActionButton(SRApi.T("关闭派对盒", "Close party box"), SRApi.T("结束派对盒选择，进入游玩阶段（走游戏原生相位切换，全员同步）", "End the party-box selection and enter the play phase (native phase change, synced)"), LevelPartyBox.ClosePartyBoxKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.ClosePartyBox();
+        if (SRApi.Ctl.HotkeyActionButton(SRApi.Tid("ca7d265142", "关闭派对盒", "Close party box"), SRApi.Tid("582d674546", "结束派对盒选择，进入游玩阶段（走游戏原生相位切换，全员同步）", "End the party-box selection and enter the play phase (native phase change, synced)"), LevelPartyBox.ClosePartyBoxKeyEntry, SRApi.Ctl.Sc(150), true)) LevelPartyBox.ClosePartyBox();
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(4));

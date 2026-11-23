@@ -1,0 +1,8 @@
+<Project>
+  <!-- 全仓统一编译属性；各项目自定目标框架与语言版本，本文件不改它们。 -->
+  <PropertyGroup>
+    <Deterministic>true</Deterministic>
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+</Project>

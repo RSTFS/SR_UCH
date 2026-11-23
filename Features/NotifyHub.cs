@@ -17,10 +17,9 @@ using BepInEx.Configuration;
 using UnityEngine;
 
 namespace SR_UCH.Tweaks {
-    [SrFeature("sr.notifyhub", "通知中心", "1.0", Provides = new string[] { SRApi.SlotKeys.NotifyHook })]
+    [SrFeature("sr.notifyhub", "通知中心", "1.0")]
     public class NotifyHub : ITweak {
         private const string Sec = "通知中心";
-        private const string HookSlot = SRApi.SlotKeys.NotifyHook;
 
         // 2 高（要动手 / 出错） 1 中（一般反馈） 0 低（纯确认）
         private static readonly string[] HighWords = {
@@ -29,7 +28,7 @@ namespace SR_UCH.Tweaks {
         };
         private static readonly string[] LowWords = {
             "已复制", "已写入日志", "已保存", "已还原", "已清空", "已开始",
-            "copied", "written to log", "saved", "restored", "cleared"
+            "copied", "written to log", "saved", "restored", "cleared", "started"
         };
 
         private sealed class Notice {
@@ -71,57 +70,33 @@ namespace SR_UCH.Tweaks {
         private static GUIStyle _label, _btn, _sym;
         private static HubUI _ui;
 
-        // 自己 Provide 的委托实例：注销时按值匹配。
-        private static readonly System.Collections.Generic.Dictionary<string, object> _provided =
-            new System.Collections.Generic.Dictionary<string, object>();
-
         // ============ 生命周期 ============
 
         private static bool _uiReg;
 
         // 配置行走"标签 + 控件"，否则 LocKey / LocDesc 不会被消费；列宽固定 180 设计像素。
-        private static void CfgRow(ConfigEntryBase e) {
-            SRApi.Ctl.DrawEntryRow(e);
-        }
 
         // 显示名与悬浮说明必须登记。
         private static void RegUi() {
-            SRApi.LocKey(Sec, "Enabled", "启用通知中心", "Enable notification hub");
-            SRApi.LocDesc(Sec, "Enabled",
-                "启用通知中心\n统一接管所有屏幕提示：分级、合并、排队。",
-                "Enable notification hub\nTake over all screen toasts: priority, merging and queueing.");
-            SRApi.LocKey(Sec, "Max Visible", "同时显示条数", "Max visible");
-            SRApi.LocDesc(Sec, "Max Visible",
-                "同时显示条数\n浮层最多同时显示几条（1-6）。",
-                "Max visible\nHow many toasts show at once. Range 1-6.");
-            SRApi.LocKey(Sec, "Toast Seconds", "停留秒数", "Toast seconds");
-            SRApi.LocDesc(Sec, "Toast Seconds",
-                "停留秒数\n每条通知停留多长时间。\n按 0.5 秒为一档。",
-                "Toast seconds\nHow long each toast stays.\n0.5 s per step.");
-            SRApi.LocKey(Sec, "Font Size", "文字大小", "Font size");
-            SRApi.LocDesc(Sec, "Font Size",
-                "文字大小\n正文文字的大小。\n越大越容易看清，但同样内容占的空间更多。",
-                "Font size\nSize of the toast text.\nLarger is easier to read but takes more room.");
-            SRApi.LocKey(Sec, "Card Width", "卡片宽度", "Card width");
-            SRApi.LocDesc(Sec, "Card Width",
-                "卡片宽度\n浮层卡片的像素宽度。\n越宽可容纳的正文越多。",
-                "Card width\nOverlay card width in pixels.\nWider cards fit more text.");
-            SRApi.LocKey(Sec, "Card Scale", "浮层缩放", "Overlay scale");
-            SRApi.LocDesc(Sec, "Card Scale",
-                "浮层缩放\n整个浮层按百分比缩放。\n百分比越大卡片越大。",
-                "Overlay scale\nScale the whole overlay in percent.\nLarger values give larger cards.");
-            SRApi.LocKey(Sec, "Card Opacity", "卡片不透明度", "Card opacity");
-            SRApi.LocDesc(Sec, "Card Opacity",
-                "卡片不透明度\n浮层卡片背景的不透明程度。",
-                "Card opacity\nBackground opacity of overlay cards.");
-            SRApi.LocKey(Sec, "Opacity Default 72", "不透明度默认值迁移", "Opacity default migration");
-            SRApi.LocDesc(Sec, "Opacity Default 72",
+            TweakCfg.Entry(Sec, "Enabled", "启用通知中心", "Enable notification hub",
+                "启用通知中心\n统一接管所有屏幕提示：分级、合并、排队", "Enable notification hub\nTake over all screen toasts: priority, merging and queueing");
+            TweakCfg.Entry(Sec, "Max Visible", "同时显示条数", "Max visible",
+                "同时显示条数\n浮层最多同时显示几条（1-6）。", "Max visible\nHow many toasts show at once. Range 1-6.");
+            TweakCfg.Entry(Sec, "Toast Seconds", "停留秒数", "Toast seconds",
+                "停留秒数\n每条通知停留多长时间。\n按 0.5 秒为一档。", "Toast seconds\nHow long each toast stays.\n0.5 s per step.");
+            TweakCfg.Entry(Sec, "Font Size", "文字大小", "Font size",
+                "文字大小\n正文文字的大小。\n越大越容易看清，但同样内容占的空间更多。", "Font size\nSize of the toast text.\nLarger is easier to read but takes more room.");
+            TweakCfg.Entry(Sec, "Card Width", "卡片宽度", "Card width",
+                "卡片宽度\n浮层卡片的像素宽度。\n越宽可容纳的正文越多。", "Card width\nOverlay card width in pixels.\nWider cards fit more text.");
+            TweakCfg.Entry(Sec, "Card Scale", "浮层缩放", "Overlay scale",
+                "浮层缩放\n整个浮层按百分比缩放。\n百分比越大卡片越大。", "Overlay scale\nScale the whole overlay in percent.\nLarger values give larger cards.");
+            TweakCfg.Entry(Sec, "Card Opacity", "卡片不透明度", "Card opacity",
+                "卡片不透明度\n浮层卡片背景的不透明程度。", "Card opacity\nBackground opacity of overlay cards.");
+            TweakCfg.Entry(Sec, "Opacity Default 72", "不透明度默认值迁移", "Opacity default migration",
                 "内部标记：卡片不透明度默认值迁移\n从旧默认 64 改成 72 后置真\n用户手动改过的不透明度不会被动",
                 "internal marker for the card-opacity default migration\nset once the old default 64 has been moved to 72\nmanually chosen opacity is left untouched");
-            SRApi.LocKey(Sec, "Corner", "停靠位置", "Overlay position");
-            SRApi.LocDesc(Sec, "Corner",
-                "浮层停靠角\n浮层停靠位置：0 右下 / 1 右上 / 2 左下 / 3 左上。",
-                "Overlay corner\n0 bottom-right / 1 top-right / 2 bottom-left / 3 top-left.");
+            TweakCfg.Entry(Sec, "Corner", "停靠位置", "Overlay position",
+                "浮层停靠角\n浮层停靠位置：0 右下 / 1 右上 / 2 左下 / 3 左上。", "Overlay corner\n0 bottom-right / 1 top-right / 2 bottom-left / 3 top-left.");
             if (!_uiReg) { _uiReg = true; SRApi.RowSliders.Add(UiSlider); }
         }
 
@@ -145,7 +120,6 @@ namespace SR_UCH.Tweaks {
 
         public void Initialize(IFeatureHost plugin) {
             _enabled = plugin.Config.Bind(Sec, "Enabled", true, "统一接管所有屏幕提示：分级、合并、排队。");
-            // 旧配置项已删除：启动时从 cfg 清理。
             try { SRApi.Migration.Remove(Sec, "Use Native Toast"); } catch (Exception __mr) { SRApi.Guard.Log("通知中心/清理旧键1", __mr); }
             try { SRApi.Migration.Remove(Sec, "Show On Screen"); } catch (Exception __mr2) { SRApi.Guard.Log("通知中心/清理旧键2", __mr2); }
             _maxVisible = plugin.Config.Bind(Sec, "Max Visible", 3,
@@ -186,9 +160,11 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterPage(Sec, "HubOptions", "通知设置", "Settings", 20, RenderOptionsPage);
             SRApi.RegisterTick("通知中心-绑定与过期", Tick);
             // 关掉时清空待显示队列，否则重新打开会弹旧消息。
-            _enabled.SettingChanged += (s2, e2) => { if (!_enabled.Value) ClearPending(); };
+            System.EventHandler __h__enabled_1 = (s2, e2) => { if (!_enabled.Value) ClearPending(); };
+            _enabled.SettingChanged += __h__enabled_1;
+            Sub.Revoke(() => _enabled.SettingChanged -= __h__enabled_1);
             // 停留秒数按 0.5 步进（防递归用标志位）。
-            _toastSeconds.SettingChanged += (s2, e2) => {
+            System.EventHandler __h__toastSeconds_2 = (s2, e2) => {
                 if (_toastFixing) return;
                 try {
                     float v = Mathf.Clamp(_toastSeconds.Value, 0.5f, 5f);
@@ -196,13 +172,15 @@ namespace SR_UCH.Tweaks {
                     if (Mathf.Abs(r - v) > 0.001f) { _toastFixing = true; _toastSeconds.Value = r; _toastFixing = false; }
                 } catch (Exception __ts) { SRApi.Guard.Log("通知中心/停留步进", __ts); }
             };
+            _toastSeconds.SettingChanged += __h__toastSeconds_2;
+            Sub.Revoke(() => _toastSeconds.SettingChanged -= __h__toastSeconds_2);
 
             // 核心 NotifyImpl 惰性查这个名字。
-            Func<string, string, bool> __hook = (t, g) => OnNotify(t, g); _provided[HookSlot] = __hook; Slots.Provide(HookSlot, __hook);
+            Func<string, string, bool> __hook = (t, g) => OnNotify(t, g);
+            SrCaps.NotifyHook = __hook;
             // 新钩子带级别 / 动作（NotifyEx）；旧钩子给普通 Notify。
             SRApi.NotifyExFn __hook2 = delegate (SRApi.NotifyArgs a) { return OnNotifyEx(a); };
-            _provided[SRApi.SlotKeys.NotifyHub2] = __hook2;   // 关机时需一并 Retract
-            Slots.Provide(SRApi.SlotKeys.NotifyHub2, __hook2);
+            SrCaps.NotifyHub2 = __hook2;   // 关机时清空
 
             SRApi.OnShutdown("通知中心", Shutdown);
             if (_ui == null) {
@@ -212,13 +190,10 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        // 关机入口：注销槽位、销毁自建对象；槽位须传自己的委托。
+        // 关机入口：清空能力容器、销毁自建对象。
         public void Shutdown() {
-            foreach (System.Collections.Generic.KeyValuePair<string, object> kv in _provided) {
-                try { if (kv.Value != null) Slots.Retract(kv.Key, kv.Value); }
-                catch (Exception __rt) { SRApi.Guard.Log("通知中心/注销槽位", __rt); }
-            }
-            _provided.Clear();
+            SrCaps.NotifyHook = null;
+            SrCaps.NotifyHub2 = null;
             if (_ui != null) { try { UnityEngine.Object.Destroy(_ui.gameObject); } catch (Exception ex) { SRApi.Guard.Log("通知中心/销毁对象", ex); } _ui = null; }
             if (_white != null) { try { UnityEngine.Object.Destroy(_white); } catch (Exception ex) { SRApi.Guard.Log("通知中心/销毁贴图", ex); } _white = null; }
         }
@@ -293,19 +268,16 @@ namespace SR_UCH.Tweaks {
                     if (action != null) merged.Action = action;
                     merged.At = now;
                     merged.Stay = stay;
-                    // 合并可能把条目升级到更高优先级：必须重排，否则它仍排在队尾、不会立刻上屏。
-                    int __prevLevel = merged.Level;
                     merged.Level = Mathf.Max(merged.Level, level);
-                    bool __levelRaised = merged.Level != __prevLevel;
                     // 已不在队列：重新排队，避免再次出现时被合并掉。
                     bool queued = false;
                     for (int vi = 0; vi < _visible.Count; vi++) if (_visible[vi].Key == key) { queued = true; break; }
-                    if (__levelRaised) SortTrim();   // 优先级变了就立刻重排
                     if (queued) {
                         bool wasDying = merged.DyingAt > 0f;
                         merged.DyingAt = 0f;
                         merged.ShownAt = now;      // 已在屏上：续满停留时间，不重播入场动画
                         if (wasDying) merged.EnterAt = 0f;   // 退场中被续期：重新淡入
+                        SortTrim();   // 合并可能升级优先级，重排后才立刻上屏
                     } else {
                         merged.ShownAt = 0f;       // 重新排队：等轮到它再开始计时
                         merged.EnterAt = 0f;
@@ -433,7 +405,7 @@ namespace SR_UCH.Tweaks {
             Color prevColor = GUI.color;
             _hoverAny = false;   // 本趟重新判定；鼠标不在任何卡片上时 Tick 恢复正常倒计时
             try {
-                GUI.depth = 3;   // 比局内简报(2) 更靠上；finally 还原，不污染全局
+                GUI.depth = (int)UiLayer.Toast;   // 浮层置顶；finally 还原，不污染全局
                 float target = yStart;
                 for (int i = 0; i < n; i++) {
                     if (!draw[i]) continue;
@@ -530,21 +502,21 @@ namespace SR_UCH.Tweaks {
         // ============ 设置页 ============
 
         private void RenderOptionsPage() {
-            CfgRow(_enabled);
+            TweakCfg.Row(_enabled);
             // 功能关闭时下面的设置仍然可调（下列控件不依赖运行期状态）。
-            CfgRow(_maxVisible);
-            CfgRow(_toastSeconds);
-            CfgRow(_cardScale);
-            CfgRow(_cardW);
-            CfgRow(_fontSize);
-            CfgRow(_cardAlpha);
+            TweakCfg.Row(_maxVisible);
+            TweakCfg.Row(_toastSeconds);
+            TweakCfg.Row(_cardScale);
+            TweakCfg.Row(_cardW);
+            TweakCfg.Row(_fontSize);
+            TweakCfg.Row(_cardAlpha);
             {
                 string[] vals = new string[] { "0", "1", "2", "3" };
                 string[] labels = new string[] {
-                    SRApi.T("右下", "bottom-right"), SRApi.T("右上", "top-right"),
-                    SRApi.T("左下", "bottom-left"), SRApi.T("左上", "top-left") };
-                SRApi.Ctl.RowCombo(SRApi.T("位置", "Position"),
-                    SRApi.T("通知浮层停在屏幕的哪个角。", "Which screen corner the toasts dock to."),
+                    SRApi.Tid("4028d15252", "右下", "bottom-right"), SRApi.Tid("26ee260811", "右上", "top-right"),
+                    SRApi.Tid("8b8a493019", "左下", "bottom-left"), SRApi.Tid("bd66071f00", "左上", "top-left") };
+                SRApi.Ctl.RowCombo(SRApi.Tid("d6522957dc", "位置", "Position"),
+                    SRApi.Tid("e58ca5a56a", "通知浮层停在屏幕的哪个角。", "Which screen corner the toasts dock to."),
                     _corner, vals, labels, SRApi.Ctl.Sc(140f));
             }
 

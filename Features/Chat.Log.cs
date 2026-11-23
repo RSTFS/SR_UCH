@@ -107,10 +107,10 @@ public partial class Chat : ITweak {
             SRApi.RegisterPage("Chat", "ChatLog", "对话内容", "ChatLog", 20, Render); // 会话栏目第 2 页
             // 顶部工具行与底部输入行须画在滚动区之外（不随内容滚动），故注册为页面外框部件。
             SRApi.RegisterPageChrome("Chat", RenderToolbar, RenderInputRow);
-            SRApi.LocKey("Chat", "Filter Quick Msgs", "过滤快捷消息", null);
-            SRApi.LocDesc("Chat", "Filter Quick Msgs", "快捷消息过滤\n记录里隐藏表情与预设消息\n只影响本模组记录页", "Quick message filter\nhides emotes and preset messages from the log\nthis mod's log page only");
-            SRApi.LocKey("Chat", "Show Time", "显示时间", null);
-            SRApi.LocDesc("Chat", "Show Time", "时间戳\n每条记录前显示时间\n只影响本模组记录页", "Timestamps\nshows the time before each message\nthis mod's log page only");
+            TweakCfg.Entry("Chat", "Filter Quick Msgs", "过滤快捷消息", null,
+                "快捷消息过滤\n记录里隐藏表情与预设消息\n只影响本模组记录页", "Quick message filter\nhides emotes and preset messages from the log\nthis mod's log page only");
+            TweakCfg.Entry("Chat", "Show Time", "显示时间", null,
+                "时间戳\n每条记录前显示时间\n只影响本模组记录页", "Timestamps\nshows the time before each message\nthis mod's log page only");
             SRApi.HotkeyAction("chat.clear", "清空", () => { Clear(); _chatTextCache = null; _chatBuilt = false; });
             SRApi.HotkeyAction("chat.copy", "复制", () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (System.Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); } });
             SRApi.HotkeyAction("chat.send", "发送", () => { SendChatText(_chatInputText); _chatInputText = ""; });
@@ -154,10 +154,10 @@ public partial class Chat : ITweak {
             }
             if (entries.Count == 0) {
                 ChatFollowReset(); // 无内容：回到跟随态
-                GUILayout.Label(SRApi.T("（暂无消息）", "(no messages)"), SRApi.Ctl.Label);
+                GUILayout.Label(SRApi.Tid("aaf9b4ced4", "（暂无消息）", "(no messages)"), SRApi.Ctl.Label);
             } else if (string.IsNullOrEmpty(_chatTextCache)) {
                 ChatFollowReset(); // 全部被过滤：没有可滚动内容
-                GUILayout.Label(SRApi.T("（已过滤全部消息）", "(all messages filtered)"), SRApi.Ctl.Label);
+                GUILayout.Label(SRApi.Tid("ad700c971d", "（已过滤全部消息）", "(all messages filtered)"), SRApi.Ctl.Label);
             } else {
                 float w = Mathf.Max(SRApi.Ctl.Sc(140), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(36));
                 float innerW = w - SRApi.Ctl.Sc(20);
@@ -261,7 +261,7 @@ public partial class Chat : ITweak {
             _hintRowH = h + SRApi.Ctl.Sc(4);
             GUILayout.Space(SRApi.Ctl.Sc(4));
             GUILayout.BeginHorizontal();
-            string hint = SRApi.T("有新消息 ↓ 点击跳到底部", "New messages ↓ click to jump to the bottom");
+            string hint = SRApi.Tid("65c6e60eb9", "有新消息 ↓ 点击跳到底部", "New messages ↓ click to jump to the bottom");
             if (_newCount > 1) hint += " (" + _newCount + ")";
             if (GUILayout.Button(hint, SRApi.Ctl.Btn, GUILayout.Height(h))) {
                 _autoScroll = true;
@@ -275,7 +275,7 @@ public partial class Chat : ITweak {
             if (SRApi.SelectedPageId("Chat") != "ChatLog") return; //顶栏只属于对话内容页
             GUILayout.BeginHorizontal();
             //清空（可右键绑定快捷键）
-            if (SRApi.Ctl.HotkeyButton("chat.clear", SRApi.T("清空", "Clear"), SRApi.T("清空聊天记录", "Clear the chat log"),
+            if (SRApi.Ctl.HotkeyButton("chat.clear", SRApi.Tid("c69ad09e1c", "清空", "Clear"), SRApi.Tid("40e4020cd3", "清空聊天记录", "Clear the chat log"),
                 () => { Clear(); _chatTextCache = null; _chatBuilt = false; },
                 SRApi.Ctl.Sc(56), SRApi.Ctl.Sc(26))) {
                 Clear();
@@ -283,18 +283,18 @@ public partial class Chat : ITweak {
                 _chatBuilt = false; // 强制重建，不等下一个计时点
             }
             GUILayout.Space(SRApi.Ctl.Sc(4));
-            if (SRApi.Ctl.HotkeyButton("chat.copy", SRApi.T("复制", "Copy"),
-                SRApi.T("把当前显示的聊天记录复制到剪贴板（游戏里没有文本选择功能，用这个代替）", "Copy the currently shown chat log to the clipboard"),
+            if (SRApi.Ctl.HotkeyButton("chat.copy", SRApi.Tid("51b2bc4bd0", "复制", "Copy"),
+                SRApi.Tid("203265da27", "把当前显示的聊天记录复制到剪贴板（游戏里没有文本选择功能，用这个代替）", "Copy the currently shown chat log to the clipboard"),
                 () => { try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); } },
                 SRApi.Ctl.Sc(56), SRApi.Ctl.Sc(26))) {
                 try { GUIUtility.systemCopyBuffer = BuildChatText(Entries) ?? ""; } catch (Exception __ex) { SRApi.Guard.Log("复制聊天记录", __ex); }
             }
             GUILayout.Space(SRApi.Ctl.Sc(8));
-            SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("过滤快捷消息", "Hide quick msgs"), SRApi.T("过滤快捷消息（表情/预设消息不显示）", "Hide quick msgs (emotes/presets)")),
+            SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.Tid("b3b95ab4d7", "过滤快捷消息", "Hide quick msgs"), SRApi.Tid("8296cbaaee", "过滤快捷消息（表情/预设消息不显示）", "Hide quick msgs (emotes/presets)")),
                 _chatFilterQuickEntry, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(26));
             if (_chatFilterQuickEntry != null) SRApi.Ctl.RenderControl(_chatFilterQuickEntry);
             GUILayout.Space(SRApi.Ctl.Sc(16));
-            SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("显示具体时间", "Show time"), SRApi.T("每条消息前显示具体时间", "Show a timestamp before each message")),
+            SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.Tid("4448334bad", "显示具体时间", "Show time"), SRApi.Tid("469ce9a851", "每条消息前显示具体时间", "Show a timestamp before each message")),
                 _chatShowTimeEntry, SRApi.Ctl.Sc(110), SRApi.Ctl.Sc(26));
             if (_chatShowTimeEntry != null) SRApi.Ctl.RenderControl(_chatShowTimeEntry);
             GUILayout.FlexibleSpace();
@@ -318,7 +318,7 @@ public partial class Chat : ITweak {
             }
             GUI.SetNextControlName("SRUCH_ChatInput");
             _chatInputText = SRApi.ClearableTextField(_chatInputText, SRApi.Ctl.SearchBox, GUILayout.Height(SRApi.Ctl.Sc(26)));
-            if (SRApi.Ctl.HotkeyButton("chat.send", SRApi.T("发送", "Send"), SRApi.T("把输入内容作为聊天消息发到游戏聊天里", "Send the text as a chat message"),
+            if (SRApi.Ctl.HotkeyButton("chat.send", SRApi.Tid("f1004bfbac", "发送", "Send"), SRApi.Tid("23d9db8d14", "把输入内容作为聊天消息发到游戏聊天里", "Send the text as a chat message"),
                 () => { SendChatText(_chatInputText); _chatInputText = ""; },
                 SRApi.Ctl.Sc(56), SRApi.Ctl.Sc(26))) {
                 SendChatText(_chatInputText);
@@ -332,20 +332,23 @@ public partial class Chat : ITweak {
             SelfRegLog();
             _chatFilterQuickEntry = plugin.Config.Bind("Chat", "Filter Quick Msgs", false, "会话内容页：过滤快捷消息（表情/预设消息不显示）");
             _chatLogSystemEntry = plugin.Config.Bind("Chat", "Log System Msgs", true, "会话内容页：记录系统消息（加入/离开/踢人/回合提示等）。关掉只记录玩家发言。");
-            SRApi.LocKey("Chat", "Log System Msgs", "记录系统消息", "Log system messages");
-            SRApi.LocKey("Chat", "Log Limit", "日志上限", "Log limit");
-            SRApi.LocDesc("Chat", "Log Limit",
-                "日志上限\n聊天历史最多保留多少条\n超出后丢弃最旧的记录",
-                "log limit\nhow many chat history lines are kept\nthe oldest are dropped beyond this");
-            SRApi.LocDesc("Chat", "Log System Msgs", "记录系统消息\n把加入/离开/踢人/回合提示这类系统事件也记进会话内容\n关掉则只记玩家发言", "Log system messages\nalso record system events such as joins, leaves, kicks and round notices\noff records player chat only");
+            TweakCfg.Entry("Chat", "Log System Msgs", "记录系统消息", "Log system messages",
+                "记录系统消息\n把加入/离开/踢人/回合提示这类系统事件也记进会话内容\n关掉则只记玩家发言",
+                "Log system messages\nalso record system events such as joins, leaves, kicks and round notices\noff records player chat only");
+            TweakCfg.Entry("Chat", "Log Limit", "日志上限", "Log limit",
+                "日志上限\n聊天历史最多保留多少条\n超出后丢弃最旧的记录", "log limit\nhow many chat history lines are kept\nthe oldest are dropped beyond this");
             _chatFilterQuick = _chatFilterQuickEntry.Value;
-            _chatFilterQuickEntry.SettingChanged += (s, e) => _chatFilterQuick = _chatFilterQuickEntry.Value;
+            System.EventHandler __h__chatFilterQuickEntry_1 = (s, e) => _chatFilterQuick = _chatFilterQuickEntry.Value;
+            _chatFilterQuickEntry.SettingChanged += __h__chatFilterQuickEntry_1;
+            Sub.Revoke(() => _chatFilterQuickEntry.SettingChanged -= __h__chatFilterQuickEntry_1);
             _chatShowTimeEntry = plugin.Config.Bind("Chat", "Show Time", false, "会话内容页：每条消息前显示具体时间。默认开启。");
             _chatLogLimitEntry = plugin.Config.Bind("Chat", "Log Limit", 500,
                 new ConfigDescription("会话内容页保留多少条消息（100-5000，超出后滚动淘汰最旧的）。调大可翻更久的历史。",
                     new AcceptableValueRange<int>(100, 5000)));
             _chatShowTime = _chatShowTimeEntry.Value;
-            _chatShowTimeEntry.SettingChanged += (s, e) => _chatShowTime = _chatShowTimeEntry.Value;
+            System.EventHandler __h__chatShowTimeEntry_2 = (s, e) => _chatShowTime = _chatShowTimeEntry.Value;
+            _chatShowTimeEntry.SettingChanged += __h__chatShowTimeEntry_2;
+            Sub.Revoke(() => _chatShowTimeEntry.SettingChanged -= __h__chatShowTimeEntry_2);
         }
 
         [HarmonyPatch(typeof(ChatDisplay), "DisplayNewMessage")]
@@ -370,8 +373,8 @@ public partial class Chat : ITweak {
                 }
                 _log.Add(new ChatEntry {
                     time = DateTime.Now.ToString("HH:mm:ss"),
-                    sender = __system ? SRApi.T("系统", "System")
-                             : (string.IsNullOrEmpty(details.UserName) ? SRApi.T("未知", "Unknown") : details.UserName),
+                    sender = __system ? SRApi.Tid("5b103db0e0", "系统", "System")
+                             : (string.IsNullOrEmpty(details.UserName) ? SRApi.Tid("5e1302f90c", "未知", "Unknown") : details.UserName),
                     color = details.UserNameColor,
                     text = text,
                     isQuick = isQuick

@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "feature": "sr.chaos",
+  "group": "Chaos",
+  "feature_files": [
+    "Chaos.Logic.cs",
+    "Chaos.Ui.cs",
+    "Chaos.cs"
+  ],
+  "spec_entries": [
+    "groups[].feature_ids",
+    "features[]",
+    "artifacts.manifest.json"
+  ],
+  "cfg_migration_lines": [],
+  "loc_ids": [
+    "04a69c96e5",
+    "09beafdacf",
+    "106e5ad1eb",
+    "1776951d46",
+    "233a9f783a",
+    "2d8d0e9bdb",
+    "321c0930e1",
+    "38937e841a",
+    "479852f111",
+    "4957c49e50",
+    "4b9e822548",
+    "6486d4e8b0",
+    "7339f5954f",
+    "87bc828d83",
+    "881021dfc8",
+    "92ab16bb0d",
+    "9e4c887019",
+    "9f20c219c0",
+    "a8de93c052",
+    "b824cfd002",
+    "cdc1e9617c",
+    "d280869c6e",
+    "dcda6abd9e"
+  ],
+  "slots": [],
+  "tests_lines": [
+    "Eq(\"ChaosLogic 低重力=增益\", 0, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 0, 1));",
+    "Eq(\"ChaosLogic 高重力=减益\", 1, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 0, 2));",
+    "Eq(\"ChaosLogic 快冲刺=增益\", 0, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 2, 2));",
+    "Eq(\"ChaosLogic 跳舞=增益\", 0, SR_UCH.Tweaks.ChaosLogic.TintKind(true, 9, 0));",
+    "Eq(\"ChaosLogic 镜像=减益\", 1, SR_UCH.Tweaks.ChaosLogic.TintKind(true, 10, 0));",
+    "Eq(\"ChaosLogic 慢射速=减益\", 1, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 4, 1));",
+    "Eq(\"ChaosLogic 未知字段=中性\", 2, SR_UCH.Tweaks.ChaosLogic.TintKind(false, 7, 1));",
+    "NetMsgId.Register(\"a\", NetMsgId.ChaosRule);",
+    "NetMsgId.Register(\"b\", NetMsgId.ChaosRule);"
+  ],
+  "generated": [
+    "README_features.generated.md",
+    "feature_index.generated.md",
+    "contract-fingerprint.json",
+    "facts.generated.json",
+    "docs\\STATUS.md"
+  ],
+  "note": "单 DLL：删功能只需清 spec 条目、源码与对应声明；不存在独立 DLL / feat rsp。",
+  "artifact": "SR_UCH.dll"
+}

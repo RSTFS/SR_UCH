@@ -1,10 +1,34 @@
-﻿bin/
+bin/
 obj/
 *.user
 *.log
 build/.cache/
-# 独立插件只保存在 D:\RS_TFS\CC\Others（不在本仓库）
+# EX 与独立插件源码保留在各自项目，本仓库只收 SR 源码
 Others/
 .vs/
 # 审计报告是本机/本游戏版本的产物，不入库
 docs/audit-*.md
+
+# Python 守卫缓存
+__pycache__/
+*.pyc
+
+# 纯派生物由 python3 tools/uch.py materialize 从 spec 恢复，不入库。
+# 白名单：历史基线、离线比对结论、静态产物、手写编译输入，必须入库。
+build/rsp/*.rsp
+build/specs/generated/*
+!build/specs/generated/contract-fingerprint.json
+!build/specs/generated/ratchets.json
+!build/specs/generated/health.schema.json
+!build/specs/generated/selftest.expected.json
+!build/specs/generated/slots.generated.json
+!build/specs/generated/slots.declared.cs.txt
+!build/specs/generated/removal-plan.json
+# 编译输入必须入库：fresh clone 直接 dotnet build 不需要先 materialize。
+!build/specs/generated/compile.targets
+!build/specs/generated/references.props
+!build/rsp/sr_uch.rsp
+SR_UCH/Contracts/Generated/*.g.cs
+!SR_UCH/Contracts/Generated/NetMessages.g.cs
+!SR_UCH/Contracts/Generated/SrBuildGraph.g.cs
+!SR_UCH/Contracts/Generated/SrStateMap.g.cs

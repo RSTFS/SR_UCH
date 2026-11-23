@@ -47,42 +47,27 @@ namespace SR_UCH.Tweaks {
             SRApi.Nav(Sec, 140);   // 侧栏顺序
             SRApi.RegisterPage(Sec, "Main", "画面", "View", 10, RenderPage);
 
-            SRApi.LocKey(Sec, "Enabled", "启用视觉辅助", "Enable visual aid");
-            SRApi.LocDesc(Sec, "Enabled",
+            TweakCfg.Entry(Sec, "Enabled", "启用视觉辅助", "Enable visual aid",
                 "启用视觉辅助\n淡化其他玩家，方便看清自己、录屏或截图\n只影响本机画面，不改变游戏状态",
                 "Enable visual aid\nFades other players for a clearer view while recording\nlocal picture only; gameplay is unchanged");
-            SRApi.LocKey(Sec, "Skip In Treehouse", "树屋无效", "Disabled in treehouse");
-            SRApi.LocDesc(Sec, "Skip In Treehouse",
-                "树屋无效\n在树屋/大厅等非对局场景完全不淡化\n避免在树屋里误把角色淡化",
-                "disabled in treehouse\nno fading outside a match (treehouse, lobby)\navoids fading characters in the treehouse");
-            SRApi.LocKey(Sec, "Skip When Dead", "死后无效", "Disabled while dead");
-            SRApi.LocDesc(Sec, "Skip When Dead",
-                "死后无效\n本机角色死亡期间停止淡化其他玩家\n复活后自动恢复",
-                "disabled while dead\nstops fading while your character is dead\nresumes after respawn");
-            SRApi.LocKey(Sec, "Fade Seconds", "淡化时长", "Fade duration");
-            SRApi.LocDesc(Sec, "Fade Seconds",
-                "淡化/恢复的过渡时长\n0 = 立即切换，数值越大越柔和\n范围 0-2 秒",
-                "fade in/out duration\n0 = instant, larger is smoother\nrange 0-2 seconds");
-            SRApi.LocKey(Sec, "Opacity Default 30", "不透明度默认值迁移", "Opacity default migration");
-            SRApi.LocDesc(Sec, "Opacity Default 30",
+            TweakCfg.Entry(Sec, "Skip In Treehouse", "树屋无效", "Disabled in treehouse",
+                "树屋无效\n在树屋/大厅等非对局场景完全不淡化\n避免在树屋里误把角色淡化", "disabled in treehouse\nno fading outside a match (treehouse, lobby)\navoids fading characters in the treehouse");
+            TweakCfg.Entry(Sec, "Skip When Dead", "死后无效", "Disabled while dead",
+                "死后无效\n本机角色死亡期间停止淡化其他玩家\n复活后自动恢复", "disabled while dead\nstops fading while your character is dead\nresumes after respawn");
+            TweakCfg.Entry(Sec, "Fade Seconds", "淡化时长", "Fade duration",
+                "淡化/恢复的过渡时长\n0 = 立即切换，数值越大越柔和\n范围 0-2 秒", "fade in/out duration\n0 = instant, larger is smoother\nrange 0-2 seconds");
+            TweakCfg.Entry(Sec, "Opacity Default 30", "不透明度默认值迁移", "Opacity default migration",
                 "内部标记：不透明度默认值迁移\n从旧默认 50 改成 30 后置真\n手动改过的不透明度不会被动",
                 "internal marker for the opacity default migration\nset once the old default 50 has been moved to 30\nmanually chosen opacity is left untouched");
-            SRApi.LocKey(Sec, "Opacity", "其他玩家不透明度", "Other players opacity");
-            SRApi.LocDesc(Sec, "Opacity",
+            TweakCfg.Entry(Sec, "Opacity", "其他玩家不透明度", "Other players opacity",
                 "其他玩家不透明度\n0 = 完全隐藏，100 = 保持原样\n只作用于「其他玩家」，自己永远不变",
                 "Other players opacity\n0 = fully hidden, 100 = untouched\nonly affects other players; your character is unchanged");
-            SRApi.LocKey(Sec, "Use Distance", "只在近距离淡化", "Fade only when close");
-            SRApi.LocDesc(Sec, "Use Distance",
-                "只在近距离淡化\n开启后只淡化距离内的其他玩家，远处保持原样\n关闭则淡化全部其他玩家",
-                "Fade only when close\nwhen on, only players within the distance are faded\nwhen off, every other player is faded");
-            SRApi.LocKey(Sec, "Distance", "淡化距离", "Fade distance");
-            SRApi.LocDesc(Sec, "Distance",
-                "淡化距离\n离本机玩家不超过该距离（米）的其他玩家才淡化\n1-30；配合上面的开关使用",
-                "Fade distance\nother players within this many units are faded\n1-30; used together with the toggle above");
-            SRApi.LocKey(Sec, "Toggle Key", "视觉辅助开关", "Visual aid key");
-            SRApi.LocDesc(Sec, "Toggle Key",
-                "视觉辅助开关\n对局内临时切换视觉辅助\n可改绑，支持组合键",
-                "Visual aid key\ntoggles the visual aid in-game\nrebindable, combos supported");
+            TweakCfg.Entry(Sec, "Use Distance", "只在近距离淡化", "Fade only when close",
+                "只在近距离淡化\n开启后只淡化距离内的其他玩家，远处保持原样\n关闭则淡化全部其他玩家", "Fade only when close\nwhen on, only players within the distance are faded\nwhen off, every other player is faded");
+            TweakCfg.Entry(Sec, "Distance", "淡化距离", "Fade distance",
+                "淡化距离\n离本机玩家不超过该距离（米）的其他玩家才淡化\n1-30；配合上面的开关使用", "Fade distance\nother players within this many units are faded\n1-30; used together with the toggle above");
+            TweakCfg.Entry(Sec, "Toggle Key", "视觉辅助开关", "Visual aid key",
+                "视觉辅助开关\n对局内临时切换视觉辅助\n可改绑，支持组合键", "Visual aid key\ntoggles the visual aid in-game\nrebindable, combos supported");
 
             // 开关右侧同行显示快捷键（按 F6 即切换同一个 Enable 开关）。
             SRApi.RowCompanions.Add(Companion);
@@ -141,12 +126,24 @@ namespace SR_UCH.Tweaks {
                 _toggleKey = plugin.Config.Bind(Sec, "Toggle Key", KeyCode.F6, "对局内切换视觉辅助的按键。");
 
                 Refresh();
-                _enabled.SettingChanged += (s, e) => Refresh();
-                _opacityPercent.SettingChanged += (s, e) => { FixOpacityStep(); Refresh(); };
-                _useDistance.SettingChanged += (s, e) => Refresh();
-                _skipTreehouse.SettingChanged += (s, e) => Refresh();
-                _skipWhenDead.SettingChanged += (s, e) => Refresh();
-                _distance.SettingChanged += (s, e) => Refresh();
+                System.EventHandler __h__enabled_1 = (s, e) => Refresh();
+                _enabled.SettingChanged += __h__enabled_1;
+                Sub.Revoke(() => _enabled.SettingChanged -= __h__enabled_1);
+                System.EventHandler __h__opacityPercent_2 = (s, e) => { FixOpacityStep(); Refresh(); };
+                _opacityPercent.SettingChanged += __h__opacityPercent_2;
+                Sub.Revoke(() => _opacityPercent.SettingChanged -= __h__opacityPercent_2);
+                System.EventHandler __h__useDistance_3 = (s, e) => Refresh();
+                _useDistance.SettingChanged += __h__useDistance_3;
+                Sub.Revoke(() => _useDistance.SettingChanged -= __h__useDistance_3);
+                System.EventHandler __h__skipTreehouse_4 = (s, e) => Refresh();
+                _skipTreehouse.SettingChanged += __h__skipTreehouse_4;
+                Sub.Revoke(() => _skipTreehouse.SettingChanged -= __h__skipTreehouse_4);
+                System.EventHandler __h__skipWhenDead_5 = (s, e) => Refresh();
+                _skipWhenDead.SettingChanged += __h__skipWhenDead_5;
+                Sub.Revoke(() => _skipWhenDead.SettingChanged -= __h__skipWhenDead_5);
+                System.EventHandler __h__distance_6 = (s, e) => Refresh();
+                _distance.SettingChanged += __h__distance_6;
+                Sub.Revoke(() => _distance.SettingChanged -= __h__distance_6);
 
                 SRApi.RegisterKey("视觉辅助-开关", _toggleKey, "press", delegate {
                     try {
@@ -330,25 +327,19 @@ namespace SR_UCH.Tweaks {
         }
 
 
-        private static void CfgRow(ConfigEntryBase e) {
-            SRApi.Ctl.DrawEntryRow(e, SRApi.Ctl.Sc(180f));
-        }
-
         private static void RenderPage() {
-            SRApi.Ctl.SectionTitle(SRApi.T("其他玩家显示", "Other players"),
-                SRApi.T("淡化其他玩家，方便看不清自己 / 录屏 / 截图；只改变本机画面，不影响任何玩法和联机。",
-                        "Fades other players for a clearer view; local picture only, no gameplay or network effect."));
+            SRApi.Ctl.SectionTitle(SRApi.Tid("58f472a561", "其他玩家显示", "Other players"),
+                SRApi.Tid("1415ac890b", "淡化其他玩家，方便看不清自己 / 录屏 / 截图；只改变本机画面，不影响任何玩法和联机。", "Fades other players for a clearer view; local picture only, no gameplay or network effect."));
             if (_conflict) {
-                GUILayout.Label(SRApi.T("检测到 CamHog：本功能已让位（两个 mod 同时改透明度会互相覆盖）。想用本功能请先移除 CamHog。",
-                                         "CamHog detected: this feature yields (both mods would overwrite opacity). Remove CamHog to use this."),
+                GUILayout.Label(SRApi.Tid("19589a495c", "检测到 CamHog：本功能已让位（两个 mod 同时改透明度会互相覆盖）。想用本功能请先移除 CamHog。", "CamHog detected: this feature yields (both mods would overwrite opacity). Remove CamHog to use this."),
                     SRApi.Ctl.LabelWrap);
             }
-            CfgRow(_enabled);
-            CfgRow(_opacityPercent);
-            CfgRow(_skipTreehouse);
-            CfgRow(_skipWhenDead);
-            CfgRow(_useDistance);
-            CfgRow(_distance);
+            TweakCfg.Row(_enabled);
+            TweakCfg.Row(_opacityPercent);
+            TweakCfg.Row(_skipTreehouse);
+            TweakCfg.Row(_skipWhenDead);
+            TweakCfg.Row(_useDistance);
+            TweakCfg.Row(_distance);
         }
     }
 }

@@ -42,7 +42,7 @@ namespace SR_UCH.Tweaks {
             RegionMember m;
             if (_regionMembers.TryGetValue(t, out m)) return m;
             m = new RegionMember();
-            try { m.Loc = t.GetProperty("LocalizedShortName"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+            try { m.Loc = RefCache.PropertyOf(t, "LocalizedShortName"); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             try {
                 string tn = t != null ? t.Name : "Region";
                 SRApi.Ref.Override(tn + ".shortName", "联机列表：区域短名");
@@ -112,9 +112,9 @@ namespace SR_UCH.Tweaks {
         private static string DispRegion(string code) {
             if (code == NoneCode || string.IsNullOrEmpty(code)) return "-";
             string n = NormRegion(code);
-            if (n == "AP") return SRApi.T("亚太", "Asia Pacific");
-            if (n == "EU") return SRApi.T("欧盟", "Europe");
-            if (n == "US") return SRApi.T("美国", "America");
+            if (n == "AP") return SRApi.Tid("512ffa4cab", "亚太", "Asia Pacific");
+            if (n == "EU") return SRApi.Tid("c3385026bf", "欧盟", "Europe");
+            if (n == "US") return SRApi.Tid("42b3c28134", "美国", "America");
             return code;   // 认不出来的原始短名原样显示
         }
 
@@ -161,15 +161,15 @@ namespace SR_UCH.Tweaks {
 
         // 提示文字按优先级判定：已加入 > 房间已空 > 已失联 > 可加入 > 信息不全 > 对局中 > 房主 AFK > 人满。
         private static string JoinText(Matchmaker.LobbyListInfo li) {
-            if (IsSelfLobby(li)) return SRApi.T("已进入", "joined");
-            if (li.Players == 0) return SRApi.T("房间已空", "empty");
-            if (IsStale(li) && !IsJoinable(li)) return SRApi.T("已失联", "No heartbeat");
-            if (IsJoinable(li)) return SRApi.T("加入", "Join");
-            if (li.error || !li.InfoReceived) return SRApi.T("信息不全", "no info");
-            if (li.matchProgress != 0) return SRApi.T("对局中", "in match");
-            if (li.isAFK) return SRApi.T("房主AFK", "host AFK");
-            if (IsFull(li)) return SRApi.T("人满", "full");
-            return SRApi.T("不可加入", "closed");
+            if (IsSelfLobby(li)) return SRApi.Tid("18ef350180", "已进入", "joined");
+            if (li.Players == 0) return SRApi.Tid("8b62e6a626", "房间已空", "empty");
+            if (IsStale(li) && !IsJoinable(li)) return SRApi.Tid("567f1d592d", "已失联", "No heartbeat");
+            if (IsJoinable(li)) return SRApi.Tid("78e5bd1399", "加入", "Join");
+            if (li.error || !li.InfoReceived) return SRApi.Tid("8f41349775", "信息不全", "no info");
+            if (li.matchProgress != 0) return SRApi.Tid("e4029a1120", "对局中", "in match");
+            if (li.isAFK) return SRApi.Tid("f2ebafc67b", "房主AFK", "host AFK");
+            if (IsFull(li)) return SRApi.Tid("a8b0ea7444", "人满", "full");
+            return SRApi.Tid("cd032f6be1", "不可加入", "closed");
         }
 
         // 房主失联（僵尸房间）：断心跳超过 30 秒即视为房间已死，仅用于显示。
@@ -264,7 +264,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string FlagsText(Matchmaker.LobbyListInfo li) {
-            return li.usingMods ? SRApi.T("修改器", "mod") : "";
+            return li.usingMods ? SRApi.Tid("bc509b6de8", "修改器", "mod") : "";
         }
 
         private static string Val(ConfigEntry<string> e) { return e != null ? (e.Value ?? "") : ""; }
@@ -356,11 +356,11 @@ namespace SR_UCH.Tweaks {
 
         private static void UpdateLobbyMsg() {
             if (_lobbySearching) {
-                _lobbyMsg = string.Format(SRApi.T("搜索中… 已找到 {0} 个（筛选后 {1} 个）", "Searching... {0} found ({1} after filters)"),
+                _lobbyMsg = string.Format(SRApi.Tid("79c8fe0784", "搜索中… 已找到 {0} 个（筛选后 {1} 个）", "Searching... {0} found ({1} after filters)"),
                     _lobbies.Count, CountShown());
                 return;
             }
-            _lobbyMsg = string.Format(SRApi.T("共 {0} 个房间，筛选后 {1} 个", "{0} lobbies, {1} after filters"), _lobbies.Count, CountShown());
+            _lobbyMsg = string.Format(SRApi.Tid("68135df658", "共 {0} 个房间，筛选后 {1} 个", "{0} lobbies, {1} after filters"), _lobbies.Count, CountShown());
         }
 
         // 页面：联机。

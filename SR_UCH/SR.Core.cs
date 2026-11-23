@@ -11,8 +11,8 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
-[SrFeature("sr.core", "SR 核心", "1.0", Rank = 0)]
-public partial class SR : ITweak {
+// 框架本体：不实现 ITweak、不挂 [SrFeature]；由 MainPlugin 显式自举，不进功能表。
+public partial class SR {
 
 // 分区：Core（核心状态 / 初始化 / 插件扫描）
 // 静态字段集中于此；分区之间共享 private 字段编译器不会拦，故只在本文件用。
@@ -97,10 +97,8 @@ public partial class SR : ITweak {
             if (cfg == null) return null;
             if (!_orphanMemberTried) {
                 _orphanMemberTried = true;
-                const System.Reflection.BindingFlags BF = System.Reflection.BindingFlags.Instance
-                    | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
-                try { _orphanMember = typeof(ConfigFile).GetProperty("OrphanedEntries", BF); } catch { _orphanMember = null; }
-                if (_orphanMember == null) { try { _orphanMember = typeof(ConfigFile).GetField("OrphanedEntries", BF); } catch { _orphanMember = null; } }
+                try { _orphanMember = RefCache.PropertyOf(typeof(ConfigFile), "OrphanedEntries"); } catch { _orphanMember = null; }
+                if (_orphanMember == null) { try { _orphanMember = RefCache.FieldOf(typeof(ConfigFile), "OrphanedEntries"); } catch { _orphanMember = null; } }
                 if (_orphanMember == null) SR.LogWarn("[SR.Cfg] 读不到 BepInEx 的 OrphanedEntries（版本差异），跳过孤儿键自检");
             }
             if (_orphanMember == null) return null;
@@ -146,7 +144,7 @@ public partial class SR : ITweak {
 
         private static void OnAnySettingChanged(object s, SettingChangedEventArgs e) { _cfgDirty = true; }
 
-        // 登记配置待落盘：SR 自身记 _cfgDirty，其它插件进 _dirtyConfigs。必须 public：拆分模式下功能是独立程序集。
+        // 登记配置待落盘：SR 自身记 _cfgDirty，其它插件进 _dirtyConfigs。
         public static void MarkConfigDirty(ConfigFile cfg) {
             if (cfg == null) return;
             if (ReferenceEquals(cfg, _internalConfig)) { _cfgDirty = true; return; }
@@ -375,9 +373,10 @@ public partial class SR : ITweak {
             _internalConfig = MainPlugin.Data != null ? MainPlugin.Data : plugin.Config; // 核心条目也走外置文件
             // 界面文案自注册：派发各分部文件，功能在 Initialize 里注册自己的文案。
             SelfRegCore();
-            // 必须在任何 Config.Bind 之前把旧 cfg 的中文段/键改成英文并重新读盘，否则新条目取默认值且写盘又写回中文。
+            // 本体输入冻结补丁：必须显式 RegisterPatch（CreateAndPatchAll 不发现独立类）。
+            try { SRInputGate.Register(); } catch (Exception __ig) { Guard.Log("输入门控补丁注册", __ig); }
             try {
-                // 两处文件都要迁：插件自带 cfg 与 MainPlugin.Data（条目实际 Bind 在后者），只迁前者会让外置旧段名永不改写。
+                // 插件自带 cfg 与外置 cfg 都要校验。
                 bool migratedAny = false;
                 string pluginPath = plugin.Config.ConfigFilePath;
                 if (ConfigMigration.Migrate(pluginPath)) migratedAny = true;
@@ -390,7 +389,7 @@ public partial class SR : ITweak {
                     try { plugin.Config.Reload(); } catch (Exception __rp) { Guard.Log("配置迁移/重载插件 cfg", __rp); }
                     try { if (_internalConfig != null) _internalConfig.Reload(); } catch (Exception __ri) { Guard.Log("配置迁移/重载外置 cfg", __ri); }
                     ClearEntryCache();   // 键被改名 / 删掉了：条目缓存必须失效
-                    SR.LogInfo("[T1] 已迁移旧版 cfg（插件 cfg + 外置 cfg）并重新读盘");
+                    SR.LogInfo("[T1] cfg schema 已对齐（插件 cfg + 外置 cfg）并重新读盘");
                 }
             } catch (Exception __ex) { Guard.Log("T1 cfg 迁移/重读", __ex); }
             // 反射探针只做启动自检；NavHide 把 cfg 里残留的 [Reflection] 段从侧栏藏掉。
@@ -406,10 +405,11 @@ public partial class SR : ITweak {
             _tickProf = plugin.Config.Bind(Keys.Settings, "Tick Profiling", false,
                 "把每个帧钩子的耗时写进日志（默认关，排查卡顿时打开）。");
             // 切语言 / 装语言包都走 ApplyLanguage：解析 id 并让显示名缓存失效。
-            _langEntry.SettingChanged += (s, e) => ApplyLanguage();
+            System.EventHandler __h__langEntry_1 = (s, e) => ApplyLanguage();
+            _langEntry.SettingChanged += __h__langEntry_1;
+            Sub.Revoke(() => _langEntry.SettingChanged -= __h__langEntry_1);
             ApplyLanguage();
             // 语言包外置：扫描 config/SR_UCH/lang/*.json 并注册；须在语言条目 Bind + ApplyLanguage 之后、
-            // 各功能 Initialize 与首次渲染之前。
             try { LoadJsonLanguagePacks(); } catch (Exception __ex) { Guard.Log("加载 JSON 语言包", __ex); }
             // 地图总开关：开启后 M 键开地图，关闭时已开的地图立即关闭。
             // 侧栏栏目宽度：0 = 按文字宽度自动；拖侧栏右缘也可调整并写回。
@@ -428,25 +428,31 @@ public partial class SR : ITweak {
                 }
             } catch (Exception __ex) { Guard.Log("清理侧栏顺序历史值", __ex); }
             SidebarW = SidebarWEntry.Value;
-            SidebarWEntry.SettingChanged += (s, e) => SidebarW = SidebarWEntry.Value;
+            System.EventHandler __h_SidebarWEntry_2 = (s, e) => SidebarW = SidebarWEntry.Value;
+            SidebarWEntry.SettingChanged += __h_SidebarWEntry_2;
+            Sub.Revoke(() => SidebarWEntry.SettingChanged -= __h_SidebarWEntry_2);
                     _allEnabledEntry = plugin.Config.Bind(Keys.Settings, Keys.AllEnabled, false, "整个 Mod 的总开关. 关掉以后所有内部功能都不生效, 但每个功能的开关值不会被改掉.\n默认是关的, 改动会自动保存, 下次启动保持上次的状态.");
             AllEnabled = _allEnabledEntry.Value;
             // 总开关关闭也走 FireDismissUi（与换场景、对局开始、EX 强制回主界面同理）。
-            _allEnabledEntry.SettingChanged += (s, e) => {
+            System.EventHandler __h__allEnabledEntry_3 = (s, e) => {
                 AllEnabled = _allEnabledEntry.Value;
                 if (!AllEnabled) {
                     try { FireDismissUi(); } catch (Exception __ex) { Guard.Log("总开关关闭时收起功能 UI", __ex); }
                 }
             };
+            _allEnabledEntry.SettingChanged += __h__allEnabledEntry_3;
+            Sub.Revoke(() => _allEnabledEntry.SettingChanged -= __h__allEnabledEntry_3);
             // 外部插件默认启用；手动禁用的 GUID 记入 deny-list，重启后保持禁用。
             _disabledPluginsEntry = plugin.Config.Bind(Keys.Settings, Keys.DisabledPlugins, "", "不想让它跟着管理器一起出现的外部插件, 把 GUID 填进来, 用分号隔开. 没写进来的默认启用.");
             SRApi.RowFilters.Add(SettingsHiddenDisabledPlugins);
             SRApi.RowFilters.Add(SettingsHiddenWindowGeometry);
             BlockInput = _blockInputEntry.Value;
-            _blockInputEntry.SettingChanged += (s, e) => {
+            System.EventHandler __h__blockInputEntry_4 = (s, e) => {
                 BlockInput = _blockInputEntry.Value;
                 ApplyEventSystemGate();
             };
+            _blockInputEntry.SettingChanged += __h__blockInputEntry_4;
+            Sub.Revoke(() => _blockInputEntry.SettingChanged -= __h__blockInputEntry_4);
             // 窗口几何条目建一次并缓存；类型须与既有写法一致（宽高 int，X/Y float），否则 BepInEx 会另建条目。
             _winWidthEntry = plugin.Config.Bind(Keys.Settings, Keys.WinWidth, 720, "");
             _winHeightEntry = plugin.Config.Bind(Keys.Settings, Keys.WinHeight, 520, "");
@@ -461,7 +467,7 @@ public partial class SR : ITweak {
             UnityEngine.Object.DontDestroyOnLoad(go);
             go.AddComponent<ManagerUI>();
             // 换场景：复位全部 UI 状态，否则管理器会冻结角色、停掉 GameControl 并禁用 EventSystem。
-            SceneManager.activeSceneChanged += (a, b) => {
+            UnityEngine.Events.UnityAction<UnityEngine.SceneManagement.Scene, UnityEngine.SceneManagement.Scene> __h_SceneManager_5 = (a, b) => {
                 _stylesReady = false;
                 // 先通知功能（FireSceneChanged），再请它们收起自己的 UI（FireDismissUi）。
                 try { FireSceneChanged(); } catch (Exception __ex) { Guard.Log("换场景通知功能", __ex); }
@@ -477,6 +483,8 @@ public partial class SR : ITweak {
                 }
                 try { ResetWheelState(); } catch (Exception __ex) { Guard.Log("SR.Core", __ex); }   // 清掉滑块 / 滚轮盾的跨帧残留
             };
+            SceneManager.activeSceneChanged += __h_SceneManager_5;
+            Sub.Revoke(() => SceneManager.activeSceneChanged -= __h_SceneManager_5);
             // 扫描不在此调用：其它 tweak 可能晚于本插件初始化，改在首帧 Update 跑。
             try { SRApi.RegisterPatch(typeof(SR)); } catch (Exception ex) { SR.LogError("SR 补丁注册失败: " + ex.Message); }
             // 录键屏蔽表情系统的嵌套类不被 CreateAndPatchAll 递归发现，需单独注册。
@@ -650,7 +658,10 @@ public partial class SR : ITweak {
                     // 关掉 BepInEx 的 SaveOnConfigSet，改由 FlushConfig（最多 1 秒一次）+ 显式 Save 落盘。
                     try {
                         pe.config.SaveOnConfigSet = false;
-                        pe.config.SettingChanged += OnAnySettingChanged;
+                        // SettingChanged 是 EventHandler<SettingChangedEventArgs>，不能赋给无泛型 EventHandler。
+                        System.EventHandler<SettingChangedEventArgs> __h_pe_config_6 = OnAnySettingChanged;
+                        pe.config.SettingChanged += __h_pe_config_6;
+                        Sub.Revoke(() => pe.config.SettingChanged -= __h_pe_config_6);
                     } catch (Exception __ex) { Guard.Log("配置落盘节流初始化", __ex); }
                     try {
                         foreach (var kme in new Dictionary<ConfigEntryBase, ComboMod>(_keyMods)) {
@@ -725,7 +736,6 @@ public partial class SR : ITweak {
             SRApi.RowFilters.Add(AllEnabledRowHidden); // 设置页不重复显示本 Mod 总开关
             SR.LocSec("Settings", "设置", null);
             SR.NavHide("Settings"); // 设置页是独立顶层页（不占内部侧栏栏目）
-            // 已删除功能的段名不能让残留段出现在侧栏；名单由 ConfigMigration 维护。
             for (int i = 0; i < ConfigMigration.DeletedSections.Length; i++)
                 SR.NavHide(ConfigMigration.DeletedSections[i]);
             SR.LocSec("Home", "首页", null);

@@ -26,8 +26,7 @@ namespace SR_UCH {
 
         public void Initialize(IFeatureHost plugin) {
             try {
-                SRApi.LocKey(Sec, "Grid Always On", "常显网格", "Always show grid");
-                SRApi.LocDesc(Sec, "Grid Always On",
+                TweakCfg.Entry(Sec, "Grid Always On", "常显网格", "Always show grid",
                     "常显网格\n行动状态下也显示建造网格（游戏默认只在建造阶段显示）\n随开随关：开启立即淡入，关闭立即淡出",
                     "Always show grid\nkeeps the build grid visible during the play phase (vanilla shows it while building only)\ntakes effect immediately when toggled");
 
@@ -68,10 +67,9 @@ namespace SR_UCH {
 
         internal static void RenderOtherPage() {
             try {
-                SRApi.Ctl.SectionTitle(SRApi.T("地图网格", "Map grid"));
-                SRApi.Ctl.LabeledRow(SRApi.T("常显网格", "Always show grid"),
-                    SRApi.T("行动状态下也显示建造网格\n随开随关：开启立即淡入，关闭立即淡出",
-                        "keeps the build grid visible during the play phase\ntakes effect immediately when toggled"),
+                SRApi.Ctl.SectionTitle(SRApi.Tid("2ce58006e0", "地图网格", "Map grid"));
+                SRApi.Ctl.LabeledRow(SRApi.Tid("93ccff17d0", "常显网格", "Always show grid"),
+                    SRApi.Tid("cb6009d398", "行动状态下也显示建造网格\n随开随关：开启立即淡入，关闭立即淡出", "keeps the build grid visible during the play phase\ntakes effect immediately when toggled"),
                     _alwaysOn);
             } catch (Exception __ex) { SRApi.Guard.Log("地图网格/渲染", __ex); }
         }

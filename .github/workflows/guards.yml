@@ -1,12 +1,10 @@
 name: guards
 
-# 四道门禁（都不需要游戏安装）：
-#  1) text-guards  ：文本层守卫（API 棘轮 / 契约边界 / 功能层边界 / 编码 / 悬浮文案 / 单文件行数 …）
-#  2) schema-guards：槽位图 / 配置与本地化一致性（guards-schema.ps1）
-#  3) rsp-verify   ：构建源码清单覆盖（gen-rsp.ps1 -Verify）
-#  4) unit-tests   ：编译契约层 + 跑单元测试（tests/SR_UCH.Tests.csproj，BepInEx 与 UnityEngine 都用桩）
-#     这一步同时充当"契约层必须能编译"的最小编译门禁 —— 编译不过的 PR 在 CI 里就会红。
-# 需要游戏 Managed DLL 的守卫（csproj 构建 / 拆分构建 / 运行时自检）仍只在本地 build\build.ps1 -Check 里跑。
+# 3 个 job（都不需要游戏安装）：
+#  1) guards      ：统一入口 verify --strict + 全部机械规则 + 冒烟 / 预检 / 闸门
+#  2) tests       ：契约层 + 纯函数层真实编译与表驱动单测
+#  3) build-graph ：构建图对账；提供游戏参考程序集时执行全源码 IL 编译
+# 判定逻辑只有一份：tools/spec_engine.py 派生、tools/uch_rules.py 守卫。
 
 on:
   push:
@@ -15,37 +13,66 @@ on:
   workflow_dispatch:
 
 jobs:
-  text-guards:
+  guards:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: 运行文本类守卫
-        shell: pwsh
-        run: ./build/guards-text.ps1
+      - name: 恢复派生物（spec 单一真值）
+        run: python3 tools/uch.py materialize
+      - name: 统一回归（固定 CHK 表 + 单一基线）
+        run: python3 tools/uch.py verify --strict
+      - name: 机械守卫唯一实现
+        run: python3 tools/uch.py rules --suite all
+      - name: 一条命令冒烟
+        run: python3 tools/uch.py smoke
+      - name: 按文件影响路由
+        run: python3 tools/uch.py impact build/specs/features.spec.json
+      - name: 可重放结构规则（幂等）
+        run: python3 tools/uch.py codemod --apply
+      - name: 结构改动清单 dry-run
+        run: python3 tools/uch.py migrate --dry-run
+      - name: 真编译前离线预检
+        run: python3 tools/uch.py precompile
+      - name: 双轨退役闸门（cutover 需实机 A/B 证据）
+        run: python3 tools/uch.py trace-gate --enforce
 
-  schema-guards:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: 运行结构守卫（槽位图 / 本地化覆盖）
-        shell: pwsh
-        run: ./build/guards-schema.ps1
-
-  rsp-verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: 构建清单与磁盘源码一致性（不需要游戏）
-        shell: pwsh
-        run: ./build/gen-rsp.ps1 -Verify
-
-  unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: 恢复派生物（spec 单一真值）
+        run: python3 tools/uch.py materialize
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
       - name: 契约层编译 + 单元测试（无游戏）
-        shell: pwsh
-        run: ./build/run-tests.ps1 -NoGame
+        run: dotnet run --project tests/SR_UCH.Tests.csproj -c Release --nologo
+      - name: 纯函数层表驱动测试（真实 IL 编译 + 运行）
+        run: dotnet run --project tests/SR_UCH.Pure.Tests.csproj -c Release --nologo
+      - name: 契约层 / 纯函数层真实编译（警告即失败）
+        run: |
+          dotnet build tests/SR_UCH.Tests.csproj -c Release --nologo -warnaserror
+          dotnet build tests/SR_UCH.Pure.Tests.csproj -c Release --nologo -warnaserror
+
+  build-graph:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 恢复派生物（spec 单一真值）
+        run: python3 tools/uch.py materialize
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: 构建图对账（单一规则实现）
+        run: python3 tools/uch.py rules --suite build-graph
+      - name: 维护入口环境诊断
+        run: python3 tools/uch.py doctor
+      - name: 全源码 IL 编译（提供游戏参考程序集时执行）
+        env:
+          UCH_MANAGED: ${{ vars.UCH_MANAGED_DIR }}
+        run: |
+          if [ -n "$UCH_MANAGED" ]; then
+            dotnet build SR_UCH.csproj -c Release --nologo -warnaserror -p:UchManagedDir="$UCH_MANAGED"
+          else
+            echo 'UCH_MANAGED_DIR 未配置：跳过全源码 IL 编译'
+          fi

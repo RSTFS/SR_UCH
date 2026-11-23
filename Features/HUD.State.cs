@@ -23,7 +23,8 @@ public partial class HUD {
                 ScoreboardEvent sb = e as ScoreboardEvent;
                 if (sb != null) {
                     // 记分板出现或结算完成 = 本回合确实推进过，作为回合增量证据。
-                    try { if (sb.Showing || sb.AfterTally) _roundTallySeen = true; } catch { /* 静默：非关键路径，失败可直接忽略 */ }
+                    try { if (sb.Showing || sb.AfterTally) SR_UCH.Pure.RoundTruth.NoteTally(ref _rs); }
+                    catch { /* 静默：非关键路径，失败可直接忽略 */ }
                 }
             } catch (Exception __ex) { SRApi.Guard.Log("HUD 阶段事件", __ex); }
         }
@@ -53,9 +54,7 @@ public partial class HUD {
                     _phase = GameControl.GamePhase.NONE;
                     _phaseStart = Time.unscaledTime;
                     _lastRound = 0;
-                    _trueRound = 0;
-                    _roundPending = 0;
-                    _roundTallySeen = false;
+                    SR_UCH.Pure.RoundTruth.Reset(ref _rs);
                 }
                 LobbyManager lm = LobbyManager.instance;
                 GameControl gc = (lm != null) ? lm.CurrentGameController : null;
@@ -77,9 +76,7 @@ public partial class HUD {
                     _timerText = "00:00";
                     _warnLevel = 0;
                     _lastRound = 0;
-                    _trueRound = 0;
-                    _roundPending = 0;
-                    _roundTallySeen = false;
+                    SR_UCH.Pure.RoundTruth.Reset(ref _rs);
                 }
                 if (!_eventSeen) {
                     GameControl.GamePhase p = gc.Phase;
@@ -242,53 +239,21 @@ public partial class HUD {
             } catch { return false; }
         }
         private static string RoundWord() {
-            return IsChallengeMode() ? SRApi.T("重试：", "Retry: ") : SRApi.T("回合：", "Round: ");
+            return IsChallengeMode() ? SRApi.Tid("e473619c63", "重试：", "Retry: ") : SRApi.Tid("cd5993f3eb", "回合：", "Round: ");
         }
         private static void UpdateRound(GameControl gc, GameSettings gs) {
             try {
                 int candidate = gc.RoundNumber;
+                // 真回合判定与混乱牌组共用 Pure/RoundTruth.cs：结算证据 + 挂起候选 + 只进不退。
+                bool challenge = IsChallengeMode();
+                SR_UCH.Pure.RoundTruth.Step(ref _rs, candidate, challenge);
+                int trueRound = _rs.TrueRound;
+                if (trueRound <= 0) { _roundText = null; return; }
                 // 挑战模式：每死一次即一次重试，无回合上限，也不发结算记分板事件。
-                if (IsChallengeMode()) {
-                    if (candidate <= 0) { _roundText = null; return; }
-                    // 只接受「前进」或「回到 1」；否则 roundNumber 抖动会让回合提示反复重播。
-                    if (candidate > _trueRound || candidate <= 1) {
-                        _trueRound = candidate;
-                        _roundPending = 0;
-                        _roundTallySeen = false;
-                    }
-                    _roundText = RoundWord() + _trueRound;
-                    return;
-                }
-                                if (candidate < _trueRound) {
-                    // 回合数回退：仅在确实换了对局（回到 1）时接受，否则保留较大值以免提示闪烁。
-                    if (candidate <= 1) {
-                        _trueRound = candidate;
-                        _roundPending = 0;
-                        _roundTallySeen = false;
-                    }
-                }
-                if (_trueRound <= 0 && candidate > 0) {
-                    _trueRound = candidate;
-                    _roundPending = 0;
-                } else if (candidate > _trueRound) {
-                    if (candidate == _trueRound + 1 && _roundTallySeen) {
-                        _trueRound = candidate;
-                        _roundPending = 0;
-                        _roundTallySeen = false;
-                    } else if (candidate > _roundPending) {
-                        _roundPending = candidate;   // 未确认（可能是刷新派对盒的额外 +1）
-                    }
-                }
-                if (_roundTallySeen && _roundPending > _trueRound) {
-                    // 结算已发生：接受此前挂起的回合。
-                    _trueRound = _roundPending;
-                    _roundPending = 0;
-                    _roundTallySeen = false;
-                }
-                if (_trueRound <= 0) { _roundText = null; return; }
+                if (challenge) { _roundText = RoundWord() + trueRound; return; }
                 int max = 0;
                 try { if (gs != null) max = gs.MaxRounds; } catch { max = 0; }
-                int shown = max > 0 ? Mathf.Min(_trueRound, max) : _trueRound;
+                int shown = max > 0 ? Mathf.Min(trueRound, max) : trueRound;
                 _roundText = max > 0
                     ? RoundWord() + shown + "/" + max
                     : RoundWord() + shown;
@@ -310,7 +275,7 @@ public partial class HUD {
                     }
                 }
             } catch { level = null; code = null; }
-            if (string.IsNullOrEmpty(level) && !string.IsNullOrEmpty(code)) level = SRApi.T("自定义关卡", "Custom level");
+            if (string.IsNullOrEmpty(level) && !string.IsNullOrEmpty(code)) level = SRApi.Tid("756f1de77d", "自定义关卡", "Custom level");
             return level;
         }
         private static void UpdateLevel(GameSettings gs) {
@@ -332,11 +297,11 @@ public partial class HUD {
                     if (ms > 0) target = ms;
                 }
             } catch { target = WinScoreFallback; }
-            _winText = SRApi.T("获胜：", "Win: ") + target;
+            _winText = SRApi.Tid("967826caf4", "获胜：", "Win: ") + target;
         }
         private static void UpdateRoundNotice() {
             try {
-                int round = _trueRound;
+                int round = _rs.TrueRound;
                 if (round <= 0 || round == _lastRound) return;
                 _lastRound = round;
                 if (!RoundNoticeOn()) return;
@@ -359,10 +324,10 @@ public partial class HUD {
         }
         private static string ModeName(GameState.GameMode mode) {
             switch (mode) {
-            case GameState.GameMode.FREEPLAY: return SRApi.T("自由", "Freeplay");
-            case GameState.GameMode.CREATIVE: return SRApi.T("创造", "Creative");
-            case GameState.GameMode.PARTY: return SRApi.T("派对", "Party");
-            case GameState.GameMode.CHALLENGE: return SRApi.T("挑战", "Challenge");
+            case GameState.GameMode.FREEPLAY: return SRApi.Tid("ebb2dba278", "自由", "Freeplay");
+            case GameState.GameMode.CREATIVE: return SRApi.Tid("e801e3fee7", "创造", "Creative");
+            case GameState.GameMode.PARTY: return SRApi.Tid("97c0e6938b", "派对", "Party");
+            case GameState.GameMode.CHALLENGE: return SRApi.Tid("0cce1e0303", "挑战", "Challenge");
             default: return null;
             }
         }
@@ -415,13 +380,13 @@ public partial class HUD {
         }
         private static string PhaseName(GameControl.GamePhase p) {
             switch (p) {
-            case GameControl.GamePhase.START: return SRApi.T("准备", "Ready");
-            case GameControl.GamePhase.PLAY: return SRApi.T("游玩", "Play");
-            case GameControl.GamePhase.PLACE: return SRApi.T("建造", "Build");
-            case GameControl.GamePhase.SUDDENDEATH: return SRApi.T("决胜", "Sudden death");
-            case GameControl.GamePhase.END: return SRApi.T("结算", "End");
-            case GameControl.GamePhase.WAIT: return SRApi.T("等待", "Wait");
-            default: return SRApi.T("空闲", "Idle");
+            case GameControl.GamePhase.START: return SRApi.Tid("87d63f318f", "准备", "Ready");
+            case GameControl.GamePhase.PLAY: return SRApi.Tid("ff8579f723", "游玩", "Play");
+            case GameControl.GamePhase.PLACE: return SRApi.Tid("9db72ef8ce", "建造", "Build");
+            case GameControl.GamePhase.SUDDENDEATH: return SRApi.Tid("d8d8cb5185", "决胜", "Sudden death");
+            case GameControl.GamePhase.END: return SRApi.Tid("b09c26afe2", "结算", "End");
+            case GameControl.GamePhase.WAIT: return SRApi.Tid("df7f30218f", "等待", "Wait");
+            default: return SRApi.Tid("25bf134c48", "空闲", "Idle");
             }
         }
 

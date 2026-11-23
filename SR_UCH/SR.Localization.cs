@@ -203,7 +203,7 @@ public partial class SR {
             if (hk == null) return "";
             KeyCode v = KeyCode.None;
             try { v = hk.Value; } catch (Exception __ex) { Guard.Log("按键提示行", __ex); return ""; }
-            if (v == KeyCode.None) return T("按键：右键设置/删除快捷键", "Key: right-click to set/remove");
+            if (v == KeyCode.None) return Tid("9e9176d4aa", "按键：右键设置/删除快捷键", "Key: right-click to set/remove");
             return T("按键：" + ComboKeyDisplay(hk, v), "Key: " + ComboKeyDisplay(hk, v));
         }
 
@@ -290,7 +290,7 @@ public partial class SR {
         }
 
         private static string ModeLabelRaw() {
-            string mode = T("未知", "Unknown");
+            string mode = Tid("5e1302f90c", "未知", "Unknown");
             try {
                 GameState.GameMode gm = GameSettings.GetInstance().GameMode;
                 string term = null;
@@ -311,11 +311,11 @@ public partial class SR {
             try { scene = SceneManager.GetActiveScene().name; } catch (Exception __ex) { Guard.Log("ModeLabel 场景名", __ex); }
             string level = null;
             try {
-                if (scene == "Treehouse") level = T("树屋", "Treehouse");
-                else if (scene == "Lobby") level = T("大厅", "Lobby");
+                if (scene == "Treehouse") level = Tid("3f7114bae0", "树屋", "Treehouse");
+                else if (scene == "Lobby") level = Tid("5ffed55f6c", "大厅", "Lobby");
                 else if (scene == "BlankLevel") {
                     LevelSelectController.PlayedSnapshotInfo info = GameState.GetInstance().currentSnapshotInfo;
-                    level = !string.IsNullOrEmpty(info.snapshotName) ? info.snapshotName : T("自定义关卡", "Custom level");
+                    level = !string.IsNullOrEmpty(info.snapshotName) ? info.snapshotName : Tid("756f1de77d", "自定义关卡", "Custom level");
                 } else if (!string.IsNullOrEmpty(scene)) {
                     foreach (GameState.LevelName lv in Enum.GetValues(typeof(GameState.LevelName))) {
                         if (GameState.GetLevelSceneName(lv) == scene) { level = GameState.GetLevelLocalizedName(lv); break; }
@@ -406,7 +406,7 @@ public partial class SR {
             get { return (_langEn || _fallbackEn) && !_forceZh; }
         }
 
-        // 外部语言包覆盖：先按中文原文查，再按英文原名查；词条表引用按语言版本号缓存。
+        // 动态文案的原文覆盖：按中文/英文原文查；静态词条一律走 Tid 的 @id 索引。
         private static IDictionary<string, string> _packMap;
         private static int _packMapVer = -1;
 
@@ -433,6 +433,18 @@ public partial class SR {
             return UseEn ? (en ?? zh) : zh;
         }
 
+        // 稳定 ID 入口：语言包只按 @id 索引；未收录时用内置文案。
+        // T(zh,en) 仅用于非字面量动态文案，不参与词条索引。
+        public static string Tid(string id, string zh, string en) {
+            if (_pack != null && !_forceZh && !string.IsNullOrEmpty(id)) {
+                try {
+                    IDictionary<string, string> map = _pack.Map;
+                    string ov;
+                    if (map != null && map.TryGetValue("@" + id, out ov) && ov != null) return ov;
+                } catch (Exception __ex) { Guard.Log("Tid", __ex); }
+            }
+            return UseEn ? (en ?? zh) : zh;
+        }
         private static readonly Dictionary<string, string> _enumZh = new Dictionary<string, string> {
             { "PUBLIC", "公开" }, { "FRIENDS", "仅限朋友" }, { "PRIVATE", "仅邀请" }, { "INVISIBLE", "隐身" },
             { "Fun", "好玩" }, { "Competitive", "竞技" }, { "Beginner", "新手" }, { "CustomLevels", "自定义关卡" },

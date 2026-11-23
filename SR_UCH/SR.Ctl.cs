@@ -292,7 +292,6 @@ public partial class SR {
         public static bool LangEn { get { return UseEn; } }
         public static bool ForceZh { get { return _forceZh; } set { _forceZh = value; } }
         public static Dictionary<ConfigEntryBase, bool> EditOpen { get { return _editOpen; } }
-        // 下拉框矩形登记（上一帧）：窗口据此在 BeginScrollView 之前截走滚轮。
         private static System.Collections.Generic.List<Rect> _comboRectsCur = new System.Collections.Generic.List<Rect>();
         private static System.Collections.Generic.List<Rect> _comboRectsPrev = new System.Collections.Generic.List<Rect>();
         internal static void ComboFrameBegin() {
@@ -348,7 +347,7 @@ public partial class SR {
         // 按钮矩形登记（右键绑键用），命中检测须在同一 GUI 组内。
 
         private static string RecText() {
-            if (_recSeq.Count == 0) return T("请按键...", "press keys...");
+            if (_recSeq.Count == 0) return Tid("510fee023b", "请按键...", "press keys...");
             string s = "";
             foreach (KeyCode k in _recSeq) s += (s.Length > 0 ? " -> " : "") + KeyDisplayName(k);
             return s;
@@ -383,7 +382,7 @@ public partial class SR {
         private static bool SelfToggleButton(string label, string tooltip, bool on, ConfigEntry<KeyCode> keyEntry, float width = 0f, bool bindable = false) {
             bool capturing = keyEntry != null && _capturing == keyEntry;
             
-            string text = label + (on ? T("开", "ON") : T("关", "OFF")) + SR.KeySuffix(keyEntry);
+            string text = label + (on ? Tid("3afb327a3e", "开", "ON") : Tid("525ff1a6ae", "关", "OFF")) + SR.KeySuffix(keyEntry);
             float w = width > 0f ? width : Sc(150);
             Event e = Event.current;
             int evBtn = e != null ? e.button : 0;
@@ -401,7 +400,7 @@ public partial class SR {
         private static string KeyTip(ConfigEntry<KeyCode> key) {
             try {
                 if (key == null || key.Value == KeyCode.None) return "";
-                return "\n" + T("按键：", "Key: ") + SR.KeySuffix(key).Trim().Trim('[', ']');
+                return "\n" + Tid("5cd9e67d82", "按键：", "Key: ") + SR.KeySuffix(key).Trim().Trim('[', ']');
             } catch { return ""; }
         }
 
@@ -414,7 +413,7 @@ public partial class SR {
                 actTip += KeyTip(keyEntry);
                 
                 if (bindable) {
-                    string hintTxt = T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey");
+                    string hintTxt = Tid("c576c0e119", "右键：绑定/删除快捷键", "Right-click: bind/remove hotkey");
                     tooltip = string.IsNullOrEmpty(actTip) ? hintTxt : actTip + "\n" + hintTxt;
                 } else {
                     tooltip = actTip;
@@ -492,7 +491,7 @@ public partial class SR {
             bool capturing = key != null && _capturing == key;
             // 快捷键框只显示按键；动作名进提示，提示不能以换行开头。
             string tip = tooltip ?? "";
-            string hint = T("右键：绑定/删除快捷键", "Right-click: bind/remove hotkey");
+            string hint = Tid("c576c0e119", "右键：绑定/删除快捷键", "Right-click: bind/remove hotkey");
             tip = tip.Length > 0 ? tip + "\n" + hint : hint;
             tip = SRApi.Ctl.CleanTip(tip);
             Event e = Event.current;
@@ -545,7 +544,7 @@ public partial class SR {
         }
 
         private static void RenderHomePage() {
-            GUILayout.Label(T("- 欢迎使用 SR＿UCH -", "- Welcome to SR＿UCH -"), _secHeader);
+            GUILayout.Label(Tid("8d020282f8", "- 欢迎使用 SR＿UCH -", "- Welcome to SR＿UCH -"), _secHeader);
             // 自检发现问题时在首页提示；详细清单在 设置 -> 自检。
             if (SR.AuditHasIssues) {
                 Color __pc = GUI.color;
@@ -556,11 +555,11 @@ public partial class SR {
                 } finally { GUI.color = __pc; }
                 GUILayout.Space(Sc(2));
             }
-            WrapLabel(T("Ultimate Chicken Horse 模组整合增强包。", "An enhancement pack for Ultimate Chicken Horse."));
-            WrapLabel(T("本 mod 参考了 BetterFreeplay，BuildingPlus，BuildUnlimiter，UCH Freeplay Spawn Setter，UCH Tweaks，UCH-PlayerTracker-Mod，UltimateBuilder，向这些 mod 的制作者表示感谢。", "This mod references BetterFreeplay, BuildingPlus, BuildUnlimiter, UCH Freeplay Spawn Setter, UCH Tweaks, UCH-PlayerTracker-Mod and UltimateBuilder. Thanks to their authors."));
+            WrapLabel(Tid("b831730f4d", "Ultimate Chicken Horse 模组整合增强包。", "An enhancement pack for Ultimate Chicken Horse."));
+            WrapLabel(Tid("d4163ecbb7", "本 mod 参考了 BetterFreeplay，BuildingPlus，BuildUnlimiter，UCH Freeplay Spawn Setter，UCH Tweaks，UCH-PlayerTracker-Mod，UltimateBuilder，向这些 mod 的制作者表示感谢。", "This mod references BetterFreeplay, BuildingPlus, BuildUnlimiter, UCH Freeplay Spawn Setter, UCH Tweaks, UCH-PlayerTracker-Mod and UltimateBuilder. Thanks to their authors."));
             GUILayout.Space(Sc(2));
 
-            GUILayout.Label(T("- 开源地址 -", "- Source -"), _secHeader);
+            GUILayout.Label(Tid("22110495d9", "- 开源地址 -", "- Source -"), _secHeader);
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("https://github.com/RSTFS/SR_UCH", _btn, GUILayout.Height(Sc(30)))) {
                 try { Application.OpenURL("https://github.com/RSTFS/SR_UCH"); } catch (Exception __ex) { Guard.Log("打开开源地址", __ex); }
@@ -570,19 +569,15 @@ public partial class SR {
             GUILayout.Space(Sc(2));
 
             GUILayout.Space(Sc(8));
-            GUILayout.Label(T("- 操作提示 -", "- Tips -"), _secHeader);
-            WrapLabelTight(T("表格：拖分隔线调列宽，拖表头换列序，右键表头隐藏列；Shift+右键表格 = 还原。",
-                "Tables: drag a separator to resize, drag a header to reorder, right-click a header to hide a column; Shift+right-click the table to reset."));
-            WrapLabelTight(T("滚轮：Shift+滚轮横向滚动；下拉框/滑块上滚轮只调值，不滚页面。",
-                "Wheel: Shift+wheel scrolls horizontally; over a dropdown/slider the wheel changes its value instead of scrolling."));
-            WrapLabelTight(T("按键：点键位框后按键录制，支持组合键与 9->0 序列；Esc 清空，Shift+Esc 恢复原值。",
-                "Keys: click the key box and press keys to record; combos and sequences like 9->0 work; Esc clears, Shift+Esc restores the previous value."));
-            WrapLabelTight(T("条目：点名称恢复默认值，右键名称绑定快捷键。", "Entries: click a name to restore its default, right-click a name to bind a hotkey."));
-            WrapLabelTight(T("侧栏：在设置页的自定义栏目里拖动列头，即可调整栏目顺序。",
-                "Sidebar: reorder sections by dragging a header under Settings - Custom sections."));
+            GUILayout.Label(Tid("1683900adb", "- 操作提示 -", "- Tips -"), _secHeader);
+            WrapLabelTight(Tid("15df328c78", "表格：拖分隔线调列宽，拖表头换列序，右键表头隐藏列；Shift+右键表格 = 还原。", "Tables: drag a separator to resize, drag a header to reorder, right-click a header to hide a column; Shift+right-click the table to reset."));
+            WrapLabelTight(Tid("6e144384c2", "滚轮：Shift+滚轮横向滚动；下拉框/滑块上滚轮只调值，不滚页面。", "Wheel: Shift+wheel scrolls horizontally; over a dropdown/slider the wheel changes its value instead of scrolling."));
+            WrapLabelTight(Tid("44bc0664f8", "按键：点键位框后按键录制，支持组合键与 9->0 序列；Esc 清空，Shift+Esc 恢复原值。", "Keys: click the key box and press keys to record; combos and sequences like 9->0 work; Esc clears, Shift+Esc restores the previous value."));
+            WrapLabelTight(Tid("10f224ef75", "条目：点名称恢复默认值，右键名称绑定快捷键。", "Entries: click a name to restore its default, right-click a name to bind a hotkey."));
+            WrapLabelTight(Tid("6d26da5a02", "侧栏：在设置页的自定义栏目里拖动列头，即可调整栏目顺序。", "Sidebar: reorder sections by dragging a header under Settings - Custom sections."));
 
-            GUILayout.Label(T("- 请共同维护游戏体验 -", "- Keep the game fun for everyone -"), _secHeader);
-            WrapLabel(T("请不要使用本模组破坏别人的游戏体验。", "Please do not use this mod to ruin other players' experience."));
+            GUILayout.Label(Tid("ffc11e305b", "- 请共同维护游戏体验 -", "- Keep the game fun for everyone -"), _secHeader);
+            WrapLabel(Tid("db080771f9", "请不要使用本模组破坏别人的游戏体验。", "Please do not use this mod to ruin other players' experience."));
             GUILayout.Space(Sc(2));
 
             GUILayout.FlexibleSpace();
@@ -791,7 +786,6 @@ public partial class SR {
 
 
 
-    // 页签行：须在 RenderPageHeader 之前调用；每栏目有一个左侧前缀绘制点。
     private static readonly Dictionary<string, Action> _tabPrefix = new Dictionary<string, Action>();
 
     public static void RegisterTabPrefix(string section, Action draw) {

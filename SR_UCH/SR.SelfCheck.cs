@@ -19,35 +19,11 @@ public partial class SR {
             GUILayout.Label(text, _labelWrap, GUILayout.Height(Mathf.Max(Sc(18f), h)));
         }
 
-        // 诊断报告：自检、功能清单、帧钩子耗时、运行时异常拼成可粘贴文本，无需查日志文件。
+        // 诊断报告：卡片 / 支持包 / 日志行 / CI 基线共用 HealthSnapshot，文本格式由契约层定义。
         internal static string BuildDiagnosticReport() {
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
-            try {
-                sb.AppendLine("=== SR_UCH 诊断报告 ===");
-                sb.Append("游戏版本: ").AppendLine(Application.version);
-                sb.Append("契约版本: v").AppendLine(SRContract.Version.ToString());
-                sb.Append("补丁: ").Append(SR.AuditPatchOk).Append("/").Append(SR.AuditPatchTotal)
-                  .Append("  反射: ").Append(SR.AuditRefOk).Append("/").Append(SR.AuditRefTotal).AppendLine();
-                sb.Append("功能: ").Append(Features.Count).Append("  问题: ").Append(Features.ProblemCount).AppendLine();
-                sb.Append("第三方插件: ").AppendLine(CompatSummary());
-                sb.Append("启动耗时: ").AppendLine(SR.BootTimings ?? "(未记录)");
-                sb.Append("API 注入: ").Append(SRApi.SinkCount()).Append("/").Append(SRApi.SinkTotal()).AppendLine();
-                string[] miss = SRApi.MissingSinks();
-                if (miss != null && miss.Length > 0) sb.Append("缺失注入: ").AppendLine(string.Join(",", miss));
-                sb.Append("槽位: ").Append(Slots.Count).Append("  未提供: ").Append(Slots.MissCount).AppendLine();
-                if (Slots.MissNames != null && Slots.MissNames.Count > 0) sb.Append("未提供的槽位: ").AppendLine(string.Join(", ", new List<string>(Slots.MissNames).ToArray()));
-                sb.Append("运行时异常: ").AppendLine(SR.Guard.WarnCount.ToString());
-                if (!string.IsNullOrEmpty(SR.Guard.LastWhat)) sb.Append("最近一次: ").Append(SR.Guard.LastWhat).Append(" - ").AppendLine(SR.Guard.LastError ?? "");
-                IList<SR.AuditIssue> issues = SR.AuditIssues;
-                if (issues != null) {
-                    for (int i = 0; i < issues.Count; i++) {
-                        sb.Append("  ✗ ").Append(issues[i].Kind).Append(" ").Append(issues[i].Target).Append(" <- ").AppendLine(issues[i].Scope);
-                    }
-                }
-                sb.AppendLine(SR.TickProfileReport());
-                sb.AppendLine(SR.AttributionReport());
-            } catch (Exception __ex) { Guard.Log("生成诊断报告", __ex); }
-            return sb.ToString();
+            string gv = "?";
+            try { gv = Application.version; } catch (Exception __gv) { Guard.Log("诊断报告/游戏版本", __gv); }
+            return Health.DiagnosticText(gv);
         }
 
         private static SRApi.TableArgs _hookArgs;   // 帧钩子表格
@@ -60,27 +36,27 @@ public partial class SR {
                 int bad = issues != null ? issues.Count : 0;
                 bool allClean = bad == 0;
 
-                Card(allClean, T("总体", "Overall"),
-                    allClean ? T("一切正常", "Everything is fine")
+                Card(allClean, Tid("6b2ffdda16", "总体", "Overall"),
+                    allClean ? Tid("76ae0999b9", "一切正常", "Everything is fine")
                              : T(bad + " 项失效：开关还在，行为没了", bad + " broken target(s): the switches remain, the behaviour is gone"),
                     delegate {
                         GUILayout.BeginHorizontal();
-                        if (GUILayout.Button(T("重新扫描", "Rescan"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
+                        if (GUILayout.Button(Tid("e487a81b29", "重新扫描", "Rescan"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
                             // 真正重新采集：重扫 Harmony 补丁表并重建归因快照。
                             try {
                                 SR.ScanPatches();
-                                SR.Notify(T("已重新扫描补丁与归因", "Patches and attribution rescanned"));
+                                SR.Notify(Tid("bb13ef410d", "已重新扫描补丁与归因", "Patches and attribution rescanned"));
                             } catch (Exception __rs) { Guard.Log("自检/重新扫描", __rs); }
                         }
-                        if (GUILayout.Button(T("复制报告", "Copy report"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
+                        if (GUILayout.Button(Tid("4e24f03ab1", "复制报告", "Copy report"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
                             string rep = BuildDiagnosticReport();
                             bool ok = false;
                             try { GUIUtility.systemCopyBuffer = rep; ok = true; } catch (Exception __cb) { Guard.Log("复制诊断报告", __cb); }
-                            SR.Notify(ok ? T("诊断报告已复制", "Report copied") : T("复制失败，已写入日志", "Copy failed; written to log"));
+                            SR.Notify(ok ? Tid("2b47eadbf6", "诊断报告已复制", "Report copied") : Tid("71b47828b3", "复制失败，已写入日志", "Copy failed; written to log"));
                             if (!ok) { try { SR.LogInfo(rep); } catch (Exception __lg) { Guard.Log("诊断报告写日志", __lg); } }
                         }
-                        if (GUILayout.Button(T("写入日志", "Write to log"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
-                            try { SR.LogInfo(BuildDiagnosticReport()); SR.Notify(T("已写入日志", "Written to log")); }
+                        if (GUILayout.Button(Tid("67647145ea", "写入日志", "Write to log"), _btn, GUILayout.Width(Sc(96)), GUILayout.Height(Sc(24)))) {
+                            try { SR.LogInfo(BuildDiagnosticReport()); SR.Notify(Tid("a19a591e53", "已写入日志", "Written to log")); }
                             catch (Exception __lg) { Guard.Log("写诊断日志", __lg); }
                         }
                         GUILayout.FlexibleSpace();
@@ -88,7 +64,7 @@ public partial class SR {
                     });
 
                 bool __cfgOk = SR.OrphanKeyCount == 0 && SR.FallbackSectionCount == 0;
-                Card(bad == 0 && __cfgOk, T("目标与配置", "Targets & config"),
+                Card(bad == 0 && __cfgOk, Tid("8a71957dff", "目标与配置", "Targets & config"),
                     bad == 0 ? T(SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " 补丁 · " + SR.AuditRefOk + "/" + SR.AuditRefTotal + " 反射 · 孤儿键 " + SR.OrphanKeyCount + " · 异常 " + SR.Guard.WarnCount,
                                  SR.AuditPatchOk + "/" + SR.AuditPatchTotal + " patches · " + SR.AuditRefOk + "/" + SR.AuditRefTotal + " members · orphan keys " + SR.OrphanKeyCount + " · errors " + SR.Guard.WarnCount)
                              : T(bad + " 项失效", bad + " broken"),
@@ -97,7 +73,7 @@ public partial class SR {
                         // 不用内层滚动区：页面本身可滚，嵌套 BeginScrollView 会让排版错位。
                         for (int i = 0; i < issues.Count; i++) {
                             string kindRaw = issues[i].Kind;
-                            string kindTxt = kindRaw == "补丁" ? T("补丁", "Patch") : kindRaw == "反射" ? T("反射", "Reflection") : kindRaw;
+                            string kindTxt = kindRaw == "补丁" ? Tid("443eec7811", "补丁", "Patch") : kindRaw == "反射" ? Tid("97e7e627c0", "反射", "Reflection") : kindRaw;
                             string tgt = issues[i].Target ?? "";
                             float h = Mathf.Max(_labelWrap.CalcHeight(new GUIContent(tgt), Sc(320)), Ctl.TableRowH());
                             GUILayout.BeginHorizontal();
@@ -115,30 +91,30 @@ public partial class SR {
                             bool oldEn2 = GUI.enabled;
                             try {
                                 GUI.enabled = oldEn2 && had;
-                                if (GUILayout.Button(T("清理孤儿键（", "Clean orphan keys (") + SR.OrphanKeyCount + ")", _btn,
+                                if (GUILayout.Button(Tid("dbb4d3c784", "清理孤儿键（", "Clean orphan keys (") + SR.OrphanKeyCount + ")", _btn,
                                         GUILayout.Width(Sc(170)), GUILayout.Height(Sc(24)))) {
                                     int __n = SR.CleanOrphanKeys();
                                     SR.Notify(__n > 0
-                                        ? T("已清理 ", "Cleaned ") + __n + T(" 个孤儿键（原文件已备份）", " orphan keys (backup kept)")
-                                        : T("没有可清理的孤儿键", "Nothing to clean"));
+                                        ? Tid("3da3137b49", "已清理 ", "Cleaned ") + __n + Tid("1816b4babb", " 个孤儿键（原文件已备份）", " orphan keys (backup kept)")
+                                        : Tid("6bb5a5535d", "没有可清理的孤儿键", "Nothing to clean"));
                                     try { SR.ScanPatches(); } catch (Exception __rs) { Guard.Log("自检/清理后重扫", __rs); }
                                 }
                             } finally { GUI.enabled = oldEn2; }
                             GUILayout.Label(had
-                                    ? T("配置里有已不再使用的键；清理会先备份原文件", "The config still has keys nothing reads any more; the original file is backed up first")
-                                    : T("没有孤儿键", "No orphan keys"),
+                                    ? Tid("65e70f7e86", "配置里有已不再使用的键；清理会先备份原文件", "The config still has keys nothing reads any more; the original file is backed up first")
+                                    : Tid("e880297c0b", "没有孤儿键", "No orphan keys"),
                                 _label, GUILayout.Height(Sc(24)));
                             GUILayout.FlexibleSpace();
                         } finally { GUILayout.EndHorizontal(); }
 
                         // 契约版本：宿主 API 版本与功能最低要求，升级/降级时一眼可见。
-                        AuditLabel(T("契约版本", "Contract") + "：API v" + SRContract.Version
-                            + " · " + T("最低要求", "min required") + " ≤ v" + SRContract.Version);
-                        AuditLabel(T("配置：孤儿键", "Config: orphan keys") + "：" + SR.OrphanKeyCount
-                            + " · " + T("无主段", "unowned sections") + "：" + SR.FallbackSectionCount
-                            + " · " + T("运行时异常", "runtime errors") + "：" + SR.Guard.WarnCount);
+                        AuditLabel(Tid("03522cb155", "契约版本", "Contract") + "：API v" + SRContract.Version
+                            + " · " + Tid("da665858b8", "最低要求", "min required") + " ≤ v" + SRContract.Version);
+                        AuditLabel(Tid("540c13a5dc", "配置：孤儿键", "Config: orphan keys") + "：" + SR.OrphanKeyCount
+                            + " · " + Tid("c3c9459406", "无主段", "unowned sections") + "：" + SR.FallbackSectionCount
+                            + " · " + Tid("8f681d1233", "运行时异常", "runtime errors") + "：" + SR.Guard.WarnCount);
                         if (!string.IsNullOrEmpty(SR.Guard.LastWhat))
-                            AuditLabel(T("最近一次", "Last") + "：" + SR.Guard.LastWhat + " - " + (SR.Guard.LastError ?? ""));
+                            AuditLabel(Tid("ddd08b47d1", "最近一次", "Last") + "：" + SR.Guard.LastWhat + " - " + (SR.Guard.LastError ?? ""));
                         try { AuditLabel(SR.AttributionReport()); } catch (Exception __at) { Guard.Log("自检/归因", __at); }
                     });
 
@@ -146,8 +122,8 @@ public partial class SR {
                 RenderGuardRecentCard();
 
                 List<SR.KeyConflict> conflicts = SR.FindKeyConflicts();
-                Card(conflicts.Count == 0, T("键位冲突", "Key conflicts"),
-                    conflicts.Count == 0 ? T("没有重复的快捷键", "no duplicate hotkeys")
+                Card(conflicts.Count == 0, Tid("d3c53e2e30", "键位冲突", "Key conflicts"),
+                    conflicts.Count == 0 ? Tid("d49bf6e7c1", "没有重复的快捷键", "no duplicate hotkeys")
                                          : T(conflicts.Count + " 组快捷键重复", conflicts.Count + " duplicate combo(s)"),
                     delegate {
                         for (int i = 0; i < conflicts.Count; i++) {
@@ -158,7 +134,7 @@ public partial class SR {
                             GUILayout.Label(kc.A + "  ↔  " + kc.B, _labelWrap, GUILayout.ExpandWidth(true), GUILayout.Height(Ctl.TableRowH()));
                             GUILayout.EndHorizontal();
                         }
-                        if (conflicts.Count == 0) AuditLabel(T("（自动快捷键与右键绑定都在检测范围内；重复时两条动作会同时触发）", "(covers auto hotkeys and right-click bindings; a duplicate fires both actions)"));
+                        if (conflicts.Count == 0) AuditLabel(Tid("9d04ee2773", "（自动快捷键与右键绑定都在检测范围内；重复时两条动作会同时触发）", "(covers auto hotkeys and right-click bindings; a duplicate fires both actions)"));
                     });
 
                 RenderKeyCenterCard();
@@ -167,8 +143,8 @@ public partial class SR {
                 bool __profOn = false;
                 try { __profOn = SR.TickProfilingEnabled; } catch (Exception __tp) { Guard.Log("自检/读性能开关", __tp); }
                 string tickRep = __profOn ? SR.TickProfileReport() : null;
-                Card(true, T("帧钩子", "Frame hooks"),
-                    T("按名字排序，超阈值才需要关注", "sorted by name; only over-threshold rows matter"),
+                Card(true, Tid("3c6ec1fe21", "帧钩子", "Frame hooks"),
+                    Tid("ef2e3e96e0", "按名字排序，超阈值才需要关注", "sorted by name; only over-threshold rows matter"),
                     delegate {
                         // 剖析开关（默认关）：关掉后既不写日志也不刷新列表。
                         SRApi.RenderSectionEntries(Keys.Settings, delegate (ConfigEntryBase e) {
@@ -177,13 +153,13 @@ public partial class SR {
                         // 预算状态：压力与当前档位（超预算时非输入钩子自动降频）。
                         try { AuditLabel(SR.TickBudgetText()); } catch (Exception __tb) { Guard.Log("自检/预算状态", __tb); }
                         if (!__profOn) {
-                            AuditLabel(T("（剖析已关闭：勾选上面的开关后开始采样）", "(profiling is off: tick the switch above to start sampling)"));
+                            AuditLabel(Tid("2d52014712", "（剖析已关闭：勾选上面的开关后开始采样）", "(profiling is off: tick the switch above to start sampling)"));
                             return;
                         }
                         // 用核心 TableDraw：按内容高，不套内层滚动区。
                         _hookRows = SR.TickProfileRows();   // 静态字段：避免闭包钉死首帧数据
                         List<string[]> hrows = _hookRows;
-                        if (hrows.Count == 0) { AuditLabel(T("（还没有采样）", "(no samples yet)")); return; }
+                        if (hrows.Count == 0) { AuditLabel(Tid("7bcc4296b3", "（还没有采样）", "(no samples yet)")); return; }
                         if (_hookArgs == null) {
                             _hookArgs = new SRApi.TableArgs();
                             _hookArgs.colW = new float[] { 200f, 90f, 90f, 70f, 60f };
@@ -191,7 +167,7 @@ public partial class SR {
                             _hookArgs.hidden = new HashSet<int>();
                             _hookArgs.vis = new List<int>();   // 由核心推导可见列
                             _hookArgs.resizable = true;
-                            _hookArgs.title = delegate (int c) { return c == 0 ? T("钩子", "Hook") : c == 1 ? T("平均", "Avg") : c == 2 ? T("峰值", "Max") : c == 3 ? T("频率", "Rate") : T("超限", "Over"); };
+                            _hookArgs.title = delegate (int c) { return c == 0 ? Tid("99b5d39252", "钩子", "Hook") : c == 1 ? Tid("0a145d06f7", "平均", "Avg") : c == 2 ? Tid("dea091f979", "峰值", "Max") : c == 3 ? Tid("adbc1a9e34", "频率", "Rate") : Tid("151dc7c457", "超限", "Over"); };
                             _hookArgs.rowCells = delegate (int row) { return _hookRows[row]; };
                         }
                         _hookArgs.rowCount = hrows.Count;

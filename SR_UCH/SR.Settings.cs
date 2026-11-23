@@ -9,6 +9,24 @@ using BepInEx.Configuration;
 using UnityEngine;
 
 namespace SR_UCH.Tweaks {
+
+    // Configuration Manager（F1）反射读取的容器：类名 / 字段名不可改，CM 按字段名读 Tags。
+    // 原先是独立文件 SR.CmAttributes.cs；SR_UCH/ 只收本体，故并入唯一使用处（设置页）。
+    public class ConfigurationManagerAttributes {
+        public int? Order;
+        public bool? IsAdvanced;
+        public bool? Browsable;
+        public string Category;
+        public bool? ShowRangeAsPercent;
+        public bool? HideDefaultButton;
+        public bool? HideSettingName;
+        public bool? ReadOnly;
+        // Browsable=false 或 HideSetting=true 时不显示该条目。
+        public bool? HideSetting;
+        public string DispName;
+        public string Description;
+    }
+
 public partial class SR {
 
 // 分区：Settings（设置页 / 条目行 / 控件 / 滑块 / 下拉框）
@@ -154,14 +172,14 @@ public partial class SR {
                 RenderSidebarOrder();
                 RenderPluginList();
             }
-            if (!any) GUILayout.Label(T("（无匹配条目）", "(no matching entries)"), _label);
+            if (!any) GUILayout.Label(Tid("2be7d7a6da", "（无匹配条目）", "(no matching entries)"), _label);
         }
 
 
         private static void RenderSidebarWidthRow() {
             int cur = _sidebarWEntry != null ? Mathf.Clamp(_sidebarWEntry.Value, Ui.SidebarWMin, Ui.SidebarWMax) : 0;
             GUILayout.BeginHorizontal();
-            GUILayout.Label(new GUIContent(T("栏目宽度", "Sidebar Width"), T("左侧栏目栏宽度（0 = 自动，100-320）", "Left sidebar width (0 = auto, 100-320)")), _label, GUILayout.Width(Sc(140)), GUILayout.Height(Sc(26)));
+            GUILayout.Label(new GUIContent(Tid("7c099386bd", "栏目宽度", "Sidebar Width"), Tid("74e251460f", "左侧栏目栏宽度（0 = 自动，100-320）", "Left sidebar width (0 = auto, 100-320)")), _label, GUILayout.Width(Sc(140)), GUILayout.Height(Sc(26)));
             if (GUILayout.Button("-", _btn, GUILayout.Width(Sc(30)), GUILayout.Height(Sc(26)))) SetSidebarWidth(cur - 16);
             Rect sr = GUILayoutUtility.GetRect(Sc(150), CtlH(), GUILayout.Width(SliderTrackWidth()));
             float nv = DrawSlider(sr, cur, (float)Ui.SidebarWMin, (float)Ui.SidebarWMax, true);
@@ -284,7 +302,6 @@ public partial class SR {
                 HashSet<string> hid = new HashSet<string>();
                 // 先按改名映射改写段名，再做死条目判定。
                 if (!string.IsNullOrEmpty(ord)) ord = RemapSidebarOrderNames(ord);
-                // 剔除匹配不到真实栏目的死条目，须在字母序判定之前。
                 if (!string.IsNullOrEmpty(ord)) ord = DropDeadSidebarOrderNames(ord);
                 // 纯字母序的 Sidebar Order 视为非自定义并忽略，避免永久覆盖默认 rank 顺序。
                 if (!string.IsNullOrEmpty(ord)) {
@@ -431,9 +448,8 @@ public partial class SR {
         private static void RenderSidebarOrder() {
             try {
                 if (SR._allSections.Count <= 1) return;
-                GUILayout.Label(T("- 自定义栏目 -", "- Custom sections -"), _secHeader);
-                SR.WrapLabel(T("拖动列头调整侧栏顺序；右键列头隐藏栏目；Shift+右键还原。",
-                                  "Drag a header to reorder; right-click a header to hide a section; Shift+right-click to restore."));
+                GUILayout.Label(Tid("1987a57ec0", "- 自定义栏目 -", "- Custom sections -"), _secHeader);
+                SR.WrapLabel(Tid("be661445db", "拖动列头调整侧栏顺序；右键列头隐藏栏目；Shift+右键还原。", "Drag a header to reorder; right-click a header to hide a section; Shift+right-click to restore."));
                 int n = SR._allSections.Count;
                 EnsureOrdArgs(n);
                 GUILayout.BeginVertical(GUILayout.Height(Sc(30)));
@@ -625,8 +641,8 @@ public partial class SR {
                         // 反射登记：BepInEx 公共 API，改名后自检会报出来
                         SRApi.Ref.Override("AcceptableValueRange`1.Min", "悬浮条目：显示数值范围");
                         SRApi.Ref.Override("AcceptableValueRange`1.Max", "悬浮条目：显示数值范围");
-                        System.Reflection.PropertyInfo pmin = av.GetType().GetProperty("Min");
-                        System.Reflection.PropertyInfo pmax = av.GetType().GetProperty("Max");
+                        System.Reflection.PropertyInfo pmin = RefCache.PropertyOf(av.GetType(), "Min");
+                        System.Reflection.PropertyInfo pmax = RefCache.PropertyOf(av.GetType(), "Max");
                         if (pmin != null && pmax != null) {
                             object mn = pmin.GetValue(av, null), mx = pmax.GetValue(av, null);
                             if (mn != null && mx != null)

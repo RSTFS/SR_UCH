@@ -66,7 +66,11 @@ $refs = @(
 )
 
 $sources = @()
-foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $root 'SR_UCH\Contracts') -Filter '*.cs' -File | Sort-Object Name)) {
+# 纯函数层：契约层直接调用 SR_UCH.Pure.*，必须一起编（tests 工程同样包含 Pure\*.cs）。
+foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $root 'Pure') -Filter '*.cs' -File | Sort-Object FullName)) {
+    $sources += ('"' + $f.FullName + '"')
+}
+foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $root 'SR_UCH\Contracts') -Recurse -Filter '*.cs' -File | Sort-Object FullName)) {
     $sources += ('"' + $f.FullName + '"')
 }
 foreach ($f in @('Chaos.Logic.cs','NotifyHub.Logic.cs','BuildingPresets.Logic.cs')) {
@@ -93,7 +97,19 @@ if (Test-Path -LiteralPath $bepInExDll) {
 }
 
 Write-Host '== 运行测试 =='
-& $outExe
+# csc 编出来的 exe 引用的是"游戏自带 mscorlib"（.NET Framework），
+# 当前机器没有 .NET Framework 运行时，只能由 .NET 8 宿主直接执行 →
+# 框架错配：.NET Core 专有的重载（如 String.Split(char, StringSplitOptions)）会被误绑而抛
+# MissingMethodException。改用 tests\SR_UCH.Tests.csproj（net8.0，源码与 DllImport 一致）跑，
+# 结果等价且不受宿主框架影响；仅在 dotnet 不可用时回退到旧 exe。
+$testsProj = Join-Path (Join-Path $root 'tests') 'SR_UCH.Tests.csproj'
+$usedProj = $false
+if (Test-Path -LiteralPath $testsProj) {
+    & dotnet run --project $testsProj -c Release
+    if ($LASTEXITCODE -ne 0) { Write-Host '测试失败 ❌' -ForegroundColor Red; exit 1 }
+    $usedProj = $true
+}
+if (-not $usedProj) { & $outExe }
 if ($LASTEXITCODE -ne 0) {
     Write-Host '测试失败 ❌' -ForegroundColor Red
     exit 1

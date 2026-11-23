@@ -1,5 +1,5 @@
 // 方块破坏：列出现场方块、按玩家归属筛选、远程销毁。
-// 槽位（对外 Provide）：DestroyBlocks.PlayerPlacedBlocks / AttributeToHost。
+// 对外能力：SrCaps.AttributeToHost（快照方块归属房主）。
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
@@ -11,8 +11,7 @@ using UnityEngine.UI;
 
 namespace SR_UCH.Tweaks {
     [SrFeature("sr.destroyblocks", "DestroyBlocks", "1.0",
-        Modes = (int)(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay),
-        Provides = new string[] { "DestroyBlocks.PlayerPlacedBlocks", "DestroyBlocks.AttributeToHost" })]
+        Modes = (int)(SRApi.ModeMask.Party | SRApi.ModeMask.Creative | SRApi.ModeMask.Freeplay))]
     public class DestroyBlocks : ITweak {
         private static IFeatureHost _mp; // 仅用于读 Config（契约类型）
         private static int _index;
@@ -260,25 +259,26 @@ namespace SR_UCH.Tweaks {
             SRApi.RowFilters.Add(TrackPlayerRowVisible); // 通用条目行扩展点
             SRApi.LocSec("Destroy Blocks", "方块破坏", null);
             SRApi.Nav("Destroy Blocks", 80); // 侧栏栏目顺序
-            SRApi.LocKey("Destroy Blocks", "Toggle Key", "切换键", null);
-            SRApi.LocDesc("Destroy Blocks", "Toggle Key", "删除模式按键\n按住高亮候选方块（房客同样可用）\n可改绑，支持组合键", "Delete-mode key\nhold to highlight candidates (guests can use it too)\nrebindable, combos supported");
-            SRApi.LocKey("Destroy Blocks", "Delete Key", "删除键", null);
-            SRApi.LocDesc("Destroy Blocks", "Delete Key", "删除按键\n删除当前选中的方块（仅房主）\n房客按下只提示，不做删除；滚轮换目标", "Delete key\ndeletes the selected block (host only)\nguests only get a hint; the wheel cycles targets");
-            SRApi.LocKey("Destroy Blocks", "Enabled", "方块破坏", null);
-            SRApi.LocDesc("Destroy Blocks", "Enabled", "方块破坏总开关\n开启后本页功能才生效\n默认仅房主可删；房客可高亮标记", "Block breaking master switch\nthe page works only while this is on\nhost-only by default; guests can highlight");
-            SRApi.LocKey("Destroy Blocks", "Select Mode", "选择模式", null);
-            SRApi.LocDesc("Destroy Blocks", "Select Mode", "候选排序方式\n距离＝离你近的优先；放置顺序＝新放的优先\n只影响选择顺序", "Candidate ordering\ndistance = nearest first; placement = newest first\nselection order only");
-            SRApi.LocKey("Destroy Blocks", "List Mode", "列表模式", null);
-            SRApi.LocDesc("Destroy Blocks", "List Mode", "列表模式\n普通＝只列玩家放置的方块；进阶＝场上所有方块\n普通模式排除炸弹等临时物件", "List mode\nnormal = player-placed blocks only; advanced = every block\nnormal excludes temporary items such as bombs");
-            SRApi.LocKey("Destroy Blocks", "Track Player", "追踪玩家", null);
-            SRApi.LocDesc("Destroy Blocks", "Track Player", "按玩家号过滤\n不追踪＝全部；1-4＝只看该玩家\n只影响列表，需配合列表模式", "Player filter\nno-track = everyone; 1-4 = that player only\nlist only; works with list mode");
+            TweakCfg.Entry("Destroy Blocks", "Toggle Key", "切换键", null,
+                "删除模式按键\n按住高亮候选方块（房客同样可用）\n可改绑，支持组合键", "Delete-mode key\nhold to highlight candidates (guests can use it too)\nrebindable, combos supported");
+            TweakCfg.Entry("Destroy Blocks", "Delete Key", "删除键", null,
+                "删除按键\n删除当前选中的方块（仅房主）\n房客按下只提示，不做删除；滚轮换目标", "Delete key\ndeletes the selected block (host only)\nguests only get a hint; the wheel cycles targets");
+            TweakCfg.Entry("Destroy Blocks", "Enabled", "方块破坏", null,
+                "方块破坏总开关\n开启后本页功能才生效\n默认仅房主可删；房客可高亮标记", "Block breaking master switch\nthe page works only while this is on\nhost-only by default; guests can highlight");
+            TweakCfg.Entry("Destroy Blocks", "Select Mode", "选择模式", null,
+                "候选排序方式\n距离＝离你近的优先；放置顺序＝新放的优先\n只影响选择顺序", "Candidate ordering\ndistance = nearest first; placement = newest first\nselection order only");
+            TweakCfg.Entry("Destroy Blocks", "List Mode", "列表模式", null,
+                "列表模式\n普通＝只列玩家放置的方块；进阶＝场上所有方块\n普通模式排除炸弹等临时物件",
+                "List mode\nnormal = player-placed blocks only; advanced = every block\nnormal excludes temporary items such as bombs");
+            TweakCfg.Entry("Destroy Blocks", "Track Player", "追踪玩家", null,
+                "按玩家号过滤\n不追踪＝全部；1-4＝只看该玩家\n只影响列表，需配合列表模式", "Player filter\nno-track = everyone; 1-4 = that player only\nlist only; works with list mode");
             SRApi.LocEnum("Realtime", "实时");
             SRApi.LocEnum("Snapshot", "暂存");
-            SRApi.LocKey("Destroy Blocks", "Refresh Mode", "列表刷新", null);
-            SRApi.LocDesc("Destroy Blocks", "Refresh Mode", "候选列表刷新方式\n实时＝按住时持续更新；暂存＝按下时重建一次\n实时已节流，只在按住时有开销", "Candidate refresh\nrealtime = updates while held; snapshot = built once on press\nrealtime is throttled and only costs while held");
-            SRApi.LocKey("Destroy Blocks", "Use Smoke", "破坏动画", null);
-            SRApi.LocDesc("Destroy Blocks", "Use Smoke", "破坏动画\n删除方块时播放烟雾与破碎效果\n关闭后方块直接消失",
-                "Break effect\nplays the smoke and shatter effect when a piece is removed\nwhen off the piece just disappears");
+            TweakCfg.Entry("Destroy Blocks", "Refresh Mode", "列表刷新", null,
+                "候选列表刷新方式\n实时＝按住时持续更新；暂存＝按下时重建一次\n实时已节流，只在按住时有开销",
+                "Candidate refresh\nrealtime = updates while held; snapshot = built once on press\nrealtime is throttled and only costs while held");
+            TweakCfg.Entry("Destroy Blocks", "Use Smoke", "破坏动画", null,
+                "破坏动画\n删除方块时播放烟雾与破碎效果\n关闭后方块直接消失", "Break effect\nplays the smoke and shatter effect when a piece is removed\nwhen off the piece just disappears");
         }
 
         private static bool RealtimeListOn { get { return _refreshMode == null || _refreshMode.Value == RefreshMode.Realtime; } }
@@ -293,7 +293,9 @@ namespace SR_UCH.Tweaks {
             _mp = plugin;
             ConfigEntry<bool> enabled = _mp.Config.Bind("Destroy Blocks", "Enabled", false, "方块破坏功能总开关（仅房主可用）");
             Enabled = enabled.Value;
-            enabled.SettingChanged += (s, e) => Enabled = enabled.Value;
+            System.EventHandler __h_enabled_1 = (s, e) => Enabled = enabled.Value;
+            enabled.SettingChanged += __h_enabled_1;
+            Sub.Revoke(() => enabled.SettingChanged -= __h_enabled_1);
             _toggleKey = _mp.Config.Bind(
                 "Destroy Blocks",
                 "Toggle Key",
@@ -318,7 +320,9 @@ namespace SR_UCH.Tweaks {
                 ListMode.Normal,
                 "列表模式：普通 = 只列出玩家确切放置过的方块（关卡初始布局/系统方块不出现）；进阶 = 所有方块单独列出，不在乎有没有玩家号。");
             // 该行可见性取决于列表模式，条目缓存只按绑定版本失效，故切换时须主动失效。
-            _listMode.SettingChanged += (s, e) => SRApi.Ctl.NoteEntryBound();
+            System.EventHandler __h__listMode_2 = (s, e) => SRApi.Ctl.NoteEntryBound();
+            _listMode.SettingChanged += __h__listMode_2;
+            Sub.Revoke(() => _listMode.SettingChanged -= __h__listMode_2);
             _trackMode = _mp.Config.Bind(
                 "Destroy Blocks",
                 "Track Player",
@@ -332,8 +336,14 @@ namespace SR_UCH.Tweaks {
             _useSmoke = _mp.Config.Bind("Destroy Blocks", "Use Smoke", false,
                 "破坏动画：删除方块时播放烟雾与破碎效果；关闭后方块直接消失。");
 
-            _listMode.SettingChanged += (s, e) => _listDirty = true;
-            _trackMode.SettingChanged += (s, e) => _listDirty = true;
+            System.EventHandler __h__listMode_3 = (s, e) => _listDirty = true;
+
+            _listMode.SettingChanged += __h__listMode_3;
+
+            Sub.Revoke(() => _listMode.SettingChanged -= __h__listMode_3);
+            System.EventHandler __h__trackMode_4 = (s, e) => _listDirty = true;
+            _trackMode.SettingChanged += __h__trackMode_4;
+            Sub.Revoke(() => _trackMode.SettingChanged -= __h__trackMode_4);
 
             // 补丁注册失败不能连带跳过后面的 Listener 注册与场景订阅。
             try { SRApi.RegisterPatch(typeof(DestroyBlocks)); } catch (Exception e) { SRApi.LogError("方块破坏 补丁注册失败: " + e.Message); }
@@ -343,16 +353,15 @@ namespace SR_UCH.Tweaks {
             // 补记非本端放置的方块归属，供追踪模式按玩家号筛选。
             NetworkPlacementListener netListener = new NetworkPlacementListener();
             GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(netListener, true);
-            SceneManager.activeSceneChanged += OnSceneChanged;
+            UnityEngine.Events.UnityAction<UnityEngine.SceneManagement.Scene, UnityEngine.SceneManagement.Scene> __h_SceneManager_5 = OnSceneChanged;
+            SceneManager.activeSceneChanged += __h_SceneManager_5;
+            Sub.Revoke(() => SceneManager.activeSceneChanged -= __h_SceneManager_5);
             _listener = listener;
             _netListener = netListener;
 
-            // 归属登记走槽位，避免编译期引用（拆分编译 CS0103）；Level.Snapshot 经 Require 取 AttributeToHost。
-            // 委托存局部变量：注销按值匹配，避免误删后来注册的实现。
-            Func<List<Placeable>> __ppb = PlayerPlacedBlocks;
+            // 归属能力直接写契约层容器；单 DLL 已无跨程序集编译限制。
             Action<List<Placeable>> __ath = AttributeToHost;
-            Slots.Provide(SlotPlayerPlacedBlocks, __ppb);
-            Slots.Provide(SlotAttributeToHost, __ath);
+            SrCaps.AttributeToHost = __ath;
             // 关机时摘掉自己提供的槽位，否则宿主仍能 Require 到失效实现。
             SRApi.OnShutdown("方块破坏/槽位", delegate {
                 try {
@@ -369,29 +378,23 @@ namespace SR_UCH.Tweaks {
                         }
                         SceneManager.activeSceneChanged -= OnSceneChanged;
                     } catch (Exception __ul) { SRApi.Guard.Log("方块破坏/注销监听", __ul); }
-                    Slots.Retract(SlotPlayerPlacedBlocks, __ppb);
-                    Slots.Retract(SlotAttributeToHost, __ath);
-                    SRApi.LogInfo("[方块破坏] 已注销 2 个对外槽位");
+                    SrCaps.AttributeToHost = null;
+                    SRApi.LogInfo("[方块破坏] 已注销对外能力");
                 } catch (Exception __rt) { SRApi.Guard.Log("方块破坏/注销槽位", __rt); }
             });
         }
 
 
-        // 槽位名：与调用方只靠“名字 + 委托签名”约定，故用 private const。
-        // 房客删除放行槽位：外部模组提供 Func<bool>，true = 房客也可真正删除。
-        // 每次调用都 Require：放行方可能比本功能初始化更晚。
-        private const string SlotAllowClientsOn = "Blocks.AllowClientsOn";
+        // 房客删除放行：外部 DLL 可直接给 SrCaps.AllowClientsOn 赋值，true = 房客也可真正删除。
+        // 每次调用都读：放行方可能比本功能初始化更晚。
         private static bool AllowClientsOn {
             get {
                 try {
-                    Func<bool> f = Slots.Require<Func<bool>>(SlotAllowClientsOn);
+                    Func<bool> f = SrCaps.AllowClientsOn;
                     return f != null && f();
                 } catch (Exception __ac) { SRApi.Guard.Log("方块破坏/读取房客放行槽位", __ac); return false; }
             }
         }
-
-        private const string SlotPlayerPlacedBlocks = "DestroyBlocks.PlayerPlacedBlocks";
-        private const string SlotAttributeToHost = "DestroyBlocks.AttributeToHost";
 
         private static void OnSceneChanged(Scene a, Scene b) {
             _placements.Clear();
@@ -448,7 +451,7 @@ namespace SR_UCH.Tweaks {
                 if (SRApi.ComboKeyDown(_deleteKey)) {
                     if (!canDestroy) {
                         SRApi.NotifyT("仅房主可破坏方块：", "Only the host can destroy blocks: ",
-                            SRApi.T("房客只能高亮标记", "guests can only highlight"));
+                            SRApi.Tid("365b7628ec", "房客只能高亮标记", "guests can only highlight"));
                     } else {
                         Placeable target = Blocks[_index];
                         if (target == null || target.MarkedForDestruction) {

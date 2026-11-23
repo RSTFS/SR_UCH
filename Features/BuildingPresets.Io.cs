@@ -30,7 +30,7 @@ namespace SR_UCH.Tweaks {
                     SRApi.NotifyT("剪贴板是空的", "The clipboard is empty");
                     return;
                 }
-                ImportXmlText(xml, null, SRApi.T("剪贴板", "clipboard"));
+                ImportXmlText(xml, null, SRApi.Tid("9df9f16f4f", "剪贴板", "clipboard"));
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/导入(剪贴板)", __ex);
             }
@@ -74,7 +74,7 @@ namespace SR_UCH.Tweaks {
                 }
                 string defaultName = null;
                 try { defaultName = Path.GetFileNameWithoutExtension(path); } catch { /* 静默：非关键路径，失败可直接忽略 */ }
-                ImportXmlText(xml, defaultName, SRApi.T("文件", "file"));
+                ImportXmlText(xml, defaultName, SRApi.Tid("36686a9054", "文件", "file"));
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/导入(路径)", __ex);
             }
@@ -98,7 +98,7 @@ namespace SR_UCH.Tweaks {
                 } catch (Exception __ex) {
                     SRApi.Guard.Log("布局预设/解析导入 XML", __ex);
                 }
-                if (doc == null || doc.DocumentElement == null || doc.DocumentElement.Name != "scene") {
+                if (doc == null || doc.DocumentElement == null || doc.DocumentElement.Name != SR_UCH.Pure.PresetXmlPolicy.RootName) {
                     SRApi.NotifyT("导入内容不是关卡布局 XML（根节点必须是 scene）", "The import content is not level layout XML (root node must be scene)");
                     return;
                 }
@@ -109,7 +109,7 @@ namespace SR_UCH.Tweaks {
                 }
                 if (blocks > MaxImportBlocks) {
                     SRApi.NotifyT("方块数超过导入上限 {0}", "Block count exceeds the import limit {0}", MaxImportBlocks
-                        + SRApi.T("，已拒绝导入", "; import rejected"));
+                        + SRApi.Tid("7f58569572", "，已拒绝导入", "; import rejected"));
                     return;
                 }
                 string level = LevelFromDoc(doc);
@@ -120,7 +120,7 @@ namespace SR_UCH.Tweaks {
                 StripDestroyed(doc);
                 string name = (_newName ?? "").Trim();
                 if (name.Length == 0 && !string.IsNullOrEmpty(defaultBaseName)) name = defaultBaseName.Trim();
-                if (name.Length == 0) name = SRApi.T("导入 ", "Imported ") + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture);
+                if (name.Length == 0) name = SRApi.Tid("5e33269504", "导入 ", "Imported ") + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture);
                 if (name.Length > 40) name = name.Substring(0, 40);
                 string mode = "IMPORTED";
                 try {
@@ -232,7 +232,7 @@ namespace SR_UCH.Tweaks {
                 }
                 _visibleCache = null;
                 SaveIndex();
-                _status = SRApi.T("已删除预设：", "Deleted preset: ") + (p.Name ?? "");
+                _status = SRApi.Tid("da8f170ccf", "已删除预设：", "Deleted preset: ") + (p.Name ?? "");
                 SRApi.Notify(_status);
                 SRApi.LogInfo("[布局预设] " + _status);
             } catch (Exception __ex) {
@@ -282,7 +282,7 @@ namespace SR_UCH.Tweaks {
                 _renameKey = null;
                 _renameText = null;
                 SaveIndex();
-                _status = SRApi.T("已重命名预设：", "Renamed preset: ") + name;
+                _status = SRApi.Tid("4eeab35a10", "已重命名预设：", "Renamed preset: ") + name;
                 SRApi.LogInfo("[布局预设] " + _status);
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/重命名", __ex);

@@ -56,17 +56,6 @@ public partial class SR {
                 if (_internalConfig != null) {
                     ConfigEntry<string> modEntry = _internalConfig.Bind(Keys.Settings, Keys.ComboPrefix + ComboEntryName(entry), "",
                         "组合键修饰（自动记录，Shift/Ctrl/Alt/空）");
-                    // 旧命名迁移：新条目为空时搬入旧值
-                    try {
-                        if (string.IsNullOrEmpty(modEntry.Value)) {
-                            ConfigEntry<string> legacy = _internalConfig.Bind(Keys.Settings, Keys.ComboPrefix + entry.Definition.Key, "",
-                                "组合键修饰（旧命名，已弃用；值会自动迁移到带分区名的新条目）");
-                            if (!string.IsNullOrEmpty(legacy.Value)) {
-                                modEntry.Value = legacy.Value;
-                                // 不清空旧条目：留着当备份，否则新条目被重置/删掉会丢失用户设置。
-                            }
-                        }
-                    } catch (Exception __ex) { Guard.Log("RegisterComboEntry", __ex); }
                     _keyModEntries[entry] = modEntry;
                     _watchDirty = true;
                     NoteEntryBound();   // 让 SectionEntries 缓存失效
@@ -554,11 +543,11 @@ public partial class SR {
         internal static void EnterCapturePublic(ConfigEntry<KeyCode> k) { SR.EnterCaptureInternal(k); }
 
         public static string KeyText(ConfigEntry<KeyCode> k) {
-            if (k == null) return T("未绑定", "Unbound");
+            if (k == null) return Tid("b4f93aa760", "未绑定", "Unbound");
             if (_capturing == k) return _recSeq.Count == 0 ? "..." : RecText();
             KeyCode v = KeyCode.None;
             try { v = k.Value; } catch (Exception __ex) { Guard.Log("KeyText", __ex); }
-            if (v == KeyCode.None) return T("未绑定", "Unbound");
+            if (v == KeyCode.None) return Tid("b4f93aa760", "未绑定", "Unbound");
             return ComboKeyDisplay(k, v);
         }
 
@@ -677,7 +666,7 @@ public partial class SR {
                     KeyCenterRow r = new KeyCenterRow();
                     r.Entry = kc;
                     r.Auto = string.Equals(e.Definition.Section, HkSec, StringComparison.Ordinal);
-                    r.Group = r.Auto ? T("自动快捷键", "Auto hotkeys") : ZhSection(e.Definition.Section);
+                    r.Group = r.Auto ? Tid("e2eac4152b", "自动快捷键", "Auto hotkeys") : ZhSection(e.Definition.Section);
                     r.Name = r.Auto ? KeyCenterAutoLabel(e.Definition.Key) : ZhKey(kc);
                     r.Combo = ComboKeyDisplay(kc, kc.Value);
                     _kcRows.Add(r);
@@ -711,13 +700,13 @@ public partial class SR {
                 }
                 string summary = T("已绑定 " + bound + " 个（自动 " + autoBound + "）· 重复组合 " + dupRows + " 条",
                                    bound + " bound (" + autoBound + " auto) · " + dupRows + " duplicate row(s)");
-                Card(dupRows == 0, T("按键中心", "Hotkey center"), summary, delegate {
-                    if (GUILayout.Button(T("重新读取键位", "Reload bindings"), _btn, GUILayout.Width(Sc(140)), GUILayout.Height(Sc(24)))) {
+                Card(dupRows == 0, Tid("a55309a063", "按键中心", "Hotkey center"), summary, delegate {
+                    if (GUILayout.Button(Tid("81ff69f1a7", "重新读取键位", "Reload bindings"), _btn, GUILayout.Width(Sc(140)), GUILayout.Height(Sc(24)))) {
                         MarkKeyCenterDirty();
                         BuildKeyCenterRows();
                     }
                     GUILayout.Space(Sc(4));
-                    if (_kcRows.Count == 0) { AuditLabel(T("（没有可显示的按键条目）", "(no key entries)")); return; }
+                    if (_kcRows.Count == 0) { AuditLabel(Tid("f70cb2b4ec", "（没有可显示的按键条目）", "(no key entries)")); return; }
                     string lastGroup = null;
                     for (int i = 0; i < _kcRows.Count; i++) {
                         KeyCenterRow r = _kcRows[i];
@@ -729,11 +718,11 @@ public partial class SR {
                         bool prevEn = GUI.enabled;
                         try {
                             GUI.enabled = prevEn && r.Entry.Value != KeyCode.None;
-                            if (GUILayout.Button(T("清除", "Clear"), _btn, GUILayout.Width(Sc(64)), GUILayout.Height(Sc(22)))) {
+                            if (GUILayout.Button(Tid("7164bdadb3", "清除", "Clear"), _btn, GUILayout.Width(Sc(64)), GUILayout.Height(Sc(22)))) {
                                 r.Entry.Value = KeyCode.None;
                                 MarkKeyChanged();
                                 MarkKeyCenterDirty();
-                                Notify(T("已清除按键", "Hotkey cleared"));
+                                Notify(Tid("23615e53bd", "已清除按键", "Hotkey cleared"));
                             }
                         } finally { GUI.enabled = prevEn; }
                         GUILayout.EndHorizontal();

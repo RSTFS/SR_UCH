@@ -1,9 +1,11 @@
 // 联机版本/功能握手：双方 SR 的功能表签名不一致时提示（纯提示，不改游戏状态）。
 // 做法：复用 GameRuleSet 消息做带外信号，魔数 773（与混乱牌组的 771/772 错开），
 // 消息体 NewRule=None 表示不是真实规则变更；每 20 秒互发一次本机签名，
-// 房主用 SendToAll 广播（Valueb=true 标「来自房主」），签名不同则记日志 + 弹一次提示。
+// 房主用 SendToAll 广播（Valueb=true 标「来自房主」）；接收端按 Valueb 过滤自身回环与房客互发，
+// 签名不同才记警告 + 弹一次提示。
 // 为什么需要：UCH 锁房，双方功能/版本不同时界面与行为可能不一致。
 using System;
+using System.Collections.Generic;
 using GameEvent;   // GameEventManager / IGameEventListener 在 namespace GameEvent 内
 using UnityEngine;
 using UnityEngine.Networking;
@@ -19,7 +21,7 @@ public partial class SR {
     private static CompatListener _compatListener;
     private static int _compatHash;           // 本地功能签名（首次发送时计算并缓存）
     private static int _compatCount;          // 本地功能数量
-    private static int _compatRemoteHash;     // 最近一次收到的对方签名（去重提示）
+    private static readonly HashSet<int> _compatSeen = new HashSet<int>();  // 已提示过的对方签名
 
     private sealed class CompatListener : GameEvent.IGameEventListener {
         public void handleEvent(GameEvent.GameEvent e) {
@@ -47,6 +49,7 @@ public partial class SR {
         } catch (Exception __ex) { Guard.Log("联机握手/注销", __ex); }
         _compatListener = null;
         _compatInited = false;
+        _compatSeen.Clear();
         LatencyShutdown();
     }
 
@@ -106,19 +109,17 @@ public partial class SR {
         MsgGameRuleSet m = nm.ReadMessage as MsgGameRuleSet;
         if (m == null || m.NewRule != TabletRule.None) return;          // 只认带外信号
         if ((m.Value2 >> 8) != CompatMagic) return;                     // 其它功能/游戏的规则消息
+        // 房主只处理房客上报，房客只处理房主广播：滤掉 SendToAll 的自身回环与房客互发。
+        bool fromHost = m.Valueb;
+        bool amHost = NetworkServer.active;
+        if (fromHost == amHost) return;
         int remoteHash = m.Value;
         int remoteCount = m.Value2 & 0xFF;
-        // 房主的 SendToAll 会把消息也发给本机 local connection：不滤掉会自己收到自己的签名，
-        // 每 20 秒刷一条"握手一致"。只处理"来自房主"且不是自身回环的消息。
-        if (m.Valueb && m.Value == LocalCompatHash()) return;            // 自身回环（房主收到自己发的）
-        if (remoteHash == 0 || remoteHash == _compatRemoteHash) return; // 同一签名只处理一次
-        _compatRemoteHash = remoteHash;
+        if (remoteHash == 0) return;
         int mine = LocalCompatHash();
-        if (remoteHash == mine) {
-            LogInfo("[SR.Net] 联机握手一致：双方 SR 功能签名相同（" + _compatCount + " 个功能）");
-            return;
-        }
-        LogInfo("[SR.Net] 联机握手不一致：对方功能 " + remoteCount + " 个 / 签名 " + remoteHash
+        if (remoteHash == mine) return;                     // 一致：静默，不刷日志
+        if (!_compatSeen.Add(remoteHash)) return;            // 同一签名只提示一次
+        LogWarn("[SR.Net] 联机握手不一致：对方功能 " + remoteCount + " 个 / 签名 " + remoteHash
                 + "，本地 " + _compatCount + " 个 / 签名 " + mine);
         Notify(T("联机双方 SR 版本/功能不一致（对方 " + remoteCount + " 个 / 本地 " + _compatCount + " 个），界面与行为可能不同；建议使用同一版本。",
                  "SR features differ between peers (" + remoteCount + " remote / " + _compatCount + " local); UI and behaviour may differ - use the same version."));

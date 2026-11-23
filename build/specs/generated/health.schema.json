@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "version": 1,
+  "fields": [
+    "schema",
+    "verdict",
+    "game",
+    "contract",
+    "patches_ok",
+    "patches_total",
+    "reflection_ok",
+    "reflection_total",
+    "features",
+    "feature_problems",
+    "plugins",
+    "boot_timings",
+    "sink_ok",
+    "sink_total",
+    "missing_sinks",
+    "errors",
+    "last_what",
+    "last_error",
+    "issues",
+    "events"
+  ],
+  "event_codes": [
+    "SR-H002",
+    "SR-H003",
+    "SR-H004",
+    "SR-H005",
+    "SR-H006"
+  ]
+}

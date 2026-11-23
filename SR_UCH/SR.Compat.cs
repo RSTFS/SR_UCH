@@ -81,7 +81,7 @@ public partial class SR {
                 AssemblyName an = asm.GetName();
                 string name = an != null ? an.Name : null;
                 if (string.IsNullOrEmpty(name)) continue;
-                if (name == "SR_UCH" || name == "SR_UCH_EX" || name == "SR_Manager" || name == "SR_UCH_Manager") continue;
+                if (name == "SR_UCH") continue;
                 if (!InPluginsDir(asm.Location)) continue;
                 CompatRule rule = FindCompatRule(name);
                 CompatPlugin row = new CompatPlugin();
@@ -112,15 +112,15 @@ public partial class SR {
                 else if (p.Level == 1) note++;
                 else other++;
             }
-            return _compatPlugins.Count + T(" 个（冲突 ", " detected (conflict ") + conflict + T(" · 注意 ", " · note ")
-                + note + T(" · 无已知冲突/未测试 ", " · clear/untested ") + other + "）";
+            return _compatPlugins.Count + Tid("fea3102b30", " 个（冲突 ", " detected (conflict ") + conflict + Tid("77167b8f24", " · 注意 ", " · note ")
+                + note + Tid("d2b65d3a2a", " · 无已知冲突/未测试 ", " · clear/untested ") + other + "）";
         } catch (Exception __ex) { Guard.Log("兼容性/摘要", __ex); return "?"; }
     }
 
     private static string CompatVerdict(CompatPlugin p) {
-        if (p.Level >= 2) return T("冲突", "conflict");
-        if (p.Level == 1) return T("注意", "note");
-        return p.Known ? T("无已知冲突", "clear") : T("未测试", "untested");
+        if (p.Level >= 2) return Tid("07f284b4af", "冲突", "conflict");
+        if (p.Level == 1) return Tid("2159ceab95", "注意", "note");
+        return p.Known ? Tid("ea54e524e8", "无已知冲突", "clear") : Tid("0d86b7a418", "未测试", "untested");
     }
 
 }

@@ -13,7 +13,15 @@ public partial class SR {
         internal static Font OrigSkinFontValue { get { return _origSkinFont; } }
         // 主题字体（SR 界面统一用这个；独立浮层也要一致）。
         internal static Font UiFont { get { return _font; } }
-        private static Font _origSkinFont;                 // 全局皮肤的原始字体（恢复用）
+        
+        // 语言 / 字号切换后调用：只置失效标记，下一帧复用已建对象重建属性，不销毁贴图。
+        // 注意：不在此处 Destroy —— OnGUI 期间销毁贴图会让当前帧绘制读到空资源。
+        private static bool _stylesDirty = true;
+        public static void InvalidateStyles() { _stylesDirty = true; }
+        public static bool StylesDirty { get { return _stylesDirty; } }
+        public static void MarkStylesBuilt() { _stylesDirty = false; }
+
+private static Font _origSkinFont;                 // 全局皮肤的原始字体（恢复用）
         private static bool _origSelColorSaved;
         private static Color _origSelColor;               // 全局皮肤的原始选择色
 
@@ -120,7 +128,6 @@ public partial class SR {
         private static readonly Color _cCapture = new Color(0.5f, 0.3f, 0.12f, 1f);
         private static readonly Color _cText = new Color(0.92f, 0.92f, 0.95f, 1f);
 
-        // 保存原始选择色：必须在第一次改写之前调用。
         private static void EnsureOrigSelColor() {
             try {
                 if (!_origSelColorSaved) { _origSelColor = GUI.skin.settings.selectionColor; _origSelColorSaved = true; }

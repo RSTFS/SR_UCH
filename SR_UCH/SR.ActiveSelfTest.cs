@@ -28,44 +28,42 @@ public partial class SR {
         _stPass = 0; _stFail = 0;
         try {
             string[] patchMiss; int patchTotal = SR.AuditPatches(out patchMiss);
-            StCheck(T("补丁目标存在", "Patch targets exist"), patchMiss == null || patchMiss.Length == 0,
-                patchMiss != null && patchMiss.Length > 0 ? string.Join(", ", patchMiss) : T("已校验 ", "checked ") + patchTotal);
+            StCheck(Tid("f6777fc737", "补丁目标存在", "Patch targets exist"), patchMiss == null || patchMiss.Length == 0,
+                patchMiss != null && patchMiss.Length > 0 ? string.Join(", ", patchMiss) : Tid("3f8e837a0a", "已校验 ", "checked ") + patchTotal);
             string[] unreg = SR.FindUnregisteredPatchTypes();
-            StCheck(T("补丁已注册", "Patches registered"), unreg == null || unreg.Length == 0,
+            StCheck(Tid("9551131e2c", "补丁已注册", "Patches registered"), unreg == null || unreg.Length == 0,
                 unreg != null && unreg.Length > 0
-                    ? T("未注册（会静默失效）: ", "declared but never registered: ") + string.Join(", ", unreg)
-                    : T("已注册 ", "registered ") + SR.PatchedCount);
+                    ? Tid("a39b9b0473", "未注册（会静默失效）: ", "declared but never registered: ") + string.Join(", ", unreg)
+                    : Tid("3bda7309f7", "已注册 ", "registered ") + SR.PatchedCount);
             string[] magicConf = SRApi.NetMagic.Conflicts();
-            StCheck(T("网络魔数唯一", "Network magics unique"), magicConf == null || magicConf.Length == 0,
-                magicConf != null && magicConf.Length > 0 ? string.Join("; ", magicConf) : T("已登记 ", "registered ") + SRApi.NetMagic.Registered);
+            StCheck(Tid("23b73a5064", "网络魔数唯一", "Network magics unique"), magicConf == null || magicConf.Length == 0,
+                magicConf != null && magicConf.Length > 0 ? string.Join("; ", magicConf) : Tid("4d997dfb6f", "已登记 ", "registered ") + SRApi.NetMagic.Registered);
             string[] missStates = SRApi.Sinks.MissingStates();
-            StCheck(T("API 状态通道", "API state channels"), missStates == null || missStates.Length == 0,
-                missStates != null && missStates.Length > 0 ? string.Join(", ", missStates) : T("全部就绪", "all ready"));
+            StCheck(Tid("b27920494f", "API 状态通道", "API state channels"), missStates == null || missStates.Length == 0,
+                missStates != null && missStates.Length > 0 ? string.Join(", ", missStates) : Tid("2122215623", "全部就绪", "all ready"));
             string[] miss = SRApi.MissingSinks();
-            StCheck(T("API 通道注入", "API sinks injected"), miss == null || miss.Length == 0,
-                miss != null && miss.Length > 0 ? (T("缺 ", "missing ") + miss.Length) : null);
+            StCheck(Tid("f030a9af33", "API 通道注入", "API sinks injected"), miss == null || miss.Length == 0,
+                miss != null && miss.Length > 0 ? (Tid("c7da26a8f1", "缺 ", "missing ") + miss.Length) : null);
 
-            StCheck(T("功能清单", "Feature manifest"), Features.Count > 0 && Features.ProblemCount == 0,
-                T("功能 ", "features ") + Features.Count + T(" · 问题 ", " · problems ") + Features.ProblemCount);
+            StCheck(Tid("5f53c3753c", "功能清单", "Feature manifest"), Features.Count > 0 && Features.ProblemCount == 0,
+                Tid("8983021c38", "功能 ", "features ") + Features.Count + Tid("d62bec169b", " · 问题 ", " · problems ") + Features.ProblemCount);
 
             try { SR.ScanPatches(); } catch (Exception __sp) { Guard.Log("主动自检/重扫补丁", __sp); }
-            StCheck(T("补丁与反射", "Patches & reflection"),
+            StCheck(Tid("48f85b6636", "补丁与反射", "Patches & reflection"),
                 SR.AuditPatchTotal > 0 && SR.AuditPatchOk == SR.AuditPatchTotal && SR.AuditRefOk == SR.AuditRefTotal,
-                SR.AuditPatchOk + "/" + SR.AuditPatchTotal + T(" 补丁 · ", " patches · ") + SR.AuditRefOk + "/" + SR.AuditRefTotal + T(" 反射", " members"));
+                SR.AuditPatchOk + "/" + SR.AuditPatchTotal + Tid("eecf9f9e55", " 补丁 · ", " patches · ") + SR.AuditRefOk + "/" + SR.AuditRefTotal + Tid("78e04c70c4", " 反射", " members"));
 
             object token = new object();
-            int slotBefore = Slots.Count;
-            Slots.Provide(SRApi.SlotKeys.SelfTestToken, token);
-            object got = Slots.Require<object>(SRApi.SlotKeys.SelfTestToken);
-            Slots.Retract(SRApi.SlotKeys.SelfTestToken, token);
-            StCheck(T("槽位往返", "Slots round-trip"),
-                ReferenceEquals(token, got) && Slots.Count == slotBefore,
-                slotBefore + " -> " + Slots.Count);
+            SrCaps.SelfTestToken = token;
+            object got = SrCaps.SelfTestToken;
+            SrCaps.SelfTestToken = null;
+            StCheck(Tid("eca654677b", "能力容器往返", "Caps round-trip"),
+                ReferenceEquals(token, got) && SrCaps.SelfTestToken == null, "ok");
 
             bool notifyOk = SRApi.SinkCount() > 0;
-            try { SRApi.Notify(SRApi.T("自检：通知通道正常", "Self-test: notify path works")); }
+            try { SRApi.Notify(SRApi.Tid("81d671cdee", "自检：通知通道正常", "Self-test: notify path works")); }
             catch (Exception __nt) { notifyOk = false; Guard.Log("主动自检/通知", __nt); }
-            StCheck(T("通知通道", "Notify path"), notifyOk, T("注入 ", "sinks ") + SRApi.SinkCount());
+            StCheck(Tid("e7d8d3f609", "通知通道", "Notify path"), notifyOk, Tid("30ae7b62c4", "注入 ", "sinks ") + SRApi.SinkCount());
 
             int entries = 0;
             bool cfgOk = _internalConfig != null;
@@ -73,36 +71,36 @@ public partial class SR {
                 try { foreach (ConfigEntryBase __e in AllEntries(_internalConfig)) entries++; }
                 catch (Exception __ae) { Guard.Log("主动自检/配置条目", __ae); }
             }
-            StCheck(T("配置可读", "Config readable"), cfgOk && entries > 0, T("条目 ", "entries ") + entries);
+            StCheck(Tid("f8f9703779", "配置可读", "Config readable"), cfgOk && entries > 0, Tid("967e550f46", "条目 ", "entries ") + entries);
 
-            string t = SRApi.T("自检", "Self-test");
-            StCheck(T("本地化回退", "Localization fallback"), !string.IsNullOrEmpty(t), t);
+            string t = SRApi.Tid("7574c32255", "自检", "Self-test");
+            StCheck(Tid("ccfcdc1ecd", "本地化回退", "Localization fallback"), !string.IsNullOrEmpty(t), t);
 
-            StCheck(T("按键注册表", "Hotkey registry"), SR.HotkeyCount > 0,
-                T("快捷键 ", "hotkeys ") + SR.HotkeyCount);
+            StCheck(Tid("b518936aa5", "按键注册表", "Hotkey registry"), SR.HotkeyCount > 0,
+                Tid("1d310c3c06", "快捷键 ", "hotkeys ") + SR.HotkeyCount);
         } catch (Exception __ex) {
             Guard.Log("主动自检", __ex);
-            StCheck(T("自检执行", "Self-test run"), false, __ex.GetType().Name);
+            StCheck(Tid("0dce1ed2ef", "自检执行", "Self-test run"), false, __ex.GetType().Name);
         }
         SRApi.Notify(_stFail == 0
-            ? SRApi.T("主动自检：全部通过", "Self-test: all passed")
-            : SRApi.T("主动自检：有失败项，见自检页", "Self-test: some checks failed, see self-check page"));
+            ? SRApi.Tid("9231e3b7ad", "主动自检：全部通过", "Self-test: all passed")
+            : SRApi.Tid("58d303690c", "主动自检：有失败项，见自检页", "Self-test: some checks failed, see self-check page"));
     }
 
     internal static void RenderActiveSelfTestCard() {
         try {
             int pass = _stPass, fail = _stFail;
             bool ran = _stResults != null && _stResults.Count > 0;
-            string summary = !ran ? T("未运行（点下面按钮）", "not run yet (use the button below)")
+            string summary = !ran ? Tid("a7682a68f3", "未运行（点下面按钮）", "not run yet (use the button below)")
                 : T("通过 " + pass + " / 失败 " + fail, pass + " passed / " + fail + " failed");
             summary += "  ·  Tick " + SR.PerfTickAvgMs.ToString("0.00") + "/" + SR.PerfTickMaxMs.ToString("0.00")
                      + " ms  ·  GUI " + SR.PerfGuiAvgMs.ToString("0.00") + "/" + SR.PerfGuiMaxMs.ToString("0.00") + " ms";
-            Card(!ran || fail == 0, T("主动自检", "Active self-test"), summary, delegate {
+            Card(!ran || fail == 0, Tid("744e1b374f", "主动自检", "Active self-test"), summary, delegate {
                 GUILayout.BeginHorizontal();
-                if (GUILayout.Button(T("运行自检", "Run self-test"), _btn, GUILayout.Width(Sc(110)), GUILayout.Height(Sc(24))))
+                if (GUILayout.Button(Tid("bd907c3a78", "运行自检", "Run self-test"), _btn, GUILayout.Width(Sc(110)), GUILayout.Height(Sc(24))))
                     RunActiveSelfTest();
                 GUILayout.Space(Sc(6));
-                if (GUILayout.Button(T("导出支持包", "Export support bundle"), _btn, GUILayout.Width(Sc(150)), GUILayout.Height(Sc(24))))
+                if (GUILayout.Button(Tid("89ef250c83", "导出支持包", "Export support bundle"), _btn, GUILayout.Width(Sc(150)), GUILayout.Height(Sc(24))))
                     ExportSupportBundle();
                 GUILayout.FlexibleSpace();
                 GUILayout.EndHorizontal();
@@ -131,11 +129,11 @@ public partial class SR {
         try {
             string[] recent = SRApi.Guard.Recent();
             int warns = Guard.WarnCount;
-            string summary = warns == 0 ? T("没有异常记录", "no errors recorded")
+            string summary = warns == 0 ? Tid("afb5315ac5", "没有异常记录", "no errors recorded")
                 : T("累计 " + warns + " 次（同来源 5 秒内已去重）", warns + " total (deduped per source for 5s)");
-            Card(warns == 0, T("最近异常", "Recent errors"), summary, delegate {
+            Card(warns == 0, Tid("960926589b", "最近异常", "Recent errors"), summary, delegate {
                 if (recent == null || recent.Length == 0) {
-                    AuditLabel(T("（无记录）", "(none)"));
+                    AuditLabel(Tid("d21c1af94f", "（无记录）", "(none)"));
                     return;
                 }
                 for (int i = 0; i < recent.Length; i++) AuditLabel("• " + recent[i]);
@@ -198,14 +196,20 @@ public partial class SR {
                 } else sb.AppendLine("(找不到 " + log + ")");
             } catch (Exception __le) { sb.AppendLine("(日志读取失败: " + __le.GetType().Name + ")"); Guard.Log("支持包/日志", __le); }
 
+            // 结构化健康快照：与诊断报告同源，供 CI / issue 直接读，不必再解析文本。
+            string healthFile = Path.Combine(dir, "SR_UCH_health_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".json");
+            try {
+                File.WriteAllText(healthFile, Health.DiagnosticJson(Application.version), new UTF8Encoding(false));
+                sb.AppendLine("健康快照(JSON): " + healthFile);
+            } catch (Exception __hj) { Guard.Log("支持包/健康快照", __hj); }
             File.WriteAllText(file, sb.ToString(), new UTF8Encoding(false));
             try { GUIUtility.systemCopyBuffer = file; } catch (Exception __cb) { Guard.Log("支持包/复制路径", __cb); }
             try { SR.LogInfo("[SR.Support] 已导出支持包: " + file); } catch (Exception __lg) { Guard.Log("支持包/写日志", __lg); }
-            SRApi.Notify(SRApi.T("支持包已导出（路径已复制到剪贴板）", "Support bundle exported (path copied to clipboard)"));
+            SRApi.Notify(SRApi.Tid("5a205fe118", "支持包已导出（路径已复制到剪贴板）", "Support bundle exported (path copied to clipboard)"));
             return true;
         } catch (Exception __ex) {
             Guard.Log("导出支持包", __ex);
-            SRApi.Notify(SRApi.T("支持包导出失败，详见日志", "Support bundle export failed; see log"));
+            SRApi.Notify(SRApi.Tid("c858e48893", "支持包导出失败，详见日志", "Support bundle export failed; see log"));
             return false;
         }
     }

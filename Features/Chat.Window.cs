@@ -60,8 +60,9 @@ public partial class Chat : ITweak {
         }
 
         private static void SelfRegWindow(IFeatureHost plugin) {
-            SRApi.LocKey(Sec, "Enabled", "会话窗口开关", null);
-            SRApi.LocDesc(Sec, "Enabled", "会话窗口开关\n总的开关：关掉后本页所有聊天框改动都不生效\n聊天本身仍在游戏里正常显示", "Chat window switch\nmaster switch: when off none of this page's chat box changes apply\nchatting itself keeps working in the game");
+            TweakCfg.Entry(Sec, "Enabled", "会话窗口开关", null,
+                "会话窗口开关\n总的开关：关掉后本页所有聊天框改动都不生效\n聊天本身仍在游戏里正常显示",
+                "Chat window switch\nmaster switch: when off none of this page's chat box changes apply\nchatting itself keeps working in the game");
             SRApi.Ref.Override("ChatDisplay.VisibilityTimer", "聊天窗口（可见计时器：保持显示但不自己写 alpha，淡入淡出交给游戏）");
 
             // 本页是会话栏目第 1 个子页，配置段仍为 Chat Window（不单独成侧栏栏目）。
@@ -80,32 +81,35 @@ public partial class Chat : ITweak {
         // 位置 X/Y 用滑块渲染：范围取当前分辨率，0 = 游戏默认位置。
 
         // 不能登记 Remove(Sec, "Enabled")：本页仍 Bind 这个键，登了会每次启动删一次、永远存不下来。
-            SRApi.LocKey(Sec, "Enabled", "启用增强", "Enable tweaks");
-            SRApi.LocDesc(Sec, "Enabled", "聊天窗口增强总开关\n开启后本页各项修改才生效\n关闭即回到游戏原版行为", "Chat window master switch\nthe options here apply only while on\noff returns to vanilla behaviour");
-            SRApi.LocKey(Sec, "No Auto Show", "关闭自动弹出", "Suppress auto show");
-            SRApi.LocDesc(Sec, "No Auto Show", "新消息自动弹出（取反）\n开启后新消息不会自动弹出窗口\n按住显示键或按 Enter 仍可见", "Auto-popup (inverted)\nwhen on, new messages do not pop the window\nthe show key and Enter still reveal it");
-            SRApi.LocKey(Sec, "No Fade", "关闭淡入淡出动画", "No fade in/out");
-            SRApi.LocDesc(Sec, "No Fade", "淡入淡出（取反）\n开启后窗口出现与消失瞬切\n关闭时沿用游戏淡入淡出速度", "Fade (inverted)\nwhen on, the window appears and disappears instantly\noff keeps the game's fade speed");
-            SRApi.LocKey(Sec, "Window Key", "显示窗口键", "Show window key");
-            SRApi.LocDesc(Sec, "Window Key", "聊天窗口显示键\n按下显示窗口，方式由下一项决定\n点键框后按新键改绑，Esc 取消", "Chat window show key\npress to show the window; behaviour set by the next option\nclick the key box and press a key; Esc cancels");
-            SRApi.LocKey(Sec, "Window Mode", "显示方式", "Show mode");
-            SRApi.LocDesc(Sec, "Window Mode", "显示键的工作方式\n按住＝按住期间显示；切换＝按一下固定或还原\n需配合显示键", "Show key behaviour\nhold = visible while held; toggle = tap to pin or release\nworks with the show key");
-            SRApi.LocKey(Sec, "Box Scale", "聊天框缩放", "Chat box scale");
-            SRApi.LocDesc(Sec, "Box Scale", "聊天框缩放\n按比例缩放消息区（文字、玩家名、头像）\n范围 0.5-2；按住缩放键滚轮调整", "Chat box scale\nscales the message area including names and portraits\nrange 0.5-2; hold the scale key and scroll");
-            SRApi.LocKey(Sec, "Box Scale Key", "缩放键", "Scale key");
-            SRApi.LocDesc(Sec, "Box Scale Key", "缩放调节键\n按住它滚轮微调聊天框缩放\n每格 0.05；字号用字号调节键", "Scale modifier key\nhold and scroll to fine-tune the chat box scale\n0.05 per notch; use the font key for text size");
-            SRApi.LocKey(Sec, "Font Size", "聊天文字大小", "Chat font size");
-            SRApi.LocDesc(Sec, "Font Size", "聊天文字字号\n设置消息、玩家名与头像的文字尺寸\n范围 1-50；不影响输入框；按住字号键滚轮调整", "Chat text size\nsize of messages, player names and portraits\nrange 1-50; input field unaffected; hold the font key and scroll");
-            SRApi.LocKey(Sec, "Font Key", "字号键", "Font key");
-            SRApi.LocDesc(Sec, "Font Key", "字号调节键\n按住它滚轮调整文字尺寸\n每格 1", "Font modifier key\nhold and scroll to change the text size\n1 per notch");
-            SRApi.LocKey(Sec, "Crisp Text", "启用清晰度", "Crisp text");
-            SRApi.LocDesc(Sec, "Crisp Text", "文字清晰度\n画布像素对齐，减少模糊\n切换时消息文字重建一次", "Text crispness\npixel-perfect canvas to reduce blur\nmessage texts are rebuilt once when toggled");
-            SRApi.LocKey(Sec, "Pos Enabled", "启用位置调整", "Enable position");
-            SRApi.LocDesc(Sec, "Pos Enabled", "位置调整\n是否应用下面的 X / Y 偏移\n关闭时撤销已加偏移，位置交还游戏", "Position tweaks\napplies the X and Y offsets below\nwhen off, the offset is removed and the game owns the position");
-            SRApi.LocKey(Sec, "Pos X", "位置 X", "Position X");
-            SRApi.LocDesc(Sec, "Pos X", "水平偏移（像素）\n正值把聊天框向右移\n仅在位置调整开启时生效", "Horizontal offset (px)\npositive values move the window right\nonly applies while position tweaks are on");
-            SRApi.LocKey(Sec, "Pos Y", "位置 Y", "Position Y");
-            SRApi.LocDesc(Sec, "Pos Y", "垂直偏移（像素）\n负值把聊天框向下移\n仅在位置调整开启时生效", "Vertical offset (px)\nnegative values move the window down\nonly applies while position tweaks are on");
+            TweakCfg.Entry(Sec, "Enabled", "启用增强", "Enable tweaks",
+                "聊天窗口增强总开关\n开启后本页各项修改才生效\n关闭即回到游戏原版行为", "Chat window master switch\nthe options here apply only while on\noff returns to vanilla behaviour");
+            TweakCfg.Entry(Sec, "No Auto Show", "关闭自动弹出", "Suppress auto show",
+                "新消息自动弹出（取反）\n开启后新消息不会自动弹出窗口\n按住显示键或按 Enter 仍可见", "Auto-popup (inverted)\nwhen on, new messages do not pop the window\nthe show key and Enter still reveal it");
+            TweakCfg.Entry(Sec, "No Fade", "关闭淡入淡出动画", "No fade in/out",
+                "淡入淡出（取反）\n开启后窗口出现与消失瞬切\n关闭时沿用游戏淡入淡出速度", "Fade (inverted)\nwhen on, the window appears and disappears instantly\noff keeps the game's fade speed");
+            TweakCfg.Entry(Sec, "Window Key", "显示窗口键", "Show window key",
+                "聊天窗口显示键\n按下显示窗口，方式由下一项决定\n点键框后按新键改绑，Esc 取消",
+                "Chat window show key\npress to show the window; behaviour set by the next option\nclick the key box and press a key; Esc cancels");
+            TweakCfg.Entry(Sec, "Window Mode", "显示方式", "Show mode",
+                "显示键的工作方式\n按住＝按住期间显示；切换＝按一下固定或还原\n需配合显示键", "Show key behaviour\nhold = visible while held; toggle = tap to pin or release\nworks with the show key");
+            TweakCfg.Entry(Sec, "Box Scale", "聊天框缩放", "Chat box scale",
+                "聊天框缩放\n按比例缩放消息区（文字、玩家名、头像）\n范围 0.5-2；按住缩放键滚轮调整",
+                "Chat box scale\nscales the message area including names and portraits\nrange 0.5-2; hold the scale key and scroll");
+            TweakCfg.Entry(Sec, "Box Scale Key", "缩放键", "Scale key",
+                "缩放调节键\n按住它滚轮微调聊天框缩放\n每格 0.05；字号用字号调节键", "Scale modifier key\nhold and scroll to fine-tune the chat box scale\n0.05 per notch; use the font key for text size");
+            TweakCfg.Entry(Sec, "Font Size", "聊天文字大小", "Chat font size",
+                "聊天文字字号\n设置消息、玩家名与头像的文字尺寸\n范围 1-50；不影响输入框；按住字号键滚轮调整",
+                "Chat text size\nsize of messages, player names and portraits\nrange 1-50; input field unaffected; hold the font key and scroll");
+            TweakCfg.Entry(Sec, "Font Key", "字号键", "Font key",
+                "字号调节键\n按住它滚轮调整文字尺寸\n每格 1", "Font modifier key\nhold and scroll to change the text size\n1 per notch");
+            TweakCfg.Entry(Sec, "Crisp Text", "启用清晰度", "Crisp text",
+                "文字清晰度\n画布像素对齐，减少模糊\n切换时消息文字重建一次", "Text crispness\npixel-perfect canvas to reduce blur\nmessage texts are rebuilt once when toggled");
+            TweakCfg.Entry(Sec, "Pos Enabled", "启用位置调整", "Enable position",
+                "位置调整\n是否应用下面的 X / Y 偏移\n关闭时撤销已加偏移，位置交还游戏", "Position tweaks\napplies the X and Y offsets below\nwhen off, the offset is removed and the game owns the position");
+            TweakCfg.Entry(Sec, "Pos X", "位置 X", "Position X",
+                "水平偏移（像素）\n正值把聊天框向右移\n仅在位置调整开启时生效", "Horizontal offset (px)\npositive values move the window right\nonly applies while position tweaks are on");
+            TweakCfg.Entry(Sec, "Pos Y", "位置 Y", "Position Y",
+                "垂直偏移（像素）\n负值把聊天框向下移\n仅在位置调整开启时生效", "Vertical offset (px)\nnegative values move the window down\nonly applies while position tweaks are on");
 
             _enabled = plugin.Config.Bind(Sec, "Enabled", false, "会话窗口总开关：关掉后本页的聊天框改动全部不生效。");
             _noAutoShow = plugin.Config.Bind(Sec, "No Auto Show", false, "关闭自动弹出：新消息不再自动显示聊天窗口。");
@@ -156,7 +160,7 @@ public partial class Chat : ITweak {
                 ConfigEntryBase e = entries[i];
                 if (e.Definition.Key == "Pos Enabled") {
                     GUILayout.Space(SRApi.Ctl.Sc(6));
-                    SRApi.Ctl.SectionTitle(SRApi.T("聊天框位置", "Chat box position"));
+                    SRApi.Ctl.SectionTitle(SRApi.Tid("52144de2bb", "聊天框位置", "Chat box position"));
                 }
                 SRApi.Ctl.RenderEntryRow(e, true, col);
             }
@@ -506,6 +510,24 @@ public partial class Chat : ITweak {
                     + " alpha=" + (cg != null ? cg.alpha.ToString() : "?")
                     + " || 首条消息 " + first);
             } catch (Exception __ex) { SRApi.Guard.Log("聊天窗口诊断", __ex); }
+        }
+}
+}
+
+// 会话栏目：栏目与页面注册、生命周期、Harmony 补丁。
+
+
+namespace SR_UCH.Tweaks {
+public partial class Chat {
+
+        public void Initialize(IFeatureHost plugin) {
+            SRApi.LocSec("Chat", "会话", null);
+            SRApi.Nav("Chat", 90); // 栏位顺序值（越小越靠前）
+            InitWindow(plugin);
+            InitLog(plugin);
+            // CreateAndPatchAll 按类型扫描，一次调用覆盖两个 partial 文件，不可重复注册。
+            try { SRApi.RegisterPatch(typeof(Chat)); }
+            catch (Exception e) { SRApi.LogError("会话(聊天窗口/聊天记录) 补丁注册失败: " + e.Message); }
         }
 }
 }

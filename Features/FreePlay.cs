@@ -28,14 +28,12 @@ namespace SR_UCH {
         // 地图页：开关 + 视野 + 打开按钮 + 说明（地图本身是覆盖在主窗口之上的全屏视图）。
         private static void RenderMapPage() {
             try {
-                SRApi.Ctl.SectionTitle(SRApi.T("地图", "Map"),
-                    SRApi.T("俯视查看整张关卡平面图\n打开后可拖动平移、滚轮缩放、右键操作\n仅自由模式可用",
-                            "overhead view of the whole level\ndrag to pan, wheel to zoom, right-click for actions\nfreeplay only"));
+                SRApi.Ctl.SectionTitle(SRApi.Tid("41f8e215e9", "地图", "Map"),
+                    SRApi.Tid("9bd574c16c", "俯视查看整张关卡平面图\n打开后可拖动平移、滚轮缩放、右键操作\n仅自由模式可用", "overhead view of the whole level\ndrag to pan, wheel to zoom, right-click for actions\nfreeplay only"));
                 // 开关地图：内容标签 + 按钮（右键绑键）+ 快捷键框（不再单列一行快捷键配置）。
-                if (SRApi.Ctl.ActionRow(SRApi.T("开关地图", "Toggle map"),
-                        SRApi.T("打开或关闭俯视地图\n按钮左键开关，右键可绑定快捷键",
-                                "open or close the overhead map\nleft-click to toggle, right-click to bind a key"),
-                        FreePlayMap.IsOpen ? SRApi.T("关闭地图", "Close map") : SRApi.T("打开地图", "Open map"),
+                if (SRApi.Ctl.ActionRow(SRApi.Tid("bc5edc39b9", "开关地图", "Toggle map"),
+                        SRApi.Tid("98865e88be", "打开或关闭俯视地图\n按钮左键开关，右键可绑定快捷键", "open or close the overhead map\nleft-click to toggle, right-click to bind a key"),
+                        FreePlayMap.IsOpen ? SRApi.Tid("233cd1c1f3", "关闭地图", "Close map") : SRApi.Tid("c0158b887b", "打开地图", "Open map"),
                         FreePlayMap.OpenKeyEntry, 110f))
                     FreePlayMap.Toggle();
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) {
@@ -49,8 +47,7 @@ namespace SR_UCH {
 
         private static void RenderSpawnPage() {
             try {
-                SRApi.Ctl.SectionTitle(SRApi.T("重生点", "Spawn points"));
-                // 顺序：开关 -> 动作行（可右键绑键）-> 列表。提示标签已删除（说明在各行 tooltip 里）。
+                SRApi.Ctl.SectionTitle(SRApi.Tid("579d47d72f", "重生点", "Spawn points"));
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) {
                     return e.Definition.Key == "Spawn Points";
                 });
@@ -61,9 +58,8 @@ namespace SR_UCH {
 
         private static void RenderAll() {
             try {
-                SRApi.Ctl.SectionTitle(SRApi.T("自由相机", "Free camera"),
-                    SRApi.T("开启后可以用滚轮自由缩放视野\n关闭后完全恢复游戏默认相机\n只在自由模式有效",
-                            "wheel zooms the view freely while on\noff restores the default camera\nfreeplay only"));
+                SRApi.Ctl.SectionTitle(SRApi.Tid("1286ff8e10", "自由相机", "Free camera"),
+                    SRApi.Tid("96b208850a", "开启后可以用滚轮自由缩放视野\n关闭后完全恢复游戏默认相机\n只在自由模式有效", "wheel zooms the view freely while on\noff restores the default camera\nfreeplay only"));
                 SRApi.RenderSectionEntries("自由模式", delegate (ConfigEntryBase e) {
                     return e.Definition.Key == "Free Camera" || e.Definition.Key == "Free Camera FOV"
                         || e.Definition.Key == "Free Camera Speed";
@@ -71,7 +67,7 @@ namespace SR_UCH {
                 // 视野快捷键与自由相机开关同一行：由核心的「行 companion」机制画在复选框右边。
                 GUILayout.Space(SRApi.Ctl.Sc(4));
 
-                SRApi.Ctl.SectionTitle(SRApi.T("自身状态", "Self state"));
+                SRApi.Ctl.SectionTitle(SRApi.Tid("24c925fe06", "自身状态", "Self state"));
                 SelfState.RenderRows();
                 GUILayout.Space(SRApi.Ctl.Sc(4));
 

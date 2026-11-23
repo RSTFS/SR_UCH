@@ -27,12 +27,13 @@ namespace SR_UCH.Tweaks {
         }
 
         private static void SelfReg() {
-            SRApi.LocKey(Sec, "Respawn Delay", "重生延迟", null);
-            SRApi.LocDesc(Sec, "Respawn Delay", "重生延迟\n死亡后等多少秒再自动重生\n默认值就是游戏原版数值；0 = 立即重生", "Respawn delay\nseconds to wait after death before respawning automatically\ndefaults to the game's own value; 0 = respawn instantly");
-            SRApi.LocKey(Sec, "Spawn Invincible", "出生无敌", null);
-            SRApi.LocDesc(Sec, "Spawn Invincible", "出生无敌\n每次出生后无敌多少秒\n挑战/自由模式；0 = 不加无敌", "Spawn invincibility\nseconds of invincibility after each spawn\nchallenge and freeplay; 0 = none");
-            SRApi.LocKey(Sec, "Cannon Auto Respawn", "炮弹卡死重生", null);
-            SRApi.LocDesc(Sec, "Cannon Auto Respawn", "炮弹卡死重生\n死了还卡在炮弹里超过 1.5 秒时自动重生\n挑战/自由模式", "Respawn when stuck in a cannon\nrespawns if you stay dead inside a cannon for over 1.5s\nchallenge and freeplay");
+            TweakCfg.Entry(Sec, "Respawn Delay", "重生延迟", null,
+                "重生延迟\n死亡后等多少秒再自动重生\n默认值就是游戏原版数值；0 = 立即重生",
+                "Respawn delay\nseconds to wait after death before respawning automatically\ndefaults to the game's own value; 0 = respawn instantly");
+            TweakCfg.Entry(Sec, "Spawn Invincible", "出生无敌", null,
+                "出生无敌\n每次出生后无敌多少秒\n挑战/自由模式；0 = 不加无敌", "Spawn invincibility\nseconds of invincibility after each spawn\nchallenge and freeplay; 0 = none");
+            TweakCfg.Entry(Sec, "Cannon Auto Respawn", "炮弹卡死重生", null,
+                "炮弹卡死重生\n死了还卡在炮弹里超过 1.5 秒时自动重生\n挑战/自由模式", "Respawn when stuck in a cannon\nrespawns if you stay dead inside a cannon for over 1.5s\nchallenge and freeplay");
         }
 
         internal static void Initialize(IFeatureHost plugin) {
@@ -190,20 +191,20 @@ public partial class QuickAdjust : ITweak {
         SRApi.Nav("Quick Adjust", 30); // 侧栏栏目顺序 30
         SRApi.RegisterPage("Quick Adjust", "qa", "快速调整", "Quick adjust", 10, Render);   // 第 1 页：本功能页自绘
         SRApi.RegisterPage("Quick Adjust", "challenge", "重生", "Respawn", 20, RenderChallengePage);   // 第 2 页：挑战 + 重生两个分区
-        SRApi.LocKey("Quick Adjust", "Quick Switch", "快速切换", null);
-        SRApi.LocDesc("Quick Adjust", "Quick Switch", "快速切换\n自由模式下长按切换键在行动与建造间切换\n仅自由模式生效", "Quick switch\nin freeplay, hold the key to swap action and build\nfreeplay only");
-        SRApi.LocKey("Quick Adjust", "Quick Switch Hold", "等待秒数", null);
-        SRApi.LocDesc("Quick Adjust", "Quick Switch Hold", "快速切换长按时间\n长按多少秒触发切换\n范围 0-2，0 为立即", "Quick switch hold\nseconds to hold before switching\nrange 0-2; 0 = instant");
-        SRApi.LocKey("Quick Adjust", "Quick Retry", "死后自动重试", null);
-        SRApi.LocDesc("Quick Adjust", "Quick Retry", "死后自动重试\n挑战模式死亡后自动重开关卡\n仅挑战模式生效", "Auto retry\nrestarts the run automatically after death in challenge mode\nchallenge mode only");
-        SRApi.LocKey("Quick Adjust", "Quick Retry Fast", "快速重试", null);
-        SRApi.LocDesc("Quick Adjust", "Quick Retry Fast", "快速重试\n死亡后长按重试键到设定秒数触发重试\n仅挑战模式；长按时间见下一项", "Quick retry\nhold the retry key for the set time after death\nchallenge mode only; hold time below");
-        SRApi.LocKey("Quick Adjust", "Quick Retry Hold", "等待秒数", null);
-        SRApi.LocDesc("Quick Adjust", "Quick Retry Hold", "快速重试长按时间\n死亡后长按多久触发重试\n范围 0-2，0 为立即", "Quick retry hold\nseconds to hold after death\nrange 0-2; 0 = instant");
-        SRApi.LocKey("Quick Adjust", "Handicap", "评分百分比", null);
-        SRApi.LocDesc("Quick Adjust", "Handicap", "评分百分比\n直接设置自己那行的评分百分比\n范围 10-100 整十；100 即不折扣", "Score percentage\nsets your own row's score percentage\n10-100 in tens; 100 = no discount");
-        SRApi.LocKey("Quick Adjust", "More Handicap Values", "更多数值", null);
-        SRApi.LocDesc("Quick Adjust", "More Handicap Values", "自由输入百分比\n评分百分比改为输入框而非整十滑块\n范围 10-100 任意整数", "Free percentage input\nreplaces the tens slider with an input box\nany integer 10-100");
+        TweakCfg.Entry("Quick Adjust", "Quick Switch", "快速切换", null,
+            "快速切换\n自由模式下长按切换键在行动与建造间切换\n仅自由模式生效", "Quick switch\nin freeplay, hold the key to swap action and build\nfreeplay only");
+        TweakCfg.Entry("Quick Adjust", "Quick Switch Hold", "等待秒数", null,
+            "快速切换长按时间\n长按多少秒触发切换\n范围 0-2，0 为立即", "Quick switch hold\nseconds to hold before switching\nrange 0-2; 0 = instant");
+        TweakCfg.Entry("Quick Adjust", "Quick Retry", "死后自动重试", null,
+            "死后自动重试\n挑战模式死亡后自动重开关卡\n仅挑战模式生效", "Auto retry\nrestarts the run automatically after death in challenge mode\nchallenge mode only");
+        TweakCfg.Entry("Quick Adjust", "Quick Retry Fast", "快速重试", null,
+            "快速重试\n死亡后长按重试键到设定秒数触发重试\n仅挑战模式；长按时间见下一项", "Quick retry\nhold the retry key for the set time after death\nchallenge mode only; hold time below");
+        TweakCfg.Entry("Quick Adjust", "Quick Retry Hold", "等待秒数", null,
+            "快速重试长按时间\n死亡后长按多久触发重试\n范围 0-2，0 为立即", "Quick retry hold\nseconds to hold after death\nrange 0-2; 0 = instant");
+        TweakCfg.Entry("Quick Adjust", "Handicap", "评分百分比", null,
+            "评分百分比\n直接设置自己那行的评分百分比\n范围 10-100 整十；100 即不折扣", "Score percentage\nsets your own row's score percentage\n10-100 in tens; 100 = no discount");
+        TweakCfg.Entry("Quick Adjust", "More Handicap Values", "更多数值", null,
+            "自由输入百分比\n评分百分比改为输入框而非整十滑块\n范围 10-100 任意整数", "Free percentage input\nreplaces the tens slider with an input box\nany integer 10-100");
         SRApi.HotkeyAction("qa.apply_discount", "应用折扣", () => QuickAdjust.ApplyScoreDiscount());
         SRApi.HotkeyAction("qa.restore_discount", "重置为不折扣", () => QuickAdjust.RestoreScoreDiscount());
     }
@@ -211,13 +212,12 @@ public partial class QuickAdjust : ITweak {
     public static void Render() {
         try {
         // 每对 BeginHorizontal/EndHorizontal 之间都有会抛异常的控件，任一处抛异常会使 IMGUI 布局栈失衡，故整段包 try/catch。
-        SRApi.Ctl.SectionTitle(SRApi.T("评分百分比", "Score percentage"));
+        SRApi.Ctl.SectionTitle(SRApi.Tid("31e6d803f5", "评分百分比", "Score percentage"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase disc = SRApi.Ctl.FindEntry("Quick Adjust", "Handicap");
         int discVal = QuickAdjust.HandicapValue;
-        GUIContent __dct = SRApi.Ctl.Content(SRApi.T("评分百分比", "Score percentage"),
-            SRApi.T("当前评分百分比\n直接设置自己那行的评分百分比（10-100）\n等效折扣 = 100 减该数值，100 即不折扣。",
-                "current score percentage\nsets your own score percentage directly (10-100)\nequivalent discount = 100 minus this value, 100 = no discount"));
+        GUIContent __dct = SRApi.Ctl.Content(SRApi.Tid("31e6d803f5", "评分百分比", "Score percentage"),
+            SRApi.Tid("d7a8f5ecb5", "当前评分百分比\n直接设置自己那行的评分百分比（10-100）\n等效折扣 = 100 减该数值，100 即不折扣。", "current score percentage\nsets your own score percentage directly (10-100)\nequivalent discount = 100 minus this value, 100 = no discount"));
         float __dcw = Mathf.Max(SRApi.Ctl.Sc(84), SRApi.Ctl.LabelWrap.CalcSize(new GUIContent(__dct.text)).x + SRApi.Ctl.Sc(8));
         GUILayout.Label(__dct, SRApi.Ctl.LabelWrap, GUILayout.Width(__dcw), GUILayout.Height(SRApi.Ctl.Sc(52)));
         int slideVal = Mathf.Clamp(discVal, 10, 100);
@@ -243,38 +243,37 @@ public partial class QuickAdjust : ITweak {
         GUILayout.EndHorizontal();
         GUILayout.Space(SRApi.Ctl.Sc(2));
         GUILayout.BeginHorizontal();
-        if (SRApi.Ctl.HotkeyButton("qa.apply_discount", SRApi.T("应用折扣", "Apply"), SRApi.T("把评分百分比设成上面的数值.\n滑块 10 到 100 整十走, 100 不折扣, 10 相当于减 90%.\n这一局立刻生效, 平衡板上能看到.", "Set your score percentage to the value above.\nSlider goes 10-100 in tens: 100 = no discount, 10 = 90% off.\nTakes effect immediately and shows on the balancer."), QuickAdjust.ApplyScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
+        if (SRApi.Ctl.HotkeyButton("qa.apply_discount", SRApi.Tid("923838eb6a", "应用折扣", "Apply"), SRApi.Tid("0c5a8260ec", "把评分百分比设成上面的数值.\n滑块 10 到 100 整十走, 100 不折扣, 10 相当于减 90%.\n这一局立刻生效, 平衡板上能看到.", "Set your score percentage to the value above.\nSlider goes 10-100 in tens: 100 = no discount, 10 = 90% off.\nTakes effect immediately and shows on the balancer."), QuickAdjust.ApplyScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
             QuickAdjust.CommitDraft(SRApi.Ctl.FindEntry("Quick Adjust", "Handicap"));
             QuickAdjust.ApplyScoreDiscount();
         }
         GUILayout.Space(SRApi.Ctl.Sc(8));
-        if (SRApi.Ctl.HotkeyButton("qa.restore_discount", SRApi.T("还原折扣", "Restore"), SRApi.T("把评分百分比恢复为 100%（不折扣）.\n等价于滑块拖到 100 再应用.\n只影响自己那一行.", "Restore your score percentage to 100% (no discount).\nSame as setting the slider to 100 and applying.\nAffects only your own row."), QuickAdjust.RestoreScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
+        if (SRApi.Ctl.HotkeyButton("qa.restore_discount", SRApi.Tid("fed6104fba", "还原折扣", "Restore"), SRApi.Tid("d7c2e5f224", "把评分百分比恢复为 100%（不折扣）.\n等价于滑块拖到 100 再应用.\n只影响自己那一行.", "Restore your score percentage to 100% (no discount).\nSame as setting the slider to 100 and applying.\nAffects only your own row."), QuickAdjust.RestoreScoreDiscount, SRApi.Ctl.Sc(120), SRApi.Ctl.Sc(30))) {
             QuickAdjust.RestoreScoreDiscount();
         }
             // 「更多数值」开关紧接在「还原折扣」右边同一行。
         GUILayout.Space(SRApi.Ctl.Sc(10));
         ConfigEntryBase more = SRApi.Ctl.FindEntry("Quick Adjust", "More Handicap Values");
         if (more != null) {
-            SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("更多数值", "More values"),
-                SRApi.T("自由输入模式开关\n开启后评分百分比由整十滑块改为输入框\n范围 10 到 100 任意整数。",
-                        "free input mode switch\nturns the tens slider into an input box\nany integer from 10 to 100")),
+            SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.Tid("c4822ae065", "更多数值", "More values"),
+                SRApi.Tid("1583ba5622", "自由输入模式开关\n开启后评分百分比由整十滑块改为输入框\n范围 10 到 100 任意整数。", "free input mode switch\nturns the tens slider into an input box\nany integer from 10 to 100")),
                 more, SRApi.Ctl.Sc(110), SRApi.Ctl.Sc(26));
             SRApi.Ctl.RenderControl(more);
         }
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
 
-        SRApi.Ctl.SectionTitle(SRApi.T("快速切换", "Quick switch"));
+        SRApi.Ctl.SectionTitle(SRApi.Tid("1a0772f552", "快速切换", "Quick switch"));
         GUILayout.BeginHorizontal();
         ConfigEntryBase qs = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Switch");
-        SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.T("快速切换", "Quick switch"), SRApi.T("仅自由模式：长按 B 到设定等待秒数切换 行动<->建造 模式。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n长按时间在下方设置，对局中开关立即生效。", "Freeplay only: hold B for the set seconds to switch Action<->Build.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately.")), qs, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
+        SRApi.Ctl.RestoreLabel(SRApi.Ctl.Content(SRApi.Tid("1a0772f552", "快速切换", "Quick switch"), SRApi.Tid("eac711166b", "仅自由模式：长按 B 到设定等待秒数切换 行动<->建造 模式。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n长按时间在下方设置，对局中开关立即生效。", "Freeplay only: hold B for the set seconds to switch Action<->Build.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately.")), qs, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
         if (qs != null) SRApi.Ctl.RenderControl(qs);
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         GUILayout.BeginHorizontal();
         ConfigEntryBase qsh = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Switch Hold");
         string vanillaSwitch = QuickAdjust.VanillaHoldBText(true);
-        GUILayout.Label(SRApi.Ctl.Content(SRApi.T("等待秒数", "Hold s"), SRApi.T("自由模式长按 B 的阈值：行动->建造 = Character.SuicideTime，游戏默认 " + vanillaSwitch + "；建造->行动 = PiecePlacementCursor.SwitchTime。",
+        GUILayout.Label(SRApi.Ctl.Content(SRApi.Tid("a754cf7ff1", "等待秒数", "Hold s"), SRApi.T("自由模式长按 B 的阈值：行动->建造 = Character.SuicideTime，游戏默认 " + vanillaSwitch + "；建造->行动 = PiecePlacementCursor.SwitchTime。",
               "Freeplay hold-B thresholds: action->build = Character.SuicideTime, vanilla " + vanillaSwitch + "; build->action = PiecePlacementCursor.SwitchTime.")),
             SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(84)), GUILayout.Height(SRApi.Ctl.Sc(26)));
         if (qsh != null) {
@@ -300,17 +299,17 @@ public partial class QuickAdjust : ITweak {
         private static string _pageLabelLang;
         internal static float PageLabelWidth() {
             try {
-                string lang = SRApi.T("z", "e");
+                string lang = SRApi.Tid("40401a9f85", "z", "e");
                 if (_pageLabelW > 0f && lang == _pageLabelLang) return _pageLabelW;
                 _pageLabelLang = lang;
                 string[] labels = new string[] {
-                    SRApi.T("死后自动重试", "Auto retry on death"),
-                    SRApi.T("快速重试", "Quick retry"),
-                    SRApi.T("等待秒数", "Hold s"),
-                    SRApi.T("死亡无计分板", "No death scoreboard"),
-                    SRApi.T("重生延迟", "Respawn delay"),
-                    SRApi.T("出生无敌", "Spawn invincibility"),
-                    SRApi.T("炮弹卡死重生", "Cannon auto respawn"),
+                    SRApi.Tid("1f3096c97f", "死后自动重试", "Auto retry on death"),
+                    SRApi.Tid("ec49dafbec", "快速重试", "Quick retry"),
+                    SRApi.Tid("a754cf7ff1", "等待秒数", "Hold s"),
+                    SRApi.Tid("dbc3dc3f0b", "死亡无计分板", "No death scoreboard"),
+                    SRApi.Tid("ce227dfac3", "重生延迟", "Respawn delay"),
+                    SRApi.Tid("feeafddd5a", "出生无敌", "Spawn invincibility"),
+                    SRApi.Tid("d75bcbd20e", "炮弹卡死重生", "Cannon auto respawn"),
                 };
                 float w = SRApi.Ctl.Sc(60f);
                 for (int i = 0; i < labels.Length; i++)
@@ -329,27 +328,23 @@ public partial class QuickAdjust : ITweak {
 
     public static void RenderChallengePage() {
         try {
-            SRApi.Ctl.SectionTitle(SRApi.T("挑战", "Challenge"),
-                SRApi.T("挑战模式的自动重试与长按重试；两套都只影响挑战模式。",
-                        "Auto retry and hold-to-retry for challenge mode; both only affect challenge runs."));
+            SRApi.Ctl.SectionTitle(SRApi.Tid("0cce1e0303", "挑战", "Challenge"),
+                SRApi.Tid("7eb2a117b4", "挑战模式的自动重试与长按重试；两套都只影响挑战模式。", "Auto retry and hold-to-retry for challenge mode; both only affect challenge runs."));
             GUILayout.Space(SRApi.Ctl.Sc(2));
 
             ConfigEntryBase qr = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry");
-            if (qr != null) PageRow(SRApi.T("死后自动重试", "Auto retry on death"),
-                SRApi.T("仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n对局中开关立即生效。",
-                        "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nTakes effect immediately."),
+            if (qr != null) PageRow(SRApi.Tid("1f3096c97f", "死后自动重试", "Auto retry on death"),
+                SRApi.Tid("b42b86aa35", "仅挑战模式：死亡后自动触发重试（重开关卡），无需长按。\n原理：修改重生延迟在挑战模式的最短时间自动重试。\n对局中开关立即生效。", "Challenge only: auto-retry (restart the run) after death, no hold needed.\nUses the respawn-delay challenge logic.\nTakes effect immediately."),
                 qr);   // 标签宽度交给核心按本页标签收敛，不再写死
 
             ConfigEntryBase qrf = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Fast");
-            if (qrf != null) PageRow(SRApi.T("快速重试", "Quick retry"),
-                SRApi.T("仅挑战模式：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n长按时间在下方设置，对局中开关立即生效。",
-                        "Challenge only: after death, hold B for the set seconds to auto-retry.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately."),
+            if (qrf != null) PageRow(SRApi.Tid("ec49dafbec", "快速重试", "Quick retry"),
+                SRApi.Tid("900a70eaed", "仅挑战模式：死亡后长按 B 到设定等待秒数自动重试。\n选中后由下方滑块条修改长按 B 的等待时间（游戏默认 0.5 秒）。\n长按时间在下方设置，对局中开关立即生效。", "Challenge only: after death, hold B for the set seconds to auto-retry.\nWhen on, the slider below sets the hold-B wait time (vanilla 0.5s).\nThe hold time is set below; takes effect immediately."),
                 qrf);   // 同上：写死会让本页各行左边缘不齐
 
             ConfigEntryBase qrh = SRApi.Ctl.FindEntry("Quick Adjust", "Quick Retry Hold");
-            if (qrh != null) PageSlider(SRApi.T("等待秒数", "Hold s"),
-                SRApi.T("长按 B 的等待阈值（Character.SuicideTime）：挑战模式重试游戏默认 0.5 秒。\n范围 0-2，0.1 步进",
-                        "Hold-B threshold (Character.SuicideTime): vanilla 0.5s for challenge retry.\nrange 0-2 in 0.1 steps"),
+            if (qrh != null) PageSlider(SRApi.Tid("a754cf7ff1", "等待秒数", "Hold s"),
+                SRApi.Tid("3ab24ba1c9", "长按 B 的等待阈值（Character.SuicideTime）：挑战模式重试游戏默认 0.5 秒。\n范围 0-2，0.1 步进", "Hold-B threshold (Character.SuicideTime): vanilla 0.5s for challenge retry.\nrange 0-2 in 0.1 steps"),
                 qrh, 0f, 2f, "0.0");
             RespawnTools.RenderRespawnSection();
         } catch (Exception __ex) { SRApi.Guard.Log("快速调整/挑战页", __ex); }

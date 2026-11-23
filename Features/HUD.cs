@@ -55,9 +55,8 @@ namespace SR_UCH.Tweaks {
         private static string _winText;
         private static int _lastRound;
         // 真实回合：RoundNumber 在重载 / 刷新派对盒时会被额外 +1，故只在观察到结算记分板后接受增量。
-        private static int _trueRound;
-        private static int _roundPending;
-        private static bool _roundTallySeen;
+        // 判定与混乱牌组共用 Pure/RoundTruth.cs，避免两套状态机漂移。
+        private static SR_UCH.Pure.RoundTruthState _rs;
         private static bool _vsPlaceSeen;
 
         private static bool _inLobby;
@@ -241,16 +240,16 @@ namespace SR_UCH.Tweaks {
             for (int i = 0; i < _content.Length; i++) {
                 ContentDef d = _content[i];
                 Loc(d.Key, d.LabelZh, d.LabelEn, d.DescZh, d.DescEn);
-                SRApi.LocKey(Sec, d.ColorKey, d.LabelZh + "颜色", d.LabelEn + " color");
-                SRApi.LocDesc(Sec, d.ColorKey,
+                TweakCfg.Entry(Sec, d.ColorKey, d.LabelZh + "颜色", d.LabelEn + " color",
                     d.LabelZh + "的文字颜色\n十六进制颜色值，例如 #FFFFFF\n点色块开调色板；点名称还原默认色",
                     "text color for " + d.LabelEn.ToLowerInvariant() + "\nhex color value, for example #FFFFFF\nclick the swatch to open the picker; click the name to reset");
             }
         }
 
         private static void Loc(string key, string zh, string en, string descZh, string descEn) {
-            SRApi.LocKey(Sec, key, zh, en);
-            SRApi.LocDesc(Sec, key, descZh, descEn);
+            TweakCfg.Entry(Sec, key, zh, en,
+                descZh,
+                descEn);
         }
 
         // ================= 设置页 =================
@@ -298,7 +297,7 @@ namespace SR_UCH.Tweaks {
             try {
                 ConfigEntryBase show = SRApi.Ctl.FindEntry(Sec, d.Key);
                 ConfigEntryBase color = SRApi.Ctl.FindEntry(Sec, d.ColorKey);
-                string tip = SRApi.T(d.DescZh, d.DescEn) + "\n" + SRApi.T("点击名称还原默认色", "Click the name to reset to the default color");
+                string tip = SRApi.T(d.DescZh, d.DescEn) + "\n" + SRApi.Tid("b91a694f3e", "点击名称还原默认色", "Click the name to reset to the default color");
                 GUIContent label = new GUIContent(SRApi.T(d.LabelZh, d.LabelEn), tip);
                 float h = SRApi.Ctl.Sc(26f);
                 GUILayout.BeginHorizontal();
@@ -396,7 +395,7 @@ namespace SR_UCH.Tweaks {
                         try {
                             if (!SRApi.GateMaster || _enabled == null) return;
                             _enabled.Value = !_enabled.Value;
-                            SRApi.Notify(_enabled.Value ? SRApi.T("HUD：开", "HUD: ON") : SRApi.T("HUD：关", "HUD: OFF"));
+                            SRApi.Notify(_enabled.Value ? SRApi.Tid("d2bf6159b9", "HUD：开", "HUD: ON") : SRApi.Tid("2dca0b5d56", "HUD：关", "HUD: OFF"));
                         } catch (Exception __hk) { SRApi.Guard.Log("HUD/显示键", __hk); }
                     });
                 }
@@ -470,7 +469,7 @@ namespace SR_UCH.Tweaks {
             for (int i = 0; i < _hudHeights.Length; i++) _hudHeights[i] = 0f;
             for (int i = 0; i < _segWSmooth.Length; i++) _segWSmooth[i] = 0f;
             _heightFrame = -1;
-            _roundTallySeen = false;
+            SR_UCH.Pure.RoundTruth.ClearTally(ref _rs);
             _dragging = false;
         }
 
@@ -665,6 +664,37 @@ namespace SR_UCH.Tweaks {
                 }
                 break;
             }
+        }
+    }
+}
+
+// 回合 HUD · 设置页（RenderPage1 / RenderPage2）。
+
+namespace SR_UCH.Tweaks {
+    public partial class HUD {
+        private static void RenderPage1() {
+            try {
+                List<ConfigEntryBase> list = SRApi.SectionEntries(Sec);
+                if (list == null || list.Count == 0) { GUILayout.Label(SRApi.Tid("2be7d7a6da", "（无匹配条目）", "(no matching entries)"), SRApi.Ctl.Label); return; }
+                SRApi.Ctl.SectionTitle(SRApi.Tid("f1848d2d65", "配置", "Config"));
+                SRApi.RenderSectionEntries(Sec, _rowConfig);
+                SRApi.Ctl.SectionTitle(SRApi.Tid("cab005b3b5", "外观", "Appearance"));
+                SRApi.RenderSectionEntries(Sec, _rowAppearance);
+                SRApi.Ctl.SectionTitle(SRApi.Tid("f4cbef6a47", "行为", "Behavior"));
+                SRApi.RenderSectionEntries(Sec, _rowBehavior);
+            } catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 设置页", __ex); }
+        }
+
+        private static void RenderPage2() {
+            try {
+                SRApi.Ctl.SectionTitle(SRApi.Tid("b141cce614", "显示方案", "Display mode"));
+                SRApi.RenderSectionEntries(Sec, _rowDisplay);
+                SRApi.Ctl.SectionTitle(SRApi.Tid("ea74f0d293", "一般", "General"));
+                for (int i = 0; i <= 4; i++) RenderContentRow(_content[i]);
+                SRApi.Ctl.SectionTitle(SRApi.Tid("d9c5dacd95", "其它", "Other"));
+                RenderContentRow(_content[5]);
+                RenderContentRow(_content[6]);
+            } catch (Exception __ex) { SRApi.Guard.Log("渲染 HUD 显示内容页", __ex); }
         }
     }
 }

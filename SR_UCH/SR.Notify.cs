@@ -12,7 +12,7 @@ public partial class SR {
         // 优先交通知中心钩子（可画动作按钮 / 精确分级），否则退回普通提示。
         internal static void NotifyEx(SRApi.NotifyArgs a) {
             try {
-                SRApi.NotifyExFn hook = Slots.Require<SRApi.NotifyExFn>(SRApi.SlotKeys.NotifyHub2);
+                SRApi.NotifyExFn hook = SrCaps.NotifyHub2;
                 if (hook != null && hook(a)) return;
                 Notify(a != null ? a.Text : "");
             } catch (Exception __ne) { Guard.Log("通知中心/NotifyEx 转发", __ne); }
@@ -46,18 +46,14 @@ public partial class SR {
         private static float _tipRetryAt;   // 下次重试时刻（60 秒一次）
 
         // 通知治理钩子（可选）：true = 治理中心负责显示，false / 无提供者照旧。
-        // 先用 Slots.Names 判存在再 Require，避免产生「槽位缺失」记录。
-        private const string NotifyHookSlot = SRApi.SlotKeys.NotifyHook;
         private static Func<string, string, bool> _notifyHook;
         private static float _notifyHookNext;
 
         private static Func<string, string, bool> NotifyHook() {
-            // 每 2 秒复核：通知中心 Shutdown 会 Retract，旧缓存必须失效。
+            // 每 2 秒复核：通知中心 Shutdown 会清空能力容器，旧缓存必须失效。
             if (Time.unscaledTime < _notifyHookNext) return _notifyHook;
             _notifyHookNext = Time.unscaledTime + 2f;
-            bool present = false;
-            foreach (string n in Slots.Names) { if (n == NotifyHookSlot) { present = true; break; } }
-            _notifyHook = present ? Slots.Require<Func<string, string, bool>>(NotifyHookSlot) : null;
+            _notifyHook = SrCaps.NotifyHook;
             return _notifyHook;
         }
 

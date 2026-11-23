@@ -62,14 +62,14 @@ namespace SR_UCH {
             SRApi.Ref.Override("Character.setupDeath", "自身状态：拦截广播死亡");
             SRApi.Ref.Override("Character.invincibleTimer", "自身状态：无敌计时器");
             SRApi.Ref.Override("Character.crouchingDown", "自身状态：蹲移");
-            SRApi.LocKey(Sec, "Invincible", "无敌", "Invincible");
-            SRApi.LocDesc(Sec, "Invincible", "无敌\n免疫非强制死亡（陷阱/子弹/掉坑/拳击）\n只对本机生效", "Invincible\nimmune to non-forced deaths (traps, bullets, pits, punches)\nlocal only");
-            SRApi.LocKey(Sec, "God Mode", "完美无敌", "God mode");
-            SRApi.LocDesc(Sec, "God Mode", "完美无敌\n在无敌之上再拦强制死亡（深坑、判死线）\n完全没有死亡反馈，不适合正常玩", "God mode\ninvincible plus forced deaths (pits, death line)\nno death feedback at all; not for normal play");
-            SRApi.LocKey(Sec, "Fly", "飞天", "Fly");
-            SRApi.LocDesc(Sec, "Fly", "飞天\n方向键自由飞行，Shift 加速\n不按键则悬停在空中", "Fly\nfly freely with the arrow keys; hold Shift to speed up\nstays hovering when no key is held");
-            SRApi.LocKey(Sec, "Ignore Collision", "无视碰撞", "Ignore collision");
-            SRApi.LocDesc(Sec, "Ignore Collision", "无视碰撞\n自己穿过所有实体碰撞\n可能掉出地图", "Ignore collision\npass through every solid collider\nmay fall out of the map");
+            TweakCfg.Entry(Sec, "Invincible", "无敌", "Invincible",
+                "无敌\n免疫非强制死亡（陷阱/子弹/掉坑/拳击）\n只对本机生效", "Invincible\nimmune to non-forced deaths (traps, bullets, pits, punches)\nlocal only");
+            TweakCfg.Entry(Sec, "God Mode", "完美无敌", "God mode",
+                "完美无敌\n在无敌之上再拦强制死亡（深坑、判死线）\n完全没有死亡反馈，不适合正常玩", "God mode\ninvincible plus forced deaths (pits, death line)\nno death feedback at all; not for normal play");
+            TweakCfg.Entry(Sec, "Fly", "飞天", "Fly",
+                "飞天\n方向键自由飞行，Shift 加速\n不按键则悬停在空中", "Fly\nfly freely with the arrow keys; hold Shift to speed up\nstays hovering when no key is held");
+            TweakCfg.Entry(Sec, "Ignore Collision", "无视碰撞", "Ignore collision",
+                "无视碰撞\n自己穿过所有实体碰撞\n可能掉出地图", "Ignore collision\npass through every solid collider\nmay fall out of the map");
         }
 
         // 分区：快捷键
@@ -334,14 +334,14 @@ namespace SR_UCH {
             try {
                 float w = SRApi.Ctl.Sc(200f);
                 float gap = SRApi.Ctl.Sc(12f);
-                RenderPair(SRApi.T("无敌：", "Invincible: "), SRApi.T("自己免疫非强制死亡", "Immune to non-forced deaths"),
+                RenderPair(SRApi.Tid("1b9e3f8e50", "无敌：", "Invincible: "), SRApi.Tid("b97a44acdd", "自己免疫非强制死亡", "Immune to non-forced deaths"),
                            On(_invincible), _invincibleKey, delegate { Toggle(_invincible, "无敌", "Invincible"); },
-                           SRApi.T("飞天：", "Fly: "), SRApi.T("方向键自由飞行", "Fly with the arrow keys"),
+                           SRApi.Tid("843e457386", "飞天：", "Fly: "), SRApi.Tid("c84116a612", "方向键自由飞行", "Fly with the arrow keys"),
                            On(_fly), _flyKey, delegate { Toggle(_fly, "飞天", "Fly"); }, w, gap);
                 GUILayout.Space(SRApi.Ctl.Sc(4f));
-                RenderPair(SRApi.T("完美无敌：", "God mode: "), SRApi.T("连强制死亡、深坑、掉出判死线都拦", "Also blocks forced deaths (pits, death line)"),
+                RenderPair(SRApi.Tid("5ca4434851", "完美无敌：", "God mode: "), SRApi.Tid("c1af606272", "连强制死亡、深坑、掉出判死线都拦", "Also blocks forced deaths (pits, death line)"),
                            On(_godMode), _godModeKey, delegate { Toggle(_godMode, "完美无敌", "God mode"); },
-                           SRApi.T("无视碰撞：", "Ignore collision: "), SRApi.T("自己穿过所有实体碰撞", "Pass through every solid collider"),
+                           SRApi.Tid("ffcbbac6d6", "无视碰撞：", "Ignore collision: "), SRApi.Tid("92c9343976", "自己穿过所有实体碰撞", "Pass through every solid collider"),
                            On(_ignoreCollision), _ignoreCollisionKey, delegate { Toggle(_ignoreCollision, "无视碰撞", "Ignore collision"); }, w, gap);
             } catch (Exception __ex) { SRApi.Guard.Log("自身状态/渲染", __ex); }
         }

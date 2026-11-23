@@ -291,7 +291,6 @@ public partial class SR {
                 string path = cfg.ConfigFilePath;
                 if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) return 0;
                 string text = System.IO.File.ReadAllText(path, System.Text.Encoding.UTF8);
-                // 内存表同步清理，否则文件已删、界面仍按旧表显示。
                 try {
                     for (int i = 0; i < pairs.Count; i++) {
                         string[] __kv = pairs[i].Split(new[] { ConfigMigration.AuditSep }, StringSplitOptions.None);

@@ -92,18 +92,15 @@ namespace SR_UCH.Tweaks {
 
         // LevelSelectController.FadeOut 是 private 序列化字段（场景内遮罩），FadeToLevel 等的就是它。
         private static readonly FieldInfo _fLsFadeOut =
-            typeof(LevelSelectController).GetField("FadeOut", BindingFlags.Instance | BindingFlags.NonPublic);
+            RefCache.FieldOf(typeof(LevelSelectController), "FadeOut");
 
         private const string SecOnline = "Online";
         private const string ColWidthsKey = "Column Widths 5";   // v5：删除技能系数列（加/删列即换键，v4 旧值由配置迁移裁剪）
         private const string TableHKey = "Table Height";
         private const string ColOrderKey = "Column Order";
-        private const string HiddenColsKey = "Hidden Columns 5";   // v5：删除技能系数列（v4 旧值由配置迁移裁剪）
+        private const string HiddenColsKey = "Hidden Columns 5";
         // 默认隐藏列索引，取值须与 CombinedCol 一致。
         private const string DefaultHiddenCol = "9";
-        // 旧列布局 12 列，索引 3 是已删除的「技能系数」列；Column Order 无版本号，加载时按老形状裁剪。
-        private const int OldColCount = 12;
-        private const int OldSkillCol = 3;
 
         // 默认列宽，顺序：区域 人数 质量 进度 模式 标签 房主 限制 标记 综合分 操作。
         private static readonly float[] DefWidths = { 62f, 53f, 76f, 66f, 80f, 50f, 86f, 78f, 50f, 65f, 70f };   // 人数 +20%（44→53）、综合分 +20%（54→65）
@@ -190,8 +187,9 @@ namespace SR_UCH.Tweaks {
                 // 配置被手改成越界值时当作不排序。
                 if (_sortCol < 0 || _sortCol >= ColCount || _sortCol == JoinCol) _sortCol = -1;
             } catch { _sortCol = -1; _sortDesc = false; }
-            SRApi.LocKey(SecOnline, "Show Quality Coeff", "显示技能匹配质量", null);
-            SRApi.LocDesc(SecOnline, "Show Quality Coeff", "匹配系数显示\n在质量列后附带 0-1 的技能匹配系数\n也可 Shift+点击该列列头切换", "Match coefficient\nappends a 0-1 skill-match coefficient to the quality column\nalso toggled by Shift+clicking that header");
+            TweakCfg.Entry(SecOnline, "Show Quality Coeff", "显示技能匹配质量", null,
+                "匹配系数显示\n在质量列后附带 0-1 的技能匹配系数\n也可 Shift+点击该列列头切换",
+                "Match coefficient\nappends a 0-1 skill-match coefficient to the quality column\nalso toggled by Shift+clicking that header");
         }
 
         // 清空房间列表与几何缓存，不动列宽 / 列序 / 隐藏列偏好。
@@ -345,7 +343,7 @@ namespace SR_UCH.Tweaks {
                 Matchmaker mm = MatchmakerOrNull();
                 // 判空必须放最前：下面的分支会立刻调用 mm.GetType()。
                 if (mm == null) {
-                    _lobbyMsg = SRApi.T("联机未初始化：请先进入游戏的联机界面一次", "Online not initialised: open the game's online screen once first");
+                    _lobbyMsg = SRApi.Tid("2454fd5094", "联机未初始化：请先进入游戏的联机界面一次", "Online not initialised: open the game's online screen once first");
                     _lobbyErr = true;
                     return;
                 }
@@ -353,21 +351,21 @@ namespace SR_UCH.Tweaks {
                 bool gameSearching = false;
                 try { gameSearching = Matchmaker.Instance.Searching; } catch (Exception __gs) { SRApi.Guard.Log("联机/查询游戏搜索状态", __gs); }
                 if (gameSearching) {
-                    _lobbyMsg = SRApi.T("游戏正在搜索房间，稍后再刷新", "The game is already searching; refresh again in a moment");
+                    _lobbyMsg = SRApi.Tid("86ad18d4bf", "游戏正在搜索房间，稍后再刷新", "The game is already searching; refresh again in a moment");
                     return;
                 }
                 _lobbies.Clear();
                 ClearRegionCodeCache();
                 _lobbySearching = true;
                 _lobbyErr = false;          // 本次搜索开始，清掉上一次的错误提示
-                _lobbyMsg = SRApi.T("搜索中...", "Searching...");
+                _lobbyMsg = SRApi.Tid("b1f5fb7cc6", "搜索中...", "Searching...");
                 _lobbySearchAt = Time.unscaledTime;
                 _lobbyCbFirst = -1f; _lobbyCbLast = -1f; _lobbyCbCount = 0;
                 mm.FindLobbies(new Matchmaker.LobbyListingCallback(OnLobbyInfo));
             } catch (Exception e) {
                 _lobbySearching = false;
                 _lobbyErr = true;
-                _lobbyMsg = SRApi.T("搜索失败: ", "Search failed: ") + e.Message;
+                _lobbyMsg = SRApi.Tid("8a785de507", "搜索失败: ", "Search failed: ") + e.Message;
                 SRApi.LogWarn("刷新房间列表失败: " + e.Message);
             }
         }
@@ -375,7 +373,7 @@ namespace SR_UCH.Tweaks {
         private static void OnLobbyInfo(Matchmaker.LobbyListInfo info) {
             try {
                 if (info == null) return;
-                if (info.error) { _lobbySearching = false; _lobbyErr = true; _lobbyMsg = SRApi.T("搜索出错", "Search error"); return; }
+                if (info.error) { _lobbySearching = false; _lobbyErr = true; _lobbyMsg = SRApi.Tid("a980babfe7", "搜索出错", "Search error"); return; }
                 // 同一 sLobbyID 的回调可能重复：去重替换，否则会重复行与计数虚高。
                 int exist = -1;
                 for (int i = 0; i < _lobbies.Count; i++) {
@@ -452,22 +450,19 @@ namespace SR_UCH.Tweaks {
             EnsureWidths();
             
             GUILayout.BeginHorizontal();
-            if (SRApi.Ctl.HotkeyButton("online.lobbies", SRApi.T("刷新列表", "Refresh"),
-                SRApi.T("向匹配服务查一次公开房间, 能加入的排在表格最上面, 点里面的加入就行.\n如果你正待在某个房间里, 点加入会先退出当前房间, 退完立刻自动进新的.",
-                     "Query the public lobby list, joinable lobbies on top. Click Join in the table.\nIf you are already in a lobby, clicking Join leaves it first and joins the new one right away."),
+            if (SRApi.Ctl.HotkeyButton("online.lobbies", SRApi.Tid("93b4fef82e", "刷新列表", "Refresh"),
+                SRApi.Tid("3a1bcbc083", "向匹配服务查一次公开房间, 能加入的排在表格最上面, 点里面的加入就行.\n如果你正待在某个房间里, 点加入会先退出当前房间, 退完立刻自动进新的.", "Query the public lobby list, joinable lobbies on top. Click Join in the table.\nIf you are already in a lobby, clicking Join leaves it first and joins the new one right away."),
                 RefreshLobbies, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(30))) RefreshLobbies();
             // 返回倒计时中按钮改为"强制返回"。
             bool returning = _abortDeadline > 0f || _forceDeadline > 0f || _forceRawDeadline > 0f;
             if (SRApi.Ctl.HotkeyButton("online.disband",
-                returning ? SRApi.T("强制返回", "Force return") : SRApi.T("返回主界面", "Back to main menu"),
-                SRApi.T("回主界面, 走的就是游戏自己的离开房间流程. 房主会先广播 HostEndedGame, 全员一起回去; 房客只退自己.\n点下去当帧就放出加载遮罩并清掉本页房间列表; 1.5 秒还没回去就自己收尾, 4 秒硬切主界面.\n再点一次这个按钮 = 立刻强制返回, 完全不等游戏自己的加载流程.",
-                     "Back to the main menu, using the game's own leave-lobby flow. Host: broadcasts HostEndedGame and everyone returns; guest: only you leave.\nThe moment you click it releases the loading splash and clears this page's lobby list; self-recovery at 1.5s / 4s.\nClick it again to force an immediate return, skipping the game's own loading flow."),
+                returning ? SRApi.Tid("68d4bb81a2", "强制返回", "Force return") : SRApi.Tid("a17eeea4b3", "返回主界面", "Back to main menu"),
+                SRApi.Tid("a29fa1bdda", "回主界面, 走的就是游戏自己的离开房间流程. 房主会先广播 HostEndedGame, 全员一起回去; 房客只退自己.\n点下去当帧就放出加载遮罩并清掉本页房间列表; 1.5 秒还没回去就自己收尾, 4 秒硬切主界面.\n再点一次这个按钮 = 立刻强制返回, 完全不等游戏自己的加载流程.", "Back to the main menu, using the game's own leave-lobby flow. Host: broadcasts HostEndedGame and everyone returns; guest: only you leave.\nThe moment you click it releases the loading splash and clears this page's lobby list; self-recovery at 1.5s / 4s.\nClick it again to force an immediate return, skipping the game's own loading flow."),
                 DisbandOrLeave, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(30))) DisbandOrLeave();
             // 房间码加入，走游戏的 JoinLobby(code, useCode:true)。
             GUILayout.Space(SRApi.Ctl.Sc(14));
-            GUILayout.Label(new GUIContent(SRApi.T("房间码", "Lobby code"),
-                SRApi.T("输入 4 个大写字母的房间码直接加入（和游戏里按码加入一样；在对局内会先退出当前房间）。",
-                     "Enter the 4-letter lobby code to join directly (same as the game's join-by-code; while in a session it leaves the current one first).")),
+            GUILayout.Label(new GUIContent(SRApi.Tid("359fd14f70", "房间码", "Lobby code"),
+                SRApi.Tid("55d99bfc17", "输入 4 个大写字母的房间码直接加入（和游戏里按码加入一样；在对局内会先退出当前房间）。", "Enter the 4-letter lobby code to join directly (same as the game's join-by-code; while in a session it leaves the current one first).")),
                 SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(CodeLabelW)), GUILayout.Height(SRApi.Ctl.Sc(30)));
             string typed = SRApi.ClearableTextField(_joinCode ?? "", 4, SRApi.Ctl.SearchBox,
                 GUILayout.Width(SRApi.Ctl.Sc(62)), GUILayout.Height(SRApi.Ctl.Sc(24)));
@@ -477,7 +472,7 @@ namespace SR_UCH.Tweaks {
                          && _joinCode.Length == 4;
             bool oldEnabled = GUI.enabled;
             GUI.enabled = _joinCode.Length == 4;   // 不足 4 位不可点
-            bool clickJoin = GUILayout.Button(SRApi.T("加入", "Join"), SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(46)), GUILayout.Height(SRApi.Ctl.Sc(24)));
+            bool clickJoin = GUILayout.Button(SRApi.Tid("78e5bd1399", "加入", "Join"), SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(46)), GUILayout.Height(SRApi.Ctl.Sc(24)));
             GUI.enabled = oldEnabled;
             if (_joinCode.Length == 4 && (clickJoin || enter)) JoinByCode(_joinCode);
             GUILayout.FlexibleSpace();
@@ -498,8 +493,7 @@ namespace SR_UCH.Tweaks {
             }
             // 统计文案每帧重算；错误提示粘住。
             if (!_lobbyErr) UpdateLobbyMsg();
-            string hint = SRApi.T("（点刷新列表查询）表头：左键点=按该列排序（升->降->默认），拖分隔线=调列宽（<->），拖表头=换列位置（+），Shift+点游戏质量=显示/隐藏匹配质量系数，右键=隐藏该列，Shift+右键=还原；滚轮=上下，Ctrl+滚轮=左右；表格底边可拖高度",
-                               "(click 'Refresh' to query) Header: left-click = sort by that column (asc/desc/default), drag a separator = resize (<->), drag a header = reorder (+), Shift+click 'Quality' = show/hide the skill-match coefficient, right-click = hide that column, Shift+right-click = reset; wheel = up/down, Ctrl+wheel = left/right; drag the table's bottom edge to resize height");
+            string hint = SRApi.Tid("7aeb35a042", "（点刷新列表查询）表头：左键点=按该列排序（升->降->默认），拖分隔线=调列宽（<->），拖表头=换列位置（+），Shift+点游戏质量=显示/隐藏匹配质量系数，右键=隐藏该列，Shift+右键=还原；滚轮=上下，Ctrl+滚轮=左右；表格底边可拖高度", "(click 'Refresh' to query) Header: left-click = sort by that column (asc/desc/default), drag a separator = resize (<->), drag a header = reorder (+), Shift+click 'Quality' = show/hide the skill-match coefficient, right-click = hide that column, Shift+right-click = reset; wheel = up/down, Ctrl+wheel = left/right; drag the table's bottom edge to resize height");
             GUILayout.Label(string.IsNullOrEmpty(_lobbyMsg) ? hint : _lobbyMsg, SRApi.Ctl.Label);
 
             // 筛选单行：区域 / 模式 / 标签 / 状态，下拉框宽度按 4 等分。
@@ -598,18 +592,11 @@ namespace SR_UCH.Tweaks {
                 string v = _colWidths != null ? _colWidths.Value : null;
                 if (!string.IsNullOrEmpty(v)) {
                     string[] p = v.Split(',');
-                    // 兼容旧版 12 项值：先裁掉已删除的列再套用，否则整串被丢弃。
-                    if (p.Length == OldColCount) {
-                        List<string> q = new List<string>(ColCount);
-                        for (int i = 0; i < p.Length; i++) { if (i != OldSkillCol) q.Add(p[i]); }
-                        p = q.ToArray();
-                    }
                     if (p.Length == _cw.Length) {
                         for (int i = 0; i < p.Length; i++) {
                             float f;
                             if (float.TryParse(p[i], NumberStyles.Float, CultureInfo.InvariantCulture, out f) && f >= 28f && f <= 600f) {
                         _cw[i] = f;
-                        // 人数 / 综合分旧值更窄时抬高到新默认，避免表头被截。
                         if ((i == 1 || i == 9) && _cw[i] < DefWidths[i]) _cw[i] = DefWidths[i];
                     }
                         }
@@ -620,7 +607,7 @@ namespace SR_UCH.Tweaks {
             EnsureHiddenCols();
         }
 
-        // 列顺序须是 0..ColCount-1 的排列；老值 12 项含已删除的列 3，先去掉并把其后索引 -1，仍不合法就回默认。
+        // 列顺序须是 0..ColCount-1 的排列；不合法就回默认。
         private static void EnsureColOrder() {
             try {
                 string v = _colOrder != null ? _colOrder.Value : null;
@@ -629,16 +616,6 @@ namespace SR_UCH.Tweaks {
                 int[] src = new int[p.Length];
                 for (int i = 0; i < p.Length; i++) {
                     if (!int.TryParse(p[i], out src[i])) return;
-                }
-                if (src.Length == OldColCount) {
-                    List<int> mapped = new List<int>(ColCount);
-                    for (int i = 0; i < src.Length; i++) {
-                        int k = src[i];
-                        if (k == OldSkillCol) continue;   // 已删除的技能系数列
-                        if (k > OldSkillCol) k -= 1;
-                        mapped.Add(k);
-                    }
-                    src = mapped.ToArray();
                 }
                 if (src.Length != ColCount) return;
                 bool[] seen = new bool[ColCount];

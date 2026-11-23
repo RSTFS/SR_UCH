@@ -170,15 +170,14 @@ public partial class SR {
         private static void RenderPluginList() {
             try {
                 if (_externalPlugins.Count == 0) return;
-                GUILayout.Label(T("- 外部插件（运行时启用/禁用）-", "- External plugins (enable/disable at runtime) -"), _secHeader);
-                WrapLabel(T("禁用会立刻卸载该插件的 Harmony 补丁并停掉它，重启后保持；启用会重新应用补丁。",
-                            "Disabling unpatches and stops the plugin immediately and persists after a restart; enabling re-applies its patches."));
+                GUILayout.Label(Tid("54aff5d226", "- 外部插件（运行时启用/禁用）-", "- External plugins (enable/disable at runtime) -"), _secHeader);
+                WrapLabel(Tid("139494106a", "禁用会立刻卸载该插件的 Harmony 补丁并停掉它，重启后保持；启用会重新应用补丁。", "Disabling unpatches and stops the plugin immediately and persists after a restart; enabling re-applies its patches."));
                 GUILayout.Space(Sc(2));
                 float w = Mathf.Max(Sc(160), _winWidth - SidebarWidth() - Sc(40));
                 foreach (PluginEntry p in _externalPlugins) {
                     bool dis = IsExternalDisabled(p.guid);
                     GUILayout.BeginHorizontal(GUILayout.Width(w));
-                    if (GUILayout.Button(dis ? T("启用", "Enable") : T("禁用", "Disable"),
+                    if (GUILayout.Button(dis ? Tid("14891bd418", "启用", "Enable") : Tid("6eb7d96b00", "禁用", "Disable"),
                             dis ? _checkOn : _btn, GUILayout.Width(Sc(58)), GUILayout.Height(Sc(24)))) {
                         ToggleExternalPlugin(p);
                     }
@@ -187,7 +186,7 @@ public partial class SR {
                     try {
                     if (dis) GUI.color = new Color(1f, 1f, 1f, 0.55f);   //禁用项用半透明标记
                     GUILayout.Label(new GUIContent((dis ? "* " : "") + p.name,
-                        p.guid + "\n" + (string.IsNullOrEmpty(p.path) ? "?" : p.path) + "\n" + (dis ? T("已禁用", "disabled") : T("已启用", "enabled"))),
+                        p.guid + "\n" + (string.IsNullOrEmpty(p.path) ? "?" : p.path) + "\n" + (dis ? Tid("9f8d385b2c", "已禁用", "disabled") : Tid("993f6f0bbb", "已启用", "enabled"))),
                         _labelClip, GUILayout.Width(w - Sc(70)), GUILayout.Height(Sc(24)));
                     } finally { GUI.color = prev; }
                     GUILayout.FlexibleSpace();
@@ -287,8 +286,7 @@ public partial class SR {
                 Assembly ours = typeof(SR).Assembly;
                 System.Collections.IEnumerable all = null;
                 try {
-                    MethodInfo gam = typeof(Harmony).GetMethod("GetAllPatchedMethods",
-                        BindingFlags.Public | BindingFlags.Static);
+                    MethodInfo gam = RefCache.MethodOf(typeof(Harmony), "GetAllPatchedMethods");
                     if (gam != null) all = gam.Invoke(null, null) as System.Collections.IEnumerable;
                 } catch (Exception __gm) { Guard.Log("补丁归因/取全局补丁表", __gm); }
                 if (all == null) { AttributionError = "当前 Harmony 不支持 GetAllPatchedMethods()"; _attrDone = true; return; }

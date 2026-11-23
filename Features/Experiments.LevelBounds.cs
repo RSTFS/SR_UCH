@@ -75,10 +75,12 @@ namespace SR_UCH.Tweaks {
             // 两处反射均需登记，否则改名后静默返回 null（表现为解除无效）。
             SRApi.Ref.Override("Cursor.boundary", "解除关卡边界：放置光标边界快照");
             SRApi.Ref.Override("ZoomCamera.frame", "解除关卡边界：相机取景框");
-            SRApi.LocKey("Experiments", "Level Bounds", "解除关卡边界", null);
-            SRApi.LocDesc("Experiments", "Level Bounds", "解锁关卡边界\n同时解除实体墙、光标、相机、界外黑幕与越界放置\n只影响本地，不改存档与联机状态", "Unlock level bounds\nremoves walls, cursor, camera and out-of-bounds limits at once\nlocal only; save and network state untouched");
-            SRApi.LocKey("Experiments", "Level Bounds Radius", "硬解除半径", "Hard radius");
-            SRApi.LocDesc("Experiments", "Level Bounds Radius", "硬解锁半径\n光标与相机能到关卡外多远\n不限上限；1＝贴着光标；仅主开关开启时生效", "Hard unlock radius\nhow far the cursor and camera reach outside the level\nno upper limit; 1 = at the cursor; main switch only");
+            TweakCfg.Entry("Experiments", "Level Bounds", "解除关卡边界", null,
+                "解锁关卡边界\n同时解除实体墙、光标、相机、界外黑幕与越界放置\n只影响本地，不改存档与联机状态",
+                "Unlock level bounds\nremoves walls, cursor, camera and out-of-bounds limits at once\nlocal only; save and network state untouched");
+            TweakCfg.Entry("Experiments", "Level Bounds Radius", "硬解除半径", "Hard radius",
+                "硬解锁半径\n光标与相机能到关卡外多远\n不限上限；1＝贴着光标；仅主开关开启时生效",
+                "Hard unlock radius\nhow far the cursor and camera reach outside the level\nno upper limit; 1 = at the cursor; main switch only");
         }
 
         private class PieceIgnoreListener : GameEvent.IGameEventListener {
@@ -112,9 +114,17 @@ namespace SR_UCH.Tweaks {
                 }
 
                 // 事件驱动即时重评估，Tick 仅作兜底（面板关闭时 Tick 可能不跑）。
-                if (_on != null) _on.SettingChanged += (s, e) => Reeval();
+                if (_on != null) {
+                    System.EventHandler __h_boundsOn = (s, e) => Reeval();
+                    _on.SettingChanged += __h_boundsOn;
+                    Sub.Revoke(() => _on.SettingChanged -= __h_boundsOn);
+                }
                 // 半径变更只重跑 ApplyHardBounds（幂等），不触发 Reeval 的全流程重扫。
-                if (_radius != null) _radius.SettingChanged += (s, e) => { if (_on != null && _on.Value) { try { ApplyHardBounds(); } catch (Exception __ex) { SRApi.Guard.Log("边界半径刷新", __ex); } } };
+                if (_radius != null) {
+                    System.EventHandler __h_boundsRadius = (s, e) => { if (_on != null && _on.Value) { try { ApplyHardBounds(); } catch (Exception __ex) { SRApi.Guard.Log("边界半径刷新", __ex); } } };
+                    _radius.SettingChanged += __h_boundsRadius;
+                    Sub.Revoke(() => _radius.SettingChanged -= __h_boundsRadius);
+                }
                 // 半径不挂 SettingChanged，Tick 每帧会调 ApplyHardBounds，改完下一帧自然生效。
                 // 旧的子项键已无任何 Config.Bind，统一由 SR.ConfigMigration 的 RemoveKeys 清理。
                 SRApi.RegisterTick("关卡边界", Tick);
@@ -403,10 +413,8 @@ namespace SR_UCH.Tweaks {
             if (_fiTried) return _fiBoundary;
             _fiTried = true;
             try {
-                const System.Reflection.BindingFlags BF = System.Reflection.BindingFlags.Instance
-                    | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
                 for (Type t = typeof(PiecePlacementCursor); t != null; t = t.BaseType) {
-                    System.Reflection.FieldInfo fi = t.GetField("boundary", BF);
+                    System.Reflection.FieldInfo fi = RefCache.FieldOf(t, "boundary");
                     if (fi != null) { _fiBoundary = fi; break; }
                 }
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
@@ -416,9 +424,7 @@ namespace SR_UCH.Tweaks {
         private static System.Reflection.FieldInfo FrameField() {
             if (_fiFrame != null) return _fiFrame;
             try {
-                const System.Reflection.BindingFlags BF = System.Reflection.BindingFlags.Instance
-                    | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
-                _fiFrame = typeof(ZoomCamera).GetField("frame", BF);
+                _fiFrame = RefCache.FieldOf(typeof(ZoomCamera), "frame");
             } catch { /* 静默：非关键路径，失败可直接忽略 */ }
             return _fiFrame;
         }

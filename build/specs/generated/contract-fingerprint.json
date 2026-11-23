@@ -1,0 +1,2586 @@
+{
+  "schema": 2,
+  "note": "唯一绑定表：entries=声明清单，bindings=每条 dump 形状+影响面，verification=比对结论，changes=换 dump 后的变更影响报告。由 uch.py fingerprint --dump 写回；hash 只覆盖 entries，结论写回不改动它。",
+  "hash": "88e2695cb4ae9b4da8e548d4c30d60b2c71fd8861bded265f303b90cd96e7c27",
+  "counts": {
+    "patch": 38,
+    "patch_dynamic": 25,
+    "patch_implicit": 1,
+    "reflection": 34,
+    "scene": 2,
+    "net_magic": 4
+  },
+  "entries": [
+    {
+      "kind": "patch_dynamic",
+      "type": "Modifiers",
+      "member": "GetOnOffValueString",
+      "signature": "Modifiers.GetOnOffValueString",
+      "origin": "Features/BuildingPresets.Mods.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "Modifiers",
+      "member": "GetOnOffValueString",
+      "signature": "Modifiers.GetOnOffValueString",
+      "origin": "Features/BuildingPresets.Mods.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "PiecePlacementCursor",
+      "member": "ReceiveEvent",
+      "signature": "PiecePlacementCursor.ReceiveEvent",
+      "origin": "Features/BuildingTools.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "PiecePlacementCursor",
+      "member": "SetPiece",
+      "signature": "PiecePlacementCursor.SetPiece",
+      "origin": "Features/BuildingTools.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "PiecePlacementCursor",
+      "member": "FixedUpdate",
+      "signature": "PiecePlacementCursor.FixedUpdate",
+      "origin": "Features/BuildingTools.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "PartyCursor",
+      "member": "FixedUpdate",
+      "signature": "PartyCursor.FixedUpdate",
+      "origin": "Features/BuildingTools.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "PiecePlacementCursor",
+      "member": "heldPositionOffset",
+      "signature": "PiecePlacementCursor.heldPositionOffset",
+      "origin": "Features/BuildingTools.cs"
+    },
+    {
+      "kind": "patch_implicit",
+      "type": "FreePlacementPatch",
+      "member": "",
+      "signature": "Features/BuildingTools.cs|FreePlacementPatch",
+      "origin": "Features/BuildingTools.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "PiecePlacementCursor",
+      "member": "SetPiece",
+      "signature": "PiecePlacementCursor.SetPiece",
+      "origin": "Features/BuildingTools.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "PiecePlacementCursor",
+      "member": "FixedUpdate",
+      "signature": "PiecePlacementCursor.FixedUpdate",
+      "origin": "Features/BuildingTools.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "PiecePlacementCursor",
+      "member": "heldPositionOffset",
+      "signature": "PiecePlacementCursor.heldPositionOffset",
+      "origin": "Features/BuildingTools.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "Character",
+      "member": "picked",
+      "signature": "Character.picked",
+      "origin": "Features/CharacterAuto.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "ChatDisplay",
+      "member": "DisplayNewMessage",
+      "signature": "ChatDisplay.DisplayNewMessage",
+      "origin": "Features/Chat.Log.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "ChatDisplay",
+      "member": "Update",
+      "signature": "ChatDisplay.Update",
+      "origin": "Features/Chat.Window.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "ChatDisplay",
+      "member": "VisibilityTimer",
+      "signature": "ChatDisplay.VisibilityTimer",
+      "origin": "Features/Chat.Window.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "ChatDisplay",
+      "member": "VisibilityTimer",
+      "signature": "ChatDisplay.VisibilityTimer",
+      "origin": "Features/Chat.Window.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "GameControl",
+      "member": "Update",
+      "signature": "GameControl.Update",
+      "origin": "Features/DestroyBlocks.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "Cursor",
+      "member": "boundary",
+      "signature": "Cursor.boundary",
+      "origin": "Features/Experiments.LevelBounds.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "ZoomCamera",
+      "member": "frame",
+      "signature": "ZoomCamera.frame",
+      "origin": "Features/Experiments.LevelBounds.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "SceneManagerWrapper",
+      "member": "LoadScene",
+      "signature": "SceneManagerWrapper.LoadScene",
+      "origin": "Features/Experiments.Scene.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "SceneManagerWrapper",
+      "member": "LoadSceneAsync",
+      "signature": "SceneManagerWrapper.LoadSceneAsync",
+      "origin": "Features/Experiments.Scene.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "UISplashScreen",
+      "member": "SkipBool",
+      "signature": "UISplashScreen.SkipBool",
+      "origin": "Features/Experiments.Scene.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "UISplashScreen",
+      "member": "SkipBool",
+      "signature": "UISplashScreen.SkipBool",
+      "origin": "Features/Experiments.Scene.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Graphpaper",
+      "member": "disableGrid",
+      "signature": "Graphpaper.disableGrid",
+      "origin": "Features/FreePlay.Grid.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "ZoomCamera",
+      "member": "Update",
+      "signature": "ZoomCamera.Update",
+      "origin": "Features/FreePlay.Map.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Character",
+      "member": "KillCharacter",
+      "signature": "Character.KillCharacter",
+      "origin": "Features/FreePlay.Self.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Character",
+      "member": "setupDeath",
+      "signature": "Character.setupDeath",
+      "origin": "Features/FreePlay.Self.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Character",
+      "member": "FixedUpdate",
+      "signature": "Character.FixedUpdate",
+      "origin": "Features/FreePlay.Self.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "Character",
+      "member": "invincibleTimer",
+      "signature": "Character.invincibleTimer",
+      "origin": "Features/FreePlay.Self.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "Character",
+      "member": "KillCharacter",
+      "signature": "Character.KillCharacter",
+      "origin": "Features/FreePlay.Self.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "Character",
+      "member": "setupDeath",
+      "signature": "Character.setupDeath",
+      "origin": "Features/FreePlay.Self.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "Character",
+      "member": "invincibleTimer",
+      "signature": "Character.invincibleTimer",
+      "origin": "Features/FreePlay.Self.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "Character",
+      "member": "crouchingDown",
+      "signature": "Character.crouchingDown",
+      "origin": "Features/FreePlay.Self.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "GameControl",
+      "member": "handleEvent",
+      "signature": "GameControl.handleEvent",
+      "origin": "Features/HUD.State.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "VersusControl",
+      "member": "placementTimer",
+      "signature": "VersusControl.placementTimer",
+      "origin": "Features/HUD.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "VersusControl",
+      "member": "levelTimer",
+      "signature": "VersusControl.levelTimer",
+      "origin": "Features/HUD.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "VersusControl",
+      "member": "countdownTimer",
+      "signature": "VersusControl.countdownTimer",
+      "origin": "Features/HUD.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "ChallengeControl",
+      "member": "runTime",
+      "signature": "ChallengeControl.runTime",
+      "origin": "Features/HUD.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "ChallengeControl",
+      "member": "runStarted",
+      "signature": "ChallengeControl.runStarted",
+      "origin": "Features/HUD.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "PartyBox",
+      "member": "pieces",
+      "signature": "PartyBox.pieces",
+      "origin": "Features/Level.AutoPartyItem.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "PartyPickCursor",
+      "member": "hoveredPick",
+      "signature": "PartyPickCursor.hoveredPick",
+      "origin": "Features/Level.AutoPartyItem.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "PartyPickCursor",
+      "member": "tryPickPiece",
+      "signature": "PartyPickCursor.tryPickPiece",
+      "origin": "Features/Level.AutoPartyItem.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "ChatDisplay",
+      "member": "DisplayNewMessage",
+      "signature": "ChatDisplay.DisplayNewMessage",
+      "origin": "Features/Level.PartyBomb.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "PartyBox",
+      "member": "pieces",
+      "signature": "PartyBox.pieces",
+      "origin": "Features/Level.PartyBomb.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "PartyBox",
+      "member": "pieces",
+      "signature": "PartyBox.pieces",
+      "origin": "Features/Level.PartyBomb.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "VersusControl",
+      "member": "showingPlacementWarning",
+      "signature": "VersusControl.showingPlacementWarning",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "VersusControl",
+      "member": "showPartyBox",
+      "signature": "VersusControl.showPartyBox",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "VersusControl",
+      "member": "ToPlaceMode",
+      "signature": "VersusControl.ToPlaceMode",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "GameControl",
+      "member": "nextPhase",
+      "signature": "GameControl.nextPhase",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "VersusControl",
+      "member": "SetupPlacementCursors",
+      "signature": "VersusControl.SetupPlacementCursors",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "VersusControl",
+      "member": "placementTimer",
+      "signature": "VersusControl.placementTimer",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "PartyBox",
+      "member": "pieces",
+      "signature": "PartyBox.pieces",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "VersusControl",
+      "member": "IsSecondBox",
+      "signature": "VersusControl.IsSecondBox",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "PartyBox",
+      "member": "pieces",
+      "signature": "PartyBox.pieces",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "VersusControl",
+      "member": "showPartyBox",
+      "signature": "VersusControl.showPartyBox",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "VersusControl",
+      "member": "showingPlacementWarning",
+      "signature": "VersusControl.showingPlacementWarning",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "VersusControl",
+      "member": "IsSecondBox",
+      "signature": "VersusControl.IsSecondBox",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "VersusControl",
+      "member": "ToPlaceMode",
+      "signature": "VersusControl.ToPlaceMode",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "VersusControl",
+      "member": "SetupPlacementCursors",
+      "signature": "VersusControl.SetupPlacementCursors",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "GameControl",
+      "member": "nextPhase",
+      "signature": "GameControl.nextPhase",
+      "origin": "Features/Level.PartyBox.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "LobbyManager",
+      "member": "ReloadScene",
+      "signature": "LobbyManager.ReloadScene",
+      "origin": "Features/Level.Reload.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "LobbyManager",
+      "member": "DisconnectBrokenClients",
+      "signature": "LobbyManager.DisconnectBrokenClients",
+      "origin": "Features/Level.Reload.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "QuickSaver",
+      "member": "LoadSnapshotFromXmlDocument",
+      "signature": "QuickSaver.LoadSnapshotFromXmlDocument",
+      "origin": "Features/Level.Snapshot.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "LoadingInterstitialSplash",
+      "member": "FadeOut",
+      "signature": "LoadingInterstitialSplash.FadeOut",
+      "origin": "Features/Level.Snapshot.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "QuickSaver",
+      "member": "initialLevelPlaceables",
+      "signature": "QuickSaver.initialLevelPlaceables",
+      "origin": "Features/Level.Snapshot.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "GameControl",
+      "member": "handleEvent",
+      "signature": "GameControl.handleEvent",
+      "origin": "Features/Level.Tool.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "ScoreKeeper",
+      "member": "ClearNewPointBlocks",
+      "signature": "ScoreKeeper.ClearNewPointBlocks",
+      "origin": "Features/Level.Tool.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "ScoreKeeper",
+      "member": "handleEvent",
+      "signature": "ScoreKeeper.handleEvent",
+      "origin": "Features/Level.Tool.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "ScoreKeeper",
+      "member": "TallyPointBlockAllPlayers",
+      "signature": "ScoreKeeper.TallyPointBlockAllPlayers",
+      "origin": "Features/Level.Tool.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "ScoreKeeper",
+      "member": "Setup",
+      "signature": "ScoreKeeper.Setup",
+      "origin": "Features/Level.Tool.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "ScoreKeeper",
+      "member": "historyPointBlocks",
+      "signature": "ScoreKeeper.historyPointBlocks",
+      "origin": "Features/Level.Tool.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "ScoreKeeper",
+      "member": "historyPointBlocks",
+      "signature": "ScoreKeeper.historyPointBlocks",
+      "origin": "Features/Level.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "QuickSaver",
+      "member": "initialLevelPlaceables",
+      "signature": "QuickSaver.initialLevelPlaceables",
+      "origin": "Features/Level.cs"
+    },
+    {
+      "kind": "scene",
+      "type": "",
+      "member": "",
+      "signature": "MainMenu",
+      "origin": "Features/Online.Watchdog.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "LevelSelectController",
+      "member": "FadeOut",
+      "signature": "LevelSelectController.FadeOut",
+      "origin": "Features/Online.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "SteamMatchmaker",
+      "member": "JoinSteamLobby",
+      "signature": "SteamMatchmaker.JoinSteamLobby",
+      "origin": "Features/Online.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "UnityMatchmaker",
+      "member": "inPlatformLobbyNoRelay",
+      "signature": "UnityMatchmaker.inPlatformLobbyNoRelay",
+      "origin": "Features/Online.cs"
+    },
+    {
+      "kind": "scene",
+      "type": "",
+      "member": "",
+      "signature": "MainMenu",
+      "origin": "Features/Online.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Character",
+      "member": "UpdateHoldBIndicator",
+      "signature": "Character.UpdateHoldBIndicator",
+      "origin": "Features/QuickAdjust.QuickSwitch.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Character",
+      "member": "UpdateSuicidalState",
+      "signature": "Character.UpdateSuicidalState",
+      "origin": "Features/QuickAdjust.QuickSwitch.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Character",
+      "member": "Update",
+      "signature": "Character.Update",
+      "origin": "Features/QuickAdjust.Respawn.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "GamePlayer",
+      "member": "set_NetworkHandicap",
+      "signature": "GamePlayer.set_NetworkHandicap",
+      "origin": "Features/QuickAdjust.Score.cs",
+      "member_alias": "NetworkHandicap"
+    },
+    {
+      "kind": "patch",
+      "type": "GamePlayer",
+      "member": "OnDeserialize",
+      "signature": "GamePlayer.OnDeserialize",
+      "origin": "Features/QuickAdjust.Score.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "VersusControl",
+      "member": "graphScoreBoardInstance",
+      "signature": "VersusControl.graphScoreBoardInstance",
+      "origin": "Features/QuickAdjust.Score.cs"
+    },
+    {
+      "kind": "patch_dynamic",
+      "type": "GraphScoreBoard",
+      "member": "scorelineRelation",
+      "signature": "GraphScoreBoard.scorelineRelation",
+      "origin": "Features/QuickAdjust.Score.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Character",
+      "member": "AttemptRespawn",
+      "signature": "Character.AttemptRespawn",
+      "origin": "Features/QuickAdjust.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Character",
+      "member": "Enable",
+      "signature": "Character.Enable",
+      "origin": "Features/QuickAdjust.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "VersusControl",
+      "member": "graphScoreBoardInstance",
+      "signature": "VersusControl.graphScoreBoardInstance",
+      "origin": "Features/QuickAdjust.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "GraphScoreBoard",
+      "member": "scorelineRelation",
+      "signature": "GraphScoreBoard.scorelineRelation",
+      "origin": "Features/QuickAdjust.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Character",
+      "member": "Update",
+      "signature": "Character.Update",
+      "origin": "Features/VisualAid.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "CharacterOpacityController",
+      "member": "Update",
+      "signature": "CharacterOpacityController.Update",
+      "origin": "Features/VisualAid.cs"
+    },
+    {
+      "kind": "net_magic",
+      "type": "ChaosRule",
+      "member": "",
+      "signature": "771",
+      "origin": "SR_UCH/Contracts/NetMsgId.cs"
+    },
+    {
+      "kind": "net_magic",
+      "type": "ChaosCard",
+      "member": "",
+      "signature": "772",
+      "origin": "SR_UCH/Contracts/NetMsgId.cs"
+    },
+    {
+      "kind": "net_magic",
+      "type": "ChaosHello",
+      "member": "",
+      "signature": "773",
+      "origin": "SR_UCH/Contracts/NetMsgId.cs"
+    },
+    {
+      "kind": "net_magic",
+      "type": "ChaosKill",
+      "member": "",
+      "signature": "774",
+      "origin": "SR_UCH/Contracts/NetMsgId.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Character",
+      "member": "Update",
+      "signature": "Character.Update",
+      "origin": "SR_UCH/SR.Input.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Character",
+      "member": "FixedUpdate",
+      "signature": "Character.FixedUpdate",
+      "origin": "SR_UCH/SR.Input.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "PiecePlacementCursor",
+      "member": "Update",
+      "signature": "PiecePlacementCursor.Update",
+      "origin": "SR_UCH/SR.Input.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "GameControl",
+      "member": "Update",
+      "signature": "GameControl.Update",
+      "origin": "SR_UCH/SR.Input.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "Cursor",
+      "member": "checkCameraToggle",
+      "signature": "Cursor.checkCameraToggle",
+      "origin": "SR_UCH/SR.Input.cs"
+    },
+    {
+      "kind": "patch",
+      "type": "KeyboardInput",
+      "member": "Update",
+      "signature": "KeyboardInput.Update",
+      "origin": "SR_UCH/SR.Input.cs"
+    },
+    {
+      "kind": "reflection",
+      "type": "AcceptableValueRange`1",
+      "member": "Min",
+      "signature": "AcceptableValueRange`1.Min",
+      "origin": "SR_UCH/SR.Settings.cs",
+      "external": true
+    },
+    {
+      "kind": "reflection",
+      "type": "AcceptableValueRange`1",
+      "member": "Max",
+      "signature": "AcceptableValueRange`1.Max",
+      "origin": "SR_UCH/SR.Settings.cs",
+      "external": true
+    },
+    {
+      "kind": "patch",
+      "type": "EmoteSystem",
+      "member": "ReceiveEvent",
+      "signature": "EmoteSystem.ReceiveEvent",
+      "origin": "SR_UCH/SR.Window.cs"
+    }
+  ],
+  "bindings": {
+    "Modifiers.GetOnOffValueString": {
+      "features": [
+        "BuildingPresets"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/BuildingPresets.Mods.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/BuildingPresets.Mods.cs",
+          "line": 199,
+          "text": "SRApi.Ref.Override(\"Modifiers.GetOnOffValueString\", \"布局预设：修改器布尔项文案\");"
+        },
+        {
+          "file": "Features/BuildingPresets.Mods.cs",
+          "line": 200,
+          "text": "MethodInfo onOff = SRApi.Ref.Method(typeof(Modifiers), \"GetOnOffValueString\", \"布局预设/修改器预览开关文本\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "public|static|string|GetOnOffValueString|(bool)|method",
+      "match": "exact",
+      "decl_line": 139621,
+      "raw": "public static string GetOnOffValueString(bool onOff)"
+    },
+    "PiecePlacementCursor.ReceiveEvent": {
+      "features": [
+        "BuildingTools"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/BuildingTools.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/BuildingTools.cs",
+          "line": 172,
+          "text": "[HarmonyPatch(typeof(PiecePlacementCursor), \"ReceiveEvent\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|ReceiveEvent|(InputEvent)|method",
+      "match": "exact",
+      "decl_line": 72664,
+      "raw": "public override void ReceiveEvent(InputEvent e)"
+    },
+    "PiecePlacementCursor.SetPiece": {
+      "features": [
+        "BuildingTools"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/BuildingTools.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/BuildingTools.cs",
+          "line": 27,
+          "text": "SRApi.Ref.Override(\"PiecePlacementCursor.SetPiece\", \"自由放置（改写放置结果）\");"
+        },
+        {
+          "file": "Features/BuildingTools.cs",
+          "line": 193,
+          "text": "MethodInfo m = SRApi.Ref.Method(typeof(PiecePlacementCursor), \"SetPiece\", \"自由放置（改写放置结果）\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "public|instance|void|SetPiece|(Placeable,bool,bool)|method",
+      "match": "exact",
+      "decl_line": 71750,
+      "raw": "public virtual void SetPiece(Placeable piece, bool destroyPrevious = false, bool pickup = true)"
+    },
+    "PiecePlacementCursor.FixedUpdate": {
+      "features": [
+        "BuildingTools"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/BuildingTools.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/BuildingTools.cs",
+          "line": 28,
+          "text": "SRApi.Ref.Override(\"PiecePlacementCursor.FixedUpdate\", \"自由放置（补丁目标）\");"
+        },
+        {
+          "file": "Features/BuildingTools.cs",
+          "line": 195,
+          "text": "m = SRApi.Ref.Method(typeof(PiecePlacementCursor), \"FixedUpdate\", \"自由放置（补丁目标）\");"
+        },
+        {
+          "file": "Features/BuildingTools.cs",
+          "line": 198,
+          "text": "m = SRApi.Ref.Method(typeof(PartyCursor), \"FixedUpdate\", \"自由放置（派生光标）\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|void|FixedUpdate|()|method",
+      "match": "exact",
+      "decl_line": 71952,
+      "raw": "protected override void FixedUpdate()"
+    },
+    "PartyCursor.FixedUpdate": {
+      "features": [
+        "BuildingTools"
+      ],
+      "kinds": [
+        "patch_dynamic"
+      ],
+      "origins": [
+        "Features/BuildingTools.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/BuildingTools.cs",
+          "line": 28,
+          "text": "SRApi.Ref.Override(\"PiecePlacementCursor.FixedUpdate\", \"自由放置（补丁目标）\");"
+        },
+        {
+          "file": "Features/BuildingTools.cs",
+          "line": 195,
+          "text": "m = SRApi.Ref.Method(typeof(PiecePlacementCursor), \"FixedUpdate\", \"自由放置（补丁目标）\");"
+        },
+        {
+          "file": "Features/BuildingTools.cs",
+          "line": 198,
+          "text": "m = SRApi.Ref.Method(typeof(PartyCursor), \"FixedUpdate\", \"自由放置（派生光标）\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "protected|instance|void|FixedUpdate|()|method",
+      "match": "exact",
+      "decl_line": 70628,
+      "raw": "protected override void FixedUpdate()"
+    },
+    "PiecePlacementCursor.heldPositionOffset": {
+      "features": [
+        "BuildingTools"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/BuildingTools.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/BuildingTools.cs",
+          "line": 29,
+          "text": "SRApi.Ref.Override(\"PiecePlacementCursor.heldPositionOffset\", \"自由放置（关闭网格吸附）\");"
+        },
+        {
+          "file": "Features/BuildingTools.cs",
+          "line": 215,
+          "text": "_heldOffsetField = SRApi.Ref.Field(typeof(PiecePlacementCursor), \"heldPositionOffset\", \"自由放置（关闭网格吸附）\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "internal|instance|return|heldPositionOffset|()|field || private|instance|Vector3|heldPositionOffset|()|field",
+      "match": "exact",
+      "decl_line": 71644,
+      "raw": "private Vector3 heldPositionOffset = Vector3.zero;"
+    },
+    "Character.picked": {
+      "features": [
+        "CharacterAuto"
+      ],
+      "kinds": [
+        "patch_dynamic"
+      ],
+      "origins": [
+        "Features/CharacterAuto.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/CharacterAuto.cs",
+          "line": 293,
+          "text": "System.Reflection.FieldInfo __fp = SRApi.Ref.Field(typeof(Character), \"picked\", \"角色/自动选择（复位卡住的已选标记）\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "internal|instance|return|picked|()|field || public|instance|bool|picked|()|field",
+      "match": "exact",
+      "decl_line": 55699,
+      "raw": "public bool picked;"
+    },
+    "ChatDisplay.DisplayNewMessage": {
+      "features": [
+        "Chat",
+        "Level"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/Chat.Log.cs",
+        "Features/Level.PartyBomb.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Chat.Log.cs",
+          "line": 355,
+          "text": "[HarmonyPatch(typeof(ChatDisplay), \"DisplayNewMessage\")]"
+        },
+        {
+          "file": "Features/Level.PartyBomb.cs",
+          "line": 41,
+          "text": "[HarmonyPatch(typeof(ChatDisplay), \"DisplayNewMessage\", new Type[] { typeof(ChatMessageDetails) })]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|DisplayNewMessage|(ChatMessageDetails)|method",
+      "match": "exact",
+      "decl_line": 84107,
+      "raw": "public void DisplayNewMessage(ChatMessageDetails chatMessageDetails)"
+    },
+    "ChatDisplay.Update": {
+      "features": [
+        "Chat"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/Chat.Window.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Chat.Window.cs",
+          "line": 276,
+          "text": "[HarmonyPatch(typeof(ChatDisplay), \"Update\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|Update|()|method",
+      "match": "exact",
+      "decl_line": 84032,
+      "raw": "public void Update()"
+    },
+    "ChatDisplay.VisibilityTimer": {
+      "features": [
+        "Chat"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/Chat.Window.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Chat.Window.cs",
+          "line": 65,
+          "text": "SRApi.Ref.Override(\"ChatDisplay.VisibilityTimer\", \"聊天窗口（可见计时器：保持显示但不自己写 alpha，淡入淡出交给游戏）\");"
+        },
+        {
+          "file": "Features/Chat.Window.cs",
+          "line": 256,
+          "text": "if (_fVisTimer == null) _fVisTimer = SRApi.Ref.Field(typeof(ChatDisplay), \"VisibilityTimer\", \"聊天窗口（可见计时器）\");"
+        },
+        {
+          "file": "Features/Chat.Window.cs",
+          "line": 266,
+          "text": "if (_fVisTimer == null) _fVisTimer = SRApi.Ref.Field(typeof(ChatDisplay), \"VisibilityTimer\", \"聊天窗口（可见计时器）\");"
+        },
+        {
+          "file": "Features/Chat.Window.cs",
+          "line": 52,
+          "text": "private static FieldInfo _fVisTimer;   // ChatDisplay.VisibilityTimer（游戏淡入淡出用）"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|float|VisibilityTimer|()|field",
+      "match": "exact",
+      "decl_line": 83980,
+      "raw": "protected float VisibilityTimer;"
+    },
+    "GameControl.Update": {
+      "features": [
+        "DestroyBlocks",
+        "core"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/DestroyBlocks.cs",
+        "SR_UCH/SR.Input.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/DestroyBlocks.cs",
+          "line": 420,
+          "text": "[HarmonyPatch(typeof(GameControl), \"Update\")]"
+        },
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 132,
+          "text": "[HarmonyPatch(typeof(Character), \"Update\")]"
+        },
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 157,
+          "text": "[HarmonyPatch(typeof(PiecePlacementCursor), \"Update\")]"
+        },
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 166,
+          "text": "[HarmonyPatch(typeof(GameControl), \"Update\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "protected|instance|void|Update|()|method",
+      "match": "exact",
+      "decl_line": 125110,
+      "raw": "protected virtual void Update()"
+    },
+    "Cursor.boundary": {
+      "features": [
+        "Experiments"
+      ],
+      "kinds": [
+        "reflection"
+      ],
+      "origins": [
+        "Features/Experiments.LevelBounds.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Experiments.LevelBounds.cs",
+          "line": 76,
+          "text": "SRApi.Ref.Override(\"Cursor.boundary\", \"解除关卡边界：放置光标边界快照\");"
+        },
+        {
+          "file": "Features/Experiments.LevelBounds.cs",
+          "line": 417,
+          "text": "System.Reflection.FieldInfo fi = RefCache.FieldOf(t, \"boundary\");"
+        }
+      ],
+      "action": "核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|Bounds|boundary|()|field",
+      "match": "exact",
+      "decl_line": 66650,
+      "raw": "protected Bounds boundary;"
+    },
+    "ZoomCamera.frame": {
+      "features": [
+        "Experiments"
+      ],
+      "kinds": [
+        "reflection"
+      ],
+      "origins": [
+        "Features/Experiments.LevelBounds.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Experiments.LevelBounds.cs",
+          "line": 77,
+          "text": "SRApi.Ref.Override(\"ZoomCamera.frame\", \"解除关卡边界：相机取景框\");"
+        },
+        {
+          "file": "Features/Experiments.LevelBounds.cs",
+          "line": 429,
+          "text": "_fiFrame = RefCache.FieldOf(typeof(ZoomCamera), \"frame\");"
+        }
+      ],
+      "action": "核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "internal|instance|return|frame|()|field || protected|instance|Bounds|frame|()|field",
+      "match": "exact",
+      "decl_line": 149309,
+      "raw": "protected Bounds frame;"
+    },
+    "SceneManagerWrapper.LoadScene": {
+      "features": [
+        "Experiments"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/Experiments.Scene.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Experiments.Scene.cs",
+          "line": 219,
+          "text": "[HarmonyPatch(typeof(SceneManagerWrapper), \"LoadScene\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|static|void|LoadScene|(string)|method",
+      "match": "exact",
+      "decl_line": 120233,
+      "raw": "public static void LoadScene(string sceneName)"
+    },
+    "SceneManagerWrapper.LoadSceneAsync": {
+      "features": [
+        "Experiments"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/Experiments.Scene.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Experiments.Scene.cs",
+          "line": 228,
+          "text": "[HarmonyPatch(typeof(SceneManagerWrapper), \"LoadSceneAsync\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|static|void|LoadSceneAsync|(string)|method",
+      "match": "exact",
+      "decl_line": 120238,
+      "raw": "public static void LoadSceneAsync(string sceneName)"
+    },
+    "UISplashScreen.SkipBool": {
+      "features": [
+        "Experiments"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/Experiments.Scene.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Experiments.Scene.cs",
+          "line": 65,
+          "text": "SRApi.Ref.Override(\"UISplashScreen.SkipBool\", \"关闭跳过加载动画需清此标志\");"
+        },
+        {
+          "file": "Features/Experiments.Scene.cs",
+          "line": 125,
+          "text": "_fiSkip = SRApi.Ref.Field(typeof(UISplashScreen), \"SkipBool\", \"场景：关闭跳过加载动画需清此标志\");"
+        },
+        {
+          "file": "Features/Experiments.Scene.cs",
+          "line": 130,
+          "text": "} catch (Exception __ex) { SRApi.Guard.Log(\"清 SkipBool\", __ex); }"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|bool|SkipBool|()|field",
+      "match": "exact",
+      "decl_line": 116853,
+      "raw": "protected bool SkipBool;"
+    },
+    "Graphpaper.disableGrid": {
+      "features": [
+        "FreePlay"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/FreePlay.Grid.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/FreePlay.Grid.cs",
+          "line": 80,
+          "text": "[HarmonyPatch(typeof(Graphpaper), \"disableGrid\")]"
+        },
+        {
+          "file": "Features/FreePlay.Grid.cs",
+          "line": 38,
+          "text": "catch (Exception __p) { SRApi.LogWarn(\"地图网格/补丁跳过（Graphpaper.disableGrid 不存在）: \" + __p.Message); }"
+        },
+        {
+          "file": "Features/FreePlay.Grid.cs",
+          "line": 63,
+          "text": "else gp.disableGrid();"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|disableGrid|()|method",
+      "match": "exact",
+      "decl_line": 21743,
+      "raw": "public void disableGrid()"
+    },
+    "ZoomCamera.Update": {
+      "features": [
+        "FreePlay"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/FreePlay.Map.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/FreePlay.Map.cs",
+          "line": 204,
+          "text": "[HarmonyPatch(typeof(ZoomCamera), \"Update\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "private|instance|void|Update|()|method",
+      "match": "exact",
+      "decl_line": 149444,
+      "raw": "private void Update()"
+    },
+    "Character.KillCharacter": {
+      "features": [
+        "FreePlay"
+      ],
+      "kinds": [
+        "patch",
+        "reflection"
+      ],
+      "origins": [
+        "Features/FreePlay.Self.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/FreePlay.Self.cs",
+          "line": 61,
+          "text": "SRApi.Ref.Override(\"Character.KillCharacter\", \"自身状态：拦截死亡\");"
+        },
+        {
+          "file": "Features/FreePlay.Self.cs",
+          "line": 101,
+          "text": "[HarmonyPatch(typeof(Character), \"KillCharacter\")]"
+        },
+        {
+          "file": "Features/FreePlay.Self.cs",
+          "line": 115,
+          "text": "try { __instance.KillCharacter(cause, deathFreezeOn, causedByPlayerNumber, true); }"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "public|instance|void|KillCharacter|(string,bool,int,bool)|method",
+      "match": "exact",
+      "decl_line": 59681,
+      "raw": "public void KillCharacter(string cause, bool deathFreezeOn, int causedByPlayerNumber, bool force = false)"
+    },
+    "Character.setupDeath": {
+      "features": [
+        "FreePlay"
+      ],
+      "kinds": [
+        "patch",
+        "reflection"
+      ],
+      "origins": [
+        "Features/FreePlay.Self.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/FreePlay.Self.cs",
+          "line": 62,
+          "text": "SRApi.Ref.Override(\"Character.setupDeath\", \"自身状态：拦截广播死亡\");"
+        },
+        {
+          "file": "Features/FreePlay.Self.cs",
+          "line": 124,
+          "text": "[HarmonyPatch(typeof(Character), \"setupDeath\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "private|instance|void|setupDeath|(string,bool,int)|method",
+      "match": "exact",
+      "decl_line": 61244,
+      "raw": "private void setupDeath(string cause, bool deathFreezeOn, int causedByPlayerNumber)"
+    },
+    "Character.FixedUpdate": {
+      "features": [
+        "FreePlay",
+        "core"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/FreePlay.Self.cs",
+        "SR_UCH/SR.Input.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/FreePlay.Self.cs",
+          "line": 141,
+          "text": "[HarmonyPatch(typeof(Character), \"FixedUpdate\")]"
+        },
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 141,
+          "text": "[HarmonyPatch(typeof(Character), \"FixedUpdate\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "private|instance|void|FixedUpdate|()|method",
+      "match": "exact",
+      "decl_line": 57847,
+      "raw": "private void FixedUpdate()"
+    },
+    "Character.invincibleTimer": {
+      "features": [
+        "FreePlay"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/FreePlay.Self.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/FreePlay.Self.cs",
+          "line": 63,
+          "text": "SRApi.Ref.Override(\"Character.invincibleTimer\", \"自身状态：无敌计时器\");"
+        },
+        {
+          "file": "Features/FreePlay.Self.cs",
+          "line": 185,
+          "text": "if (_invTimerField == null) _invTimerField = SRApi.Ref.Field(typeof(Character), \"invincibleTimer\", \"自身状态：无敌计时器\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|float|invincibleTimer|()|field",
+      "match": "exact",
+      "decl_line": 56056,
+      "raw": "protected float invincibleTimer;"
+    },
+    "Character.crouchingDown": {
+      "features": [
+        "FreePlay"
+      ],
+      "kinds": [
+        "reflection"
+      ],
+      "origins": [
+        "Features/FreePlay.Self.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/FreePlay.Self.cs",
+          "line": 64,
+          "text": "SRApi.Ref.Override(\"Character.crouchingDown\", \"自身状态：蹲移\");"
+        }
+      ],
+      "action": "核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|bool|crouchingDown|()|field",
+      "match": "exact",
+      "decl_line": 56046,
+      "raw": "protected bool crouchingDown;"
+    },
+    "GameControl.handleEvent": {
+      "features": [
+        "HUD",
+        "Level"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/HUD.State.cs",
+        "Features/Level.Tool.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/HUD.State.cs",
+          "line": 14,
+          "text": "[HarmonyPatch(typeof(GameControl), \"handleEvent\")]"
+        },
+        {
+          "file": "Features/Level.Tool.cs",
+          "line": 48,
+          "text": "[HarmonyPatch(typeof(GameControl), \"handleEvent\")]"
+        },
+        {
+          "file": "Features/Level.Tool.cs",
+          "line": 161,
+          "text": "[HarmonyPatch(typeof(ScoreKeeper), \"handleEvent\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|handleEvent|(global::GameEvent.GameEvent)|method",
+      "match": "exact",
+      "decl_line": 126198,
+      "raw": "public virtual void handleEvent(global::GameEvent.GameEvent e)"
+    },
+    "VersusControl.placementTimer": {
+      "features": [
+        "HUD",
+        "Level"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/HUD.cs",
+        "Features/Level.PartyBox.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/HUD.cs",
+          "line": 188,
+          "text": "SRApi.Ref.Override(\"VersusControl.placementTimer\", \"HUD（建造阶段剩余时间）\");"
+        },
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 191,
+          "text": "System.Reflection.FieldInfo pt = SRApi.Ref.Field(typeof(VersusControl), \"placementTimer\","
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|float|placementTimer|()|field",
+      "match": "exact",
+      "decl_line": 143899,
+      "raw": "protected float placementTimer;"
+    },
+    "VersusControl.levelTimer": {
+      "features": [
+        "HUD"
+      ],
+      "kinds": [
+        "reflection"
+      ],
+      "origins": [
+        "Features/HUD.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/HUD.cs",
+          "line": 189,
+          "text": "SRApi.Ref.Override(\"VersusControl.levelTimer\", \"HUD（对局已用时间）\");"
+        }
+      ],
+      "action": "核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|float|levelTimer|()|field",
+      "match": "exact",
+      "decl_line": 143893,
+      "raw": "protected float levelTimer;"
+    },
+    "VersusControl.countdownTimer": {
+      "features": [
+        "HUD"
+      ],
+      "kinds": [
+        "reflection"
+      ],
+      "origins": [
+        "Features/HUD.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/HUD.cs",
+          "line": 190,
+          "text": "SRApi.Ref.Override(\"VersusControl.countdownTimer\", \"HUD（决胜倒计时）\");"
+        }
+      ],
+      "action": "核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|float|countdownTimer|()|field",
+      "match": "exact",
+      "decl_line": 143895,
+      "raw": "protected float countdownTimer;"
+    },
+    "ChallengeControl.runTime": {
+      "features": [
+        "HUD"
+      ],
+      "kinds": [
+        "reflection"
+      ],
+      "origins": [
+        "Features/HUD.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/HUD.cs",
+          "line": 191,
+          "text": "SRApi.Ref.Override(\"ChallengeControl.runTime\", \"HUD（挑战计时）\");"
+        }
+      ],
+      "action": "核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "private|instance|float|runTime|()|field",
+      "match": "exact",
+      "decl_line": 121889,
+      "raw": "private float runTime;"
+    },
+    "ChallengeControl.runStarted": {
+      "features": [
+        "HUD"
+      ],
+      "kinds": [
+        "reflection"
+      ],
+      "origins": [
+        "Features/HUD.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/HUD.cs",
+          "line": 192,
+          "text": "SRApi.Ref.Override(\"ChallengeControl.runStarted\", \"HUD（挑战是否已开始）\");"
+        }
+      ],
+      "action": "核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "private|instance|bool|runStarted|()|field",
+      "match": "exact",
+      "decl_line": 121893,
+      "raw": "private bool runStarted;"
+    },
+    "PartyBox.pieces": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/Level.AutoPartyItem.cs",
+        "Features/Level.PartyBomb.cs",
+        "Features/Level.PartyBox.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.AutoPartyItem.cs",
+          "line": 102,
+          "text": "if (_fPieces == null) _fPieces = SRApi.Ref.Field(typeof(PartyBox), \"pieces\", \"派对盒自动道具（候选列表）\");"
+        },
+        {
+          "file": "Features/Level.PartyBomb.cs",
+          "line": 24,
+          "text": "SRApi.Ref.Override(\"PartyBox.pieces\", \"派对盒炸弹（生成/清理）\");"
+        },
+        {
+          "file": "Features/Level.PartyBomb.cs",
+          "line": 102,
+          "text": "var f = SRApi.Ref.Field(typeof(PartyBox), \"pieces\", \"派对盒炸弹（生成/清理）\");"
+        },
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 105,
+          "text": "SRApi.Ref.Override(\"PartyBox.pieces\", \"关卡派对盒道具（清场/重抽）\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "private|instance|List<PickableBlock>|pieces|()|field",
+      "match": "exact",
+      "decl_line": 87053,
+      "raw": "private List<PickableBlock> pieces = new List<PickableBlock>();"
+    },
+    "PartyPickCursor.hoveredPick": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch_dynamic"
+      ],
+      "origins": [
+        "Features/Level.AutoPartyItem.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.AutoPartyItem.cs",
+          "line": 187,
+          "text": "try { hp = SRApi.Ref.Field(typeof(PartyPickCursor), \"hoveredPick\", \"派对盒自动道具（直接选择）\"); }"
+        },
+        {
+          "file": "Features/Level.AutoPartyItem.cs",
+          "line": 232,
+          "text": "System.Reflection.FieldInfo hp2 = SRApi.Ref.Field(typeof(PartyPickCursor), \"hoveredPick\", \"派对盒自动道具（清理伪造悬停）\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|IPickable|hoveredPick|()|field",
+      "match": "inherited(Cursor)",
+      "decl_line": 66617,
+      "raw": "public IPickable hoveredPick;"
+    },
+    "PartyPickCursor.tryPickPiece": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch_dynamic"
+      ],
+      "origins": [
+        "Features/Level.AutoPartyItem.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.AutoPartyItem.cs",
+          "line": 244,
+          "text": "try { mi = SRApi.Ref.Method(typeof(PartyPickCursor), \"tryPickPiece\", \"派对盒自动道具（走游戏挑选协程）\"); }"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "protected|instance|IEnumerator|tryPickPiece|()|method",
+      "match": "exact",
+      "decl_line": 70779,
+      "raw": "protected override IEnumerator tryPickPiece()"
+    },
+    "VersusControl.showingPlacementWarning": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/Level.PartyBox.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 107,
+          "text": "SRApi.Ref.Override(\"VersusControl.showingPlacementWarning\", \"派对盒：建造阶段警告判定\");"
+        },
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 129,
+          "text": "System.Reflection.FieldInfo pw = SRApi.Ref.Field(typeof(VersusControl), \"showingPlacementWarning\","
+        },
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 193,
+          "text": "System.Reflection.FieldInfo pw = SRApi.Ref.Field(typeof(VersusControl), \"showingPlacementWarning\","
+        },
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 133,
+          "text": "SRApi.LogInfo(\"[派对盒] 已补发关闭边沿（showingPlacementWarning=true）\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "private|instance|bool|showingPlacementWarning|()|field",
+      "match": "exact",
+      "decl_line": 143907,
+      "raw": "private bool showingPlacementWarning;"
+    },
+    "VersusControl.showPartyBox": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/Level.PartyBox.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 106,
+          "text": "SRApi.Ref.Override(\"VersusControl.showPartyBox\", \"关卡派对盒：完整流程\");"
+        },
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 147,
+          "text": "System.Reflection.MethodInfo show = SRApi.Ref.Method(typeof(VersusControl), \"showPartyBox\", \"关卡派对盒流程\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "private|instance|void|showPartyBox|()|method",
+      "match": "exact",
+      "decl_line": 144776,
+      "raw": "private void showPartyBox()"
+    },
+    "VersusControl.ToPlaceMode": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/Level.PartyBox.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 109,
+          "text": "SRApi.Ref.Override(\"VersusControl.ToPlaceMode\", \"关卡派对盒：房客一起进建造状态\");"
+        },
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 164,
+          "text": "System.Reflection.MethodInfo toPlace = SRApi.Ref.Method(typeof(VersusControl), \"ToPlaceMode\", \"关卡派对盒：房客一起进建造状态\");"
+        },
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 166,
+          "text": "try { toPlace.Invoke(vc, null); return; } catch (System.Exception __t) { SRApi.LogWarn(\"ToPlaceMode 失败，回退: \" + __t.Messa"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|void|ToPlaceMode|()|method",
+      "match": "exact",
+      "decl_line": 144488,
+      "raw": "protected override void ToPlaceMode()"
+    },
+    "GameControl.nextPhase": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/Level.PartyBox.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 111,
+          "text": "SRApi.Ref.Override(\"GameControl.nextPhase\", \"关卡派对盒：结束放置阶段\");"
+        },
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 168,
+          "text": "System.Reflection.FieldInfo np = SRApi.Ref.Field(typeof(GameControl), \"nextPhase\", \"关卡派对盒：结束放置阶段\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|GamePhase|nextPhase|()|field",
+      "match": "exact",
+      "decl_line": 124652,
+      "raw": "protected GamePhase nextPhase;"
+    },
+    "VersusControl.SetupPlacementCursors": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/Level.PartyBox.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 110,
+          "text": "SRApi.Ref.Override(\"VersusControl.SetupPlacementCursors\", \"关卡派对盒：同步放置光标\");"
+        },
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 174,
+          "text": "System.Reflection.MethodInfo su = SRApi.Ref.Method(typeof(VersusControl), \"SetupPlacementCursors\", \"关卡派对盒：同步放置光标\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "private|instance|void|SetupPlacementCursors|()|method",
+      "match": "exact",
+      "decl_line": 146717,
+      "raw": "private void SetupPlacementCursors()"
+    },
+    "VersusControl.IsSecondBox": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/Level.PartyBox.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 108,
+          "text": "SRApi.Ref.Override(\"VersusControl.IsSecondBox\", \"关卡派对盒：第二次开箱\");"
+        },
+        {
+          "file": "Features/Level.PartyBox.cs",
+          "line": 255,
+          "text": "System.Reflection.FieldInfo f = vc != null ? SRApi.Ref.Field(typeof(VersusControl), \"IsSecondBox\", \"关卡派对盒流程\") : null;"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|bool|IsSecondBox|()|field",
+      "match": "exact",
+      "decl_line": 143929,
+      "raw": "protected bool IsSecondBox;"
+    },
+    "LobbyManager.ReloadScene": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/Level.Reload.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.Reload.cs",
+          "line": 253,
+          "text": "[HarmonyPatch(typeof(LobbyManager), \"ReloadScene\")]"
+        },
+        {
+          "file": "Features/Level.Reload.cs",
+          "line": 57,
+          "text": "private static float _reloadStartedAt = -1f; // 发起 ReloadScene 时刻（超时兜底）"
+        },
+        {
+          "file": "Features/Level.Reload.cs",
+          "line": 196,
+          "text": "lm.ReloadScene(toMode);"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|ReloadScene|(GameState.GameMode)|method",
+      "match": "exact",
+      "decl_line": 40133,
+      "raw": "public void ReloadScene(GameState.GameMode toMode)"
+    },
+    "LobbyManager.DisconnectBrokenClients": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/Level.Reload.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.Reload.cs",
+          "line": 260,
+          "text": "[HarmonyPatch(typeof(LobbyManager), \"DisconnectBrokenClients\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|DisconnectBrokenClients|()|method",
+      "match": "exact",
+      "decl_line": 40150,
+      "raw": "public void DisconnectBrokenClients()"
+    },
+    "QuickSaver.LoadSnapshotFromXmlDocument": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/Level.Snapshot.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.Snapshot.cs",
+          "line": 122,
+          "text": "[HarmonyPatch(typeof(QuickSaver), \"LoadSnapshotFromXmlDocument\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|bool|LoadSnapshotFromXmlDocument|(XmlDocument)|method",
+      "match": "exact",
+      "decl_line": 141095,
+      "raw": "public bool LoadSnapshotFromXmlDocument(XmlDocument doc)"
+    },
+    "LoadingInterstitialSplash.FadeOut": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/Level.Snapshot.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.Snapshot.cs",
+          "line": 190,
+          "text": "[HarmonyPatch(typeof(LoadingInterstitialSplash), \"FadeOut\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|FadeOut|()|method",
+      "match": "exact",
+      "decl_line": 86583,
+      "raw": "public override void FadeOut()"
+    },
+    "QuickSaver.initialLevelPlaceables": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/Level.Snapshot.cs",
+        "Features/Level.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.Snapshot.cs",
+          "line": 97,
+          "text": "if (_initialPiecesField == null) _initialPiecesField = SRApi.Ref.Field(typeof(QuickSaver), \"initialLevelPlaceables\", \"快照"
+        },
+        {
+          "file": "Features/Level.cs",
+          "line": 25,
+          "text": "SRApi.Ref.Override(\"QuickSaver.initialLevelPlaceables\", \"快照加载后的初始方块集合（关卡自带件）\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "private|instance|List<SaveablePiece>|initialLevelPlaceables|()|field",
+      "match": "exact",
+      "decl_line": 140372,
+      "raw": "private List<SaveablePiece> initialLevelPlaceables;"
+    },
+    "ScoreKeeper.ClearNewPointBlocks": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/Level.Tool.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.Tool.cs",
+          "line": 105,
+          "text": "[HarmonyPatch(typeof(ScoreKeeper), \"ClearNewPointBlocks\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|ClearNewPointBlocks|(bool)|method",
+      "match": "exact",
+      "decl_line": 143055,
+      "raw": "public void ClearNewPointBlocks(bool clearAll = false)"
+    },
+    "ScoreKeeper.handleEvent": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/Level.Tool.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.Tool.cs",
+          "line": 48,
+          "text": "[HarmonyPatch(typeof(GameControl), \"handleEvent\")]"
+        },
+        {
+          "file": "Features/Level.Tool.cs",
+          "line": 161,
+          "text": "[HarmonyPatch(typeof(ScoreKeeper), \"handleEvent\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|handleEvent|(global::GameEvent.GameEvent)|method",
+      "match": "exact",
+      "decl_line": 143231,
+      "raw": "public void handleEvent(global::GameEvent.GameEvent e)"
+    },
+    "ScoreKeeper.TallyPointBlockAllPlayers": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/Level.Tool.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.Tool.cs",
+          "line": 177,
+          "text": "[HarmonyPatch(typeof(ScoreKeeper), \"TallyPointBlockAllPlayers\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|TallyPointBlockAllPlayers|(bool)|method",
+      "match": "exact",
+      "decl_line": 143000,
+      "raw": "public void TallyPointBlockAllPlayers(bool checkStreaks)"
+    },
+    "ScoreKeeper.Setup": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/Level.Tool.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.Tool.cs",
+          "line": 187,
+          "text": "[HarmonyPatch(typeof(ScoreKeeper), \"Setup\")]"
+        },
+        {
+          "file": "Features/Level.Tool.cs",
+          "line": 236,
+          "text": "[HarmonyPatch(typeof(ScoreKeeper), \"Setup\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|Setup|()|method",
+      "match": "exact",
+      "decl_line": 142951,
+      "raw": "public void Setup()"
+    },
+    "ScoreKeeper.historyPointBlocks": {
+      "features": [
+        "Level"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/Level.Tool.cs",
+        "Features/Level.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Level.Tool.cs",
+          "line": 195,
+          "text": "FieldInfo hf = SRApi.Ref.Field(typeof(ScoreKeeper), \"historyPointBlocks\", \"重载保分（历史分块）\");"
+        },
+        {
+          "file": "Features/Level.cs",
+          "line": 23,
+          "text": "SRApi.Ref.Override(\"ScoreKeeper.historyPointBlocks\", \"重载保分（历史分块）\");"
+        },
+        {
+          "file": "Features/Level.Tool.cs",
+          "line": 199,
+          "text": "SRApi.LogWarn(\"[保分] 备份 historyPointBlocks 失败: \" + ex.Message);"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "private|instance|List<PointBlock>|historyPointBlocks|()|field",
+      "match": "exact",
+      "decl_line": 142923,
+      "raw": "private List<PointBlock> historyPointBlocks = new List<PointBlock>();"
+    },
+    "LevelSelectController.FadeOut": {
+      "features": [
+        "Online"
+      ],
+      "kinds": [
+        "reflection"
+      ],
+      "origins": [
+        "Features/Online.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Online.cs",
+          "line": 95,
+          "text": "RefCache.FieldOf(typeof(LevelSelectController), \"FadeOut\");"
+        },
+        {
+          "file": "Features/Online.cs",
+          "line": 137,
+          "text": "SRApi.Ref.Override(\"LevelSelectController.FadeOut\", \"联机：强制返回主界面（放出加载遮罩）\");"
+        }
+      ],
+      "action": "核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "private|instance|LoadingInterstitialSplash|FadeOut|()|field",
+      "match": "exact",
+      "decl_line": 133343,
+      "raw": "private LoadingInterstitialSplash FadeOut;"
+    },
+    "SteamMatchmaker.JoinSteamLobby": {
+      "features": [
+        "Online"
+      ],
+      "kinds": [
+        "reflection"
+      ],
+      "origins": [
+        "Features/Online.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Online.cs",
+          "line": 139,
+          "text": "SRApi.Ref.Override(\"SteamMatchmaker.JoinSteamLobby\", \"联机：按 Steam 房间号加入\");"
+        }
+      ],
+      "action": "核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "public|instance|void|JoinSteamLobby|(CSteamID)|method || public|instance|void|JoinSteamLobby|(string)|method || public|instance|void|JoinSteamLobby|(ulong)|method",
+      "match": "exact",
+      "decl_line": 48220,
+      "raw": "public void JoinSteamLobby(string lobbyID)"
+    },
+    "UnityMatchmaker.inPlatformLobbyNoRelay": {
+      "features": [
+        "Online"
+      ],
+      "kinds": [
+        "reflection"
+      ],
+      "origins": [
+        "Features/Online.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/Online.cs",
+          "line": 140,
+          "text": "SRApi.Ref.Override(\"UnityMatchmaker.inPlatformLobbyNoRelay\", \"联机：判断是否在平台房间里\");"
+        }
+      ],
+      "action": "核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "internal|instance|return|inPlatformLobbyNoRelay|()|field || protected|instance|bool|inPlatformLobbyNoRelay|()|field",
+      "match": "exact",
+      "decl_line": 48891,
+      "raw": "protected bool inPlatformLobbyNoRelay;"
+    },
+    "Character.UpdateHoldBIndicator": {
+      "features": [
+        "QuickAdjust"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/QuickAdjust.QuickSwitch.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/QuickAdjust.QuickSwitch.cs",
+          "line": 41,
+          "text": "[HarmonyPatch(typeof(Character), \"UpdateHoldBIndicator\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "private|instance|void|UpdateHoldBIndicator|()|method",
+      "match": "exact",
+      "decl_line": 57562,
+      "raw": "private void UpdateHoldBIndicator()"
+    },
+    "Character.UpdateSuicidalState": {
+      "features": [
+        "QuickAdjust"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/QuickAdjust.QuickSwitch.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/QuickAdjust.QuickSwitch.cs",
+          "line": 102,
+          "text": "[HarmonyPatch(typeof(Character), \"UpdateSuicidalState\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "private|instance|void|UpdateSuicidalState|()|method",
+      "match": "exact",
+      "decl_line": 62957,
+      "raw": "private void UpdateSuicidalState()"
+    },
+    "Character.Update": {
+      "features": [
+        "QuickAdjust",
+        "VisualAid",
+        "core"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/QuickAdjust.Respawn.cs",
+        "Features/VisualAid.cs",
+        "SR_UCH/SR.Input.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/QuickAdjust.Respawn.cs",
+          "line": 55,
+          "text": "[HarmonyPatch(typeof(Character), \"Update\")]"
+        },
+        {
+          "file": "Features/VisualAid.cs",
+          "line": 327,
+          "text": "[HarmonyPatch(typeof(Character), \"Update\")]"
+        },
+        {
+          "file": "Features/VisualAid.cs",
+          "line": 334,
+          "text": "[HarmonyPatch(typeof(CharacterOpacityController), \"Update\")]"
+        },
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 132,
+          "text": "[HarmonyPatch(typeof(Character), \"Update\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "private|instance|void|Update|()|method",
+      "match": "exact",
+      "decl_line": 57713,
+      "raw": "private void Update()"
+    },
+    "GamePlayer.OnDeserialize": {
+      "features": [
+        "QuickAdjust"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/QuickAdjust.Score.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/QuickAdjust.Score.cs",
+          "line": 228,
+          "text": "[HarmonyPatch(typeof(GamePlayer), \"OnDeserialize\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|OnDeserialize|(NetworkReader,bool)|method",
+      "match": "exact",
+      "decl_line": 34523,
+      "raw": "public override void OnDeserialize(NetworkReader reader, bool initialState)"
+    },
+    "VersusControl.graphScoreBoardInstance": {
+      "features": [
+        "QuickAdjust"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/QuickAdjust.Score.cs",
+        "Features/QuickAdjust.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/QuickAdjust.Score.cs",
+          "line": 261,
+          "text": "if (_gsbField == null) _gsbField = SRApi.Ref.Field(typeof(VersusControl), \"graphScoreBoardInstance\", \"评分折扣（取计分板实例）\");"
+        },
+        {
+          "file": "Features/QuickAdjust.cs",
+          "line": 187,
+          "text": "SRApi.Ref.Override(\"VersusControl.graphScoreBoardInstance\", \"评分折扣（取计分板实例）\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "protected|instance|GraphScoreBoard|graphScoreBoardInstance|()|field",
+      "match": "exact",
+      "decl_line": 143933,
+      "raw": "protected GraphScoreBoard graphScoreBoardInstance;"
+    },
+    "GraphScoreBoard.scorelineRelation": {
+      "features": [
+        "QuickAdjust"
+      ],
+      "kinds": [
+        "patch_dynamic",
+        "reflection"
+      ],
+      "origins": [
+        "Features/QuickAdjust.Score.cs",
+        "Features/QuickAdjust.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/QuickAdjust.Score.cs",
+          "line": 269,
+          "text": "if (_relField == null) _relField = SRApi.Ref.Field(typeof(GraphScoreBoard), \"scorelineRelation\", \"评分折扣（分数条位置）\");"
+        },
+        {
+          "file": "Features/QuickAdjust.cs",
+          "line": 188,
+          "text": "SRApi.Ref.Override(\"GraphScoreBoard.scorelineRelation\", \"评分折扣（分数条位置）\");"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名 / 核对 Ref.Override 字符串与 GetMethod/GetField 参数",
+      "dump_shape": "private|instance|Dictionary<int, ScoreLine>|scorelineRelation|()|field",
+      "match": "exact",
+      "decl_line": 82910,
+      "raw": "private Dictionary<int, ScoreLine> scorelineRelation = new Dictionary<int, ScoreLine>();"
+    },
+    "Character.AttemptRespawn": {
+      "features": [
+        "QuickAdjust"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/QuickAdjust.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/QuickAdjust.cs",
+          "line": 110,
+          "text": "[HarmonyPatch(typeof(Character), \"AttemptRespawn\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "private|instance|bool|AttemptRespawn|()|method",
+      "match": "exact",
+      "decl_line": 61564,
+      "raw": "private bool AttemptRespawn()"
+    },
+    "Character.Enable": {
+      "features": [
+        "QuickAdjust"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/QuickAdjust.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/QuickAdjust.cs",
+          "line": 138,
+          "text": "[HarmonyPatch(typeof(Character), \"Enable\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|Enable|(bool)|method",
+      "match": "exact",
+      "decl_line": 59919,
+      "raw": "public void Enable(bool playSound = true)"
+    },
+    "CharacterOpacityController.Update": {
+      "features": [
+        "VisualAid"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "Features/VisualAid.cs"
+      ],
+      "sites": [
+        {
+          "file": "Features/VisualAid.cs",
+          "line": 327,
+          "text": "[HarmonyPatch(typeof(Character), \"Update\")]"
+        },
+        {
+          "file": "Features/VisualAid.cs",
+          "line": 334,
+          "text": "[HarmonyPatch(typeof(CharacterOpacityController), \"Update\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "private|instance|void|Update|()|method",
+      "match": "exact",
+      "decl_line": 66148,
+      "raw": "private void Update()"
+    },
+    "PiecePlacementCursor.Update": {
+      "features": [
+        "core"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "SR_UCH/SR.Input.cs"
+      ],
+      "sites": [
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 132,
+          "text": "[HarmonyPatch(typeof(Character), \"Update\")]"
+        },
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 157,
+          "text": "[HarmonyPatch(typeof(PiecePlacementCursor), \"Update\")]"
+        },
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 166,
+          "text": "[HarmonyPatch(typeof(GameControl), \"Update\")]"
+        },
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 183,
+          "text": "[HarmonyPatch(typeof(KeyboardInput), \"Update\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "protected|instance|void|Update|()|method",
+      "match": "exact",
+      "decl_line": 71844,
+      "raw": "protected override void Update()"
+    },
+    "Cursor.checkCameraToggle": {
+      "features": [
+        "core"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "SR_UCH/SR.Input.cs"
+      ],
+      "sites": [
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 174,
+          "text": "[HarmonyPatch(typeof(Cursor), \"checkCameraToggle\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "private|instance|void|checkCameraToggle|()|method",
+      "match": "exact",
+      "decl_line": 67821,
+      "raw": "private void checkCameraToggle()"
+    },
+    "KeyboardInput.Update": {
+      "features": [
+        "core"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "SR_UCH/SR.Input.cs"
+      ],
+      "sites": [
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 132,
+          "text": "[HarmonyPatch(typeof(Character), \"Update\")]"
+        },
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 157,
+          "text": "[HarmonyPatch(typeof(PiecePlacementCursor), \"Update\")]"
+        },
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 166,
+          "text": "[HarmonyPatch(typeof(GameControl), \"Update\")]"
+        },
+        {
+          "file": "SR_UCH/SR.Input.cs",
+          "line": 183,
+          "text": "[HarmonyPatch(typeof(KeyboardInput), \"Update\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|Update|()|method",
+      "match": "exact",
+      "decl_line": 23923,
+      "raw": "public override void Update()"
+    },
+    "EmoteSystem.ReceiveEvent": {
+      "features": [
+        "core"
+      ],
+      "kinds": [
+        "patch"
+      ],
+      "origins": [
+        "SR_UCH/SR.Window.cs"
+      ],
+      "sites": [
+        {
+          "file": "SR_UCH/SR.Window.cs",
+          "line": 145,
+          "text": "[HarmonyPatch(typeof(EmoteSystem), \"ReceiveEvent\")]"
+        }
+      ],
+      "action": "核对 HarmonyPatch 目标签名",
+      "dump_shape": "public|instance|void|ReceiveEvent|(InputEvent)|method",
+      "match": "exact",
+      "decl_line": 84944,
+      "raw": "public void ReceiveEvent(InputEvent e)"
+    }
+  },
+  "verification": {
+    "verdict": "OK",
+    "checked": 64,
+    "suspected_missing": [],
+    "reviewed": [
+      "AcceptableValueRange`1.Max (external, skipped)",
+      "AcceptableValueRange`1.Min (external, skipped)",
+      "GamePlayer.set_NetworkHandicap (property alias: NetworkHandicap)"
+    ],
+    "match_stats": {
+      "exact": 63,
+      "inherited": 1
+    },
+    "dump_sha256": "b8a5bdb605ecb0ab0e471905f69d18ac37841a13ff2396d3490048f0be25c73b",
+    "at": "2026-10-03T11:53:03Z",
+    "checked_basis": "unique (type,member); scene/net_magic/patch_implicit/external/alias excluded",
+    "fingerprint_hash": "88e2695cb4ae9b4da8e548d4c30d60b2c71fd8861bded265f303b90cd96e7c27",
+    "tool": "uch.py fingerprint --dump"
+  },
+  "changes": []
+}

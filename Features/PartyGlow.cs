@@ -1,7 +1,5 @@
-// 派对盒道具「品质光芒」：按抽取权重给道具加一层品质色柔光。
-// 权重取自 BlockGroup.GetItemFilterWeight（派对盒实际抽取口径），只读 public API、无反射。
-// 光晕是道具自身的子对象（随道具销毁），只加半透明径向渐变，不遮住本体、不碰网络。
-// 品质方向：概率越低 = 越稀有 = 品质越高；可用「反向着色」开关翻转。
+// 派对盒道具「品质光芒」：按 GetItemFilterWeight 的抽取权重加径向柔光团；纯本地视觉，不碰网络。
+// 注意：概率越低 = 越稀有 = 品质越高；柔光是道具子对象，随道具销毁。
 
 using System;
 using System.Collections.Generic;
@@ -49,31 +47,17 @@ namespace SR_UCH.Tweaks {
 
         private static bool _uiReg;
 
-        // 配置行统一走"标签 + 控件"：RenderControl 只画控件、没有名称列，
-        // 那样 LocKey / LocDesc 登记不会被消费，界面上也没有任何配置项名称。
-        // 列宽与核心 Sc() 同坐标系；契约层未暴露 EntryNameWidth，故用固定 180 设计像素。
-        private static void CfgRow(ConfigEntryBase e) {
-            SRApi.Ctl.DrawEntryRow(e, SRApi.Ctl.Sc(180f));
-        }
-
         // 本页配置行的显示名与悬浮说明：缺 LocKey 时中文界面回退英文键名。
         private static void RegUi() {
-            SRApi.LocKey(Sec, "Enabled", "启用品质光芒", "Enable rarity glow");
-            SRApi.LocDesc(Sec, "Enabled",
-                "启用品质光芒\n按当前抽取权重给派对盒里的道具加一层柔和径向光晕；纯本地视觉，联机各端各画各的。",
-                "Enable rarity glow\nAdds a soft radial glow behind party-box items based on their current draw weight. Local only.");
-            SRApi.LocKey(Sec, "Strength", "光芒强度", "Glow strength");
-            SRApi.LocDesc(Sec, "Strength",
-                "光芒强度\n光晕不透明度百分比（20-150）。",
-                "Glow strength\nGlow opacity in percent. Range 20-150.");
-            SRApi.LocKey(Sec, "Size", "光芒尺寸", "Glow size");
-            SRApi.LocDesc(Sec, "Size",
-                "光芒尺寸\n光晕相对道具包围盒的尺寸百分比（100-300）。",
-                "Glow size\nGlow size relative to the item bounds in percent. Range 100-300.");
-            SRApi.LocKey(Sec, "Breathe", "呼吸脉动", "Breathe");
-            SRApi.LocDesc(Sec, "Breathe",
-                "呼吸脉动\n轻微呼吸脉动。用缩放时间驱动：梦境定格时它会跟着静止。",
-                "Breathe\nGentle pulse driven by scaled time; stops while Dream freezes the clock.");
+            TweakCfg.Entry(Sec, "Enabled", "启用品质光芒", "Enable rarity glow",
+                "启用品质光芒\n按当前概率给派对盒道具加径向柔光团；纯本地视觉，联机各端各画各的。",
+                "Enable rarity glow\nAdds a soft radial glow behind party-box items based on their current draw probability. Local only.");
+            TweakCfg.Entry(Sec, "Strength", "光芒强度", "Glow strength",
+                "光芒强度\n光晕不透明度百分比（20-150）。", "Glow strength\nGlow opacity in percent. Range 20-150.");
+            TweakCfg.Entry(Sec, "Size", "光芒尺寸", "Glow size",
+                "光芒尺寸\n光晕相对道具包围盒的尺寸百分比（100-300）。", "Glow size\nGlow size relative to the item bounds in percent. Range 100-300.");
+            TweakCfg.Entry(Sec, "Breathe", "呼吸脉动", "Breathe",
+                "呼吸脉动\n用缩放时间驱动的轻微脉动", "Breathe\nGentle pulse driven by scaled time");
             if (!_uiReg) { _uiReg = true; SRApi.RowSliders.Add(UiSlider); }
         }
 
@@ -91,7 +75,7 @@ namespace SR_UCH.Tweaks {
         }
 
         public void Initialize(IFeatureHost plugin) {
-            _enabled = plugin.Config.Bind(Sec, "Enabled", true, "按当前抽取权重给派对盒里的道具加一层柔和径向光晕；纯本地视觉，联机各端各画各的。");
+            _enabled = plugin.Config.Bind(Sec, "Enabled", true, "按当前概率给派对盒道具加径向柔光团；纯本地视觉，联机各端各画各的。");
             _strength = plugin.Config.Bind(Sec, "Strength", 80, new ConfigDescription("光晕不透明度百分比（20-150）。", new AcceptableValueRange<int>(20, 150)));
             _tierColors = new ConfigEntry<string>[6];
             for (int i = 0; i < 6; i++) {
@@ -99,14 +83,15 @@ namespace SR_UCH.Tweaks {
                 _tierColors[i] = plugin.Config.Bind(Sec, "Tier Color " + i, "#" + ColorUtility.ToHtmlStringRGB(TierColorDefault[i]),
                     "第 " + (i + 1) + " 档（" + TierZh[i] + "）的光晕颜色，十六进制 #RRGGBB。");
                 TierColor[i] = ParseColor(_tierColors[i].Value, TierColorDefault[i]);
-                _tierColors[i].SettingChanged += (s2, e2) => { TierColor[ti] = ParseColor(_tierColors[ti].Value, TierColorDefault[ti]); };
-                SRApi.LocKey(Sec, "Tier Color " + i, TierZh[i] + "颜色", TierEn[i] + " color");
-                SRApi.LocDesc(Sec, "Tier Color " + i,
+                System.EventHandler __h__tierColors_i__1 = (s2, e2) => { TierColor[ti] = ParseColor(_tierColors[ti].Value, TierColorDefault[ti]); };
+                _tierColors[i].SettingChanged += __h__tierColors_i__1;
+                Sub.Revoke(() => _tierColors[i].SettingChanged -= __h__tierColors_i__1);
+                TweakCfg.Entry(Sec, "Tier Color " + i, TierZh[i] + "颜色", TierEn[i] + " color",
                     TierZh[i] + "的颜色\n品质光芒按档位取这里的前景色\n十六进制格式（#RRGGBB）",
                     TierEn[i] + " color\nthe glow uses this colour for that tier\nhex format (#RRGGBB)");
             }
             _size = plugin.Config.Bind(Sec, "Size", 180, new ConfigDescription("光晕相对道具包围盒的尺寸百分比（100-300）。", new AcceptableValueRange<int>(100, 300)));
-            _breathe = plugin.Config.Bind(Sec, "Breathe", false, "轻微呼吸脉动。用缩放时间驱动：梦境定格时它会跟着静止。");
+            _breathe = plugin.Config.Bind(Sec, "Breathe", false, "轻微呼吸脉动，用缩放时间驱动。");
 
             SRApi.LocSec(Sec, "品质光芒", "Rarity Glow");
 
@@ -115,7 +100,9 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterPage(Sec, "Glow", "品质光芒", "Rarity Glow", 10, RenderPage);
             SRApi.RegisterTick("品质光芒-扫描", Tick);
             SRApi.OnShutdown("品质光芒", Shutdown);
-            _enabled.SettingChanged += (s, e) => { if (!_enabled.Value) RemoveAll(); };
+            System.EventHandler __h__enabled_2 = (s, e) => { if (!_enabled.Value) RemoveAll(); };
+            _enabled.SettingChanged += __h__enabled_2;
+            Sub.Revoke(() => _enabled.SettingChanged -= __h__enabled_2);
         }
 
         public void Shutdown() {
@@ -303,7 +290,7 @@ namespace SR_UCH.Tweaks {
                 if (has) { worldCenter = b.center; worldSize = Mathf.Max(b.size.x, b.size.y); }
             }
             float scaleX = Mathf.Max(0.01f, holder.lossyScale.x);
-            // 光晕比包围盒大一圈（×2.6）：光要散出去，而不是贴着道具画边。
+            // 柔光比包围盒大 1.6~2.2 倍（随档位递增）：光要散出去，不贴着道具画边。
             float tierSpread = 1.6f + 0.12f * Mathf.Clamp(tier, 0, 5);
             float localSize = worldSize * tierSpread * (_size.Value / 100f) / scaleX;
             g.localPosition = holder.InverseTransformPoint(worldCenter);
@@ -382,7 +369,6 @@ namespace SR_UCH.Tweaks {
                 }
             } catch (Exception ex) { SRApi.Guard.Log("品质光芒/清理登记表", ex); }
             _made.Clear();
-            // 兜底：帧缓存里还有但未登记的光晕（防旧版本/手工残留）。
             try {
                 PickableBlock[] all = SRApi.FrameObjects<PickableBlock>();
                 if (all == null) all = new PickableBlock[0];   // 拿不到也要走清理，避免光晕残留
@@ -404,10 +390,10 @@ namespace SR_UCH.Tweaks {
         private static GUIContent[] _tierLabels;   // 每档标签缓存：只为避免每帧新建 6 个 GUIContent
 
         private void RenderPage() {
-            CfgRow(_enabled);
-            CfgRow(_strength);
-            CfgRow(_size);
-            CfgRow(_breathe);
+            TweakCfg.Row(_enabled);
+            TweakCfg.Row(_strength);
+            TweakCfg.Row(_size);
+            TweakCfg.Row(_breathe);
             // 六档颜色走核心取色器；改完立即重建颜色表。
             if (_tierColors != null) {
                 if (_tierLabels == null) {

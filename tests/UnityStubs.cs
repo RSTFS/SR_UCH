@@ -73,9 +73,24 @@ namespace UnityEngine {
         public static Event current { get { return null; } }
     }
 
+    // 契约层的 GuiScope 会保存/还原 GUI.matrix，测试桩只需类型存在。
+    public struct Matrix4x4 {
+        public static Matrix4x4 identity { get { return new Matrix4x4(); } }
+    }
+
+    public class GUISkin {
+        public Font font;
+    }
+
+    // 契约层 GuiScope 会整体保存/还原这些全局状态，桩里必须齐全。
     public static class GUI {
         public static bool enabled = true;
         public static Color color = new Color(1f, 1f, 1f, 1f);
+        public static Color backgroundColor = new Color(1f, 1f, 1f, 1f);
+        public static Color contentColor = new Color(1f, 1f, 1f, 1f);
+        public static Matrix4x4 matrix = new Matrix4x4();
+        public static int depth;
+        public static GUISkin skin = new GUISkin();
     }
 
     public static class GUILayout {

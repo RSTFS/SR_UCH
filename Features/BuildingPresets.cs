@@ -1,6 +1,6 @@
 // 布局预设库（sr.buildingpresets）：把当前方块布局存成命名预设，支持列表管理 / 加载 / 导入导出。
 // 存储：BepInEx/config/SR_UCH/presets/<模式>/<安全文件名>.xml + 同目录 index.json（元数据缓存）。
-// 约束：本文件单独编成 SR_UCH_BuildingPresets.dll，只允许走 SRApi / Slots 契约，不得引用 SR.* 实现层。
+// 约束：全部功能同程序集编译为单一 SR_UCH.dll；功能层经 SRApi 契约访问实现层，不得直接引用 SR.* 私有状态。
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -15,7 +15,7 @@ using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 
 namespace SR_UCH.Tweaks {
-    [SrFeature("sr.buildingpresets", "BuildingPresets", "1.0", Provides = new string[] { SRApi.SlotKeys.PresetsReloadBusy })]
+    [SrFeature("sr.buildingpresets", "BuildingPresets", "1.0")]
     public partial class BuildingPresets : ITweak {
         // 配置段名：导航栏目名 / LocSec / Config.Bind 三处必须完全一致。
         private const string Section = "Building Presets";
@@ -222,7 +222,9 @@ namespace SR_UCH.Tweaks {
                     new ConfigDescription("列表排序方式：0=时间（新→旧），1=名称（A→Z）。",
                         new AcceptableValueRange<int>(SortModeMin, SortModeMax)));
                 _sortMode = _sortModeEntry.Value;
-                _sortModeEntry.SettingChanged += delegate { _sortMode = _sortModeEntry.Value; };
+                System.EventHandler __h_sortMode = delegate { _sortMode = _sortModeEntry.Value; };
+                _sortModeEntry.SettingChanged += __h_sortMode;
+                Sub.Revoke(() => _sortModeEntry.SettingChanged -= __h_sortMode);
                 // 类型/关卡/模式筛选落盘；搜索框不存（临时输入）。
                 _filterTypeEntry = plugin.Config.Bind(Section, "Filter Type", "",
                     "列表页类型筛选：空=全部 / preset=仅预设 / local=仅本地存档");
@@ -233,9 +235,15 @@ namespace SR_UCH.Tweaks {
                 _typeFilter = _filterTypeEntry.Value ?? "";
                 _levelFilter = _filterLevelEntry.Value ?? "";
                 _modeFilter = _filterModeEntry.Value ?? "";
-                _filterTypeEntry.SettingChanged += delegate { _typeFilter = _filterTypeEntry.Value ?? ""; };
-                _filterLevelEntry.SettingChanged += delegate { _levelFilter = _filterLevelEntry.Value ?? ""; };
-                _filterModeEntry.SettingChanged += delegate { _modeFilter = _filterModeEntry.Value ?? ""; };
+                System.EventHandler __h_filterType = delegate { _typeFilter = _filterTypeEntry.Value ?? ""; };
+                _filterTypeEntry.SettingChanged += __h_filterType;
+                Sub.Revoke(() => _filterTypeEntry.SettingChanged -= __h_filterType);
+                System.EventHandler __h_filterLevel = delegate { _levelFilter = _filterLevelEntry.Value ?? ""; };
+                _filterLevelEntry.SettingChanged += __h_filterLevel;
+                Sub.Revoke(() => _filterLevelEntry.SettingChanged -= __h_filterLevel);
+                System.EventHandler __h_filterMode = delegate { _modeFilter = _filterModeEntry.Value ?? ""; };
+                _filterModeEntry.SettingChanged += __h_filterMode;
+                Sub.Revoke(() => _filterModeEntry.SettingChanged -= __h_filterMode);
                 _skipTreehouse = plugin.Config.Bind(Section, "Skip Treehouse", false,
                     "跳过树屋流程：勾选后联机替换关卡不再先回树屋，而是直接替换场景（房客的 SelectedLevel 可能不同步，风险自负）。");
                 // 旧配置残留的越界值夹回 0（时间）。
@@ -250,9 +258,8 @@ namespace SR_UCH.Tweaks {
                     "内部状态：预设列表隐藏列（逗号分隔的列索引，右键表头隐藏后自动写入）。");
             // 不能加 AcceptableValueRange：会把默认值 0 夹成 120。
             _tableHEntry = plugin.Config.Bind(Section, "Table Height", 0,
-                new ConfigDescription(SRApi.T("预设列表高度（0 = 自动；拖动表格底边可直接修改并保存）", "Preset list height (0 = auto; drag the table bottom edge to change and save)")));
+                new ConfigDescription(SRApi.Tid("26766e29df", "预设列表高度（0 = 自动；拖动表格底边可直接修改并保存）", "Preset list height (0 = auto; drag the table bottom edge to change and save)")));
             if (_tableHEntry.Value == 120) _tableHEntry.Value = 0;
-            // 一次性迁移：Table Height 现已生效，旧值不迁移会让列表突然变矮；用独立标记键只做一次。
             try {
                 ConfigEntry<bool> __migH = plugin.Config.Bind(Section, "Table Height Migrated", false,
                     "内部状态：是否已把旧版无效的表格高度复位（勿手动修改）。");
@@ -261,9 +268,9 @@ namespace SR_UCH.Tweaks {
                     if (_tableHEntry.Value > 0) { _tableHEntry.Value = 0; SRApi.LogInfo("[布局预设] 旧的表格高度值已复位为自动（此前该值从未生效）"); }
                 }
             } catch (Exception __mh) { SRApi.Guard.Log("布局预设/表格高度迁移", __mh); }
-                // 互斥槽位：关卡重载动手前会 Require 它，双方都忙时互相拦下。
-                try { Slots.Provide(SRApi.SlotKeys.PresetsReloadBusy, (Func<bool>)(() => _reloadBusy)); }
-                catch (Exception __sx) { SRApi.Guard.Log("布局预设/登记重载互斥槽位", __sx); }
+                // 互斥锁：关卡重载动手前会读它，双方都忙时互相拦下。
+                SrCaps.PresetsReloadBusy = () => _reloadBusy;
+                FeatureRuntime.RecordRevoke(() => SrCaps.PresetsReloadBusy = null);
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设 初始化", __ex);
             }
@@ -288,55 +295,35 @@ namespace SR_UCH.Tweaks {
             catch (Exception __tl) { SRApi.Guard.Log("布局预设/注册锁自愈", __tl); }
             try { SRApi.RegisterTick("布局预设-XML兜底", TickXmlGuard); }
             catch (Exception __tx) { SRApi.Guard.Log("布局预设/注册XML兜底", __tx); }
-            // 淘汰旧键：Show Timestamps（功能已删）与 Enabled（总开关已删）。
             try { SRApi.Migration.Remove(Section, "Show Timestamps"); }
             catch (Exception __mx) { SRApi.Guard.Log("布局预设/注册淘汰键", __mx); }
             try { SRApi.Migration.Remove(Section, "Enabled"); }
             catch (Exception __me) { SRApi.Guard.Log("布局预设/淘汰总开关键", __me); }
-            SRApi.LocKey(Section, "Max Presets", "预设数量上限", "Max presets");
-            SRApi.LocDesc(Section, "Max Presets",
-                "预设数量上限\n列表最多保留多少条预设\n范围 1-100；只限制新保存，不删磁盘文件",
-                "Preset count limit\nhow many presets the list keeps\n1-100; limits new saves only, never deletes files");
-            SRApi.LocKey(Section, "Filter Type", "类型筛选", "Filter type");
-            SRApi.LocDesc(Section, "Filter Type",
-                "列表页的类型筛选（会存盘）\n全部 / 仅预设 / 仅本地存档\n默认「全部」",
-                "List type filter (persisted)\nall / presets only / local saves only\ndefault: all");
-            SRApi.LocKey(Section, "Filter Level", "关卡筛选", "Filter level");
-            SRApi.LocDesc(Section, "Filter Level",
-                "列表页的关卡筛选（会存盘）\n空 = 全部关卡\n其余为关卡场景名",
-                "List level filter (persisted)\nempty = all levels\notherwise a level scene name");
-            SRApi.LocKey(Section, "Filter Mode", "模式筛选", "Filter mode");
-            SRApi.LocDesc(Section, "Filter Mode",
-                "列表页的模式筛选（会存盘）\n空 = 全部模式\n其余为保存时的模式名",
-                "List mode filter (persisted)\nempty = all modes\notherwise the mode the preset was saved in");
-            SRApi.LocKey(Section, "Sort Mode", "列表排序", "Sort mode");
-            SRApi.LocDesc(Section, "Sort Mode",
-                "列表排序方式\n0＝按时间（新到旧），1＝按名称\n由列表页的排序下拉维护",
-                "List sort mode\n0 = newest first, 1 = by name\nmaintained by the list page dropdown");
+            TweakCfg.Entry(Section, "Max Presets", "预设数量上限", "Max presets",
+                "预设数量上限\n列表最多保留多少条预设\n范围 1-100；只限制新保存，不删磁盘文件", "Preset count limit\nhow many presets the list keeps\n1-100; limits new saves only, never deletes files");
+            TweakCfg.Entry(Section, "Filter Type", "类型筛选", "Filter type",
+                "列表页的类型筛选（会存盘）\n全部 / 仅预设 / 仅本地存档\n默认「全部」", "List type filter (persisted)\nall / presets only / local saves only\ndefault: all");
+            TweakCfg.Entry(Section, "Filter Level", "关卡筛选", "Filter level",
+                "列表页的关卡筛选（会存盘）\n空 = 全部关卡\n其余为关卡场景名", "List level filter (persisted)\nempty = all levels\notherwise a level scene name");
+            TweakCfg.Entry(Section, "Filter Mode", "模式筛选", "Filter mode",
+                "列表页的模式筛选（会存盘）\n空 = 全部模式\n其余为保存时的模式名", "List mode filter (persisted)\nempty = all modes\notherwise the mode the preset was saved in");
+            TweakCfg.Entry(Section, "Sort Mode", "列表排序", "Sort mode",
+                "列表排序方式\n0＝按时间（新到旧），1＝按名称\n由列表页的排序下拉维护", "List sort mode\n0 = newest first, 1 = by name\nmaintained by the list page dropdown");
             // 换场景后下次打开面板重新扫盘，能看到手动增删的 XML。
             try { SRApi.RegisterSceneHook(delegate { _loaded = false; }); }
             catch (Exception __sh) { SRApi.Guard.Log("布局预设/注册场景钩子", __sh); }
             try { SRApi.HotkeyAction("presets.treehouse", "返回树屋", delegate { ReturnToTreehouse(); }); }
             catch (Exception __hk) { SRApi.Guard.Log("布局预设/注册返回树屋快捷键", __hk); }
-            SRApi.LocKey(Section, "Skip Treehouse", "跳过树屋流程", "Skip treehouse");
-            SRApi.LocDesc(Section, "Skip Treehouse",
-                "跳过树屋流程\n直接切换场景进入目标关卡，不先回树屋\n仅单人生效；联机时强制走树屋",
-                "Skip treehouse\nswitches scene straight into the target level\nsingle-player only; forced on online");
-            SRApi.LocKey(Section, ColWidthsKey, "列表列宽（内部）", "Preset widths (internal)");
-            SRApi.LocDesc(Section, ColWidthsKey,
-                "预设列表列宽\n拖动表头后自动写入\n一般无需手改；非法值回退默认",
-                "Preset column widths\nwritten automatically after dragging the header\nrarely needs editing; invalid values fall back");
-            SRApi.LocKey(Section, ColOrderKey, "列表列序（内部）", "Preset order (internal)");
-            SRApi.LocDesc(Section, ColOrderKey,
-                "预设列表列序\n拖动表头换位后自动写入\n一般无需手改；非法值回退默认",
-                "Preset column order\nwritten automatically after reordering the header\nrarely needs editing; invalid values fall back");
-            SRApi.LocKey(Section, ColHiddenKey, "隐藏列（内部）", "Preset hidden (internal)");
-            SRApi.LocDesc(Section, ColHiddenKey,
-                "预设列表隐藏列\n右键表头隐藏后自动写入\nShift+右键表头可恢复全部",
-                "Preset hidden columns\nwritten after hiding with a header right-click\nShift+right-click the header restores all");
+            TweakCfg.Entry(Section, "Skip Treehouse", "跳过树屋流程", "Skip treehouse",
+                "跳过树屋流程\n直接切换场景进入目标关卡，不先回树屋\n仅单人生效；联机时强制走树屋", "Skip treehouse\nswitches scene straight into the target level\nsingle-player only; forced on online");
+            TweakCfg.Entry(Section, ColWidthsKey, "列表列宽（内部）", "Preset widths (internal)",
+                "预设列表列宽\n拖动表头后自动写入\n一般无需手改；非法值回退默认", "Preset column widths\nwritten automatically after dragging the header\nrarely needs editing; invalid values fall back");
+            TweakCfg.Entry(Section, ColOrderKey, "列表列序（内部）", "Preset order (internal)",
+                "预设列表列序\n拖动表头换位后自动写入\n一般无需手改；非法值回退默认", "Preset column order\nwritten automatically after reordering the header\nrarely needs editing; invalid values fall back");
+            TweakCfg.Entry(Section, ColHiddenKey, "隐藏列（内部）", "Preset hidden (internal)",
+                "预设列表隐藏列\n右键表头隐藏后自动写入\nShift+右键表头可恢复全部", "Preset hidden columns\nwritten after hiding with a header right-click\nShift+right-click the header restores all");
             // 内部键同段却没有本地化会显示成英文 key，补齐并标注"勿手动修改"。
-            SRApi.LocKey(Section, "Table Height Migrated", "列表高度迁移标记（内部）", "List height migration flag (internal)");
-            SRApi.LocDesc(Section, "Table Height Migrated",
+            TweakCfg.Entry(Section, "Table Height Migrated", "列表高度迁移标记（内部）", "List height migration flag (internal)",
                 "内部状态：是否已完成旧版无效的表格高度复位\n由模组自动维护，勿手动修改\n改动后需要重开设置页才会重新判断",
                 "Internal: whether the legacy ineffective table height has been reset\nmaintained by the mod automatically; do not edit\na change is re-evaluated the next time the settings page opens");
         }
@@ -412,8 +399,8 @@ namespace SR_UCH.Tweaks {
         private static void RenderListStatus(int shown, int total) {
             try {
                 string count = (shown == total)
-                    ? SRApi.T("共 ", "Total ") + total + SRApi.T(" 条", " items")
-                    : SRApi.T("显示 ", "Showing ") + shown + SRApi.T(" / ", " / ") + total + SRApi.T(" 条", " items");
+                    ? SRApi.Tid("e892ae517a", "共 ", "Total ") + total + SRApi.Tid("cd8df9bab8", " 条", " items")
+                    : SRApi.Tid("7675e5bf32", "显示 ", "Showing ") + shown + SRApi.Tid("fbd1bece3e", " / ", " / ") + total + SRApi.Tid("cd8df9bab8", " 条", " items");
                 // _status 永不清除，这里只控制显示：值变化时重新计时，8 秒后不再拼接。
                 string status = _status;
                 if (!string.IsNullOrEmpty(status)) {
@@ -437,8 +424,8 @@ namespace SR_UCH.Tweaks {
             int sig = (SRApi.Ctl.LangEn ? 1 : 0) * 31 + Mathf.RoundToInt(SRApi.Ctl.Sc(100f));
             if (sig == _formLabelSig) return _formLabelW;
             try {
-                float wa = SRApi.Ctl.Label.CalcSize(SRApi.Ctl.Content(SRApi.T("预设名称", "Preset name"))).x;
-                float wb = SRApi.Ctl.Label.CalcSize(SRApi.Ctl.Content(SRApi.T("XML 路径", "XML path"))).x;
+                float wa = SRApi.Ctl.Label.CalcSize(SRApi.Ctl.Content(SRApi.Tid("d220332704", "预设名称", "Preset name"))).x;
+                float wb = SRApi.Ctl.Label.CalcSize(SRApi.Ctl.Content(SRApi.Tid("c7a0abd3fd", "XML 路径", "XML path"))).x;
                 _formLabelW = Mathf.Max(SRApi.Ctl.Sc(52f), Mathf.Max(wa, wb) + SRApi.Ctl.Sc(4f));   // 标签与输入框间距缩小约 1/3
                 _formLabelSig = sig;
                 return _formLabelW;
@@ -502,7 +489,7 @@ namespace SR_UCH.Tweaks {
                 if (!SRApi.Visible) return;          // 一类窗口只能由 SR 界面触发
                 if (SRApi.Ctl.FloatIsOpen) return;
                 _renameOwnsFloat = true;
-                SRApi.Ctl.FloatOpen(SRApi.T("重命名预设", "Rename preset"),
+                SRApi.Ctl.FloatOpen(SRApi.Tid("a74db606eb", "重命名预设", "Rename preset"),
                     new Vector2(420f, 130f), DrawRenameContent, CancelRename);
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/重命名浮窗", __ex); }
         }
@@ -534,15 +521,12 @@ namespace SR_UCH.Tweaks {
                 if (e != null && e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape) { CancelRename(); e.Use(); return; }
                 if (e != null && e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)) { SubmitRename(p); e.Use(); return; }
                 float bw = SRApi.Ctl.Sc(76f);
-                if (GUI.Button(new Rect(w - bw * 2f - SRApi.Ctl.Sc(8f), SRApi.Ctl.Sc(36f), bw, SRApi.Ctl.Sc(24f)), SRApi.T("确定", "OK"), SRApi.Ctl.Btn))
+                if (GUI.Button(new Rect(w - bw * 2f - SRApi.Ctl.Sc(8f), SRApi.Ctl.Sc(36f), bw, SRApi.Ctl.Sc(24f)), SRApi.Tid("6259d30d8a", "确定", "OK"), SRApi.Ctl.Btn))
                     SubmitRename(p);
-                else if (GUI.Button(new Rect(w - bw, SRApi.Ctl.Sc(36f), bw, SRApi.Ctl.Sc(24f)), SRApi.T("取消", "Cancel"), SRApi.Ctl.Btn))
+                else if (GUI.Button(new Rect(w - bw, SRApi.Ctl.Sc(36f), bw, SRApi.Ctl.Sc(24f)), SRApi.Tid("d94a8eaf28", "取消", "Cancel"), SRApi.Ctl.Btn))
                     CancelRename();
             } catch (Exception __ex) { SRApi.Guard.Log("布局预设/重命名内容", __ex); }
         }
-
-        // 由核心浮窗派发：主面板关闭时也要画。
-        internal static void DrawRenameWindow() { DrawInlineRename(); }
 
         private static void SubmitRename(PresetInfo p) {
             try {
@@ -567,7 +551,7 @@ namespace SR_UCH.Tweaks {
                 for (int i = 0; i < ColCount; i++) _colW[i] = DefColW[i];
                 _hiddenCols.Clear();
                 SaveCols();
-                SRApi.LogInfo("[布局预设] " + SRApi.T("已恢复显示全部列", "All columns are shown again"));
+                SRApi.LogInfo("[布局预设] " + SRApi.Tid("6fc3737f38", "已恢复显示全部列", "All columns are shown again"));
             } catch (Exception __ex) {
                 SRApi.Guard.Log("布局预设/恢复全部列", __ex);
             }
@@ -576,12 +560,12 @@ namespace SR_UCH.Tweaks {
         private static string ColumnTitle(int ci) {
             string __arrow = (ci == _sortColOverride && ci != ColAction) ? (_sortAsc ? " ▲" : " ▼") : "";
             switch (ci) {
-                case ColName: return SRApi.T("名称", "Name") + __arrow;
-                case ColLevel: return (_levelShowCode ? SRApi.T("关卡代码", "Level code") : SRApi.T("关卡", "Level")) + __arrow;
-                case ColMode: return SRApi.T("模式", "Mode") + __arrow;
-                case ColMods: return SRApi.T("数据", "Data");
-                case ColTime: return SRApi.T("时间", "Time") + __arrow;
-                case ColAction: return SRApi.T("操作", "Actions");
+                case ColName: return SRApi.Tid("84f28b852b", "名称", "Name") + __arrow;
+                case ColLevel: return (_levelShowCode ? SRApi.Tid("afde63ce14", "关卡代码", "Level code") : SRApi.Tid("2cf41c8c56", "关卡", "Level")) + __arrow;
+                case ColMode: return SRApi.Tid("47384f58db", "模式", "Mode") + __arrow;
+                case ColMods: return SRApi.Tid("e932c3b4ad", "数据", "Data");
+                case ColTime: return SRApi.Tid("772ed3aeed", "时间", "Time") + __arrow;
+                case ColAction: return SRApi.Tid("d4eb333d8f", "操作", "Actions");
                 default: return "";
             }
         }
@@ -589,14 +573,12 @@ namespace SR_UCH.Tweaks {
         private static string ColumnTip(int ci) {
             try {
                 switch (ci) {
-                    case ColName: return SRApi.T("预设名称", "preset name");
-                    case ColLevel: return SRApi.T("预设所属关卡；单击「关卡」表头可在关卡名称 / 关卡代码之间切换（代码缺失显示 -）",
-                        "the level this preset belongs to; click the Level header to toggle between level name and level code (code shows - when unavailable)");
-                    case ColMode: return SRApi.T("保存时所在的游戏模式", "game mode the preset was saved in");
-                    case ColMods: return SRApi.T("这条预设带的自定义数据\n默认 = 全部用预设自带；自定义 = 修改器/规则/积分/模块概率按你的设定\n鼠标停在该列格子上可预览具体内容",
-                        "custom data carried by this preset\nDefault = use whatever the preset has; Custom = your own modifiers/rules/points/block odds\nhover a cell in this column to preview the details");
-                    case ColTime: return SRApi.T("保存时间（本地时间）", "save time (local time)");
-                    case ColAction: return SRApi.T("加载 / 数据 / 导出到剪贴板 / 删除；删除需点两次确认\n重命名：右键「名称」列；自定义数据：右键「数据」列", "load / data / export to clipboard / delete; delete needs a second click\nrename: right-click the Name column; custom data: right-click the Data column");
+                    case ColName: return SRApi.Tid("9d0259eed3", "预设名称", "preset name");
+                    case ColLevel: return SRApi.Tid("15eb825eee", "预设所属关卡；单击「关卡」表头可在关卡名称 / 关卡代码之间切换（代码缺失显示 -）", "the level this preset belongs to; click the Level header to toggle between level name and level code (code shows - when unavailable)");
+                    case ColMode: return SRApi.Tid("dea7d3304c", "保存时所在的游戏模式", "game mode the preset was saved in");
+                    case ColMods: return SRApi.Tid("c006e12dfa", "这条预设带的自定义数据\n默认 = 全部用预设自带；自定义 = 修改器/规则/积分/模块概率按你的设定\n鼠标停在该列格子上可预览具体内容", "custom data carried by this preset\nDefault = use whatever the preset has; Custom = your own modifiers/rules/points/block odds\nhover a cell in this column to preview the details");
+                    case ColTime: return SRApi.Tid("31939b5f4f", "保存时间（本地时间）", "save time (local time)");
+                    case ColAction: return SRApi.Tid("2bcb9071eb", "加载 / 数据 / 导出到剪贴板 / 删除；删除需点两次确认\n重命名：右键「名称」列；自定义数据：右键「数据」列", "load / data / export to clipboard / delete; delete needs a second click\nrename: right-click the Name column; custom data: right-click the Data column");
                     default: return null;
                 }
             } catch { return null; }
@@ -638,7 +620,7 @@ namespace SR_UCH.Tweaks {
             }
             string[] c = ent.Cells;
             c[ColName] = p.IsLocal
-                ? SRApi.T("本地", "Local") + " · " + (p.Name ?? "")
+                ? SRApi.Tid("c94b4b3e96", "本地", "Local") + " · " + (p.Name ?? "")
                 : (p.Name ?? "");
             c[ColLevel] = _levelShowCode ? LevelCodeText(p) : LevelText(p);
             c[ColMode] = ModeText(p.Mode);
@@ -670,7 +652,7 @@ namespace SR_UCH.Tweaks {
                 }
                 bool delPending = IsPending("del:" + p.Key);
                 _actActions[ActLoad].Label = PendingLabel("加载", "Load", "replace:" + p.Key);
-                _actActions[ActExport].Label = SRApi.T("导出", "Export");
+                _actActions[ActExport].Label = SRApi.Tid("9bb429ef37", "导出", "Export");
                 _actActions[ActDelete].Label = PendingLabel("删除", "Delete", "del:" + p.Key);
                 int hit = SRApi.TableActionButtons(r, _actActions, null, ref hover);
                 if (hit >= 0) _actionHitThisFrame = true;
@@ -805,7 +787,7 @@ namespace SR_UCH.Tweaks {
         }
 
         private static string SaveButtonText() {
-            return IsPendingPrefix("overwrite:") ? PendingLabel("确认覆盖", "Confirm overwrite", _pendingKey) : SRApi.T("保存当前布局", "Save layout");
+            return IsPendingPrefix("overwrite:") ? PendingLabel("确认覆盖", "Confirm overwrite", _pendingKey) : SRApi.Tid("dae2b8018f", "保存当前布局", "Save layout");
         }
 
     }

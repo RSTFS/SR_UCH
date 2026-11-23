@@ -1,8 +1,6 @@
-// 输入：打开/关闭键、EventSystem 门控、按帧滚轮仲裁，以及独立功能类 SRInputGate。
-// SRInputGate 自行注册 Harmony 补丁；管理器本身不 patch 游戏。
+// 输入：打开/关闭键、EventSystem 门控、按帧滚轮仲裁，以及面板期冻结输入的本体补丁。
+// 冻结补丁不实现 ITweak、不挂 [SrFeature]，由 SR.Initialize 显式注册。
 using System;
-using BepInEx;
-using BepInEx.Bootstrap;
 using HarmonyLib;
 using UnityEngine;
 
@@ -112,12 +110,12 @@ public partial class SR {
 
     }
 
-// 输入门控（独立功能类）：打开面板/地图时冻结游戏输入的 6 个补丁。
-// 放本文件：csproj 为显式文件列表，新增 .cs 不会编译。
-[SrFeature("sr.srinputgate", "SRInputGate", "1.0")]
-public class SRInputGate : ITweak {
 
-    public void Initialize(IFeatureHost plugin) {
+// 本体补丁：面板 / 地图打开时冻结游戏输入，与 SR.Window 的 EmoteBlockPatch 同类。
+// 不实现 ITweak、不挂 [SrFeature]、不进功能表 —— 这是框架行为，不是玩法功能。
+internal static class SRInputGate {
+
+    internal static void Register() {
         try { SRApi.RegisterPatch(typeof(SRInputGate)); }
         catch (Exception e) { SR.LogError("输入门控 补丁注册失败: " + e.Message); }
     }

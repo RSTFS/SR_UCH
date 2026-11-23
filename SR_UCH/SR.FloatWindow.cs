@@ -124,7 +124,7 @@ public partial class SR {
                 Font prevFont = GUI.skin.font;
                 int prevDepth = GUI.depth;
                 try {
-                    GUI.depth = -1000;                    // 高于 SR 主窗口一层（主窗口为默认 0）
+                    GUI.depth = (int)UiLayer.Modal;                    // 高于 SR 主窗口一层（主窗口为默认 0）
                     Font f = SRApi.Ctl.UiFont;
                     if (f != null) GUI.skin.font = f;
                     GUI.Box(Rect, GUIContent.none, SR.Ctl.Footer);
@@ -144,7 +144,7 @@ public partial class SR {
                     if (e != null) {
                         Texture2D cur = SRApi.Ctl.CursorTexture;
                         if (cur != null) {
-                            GUI.depth = -2000;
+                            GUI.depth = (int)UiLayer.Backdrop;
                             Color c = GUI.color;
                             try {
                                 GUI.color = Color.white;

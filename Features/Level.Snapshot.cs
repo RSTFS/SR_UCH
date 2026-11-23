@@ -49,7 +49,7 @@ namespace SR_UCH.Tweaks {
             }
             if (!IsPartyCreativeOrFreeplay())
             {
-                SRApi.Notify(feature + SRApi.T("：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
+                SRApi.Notify(feature + SRApi.Tid("25f0182810", "：仅派对、创意或自由关卡内可用", ": available in Party, Creative and Freeplay levels only"));
                 return false;
             }
             if (!SRApi.GateHost)
@@ -115,9 +115,6 @@ namespace SR_UCH.Tweaks {
             } catch (Exception __ex) { SRApi.Guard.Log("清场.逐块销毁", __ex); }
         }
 
-        // 对外槽位：调用方经 Slots.Require 按名取用，取不到即降级。
-        private const string SlotClearPlacedBlocks = "Level.ClearPlacedBlocks"; // Action<List<Placeable>,string>
-        private const string SlotAttributeToHost = "DestroyBlocks.AttributeToHost"; // Action<List<Placeable>>
         // 快照加载后收尾（仅 SR 发起的快照）：补阶段事件、放置计数与着色、方块归属房主。
         [HarmonyPatch(typeof(QuickSaver), "LoadSnapshotFromXmlDocument")]
         [HarmonyPostfix]
@@ -154,17 +151,15 @@ namespace SR_UCH.Tweaks {
                     }
                     if (nFix > 0) SRApi.LogInfo("[快照] 已为 " + nFix + " 个方块补放置计数并着色");
                 } catch (Exception __fx) { SRApi.Guard.Log("快照方块收尾", __fx); }
-                // 归属登记必须在加载之后：方块是加载时创建的，之前集合为空。
                 try {
                     System.Collections.Generic.HashSet<Placeable> initPcs = initFix;   // 与上方共用
                     List<Placeable> built = new List<Placeable>();
                     foreach (Placeable bp in Placeable.AllPlaceables) {
-                        // 必须过滤 MarkedForDestruction：上一轮残留的死方块会被误算进 built。
                         if (bp == null || bp.MarkedForDestruction || initPcs.Contains(bp)) continue;
                         built.Add(bp);
                     }
-                    // 经槽位取用以避免跨功能依赖；取不到只丢归属，不影响重建。
-                    Action<List<Placeable>> attributeToHost = Slots.Require<Action<List<Placeable>>>(SlotAttributeToHost);
+                    // 直读契约层能力容器；取不到只丢归属，不影响重建。
+                    Action<List<Placeable>> attributeToHost = SrCaps.AttributeToHost as Action<List<Placeable>>;
                     if (attributeToHost != null) {
                         attributeToHost(built);
                         SRApi.LogInfo("[快照] 已把 " + built.Count + " 个快照方块归属房主(#1)");

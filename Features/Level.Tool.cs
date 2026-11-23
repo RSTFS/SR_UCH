@@ -17,16 +17,16 @@ public partial class Level {
 
 
     public static void RenderTools() {
-        SRApi.Ctl.SectionTitle(SRApi.T("关卡工具", "Level tools"));
+        SRApi.Ctl.SectionTitle(SRApi.Tid("e86dac38fe", "关卡工具", "Level tools"));
         GUILayout.BeginHorizontal();
-        if (SRApi.Ctl.HotkeyButton("level.reload", SRApi.T("重载关卡", "Reload level"),
-            SRApi.T("房主把当前看到的方块都写进关卡快照, 然后真的重载一次当前关卡, 全员一起重新加载.\n重载完按快照把方块重建出来并广播, 玩家放的方块和能动的道具都不会丢.\n要不要顺手把分数补回来, 看下面那个重载模式.\n 只在派对和创意模式的对局里生效, 而且只有房主能用.", "Host writes the current blocks into the snapshot and really reloads the level scene, so everyone reloads.\nBlocks are rebuilt from the snapshot and nothing is lost.\nWhether the score is filled back depends on the Reload mode below.\n Party/Creative matches only, host only."),
+        if (SRApi.Ctl.HotkeyButton("level.reload", SRApi.Tid("bc08efc166", "重载关卡", "Reload level"),
+            SRApi.Tid("976f787e67", "房主把当前看到的方块都写进关卡快照, 然后真的重载一次当前关卡, 全员一起重新加载.\n重载完按快照把方块重建出来并广播, 玩家放的方块和能动的道具都不会丢.\n要不要顺手把分数补回来, 看下面那个重载模式.\n 只在派对和创意模式的对局里生效, 而且只有房主能用.", "Host writes the current blocks into the snapshot and really reloads the level scene, so everyone reloads.\nBlocks are rebuilt from the snapshot and nothing is lost.\nWhether the score is filled back depends on the Reload mode below.\n Party/Creative matches only, host only."),
             () => Level.ReloadLevel(), SRApi.Ctl.Sc(170), SRApi.Ctl.Sc(30))) {
             Level.ReloadLevel();
         }
         ConfigEntryBase rlm = SRApi.Ctl.FindEntry("Level", "Reload Mode");
-        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.T("重载模式", "Reload mode"),
-            SRApi.T("重载关卡模式：\n保留方块和分数（允许补分）= 重载后当前方块保留；房主按原类型分块给全员广播补分，下一回合结算时全员得分板显示与重载前一致的分数和类型。\n仅保留方块（跳过补分）= 重载后当前方块保留，分数重置。", "Reload level mode:\nKeep blocks & score (allow fill) = blocks kept; the host fills scores so everyone sees the same score/types next tally.\nKeep blocks only (skip fill) = blocks kept, score resets.")),
+        SRApi.Ctl.RestoreLabel(new GUIContent(SRApi.Tid("7601b32380", "重载模式", "Reload mode"),
+            SRApi.Tid("083c994f01", "重载关卡模式：\n保留方块和分数（允许补分）= 重载后当前方块保留；房主按原类型分块给全员广播补分，下一回合结算时全员得分板显示与重载前一致的分数和类型。\n仅保留方块（跳过补分）= 重载后当前方块保留，分数重置。", "Reload level mode:\nKeep blocks & score (allow fill) = blocks kept; the host fills scores so everyone sees the same score/types next tally.\nKeep blocks only (skip fill) = blocks kept, score resets.")),
             rlm, SRApi.Ctl.Sc(140), SRApi.Ctl.Sc(52));
         if (rlm != null) SRApi.Ctl.RenderControl(rlm);
         GUILayout.FlexibleSpace();

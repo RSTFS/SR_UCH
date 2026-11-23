@@ -32,9 +32,9 @@ namespace SR_UCH.Tweaks {
         private static float _nextTryAt;
 
         private static string ModeLabel(string v) {
-            if (v == "random") return SRApi.T("随机空闲", "Random free");
-            if (v == "smart") return SRApi.T("智能选择", "Smart pick");
-            return SRApi.T("指定角色", "Specific animal");
+            if (v == "random") return SRApi.Tid("c866dbd8df", "随机空闲", "Random free");
+            if (v == "smart") return SRApi.Tid("01b0e8c3cd", "智能选择", "Smart pick");
+            return SRApi.Tid("6540d9fc08", "指定角色", "Specific animal");
         }
 
         // 可用动物：优先读存档的解锁表，读不到时退回枚举全集。
@@ -58,7 +58,7 @@ namespace SR_UCH.Tweaks {
                 catch (Exception __u) { SRApi.Guard.Log("角色/解锁过滤", __u); ok = true; }
                 Animals.Add(a.ToString());
                 // 全量列出（解锁表可能缺项/DLC 不同步）；未解锁的加后缀。
-                AnimalLabels.Add(AnimalZh(a.ToString()) + (ok ? "" : SRApi.T("（未解锁）", " (locked)")));
+                AnimalLabels.Add(AnimalZh(a.ToString()) + (ok ? "" : SRApi.Tid("6ae9579ed1", "（未解锁）", " (locked)")));
             }
             if (Animals.Count == 0) { Animals.Add("CHICKEN"); AnimalLabels.Add(AnimalZh("CHICKEN")); }
         }
@@ -126,16 +126,16 @@ namespace SR_UCH.Tweaks {
             SRApi.RegisterPage(Sec, "auto", "自动选择", "Auto pick", 10, RenderPick);
             SRApi.RegisterPage(Sec, "outfit", "自动时装", "Auto outfit", 20, RenderOutfit);
 
-            SRApi.LocKey(Sec, "Enabled", "自动选择角色", null);
-            SRApi.LocDesc(Sec, "Enabled", "自动选择角色\n进入树屋/房间时自动挑一次动物\n已经有角色就不动，整局只处理一次", "Auto pick animal\npicks once when you enter the treehouse or a room\ndoes nothing while you already have an animal");
-            SRApi.LocKey(Sec, "Mode", "选择方式", null);
-            SRApi.LocDesc(Sec, "Mode", "选择方式\n指定 = 每次挑同一只\n随机 = 在已解锁的空闲动物里随机；智能 = 优先你用得最多的", "Pick mode\nSpecific = always the same animal\nRandom = any unlocked free one; Smart = your most used");
-            SRApi.LocKey(Sec, "Animal", "指定动物", null);
-            SRApi.LocDesc(Sec, "Animal", "指定动物\n「指定角色」方式下要挑的动物\n只列出存档里已解锁的动物", "Target animal\nthe animal used by the Specific mode\nonly unlocked animals are listed");
-            SRApi.LocKey(Sec, "Outfit Enabled", "自动时装", null);
-            SRApi.LocDesc(Sec, "Outfit Enabled", "自动时装\n每个角色第一次随机一套并记住，之后固定\n只使用已解锁的外观", "Auto outfit\neach animal rolls one look the first time and keeps it\nonly unlocked outfits are used");
-            SRApi.LocKey(Sec, "Outfit Data", "外观记录", null);
-            SRApi.LocDesc(Sec, "Outfit Data", "外观记录\n内部状态：每个角色记住的那一套外观\n由本功能自动写入，勿手动修改", "Outfit records\ninternal state: the look remembered per animal\nwritten automatically; do not edit");
+            TweakCfg.Entry(Sec, "Enabled", "自动选择角色", null,
+                "自动选择角色\n进入树屋/房间时自动挑一次动物\n已经有角色就不动，整局只处理一次", "Auto pick animal\npicks once when you enter the treehouse or a room\ndoes nothing while you already have an animal");
+            TweakCfg.Entry(Sec, "Mode", "选择方式", null,
+                "选择方式\n指定 = 每次挑同一只\n随机 = 在已解锁的空闲动物里随机；智能 = 优先你用得最多的", "Pick mode\nSpecific = always the same animal\nRandom = any unlocked free one; Smart = your most used");
+            TweakCfg.Entry(Sec, "Animal", "指定动物", null,
+                "指定动物\n「指定角色」方式下要挑的动物\n只列出存档里已解锁的动物", "Target animal\nthe animal used by the Specific mode\nonly unlocked animals are listed");
+            TweakCfg.Entry(Sec, "Outfit Enabled", "自动时装", null,
+                "自动时装\n每个角色第一次随机一套并记住，之后固定\n只使用已解锁的外观", "Auto outfit\neach animal rolls one look the first time and keeps it\nonly unlocked outfits are used");
+            TweakCfg.Entry(Sec, "Outfit Data", "外观记录", null,
+                "外观记录\n内部状态：每个角色记住的那一套外观\n由本功能自动写入，勿手动修改", "Outfit records\ninternal state: the look remembered per animal\nwritten automatically; do not edit");
         }
 
         public void Initialize(IFeatureHost plugin) {
@@ -154,14 +154,13 @@ namespace SR_UCH.Tweaks {
 
         private static void RenderPick() {
             try {
-                SRApi.Ctl.SectionTitle(SRApi.T("自动选择", "Auto pick"));
+                SRApi.Ctl.SectionTitle(SRApi.Tid("321df99302", "自动选择", "Auto pick"));
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) { return e.Definition.Key == "Enabled"; });
                 EnsureAnimalList();
                 // 核心 RowCombo 用配置条目当稳定 ID 管理展开态，选中即写值并收起；须传原始枚举值（传本地化名会永远显示第一项）。
                 if (_mode != null)
-                    SRApi.Ctl.RowCombo(SRApi.T("选择方式", "Pick mode"),
-                        SRApi.T("选择方式\n指定 = 每次挑同一只\n随机 = 已解锁空闲里随机；智能 = 优先你用得最多的",
-                                "Pick mode\nSpecific = always the same animal\nRandom = any unlocked free one; Smart = your most used"),
+                    SRApi.Ctl.RowCombo(SRApi.Tid("0d1af428f8", "选择方式", "Pick mode"),
+                        SRApi.Tid("900a7483a4", "选择方式\n指定 = 每次挑同一只\n随机 = 已解锁空闲里随机；智能 = 优先你用得最多的", "Pick mode\nSpecific = always the same animal\nRandom = any unlocked free one; Smart = your most used"),
                         _mode, ModeVals, new string[] { ModeLabel("smart"), ModeLabel("target"), ModeLabel("random") }, 160f, 96f);
                 // 结构固定：非「指定」时置灰，不变更控件数量（否则 IMGUI 报 LayoutGroup 不匹配）。
                 bool target = (_mode == null || string.IsNullOrEmpty(_mode.Value) || _mode.Value == "target");
@@ -170,7 +169,7 @@ namespace SR_UCH.Tweaks {
                     GUI.enabled = oldEnabled && target;
                 EnsureAnimalList();
                 // 全部角色一次列出（不用下拉、不滚动），按宽度换行；本房间没有的照样列出，挑选时跳过。
-                if (_animal != null) RowAnimalGrid(SRApi.T("指定动物", "Target animal"), _animal);
+                if (_animal != null) RowAnimalGrid(SRApi.Tid("5b461ada3b", "指定动物", "Target animal"), _animal);
                 } finally { GUI.enabled = oldEnabled; }
             } catch (Exception __ex) { SRApi.Guard.Log("角色/渲染自动选择页", __ex); }
         }
@@ -187,8 +186,7 @@ namespace SR_UCH.Tweaks {
                 try {
                     float lw = SRApi.Ctl.LabelColumnWidth(label);
                     GUILayout.Label(SRApi.Ctl.Content(label,
-                        SRApi.T("自动选择的目标角色\n直接列出全部角色，按宽度换行\n只有「选择方式 = 指定角色」时生效",
-                                "the animal auto-pick targets\nlists every animal in a wrapped grid\nonly used when pick mode is Specific")),
+                        SRApi.Tid("f20e4fdc16", "自动选择的目标角色\n直接列出全部角色，按宽度换行\n只有「选择方式 = 指定角色」时生效", "the animal auto-pick targets\nlists every animal in a wrapped grid\nonly used when pick mode is Specific")),
                         SRApi.Ctl.Label, GUILayout.Width(lw), GUILayout.Height(SRApi.Ctl.Sc(26)));
                     GUILayout.Space(SRApi.Ctl.Sc(6));
                     float bw = SRApi.Ctl.Sc(56f);
@@ -217,21 +215,21 @@ namespace SR_UCH.Tweaks {
 
         private static void RenderOutfit() {
             try {
-                SRApi.Ctl.SectionTitle(SRApi.T("自动时装", "Auto outfit"));
+                SRApi.Ctl.SectionTitle(SRApi.Tid("eea75dc871", "自动时装", "Auto outfit"));
                 SRApi.RenderSectionEntries(Sec, delegate (ConfigEntryBase e) { return e.Definition.Key == "Outfit Enabled"; });
                 GUILayout.Space(SRApi.Ctl.Sc(4f));
                 GUILayout.BeginHorizontal();
                 try {
-                    if (SRApi.Ctl.Button(SRApi.T("随机整套", "Randomize all"),
-                            SRApi.T("只重抽当前角色的一套外观并覆盖它的记录\n其它角色不受影响", "rerolls only the current animal's look and overwrites its record\nother animals are untouched"), 120f, 26f))
+                    if (SRApi.Ctl.Button(SRApi.Tid("0855d07070", "随机整套", "Randomize all"),
+                            SRApi.Tid("5abf7bb037", "只重抽当前角色的一套外观并覆盖它的记录\n其它角色不受影响", "rerolls only the current animal's look and overwrites its record\nother animals are untouched"), 120f, 26f))
                         RandomizeCurrent();
                     GUILayout.Space(SRApi.Ctl.Sc(8));
-                    if (SRApi.Ctl.Button(SRApi.T("清空时装", "Clear outfit"),
-                            SRApi.T("关闭当前角色的全部外观并标记为「不要自动穿」\n想恢复随机请点「随机整套」", "turns off every outfit on the current animal and marks it as do-not-auto-dress\nuse Randomize all to roll again"), 110f, 26f))
+                    if (SRApi.Ctl.Button(SRApi.Tid("bb74aca62b", "清空时装", "Clear outfit"),
+                            SRApi.Tid("ee54434811", "关闭当前角色的全部外观并标记为「不要自动穿」\n想恢复随机请点「随机整套」", "turns off every outfit on the current animal and marks it as do-not-auto-dress\nuse Randomize all to roll again"), 110f, 26f))
                         ClearCurrentOutfit();
                     GUILayout.Space(SRApi.Ctl.Sc(8));
-                    if (SRApi.Ctl.HotkeyButton("character.dress", SRApi.T("原地换装", "Dress here"),
-                            SRApi.T("在角色当前位置打开游戏原生的换装界面\n需要先选好角色；关闭用 Accept / Esc\n右键本按钮可绑定快捷键", "opens the game's own dresser at your character\npick an animal first; close with Accept or Esc\nright-click this button to bind a hotkey"),
+                    if (SRApi.Ctl.HotkeyButton("character.dress", SRApi.Tid("90a40c4959", "原地换装", "Dress here"),
+                            SRApi.Tid("ead1863d32", "在角色当前位置打开游戏原生的换装界面\n需要先选好角色；关闭用 Accept / Esc\n右键本按钮可绑定快捷键", "opens the game's own dresser at your character\npick an animal first; close with Accept or Esc\nright-click this button to bind a hotkey"),
                             OpenNativeDress, SRApi.Ctl.Sc(110), SRApi.Ctl.Sc(26)))
                         OpenNativeDress();
                     GUILayout.FlexibleSpace();
@@ -609,9 +607,9 @@ namespace SR_UCH.Tweaks {
             try {
                 LobbyManager lm = LobbyManager.instance;
                 LobbyPlayer lp = lm != null ? LocalLobbyPlayer(lm) : null;
-                string cur = lp != null && lp.CharacterInstance != null ? lp.CharacterInstance.CharacterSprite.ToString() : SRApi.T("未选角色", "no animal");
-                string on = (_enabled != null && _enabled.Value) ? SRApi.T("自动选择开", "auto pick on") : SRApi.T("自动选择关", "auto pick off");
-                return SRApi.T("当前：", "now: ") + cur + "   ·   " + on;
+                string cur = lp != null && lp.CharacterInstance != null ? lp.CharacterInstance.CharacterSprite.ToString() : SRApi.Tid("ded0b12c35", "未选角色", "no animal");
+                string on = (_enabled != null && _enabled.Value) ? SRApi.Tid("7e0e7214b6", "自动选择开", "auto pick on") : SRApi.Tid("03ae125568", "自动选择关", "auto pick off");
+                return SRApi.Tid("f01472fc36", "当前：", "now: ") + cur + "   ·   " + on;
             } catch (Exception __ex) { SRApi.Guard.Log("角色/状态行", __ex); return ""; }
         }
     }

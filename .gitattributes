@@ -1,2 +1,14 @@
 # Keep each file's own line-ending style and BOM presence: disable git's EOL/BOM conversion.
 * -text
+
+# 生成物：review 自动折叠，手改会被下次生成覆盖
+build/specs/generated/** linguist-generated=true
+SR_UCH/Contracts/Generated/** linguist-generated=true
+**/*.g.cs linguist-generated=true
+"uch.py verify" linguist-generated=true
+docs/INDEX.md linguist-generated=true
+docs/INDEX.md linguist-generated=true
+docs/INDEX.md linguist-generated=true
+docs/INDEX.md linguist-generated=true
+docs/STATUS.md linguist-generated=true
+docs/INDEX.md linguist-generated=true

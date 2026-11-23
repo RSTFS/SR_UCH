@@ -16,19 +16,19 @@ public partial class Experiments : ITweak
 
                 // 跨平台联机：反射改游戏自己的 CrossPlatformToggle，不绑版本。
                 GUILayout.Space(SRApi.Ctl.Sc(6));
-                SRApi.Ctl.SectionTitle(SRApi.T("跨平台联机", "Cross-play"),
+                SRApi.Ctl.SectionTitle(SRApi.Tid("4b9996a2dd", "跨平台联机", "Cross-play"),
                     SRApi.T("开：匹配池包含其它平台（走 Unity 大厅/中继，延迟通常更高）；关：只和同平台玩家联机. "
                         + "新建存档的默认值是关.",
                         "ON: the matchmaking pool includes other platforms (Unity lobby + relay, usually higher ping); "
                         + "OFF: same platform only. New saves default to OFF."));
                 GUILayout.BeginHorizontal();
                 if (!CrossPlay.Available) {
-                    GUILayout.Label(SRApi.T("当前游戏版本找不到该设置（开关不可用）", "Setting not found in this game build"), SRApi.Ctl.Label);
+                    GUILayout.Label(SRApi.Tid("59563aca97", "当前游戏版本找不到该设置（开关不可用）", "Setting not found in this game build"), SRApi.Ctl.Label);
                 } else {
                     bool on = CrossPlay.Read();
-                    GUILayout.Label(SRApi.T("当前：", "Now: ") + (on ? SRApi.T("开", "ON") : SRApi.T("关", "OFF")),
+                    GUILayout.Label(SRApi.Tid("654c45fce8", "当前：", "Now: ") + (on ? SRApi.Tid("3afb327a3e", "开", "ON") : SRApi.Tid("525ff1a6ae", "关", "OFF")),
                         SRApi.Ctl.Label, GUILayout.Width(SRApi.Ctl.Sc(96)));
-                    if (GUILayout.Button(on ? SRApi.T("关闭", "Turn off") : SRApi.T("开启", "Turn on"),
+                    if (GUILayout.Button(on ? SRApi.Tid("ad5fbf309a", "关闭", "Turn off") : SRApi.Tid("106fafbb87", "开启", "Turn on"),
                             SRApi.Ctl.Btn, GUILayout.Width(SRApi.Ctl.Sc(84)), GUILayout.Height(SRApi.Ctl.Sc(26)))) {
                         CrossPlay.Write(!on);
                         SRApi.Notify(CrossPlay.Note);
@@ -59,15 +59,15 @@ public partial class Experiments : ITweak
         private static ConfigEntry<float> _followSpeed;
     
         private static void SelfReg2() {
-            SRApi.LocKey("自由模式", "Free Camera", "自由相机", null);
-            SRApi.LocDesc("自由模式", "Free Camera", "自由相机\n开启后可用滚轮缩放视野\n菜单与暂停界面不生效", "Free camera\nwheel zoom for the field of view\nnot applied in menus or the pause screen");
-            SRApi.LocKey("自由模式", "Free Camera FOV", "视野大小", null);
-            SRApi.LocDesc("自由模式", "Free Camera FOV", "自由相机视野\n越小越近，越大越远\n范围 1-64；自由相机开启时滚轮也会改", "Free camera FOV\nsmaller is closer, larger is farther\n1-64; the wheel also changes it while on");
+            TweakCfg.Entry("自由模式", "Free Camera", "自由相机", null,
+                "自由相机\n开启后可用滚轮缩放视野\n菜单与暂停界面不生效", "Free camera\nwheel zoom for the field of view\nnot applied in menus or the pause screen");
+            TweakCfg.Entry("自由模式", "Free Camera FOV", "视野大小", null,
+                "自由相机视野\n越小越近，越大越远\n范围 1-64；自由相机开启时滚轮也会改", "Free camera FOV\nsmaller is closer, larger is farther\n1-64; the wheel also changes it while on");
             // 必须登记 LocKey/LocDesc，否则界面回退显示英文键名。
-            SRApi.LocKey("自由模式", "Free Camera Speed", "相机移动速度", null);
-            SRApi.LocDesc("自由模式", "Free Camera Speed", "相机跟随速度\n相机跟随角色的快慢\n范围 0.5-5，步长 0.5", "Camera follow speed\nhow fast the camera follows the character\n0.5-5 in steps of 0.5");
-            SRApi.LocKey("自由模式", "Free Camera Key", "视野快捷键", null);
-            SRApi.LocDesc("自由模式", "Free Camera Key", "自由相机按键\n按下开关自由相机\n可改绑，支持组合键", "Free camera key\ntoggles the free camera\nrebindable, combos supported");
+            TweakCfg.Entry("自由模式", "Free Camera Speed", "相机移动速度", null,
+                "相机跟随速度\n相机跟随角色的快慢\n范围 0.5-5，步长 0.5", "Camera follow speed\nhow fast the camera follows the character\n0.5-5 in steps of 0.5");
+            TweakCfg.Entry("自由模式", "Free Camera Key", "视野快捷键", null,
+                "自由相机按键\n按下开关自由相机\n可改绑，支持组合键", "Free camera key\ntoggles the free camera\nrebindable, combos supported");
             SRApi.RowSliders.Add(FovSlider);                       // FOV 用滑块渲染
             SRApi.RowSliders.Add(SpeedSlider);                     // 相机移动速度用滑块渲染
             SRApi.RowCompanions.Add(CameraCompanion);              // 自由相机行右侧并排快捷键框
@@ -114,9 +114,14 @@ public partial class Experiments : ITweak
                 SRApi.RegisterTick("自由相机-移动速度", ApplyFollowSpeed);
             // 相机缓存只在换场景时失效：缓存过期就全场景 FindObjectsOfType，开销太大。
             SRApi.RegisterSceneHook(delegate { _followZc = null; });   // 自由相机/换场景清缓存
-                _on.SettingChanged += OnLockChanged;
+                System.EventHandler __h__on_1 = OnLockChanged;
+                _on.SettingChanged += __h__on_1;
+                Sub.Revoke(() => _on.SettingChanged -= __h__on_1);
                 // 不挂 SettingChanged：ApplyFollowSpeed 已作为 30 帧节流的 Tick，下一拍自然生效。
-                _followSpeed.SettingChanged += (s, e) => { _followAt = -9999; _followLastMul = -1f; };
+                System.EventHandler __hFollow = (s, e) => { _followAt = -9999; _followLastMul = -1f; };
+                System.EventHandler __h__followSpeed_2 = __hFollow;
+                _followSpeed.SettingChanged += __h__followSpeed_2;
+                Sub.Revoke(() => _followSpeed.SettingChanged -= __h__followSpeed_2);
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 初始化", __ex); }
         }
     
@@ -165,8 +170,8 @@ public partial class Experiments : ITweak
                 if (_on != null && _on.Value) { float v = CurrentFov(); _fov.Value = Mathf.Clamp(v, MinFov, MaxFov); _savedFov = v; Camera g = GameCamera(); if (g != null) { try { if (g.orthographic) g.orthographicSize = _fov.Value; else g.fieldOfView = _fov.Value; } catch { /* 静默：非关键路径，失败可直接忽略 */ } } }
                 // 通知须说明实际效果：模式受限时“开了也不生效”，但不弹「仅XX模式」提示。
                 if (_on != null && _on.Value && !FreeplayMode()) return;
-                SRApi.Notify((_on != null && _on.Value) ? SRApi.T("自由相机：开", "Free camera: ON")
-                                                         : SRApi.T("自由相机：关（已还原）", "Free camera: OFF (restored)"));
+                SRApi.Notify((_on != null && _on.Value) ? SRApi.Tid("a1adadb005", "自由相机：开", "Free camera: ON")
+                                                         : SRApi.Tid("f7b8f8fe53", "自由相机：关（已还原）", "Free camera: OFF (restored)"));
             } catch (Exception __ex) { SRApi.Guard.Log("自由相机 开关变化", __ex); }
         }
         // 自由模式判定：自由相机只在该模式生效（其它模式相机由玩法控制）。
@@ -289,12 +294,12 @@ public partial class Experiments : ITweak
                             Type ty = scan[t];
                             if (ty == null) continue;
                             try {
-                                FieldInfo f = ty.GetField(MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+                                FieldInfo f = RefCache.FieldOf(ty, MemberName);
                                 if (f != null && f.FieldType == typeof(bool)) {
                                     object owner = f.IsStatic ? null : FindOwner(ty);
                                     if (f.IsStatic || owner != null) { _member = f; _owner = owner; break; }
                                 }
-                                PropertyInfo pr = ty.GetProperty(MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+                                PropertyInfo pr = RefCache.PropertyOf(ty, MemberName);
                                 if (pr != null && pr.PropertyType == typeof(bool) && pr.CanRead) {
                                     MethodInfo g = pr.GetGetMethod(true);
                                     bool st = g != null && g.IsStatic;
@@ -313,9 +318,7 @@ public partial class Experiments : ITweak
         private static object FindOwner(Type ty) {
             // 先试 GetInstance()（UCH 的 GameSettings 就是用这个而不是 instance 字段）。
             try {
-                System.Reflection.MethodInfo gi = ty.GetMethod("GetInstance",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static,
-                    null, System.Type.EmptyTypes, null);
+                System.Reflection.MethodInfo gi = RefCache.MethodOf(ty, "GetInstance", System.Type.EmptyTypes);
                 if (gi != null) {
                     object v = gi.Invoke(null, null);
                     if (v != null) return v;
@@ -324,12 +327,12 @@ public partial class Experiments : ITweak
             string[] names = new string[] { "instance", "Instance", "Current", "current", "singleton", "Singleton" };
             for (int i = 0; i < names.Length; i++) {
                 try {
-                    FieldInfo f = ty.GetField(names[i], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                    FieldInfo f = RefCache.FieldOf(ty, names[i]);
                     if (f != null && typeof(object).IsAssignableFrom(f.FieldType)) {
                         object v = f.GetValue(null);
                         if (v != null) return v;
                     }
-                    PropertyInfo pr = ty.GetProperty(names[i], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                    PropertyInfo pr = RefCache.PropertyOf(ty, names[i]);
                     if (pr != null && pr.CanRead) {
                         object v = pr.GetValue(null, null);
                         if (v != null) return v;
@@ -382,7 +385,7 @@ public partial class Experiments : ITweak
                 bool isStatic;
                 object resolved = CurrentOwner(out isStatic);
                 if (!isStatic && resolved == null) {
-                    Note = SRApi.T("游戏还没初始化完，稍后再试", "The game is not initialised yet; try again");
+                    Note = SRApi.Tid("76ea470c1f", "游戏还没初始化完，稍后再试", "The game is not initialised yet; try again");
                     return false;
                 }
                 object target = isStatic ? null : resolved;
@@ -390,14 +393,14 @@ public partial class Experiments : ITweak
                 if (fl != null) fl.SetValue(fl.IsStatic ? null : target, on);
                 else {
                     PropertyInfo pr = (PropertyInfo)_member;
-                    if (!pr.CanWrite) { Note = SRApi.T("该设置不可写（只读属性）", "read-only property"); return false; }
+                    if (!pr.CanWrite) { Note = SRApi.Tid("0ccbdd672d", "该设置不可写（只读属性）", "read-only property"); return false; }
                     pr.SetValue(isStatic ? null : target, on, null);
                 }
                 // 只写 GameSettings 仅本次会话生效；还须同步写存档字段 CrossPlatformToggle，再让游戏保存。
                 bool savedFile = TryWriteSaveFile(on);
                 bool persisted = TryPersist(target) || savedFile;
-                Note = (on ? SRApi.T("已开启跨平台联机", "Cross-play ON") : SRApi.T("已关闭跨平台联机", "Cross-play OFF"))
-                    + (persisted ? "" : SRApi.T("（未能确认写入存档，重启游戏可能回退）", " (could not confirm it was saved; may revert on restart)"));
+                Note = (on ? SRApi.Tid("2b88524c1f", "已开启跨平台联机", "Cross-play ON") : SRApi.Tid("a87d89d890", "已关闭跨平台联机", "Cross-play OFF"))
+                    + (persisted ? "" : SRApi.Tid("c08c1e92ef", "（未能确认写入存档，重启游戏可能回退）", " (could not confirm it was saved; may revert on restart)"));
                 SRApi.LogInfo("[跨平台] " + Note);
                 return true;
             } catch (Exception __ex) { SRApi.Guard.Log("跨平台联机/写值", __ex); return false; }
@@ -416,23 +419,21 @@ public partial class Experiments : ITweak
                 if (st == null) return false;
                 object tracker = null;
                 try {
-                    MethodInfo gi = st.GetMethod("GetInstance",
-                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, null, Type.EmptyTypes, null);
+                    MethodInfo gi = RefCache.MethodOf(st, "GetInstance", Type.EmptyTypes);
                     if (gi != null) tracker = gi.Invoke(null, null);
                 } catch (Exception __gi) { SRApi.Guard.Log("跨平台联机/StatTracker 实例", __gi); }
                 if (tracker == null) {
                     try {
-                        PropertyInfo pi = st.GetProperty("Instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                        PropertyInfo pi = RefCache.PropertyOf(st, "Instance");
                         if (pi != null) tracker = pi.GetValue(null, null);
                     } catch (Exception __pi) { SRApi.Guard.Log("跨平台联机/StatTracker.Instance", __pi); }
                 }
                 if (tracker == null) return false;
-                MethodInfo get = st.GetMethod("GetSaveFileDataForMainUser",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, Type.EmptyTypes, null);
+                MethodInfo get = RefCache.MethodOf(st, "GetSaveFileDataForMainUser", Type.EmptyTypes);
                 if (get == null) return false;
                 object data = get.Invoke(tracker, null);
                 if (data == null) return false;
-                FieldInfo f = data.GetType().GetField("CrossPlatformToggle", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                FieldInfo f = RefCache.FieldOf(data.GetType(), "CrossPlatformToggle");
                 if (f == null || f.FieldType != typeof(bool)) return false;
                 f.SetValue(data, on);
                 try { TryPersist(tracker); } catch (Exception __p) { SRApi.Guard.Log("跨平台联机/保存 StatTracker", __p); }
@@ -469,4 +470,38 @@ public partial class Experiments : ITweak
             return false;
         }
     }
+}
+
+// 实验栏目：注册侧栏栏目与三页（p1 边界 / p2 其它 / p3 场景，各自 partial 文件）。
+
+
+namespace SR_UCH.Tweaks {
+public partial class Experiments
+    {
+        private static void SelfReg() {
+            SRApi.LocSec("Experiments", "实验", null);
+            SRApi.Nav("Experiments", 999); // 栏位顺序值（越小越靠前）
+            // 页签顺序由 Order 决定：p3 场景(10) / p1 边界(20) / p2 其它(30)；id 与文件对应固定。
+            SRApi.RegisterPage("Experiments", "p1", "关卡边界", "Bounds", 20, Render);
+            SRApi.RegisterPage("Experiments", "p2", "其它", "Misc", 30, RenderPage2);
+            SRApi.RegisterPage("Experiments", "p3", "场景", "Scene", 10, RenderPage3);
+        }
+
+        // 状态行只读可复制；高度须用 Ctl.TextHeight(text, w)，固定高度会裁掉下沉字形。
+        private static void DrawStatus(string text) {
+            try {
+                if (string.IsNullOrEmpty(text)) return;
+                float w = Mathf.Max(SRApi.Ctl.Sc(160), SRApi.Ctl.WinWidth - SRApi.Ctl.SidebarWidth() - SRApi.Ctl.Sc(40));
+                float h = SRApi.Ctl.TextHeight(text, w);
+                GUILayout.Label(text, SRApi.Ctl.LabelWrap, GUILayout.Width(w), GUILayout.Height(h));
+            } catch (Exception __ex) { SRApi.Guard.Log("状态行", __ex); }
+        }
+
+        public void Initialize(IFeatureHost plugin)
+        {
+            SelfReg();
+            InitCleanup(plugin);
+            try { CrossPlay.Init(); } catch (Exception __cp) { SRApi.Guard.Log("跨平台联机 初始化", __cp); }
+        }
+}
 }
