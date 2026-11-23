@@ -165,6 +165,21 @@ if ($Features) {
     [System.IO.File]::WriteAllLines($work, $kept.ToArray(), (New-Object System.Text.UTF8Encoding($true)))
 }
 
+# 增量判断：输出 DLL 缺失或任一源文件比它新时才重编（照早期版 Test-NeedRebuild）。
+function Test-NeedRebuild([string]$rsp, [string]$outDll) {
+    if (-not (Test-Path $outDll)) { return $true }
+    $dllTime = (Get-Item $outDll).LastWriteTime
+    try {
+        foreach ($ln in [System.IO.File]::ReadAllLines($rsp)) {
+            $s = $ln.Trim()
+            if (-not $s.EndsWith('.cs') -or $s.StartsWith('/')) { continue }
+            $p2 = Join-Path $Root ($s -replace '"', '')
+            if ((Test-Path -LiteralPath $p2) -and ((Get-Item -LiteralPath $p2).LastWriteTime -gt $dllTime)) { return $true }
+        }
+    } catch { return $true }
+    return $false
+}
+
 function Invoke-Build([string]$rsp, [string]$name) {
     $missing = @()
     if (Test-Path $rsp) {
@@ -177,6 +192,14 @@ function Invoke-Build([string]$rsp, [string]$name) {
         }
     } else { Write-Host "  跳过 $name（缺 $rsp）"; return }
     if ($missing.Count) { Write-Host ("  跳过 {0}：源码缺失 {1}" -f $name, ($missing -join ', ')); return }
+    $outName = $name
+    $outPath = Join-Path $outDir $outName
+    $__need = Test-NeedRebuild $rsp $outPath
+    if (-not $__need) {
+        Write-Host ("    {0} 已是最新，跳过" -f $outName)
+        $summary.Add("SR  build   $outName")
+        return
+    }
     # 捕获编译器输出：成功只报一行，失败才展开（否则 csc 的噪音淹没真正的错误）。
     if ($csc.EndsWith('.dll')) { $out = & dotnet $csc "@$rsp" 2>&1 }
     else { $out = & $csc "@$rsp" 2>&1 }
@@ -287,3 +310,5 @@ if ($ExportAudit) {
 }
 
 } finally { Pop-Location }
+# 显式返回 0：否则 $LASTEXITCODE 会保留上一次外部命令的残留值，被编排层误判为失败。
+exit 0
