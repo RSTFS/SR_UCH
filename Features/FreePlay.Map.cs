@@ -192,7 +192,8 @@ namespace SR_UCH {
         // 冻结角色：走核心的暂停提供者，由游戏自己停住本地角色（不手改刚体，避免与物理对账打架）。
         private static bool ShouldPause() {
             try {
-                return _open && _freezeChar != null && _freezeChar.Value;
+                // 相机失效时不暂停：避免 Tick 还没跑到就先把角色冻住。
+                return _open && _cam != null && _freezeChar != null && _freezeChar.Value;
             } catch (Exception) { return false; }
         }
 
@@ -201,6 +202,10 @@ namespace SR_UCH {
         private static void Tick() {
             try {
                 if (!_open) return;
+                // 相机被销毁（换场景/重载）时必须自动收图：否则 _open 仍为 true，
+                // ShouldPause 会继续冻结角色，而 Draw 因为取不到相机什么都不画，
+                // 表现为"画面正常但人动不了、地图也看不见"。
+                if (_cam == null) { Close(); return; }
                 TickTeleportKey();
                 if (!SRApi.FeatureAllowed(typeof(FreePlayPage))) { Close(); return; }
                 EnsureBounds();

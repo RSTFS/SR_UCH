@@ -207,7 +207,6 @@ namespace SR_UCH.Tweaks {
             if (_listener == null) {
                 _listener = new ChaosListener(this);
                 GameEventManager.ChangeListener<GameEvent.StartPhaseEvent>(_listener, true);
-                GameEventManager.ChangeListener<GameEvent.ScoreboardEvent>(_listener, true);
                 GameEventManager.ChangeListener<GameEvent.GameEndEvent>(_listener, true);
                 GameEventManager.ChangeListener<GameEvent.NewMatchEvent>(_listener, true);
                 GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(_listener, true);
@@ -219,7 +218,6 @@ namespace SR_UCH.Tweaks {
         public void Shutdown() {
             if (_listener != null) {
                 GameEventManager.ChangeListener<GameEvent.StartPhaseEvent>(_listener, false);
-                GameEventManager.ChangeListener<GameEvent.ScoreboardEvent>(_listener, false);
                 GameEventManager.ChangeListener<GameEvent.GameEndEvent>(_listener, false);
                 GameEventManager.ChangeListener<GameEvent.NewMatchEvent>(_listener, false);
                 GameEventManager.ChangeListener<GameEvent.NetworkMessageReceivedEvent>(_listener, false);
