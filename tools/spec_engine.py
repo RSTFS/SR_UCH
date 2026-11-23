@@ -448,13 +448,11 @@ def derive():
         'schema': 1,
         'items': [
             {'id': 'P1', 'name': '推包进 GitHub main', 'owner': 'user',
-             'why': '十几轮成果只在交付侧；main 上次对账仍停在 11-15'},
-            {'id': 'P2', 'name': '全源码 dotnet build -warnaserror', 'owner': 'user',
-             'why': '沙盒无 dotnet / 游戏 DLL，唯一硬缺口；需 UCH_MANAGED_DIR'},
+             'why': '本地领先 origin 13+ 提交，从未推送；成果只在交付侧'},
             {'id': 'P3', 'name': '进游戏取 [SR.SelfTest] + 实机 A/B', 'owner': 'user',
              'why': '写 health.actual.json 与 ui-ab-evidence.json，解锁双轨 cutover'},
         ],
-        'note': '三件做完，「利于维护」才从静态承诺变成事实；uch.py ship 每次打印同一份。',
+        'note': 'P2（全源码 dotnet build -warnaserror）已在本机验证通过（0 警告 0 错误），已移出清单。',
     })
     gen('smoke.generated.json', {
         'schema': 1,
