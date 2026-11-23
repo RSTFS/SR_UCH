@@ -70,7 +70,7 @@ if (-not $GameDir) {
     Write-Host '  例：$env:UCH_DIR = "D:\...\Ultimate Chicken Horse"'
     exit 1
 }
-Write-Host ("游戏目录: " + $GameDir)
+if (-not $Quiet) { Write-Host ("[SR] game  " + $GameDir) }
 
 # rsp 里是相对路径（/out:bin\Release\...、源码清单），必须以仓库根为当前目录执行。
 # 兼容入口从 _tools 转发过来时 cwd 不是仓库根，不切会写错位置并报编译失败。
@@ -104,13 +104,13 @@ $useDotnetBuild = $false
 if (-not $csc) {
     # 没有仓库内置工具集、SDK 里也没找到 Roslyn：回退 MSBuild（编译输入已入库，结果等价）。
     $dn = Get-Command dotnet -ErrorAction SilentlyContinue
-    if ($dn) { $useDotnetBuild = $true; Write-Host '编译器: dotnet build（未找到独立 csc，回退 MSBuild，结果等价）' }
+    if ($dn) { $useDotnetBuild = $true; if (-not $Quiet) { Write-Host '[SR] compiler  msbuild' } }
     else {
         Write-Host '找不到任何 C# 编译器：需要 .NET SDK，或 _tools\roslyn_toolset\csc.dll / _tools\net472\csc.exe'
         exit 1
     }
 } else {
-    Write-Host ("编译器: csc  " + $csc)
+    if (-not $Quiet) { Write-Host '[SR] compiler  csc' }
 }
 
 $cache = Join-Path $PSScriptRoot '.cache'
@@ -177,12 +177,16 @@ function Invoke-Build([string]$rsp, [string]$name) {
         }
     } else { Write-Host "  跳过 $name（缺 $rsp）"; return }
     if ($missing.Count) { Write-Host ("  跳过 {0}：源码缺失 {1}" -f $name, ($missing -join ', ')); return }
-    Write-Host "== 构建 $name =="
-    if ($csc.EndsWith('.dll')) { & dotnet $csc "@$rsp" 2>&1 | Out-Null }
-    else { & $csc "@$rsp" 2>&1 | Out-Null }
-    if ($LASTEXITCODE -ne 0) { Write-Host "  [FAIL] $name"; exit 1 }
-    Write-Host "  [ OK ] $name"
-    $summary.Add("SR  build   $name")
+    # 捕获编译器输出：成功只报一行，失败才展开（否则 csc 的噪音淹没真正的错误）。
+    if ($csc.EndsWith('.dll')) { $out = & dotnet $csc "@$rsp" 2>&1 }
+    else { $out = & $csc "@$rsp" 2>&1 }
+    if ($LASTEXITCODE -ne 0) {
+        $out | ForEach-Object { Write-Host $_ }
+        Write-Host "[FAIL] $name"
+        exit 1
+    }
+    if (-not $Quiet) { Write-Host "[SR] build  OK  $name" }
+    $summary.Add("SR  build  $name")
 }
 
 # ---- -Check：守卫只有一份实现，交给统一入口 ----
@@ -200,16 +204,20 @@ if ($Check) {
 
 if ($useDotnetBuild) {
     if ($Features) { Write-Host '注意：-Features 裁剪只作用于 rsp 链；本次 dotnet 回退为全量编译' }
-    & dotnet build (Join-Path $Root 'SR_UCH.csproj') -c Release --nologo -warnaserror
-    if ($LASTEXITCODE -ne 0) { Write-Host '  [FAIL] SR_UCH.dll (dotnet)'; exit 1 }
+    $out = & dotnet build (Join-Path $Root 'SR_UCH.csproj') -c Release --nologo -warnaserror -v:q 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $out | ForEach-Object { Write-Host $_ }
+        Write-Host '[FAIL] SR_UCH.dll'
+        exit 1
+    }
     # csproj 的 OutputPath 是 bin\MSBuild；-Deploy 只认 $outDir（bin\Release），
     # 这里把产物同步一份过去，两种构建路线对部署表现为一致。
     $builtDll = Join-Path $Root 'bin\MSBuild\SR_UCH.dll'
     if (Test-Path -LiteralPath $builtDll) {
         Copy-Item -LiteralPath $builtDll -Destination (Join-Path $outDir 'SR_UCH.dll') -Force
     }
-    Write-Host '  [ OK ] SR_UCH.dll (dotnet)'
-    $summary.Add('SR  build   bin\MSBuild\SR_UCH.dll')
+    if (-not $Quiet) { Write-Host '[SR] build  OK  SR_UCH.dll' }
+    $summary.Add('SR  build  SR_UCH.dll')
 } else {
     Invoke-Build $work 'SR_UCH.dll'
 }
@@ -236,7 +244,7 @@ if ($Deploy) {
     }
     try { Copy-Item -LiteralPath $src -Destination (Join-Path $plugins $dll) -Force }
     catch { Write-Host ('复制失败（游戏是否正在运行？）: ' + $_.Exception.Message); exit 1 }
-    Write-Host ("已部署: " + (Join-Path $plugins $dll))
+    if (-not $Quiet) { Write-Host ("[SR] deploy  OK  " + $dll) }
     $srHash = ''
     try { $srHash = (Get-FileHash -LiteralPath (Join-Path $plugins $dll) -Algorithm SHA256).Hash.Substring(0, 12) } catch { }
     $summary.Add("SR  deploy  $dll  " + $srHash)
@@ -248,8 +256,10 @@ if ($Deploy) {
 }
 
 # 产物绝对路径：上层编排脚本（CC\build.ps1）据此定位 SR_UCH.dll 传给 EX 工程。
-Write-Host ('[SR] dll=' + (Join-Path $outDir $dll))
-Write-Host ('[SR] plugins=' + (Join-Path $GameDir 'BepInEx\plugins'))
+if (-not $Quiet) {
+    Write-Host ('[SR] dll      ' + (Join-Path $outDir $dll))
+    Write-Host ('[SR] plugins  ' + (Join-Path $GameDir 'BepInEx\plugins'))
+}
 
 # ---- 构建总结（-Quiet 时跳过：由上层编排统一汇总）----
 if (-not $Quiet) {

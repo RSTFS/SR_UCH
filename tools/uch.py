@@ -673,10 +673,12 @@ def cmd_verify(strict=False, as_json=False, fast=False, changed=None, nowrite=Fa
     }
     wr(MANIFEST, json.dumps(mf, ensure_ascii=False, indent=2) + '\n')
     if not as_json:
-        print('\n== UCH verify  PASS %d / FAIL %d / INFO %d  (共 %d 项，ID 稳定) ==' %
+        print('\n== UCH verify  PASS %d / FAIL %d / INFO %d  (共 %d 项) ==' %
               (len(results) - nfail - ninfo, nfail, ninfo, len(results)))
-        print('基线: ' + MANIFEST)
-        print('下一步: uch.py doctor')
+        # 基线路径与后续建议是噪音：只有失败时才提示怎么查。
+        if nfail:
+            print('基线: ' + MANIFEST)
+            print('下一步: uch.py doctor')
     else:
         print(json.dumps(mf, ensure_ascii=False))
     return 1 if (nfail and (strict or True)) else 0
