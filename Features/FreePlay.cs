@@ -6,7 +6,7 @@ using SR_UCH.Tweaks;
 using UnityEngine;
 
 namespace SR_UCH {
-    [SrFeature("sr.freeplay", "FreePlay", "1.0")]
+    [SrFeature("sr.freeplay", "FreePlay", "1.0", Modes = (int)(SRApi.ModeMask.Freeplay))]
     public class FreePlayPage : ITweak {
         private const string Sec = "自由模式";
 

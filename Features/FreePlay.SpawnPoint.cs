@@ -17,7 +17,9 @@ namespace SR_UCH.Tweaks {
         private static Vector3? _defaultPoint;
         private static MethodInfo _getSpawnPos;
 
-        internal static bool Enabled { get { return _enabled != null && _enabled.Value; } }
+        // 开关 + 模式：自由模式页整体只在自由模式可用。
+        // 右键菜单与页面按钮都直接调 Respawn/Add/Clear，必须在这里统一挡，不能只靠快捷键那条路。
+        internal static bool Enabled { get { return _enabled != null && _enabled.Value && SRApi.FeatureAllowed(typeof(FreePlayPage)); } }
         internal static int Count { get { return _points.Count; } }
         internal static IList<Vector3> All { get { return _points; } }
         internal static Vector3 At(int i) { return (i >= 0 && i < _points.Count) ? _points[i] : Vector3.zero; }
@@ -100,7 +102,7 @@ namespace SR_UCH.Tweaks {
 
         internal static void Add(Vector2 world) {
             try {
-                if (_enabled != null && !_enabled.Value) return;
+                if (!Enabled) return;
                 if (_points.Count >= MaxPoints) _points.RemoveAt(0);
                 if (_curScene.Length == 0) _curScene = CurrentScene();
                 _points.Add(new Vector3(world.x, world.y, 0f));
@@ -110,12 +112,16 @@ namespace SR_UCH.Tweaks {
         }
 
         internal static void Clear() {
-            try { _points.Clear(); SavePoints(); } catch (Exception __ex) { SRApi.Guard.Log("重生点/清空", __ex); }
+            try {
+                if (!SRApi.FeatureAllowed(typeof(FreePlayPage))) return;
+                _points.Clear(); SavePoints();
+            } catch (Exception __ex) { SRApi.Guard.Log("重生点/清空", __ex); }
         }
 
         // 删除离本机玩家最近的重生点。
         internal static void RemoveNearest() {
             try {
+                if (!Enabled) return;
                 if (_points.Count == 0) return;
                 Vector2 me = LocalPosition();
                 int best = -1; float bestD = float.MaxValue;
@@ -211,6 +217,7 @@ namespace SR_UCH.Tweaks {
 
         internal static void Respawn() {
             try {
+                if (!Enabled) return;   // 地图右键菜单直接调这里，必须自检开关与模式
                 // 优先用"当前生效点"；没有就回游戏默认出生点。
                 if (_points.Count > 0) {
                     int idx = (_activeIndex >= 0 && _activeIndex < _points.Count) ? _activeIndex : _points.Count - 1;

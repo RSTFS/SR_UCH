@@ -89,7 +89,7 @@ namespace SR_UCH {
                 SRApi.RegisterPauseProvider(ShouldPause);
                 SRApi.RegisterStandaloneDrawer(Draw);
                 SRApi.RegisterKey("自由模式-地图开关", _openKey, "press", delegate {
-                    try { if (SRApi.GateMaster) Toggle(); }
+                    try { if (SRApi.GateMaster && SRApi.FeatureAllowed(typeof(FreePlayPage))) Toggle(); }
                     catch (Exception __mk) { SRApi.Guard.Log("地图快捷键", __mk); }
                 }, typeof(FreePlayPage));
                 SRApi.RegisterSceneHook(Close);
@@ -193,7 +193,9 @@ namespace SR_UCH {
         private static bool ShouldPause() {
             try {
                 // 相机失效时不暂停：避免 Tick 还没跑到就先把角色冻住。
-                return _open && _cam != null && _freezeChar != null && _freezeChar.Value;
+                if (!_open || _cam == null) return false;
+                if (_freezeChar == null || !_freezeChar.Value) return false;
+                return SRApi.FeatureAllowed(typeof(FreePlayPage));
             } catch (Exception) { return false; }
         }
 
@@ -202,12 +204,13 @@ namespace SR_UCH {
         private static void Tick() {
             try {
                 if (!_open) return;
+                // 模式门控：自由模式页整体只在自由模式可用，这里不能只靠快捷键那条路。
+                if (!SRApi.FeatureAllowed(typeof(FreePlayPage))) { Close(); return; }
                 // 相机被销毁（换场景/重载）时必须自动收图：否则 _open 仍为 true，
                 // ShouldPause 会继续冻结角色，而 Draw 因为取不到相机什么都不画，
                 // 表现为"画面正常但人动不了、地图也看不见"。
                 if (_cam == null) { Close(); return; }
                 TickTeleportKey();
-                if (!SRApi.FeatureAllowed(typeof(FreePlayPage))) { Close(); return; }
                 EnsureBounds();
             } catch (Exception __ex) { SRApi.Guard.Log("自由模式地图/每帧", __ex); }
         }
@@ -231,6 +234,7 @@ namespace SR_UCH {
         static void AfterZoomCameraUpdate(ZoomCamera __instance) {
             try {
                 if (!_open) return;
+                if (!SRApi.FeatureAllowed(typeof(FreePlayPage))) return;   // 非自由模式不改相机
                 if (_cam == null) return;                     // 只用打开时记下的那台相机
                 Camera cam = _cam;
                 EnsureBounds();
@@ -324,6 +328,7 @@ namespace SR_UCH {
 
         internal static void Draw() {
             if (!_open) return;
+            if (!SRApi.FeatureAllowed(typeof(FreePlayPage))) return;
             Camera cam = _cam;
             if (cam == null) return;
 
