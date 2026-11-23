@@ -12,11 +12,29 @@ param([switch]$Check, [switch]$Deploy,
       [string]$Features = '', [string]$GameDir = '', [switch]$ExportAudit,
       [string]$PluginsDir = '', [string]$Root = (Split-Path -Parent $PSScriptRoot))
 $ErrorActionPreference = 'Stop'
+# ---- Python 解析：Windows 上 python3 常解析到 WindowsApps 的 App Execution Alias
+#      （0 字节占位符，直接执行返回 9009），必须按真实路径过滤。----
+function Resolve-Python {
+    foreach ($name in @('python', 'python3')) {
+        foreach ($c in (Get-Command $name -All -ErrorAction SilentlyContinue)) {
+            $src = $c.Source
+            if (-not $src) { continue }
+            if ($src -like '*\WindowsApps\*') { continue }
+            if (-not (Test-Path -LiteralPath $src)) { continue }
+            $len = 0
+            try { $len = (Get-Item -LiteralPath $src).Length } catch { $len = 0 }
+            if ($len -lt 65536) { continue }
+            return $src
+        }
+    }
+    return ''
+}
 $workspaceRoot = Split-Path -Parent $Root
 
 # ---- 游戏目录探测：-GameDir > UCH_DIR > 常见 Steam 路径 ----
 if (-not $GameDir) { $GameDir = $env:UCH_DIR }
 if (-not $GameDir) {
+    # 常见固定位置（覆盖默认安装的机器）。
     $cands = @(
         'C:\Program Files (x86)\Steam\steamapps\common\Ultimate Chicken Horse',
         'D:\Steam\steamapps\common\Ultimate Chicken Horse',
@@ -24,7 +42,40 @@ if (-not $GameDir) {
     )
     foreach ($c in $cands) { if (Test-Path -LiteralPath $c) { $GameDir = $c; break } }
 }
-if (-not $GameDir) { Write-Host '找不到游戏目录：设 UCH_DIR 或用 -GameDir'; exit 1 }
+if (-not $GameDir) {
+    # 兜底：从 Steam 安装信息与各盘符的常见 Steam 库目录里找，别把路径写死在某台机器上。
+    $probe = New-Object System.Collections.Generic.List[string]
+    try {
+        foreach ($steam in @('HKCU:\Software\Valve\Steam', 'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam')) {
+            $sp = (Get-ItemProperty -Path $steam -ErrorAction SilentlyContinue).SteamPath
+            if ($sp) {
+                $probe.Add($sp)
+                $vdf = Join-Path $sp 'steamapps\libraryfolders.vdf'
+                if (Test-Path -LiteralPath $vdf) {
+                    foreach ($m in [regex]::Matches((Get-Content -LiteralPath $vdf -Raw), '"path"\s*"([^"]+)"')) {
+                        $probe.Add($m.Groups[1].Value.Replace('\\', '\'))
+                    }
+                }
+            }
+        }
+    } catch { }
+    # 再按盘符扫常见库根（不递归全盘，只试固定层级）。
+    foreach ($d in (Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Root)) {
+        foreach ($rel in @('Steam\steamapps\common', 'SteamLibrary\steamapps\common', 'EF\Steam\steamapps\common', 'Games\Steam\steamapps\common')) {
+            $probe.Add((Join-Path $d $rel))
+        }
+    }
+    foreach ($lib in $probe) {
+        $cand = Join-Path $lib 'Ultimate Chicken Horse'
+        if (Test-Path -LiteralPath (Join-Path $cand 'UltimateChickenHorse_Data\Managed\Assembly-CSharp.dll')) { $GameDir = $cand; break }
+    }
+}
+if (-not $GameDir) {
+    Write-Host '找不到游戏目录：设环境变量 UCH_DIR，或加 -GameDir "<游戏根目录>"'
+    Write-Host '  例：$env:UCH_DIR = "D:\...\Ultimate Chicken Horse"'
+    exit 1
+}
+Write-Host ("游戏目录: " + $GameDir)
 
 # ---- csc：优先 dotnet 自带 Roslyn，回退 net472 csc.exe ----
 $csc = ''
@@ -54,10 +105,11 @@ $main = Join-Path $rspDir 'sr_uch.rsp'
 $work = Join-Path $cache 'sr_uch.rsp'
 if (-not (Test-Path -LiteralPath $main)) {
     Write-Host "缺 $main，自动恢复派生物…"
-    $py = Get-Command python3 -ErrorAction SilentlyContinue
-    if (-not $py) { $py = Get-Command python -ErrorAction SilentlyContinue }
-    if (-not $py) { Write-Host 'python3 未找到，无法自举'; exit 1 }
-    & $py.Source (Join-Path $Root 'tools\uch.py') materialize
+    $pyPath = Resolve-Python
+    if (-not $pyPath) { Write-Host 'Python 未找到（需要真实安装的 python，不能是 WindowsApps 占位符），无法自举'; exit 1 }
+    $env:PYTHONIOENCODING = 'utf-8'
+    try { & $pyPath (Join-Path $Root 'tools\uch.py') materialize }
+    finally { Remove-Item Env:\PYTHONIOENCODING -ErrorAction SilentlyContinue }
     if (-not (Test-Path -LiteralPath $main)) { Write-Host "自举后仍缺 $main"; exit 1 }
 }
 Copy-Item -LiteralPath $main -Destination $work -Force
@@ -97,17 +149,27 @@ function Invoke-Build([string]$rsp, [string]$name) {
 
 # ---- -Check：守卫只有一份实现，交给统一入口 ----
 if ($Check) {
-    $py = Get-Command python3 -ErrorAction SilentlyContinue
-    if (-not $py) { $py = Get-Command python -ErrorAction SilentlyContinue }
-    if (-not $py) { Write-Host 'python3 未找到'; exit 1 }
-    & $py.Source (Join-Path $Root 'tools\uch.py') verify --strict
-    exit $LASTEXITCODE
+    $pyPath = Resolve-Python
+    if (-not $pyPath) { Write-Host 'Python 未找到（需要真实安装的 python，不能是 WindowsApps 占位符）'; exit 1 }
+    # Windows 控制台默认 GBK，uch.py 输出含中文会 UnicodeEncodeError；显式指定 UTF-8。
+    $env:PYTHONIOENCODING = 'utf-8'
+    try {
+        & $pyPath (Join-Path $Root 'tools\uch.py') verify --strict
+        $verifyRc = $LASTEXITCODE
+    } finally { Remove-Item Env:\PYTHONIOENCODING -ErrorAction SilentlyContinue }
+    exit $verifyRc
 }
 
 if ($useDotnetBuild) {
     if ($Features) { Write-Host '注意：-Features 裁剪只作用于 rsp 链；本次 dotnet 回退为全量编译' }
     & dotnet build (Join-Path $Root 'SR_UCH.csproj') -c Release --nologo -warnaserror
     if ($LASTEXITCODE -ne 0) { Write-Host '  [FAIL] SR_UCH.dll (dotnet)'; exit 1 }
+    # csproj 的 OutputPath 是 bin\MSBuild；-Deploy 只认 $outDir（bin\Release），
+    # 这里把产物同步一份过去，两种构建路线对部署表现为一致。
+    $builtDll = Join-Path $Root 'bin\MSBuild\SR_UCH.dll'
+    if (Test-Path -LiteralPath $builtDll) {
+        Copy-Item -LiteralPath $builtDll -Destination (Join-Path $outDir 'SR_UCH.dll') -Force
+    }
     Write-Host '  [ OK ] SR_UCH.dll (dotnet)'
 } else {
     Invoke-Build $work 'SR_UCH.dll'
@@ -124,7 +186,16 @@ if ($Deploy) {
     $specFile = Join-Path $PSScriptRoot 'specs\features.spec.json'
     $dll = ((Get-Content -LiteralPath $specFile -Raw -Encoding UTF8) | ConvertFrom-Json).artifacts.dll
     $src = Join-Path $outDir $dll
-    if (-not (Test-Path -LiteralPath $src)) { Write-Host "找不到产物 $dll（先不带 -Deploy 构建）"; exit 1 }
+    if (-not (Test-Path -LiteralPath $src)) {
+        # 兜底：dotnet 路线的默认输出目录。
+        $alt = Join-Path (Join-Path $Root 'bin\MSBuild') $dll
+        if (Test-Path -LiteralPath $alt) { $src = $alt }
+    }
+    if (-not (Test-Path -LiteralPath $src)) {
+        Write-Host "找不到产物 $dll（先不带 -Deploy 构建）"
+        Write-Host ("  已查找: " + (Join-Path $outDir $dll))
+        exit 1
+    }
     try { Copy-Item -LiteralPath $src -Destination (Join-Path $plugins $dll) -Force }
     catch { Write-Host ('复制失败（游戏是否正在运行？）: ' + $_.Exception.Message); exit 1 }
     Write-Host ("已部署: " + (Join-Path $plugins $dll))
