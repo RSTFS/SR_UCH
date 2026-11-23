@@ -73,7 +73,6 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<int> _everyRounds, _maxActive;
         private static ConfigEntry<KeyCode> _drawKey;
         private static ConfigEntry<bool>[] _pool;
-        private static ConfigEntry<int>[] _paramMin, _paramMax;   // 每张数值牌的取值区间（可圈定）
 
         private static ChaosListener _listener;
         private static readonly List<ActiveCard> _active = new List<ActiveCard>();
@@ -164,19 +163,9 @@ namespace SR_UCH.Tweaks {
             _drawKey = plugin.Config.Bind(Sec, "RerollKey", KeyCode.None, "房主按此键立刻重抽一张。");
 
             _pool = new ConfigEntry<bool>[Cards.Length];
-            _paramMin = new ConfigEntry<int>[Cards.Length];
-            _paramMax = new ConfigEntry<int>[Cards.Length];
             for (int i = 0; i < Cards.Length; i++) {
                 var c = Cards[i];
                 _pool[i] = plugin.Config.Bind(Sec, c.En, true, "是否进入随机池：" + c.Zh);
-                if (!c.IsBool) {
-                    // 数值牌的取值区间：默认沿用卡牌定义，可在这里圈定（例如只要 1-2 档）。
-                    _paramMin[i] = plugin.Config.Bind(Sec, c.En + " Min", c.Min,
-                        new ConfigDescription("数值下限：" + c.Zh, new AcceptableValueRange<int>(0, 8)));
-                    _paramMax[i] = plugin.Config.Bind(Sec, c.En + " Max", c.Max,
-                        new ConfigDescription("数值上限：" + c.Zh, new AcceptableValueRange<int>(0, 8)));
-                }
-                
             }
 
             // 本功能配置不存盘：启动时强制回到默认值。
@@ -188,8 +177,6 @@ namespace SR_UCH.Tweaks {
                 _drawKey.Value = KeyCode.None;
                 for (int __i = 0; __i < _pool.Length; __i++) {
                     if (_pool[__i] != null) _pool[__i].Value = true;
-                    if (_paramMin != null && __i < _paramMin.Length && _paramMin[__i] != null) _paramMin[__i].Value = Cards[__i].Min;
-                    if (_paramMax != null && __i < _paramMax.Length && _paramMax[__i] != null) _paramMax[__i].Value = Cards[__i].Max;
                 }
             } catch (Exception __rs) { SRApi.Guard.Log("混乱牌组/会话重置", __rs); }
 
@@ -390,12 +377,8 @@ namespace SR_UCH.Tweaks {
         private int ParamFor(int id, System.Random rng) {
             var c = Cards[id];
             if (c.IsBool) return 1;
-            // 区间来自用户配置（可圈定），下限不低于 1、上限不超过该规则的取值数组长度。
+            // 区间取卡牌定义（无自定义）。
             int lo = c.Min, hi = c.Max;
-            try {
-                if (_paramMin != null && id < _paramMin.Length && _paramMin[id] != null) lo = _paramMin[id].Value;
-                if (_paramMax != null && id < _paramMax.Length && _paramMax[id] != null) hi = _paramMax[id].Value;
-            } catch (Exception __pc) { SRApi.Guard.Log("混乱牌组/读取数值区间", __pc); }
             lo = Mathf.Max(1, lo);
             if (hi < lo) hi = lo;
             var m = SafeMods();

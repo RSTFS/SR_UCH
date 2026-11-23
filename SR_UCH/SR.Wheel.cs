@@ -18,7 +18,9 @@ namespace SR_UCH.Tweaks {
             private static readonly System.Collections.Generic.Dictionary<string, Fb> _fb =
                 new System.Collections.Generic.Dictionary<string, Fb>(64);
             // 三种坐标候选各判一次：原始 / +区域偏移 / +区域偏移−页面滚动。
-            private static bool HitAny(Rect rect, Vector2 mouse) {
+            // 统一命中判定：矩形可能来自内容坐标（滚动区内），鼠标是窗口坐标，
+            // 故按「原始 / +区偏移 / +区偏移−页面滚动」三种候选各判一次。
+            internal static bool HitAny(Rect rect, Vector2 mouse) {
                 if (rect.Contains(mouse)) return true;
                 Rect r1 = new Rect(rect.x + SR.AreaOffset.x, rect.y + SR.AreaOffset.y, rect.width, rect.height);
                 if (r1.Contains(mouse)) return true;

@@ -333,7 +333,7 @@ namespace SR_UCH.Tweaks {
                 "Refresh Mode",
                 RefreshMode.Realtime,
                 "列表刷新：实时 = 按住切换键期间候选表持续保持最新（已节流，只在按住时有开销）；暂存 = 只在按下切换键那一刻重建一次。");
-            _useSmoke = _mp.Config.Bind("Destroy Blocks", "Use Smoke", false,
+            _useSmoke = _mp.Config.Bind("Destroy Blocks", "Use Smoke", true,
                 "破坏动画：删除方块时播放烟雾与破碎效果；关闭后方块直接消失。");
 
             System.EventHandler __h__listMode_3 = (s, e) => _listDirty = true;
@@ -461,6 +461,7 @@ namespace SR_UCH.Tweaks {
                             Blocks.RemoveAt(_index);
                             if (_index >= Blocks.Count) _index = Blocks.Count - 1;
                             _tintedBlock = null;
+                            _wheelPicked = null;   // 目标已失效：别让旧引用把选中项拽回头部
                             return;
                         }
 
@@ -471,6 +472,7 @@ namespace SR_UCH.Tweaks {
                         if (_index < 0) _index = 0;
                         _selected = null;
                         _tintedBlock = null;
+                        _wheelPicked = null;   // 同上：删完后按新下标重新定位，不吃旧引用
                         if (Blocks.Count <= 0) return;
                     }
                 }
@@ -599,6 +601,9 @@ namespace SR_UCH.Tweaks {
             if (Blocks.Count <= 0) {
                 _index = 0;
                 _selected = null;
+                // 列表清空时必须一并清掉滚轮选中项的引用：否则它指向已不在列表里的对象，
+                // 下一帧重定位失败 → 回落到 _index(=0) → 表现成"滚轮选好又被拉回第一个"。
+                _wheelPicked = null;
                 if (_tintedBlock != null) {
                     ClearTintGroup();   // 整组清除（含子件）
                     _tintedBlock = null;
@@ -609,6 +614,9 @@ namespace SR_UCH.Tweaks {
                 for (int i = 0; i < Blocks.Count; i++) {
                     if (Blocks[i] == prev) { _index = i; _selected = Blocks[i]; return; }
                 }
+                // 引用确实消失了（被删/被过滤）：连同滚轮引用一起作废，改由下标兜底，
+                // 不再让一个失效引用反复把选中项拽回列表头部。
+                _wheelPicked = null;
             }
             // 选中项已不在列表：就地钳制同一下标，跳到头/尾会让选中项乱飞。
             if (_index >= Blocks.Count) _index = Blocks.Count - 1;

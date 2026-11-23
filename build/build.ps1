@@ -168,13 +168,17 @@ if ($Features) {
 # 增量判断：输出 DLL 缺失或任一源文件比它新时才重编（照早期版 Test-NeedRebuild）。
 function Test-NeedRebuild([string]$rsp, [string]$outDll) {
     if (-not (Test-Path $outDll)) { return $true }
+    # 比较用秒级截断：文件系统时间戳在同一秒内写入时先后不可靠，
+    # 直接比 -gt 会漏掉"刚改完立刻构建"（同一秒）的情况，表现为改动不生效。
     $dllTime = (Get-Item $outDll).LastWriteTime
     try {
         foreach ($ln in [System.IO.File]::ReadAllLines($rsp)) {
             $s = $ln.Trim()
             if (-not $s.EndsWith('.cs') -or $s.StartsWith('/')) { continue }
             $p2 = Join-Path $Root ($s -replace '"', '')
-            if ((Test-Path -LiteralPath $p2) -and ((Get-Item -LiteralPath $p2).LastWriteTime -gt $dllTime)) { return $true }
+            if (-not (Test-Path -LiteralPath $p2)) { continue }
+            $ft = (Get-Item -LiteralPath $p2).LastWriteTime
+            if ([math]::Floor(($ft - $dllTime).TotalSeconds) -ge 0) { return $true }
         }
     } catch { return $true }
     return $false

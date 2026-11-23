@@ -327,7 +327,7 @@ namespace SR_UCH.Tweaks {
                     GUI.Label(new Rect(Sc(10f), Sc(10f), Sc(80f), Sc(24f)), SRApi.Tid("41f8e215e9", "地图", "Map"), SRApi.Ctl.SecHeader);
                     // 提示标签给足高度（原来 20px 会截断中文字形下半部分）。
                     GUI.Label(new Rect(Sc(64f), Sc(12f), Mathf.Max(Sc(120f), Screen.width - Sc(360f)), Sc(24f)),
-                        SRApi.Tid("ac090f7506", "右键拖动平移 · 滚轮缩放 · 右键操作", "right-drag to pan · wheel to zoom · right-click for actions"), SRApi.Ctl.Label);
+                        SRApi.Tid("ac090f7506", "左键拖动平移 · 滚轮缩放 · 右键操作", "left-drag to pan · wheel to zoom · right-click for actions"), SRApi.Ctl.Label);
                     // 右侧：视野读数 + 重置视图 + 关闭
                     float __fovNow = _fov;
                     GUI.Label(new Rect(Screen.width - Sc(206f), Sc(12f), Sc(84f), Sc(24f)), "FOV " + __fovNow.ToString("0.1"), SRApi.Ctl.Label);

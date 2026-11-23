@@ -42,7 +42,7 @@ namespace SR_UCH.Tweaks {
 
         // 头部二：搜索 / 排序 / 筛选（固定 2 行 + 标签列对齐）
         private static void RenderFilterHeader() {
-            SRApi.Ctl.SectionTitle(SRApi.Tid("0aff423334", "搜索 / 排序 / 筛选", "Search / sort / filter"));
+            SRApi.Ctl.SectionTitle(SRApi.Tid("0aff423334", "搜索 / 加载 / 筛选", "Search / load / filter"));
             using (var __row = SRApi.Ctl.Row()) {
             
                 RowLabel(SRApi.Tid("b3c8cd388d", "搜索", "Search"));
@@ -53,13 +53,12 @@ namespace SR_UCH.Tweaks {
                     _search = "";   // 点标签清空搜索
                     evSearch.Use();
                 }
+                // 宽度固定：搜索框不吃 FlexibleSpace，后面的控件位置就不随窗口宽度漂移。
                 string q = SRApi.ClearableTextField(_search ?? "", 40, SRApi.Ctl.SearchBox,
                     GUILayout.Width(W(110)), GUILayout.Height(W(24)));
                 if (q != null && q != _search) _search = q;
-                GUILayout.Space(W(8));
-                RowLabel(SRApi.Tid("c18f196576", "排序", "Sort"));
-                RenderSortCombo();
-                GUILayout.Space(W(8));
+                // 「加载」固定在搜索框右侧的固定偏移处（不跟随自适应布局）。
+                GUILayout.Space(W(12));
                 RowLabel(SRApi.Tid("2165f4120d", "加载", "Load"));
                 RenderLoadModeCombo();
                 GUILayout.Space(W(7));

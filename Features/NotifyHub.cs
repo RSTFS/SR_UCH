@@ -369,12 +369,14 @@ namespace SR_UCH.Tweaks {
             int cap = Mathf.Clamp(_maxVisible.Value, 1, 6);
             int n = _visible.Count;
             float[] heights = new float[n];
+            float[] textHs = new float[n];   // 正文实测高度：绘制时按它给矩形，否则折行文本会被裁
             bool[] draw = new bool[n];
             int drawnCount = 0;
             float total = 0f;
+            // 正文可用宽度必须与 DrawToast 里 GUI.Label 的宽度完全一致，否则算出的行数偏少、高度不够。
+            float __tw = Mathf.Max(1f, w - pad * 2f - SRApi.Ctl.Sc(20f) * s);
             for (int i = 0; i < n; i++) {
                 Notice it = _visible[i];
-                float __tw = w - pad * 2f - 14f * s;
                 int __fs = _label.fontSize;
                 float th;
                 if (it.CachedH > 0f && ReferenceEquals(it.CachedText, it.Text)
@@ -384,6 +386,7 @@ namespace SR_UCH.Tweaks {
                     th = Mathf.Max(22f * s, _label.CalcHeight(new GUIContent(it.Text), __tw));
                     it.CachedH = th; it.CachedText = it.Text; it.CachedW = __tw; it.CachedFs = __fs;
                 }
+                textHs[i] = th;
                 heights[i] = th + pad * 2f + gap;
                 if (it.DyingAt > 0f || drawnCount < cap) { draw[i] = true; drawnCount++; total += heights[i]; }
             }
@@ -479,9 +482,10 @@ namespace SR_UCH.Tweaks {
                     Color __symPrev = GUI.color;
                     try {
                         GUI.color = new Color(bar.r, bar.g, bar.b, aa);
-                        GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(2f), y + pad * 0.6f, SRApi.Ctl.Sc(16f) * s, h - pad * 1.6f), __symTxt, _sym);
+                        GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(2f), y + pad * 0.6f, SRApi.Ctl.Sc(16f) * s, textHs[i]), __symTxt, _sym);
                         GUI.color = new Color(1f, 1f, 1f, aa);
-                        GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(18f) * s, y + pad * 0.6f, w - pad * 2f - SRApi.Ctl.Sc(20f) * s, h - pad * 1.6f), nt.Text, _label);
+                        // 高度用实测正文高度：原先是 h - pad*1.6f，比实测少一行，折行文本必被裁。
+                        GUI.Label(new Rect(ax + barW + SRApi.Ctl.Sc(18f) * s, y + pad * 0.6f, __tw, textHs[i]), nt.Text, _label);
                     } finally { GUI.color = __symPrev; }
                     if (hovered) {
                         Rect __x = new Rect(ax + w - SRApi.Ctl.Sc(20f) * s, y + SRApi.Ctl.Sc(2f), SRApi.Ctl.Sc(18f) * s, SRApi.Ctl.Sc(18f) * s);

@@ -70,7 +70,11 @@ namespace SR_UCH.Tweaks {
                 PresetInfo p = vis[row];
                 if (p == null || p.IsLocal) return;
                 ClearPending();
+                // 六个状态必须一起设：漏 _renameTarget 时 DrawRenameContent 会立刻 FloatClose()，
+                // 表现为"右键没有界面弹出"。
                 _renameKey = p.Key; _renameText = p.Name; _renameFocusPending = true;
+                _renameTarget = p;
+                EnsureRenameFloat();
             } catch (Exception __rr) { SRApi.Guard.Log("预设列表/行右键", __rr); }
         }
 

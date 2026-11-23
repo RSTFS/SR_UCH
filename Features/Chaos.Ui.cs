@@ -185,31 +185,7 @@ namespace SR_UCH.Tweaks {
                 string label = string.IsNullOrEmpty(gm) ? ours : (gm == ours ? gm : gm + " · " + ours);
                 SRApi.LocDynamic(_pool[i], label, label);   // 行名跟随游戏语言（核心节流重注册）
                 TweakCfg.Row(_pool[i]);   // 标准复选框行（不是按钮）
-                // 数值牌：直接在行下方给出取值区间（可圈定），勾选状态与区间一起决定抽到什么。
-                if (!Cards[i].IsBool) RenderParamRange(i, c);
             }
-        }
-
-        // 数值牌的取值区间行：最小值 / 最大值两个数字框。
-        private void RenderParamRange(int i, CardDef c) {
-            try {
-                if (_paramMin == null || _paramMax == null) return;
-                if (i >= _paramMin.Length || i >= _paramMax.Length) return;
-                if (_paramMin[i] == null || _paramMax[i] == null) return;
-                // 外部配置窗口也显示中文名（本页 RowSlider 自带标签，不读 LocKey）。
-                SRApi.LocDynamic(_paramMin[i], c.Zh + " 下限", c.En + " min");
-                SRApi.LocDynamic(_paramMax[i], c.Zh + " 上限", c.En + " max");
-                SRApi.Ctl.RowSlider(SRApi.Tid("321c0930e1", "数值下限", "Min value"),
-                    SRApi.Tid("479852f111", "这张牌抽到的最小档位\n与该牌的上限一起圈定取值范围", "lowest tier this card can roll\nwith the max, defines the allowed range"),
-                    _paramMin[i], 0f, 8f, "0");
-                SRApi.Ctl.RowSlider(SRApi.Tid("04a69c96e5", "数值上限", "Max value"),
-                    SRApi.Tid("cdc1e9617c", "这张牌抽到的最大档位\n低于下限时会自动按一下限处理", "highest tier this card can roll\nfalls back to the min when lower"),
-                    _paramMax[i], 0f, 8f, "0");
-                // 防止用户把上限调到下限以下：读取时已夹紧，这里给一行说明。
-                if (_paramMax[i].Value < _paramMin[i].Value) {
-                    GUILayout.Label(SRApi.Tid("2d8d0e9bdb", "上限低于下限，抽取时按上限=下限处理。", "Max is below min; the roll uses max = min."), SRApi.Ctl.Label);
-                }
-            } catch (Exception __rp) { SRApi.Guard.Log("混乱牌组/数值区间行", __rp); }
         }
 
         private void SetAllPools(bool on) {

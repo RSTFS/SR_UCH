@@ -11,7 +11,10 @@ public partial class SR {
     public static float WheelPoll(string key, Rect rect) {
         try {
             Event e = Event.current;
-            if (e == null || !rect.Contains(e.mousePosition)) return 0f;
+            if (e == null) return 0f;
+            // 必须用统一命中判定：滚动区内的矩形是内容坐标，裸 Contains 在页面滚动后必失配，
+            // 表现为「下拉框上滚轮没换选项，反而整页跟着滑」。
+            if (!SR.Wheel.HitAny(rect, e.mousePosition)) return 0f;
             float d = 0f;
             try { d = Input.mouseScrollDelta.y; } catch (Exception __iw) { Guard.Log("滚轮/就地轮询", __iw); }
             // 某些环境里 Input.mouseScrollDelta 恒为 0，改用本趟 ScrollWheel 事件量。

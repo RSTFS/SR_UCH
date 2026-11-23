@@ -140,27 +140,54 @@ namespace SR_UCH.Tweaks {
             return Vector2.zero;
         }
 
-        // 传送本机玩家（对局内传角色；树屋/大厅传光标）。
-        internal static void TeleportLocal(Vector2 world) {
+        // 取"我操控的那个角色"。hasAuthority 只说明这个对象归本机管，
+        // 房主端所有 AI/NPC 通常 also hasAuthority，直接用它会把别人一起传走。
+        // 优先用 isLocalPlayer，取不到才退回同 FreePlay.Self 的口径（唯一 authority 角色）。
+        private static Character OwnCharacter() {
             try {
-                List<Character> all = Character.AllCharacters;
+                Character[] all = UnityEngine.Object.FindObjectsOfType<Character>();
                 if (all != null) {
-                    for (int i = 0; i < all.Count; i++) {
+                    for (int i = 0; i < all.Length; i++) {
                         Character c = all[i];
-                        if (c == null || !c.hasAuthority) continue;
-                        Rigidbody2D rb = c.GetComponent<Rigidbody2D>();
-                        if (rb != null) rb.position = world;
-                        c.transform.position = new Vector3(world.x, world.y, c.transform.position.z);
-                        return;
+                        if (c == null) continue;
+                        try { if (c.isLocalPlayer) return c; } catch { /* 旧版本没有该字段，走下面的兜底 */ }
+                    }
+                    for (int i = 0; i < all.Length; i++) {
+                        Character c = all[i];
+                        if (c != null && c.hasAuthority) return c;
                     }
                 }
+            } catch (Exception __oc) { SRApi.Guard.Log("传送/取本机角色", __oc); }
+            return null;
+        }
+
+        // 传送本机玩家（对局内传角色；树屋/大厅传光标）。
+        // 位移后必须清速度：否则旧速度会让角色立刻弹回原处，看起来像"传送没生效"。
+        internal static void TeleportLocal(Vector2 world) {
+            bool moved = false;
+            try {
+                Character c = OwnCharacter();
+                if (c != null) {
+                    Rigidbody2D rb = c.GetComponent<Rigidbody2D>();
+                    if (rb != null) {
+                        rb.position = world;
+                        try { rb.velocity = Vector2.zero; } catch { /* 某些状态无 velocity，忽略 */ }
+                    }
+                    c.transform.position = new Vector3(world.x, world.y, c.transform.position.z);
+                    moved = true;
+                }
             } catch (Exception __ex) { SRApi.Guard.Log("重生点/传送角色", __ex); }
+            if (moved) return;
+            // 大厅/树屋阶段没有角色：传光标（同样只动自己那个）。
             try {
                 LobbyCursor[] cursors = SRApi.FrameObjects<LobbyCursor>();
                 if (cursors != null) {
                     for (int i = 0; i < cursors.Length; i++) {
                         LobbyCursor lc = cursors[i];
-                        if (lc == null || !lc.hasAuthority) continue;
+                        if (lc == null) continue;
+                        bool mine = false;
+                        try { mine = lc.hasAuthority; } catch { mine = false; }
+                        if (!mine) continue;
                         lc.transform.position = new Vector3(world.x, world.y, lc.transform.position.z);
                         return;
                     }

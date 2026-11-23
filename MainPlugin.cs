@@ -50,12 +50,13 @@ namespace SR_UCH {
                     act();
                     __boot.Append(nm).Append('=').Append(__sw.ElapsedMilliseconds - __before).Append("ms ");
                 };
-                __run("PatchOwnConfigFile", PatchOwnConfigFile);
                 __run("SetupStandaloneConfig", SetupStandaloneConfig);
                 __run("MigrateLegacyConfigNames", MigrateLegacyConfigNames);
                 // 程序集解析：外部 DLL 只引用 SR_UCH.dll，全局注册一次。
                 __run("AssemblyResolve", delegate { AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve; });
+                // 注入必须先于任何 SRApi.RegisterXxx：注入前这些门面是空操作（补丁会静默不注册）。
                 __run("InjectApiSinks", InjectApiSinks);
+                __run("PatchOwnConfigFile", PatchOwnConfigFile);
                 __run("InitializeTweaks", delegate { InitializeTweaks(); });
                     // 外部功能 / 语言包 DLL：一个 DLL 一个功能或一门语言。
                 __run("LoadExternal", LoadExternal);

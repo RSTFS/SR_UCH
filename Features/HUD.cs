@@ -345,9 +345,9 @@ namespace SR_UCH.Tweaks {
                 SelfReg();
                 ConfigFile cfg = plugin.Config;
                 _enabled = cfg.Bind(Sec, "Enabled", false, "显示HUD：总开关（默认关闭）。");
-                _fade = cfg.Bind(Sec, "Fade", false, "淡入淡出：HUD 显示/隐藏时平滑过渡。");
-                _showKey = cfg.Bind(Sec, "Show Key", KeyCode.F5, "显示按键：用于显示 HUD 的按键（默认 F5）。");
-                _layout = cfg.Bind(Sec, "Layout", HudLayout.TopLeft, "HUD 布局：四角贴边或自定义拖动位置。");
+                _fade = cfg.Bind(Sec, "Fade", true, "淡入淡出：HUD 显示/隐藏时平滑过渡。");
+                _showKey = cfg.Bind(Sec, "Show Key", KeyCode.None, "显示按键：用于显示 HUD 的按键（默认不绑定）。");
+                _layout = cfg.Bind(Sec, "Layout", HudLayout.TopRight, "HUD 布局：四角贴边或自定义拖动位置。");
                 _fontSize = cfg.Bind(Sec, "Font Size", 18,
                     new ConfigDescription("字体大小（10-48）。", new AcceptableValueRange<int>(10, 48)));
                 _opacity = cfg.Bind(Sec, "Opacity", 0.85f,
@@ -356,14 +356,14 @@ namespace SR_UCH.Tweaks {
                     new ConfigDescription("背景透明度（0-1，0 为完全透明）。", new AcceptableValueRange<float>(0f, 1f)));
                 _warnSeconds = cfg.Bind(Sec, "Warning Seconds", 10,
                     new ConfigDescription("警告秒数（5-60）。", new AcceptableValueRange<int>(5, 60)));
-                _blink = cfg.Bind(Sec, "Blink", false, "闪烁提醒：最后 5 秒倒计时文字闪烁。");
-                _roundNotice = cfg.Bind(Sec, "Round Notice", false, "回合提示：回合数变化时以放大闪烁动画显示当前回合。");
+                _blink = cfg.Bind(Sec, "Blink", true, "闪烁提醒：最后 5 秒倒计时文字闪烁。");
+                _roundNotice = cfg.Bind(Sec, "Round Notice", true, "回合提示：回合数变化时以放大闪烁动画显示当前回合。");
                 _displayMode = cfg.Bind(Sec, "Display Mode", DisplayMode.Inline, "显示方案：平铺（小段横向排列，自动换行，默认）/ 堆叠（每项一行）。");
-                _showPhase = cfg.Bind(Sec, "Show Phase", false, "显示阶段名（默认关闭）。");
+                _showPhase = cfg.Bind(Sec, "Show Phase", true, "显示阶段名。");
                 _colPhase = cfg.Bind(Sec, "Color Phase", "#FFFFFF", "阶段名文字颜色（#RRGGBB）。");
-                _showCountdown = cfg.Bind(Sec, "Show Countdown", false, "显示倒计时（默认关闭）。");
+                _showCountdown = cfg.Bind(Sec, "Show Countdown", true, "显示倒计时。");
                 _colCountdown = cfg.Bind(Sec, "Color Countdown", "#FFFFFF", "倒计时文字颜色（#RRGGBB）。");
-                _showRound = cfg.Bind(Sec, "Show Round", false, "显示回合进度（默认关闭）。");
+                _showRound = cfg.Bind(Sec, "Show Round", true, "显示回合进度。");
                 _colRound = cfg.Bind(Sec, "Color Round", "#FFFFFF", "回合进度文字颜色（#RRGGBB）。");
                 _showLevel = cfg.Bind(Sec, "Show Level", false, "显示关卡/模式（默认关闭）。");
                 _colLevel = cfg.Bind(Sec, "Color Level", "#FFFFFF", "关卡/模式文字颜色（#RRGGBB）。");

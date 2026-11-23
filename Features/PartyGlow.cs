@@ -75,7 +75,7 @@ namespace SR_UCH.Tweaks {
         }
 
         public void Initialize(IFeatureHost plugin) {
-            _enabled = plugin.Config.Bind(Sec, "Enabled", true, "按当前概率给派对盒道具加径向柔光团；纯本地视觉，联机各端各画各的。");
+            _enabled = plugin.Config.Bind(Sec, "Enabled", false, "按当前概率给派对盒道具加径向柔光团；纯本地视觉，联机各端各画各的。");
             _strength = plugin.Config.Bind(Sec, "Strength", 80, new ConfigDescription("光晕不透明度百分比（20-150）。", new AcceptableValueRange<int>(20, 150)));
             _tierColors = new ConfigEntry<string>[6];
             for (int i = 0; i < 6; i++) {

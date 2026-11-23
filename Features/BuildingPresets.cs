@@ -24,8 +24,6 @@ namespace SR_UCH.Tweaks {
         // index.json 每条记录的 schema 版本：缺失 = 旧格式。
         private const int IndexSchema = 1;
         // 排序方式：0=时间（新→旧），1=名称（A→Z）。
-        private const int SortModeMin = 0;
-        private const int SortModeMax = 1;
         // 列索引（与 TableArgs.colW 顺序一致）：名称 / 关卡 / 模式 / 数据 / 时间 / 操作（操作列钉右）。
         private const int ColName = 0;
         private const int ColLevel = 1;
@@ -79,13 +77,11 @@ namespace SR_UCH.Tweaks {
         private static ConfigEntry<int> _maxPresets;
         private static ConfigEntry<bool> _skipTreehouse;   // 跳过树屋流程（联机直接替换关卡，风险自负）
         private static bool _actionHitThisFrame;   // 本帧是否命中操作按钮（空白处取消二次确认）
-        private static ConfigEntry<int> _sortModeEntry;
         private static ConfigEntry<string> _filterTypeEntry, _filterLevelEntry, _filterModeEntry;
         private static ConfigEntry<string> _colWidthsEntry;
         private static ConfigEntry<string> _colOrderEntry;
         private static ConfigEntry<string> _colHiddenEntry;
         private static ConfigEntry<int> _tableHEntry;
-        private static int _sortMode;
         private static int _sortColOverride = -1;   // 表头点击排序的临时覆盖（-1 = 用 Sort Mode 下拉）
         private static bool _sortAsc = true;
         private static string _rootDir;
@@ -218,13 +214,7 @@ namespace SR_UCH.Tweaks {
                     else if (_maxPresets.Value < 1) _maxPresets.Value = 1;
                     else if (_maxPresets.Value > 100) _maxPresets.Value = 100;
                 } catch (Exception __mxp) { SRApi.Guard.Log("布局预设/裁剪数量上限", __mxp); }
-                _sortModeEntry = plugin.Config.Bind(Section, "Sort Mode", 0,
-                    new ConfigDescription("列表排序方式：0=时间（新→旧），1=名称（A→Z）。",
-                        new AcceptableValueRange<int>(SortModeMin, SortModeMax)));
-                _sortMode = _sortModeEntry.Value;
-                System.EventHandler __h_sortMode = delegate { _sortMode = _sortModeEntry.Value; };
-                _sortModeEntry.SettingChanged += __h_sortMode;
-                Sub.Revoke(() => _sortModeEntry.SettingChanged -= __h_sortMode);
+                // 排序统一由表头点击承担（点列头切升降序），不再保留独立的排序下拉配置项。
                 // 类型/关卡/模式筛选落盘；搜索框不存（临时输入）。
                 _filterTypeEntry = plugin.Config.Bind(Section, "Filter Type", "",
                     "列表页类型筛选：空=全部 / preset=仅预设 / local=仅本地存档");
@@ -246,9 +236,6 @@ namespace SR_UCH.Tweaks {
                 Sub.Revoke(() => _filterModeEntry.SettingChanged -= __h_filterMode);
                 _skipTreehouse = plugin.Config.Bind(Section, "Skip Treehouse", false,
                     "跳过树屋流程：勾选后联机替换关卡不再先回树屋，而是直接替换场景（房客的 SelectedLevel 可能不同步，风险自负）。");
-                // 旧配置残留的越界值夹回 0（时间）。
-                try { if (_sortModeEntry.Value < SortModeMin || _sortModeEntry.Value > SortModeMax) _sortModeEntry.Value = SortModeMin; }
-                catch (Exception __cx) { SRApi.Guard.Log("布局预设/裁剪排序值", __cx); }
                 // 列表列宽 / 列序（由表头拖动维护，不在页面上渲染编辑框）。
                 _colWidthsEntry = plugin.Config.Bind(Section, ColWidthsKey, "",
                     "内部状态：预设列表列宽（逗号分隔的设计单位，由表头拖动自动写入）。");
@@ -336,12 +323,6 @@ namespace SR_UCH.Tweaks {
             }
         }
 
-        private static int SortMode {
-            get {
-                try { return Mathf.Clamp(_sortMode, SortModeMin, SortModeMax); } catch { return 0; }
-            }
-        }
-
         // 动作共用门控：模组总开关 + 本功能总开关；返回 false 时已提示。
         private static bool ActionAllowed() {
             if (!SRApi.GateMaster) {
@@ -355,7 +336,7 @@ namespace SR_UCH.Tweaks {
             return SRApi.Ctl.Sc(v);
         }
 
-        // 按配置排序（0=时间新→旧，1=名称 A→Z），同序时按名称稳定排序。
+        // 默认按时间新→旧；点表头切到该列排序（再点切升降序）。同序时按名称稳定排序。
         private static int ComparePreset(PresetInfo a, PresetInfo b) {
             try {
                 if (a == null && b == null) return 0;
@@ -371,8 +352,7 @@ namespace SR_UCH.Tweaks {
                         default: c = 0; break;
                     }
                     if (!_sortAsc) c = -c;
-                } else if (SortMode == 1) c = string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
-                else c = b.TimeUtc.CompareTo(a.TimeUtc);
+                } else c = b.TimeUtc.CompareTo(a.TimeUtc);   // 默认：新 → 旧
                 if (c != 0) return c;
                 return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
             } catch { return 0; }
