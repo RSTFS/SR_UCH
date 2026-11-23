@@ -1,14 +1,15 @@
 ﻿# ============================================================
 # SR_UCH 一键构建：单一产物 SR_UCH.dll
-#   .\build\build.ps1                      构建（默认）
-#   .\build\build.ps1 -Deploy             构建并复制进 BepInEx\plugins
+#   .\build\build.ps1                      构建 SR（+ EX，若同级存在 SR_UCH_EX 仓库）
+#   .\build\build.ps1 -Deploy             构建并复制 SR（+ EX）进 BepInEx\plugins
+#   .\build\build.ps1 -Ex                 只构建 EX（失败即报错）
+#   .\build\build.ps1 -NoEx               只构建 SR，跳过 EX
 #   .\build\build.ps1 -Check              统一回归（uch.py verify --strict）
-#   .\build\build.ps1 -Features "HUD,Chat"  裁剪构建（Lite）
 #   .\build\build.ps1 -ExportAudit        从运行日志导出启动审计报告
 # 源码清单、引用清单、部署产物都由 build/specs/features.spec.json 派生。
 # 构建链只有 build/rsp/sr_uch.rsp 一条；EX 与独立插件在各自项目构建，本仓库不放其清单。
 # ============================================================
-param([switch]$Check, [switch]$Deploy,
+param([switch]$Check, [switch]$Deploy, [switch]$Ex, [switch]$NoEx,
       [string]$Features = '', [string]$GameDir = '', [switch]$ExportAudit,
       [string]$PluginsDir = '', [string]$Root = (Split-Path -Parent $PSScriptRoot))
 $ErrorActionPreference = 'Stop'
@@ -91,6 +92,16 @@ Write-Host "csc: $csc"
 $cache = Join-Path $PSScriptRoot '.cache'
 $rspDir = Join-Path $PSScriptRoot 'rsp'
 $outDir = Join-Path $Root 'bin\Release'
+# 产物名从 spec 读一次，供 -Deploy 与 EX 构建共用（原先只在 -Deploy 分支里赋值，
+# 不带 -Deploy 时为 $null，EX 会拿到空的 SrDll 路径）。
+$dll = 'SR_UCH.dll'
+try {
+    $specFileTop = Join-Path $PSScriptRoot 'specs\features.spec.json'
+    if (Test-Path -LiteralPath $specFileTop) {
+        $specDll = ((Get-Content -LiteralPath $specFileTop -Raw -Encoding UTF8) | ConvertFrom-Json).artifacts.dll
+        if ($specDll) { $dll = $specDll }
+    }
+} catch { }
 if (-not (Test-Path -LiteralPath $cache)) { New-Item -ItemType Directory -Force -Path $cache | Out-Null }
 if (-not (Test-Path -LiteralPath $outDir)) { New-Item -ItemType Directory -Force -Path $outDir | Out-Null }
 
@@ -177,8 +188,7 @@ function Get-PluginsDir {
 if ($Deploy) {
     $plugins = Get-PluginsDir
     if (-not (Test-Path $plugins)) { Write-Host "找不到 plugins 目录；用 -PluginsDir 指定"; exit 1 }
-    $specFile = Join-Path $PSScriptRoot 'specs\features.spec.json'
-    $dll = ((Get-Content -LiteralPath $specFile -Raw -Encoding UTF8) | ConvertFrom-Json).artifacts.dll
+    # $dll 已在上面统一解析。
     $src = Join-Path $outDir $dll
     if (-not (Test-Path -LiteralPath $src)) {
         # 兜底：dotnet 路线的默认输出目录。
@@ -198,6 +208,54 @@ if ($Deploy) {
         $verLine = 'SR_UCH ' + $hash + '  built ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
         [IO.File]::WriteAllText((Join-Path $plugins 'SR_UCH.version.txt'), $verLine, (New-Object System.Text.UTF8Encoding($false)))
     } catch { Write-Host ('版本文件写入失败（忽略）: ' + $_.Exception.Message) }
+}
+
+# ---- EX：默认随 -All 一起构建（-NoEx 跳过）。EX 是独立仓库，失败不影响 SR 出包。----
+$exRoot = Join-Path $workspaceRoot 'SR_UCH_EX'
+$exProj = Join-Path $exRoot 'SR_UCH_EX.csproj'
+if ($Ex -and -not $NoEx) {
+    # 单独构建 EX：EX 编译期必须引用 SR_UCH.dll，先确保 SR 已产出。
+    $needSr = Join-Path $outDir 'SR_UCH.dll'
+    if (-not (Test-Path -LiteralPath $needSr)) {
+        Write-Host '== EX 依赖 SR 产物，先构建 SR_UCH.dll =='
+        & dotnet build (Join-Path $Root 'SR_UCH.csproj') -c Release --nologo
+        if ($LASTEXITCODE -ne 0) { Write-Host '  [FAIL] 构建 SR 失败，EX 无法继续'; exit 1 }
+        $builtForEx = Join-Path $Root 'bin\MSBuild\SR_UCH.dll'
+        if (Test-Path -LiteralPath $builtForEx) {
+            Copy-Item -LiteralPath $builtForEx -Destination $needSr -Force
+        }
+    }
+}
+if (-not $NoEx) {
+    if (-not (Test-Path -LiteralPath $exProj)) {
+        if ($Ex) { Write-Host "找不到 EX 工程: $exProj"; exit 1 }
+        Write-Host 'EX：跳过（未找到 SR_UCH_EX.csproj）'
+    } else {
+        Write-Host '== 构建 SR_UCH_EX.dll =='
+        $exArgs = @('build', $exProj, '-c', 'Release', '--nologo',
+                    ('-p:UCH_DIR=' + $GameDir), ('-p:SrDll=' + (Join-Path $outDir $dll)))
+        & dotnet @exArgs
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host '  [FAIL] SR_UCH_EX.dll'
+            # -Ex 是显式要求，失败必须报错；随 -All 时降级为警告，不拖累 SR 产物。
+            if ($Ex) { exit 1 }
+            Write-Host '  [WARN] EX 构建失败（SR 已成功，可单独跑 SR_UCH_EX\build\check-ex.ps1 排查）'
+        } else {
+            Write-Host '  [ OK ] SR_UCH_EX.dll'
+            if ($Deploy) {
+                $exBuilt = Join-Path $exRoot 'bin\MSBuild\SR_UCH_EX.dll'
+                if (Test-Path -LiteralPath $exBuilt) {
+                    try {
+                        Copy-Item -LiteralPath $exBuilt -Destination (Join-Path $plugins 'SR_UCH_EX.dll') -Force
+                        Write-Host ("已部署: " + (Join-Path $plugins 'SR_UCH_EX.dll'))
+                    } catch { Write-Host ('EX 部署失败（游戏是否正在运行？）: ' + $_.Exception.Message) }
+                } else {
+                    Write-Host ("找不到 EX 产物: $exBuilt")
+                    if ($Ex) { exit 1 }
+                }
+            }
+        }
+    }
 }
 
 if ($ExportAudit) {
