@@ -60,6 +60,10 @@ namespace SR_UCH {
         public static SRApi.NotifyExFn NotifyHub2;             // 通知中心提供，NotifyEx 读取
         public static Func<bool> AllowClientsOn;               // 可选：外部 DLL 可赋值放行房客删除
         public static Delegate AttributeToHost;                // Action<List<Placeable>>：快照方块归属房主
+        // 外部模块（EX 等）用：玩家放置的方块清单 / 清除它们。
+        // 承接原先的槽位系统（Slots.Provide/Require），改为强类型字段后同样可空降级。
+        public static Delegate PlayerPlacedBlocks;             // Func<List<Placeable>>
+        public static Delegate LevelClearPlacedBlocks;         // Action<List<Placeable>, string>
         public static object SelfTestToken;                    // 主动自检往返用
     }
 

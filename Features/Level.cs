@@ -36,9 +36,12 @@ public partial class Level : ITweak {
 
     public void Initialize(IFeatureHost plugin) {
         SelfReg();
-        // 对外能力：重载忙碌状态（预设据此避免并发重载）。清场能力无消费者，不再登记。
+        // 对外能力：重载忙碌状态（预设据此避免并发重载）与清场（EX 的"清除地图对象"用）。
         SrCaps.LevelReloadBusy = () => _reloadBusy;
         FeatureRuntime.RecordRevoke(() => SrCaps.LevelReloadBusy = null);
+        Action<List<Placeable>, string> __clear = ClearPlacedBlocks;
+        SrCaps.LevelClearPlacedBlocks = __clear;
+        FeatureRuntime.RecordRevoke(() => SrCaps.LevelClearPlacedBlocks = null);
         // 锁自愈 tick：预设加载会被残留的 level.reloadBusy 永久拦住，需定时放锁。
         try { SRApi.RegisterTick("关卡重载-锁自愈", TickReloadLock); }
         catch (Exception __tr) { SRApi.Guard.Log("关卡重载/注册锁自愈", __tr); }

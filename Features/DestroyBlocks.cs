@@ -362,6 +362,9 @@ namespace SR_UCH.Tweaks {
             // 归属能力直接写契约层容器；单 DLL 已无跨程序集编译限制。
             Action<List<Placeable>> __ath = AttributeToHost;
             SrCaps.AttributeToHost = __ath;
+            // 供外部模块（EX 清场）取"玩家放置的方块清单"。
+            Func<List<Placeable>> __ppb = PlayerPlacedBlocks;
+            SrCaps.PlayerPlacedBlocks = __ppb;
             // 关机时摘掉自己提供的槽位，否则宿主仍能 Require 到失效实现。
             SRApi.OnShutdown("方块破坏/槽位", delegate {
                 try {

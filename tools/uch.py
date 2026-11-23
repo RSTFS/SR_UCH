@@ -60,9 +60,14 @@ def exists(p):
     return os.path.isfile(p)
 
 
+# 构建中间产物目录：不是源码，不能进任何源码统计（obj 里是自动生成的 AssemblyAttributes.cs）。
+PRUNE_DIRS = {'.git', 'obj', 'bin', '__pycache__', 'node_modules', '.vs'}
+
+
 def cs_files(sub):
     out = []
     for dp, dn, fn in os.walk(sub):
+        dn[:] = [d for d in dn if d not in PRUNE_DIRS]
         for f in sorted(fn):
             if f.endswith('.cs'):
                 out.append(os.path.join(dp, f).replace('\\', '/'))

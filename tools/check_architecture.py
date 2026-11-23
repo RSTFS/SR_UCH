@@ -76,10 +76,16 @@ def layer_of(rel):
     return ''
 
 
+# 构建中间产物目录：不是源码，绝不能进分层统计（obj 里是自动生成的 AssemblyAttributes.cs）。
+PRUNE_DIRS = {'.git', 'obj', 'bin', 'build', 'docs', '__pycache__', 'node_modules', '.vs'}
+
+
 def collect():
     files = []
     for dp, dn, fn in os.walk('.'):
-        if '.git' in dp or dp.startswith('./build') or dp.startswith('./docs'):
+        dn[:] = [d for d in dn if d not in PRUNE_DIRS]
+        parts = dp.replace('\\', '/').split('/')
+        if any(seg in PRUNE_DIRS for seg in parts if seg and seg != '.'):
             continue
         for f in fn:
             if f.endswith('.cs'):
