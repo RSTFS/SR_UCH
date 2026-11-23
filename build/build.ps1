@@ -31,11 +31,12 @@ function Resolve-Python {
 }
 $workspaceRoot = Split-Path -Parent $Root
 
-# ---- 游戏目录探测：-GameDir > UCH_DIR > 常见 Steam 路径 ----
+# ---- 游戏目录探测：-GameDir > UCH_DIR > 固定候选 > 注册表 ----
 if (-not $GameDir) { $GameDir = $env:UCH_DIR }
 if (-not $GameDir) {
-    # 常见固定位置（覆盖默认安装的机器）。
+    # 已知安装位置（含本机实际路径）。
     $cands = @(
+        'D:\EF\Steam\steamapps\common\Ultimate Chicken Horse',
         'C:\Program Files (x86)\Steam\steamapps\common\Ultimate Chicken Horse',
         'D:\Steam\steamapps\common\Ultimate Chicken Horse',
         'E:\Steam\steamapps\common\Ultimate Chicken Horse'
@@ -43,30 +44,23 @@ if (-not $GameDir) {
     foreach ($c in $cands) { if (Test-Path -LiteralPath $c) { $GameDir = $c; break } }
 }
 if (-not $GameDir) {
-    # 兜底：从 Steam 安装信息与各盘符的常见 Steam 库目录里找，别把路径写死在某台机器上。
+    # 注册表：SteamPath（安装目录）+ libraryfolders.vdf（该账号的所有库）。
     $probe = New-Object System.Collections.Generic.List[string]
     try {
         foreach ($steam in @('HKCU:\Software\Valve\Steam', 'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam')) {
             $sp = (Get-ItemProperty -Path $steam -ErrorAction SilentlyContinue).SteamPath
-            if ($sp) {
-                $probe.Add($sp)
-                $vdf = Join-Path $sp 'steamapps\libraryfolders.vdf'
-                if (Test-Path -LiteralPath $vdf) {
-                    foreach ($m in [regex]::Matches((Get-Content -LiteralPath $vdf -Raw), '"path"\s*"([^"]+)"')) {
-                        $probe.Add($m.Groups[1].Value.Replace('\\', '\'))
-                    }
+            if (-not $sp) { continue }
+            $probe.Add($sp)
+            $vdf = Join-Path $sp 'steamapps\libraryfolders.vdf'
+            if (Test-Path -LiteralPath $vdf) {
+                foreach ($m in [regex]::Matches((Get-Content -LiteralPath $vdf -Raw), '"path"\s*"([^"]+)"')) {
+                    $probe.Add($m.Groups[1].Value.Replace('\\', '\'))
                 }
             }
         }
     } catch { }
-    # 再按盘符扫常见库根（不递归全盘，只试固定层级）。
-    foreach ($d in (Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Root)) {
-        foreach ($rel in @('Steam\steamapps\common', 'SteamLibrary\steamapps\common', 'EF\Steam\steamapps\common', 'Games\Steam\steamapps\common')) {
-            $probe.Add((Join-Path $d $rel))
-        }
-    }
     foreach ($lib in $probe) {
-        $cand = Join-Path $lib 'Ultimate Chicken Horse'
+        $cand = Join-Path (Join-Path $lib 'steamapps\common') 'Ultimate Chicken Horse'
         if (Test-Path -LiteralPath (Join-Path $cand 'UltimateChickenHorse_Data\Managed\Assembly-CSharp.dll')) { $GameDir = $cand; break }
     }
 }
