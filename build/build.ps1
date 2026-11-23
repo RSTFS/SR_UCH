@@ -71,7 +71,6 @@ if (-not $GameDir) {
     exit 1
 }
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
-if (-not $Quiet -and -not $Env:CC_ORCHESTRATED) { Write-Host ("  game      " + $GameDir) }
 
 # rsp 里是相对路径（/out:bin\Release\...、源码清单），必须以仓库根为当前目录执行。
 # 兼容入口从 _tools 转发过来时 cwd 不是仓库根，不切会写错位置并报编译失败。
@@ -105,13 +104,13 @@ $useDotnetBuild = $false
 if (-not $csc) {
     # 没有仓库内置工具集、SDK 里也没找到 Roslyn：回退 MSBuild（编译输入已入库，结果等价）。
     $dn = Get-Command dotnet -ErrorAction SilentlyContinue
-    if ($dn) { $useDotnetBuild = $true; if (-not $Quiet) { Write-Host '  compiler  msbuild' } }
+    if ($dn) { $useDotnetBuild = $true; if (-not $Quiet -and -not $Env:CC_ORCHESTRATED) { Write-Host '  compiler  msbuild' } }
     else {
         Write-Host '找不到任何 C# 编译器：需要 .NET SDK，或 _tools\roslyn_toolset\csc.dll / _tools\net472\csc.exe'
         exit 1
     }
 } else {
-    if (-not $Quiet) { Write-Host '  compiler  csc' }
+    if (-not $Quiet -and -not $Env:CC_ORCHESTRATED) { Write-Host '  compiler  csc' }
 }
 
 $cache = Join-Path $PSScriptRoot '.cache'
@@ -186,8 +185,8 @@ function Invoke-Build([string]$rsp, [string]$name) {
         Write-Host "[FAIL] $name"
         exit 1
     }
-    if (-not $Quiet) {
-        Write-Host ("  build     " + $name + "   " + $sw.ElapsedMilliseconds + " ms")
+    if (-not $Quiet -and -not $Env:CC_ORCHESTRATED) {
+        Write-Host ("  build     " + $name)
     }
     $summary.Add("SR  build  $name")
 }
@@ -219,8 +218,8 @@ if ($useDotnetBuild) {
     if (Test-Path -LiteralPath $builtDll) {
         Copy-Item -LiteralPath $builtDll -Destination (Join-Path $outDir 'SR_UCH.dll') -Force
     }
-    if (-not $Quiet) {
-        Write-Host ('  build     SR_UCH.dll   ' + $sw.ElapsedMilliseconds + ' ms')
+    if (-not $Quiet -and -not $Env:CC_ORCHESTRATED) {
+        Write-Host '  build     SR_UCH.dll'
     }
     $summary.Add('SR  build  SR_UCH.dll')
 } else {
@@ -249,8 +248,8 @@ if ($Deploy) {
     }
     try { Copy-Item -LiteralPath $src -Destination (Join-Path $plugins $dll) -Force }
     catch { Write-Host ('复制失败（游戏是否正在运行？）: ' + $_.Exception.Message); exit 1 }
-    if (-not $Quiet) {
-        Write-Host ("  deploy    " + $dll + "   " + $sw.ElapsedMilliseconds + " ms")
+    if (-not $Quiet -and -not $Env:CC_ORCHESTRATED) {
+        Write-Host ("  deploy    " + $dll)
     }
     $srHash = ''
     try { $srHash = (Get-FileHash -LiteralPath (Join-Path $plugins $dll) -Algorithm SHA256).Hash.Substring(0, 12) } catch { }
