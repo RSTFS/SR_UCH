@@ -1,15 +1,13 @@
 ﻿# ============================================================
 # SR_UCH 一键构建：单一产物 SR_UCH.dll
-#   .\build\build.ps1                      构建 SR（+ EX，若同级存在 SR_UCH_EX 仓库）
-#   .\build\build.ps1 -Deploy             构建并复制 SR（+ EX）进 BepInEx\plugins
-#   .\build\build.ps1 -Ex                 只构建 EX（失败即报错）
-#   .\build\build.ps1 -NoEx               只构建 SR，跳过 EX
+#   .\build\build.ps1                      构建 SR
+#   .\build\build.ps1 -Deploy             构建并复制进 BepInEx\plugins
 #   .\build\build.ps1 -Check              统一回归（uch.py verify --strict）
 #   .\build\build.ps1 -ExportAudit        从运行日志导出启动审计报告
 # 源码清单、引用清单、部署产物都由 build/specs/features.spec.json 派生。
-# 构建链只有 build/rsp/sr_uch.rsp 一条；EX 与独立插件在各自项目构建，本仓库不放其清单。
+# 构建链只有 build/rsp/sr_uch.rsp 一条。EX 由上层编排脚本（CC\build.ps1）单独构建。
 # ============================================================
-param([switch]$Check, [switch]$Deploy, [switch]$Ex, [switch]$NoEx,
+param([switch]$Check, [switch]$Deploy, [switch]$Quiet,
       [string]$Features = '', [string]$GameDir = '', [switch]$ExportAudit,
       [string]$PluginsDir = '', [string]$Root = (Split-Path -Parent $PSScriptRoot))
 $ErrorActionPreference = 'Stop'
@@ -30,7 +28,6 @@ function Resolve-Python {
     }
     return ''
 }
-$workspaceRoot = Split-Path -Parent $Root
 
 # 构建结果账本：末尾统一打印总结（每个产物一行）。
 $summary = New-Object System.Collections.Generic.List[string]
@@ -250,59 +247,12 @@ if ($Deploy) {
     } catch { Write-Host ('版本文件写入失败（忽略）: ' + $_.Exception.Message) }
 }
 
-# ---- EX：默认随 -All 一起构建（-NoEx 跳过）。EX 是独立仓库，失败不影响 SR 出包。----
-$exRoot = Join-Path $workspaceRoot 'SR_UCH_EX'
-$exProj = Join-Path $exRoot 'SR_UCH_EX.csproj'
-if ($Ex -and -not $NoEx) {
-    # 单独构建 EX：EX 编译期必须引用 SR_UCH.dll，先确保 SR 已产出。
-    $needSr = Join-Path $outDir 'SR_UCH.dll'
-    if (-not (Test-Path -LiteralPath $needSr)) {
-        Write-Host '== EX 依赖 SR 产物，先构建 SR_UCH.dll =='
-        & dotnet build (Join-Path $Root 'SR_UCH.csproj') -c Release --nologo
-        if ($LASTEXITCODE -ne 0) { Write-Host '  [FAIL] 构建 SR 失败，EX 无法继续'; exit 1 }
-        $builtForEx = Join-Path $Root 'bin\MSBuild\SR_UCH.dll'
-        if (Test-Path -LiteralPath $builtForEx) {
-            Copy-Item -LiteralPath $builtForEx -Destination $needSr -Force
-        }
-    }
-}
-if (-not $NoEx) {
-    if (-not (Test-Path -LiteralPath $exProj)) {
-        if ($Ex) { Write-Host "找不到 EX 工程: $exProj"; exit 1 }
-        Write-Host 'EX：跳过（未找到 SR_UCH_EX.csproj）'
-    } else {
-        Write-Host '== 构建 SR_UCH_EX.dll =='
-        $exArgs = @('build', $exProj, '-c', 'Release', '--nologo',
-                    ('-p:UCH_DIR=' + $GameDir), ('-p:SrDll=' + (Join-Path $outDir $dll)))
-        & dotnet @exArgs
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host '  [FAIL] SR_UCH_EX.dll'
-            # -Ex 是显式要求，失败必须报错；随 -All 时降级为警告，不拖累 SR 产物。
-            if ($Ex) { exit 1 }
-            Write-Host '  [WARN] EX 构建失败（SR 已成功，可单独跑 SR_UCH_EX\build\check-ex.ps1 排查）'
-        } else {
-            Write-Host '  [ OK ] SR_UCH_EX.dll'
-            $summary.Add('EX  build   bin\MSBuild\SR_UCH_EX.dll')
-            if ($Deploy) {
-                $exBuilt = Join-Path $exRoot 'bin\MSBuild\SR_UCH_EX.dll'
-                if (Test-Path -LiteralPath $exBuilt) {
-                    try {
-                        Copy-Item -LiteralPath $exBuilt -Destination (Join-Path $plugins 'SR_UCH_EX.dll') -Force
-                        Write-Host ("已部署: " + (Join-Path $plugins 'SR_UCH_EX.dll'))
-                        $exHash = ''
-                        try { $exHash = (Get-FileHash -LiteralPath (Join-Path $plugins 'SR_UCH_EX.dll') -Algorithm SHA256).Hash.Substring(0, 12) } catch { }
-                        $summary.Add("EX  deploy  SR_UCH_EX.dll  " + $exHash)
-                    } catch { Write-Host ('EX 部署失败（游戏是否正在运行？）: ' + $_.Exception.Message) }
-                } else {
-                    Write-Host ("找不到 EX 产物: $exBuilt")
-                    if ($Ex) { exit 1 }
-                }
-            }
-        }
-    }
-}
+# 产物绝对路径：上层编排脚本（CC\build.ps1）据此定位 SR_UCH.dll 传给 EX 工程。
+Write-Host ('[SR] dll=' + (Join-Path $outDir $dll))
+Write-Host ('[SR] plugins=' + (Join-Path $GameDir 'BepInEx\plugins'))
 
-# ---- 构建总结：一行状态 + 一行产物，避免"看起来成功了但没有产物" ----
+# ---- 构建总结（-Quiet 时跳过：由上层编排统一汇总）----
+if (-not $Quiet) {
 Write-Host ''
 if ($summary.Count -eq 0) {
     Write-Host '[构建] 无产物'
@@ -314,6 +264,7 @@ if ($summary.Count -eq 0) {
     Write-Host ('[构建] ' + $summary.Count + ' 项完成  (' + $route + ')')
     foreach ($s in $summary) { Write-Host ('       ' + $s) }
     if ($Deploy) { Write-Host ('[部署] ' + (Join-Path $GameDir 'BepInEx\plugins')) }
+}
 }
 
 if ($ExportAudit) {
